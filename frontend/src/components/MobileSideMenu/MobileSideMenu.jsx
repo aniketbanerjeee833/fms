@@ -292,13 +292,14 @@ const handleDashBoardClick = () => {
              {renderMenu("Purchase",  <ShoppingCart size={20} />, [
            
             { to: "/purchase/add", text: "Add Purchase" },
+             { to: "/purchase/payment-out", text: "Payment Out" },
             { to: "/purchase/all-purchases", text: " Purchase List " },
           ])}
                {renderMenu("Sales", <DollarSign size={20} />, [
            
            {to: "/sale/invoice", text: " Invoice" },
             { to: "/sale/add", text: "Add Sale" },
-             
+              { to: "/sale/payment-in", text: "Payment In" },
              { to: "/sale/all-sales", text: " Sale List" },
                 
           ])}

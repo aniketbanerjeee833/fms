@@ -372,7 +372,7 @@ if (
            
            {to: "/sale/invoice", text: " Invoice" },
             { to: "/sale/add", text: "Add Sale" },
-            //  { to: "/sale/payment-in", text: "Payment In" },
+             { to: "/sale/payment-in", text: "Payment In" },
              { to: "/sale/all-sales", text: " All Sales" },
           
           ])}

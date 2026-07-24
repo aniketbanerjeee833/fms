@@ -1,11 +1,13 @@
 
-import { NavLink, useLocation, useSearchParams } from "react-router-dom";
+import { NavLink,  useSearchParams } from "react-router-dom";
 
-import { useGetAllPurchasesQuery } from "../../redux/api/purchaseApi";
+// import { useGetAllpaymentOutDataQuery } from "../../redux/api/purchaseApi";
 import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useState } from "react";
+import { useAddPaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { toast } from "react-toastify";
 
 
 export default function PaymentOut() {
@@ -13,10 +15,10 @@ export default function PaymentOut() {
     // const [page, setPage] = useState(1);
 
 
-    // const [selectedPurchase, setSelectedPurchases] = useState(null);
+    // const [selectedPurchase, setSelectedpaymentOutData] = useState(null);
     // const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const location = useLocation();
+    //const location = useLocation();
     const page = Number(searchParams.get("page")) || 1;
     const searchTerm = searchParams.get("search") || "";
     // const [page, setPage] = useState(1);
@@ -28,7 +30,9 @@ export default function PaymentOut() {
     const [modal, setModal] = useState({ open: false, mode: "add", data: null });
     const { data: partiesList } = useGetAllPartiesQuery();
     // const[selecedSales,setSelectedSales]= useState(null);
-
+    const [addPaymentOut, { isLoading: isAdding }] = useAddPaymentOutMutation();
+  const [updatePaymentOut, { isLoading: isUpdating }] = useUpdatePaymentOutMutation();
+  const isSaving = isAdding || isUpdating;
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -61,13 +65,19 @@ export default function PaymentOut() {
     // const [searchTerm, setSearchTerm] = useState("");
     // const [fromDate, setFromDate] = useState('');
     // const [toDate, setToDate] = useState('');
-    const { data: purchases, isLoading } = useGetAllPurchasesQuery({
-        page,
-        search: searchTerm,
-        fromDate,
-        toDate,
-    });
-    console.log(purchases, fromDate, toDate);
+    // const { data: paymentOutData, isLoading } = useGetAllpaymentOutDataQuery({
+    //     page,
+    //     search: searchTerm,
+    //     fromDate,
+    //     toDate,
+    // });
+    const { data: paymentOutData, isLoading } = useGetAllPaymentOutsQuery({
+    page,
+    search: searchTerm,
+    fromDate,
+    toDate,
+  });
+    console.log(paymentOutData, fromDate, toDate);
     const handleExportExcel = () => {
         const params = new URLSearchParams();
         if (searchTerm) params.set("search", searchTerm);
@@ -75,14 +85,27 @@ export default function PaymentOut() {
         if (toDate) params.set("toDate", toDate);
 
         const a = document.createElement("a");
-        a.href = `http://localhost:4000/api/purchase/export-purchase-excel?${params.toString()}`;
+        a.href = `http://localhost:4000/api/paymentOut/export-paymentOut-excel?${params.toString()}`;
         a.download = "";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
     };
 
-
+const handleSavePaymentOut = async (formData) => {
+    try {
+      if (modal.mode === "edit") {
+        await updatePaymentOut({ id: modal.data.id, ...formData }).unwrap();
+      } else {
+        await addPaymentOut(formData).unwrap();
+      }
+      setModal({ open: false, mode: "add", data: null });
+      toast.success("New Payment Out added")
+    } catch (err) {
+      console.error("Failed to save payment out:", err);
+      toast.error(err?.data?.message || "Failed to save payment out. Please try again.");
+    }
+  };
     return (
         <>
             {/* // <div className="container-fluid sb2  ">
@@ -228,7 +251,8 @@ export default function PaymentOut() {
                                         backgroundColor: "#4CA1AF",
                                     }}
                                     className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
-                                //   onClick={() => navigate("/purchase/add")}
+                                //   onClick={() => navigate("/paymentOut/add")}
+                                  onClick={() => setModal({ open: true, mode: "add", data: null })}
                                 >
                                     Add  Payment Out
                                 </button>
@@ -243,7 +267,7 @@ export default function PaymentOut() {
                         {/* Total Sales */}
                         <div className="mb-2 text-left">
                             <p className="text-sm font-medium text-black">Total Amount</p>
-                            <h4 className="text-3xl font-bold text-black">₹  {purchases?.totals?.totalAmount}</h4>
+                            <h4 className="text-3xl font-bold text-black">₹  {paymentOutData?.totals?.totalAmount}</h4>
                         </div>
 
                         {/* Divider */}
@@ -253,12 +277,12 @@ export default function PaymentOut() {
                         <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
                             <div className="flex  ">
                                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                                <span className="text-sm font-semibold text-black">₹ {purchases?.totals?.totalPaid}</span>
+                                <span className="text-sm font-semibold text-black">₹ {paymentOutData?.totals?.totalPaid}</span>
                             </div>
 
                             <div className="flex">
                                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                                <span className="text-sm font-semibold text-black">₹{purchases?.totals?.totalUnpaid}</span>
+                                <span className="text-sm font-semibold text-black">₹{paymentOutData?.totals?.totalUnpaid}</span>
                             </div>
                         </div>
 
@@ -280,9 +304,9 @@ export default function PaymentOut() {
                 <div className="tab-inn">
                     <div className="table-responsive table-desi">
                         {isLoading ? (
-                            <p className="text-center mt-4">Fetching purchases...</p>
-                        ) : purchases?.length === 0 ? (
-                            <p className="text-center mt-4">No purchases found.</p>
+                            <p className="text-center mt-4">Fetching paymentOutData...</p>
+                        ) : paymentOutData?.length === 0 ? (
+                            <p className="text-center mt-4">No paymentOutData found.</p>
                         ) : (
 
 
@@ -293,45 +317,45 @@ export default function PaymentOut() {
                                 <thead>
                                     <tr>
                                         <th className="text-left">Sl.No</th>
-                                        <th className="text-left ">Bill Date</th>
+                                        <th className="text-left ">Date</th>
                                         <th className="text-left ">Party Name</th>
                                         <th className="text-left">Payment Type</th>
-                                        <th className="text-left">Amount </th>
+                                        <th className="text-left">Total Paid</th>
                                         <th className="text-left">Balance Due</th>
                                         <th>View</th>
                                         <th>Edit</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {purchases && purchases?.purchases?.length > 0 ? (
-                                        purchases?.purchases?.map((purchase, idx) => (
-                                            <tr key={purchase?.Purchase_Id}>
+                                    {paymentOutData && paymentOutData?.paymentOuts?.length > 0 ? (
+                                        paymentOutData?.paymentOuts?.map((paymentOut, idx) => (
+                                            <tr key={paymentOut?.id}>
                                                 <td>
-                                                    {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
+                                                    {(paymentOutData?.currentPage - 1) * 10 + (idx + 1)}.
                                                 </td>
                                                 {/* <td>
-  {purchase?.Bill_Date
-    ? purchase.Bill_Date.split("T")[0]
+  {paymentOut?.Bill_Date
+    ? paymentOut.Bill_Date.split("T")[0]
     : "N/A"}
 </td> */}
                                                 <td>
-                                                    {purchase?.Bill_Date
-                                                        ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
+                                                    {paymentOut?.Payment_Date
+                                                        ? new Date(paymentOut?.Payment_Date).toLocaleDateString("en-IN", {
                                                             day: "numeric",
                                                             month: "numeric",
                                                             year: "numeric",
                                                         })
                                                         : "N/A"}
                                                 </td>
-                                                <td>{purchase?.Party_Name || "N/A"}</td>
-                                                <td>{purchase?.Payment_Type || "N/A"}</td>
-                                                <td>{purchase?.Total_Amount || "N/A"}</td>
-                                                <td>{purchase?.Balance_Due || "N/A"}</td>
+                                                <td>{paymentOut?.Party_Name || "N/A"}</td>
+                                                <td>{paymentOut?.Payment_Type || "N/A"}</td>
+                                                <td>{paymentOut?.Paid || "N/A"}</td>
+                                                <td>{paymentOut?.Balance_Due || "N/A"}</td>
 
                                                 {/* <td >
                         
-                            <NavLink to={`/purchase/view/${purchase?.Purchase_Id}${location.search}`}
-                              state={{ from: "all-purchase-list" }}>
+                            <NavLink to={`/paymentOut/view/${paymentOut?.Purchase_Id}${location.search}`}
+                              state={{ from: "all-paymentOut-list" }}>
                               <Eye
                                 style={{
                                   cursor: "pointer",
@@ -343,8 +367,8 @@ export default function PaymentOut() {
                           <td
                           >
                             <NavLink
-                              to={`/purchase/edit/${purchase?.Purchase_Id}${location.search}`}
-                              state={{ from: "all-purchase-list" }}
+                              to={`/paymentOut/edit/${paymentOut?.Purchase_Id}${location.search}`}
+                              state={{ from: "all-paymentOut-list" }}
 
                             >
 
@@ -355,7 +379,7 @@ export default function PaymentOut() {
                                   color: "#4CA1AF"
                                 }} />
                             </NavLink>
-                            {/* <SquarePen onClick={() => navigate(`/purchase/edit/${purchase?.Purchase_Id}`)}
+                            {/* <SquarePen onClick={() => navigate(`/paymentOut/edit/${paymentOut?.Purchase_Id}`)}
                                   style={{
                                     cursor: "pointer",
                                     backgroundColor: "transparent",
@@ -370,7 +394,7 @@ export default function PaymentOut() {
                                                             setModal({
                                                                 open: true,
                                                                 mode: "view",
-                                                                data: purchase,
+                                                                data: paymentOut,
                                                             })
                                                         }
                                                         className="p-1 rounded-md hover:bg-slate-100 transition-colors"
@@ -387,7 +411,7 @@ export default function PaymentOut() {
                                                             setModal({
                                                                 open: true,
                                                                 mode: "edit",
-                                                                data: purchase,
+                                                                data: paymentOut,
                                                             })
                                                         }
                                                         className="p-1 rounded-md hover:bg-slate-100 transition-colors"
@@ -400,8 +424,8 @@ export default function PaymentOut() {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td className="mx-auto text-center" colSpan={10}>
-                                                No purchase found
+                                            <td className="mx-auto text-center" colSpan={9}>
+                                                No payment out found
                                             </td>
                                         </tr>
                                     )}
@@ -454,7 +478,7 @@ export default function PaymentOut() {
         </button>
       ))} */}
                             {(() => {
-                                const totalPages = purchases?.totalPages || 1;
+                                const totalPages = paymentOutData?.totalPages || 1;
                                 const maxVisible = 5; // how many pages around current
                                 const pages = [];
 
@@ -531,18 +555,18 @@ export default function PaymentOut() {
 
                         {/* CURRENT PAGE — MOBILE ONLY */}
                         <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-                            Page {page} / {purchases?.totalPages || 1}
+                            Page {page} / {paymentOutData?.totalPages || 1}
                         </div>
 
                         {/* NEXT */}
                         <button
                             type="button"
                             onClick={() => handleNextPage()}
-                            disabled={page === purchases?.totalPages ||
-                                purchases?.totalPages === 0}
+                            disabled={page === paymentOutData?.totalPages ||
+                                paymentOutData?.totalPages === 0}
                             className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === purchases?.totalPages ||
-                                    purchases?.totalPages === 0
+        ${page === paymentOutData?.totalPages ||
+                                    paymentOutData?.totalPages === 0
                                     ? 'opacity-50 '
                                     : ''
                                 }
@@ -563,7 +587,7 @@ export default function PaymentOut() {
                 >
                   ← Previous
                 </button>
-                {[...Array(purchases?.totalPages).keys()].map((index) => (
+                {[...Array(paymentOutData?.totalPages).keys()].map((index) => (
                   <button
                     key={index}
                     onClick={() => handlePageChange(index + 1)}
@@ -580,20 +604,30 @@ export default function PaymentOut() {
 
                 <button type="button"
                   onClick={() => handleNextPage()}
-                  disabled={page === purchases?.totalPages || purchases?.totalPages === 0}
+                  disabled={page === paymentOutData?.totalPages || paymentOutData?.totalPages === 0}
                   className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-                ${page === purchases?.totalPages || purchases?.totalPages === 0 ? 'opacity-50 ' : ''}
+                ${page === paymentOutData?.totalPages || paymentOutData?.totalPages === 0 ? 'opacity-50 ' : ''}
                 `}
                 >
                   Next →
                 </button>
               </div> */}
             </div>
-            {modal.open && (
+             {modal.open && (
+        <PaymentOutModal
+          mode={modal.mode}
+          initialData={modal.data}
+          parties={partiesList}
+          onClose={() => setModal({ open: false, mode: "add", data: null })}
+          onSave={handleSavePaymentOut}
+          isSaving={isSaving}
+        />
+      )}
+            {/* {modal.open && (
                 <PaymentOutModal
                     mode={modal.mode}
                     initialData={modal.data}
-                    parties={partiesList?.parties}
+                    parties={partiesList}
                     // paymentTypes={paymentTypesList}
                     onClose={() => setModal({ open: false, mode: "add", data: null })}
                     onSave={(formData) => {
@@ -602,7 +636,7 @@ export default function PaymentOut() {
                     }}
                     // isSaving={isSavingPaymentOut}
                 />
-            )}
+            )} */}
 
         </>
 

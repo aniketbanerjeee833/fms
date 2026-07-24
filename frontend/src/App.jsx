@@ -45,6 +45,7 @@ const PurchaseEdit = lazy(() => import('./pages/Purchase/PurchaseEdit'));
 
 const Invoice = lazy(() => import('./pages/Sale/Invoice'));
 const AllSaleList = lazy(() => import('./pages/Sale/AllSaleList'));
+const PaymentIn= lazy(() => import('./pages/Sale/PaymentIn'));
 const SaleAdd = lazy(() => import('./pages/Sale/SaleAdd'));
 const SaleView = lazy(() => import('./pages/Sale/SaleView'));
 const SaleEdit = lazy(() => import('./pages/Sale/SaleEdit'));
@@ -214,6 +215,17 @@ function RouterWrapper() {
                 <Layout>
                   <AllSaleList />
                 </Layout>
+              }
+            />
+              <Route
+              path="/sale/payment-in"
+              element={
+                   <Layout>
+
+                  
+                  <PaymentIn />
+                   </Layout>
+                
               }
             />
              

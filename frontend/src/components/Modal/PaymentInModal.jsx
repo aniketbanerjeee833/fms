@@ -1,44 +1,44 @@
 import { useState, useEffect, useRef } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 
 /**
- * PaymentOutModal
+ * PaymentInModal
  *
  * Mandatory fields (must match backend):
- *   Party_Id, Payment_Date, Payment_Type, Paid
+ *   Party_Id, Payment_Date, Payment_Type, Received
  *
  * Backend check being satisfied:
- *   const { Party_Id, Receipt_No, Payment_Date, Payment_Type, Paid } = req.body;
- *   if (!Party_Id || !Payment_Date || !Payment_Type || !Paid) { ... }
+ *   const { Party_Id, Receipt_No, Payment_Date, Payment_Type, Received } = req.body;
+ *   if (!Party_Id || !Payment_Date || !Payment_Type || !Received) { ... }
  */
-export default function PaymentOutModal({
+export default function PaymentInModal({
   mode = "add",              // "add" | "edit" | "view"
-  initialData = null,        // existing payment-out record for edit/view
+  initialData = null,        // existing payment-in record for edit/view
   parties = [],               // array of { Party_Id, Party_Name, Phone_Number, GSTIN } (or { parties: [...] })
   onClose,
   onSave,                     // (formData) => call your existing save/update controller
-  //onAddParty,                 // optional: (partyName) => Promise<{Party_Id, Party_Name}> - called from "+ Add Party"
   PartyAddModal,               // optional: pass your own <AddParty> component in as a prop
   isSaving = false,
 }) {
   const isView = mode === "view";
-  console.log(initialData)
+  console.log(initialData);
   // Normalize parties prop - accepts either an array or { parties: [...] }
   const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
-const formatDateForInput = (date) => {
-  if (!date) return "";
 
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const formatDateForInput = (date) => {
+    if (!date) return "";
 
-  return `${year}-${month}-${day}`;
-};
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
   const {
     register,
     handleSubmit,
-    //control,
     setValue,
     watch,
     formState: { errors },
@@ -48,11 +48,11 @@ const formatDateForInput = (date) => {
       Party_Name: initialData?.Party_Name || "",
       Receipt_No: initialData?.Receipt_No || "",
       Payment_Type: initialData?.Payment_Type || "",
-    
-  Payment_Date: formatDateForInput(initialData?.Payment_Date) || "",
+
+      Payment_Date: formatDateForInput(initialData?.Payment_Date) || "",
 
       Reference_No: initialData?.Reference_No || "",
-      Paid: initialData?.Paid ?? "",
+      Received: initialData?.Received ?? "",
     },
     mode: "onSubmit",
   });
@@ -100,8 +100,8 @@ const formatDateForInput = (date) => {
     setShowPartyModal(false);
   };
 
-    const formValues = watch();
-    console.log(formValues)
+  const formValues = watch();
+  console.log(formValues);
   const onSubmit = (data) => {
     if (isView) return;
     onSave(data);
@@ -129,7 +129,7 @@ const formatDateForInput = (date) => {
           style={{ marginBottom: "20px", paddingBottom: "10px" }}
         >
           <h4 className="text-xl font-semibold text-gray-900">
-            {mode === "add" ? "Payment-Out" : mode === "edit" ? "Edit Payment-Out" : "View Payment-Out"}
+            {mode === "add" ? "Payment-In" : mode === "edit" ? "Edit Payment-In" : "View Payment-In"}
           </h4>
           <button
             type="button"
@@ -302,10 +302,10 @@ const formatDateForInput = (date) => {
               </div>
             )}
 
-            {/* Paid */}
+            {/* Received */}
             <div className="flex flex-col">
               <span className="active">
-                Paid
+                Received
                 <span className="text-red-500">&nbsp;*</span>
               </span>
               <input
@@ -313,14 +313,14 @@ const formatDateForInput = (date) => {
                 step="0.01"
                 readOnly={isView}
                 className="w-full outline-none border-b-2 text-gray-900 py-1"
-                {...register("Paid", {
-                  required: "Paid amount is required",
+                {...register("Received", {
+                  required: "Received amount is required",
                   validate: (v) =>
                     (v !== "" && !isNaN(v) && Number(v) > 0) || "Enter a valid amount greater than 0",
                 })}
               />
-              {errors?.Paid && (
-                <p className="text-red-500 text-xs mt-1">{errors.Paid.message}</p>
+              {errors?.Received && (
+                <p className="text-red-500 text-xs mt-1">{errors.Received.message}</p>
               )}
             </div>
           </div>
