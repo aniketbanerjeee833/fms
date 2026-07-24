@@ -1,0 +1,97 @@
+.report-container {
+  padding: 10px;
+  font-family: Arial;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.section-title {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.entry {
+  margin-top: 15px;
+  /* page-break-inside: avoid; */
+  page-break-inside: auto;
+}
+
+.entry-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.entry-header .right {
+  text-align: right;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  /* font-size: 12px; */
+  margin-top: 15px;
+}
+
+.report-table th,
+.report-table td {
+  border: 1px solid black;
+  padding: 6px;
+}
+
+.totals {
+  
+  /* text-align: right; */
+  /* font-size: 12px; */
+   width: 35%;
+  margin-left: auto;
+  margin-top: 10px;
+ border: 1px solid #ccc;
+}
+
+.totals p {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 6px;
+  font-size: 12px;
+  border-bottom: 1px solid #ccc;
+}
+
+/* 🔥 PRINT FIX */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #report-print,
+  #report-print * {
+    visibility: visible;
+  }
+
+  #report-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+   .entry {
+    page-break-inside: auto;
+  }
+
+  .report-table {
+    page-break-inside: auto;
+  }
+.report-table thead {
+  display: table-header-group;   /* 🔥 MUST */
+}
+  .report-table tr {
+    page-break-inside: avoid;
+  }
+
+  .totals {
+    page-break-inside: avoid;
+  }
+}

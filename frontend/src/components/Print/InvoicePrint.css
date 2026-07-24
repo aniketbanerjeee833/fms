@@ -1,0 +1,200 @@
+
+
+/* 🔥 MAIN CONTAINER */
+
+body {
+  margin: 0;
+  padding: 0;
+}
+.invoice-container {
+  width: 800px;
+  /* margin: auto; */
+  font-family: Arial, sans-serif;
+  color: #000;
+  background: #fff;
+    margin: 0;
+  padding: 0;   /* ✅ REMOVE LEFT SHIFT */
+  /* font-size: 2rem; */
+  /* padding: 10px;
+    margin: 0;           
+  padding-left: 0;      */
+}
+.invoice-inner {
+  padding: 10px;
+}
+
+/* 🔹 CENTER TEXT */
+.text-center {
+  text-align: center;
+}
+
+/* 🔥 PARTY SECTION */
+.invoice-party-section {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #ccc;
+  /* border-bottom: 1px solid #ccc; */
+  padding: 10px 0;
+  margin-top: 10px;
+  gap:20px
+  
+}
+.invoice-party-section {
+  align-items: flex-start;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+/* LEFT + RIGHT */
+.party-left,
+.party-right {
+  width:50%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.party-left {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+/* EACH FIELD ROW */
+.field-row {
+  display: flex;
+  /* //justify-content: start; */
+  /* justify-content: space-between; */
+  align-items: flex-start;
+ padding-left: 0;
+  font-size: 12px;
+  /* gap:5px */
+}
+.invoice-party-section,
+.address-section,
+.field-row {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+/* LABEL */
+.label {
+  font-weight: bold;
+  width: 120px;
+}
+.label {
+  border: none !important;
+  background: none !important;
+  padding: 0;
+}
+/* VALUE */
+.value {
+  text-align: left;
+  flex: 1;
+  word-break: break-word;
+}
+
+/* 🔥 ADDRESS SECTION */
+.address-section {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 20px;
+}
+
+.address-section > div {
+  width: 50%;
+}
+
+.address-section .label {
+  display: block;
+   font-weight: bold;
+  width: 120px;
+  /* margin-bottom: 4px; */
+}
+
+.address-section .value {
+  text-align: left;
+  font-size: 12px;
+   flex: 1;
+  word-break: break-word;
+}
+
+/* 🔥 TABLE */
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+.invoice-table th,
+.invoice-table td {
+  border: 1px solid #000;
+  padding: 6px;
+  font-size: 12px;
+}
+
+.invoice-table th {
+  background: #f2f2f2;
+  text-align: center;
+}
+
+/* NUMERIC ALIGN RIGHT */
+.invoice-table td:nth-child(3),
+.invoice-table td:nth-child(4),
+.invoice-table td:nth-child(5),
+.invoice-table td:nth-child(6) {
+  text-align: right;
+}
+
+/* 🔥 TOTALS */
+.totals {
+  width: 35%;
+  margin-left: auto;
+  margin-top: 10px;
+  border: 1px solid #ccc;
+}
+
+.totals p {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px;
+  margin: 0;
+  font-size: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.totals p:last-child {
+  border-bottom: none;
+}
+
+.balance {
+  font-weight: bold;
+}
+
+/* 🔥 FOOTER */
+.footer {
+  text-align: center;
+  margin-top: 30px;
+  font-size: 12px;
+  color: #555;
+}
+
+/* 🔥 PRINT STYLES */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .invoice-container,
+  .invoice-container * {
+    visibility: visible;
+  }
+
+  .invoice-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* REMOVE BUTTONS / UI */
+  button {
+    display: none !important;
+  }
+}
