@@ -363,6 +363,7 @@ if (
              {renderMenu("Purchase", <ShoppingCart size={20} />, [
            
             { to: "/purchase/add", text: "Add Purchase" },
+            { to: "/purchase/payment-out", text: "Payment Out" },
             { to: "/purchase/all-purchases", text: " All Purchases " },
           ])}
 
@@ -371,7 +372,7 @@ if (
            
            {to: "/sale/invoice", text: " Invoice" },
             { to: "/sale/add", text: "Add Sale" },
-            
+            //  { to: "/sale/payment-in", text: "Payment In" },
              { to: "/sale/all-sales", text: " All Sales" },
           
           ])}

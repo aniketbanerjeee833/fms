@@ -7,6 +7,7 @@ import itemRoutes from "./routes/itemRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 
 import purchaseRoutes from "./routes/purchaseRoutes.js";
+import paymentRoutes from "./routes/paymentOutRoutes.js"
 import saleRoutes from "./routes/saleRoutes.js";
 import dailyExpenseRoutes from "./routes/dailyExpense.js";
 import financialYearRoutes from "./routes/financialYearRoutes.js";
@@ -127,6 +128,7 @@ app.use("/api/report", reportRoutes);
 app.use("/api/party", partyRoutes);
 app.use("/api/item", itemRoutes);
 app.use("/api/purchase", purchaseRoutes);
+app.use("/api/payment-out", paymentRoutes)
 app.use("/api/sale", saleRoutes);
 app.use("/api/daily-expense",dailyExpenseRoutes);
 app.use("/api/financial-year",financialYearRoutes)

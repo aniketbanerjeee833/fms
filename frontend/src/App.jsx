@@ -13,6 +13,7 @@ import Spinner from './components/Layout/Spinner';
 
 
 
+
 // 🧩 Lazy imports
 const Header = lazy(() => import('./components/Header/Header'));
 const Login = lazy(() => import('./pages/User/Login/Login'));
@@ -37,6 +38,7 @@ const ItemSalesPurchasesDetails = lazy(() => import('./pages/Items/ItemsSalesPur
 
 
 const PurchaseAdd = lazy(() => import('./pages/Purchase/PurchaseAdd'));
+const PaymentOut= lazy(() => import('./pages/Purchase/PaymentOut'));
 const PurchaseView = lazy(() => import('./pages/Purchase/PurchaseView'));
 const AllPurchasesList = lazy(() => import('./pages/Purchase/AllPurchaseList'));
 const PurchaseEdit = lazy(() => import('./pages/Purchase/PurchaseEdit'));
@@ -228,6 +230,17 @@ function RouterWrapper() {
               element={
              
                   <PurchaseAdd />
+                
+              }
+            />
+             <Route
+              path="/purchase/payment-out"
+              element={
+                   <Layout>
+
+                  
+                  <PaymentOut />
+                   </Layout>
                 
               }
             />

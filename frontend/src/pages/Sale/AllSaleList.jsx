@@ -248,7 +248,7 @@ export default function AllSaleList() {
             </div>
 
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end sm: mt-4">
       {/* <button
   type="button"
   onClick={handleExportExcel}
