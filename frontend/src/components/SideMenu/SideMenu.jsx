@@ -39,14 +39,16 @@ const currentPath = location.pathname;
    if(currentPath.startsWith("/sale/add") || currentPath.startsWith("/sale/all-sales") ||
     currentPath.startsWith("/sale/invoice") || currentPath.startsWith("/sale/edit") 
   || currentPath.startsWith("/sale/view")|| currentPath.startsWith("/new/sale/add")||
-    currentPath.startsWith("/sale/all-new-sales")|| currentPath.startsWith("/new/sale/edit") )
+    currentPath.startsWith("/sale/all-new-sales")|| currentPath.startsWith("/new/sale/edit") ||
+    currentPath.startsWith("/sale/return"))
      {
       setOpenMenu("Sales");
       
     }
  
     if(currentPath.startsWith("/purchase/add") || 
-    currentPath.startsWith("/purchase/all-purchases") )
+    currentPath.startsWith("/purchase/all-purchases") ||
+    currentPath.startsWith("/purchase/return") )
      {
       setOpenMenu("Purchase");
       
@@ -131,7 +133,8 @@ if (
   // 🔹 Purchase
   if (
     (cleanLink === "/purchase/add" && current.startsWith("/purchase/add")) ||
-    (cleanLink === "/purchase/all-purchases" && current.startsWith("/purchase/all-purchases"))
+    (cleanLink === "/purchase/all-purchases" && current.startsWith("/purchase/all-purchases") ||
+      ( cleanLink === "/purchase/return" && current.startsWith("/purchase/return")))
   )
     return true;
 
@@ -363,6 +366,7 @@ if (
              {renderMenu("Purchase", <ShoppingCart size={20} />, [
            
             { to: "/purchase/add", text: "Add Purchase" },
+              { to: "/purchase/return", text: "Purchase Return" },
             { to: "/purchase/payment-out", text: "Payment Out" },
             { to: "/purchase/all-purchases", text: " All Purchases " },
           ])}
@@ -372,6 +376,7 @@ if (
            
            {to: "/sale/invoice", text: " Invoice" },
             { to: "/sale/add", text: "Add Sale" },
+              { to: "/sale/return", text: "Sale Return" },
              { to: "/sale/payment-in", text: "Payment In" },
              { to: "/sale/all-sales", text: " All Sales" },
           

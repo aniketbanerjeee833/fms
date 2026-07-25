@@ -2,10 +2,10 @@
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useGetAllSalesQuery } from "../../redux/api/saleApi";
-import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
 
 // import { SiMicrosoftexcel } from "react-icons/si";
-export default function AllSaleList() {
+export default function SaleReturn() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
@@ -249,7 +249,7 @@ export default function AllSaleList() {
 
           </div>
           <div className="flex justify-end sm: mt-4">
-            {/* <button
+      {/* <button
   type="button"
   onClick={handleExportExcel}
   className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#217346] text-white shadow-md transition-all hover:scale-105 hover:shadow-lg active:scale-95"
@@ -257,17 +257,17 @@ export default function AllSaleList() {
 >
   <SiMicrosoftexcel size={22} />
 </button> */}
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
-              title="Export to Excel"
-            >
-              <FileSpreadsheet
-                size={22}
-                className="transition-transform duration-200 group-hover:scale-110"
-              />
-            </button>
+<button
+  type="button"
+  onClick={handleExportExcel}
+  className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
+  title="Export to Excel"
+>
+  <FileSpreadsheet
+    size={22}
+    className="transition-transform duration-200 group-hover:scale-110"
+  />
+</button>
           </div>
         </div>
 
@@ -298,7 +298,6 @@ export default function AllSaleList() {
                     <th className="text-left">Balance Due</th>
                     <th>View</th>
                     <th>Edit</th>
-                    <th>Return</th>
 
                   </tr>
                 </thead>
@@ -368,22 +367,6 @@ export default function AllSaleList() {
                                 color: "#4CA1AF"
                               }} />
                           </NavLink>
-
-                        </td>
-                        <td>
-                          <NavLink
-                            to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
-                            state={{ from: "sale-return-list" }}
-                          >
-                            <Undo2
-                              size={18}
-                              style={{
-                                cursor: "pointer",
-                                color: "#4CA1AF",
-                              }}
-                            />
-                          </NavLink>
-
 
                         </td>
                       </tr>

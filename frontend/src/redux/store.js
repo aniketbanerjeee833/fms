@@ -16,6 +16,8 @@ import { settingsApi } from "./api/settingsApi";
 import { miscellaneousApi } from "./api/miscellaneousApi";
 import { paymentOutApi } from "./api/paymentOutApi";
 import { paymentInApi } from "./api/paymentInApi";
+import { purchaseReturnApi } from "./api/purchaseReturnApi";
+import { saleReturnApi } from "./api/saleReturnApi";
 
 
 // ✅ Combine reducers
@@ -27,6 +29,8 @@ const rootReducer = combineReducers({
   [itemApi.reducerPath]: itemApi.reducer,
   [miscellaneousApi.reducerPath]: miscellaneousApi.reducer,
   [purchaseApi.reducerPath]: purchaseApi.reducer,
+  [purchaseReturnApi.reducerPath]: purchaseReturnApi.reducer,
+  [saleReturnApi.reducerPath]: saleReturnApi.reducer,
   [saleApi.reducerPath]: saleApi.reducer,
   [userApi.reducerPath]: userApi.reducer,
   [dailyExpenseApi.reducerPath]: dailyExpenseApi.reducer,
@@ -59,6 +63,8 @@ const store = configureStore({
       itemApi.middleware,
       miscellaneousApi.middleware,
       purchaseApi.middleware,
+      purchaseReturnApi.middleware,
+      saleReturnApi.middleware,
       userApi.middleware,
       dailyExpenseApi.middleware,
       paymentOutApi.middleware,

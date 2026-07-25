@@ -5,13 +5,13 @@
 CREATE TABLE IF NOT EXISTS payment_in (
 
   Id                INT AUTO_INCREMENT PRIMARY KEY,
-  Party_Id          VARCHAR(20)     NOT NULL,
-  Receipt_No        VARCHAR(50)     DEFAULT NULL,
+  Party_Id          VARCHAR(255)     NOT NULL,
+  Receipt_No        VARCHAR(255)     DEFAULT NULL,
   Payment_Date      DATE            NOT NULL,
-  Payment_Type      VARCHAR(50)     NOT NULL DEFAULT 'Cash',
-  Reference_No      VARCHAR(50)     DEFAULT NULL,
-  Received          DECIMAL(12,2)   NOT NULL DEFAULT 0,
-  Notes             TEXT            DEFAULT NULL,
+  Payment_Type      VARCHAR(255)     NOT NULL DEFAULT 'Cash',
+  Reference_No      VARCHAR(255)     DEFAULT NULL,
+  Received          DECIMAL(10,2)   NOT NULL DEFAULT 0,
+ 
   created_at        TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (Party_Id) REFERENCES add_party(Party_Id)

@@ -85,26 +85,7 @@ z.string()
   .regex(/^\d+$/, "HSN Code must contain only digits (0-9).")
 ),
  
-// Item_HSN: z
-//   .union([
-//     z.string(),
-//     z.number(),
-//     z.undefined(),
-//     z.null(),
-//   ])
-//   .transform((val) => (val === undefined || val === null ? "" : String(val))) // ✅ Always a string
-//   .refine((val) => val.trim() !== "", { message: "HSN Code is required." })
-//   .refine((val) => /^\d+$/.test(val), { message: "HSN Code must contain only digits (0-9)." })
-//   .refine((val) => val.length >= 4, { message: "HSN Code must be at least 4 digits." })
-//   .refine((val) => val.length <= 8, { message: "HSN Code must be at most 8 digits." }),
-     
-        //  Quantity: digitsOnly("Quantity", false).default(1),
-          // Quantity: z
-          // .number({
-          //   required_error: "Quantity is required",
-          //   invalid_type_error: "Quantity must be a number",
-          // })
-          // .min(1, "Quantity must be greater than zero"),
+
           Quantity: z.preprocess(
   (val) => {
     if (val === "" || val === undefined || val === null) return undefined;

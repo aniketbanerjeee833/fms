@@ -39,6 +39,8 @@ const ItemSalesPurchasesDetails = lazy(() => import('./pages/Items/ItemsSalesPur
 
 const PurchaseAdd = lazy(() => import('./pages/Purchase/PurchaseAdd'));
 const PaymentOut= lazy(() => import('./pages/Purchase/PaymentOut'));
+const PurchaseReturn= lazy(() => import('./pages/Purchase/PurchaseReturn'));
+const PurchaseReturnAdd= lazy(() => import('./pages/Purchase/PurchaseReturnAdd'));
 const PurchaseView = lazy(() => import('./pages/Purchase/PurchaseView'));
 const AllPurchasesList = lazy(() => import('./pages/Purchase/AllPurchaseList'));
 const PurchaseEdit = lazy(() => import('./pages/Purchase/PurchaseEdit'));
@@ -46,6 +48,8 @@ const PurchaseEdit = lazy(() => import('./pages/Purchase/PurchaseEdit'));
 const Invoice = lazy(() => import('./pages/Sale/Invoice'));
 const AllSaleList = lazy(() => import('./pages/Sale/AllSaleList'));
 const PaymentIn= lazy(() => import('./pages/Sale/PaymentIn'));
+const SaleReturn= lazy(() => import('./pages/Sale/SaleReturn'));
+const SaleReturnAdd= lazy(() => import('./pages/Sale/SaleReturnAdd'));
 const SaleAdd = lazy(() => import('./pages/Sale/SaleAdd'));
 const SaleView = lazy(() => import('./pages/Sale/SaleView'));
 const SaleEdit = lazy(() => import('./pages/Sale/SaleEdit'));
@@ -228,6 +232,15 @@ function RouterWrapper() {
                 
               }
             />
+             <Route
+              path="/sale/return"
+              element={
+                 <Layout>
+                  <SaleReturn />
+                  </Layout>
+                
+              }
+            />
              
               <Route
               path="/sale/view/:id"
@@ -245,6 +258,14 @@ function RouterWrapper() {
                 
               }
             />
+            <Route
+              path="/sale/return/add/:id"
+              element={
+                 
+                  <SaleReturnAdd/>
+                 
+              }
+            />
              <Route
               path="/purchase/payment-out"
               element={
@@ -254,6 +275,23 @@ function RouterWrapper() {
                   <PaymentOut />
                    </Layout>
                 
+              }
+            />
+            <Route
+              path="/purchase/return"
+              element={
+                 <Layout>
+                  <PurchaseReturn />
+                  </Layout>
+                
+              }
+            />
+             <Route
+              path="/purchase/return/add/:id"
+              element={
+                 
+                  <PurchaseReturnAdd/>
+                 
               }
             />
               <Route

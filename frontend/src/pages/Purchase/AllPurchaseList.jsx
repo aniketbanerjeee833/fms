@@ -2,7 +2,7 @@
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useGetAllPurchasesQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
 
 
 export default function AllPurchaseList() {
@@ -374,118 +374,115 @@ export default function AllPurchaseList() {
 
 
           </div>
-           </div>
-          <div className="tab-inn">
-            <div className="table-responsive table-desi">
-              {isLoading ? (
-                <p className="text-center mt-4">Fetching purchases...</p>
-              ) : purchases?.length === 0 ? (
-                <p className="text-center mt-4">No purchases found.</p>
-              ) : (
+        </div>
+        <div className="tab-inn">
+          <div className="table-responsive table-desi">
+            {isLoading ? (
+              <p className="text-center mt-4">Fetching purchases...</p>
+            ) : purchases?.length === 0 ? (
+              <p className="text-center mt-4">No purchases found.</p>
+            ) : (
 
 
 
 
 
-                <table className="w-full min-w-[500px]">
-                  <thead>
-                    <tr>
-                      <th className="text-left">Sl.No</th>
-                      <th className="text-left ">Bill Date</th>
-                      <th className="text-left ">Party Name</th>
-                      <th className="text-left">Payment Type</th>
-                      <th className="text-left">Amount </th>
-                      <th className="text-left">Balance Due</th>
-                      <th>View</th>
-                      <th>Edit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {purchases && purchases?.purchases?.length > 0 ? (
-                      purchases?.purchases?.map((purchase, idx) => (
-                        <tr key={purchase?.Purchase_Id}>
-                          <td>
-                            {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
-                          </td>
-                          {/* <td>
+              <table className="w-full min-w-[500px]">
+                <thead>
+                  <tr>
+                    <th className="text-left">Sl.No</th>
+                    <th className="text-left ">Bill Date</th>
+                    <th className="text-left ">Party Name</th>
+                    <th className="text-left">Payment Type</th>
+                    <th className="text-left">Amount </th>
+                    <th className="text-left">Balance Due</th>
+                    <th>View</th>
+                    <th>Edit</th>
+                     <th>Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases && purchases?.purchases?.length > 0 ? (
+                    purchases?.purchases?.map((purchase, idx) => (
+                      <tr key={purchase?.Purchase_Id}>
+                        <td>
+                          {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
+                        </td>
+                        {/* <td>
   {purchase?.Bill_Date
     ? purchase.Bill_Date.split("T")[0]
     : "N/A"}
 </td> */}
-                          <td>
-                            {purchase?.Bill_Date
-                              ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "numeric",
-                                year: "numeric",
-                              })
-                              : "N/A"}
-                          </td>
-                          <td>{purchase?.Party_Name || "N/A"}</td>
-                          <td>{purchase?.Payment_Type || "N/A"}</td>
-                          <td>{purchase?.Total_Amount || "N/A"}</td>
-                          <td>{purchase?.Balance_Due || "N/A"}</td>
+                        <td>
+                          {purchase?.Bill_Date
+                            ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "numeric",
+                              year: "numeric",
+                            })
+                            : "N/A"}
+                        </td>
+                        <td>{purchase?.Party_Name || "N/A"}</td>
+                        <td>{purchase?.Payment_Type || "N/A"}</td>
+                        <td>{purchase?.Total_Amount || "N/A"}</td>
+                        <td>{purchase?.Balance_Due || "N/A"}</td>
 
-                          <td >
-                            {/* <i
-                                                                    style={{
-                                                                        cursor: "pointer",
-                                                                        backgroundColor: "transparent",
-                                                                        color: "#7346ff"
-                                                                    }}
-                                                                    onClick={() => navigate(`/purchase/view/${purchase?.Purchase_Id}`)}
-                                                                   className="fa fa-eye mr-o" aria-hidden="true"></i> */}
-                            {/* <Eye onClick={() => navigate(`/purchase/view/${purchase?.Purchase_Id}`)}
-                                  style={{
-                                    cursor: "pointer",
-                                    backgroundColor: "transparent",
-                                    color: "#4CA1AF"
-                                  }} /> */}
-                            <NavLink to={`/purchase/view/${purchase?.Purchase_Id}${location.search}`}
-                              state={{ from: "all-purchase-list" }}>
-                              <Eye
-                                style={{
-                                  cursor: "pointer",
-                                  backgroundColor: "transparent",
-                                  color: "#4CA1AF"
-                                }} />
-                            </NavLink>
-                          </td>
-                          <td
+                        <td >
+                          
+                          <NavLink to={`/purchase/view/${purchase?.Purchase_Id}${location.search}`}
+                            state={{ from: "all-purchase-list" }}>
+                            <Eye
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
+                        </td>
+                        <td
+                        >
+                          <NavLink
+                            to={`/purchase/edit/${purchase?.Purchase_Id}${location.search}`}
+                            state={{ from: "all-purchase-list" }}
+
                           >
-                            <NavLink
-                              to={`/purchase/edit/${purchase?.Purchase_Id}${location.search}`}
-                              state={{ from: "all-purchase-list" }}
 
-                            >
-
-                              <SquarePen
-                                style={{
-                                  cursor: "pointer",
-                                  backgroundColor: "transparent",
-                                  color: "#4CA1AF"
-                                }} />
-                            </NavLink>
-                            {/* <SquarePen onClick={() => navigate(`/purchase/edit/${purchase?.Purchase_Id}`)}
-                                  style={{
-                                    cursor: "pointer",
-                                    backgroundColor: "transparent",
-                                    color: "#4CA1AF"
-                                  }} /> */}
-
+                            <SquarePen
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
                           </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td className="mx-auto text-center" colSpan={10}>
-                          No purchase found
+                        <td>
+                          <NavLink
+                            to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
+                            state={{ from: "purchase-return-list" }}
+                          >
+                            <Undo2
+                              size={18}
+                              style={{
+                                cursor: "pointer",
+                                color: "#4CA1AF",
+                              }}
+                            />
+                          </NavLink>
+                        
+
                         </td>
                       </tr>
-                    )}
-                  </tbody>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="mx-auto text-center" colSpan={10}>
+                        No purchase found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
 
-                </table>
+              </table>
 
 
 
@@ -495,28 +492,28 @@ export default function AllPurchaseList() {
 
 
 
-              )}
-            </div>
+            )}
           </div>
-          <div className="flex justify-center align-center p-4">
-            <div className="flex items-center space-x-2 flex-wrap justify-center">
+        </div>
+        <div className="flex justify-center align-center p-4">
+          <div className="flex items-center space-x-2 flex-wrap justify-center">
 
-              {/* PREVIOUS */}
-              <button
-                type="button"
-                onClick={() => handlePreviousPage()}
-                disabled={page === 1}
-                className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+            {/* PREVIOUS */}
+            <button
+              type="button"
+              onClick={() => handlePreviousPage()}
+              disabled={page === 1}
+              className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
         ${page === 1 ? 'opacity-50 ' : ''}
       `}
-              >
-                ← Previous
-              </button>
+            >
+              ← Previous
+            </button>
 
-              {/* PAGE NUMBERS — DESKTOP / TABLET */}
-              <div style={{ marginRight: "0px" }}
-                className="hidden sm:flex space-x-2">
-                {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
+            {/* PAGE NUMBERS — DESKTOP / TABLET */}
+            <div style={{ marginRight: "0px" }}
+              className="hidden sm:flex space-x-2">
+              {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
         <button
           key={index}
           onClick={() => handlePageChange(index + 1)}
@@ -531,107 +528,107 @@ export default function AllPurchaseList() {
           {index + 1}
         </button>
       ))} */}
-                {(() => {
-                  const totalPages = purchases?.totalPages || 1;
-                  const maxVisible = 5; // how many pages around current
-                  const pages = [];
+              {(() => {
+                const totalPages = purchases?.totalPages || 1;
+                const maxVisible = 5; // how many pages around current
+                const pages = [];
 
-                  let start = Math.max(1, page - 2);
-                  let end = Math.min(totalPages, page + 2);
+                let start = Math.max(1, page - 2);
+                let end = Math.min(totalPages, page + 2);
 
-                  // Adjust if near start
-                  if (page <= 3) {
-                    end = Math.min(totalPages, maxVisible);
-                  }
+                // Adjust if near start
+                if (page <= 3) {
+                  end = Math.min(totalPages, maxVisible);
+                }
 
-                  // Adjust if near end
-                  if (page > totalPages - 3) {
-                    start = Math.max(1, totalPages - maxVisible + 1);
-                  }
+                // Adjust if near end
+                if (page > totalPages - 3) {
+                  start = Math.max(1, totalPages - maxVisible + 1);
+                }
 
-                  // First page + dots
-                  if (start > 1) {
+                // First page + dots
+                if (start > 1) {
+                  pages.push(
+                    <button
+                      key={1}
+                      onClick={() => handlePageChange(1)}
+                      className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                    >
+                      1
+                    </button>
+                  );
+
+                  if (start > 2) {
                     pages.push(
-                      <button
-                        key={1}
-                        onClick={() => handlePageChange(1)}
-                        className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                      >
-                        1
-                      </button>
-                    );
-
-                    if (start > 2) {
-                      pages.push(
-                        <span key="start-dots" className="px-2">...</span>
-                      );
-                    }
-                  }
-
-                  // Middle pages
-                  for (let i = start; i <= end; i++) {
-                    pages.push(
-                      <button
-                        key={i}
-                        onClick={() => handlePageChange(i)}
-                        className={`px-3 py-1 rounded ${page === i
-                          ? 'bg-[#4CA1AF] text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
-                      >
-                        {i}
-                      </button>
+                      <span key="start-dots" className="px-2">...</span>
                     );
                   }
+                }
 
-                  // Last page + dots
-                  if (end < totalPages) {
-                    if (end < totalPages - 1) {
-                      pages.push(
-                        <span key="end-dots" className="px-2">...</span>
-                      );
-                    }
+                // Middle pages
+                for (let i = start; i <= end; i++) {
+                  pages.push(
+                    <button
+                      key={i}
+                      onClick={() => handlePageChange(i)}
+                      className={`px-3 py-1 rounded ${page === i
+                        ? 'bg-[#4CA1AF] text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                      {i}
+                    </button>
+                  );
+                }
 
+                // Last page + dots
+                if (end < totalPages) {
+                  if (end < totalPages - 1) {
                     pages.push(
-                      <button
-                        key={totalPages}
-                        onClick={() => handlePageChange(totalPages)}
-                        className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                      >
-                        {totalPages}
-                      </button>
+                      <span key="end-dots" className="px-2">...</span>
                     );
                   }
 
-                  return pages;
-                })()}
-              </div>
+                  pages.push(
+                    <button
+                      key={totalPages}
+                      onClick={() => handlePageChange(totalPages)}
+                      className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                    >
+                      {totalPages}
+                    </button>
+                  );
+                }
 
-              {/* CURRENT PAGE — MOBILE ONLY */}
-              <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-                Page {page} / {purchases?.totalPages || 1}
-              </div>
-
-              {/* NEXT */}
-              <button
-                type="button"
-                onClick={() => handleNextPage()}
-                disabled={page === purchases?.totalPages ||
-                  purchases?.totalPages === 0}
-                className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === purchases?.totalPages ||
-                    purchases?.totalPages === 0
-                    ? 'opacity-50 '
-                    : ''
-                  }
-      `}
-              >
-                Next →
-              </button>
-
+                return pages;
+              })()}
             </div>
+
+            {/* CURRENT PAGE — MOBILE ONLY */}
+            <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
+              Page {page} / {purchases?.totalPages || 1}
+            </div>
+
+            {/* NEXT */}
+            <button
+              type="button"
+              onClick={() => handleNextPage()}
+              disabled={page === purchases?.totalPages ||
+                purchases?.totalPages === 0}
+              className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+        ${page === purchases?.totalPages ||
+                  purchases?.totalPages === 0
+                  ? 'opacity-50 '
+                  : ''
+                }
+      `}
+            >
+              Next →
+            </button>
+
           </div>
-          {/* <div className="flex justify-center align-center space-x-2 p-4">
+        </div>
+        {/* <div className="flex justify-center align-center space-x-2 p-4">
                 <button type="button"
                   onClick={() => handlePreviousPage()}
                   disabled={page === 1}
@@ -666,16 +663,16 @@ export default function AllPurchaseList() {
                   Next →
                 </button>
               </div> */}
-        </div>
+      </div>
 
 
-      </>
+    </>
 
 
-      )
+  )
 }
 
-      {/* <div className="p-2 border-r border-gray-300 overflow-x-auto ">
+{/* <div className="p-2 border-r border-gray-300 overflow-x-auto ">
                                                     <table className="w-full ">
                                                         <thead>
                                                             <tr>
@@ -706,4 +703,4 @@ export default function AllPurchaseList() {
                                                     </table>
                                                 </div> */}
 
-      {/* Right side (Party Details) */}
+{/* Right side (Party Details) */ }
