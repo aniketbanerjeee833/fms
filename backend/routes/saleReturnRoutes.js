@@ -10,9 +10,9 @@ import {
 const router = express.Router();
 
 router.get("/", getAllSaleReturns);
-router.get("/:id", getSaleReturnById);
+router.get("/:Sale_Return_Id", getSaleReturnById);
 router.post("/:Sale_Id", createSaleReturn);
-router.put("/:id", editSaleReturn);
+router.put("/:Sale_Return_Id", editSaleReturn);
 router.delete("/:id", deleteSaleReturn);
 
 export default router;

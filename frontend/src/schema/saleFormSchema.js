@@ -1,34 +1,6 @@
 import { z } from "zod";
 
-// export const partyFormSchema = z.object({
 
-//     Party_Name: z.string().min(1, "Party name is required minimum 1 character"),
-//     GSTIN: z.string().optional().or(z.literal("")),
-//     Phone_Number: z.string()  .min(10, "Phone number must be exactly 10 digits")
-//     .max(10, "Phone number must be exactly 10 digits").optional().or(z.literal("")),
-   
-//     State: z.string().min(1, "State is required minimum 1 character")
-//     .optional().or(z.literal("")),
-    
-//     Email_Id: z.string().email("Invalid email address").optional().or(z.literal("")),
-//     Billing_Address: z.string().min(5, "Address is required minimum 5 character")
-//     .optional().or(z.literal("")),
-//    Shipping_Address: z.string().min(5, "Address is required minimum 5 character")
-//     .optional().or(z.literal("")),
-    
-// })
-// const digitsOnly = (fieldName, required = true) =>
-//   z
-//     .string({
-//       required_error: `${fieldName} is required`,
-//     })
-//     .refine(
-//       (val) => {
-//         if (!val) return !required; // allow empty if optional
-//         return /^\d+(\.\d{1,2})?$/.test(val); // ✅ allow integers & decimals up to 2 places
-//       },
-//       { message: `${fieldName} is required and should be a number` }
-//     ) .transform((val) => Number(val)); // ✅ always store as number;
 const HSN_REGEX = /^\d{4,8}$/;
 // const digitsOnly = (fieldName, required = true) =>
 //   z.union([z.string(), z.number()])  // allow both

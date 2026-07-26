@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-
+//const HSN_REGEX = /^\d{4,8}$/;
 
 /* ─────────────────────────────────────────────────────────────
-   SHARED HELPERS  (same as purchaseFormSchema)
+   SHARED HELPERS  (same as purchaseFormSchema / purchaseReturnFormSchema)
 ───────────────────────────────────────────────────────────────*/
 const digitsOnly = (fieldName, required = true) =>
   z
@@ -20,9 +20,9 @@ const digitsOnly = (fieldName, required = true) =>
     .transform((val) => (val === "" ? 0 : Number(val)));
 
 /* ─────────────────────────────────────────────────────────────
-   SHARED ITEM ROW SCHEMA  (identical to purchase — reused)
+   SHARED ITEM ROW SCHEMA  (identical to purchase/purchase-return — reused)
 ───────────────────────────────────────────────────────────────*/
-const purchaseReturnItemSchema = z.object({
+const saleReturnItemSchema = z.object({
   Item_Category: z.string().min(1, "Item category is required"),
 
   Item_Name: z.string().min(1, "Item name is required"),
@@ -51,17 +51,17 @@ const purchaseReturnItemSchema = z.object({
 
   Item_Unit: z.string().min(1, "Unit is required"),
 
-  Purchase_Price: digitsOnly("Purchase_Price", true).refine(
+  Sale_Price: digitsOnly("Sale_Price", true).refine(
     (num) => num === undefined || num > 0,
-    { message: "Purchase Price must be greater than 0" }
+    { message: "Sale Price must be greater than 0" }
   ),
 
-  Discount_On_Purchase_Price: digitsOnly(
-    "Discount_On_Purchase_Price",
+  Discount_On_Sale_Price: digitsOnly(
+    "Discount_On_Sale_Price",
     false
   ).optional(),
 
-  Discount_Type_On_Purchase_Price: z
+  Discount_Type_On_Sale_Price: z
     .enum(["Percentage", "Amount"])
     .optional()
     .default("Percentage"),
@@ -77,18 +77,18 @@ const purchaseReturnItemSchema = z.object({
 });
 
 /* ─────────────────────────────────────────────────────────────
-   PURCHASE RETURN SCHEMA
-   Extra fields vs purchase:
+   SALE RETURN SCHEMA
+   Extra fields vs sale:
      • Return_Number  — optional, user fills manually
      • Return_Date    — required, defaults to today
-   Removed vs purchase:
-     • Total_Paid     — replaced by Total_Received
+   Kept identical (vs purchase return, just renamed back):
+     • Total_Paid     — replaces Total_Received
    Kept identical:
      • Party_Name, GSTIN, Bill_Number, Bill_Date,
        State_Of_Supply, Total_Amount, Balance_Due,
        Payment_Type, Reference_Number, items
 ───────────────────────────────────────────────────────────────*/
-export const purchaseReturnFormSchema = z.object({
+export const saleReturnFormSchema = z.object({
 
   /* ── Party ── */
   Party_Name: z.string().min(1, "Party is required"),
@@ -106,14 +106,13 @@ export const purchaseReturnFormSchema = z.object({
     .string()
     .trim()
     .min(1, "Return Number is required"),
-  
 
-  Bill_Number: z.string().min(1, "Bill Number is required"),
+  Invoice_Number: z.string().min(1, "Invoice Number is required"),
 
-  Bill_Date: z
+  Invoice_Date: z
     .string()
     .refine((val) => !isNaN(Date.parse(val)), {
-      message: "Bill Date must be a valid date",
+      message: "Invoice Date must be a valid date",
     }),
 
   Return_Date: z
@@ -130,10 +129,10 @@ export const purchaseReturnFormSchema = z.object({
   /* ── Amounts ── */
   Total_Amount: digitsOnly("Total_Amount", true),
 
-  Total_Received: z                          // ✅ renamed from Total_Paid
+  Total_Paid: z                              // ✅ back to Total_Paid for sale return
     .string()
     .optional()
-    .or(digitsOnly("Total_Received", false)),
+    .or(digitsOnly("Total_Paid", false)),
 
   Balance_Due: digitsOnly("Balance_Due", true),
 
@@ -145,15 +144,15 @@ export const purchaseReturnFormSchema = z.object({
       message: "Please select a payment type",
     }),
 
- Reference_Number: z
-  .string()
-  .trim()
-  .nullable()
-  .optional()
-  .transform((val) => val ?? ""),
+  Reference_Number: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .transform((val) => val ?? ""),
 
   /* ── Items ── */
   items: z
-    .array(purchaseReturnItemSchema)
+    .array(saleReturnItemSchema)
     .nonempty("At least one item must be added"),
 });

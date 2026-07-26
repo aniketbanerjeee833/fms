@@ -41,6 +41,7 @@ const PurchaseAdd = lazy(() => import('./pages/Purchase/PurchaseAdd'));
 const PaymentOut= lazy(() => import('./pages/Purchase/PaymentOut'));
 const PurchaseReturn= lazy(() => import('./pages/Purchase/PurchaseReturn'));
 const PurchaseReturnAdd= lazy(() => import('./pages/Purchase/PurchaseReturnAdd'));
+const PurchaseReturnEdit= lazy(() => import('./pages/Purchase/PurchaseReturnEdit'));
 const PurchaseView = lazy(() => import('./pages/Purchase/PurchaseView'));
 const AllPurchasesList = lazy(() => import('./pages/Purchase/AllPurchaseList'));
 const PurchaseEdit = lazy(() => import('./pages/Purchase/PurchaseEdit'));
@@ -50,6 +51,7 @@ const AllSaleList = lazy(() => import('./pages/Sale/AllSaleList'));
 const PaymentIn= lazy(() => import('./pages/Sale/PaymentIn'));
 const SaleReturn= lazy(() => import('./pages/Sale/SaleReturn'));
 const SaleReturnAdd= lazy(() => import('./pages/Sale/SaleReturnAdd'));
+const SaleReturnEdit= lazy(() => import('./pages/Sale/SaleReturnEdit'));
 const SaleAdd = lazy(() => import('./pages/Sale/SaleAdd'));
 const SaleView = lazy(() => import('./pages/Sale/SaleView'));
 const SaleEdit = lazy(() => import('./pages/Sale/SaleEdit'));
@@ -267,6 +269,14 @@ function RouterWrapper() {
               }
             />
              <Route
+              path="/sale/return/edit/:id"
+              element={
+                 
+                  <SaleReturnEdit/>
+                 
+              }
+            />
+             <Route
               path="/purchase/payment-out"
               element={
                    <Layout>
@@ -284,6 +294,14 @@ function RouterWrapper() {
                   <PurchaseReturn />
                   </Layout>
                 
+              }
+            />
+            <Route
+              path="/purchase/return/edit/:id"
+              element={
+                 
+                  <PurchaseReturnEdit/>
+                 
               }
             />
              <Route
@@ -401,7 +419,17 @@ function RouterWrapper() {
         </Routes>
       </Suspense>
 
-      <ToastContainer position="top-right" autoClose={3000} />
+              <ToastContainer
+  position="top-right"
+  autoClose={3000}
+  hideProgressBar={false}
+  newestOnTop
+  closeOnClick
+  pauseOnHover
+  draggable
+  theme="colored"
+/>
+      {/* <ToastContainer position="top-right" autoClose={3000} /> */}
     </>
   );
 }

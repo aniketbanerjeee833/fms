@@ -289,9 +289,9 @@ const handleSavePaymentIn = async (formData) => {
                 <div className="tab-inn">
                     <div className="table-responsive table-desi">
                         {isLoading ? (
-                            <p className="text-center mt-4">Fetching paymentInData...</p>
+                            <p className="text-center mt-4">Fetching payment In Data...</p>
                         ) : paymentInData?.length === 0 ? (
-                            <p className="text-center mt-4">No paymentInData found.</p>
+                            <p className="text-center mt-4">No paymentIn Data found.</p>
                         ) : (
 
 

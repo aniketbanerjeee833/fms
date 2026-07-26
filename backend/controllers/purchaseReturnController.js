@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS purchase_return (
   
   Purchase_Id          VARCHAR(255)    NOT NULL,               -- original purchase being returned
   Party_Id             VARCHAR(255)    NOT NULL,
-  Return_No            VARCHAR(255)    DEFAULT NULL,           -- manual entry like "ALCO/17135/2627"
+  Return_Number            VARCHAR(255)    DEFAULT NULL,           -- manual entry like "ALCO/17135/2627"
   Bill_Number          VARCHAR(255)    DEFAULT NULL,           -- original bill number (pre-filled)
   Bill_Date            DATE           DEFAULT NULL,           -- original bill date  (pre-filled)
   Return_Date          DATE           NOT NULL,               -- "Date" field in UI
@@ -88,7 +88,7 @@ const getAllPurchaseReturns = async (req, res, next) => {
     if (search) {
       whereClauses.push(`(
         LOWER(a.Party_Name)      LIKE ? OR
-        LOWER(pr.Return_No)      LIKE ? OR
+        LOWER(pr.Return_Number)      LIKE ? OR
         LOWER(pr.Bill_Number)    LIKE ? OR
         CAST(pr.Total_Amount AS CHAR) LIKE ?
       )`);
@@ -158,14 +158,14 @@ const getPurchaseReturnById = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
-    const { id } = req.params;
+    const { Purchase_Return_Id } = req.params;
  
     const [[header]] = await connection.query(
       `SELECT pr.*, a.Party_Name
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
        WHERE pr.id = ?`,
-      [id]
+      [Purchase_Return_Id]
     );
  
     if (!header) {
@@ -176,8 +176,8 @@ const getPurchaseReturnById = async (req, res, next) => {
       `SELECT pri.*, ai.Item_Name as Item_Name_Ref
        FROM purchase_return_items pri
        LEFT JOIN add_item ai ON ai.Item_Id = pri.Item_Id
-       WHERE pri.id = ?`,
-      [id]
+       WHERE pri.Purchase_Return_Id = ?`,
+      [Purchase_Return_Id]
     );
  
     return res.status(200).json({ success: true, purchaseReturn: { ...header, items } });
@@ -239,14 +239,14 @@ const createPurchaseReturn = async (req, res, next) => {
     /* ── insert header ── get insertId for items ── */
     const [headerResult] = await connection.query(
       `INSERT INTO purchase_return
-         (Purchase_Id, Party_Id, Return_No, Bill_Number,
+         (Purchase_Id, Party_Id, Return_Number, Bill_Number,
           Bill_Date, Return_Date, State_Of_Supply,
           Total_Amount, Total_Received, Balance_Due, Payment_Type,Reference_Number)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Purchase_Id,
         party.Party_Id,
-        Return_Number  || null,   // ✅ was Return_No (undefined) — now uses destructured value
+        Return_Number  || null,   // ✅ was Return_Number (undefined) — now uses destructured value
         Bill_Number    || null,
         Bill_Date      || null,
         Return_Date,
@@ -354,7 +354,7 @@ const createPurchaseReturn = async (req, res, next) => {
 const editPurchaseReturn = async (req, res, next) => {
   let connection;
   try {
-    const { id: Purchase_Return_Id } = req.params;
+    const { Purchase_Return_Id } = req.params;
  
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -371,7 +371,7 @@ const editPurchaseReturn = async (req, res, next) => {
  
     const {
       Party_Name,
-      Return_No,
+      Return_Number,
       Bill_Number,
       Bill_Date,
       Return_Date,
@@ -394,20 +394,20 @@ const editPurchaseReturn = async (req, res, next) => {
     }
  
     const totalAmount = Number(Total_Amount) || 0;
-    const totalReceived   = Number(Total_Paid)   || 0;
+    const totalReceived = Number(Total_Received) || 0;
     const balanceDue  = Number(Balance_Due)  || totalAmount - totalReceived;
  
     /* update header */
     await connection.query(
       `UPDATE purchase_return SET
-         Party_Id = ?, Return_No = ?, Bill_Number = ?, Bill_Date = ?,
+         Party_Id = ?, Return_Number = ?, Bill_Number = ?, Bill_Date = ?,
          Return_Date = ?, State_Of_Supply = ?,
          Total_Amount = ?,Total_Received = ?, Balance_Due = ?,
          Payment_Type = ?, updated_at = NOW()
-       WHERE Purchase_Return_Id = ?`,
+       WHERE id = ?`,
       [
         party.Party_Id,
-        Return_No    || null,
+        Return_Number    || null,
         Bill_Number  || null,
         Bill_Date    || null,
         Return_Date,
@@ -466,14 +466,14 @@ const editPurchaseReturn = async (req, res, next) => {
              Quantity = ?, Purchase_Price = ?,
              Discount_On_Purchase_Price = ?, Discount_Type_On_Purchase_Price = ?,
              Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
-           WHERE Purchase_Return_Item_Id = ?`,
+           WHERE id = ?`,
           [
             Number(Quantity), Number(Purchase_Price),
             Number(Discount_On_Purchase_Price) || 0,
             Discount_Type_On_Purchase_Price    || "percentage",
             Tax_Type || null, Number(Tax_Amount) || 0,
             Number(Amount),
-            old.Purchase_Return_Item_Id,
+            old.id,
           ]
         );
  
@@ -491,13 +491,13 @@ const editPurchaseReturn = async (req, res, next) => {
         const Purchase_Return_Item_Id = await generateReturnItemId(connection);
         await connection.query(
           `INSERT INTO purchase_return_items
-             (Purchase_Return_Item_Id, Purchase_Return_Id, Item_Id, Item_Name,
+             ( Purchase_Return_Id, Item_Id, Item_Name,
               Item_Category, Item_HSN, Item_Unit, Quantity, Purchase_Price,
               Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
               Tax_Type, Tax_Amount, Amount)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            Purchase_Return_Item_Id, Purchase_Return_Id, Item_Id, Item_Name,
+             Purchase_Return_Id, Item_Id, Item_Name,
             Item_Category || "", Item_HSN || "", Item_Unit || "",
             Number(Quantity), Number(Purchase_Price),
             Number(Discount_On_Purchase_Price) || 0,
@@ -518,8 +518,8 @@ const editPurchaseReturn = async (req, res, next) => {
     for (const old of oldItems) {
       if (!newItemIds.has(old.Item_Id)) {
         await connection.query(
-          `DELETE FROM purchase_return_items WHERE Purchase_Return_Item_Id = ?`,
-          [old.Purchase_Return_Item_Id]
+          `DELETE FROM purchase_return_items WHERE id = ?`,
+          [old.id]
         );
         /* restore stock because we un-returned these items */
         await connection.query(

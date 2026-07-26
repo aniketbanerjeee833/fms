@@ -4,9 +4,9 @@ import { createPurchaseReturn, deletePurchaseReturn, editPurchaseReturn, getAllP
     getPurchaseReturnById } from "../controllers/purchaseReturnController.js";
 
 router.get("/",      getAllPurchaseReturns);
-router.get("/:id",   getPurchaseReturnById);
+router.get("/:Purchase_Return_Id",   getPurchaseReturnById);
 router.post("/:Purchase_Id",     createPurchaseReturn);
-router.put("/:id",   editPurchaseReturn);
+router.put("/:Purchase_Return_Id",   editPurchaseReturn);
 router.delete("/:id", deletePurchaseReturn);
 
 export default router;

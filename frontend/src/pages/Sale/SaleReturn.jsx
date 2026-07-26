@@ -1,8 +1,9 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useGetAllSalesQuery } from "../../redux/api/saleApi";
+
 import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
+import { useGetAllSaleReturnsQuery } from "../../redux/api/saleReturnApi";
 
 // import { SiMicrosoftexcel } from "react-icons/si";
 export default function SaleReturn() {
@@ -16,13 +17,19 @@ export default function SaleReturn() {
   const toDate = searchParams.get("toDate") || "";
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
-  const { data: sales, isLoading } = useGetAllSalesQuery({
+  // const { data: saleReturns, isLoading } = useGetAllSalesQuery({
+  //   page,
+  //   search: searchTerm,
+  //   fromDate,
+  //   toDate,
+  // });
+    const { data: saleReturns, isLoading } = useGetAllSaleReturnsQuery({
     page,
     search: searchTerm,
     fromDate,
     toDate,
   });
-  console.log(sales);
+  //console.log(saleReturns);
 
   // const[selecedSales,setSelectedSales]= useState(null);
 
@@ -72,7 +79,7 @@ export default function SaleReturn() {
   };
 
 
-  console.log(sales?.sales);
+  // console.log(saleReturns?.saleReturns);
 
   return (
     <>
@@ -114,14 +121,14 @@ export default function SaleReturn() {
 
             <div className="flex flex-row justify-between items-center mb-4 sm:mb-4">
               <div>
-                <h4 className="text-2xl font-bold mb-1">All Sales</h4>
+                <h4 className="text-2xl font-bold mb-1">Credit Notes</h4>
                 <p className="text-gray-500 text-sm sm:text-base">
-                  All Sale Details
+                  All Credit Note Details
                 </p>
               </div>
 
 
-              <button
+              {/* <button
                 style={{
                   outline: "none",
                   boxShadow: "none",
@@ -131,7 +138,7 @@ export default function SaleReturn() {
                 onClick={() => navigate("/sale/add")}
               >
                 Add Sale
-              </button>
+              </button> */}
             </div>
 
 
@@ -205,7 +212,7 @@ export default function SaleReturn() {
               </div>
 
 
-              <div className="hidden sm:block">
+              {/* <div className="hidden sm:block">
                 <button
                   style={{
                     outline: "none",
@@ -217,7 +224,7 @@ export default function SaleReturn() {
                 >
                   Add Sale
                 </button>
-              </div>
+              </div> */}
             </div>
 
 
@@ -228,7 +235,7 @@ export default function SaleReturn() {
             {/* Total Sales */}
             <div className="mb-2 text-left">
               <p className="text-sm font-medium text-black">Total Sales Amount</p>
-              <h4 className="text-3xl font-bold text-black">₹ {sales?.totals?.totalAmount}</h4>
+              <h4 className="text-3xl font-bold text-black">₹ {saleReturns?.totals?.totalAmount}</h4>
             </div>
 
             {/* Divider */}
@@ -238,12 +245,12 @@ export default function SaleReturn() {
             <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
               <div className="flex  ">
                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {sales?.totals?.totalReceived}</span>
+                <span className="text-sm font-semibold text-black">₹ {saleReturns?.totals?.totalReceived}</span>
               </div>
 
               <div className="flex">
                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {sales?.totals?.totalBalance}</span>
+                <span className="text-sm font-semibold text-black">₹ {saleReturns?.totals?.totalBalance}</span>
               </div>
             </div>
 
@@ -278,9 +285,9 @@ export default function SaleReturn() {
         <div className="tab-inn">
           <div className="table-responsive table-desi">
             {isLoading ? (
-              <p className="text-center mt-4">Fetching sales...</p>
-            ) : sales?.length === 0 ? (
-              <p className="text-center mt-4">No sales found.</p>
+              <p className="text-center mt-4">Fetching saleReturns...</p>
+            ) : saleReturns?.length === 0 ? (
+              <p className="text-center mt-4">No saleReturns found.</p>
             ) : (
 
 
@@ -296,17 +303,17 @@ export default function SaleReturn() {
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
                     <th className="text-left">Balance Due</th>
-                    <th>View</th>
-                    <th>Edit</th>
+                    {/* <th>View</th> */}
+                    <th>Edit/View</th>
 
                   </tr>
                 </thead>
                 <tbody>
-                  {sales && sales?.sales?.length > 0 ? (
-                    sales?.sales?.map((sale, idx) => (
-                      <tr key={sale?.Sale_Id}>
+                  {saleReturns && saleReturns?.saleReturns?.length > 0 ? (
+                    saleReturns?.saleReturns?.map((sale, idx) => (
+                      <tr key={sale?.id}>
                         <td>
-                          {(sales?.currentPage - 1) * 10 + (idx + 1)}.
+                          {(saleReturns?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
                         <td >
                           {sale?.Invoice_Date
@@ -327,14 +334,14 @@ export default function SaleReturn() {
                         <td>{sale?.Total_Amount || "N/A"}</td>
                         <td>{sale?.Balance_Due || "N/A"}</td>
 
-                        <td >
+                        {/* <td > */}
                           {/* <NavLink
                                   to={`/sale/edit/${sale.Sale_Id}${location.search}`}
 
                                 > */}
                           {/* <NavLink to={`/sale/view/${sale?.Sale_Id}`}
                                   state={{ from: "all-sale-list" }}> */}
-                          <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
+                          {/* <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
                             state={{ from: "all-sale-list" }}>
                             <Eye
                               style={{
@@ -342,7 +349,7 @@ export default function SaleReturn() {
                                 backgroundColor: "transparent",
                                 color: "#4CA1AF"
                               }} />
-                          </NavLink>
+                          </NavLink> */}
                           {/* <i
                                                                     style={{
                                                                         cursor: "pointer",
@@ -350,13 +357,13 @@ export default function SaleReturn() {
                                                                         color: "#7346ff"
                                                                     }}
                                                                     className="fa fa-eye mr-o" aria-hidden="true"></i> */}
-                        </td>
+                        {/* //</td> */}
                         <td>
                           {/* <NavLink to={`/sale/edit/${sale?.Sale_Id}`}
                                                                 state={{from:"all-sale-list"}}>               */}
                           <NavLink
-                            to={`/sale/edit/${sale.Sale_Id}${location.search}`}
-                            state={{ from: "all-sale-list" }}
+                            to={`/sale/return/edit/${sale.id}${location.search}`}
+                            state={{ from: "all-sale-return-list" }}
 
                           >
 
@@ -427,7 +434,7 @@ export default function SaleReturn() {
         </button>
       ))} */}
               {(() => {
-                const totalPages = sales?.totalPages || 1;
+                const totalPages = saleReturns?.totalPages || 1;
                 const maxVisible = 5; // how many pages around current
                 const pages = [];
 
@@ -504,18 +511,18 @@ export default function SaleReturn() {
 
             {/* CURRENT PAGE — MOBILE ONLY */}
             <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-              Page {page} / {sales?.totalPages || 1}
+              Page {page} / {saleReturns?.totalPages || 1}
             </div>
 
             {/* NEXT */}
             <button
               type="button"
               onClick={() => handleNextPage()}
-              disabled={page === sales?.totalPages ||
-                sales?.totalPages === 0}
+              disabled={page === saleReturns?.totalPages ||
+                saleReturns?.totalPages === 0}
               className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === sales?.totalPages ||
-                  sales?.totalPages === 0
+        ${page === saleReturns?.totalPages ||
+                  saleReturns?.totalPages === 0
                   ? 'opacity-50 '
                   : ''
                 }
@@ -536,7 +543,7 @@ export default function SaleReturn() {
                 >
                   ← Previous
                 </button>
-                {[...Array(sales?.totalPages).keys()].map((index) => (
+                {[...Array(saleReturns?.totalPages).keys()].map((index) => (
                   <button
                     key={index}
                     onClick={() => handlePageChange(index + 1)}
@@ -553,9 +560,9 @@ export default function SaleReturn() {
 
                 <button type="button"
                   onClick={() => handleNextPage()}
-                  disabled={page === sales?.totalPages || sales?.totalPages === 0}
+                  disabled={page === saleReturns?.totalPages || saleReturns?.totalPages === 0}
                   className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-                ${page === sales?.totalPages || sales?.totalPages === 0 ? 'opacity-50 ' : ''}
+                ${page === saleReturns?.totalPages || saleReturns?.totalPages === 0 ? 'opacity-50 ' : ''}
                 `}
                 >
                   Next →

@@ -19,8 +19,8 @@ const getAllSaleReturns = async (req, res, next) => {
     if (search) {
       whereClauses.push(`(
         LOWER(p.Party_Name)   LIKE ? OR
-        LOWER(sr.Return_No)      LIKE ? OR
-        LOWER(sr.Bill_Number)    LIKE ? OR
+        LOWER(sr.Return_Number)      LIKE ? OR
+        LOWER(sr.Invoice_Number)    LIKE ? OR
         CAST(sr.Total_Amount AS CHAR) LIKE ?
       )`);
       const like = `%${search}%`;
@@ -43,7 +43,7 @@ const getAllSaleReturns = async (req, res, next) => {
     const [rows] = await connection.query(
       `SELECT sr.*, p.Party_Name
        FROM sale_return sr
-       LEFT JOIN add_party c ON c.Party_Id = sr.Party_Id
+       LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
        ${whereSQL}
        ORDER BY sr.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -89,14 +89,14 @@ const getSaleReturnById = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
-    const { id } = req.params;
+    const { Sale_Return_Id } = req.params;
 
     const [[header]] = await connection.query(
       `SELECT sr.*, p.Party_Name
        FROM sale_return sr
-       LEFT JOIN add_party c ON c.Party_Id = sr.Party_Id
+       LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
        WHERE sr.id = ?`,
-      [id]
+      [Sale_Return_Id]
     );
 
     if (!header) {
@@ -108,7 +108,7 @@ const getSaleReturnById = async (req, res, next) => {
        FROM sale_return_items sri
        LEFT JOIN add_item ai ON ai.Item_Id = sri.Item_Id
        WHERE sri.Sale_Return_Id = ?`,
-      [id]
+      [Sale_Return_Id]
     );
 
     return res.status(200).json({ success: true, saleReturn: { ...header, items } });
@@ -132,8 +132,8 @@ const createSaleReturn = async (req, res, next) => {
     const {
       Party_Name,
       Return_Number,
-      Bill_Number,
-      Bill_Date,
+      Invoice_Number,
+      Invoice_Date,
       Return_Date,
       State_Of_Supply,
       Total_Amount,
@@ -170,16 +170,16 @@ const createSaleReturn = async (req, res, next) => {
     /* ── insert header ── get insertId for items ── */
     const [headerResult] = await connection.query(
       `INSERT INTO sale_return
-         (Sale_Id, Party_Id, Return_No, Bill_Number,
-          Bill_Date, Return_Date, State_Of_Supply,
+         (Sale_Id, Party_Id, Return_Number, Invoice_Number,
+          Invoice_Date, Return_Date, State_Of_Supply,
           Total_Amount, Total_Paid, Balance_Due, Payment_Type, Reference_Number)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Sale_Id,
         party.Party_Id,
         Return_Number   || null,
-        Bill_Number     || null,
-        Bill_Date       || null,
+        Invoice_Number     || null,
+        Invoice_Date      || null,
         Return_Date,
         State_Of_Supply || null,
         totalAmount,
@@ -285,7 +285,7 @@ const createSaleReturn = async (req, res, next) => {
 const editSaleReturn = async (req, res, next) => {
   let connection;
   try {
-    const { id: Sale_Return_Id } = req.params;
+    const { Sale_Return_Id } = req.params;
 
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -303,8 +303,8 @@ const editSaleReturn = async (req, res, next) => {
     const {
       Party_Name,
       Return_Number,
-      Bill_Number,
-      Bill_Date,
+      Invoice_Number,
+      Invoice_Date,
       Return_Date,
       State_Of_Supply,
       Total_Amount,
@@ -332,7 +332,7 @@ const editSaleReturn = async (req, res, next) => {
     /* update header */
     await connection.query(
       `UPDATE sale_return SET
-         Party_Id = ?, Return_No = ?, Bill_Number = ?, Bill_Date = ?,
+         Party_Id = ?, Return_Number = ?, Invoice_Number = ?, Invoice_Date= ?,
          Return_Date = ?, State_Of_Supply = ?,
          Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
          Payment_Type = ?, Reference_Number = ?, updated_at = NOW()
@@ -340,8 +340,8 @@ const editSaleReturn = async (req, res, next) => {
       [
         party.Party_Id,
         Return_Number   || null,
-        Bill_Number     || null,
-        Bill_Date       || null,
+        Invoice_Number     || null,
+        Invoice_Date      || null,
         Return_Date,
         State_Of_Supply || null,
         totalAmount,

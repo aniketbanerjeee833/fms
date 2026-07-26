@@ -290,8 +290,8 @@ export default function PurchaseReturn() {
                       <th className="text-left">Payment Type</th>
                       <th className="text-left">Amount </th>
                       <th className="text-left">Balance Due</th>
-                      <th>View</th>
-                      <th>Edit</th>
+                      <th>View/Edit</th>
+                      {/* <th>Edit</th> */}
                     </tr>
                   </thead>
                   <tbody>
@@ -320,21 +320,8 @@ export default function PurchaseReturn() {
                           <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
                           <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
 
-                          <td >
-                            {/* <i
-                                                                    style={{
-                                                                        cursor: "pointer",
-                                                                        backgroundColor: "transparent",
-                                                                        color: "#7346ff"
-                                                                    }}
-                                                                    onClick={() => navigate(`/purchaseReturn/view/${purchaseReturn?.Purchase_Id}`)}
-                                                                   className="fa fa-eye mr-o" aria-hidden="true"></i> */}
-                            {/* <Eye onClick={() => navigate(`/purchaseReturn/view/${purchaseReturn?.Purchase_Id}`)}
-                                  style={{
-                                    cursor: "pointer",
-                                    backgroundColor: "transparent",
-                                    color: "#4CA1AF"
-                                  }} /> */}
+                          {/* <td >
+                           
                             <NavLink to={`/purchaseReturn/view/${purchaseReturn?.Purchase_Id}${location.search}`}
                               state={{ from: "all-purchaseReturn-list" }}>
                               <Eye
@@ -344,12 +331,12 @@ export default function PurchaseReturn() {
                                   color: "#4CA1AF"
                                 }} />
                             </NavLink>
-                          </td>
+                          </td> */}
                           <td
                           >
                             <NavLink
-                              to={`/purchaseReturn/edit/${purchaseReturn?.Purchase_Id}${location.search}`}
-                              state={{ from: "all-purchaseReturn-list" }}
+                              to={`/purchase/return/edit/${purchaseReturn?.id}${location.search}`}
+                              state={{ from: "all-purchase-return-list" }}
 
                             >
 
@@ -410,21 +397,7 @@ export default function PurchaseReturn() {
               {/* PAGE NUMBERS — DESKTOP / TABLET */}
               <div style={{ marginRight: "0px" }}
                 className="hidden sm:flex space-x-2">
-                {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
-        <button
-          key={index}
-          onClick={() => handlePageChange(index + 1)}
-          className={
-            `px-3 py-1 rounded ${
-              page === index + 1
-                ? 'bg-[#ff0000] text-white'
-                : 'bg-gray-200 hover:bg-gray-300'
-            }`
-          }
-        >
-          {index + 1}
-        </button>
-      ))} */}
+              
                 {(() => {
                   const totalPages = purchaseReturns?.totalPages || 1;
                   const maxVisible = 5; // how many pages around current
@@ -569,35 +542,4 @@ export default function PurchaseReturn() {
       )
 }
 
-      {/* <div className="p-2 border-r border-gray-300 overflow-x-auto ">
-                                                    <table className="w-full ">
-                                                        <thead>
-                                                            <tr>
-                                                                <th className="text-left">Item Name</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {purchaseReturns &&
-                                                                purchaseReturns.length > 0 &&
-                                                                purchaseReturns.map((purchaseReturn) => (
-                                                                    <tr
-                                                                        key={ purchaseReturn?.Purchase_Id }
-                                                                        className={
-                                                                            selectedPurchase?.Purchase_Id=== purchaseReturn?.Purchase_Id
-                                                                                ? "bg-[#f3f2fd]  text-[#7346ff]"
-                                                                                : ""
-                                                                        }
-                                                                    >
-                                                                        <td
-                                                                            onClick={() => handleItemClick(purchaseReturn?.Item_Id)}
-                                                                            className="cursor-pointer"
-                                                                        >
-                                                                            {item?.Item_Name}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div> */}
-
-      {/* Right side (Party Details) */}
+     

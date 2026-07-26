@@ -4,27 +4,29 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import {  useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import {  itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
 
 import { toast } from "react-toastify";
 
 
-import { saleApi, useEditSaleMutation, useGetSingleSaleQuery } from "../../redux/api/saleApi";
-import { saleFormSchema } from "../../schema/saleFormSchema";
+import {  useGetSingleSaleQuery } from "../../redux/api/saleApi";
+
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
-import { dashboardApi } from "../../redux/api/dashboardApi";
+
+import { saleReturnApi, useCreateSaleReturnMutation } from "../../redux/api/saleReturnApi";
+import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 
 
 
 
-export default function SaleEdit() {
+export default function SaleReturnAdd() {
 
   const location = useLocation();
   const from = location.state?.from
@@ -148,7 +150,7 @@ export default function SaleEdit() {
     reset,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(saleFormSchema),
+    resolver: zodResolver(saleReturnFormSchema),
     defaultValues: {
         Return_Date:      new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
          Return_Number:"",
@@ -159,7 +161,7 @@ export default function SaleEdit() {
       State_Of_Supply: "",
       Total_Amount: "",
       Balance_Due: "",
-      Total_Received: "",
+      Total_Paid: "",
       Payment_Type: "Cash",
       Reference_Number: "",
       items: [{
@@ -195,7 +197,7 @@ export default function SaleEdit() {
     },
   ]);
 
-  const [editSale, { isLoading: isEditingSale }] = useEditSaleMutation();
+ const [createSaleReturn, { isLoading: isCreating }] = useCreateSaleReturnMutation();
   // helper to update a field in a specific row
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -279,13 +281,35 @@ export default function SaleEdit() {
     });
   };
 
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
+
   const handleDeleteRow = (i) => {
-    setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-    remove(i); // remove from form
-  };
+  // 1. get current items BEFORE removal
+  const currentItems = watch("items");
+ 
+  // 2. calculate new total excluding the deleted row
+  const newTotal = currentItems.reduce((sum, row, idx) => {
+    if (idx === i) return sum;                    // skip deleted row
+    return sum + parseFloat(row.Amount || 0);
+  }, 0);
+ 
+  const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+  const newBalanceDue = newTotal - currentTotalPaid;
+ 
+  // 3. remove from UI state and form
+  setRows((prev) => prev.filter((_, idx) => idx !== i));
+  remove(i);
+ 
+  // 4. update totals
+  setValue("Total_Amount", newTotal.toFixed(2),      { shouldValidate: true });
+  setValue("Balance_Due",  newBalanceDue.toFixed(2), { shouldValidate: true });
+};
 
   const itemsValues = watch("items");   // watch all item rows
-  const totalReceived = watch("Total_Received"); // watch Total_Received
+  const totalPaid = watch("Total_Paid"); // watch Total_Paid
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
 
   // helper to calculate amount in a specific row
@@ -325,7 +349,7 @@ export default function SaleEdit() {
       Tax_Amount: taxAmount.toFixed(2),
       Amount: finalAmount.toFixed(2),
       Total_Amount: totalAmount.toFixed(2), // ✅ correct grand total
-      Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
+      Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
 
@@ -385,8 +409,9 @@ export default function SaleEdit() {
         //  Invoice_Date: sale.invoicePartyDetails?.Invoice_Date,
         State_Of_Supply: sale.invoicePartyDetails?.State_Of_Supply || "",
         Total_Amount: sale.invoicePartyDetails?.Total_Amount || "",
-        Total_Received: sale.invoicePartyDetails?.Total_Received || "",
-        Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
+        //Total_Paid: sale.invoicePartyDetails?.Total_Paid || "",
+        Balance_Due:"",
+        //Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
         Payment_Type: sale.invoicePartyDetails?.Payment_Type || "",
         Reference_Number: sale.invoicePartyDetails?.Reference_Number || "",
 
@@ -395,7 +420,7 @@ export default function SaleEdit() {
     }
   }, [sale]);
   //const Invoice_Number=sale.invoicePartyDetails?.Invoice_Number 
-  //const Invoice_Date=sale.invoicePartyDetails?.Invoice_Date
+  //const Invoice_Date=sale?.invoicePartyDetails?.Invoice_Date
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
@@ -408,118 +433,183 @@ export default function SaleEdit() {
     }
   }, [sale]);
 
-  const onSubmit = async (data) => {
-    console.log("🧾 Form Data (from RHF):", data);
+  // const onSubmit = async (data) => {
+  //   console.log("🧾 Form Data (from RHF):", data);
 
-    // ✅ Validate that at least one item is present
-    if (!data.items || data.items.length === 0) {
-      toast.error("Please add at least one item before saving the sale.");
-      return;
-    }
+  //   // ✅ Validate that at least one item is present
+  //   if (!data.items || data.items.length === 0) {
+  //     toast.error("Please add at least one item before saving the sale.");
+  //     return;
+  //   }
 
-    // ✅ Clean up items (optional safety — remove blank rows)
-    const cleanedItems = data.items.filter(
-      (it) => it.Item_Name && it.Item_Name.trim() !== ""
-    );
+  //   // ✅ Clean up items (optional safety — remove blank rows)
+  //   const cleanedItems = data.items.filter(
+  //     (it) => it.Item_Name && it.Item_Name.trim() !== ""
+  //   );
 
-    if (cleanedItems.length === 0) {
-      toast.error("Please add at least one valid item with a name.");
-      return;
-    }
+  //   if (cleanedItems.length === 0) {
+  //     toast.error("Please add at least one valid item with a name.");
+  //     return;
+  //   }
 
-    // ✅ Validate no duplicates
-    const seenItems = new Set();
-    for (const item of cleanedItems) {
-      const name = item.Item_Name?.trim().toLowerCase();
+  //   // ✅ Validate no duplicates
+  //   const seenItems = new Set();
+  //   for (const item of cleanedItems) {
+  //     const name = item.Item_Name?.trim().toLowerCase();
 
-      if (seenItems.has(name)) {
-        toast.error(`Duplicate item '${item.Item_Name}' found.`);
-        return;
-      }
-      seenItems.add(name);
-    }
+  //     if (seenItems.has(name)) {
+  //       toast.error(`Duplicate item '${item.Item_Name}' found.`);
+  //       return;
+  //     }
+  //     seenItems.add(name);
+  //   }
 
-    // ✅ Ensure all items have tax & amount values (since auto-calculated)
-    const itemsWithDefaults = cleanedItems.map((item) => ({
-      ...item,
-      Tax_Type: item.Tax_Type || "None",
-      Tax_Amount: item.Tax_Amount || "0.00",
-      Amount: item.Amount || "0.00",
-    }));
+  //   // ✅ Ensure all items have tax & amount values (since auto-calculated)
+  //   const itemsWithDefaults = cleanedItems.map((item) => ({
+  //     ...item,
+  //     Tax_Type: item.Tax_Type || "None",
+  //     Tax_Amount: item.Tax_Amount || "0.00",
+  //     Amount: item.Amount || "0.00",
+  //   }));
 
-    // ✅ Build final payload
-    const payload = {
-      ...data,
-      items: itemsWithDefaults,
-      Total_Amount: data.Total_Amount || 0,
-      Total_Received: data.Total_Received || 0,
-      Balance_Due:
-        data.Balance_Due ||
-        ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-    };
+  //   // ✅ Build final payload
+  //   const payload = {
+  //     ...data,
+  //     items: itemsWithDefaults,
+  //     Total_Amount: data.Total_Amount || 0,
+  //     Total_Paid: data.Total_Paid || 0,
+  //     Balance_Due:
+  //       data.Balance_Due ||
+  //       ((data.Total_Amount || 0) - (data.Total_Paid || 0)),
+  //   };
 
-    console.log("📦 Final Payload Sent:", payload);
+  //   console.log("📦 Final Payload Sent:", payload);
 
-    // ✅ Submit to backend
-    try {
-      const res = await editSale({
-        Sale_Id,
-        body: payload,
-      }).unwrap();
+  //   // ✅ Submit to backend
+  //   try {
+  //     const res = await editSale({
+  //       Sale_Id,
+  //       body: payload,
+  //     }).unwrap();
 
-      if (!res?.success) {
-        toast.error("Failed to update sale. Please try again.");
-        return;
-      }
+  //     if (!res?.success) {
+  //       toast.error("Failed to update sale. Please try again.");
+  //       return;
+  //     }
 
-      // ✅ Refresh & navigate
+  //     // ✅ Refresh & navigate
      
-      dispatch(saleApi.util.invalidateTags(["Sale"]));
+  //     dispatch(saleApi.util.invalidateTags(["Sale"]));
 
-      dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
+  //     dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
 
-      toast.success("Sale updated successfully!");
-      //   navigate({
-      //   pathname: "/sale/all-sales",
-      //   search: location.search,
-      // });
-      if (from === "party-receivables") {
-        navigate({
-          pathname: `/party/receivables`,
-          search: location.search,
-        })
-      }
-      else if (from === "party-sales-purchases-details") {
+  //     toast.success("Sale updated successfully!");
+  //     //   navigate({
+  //     //   pathname: "/sale/all-sales",
+  //     //   search: location.search,
+  //     // });
+  //     if (from === "party-receivables") {
+  //       navigate({
+  //         pathname: `/party/receivables`,
+  //         search: location.search,
+  //       })
+  //     }
+  //     else if (from === "party-sales-purchases-details") {
 
-        navigate({
-          pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-          search: location.search,
-        })
-        dispatch(partyApi.util.invalidateTags(["Party"]));
-      }
-       else if (from === "item-sales-purchases-details") {
-                          navigate({
-                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                            search: location.search,
-                          })
-                           dispatch(itemApi.util.invalidateTags(["Item"]));
-                          // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                        } 
-      else {
-        navigate({
-          pathname: "/sale/all-sales",
-          search: location.search,
-        });
-      }
-      // navigate("/sale/all-sales");
-    } catch (error) {
-      const message =
-        error?.data?.message || error?.message || "Failed to update sale.";
-      toast.error(message);
-      console.error("❌ Submission failed:", error);
+  //       navigate({
+  //         pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+  //         search: location.search,
+  //       })
+  //       dispatch(partyApi.util.invalidateTags(["Party"]));
+  //     }
+  //      else if (from === "item-sales-purchases-details") {
+  //                         navigate({
+  //                           pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+  //                           search: location.search,
+  //                         })
+  //                          dispatch(itemApi.util.invalidateTags(["Item"]));
+  //                         // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+  //                       } 
+  //     else {
+  //       navigate({
+  //         pathname: "/sale/all-sales",
+  //         search: location.search,
+  //       });
+  //     }
+  //     // navigate("/sale/all-sales");
+  //   } catch (error) {
+  //     const message =
+  //       error?.data?.message || error?.message || "Failed to update sale.";
+  //     toast.error(message);
+  //     console.error("❌ Submission failed:", error);
+  //   }
+  // };
+const onSubmit = async (data) => {
+  console.log("Form Data (from RHF):", data);
+ 
+  const payload = { ...data };
+ 
+  // ── validate items ──
+  const seenItems = new Set();
+  for (const item of payload.items) {
+    const name     = item.Item_Name?.trim().toLowerCase();
+    const category = item.Item_Category?.trim().toLowerCase();
+    const itemHSN  = item.Item_HSN?.trim().toLowerCase();
+    const Quantity = item.Quantity;
+ 
+    if (!name || !category || !itemHSN || !Quantity) {
+      toast.error("Each item must have a valid name, category, HSN and quantity.");
+      return;
     }
-  };
-
+ 
+    if (seenItems.has(name)) {
+      toast.error(
+        `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+      );
+      return;
+    }
+    seenItems.add(name);
+  }
+ 
+  console.log("payload:", payload);
+ 
+  try {
+   const res = await createSaleReturn({
+     Sale_Id: Sale_Id,   // ← from useParams() or props
+     ...payload,                 // ← everything else (Party_Name, items, etc.)
+   }).unwrap();
+    //console.log("Created successfully:", res);
+ 
+    // invalidate so list refetches
+    dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
+   dispatch(itemApi.util.invalidateTags(["Item"]));
+    if (!res?.success) {
+      toast.error("Failed to add credit note");
+      return;
+    }
+ 
+    toast.success("Credit note added  successfull!");
+ 
+    // ── navigate back based on where user came from ──
+    if (from === "all-sale-return-list") {
+      navigate({
+        pathname: "/sale/return",
+        search: location.search,
+      });
+    } else {
+      navigate({
+        pathname: "/sale/return",
+        search: location.search,
+      });
+    }
+ 
+  } catch (error) {
+    const errorMessage =
+      error?.data?.message || error?.message || "Failed to add credit note.";
+    toast.error(errorMessage);
+    //console.error("Submission failed", error);
+  }
+};
   console.log(itemsValues, "itemsValues");
   return (
     <>
@@ -803,8 +893,8 @@ export default function SaleEdit() {
                           id=" Invoice_Number"
                           //value={Invoice_Number}
                           
-                        //   {...register("Invoice_Number")}
-                          //placeholder=" Invoice_Number"
+                          {...register("Invoice_Number")}
+                          placeholder=" Invoice_Number"
                           style={{ marginBottom: 0, border: "none", width: "50%" }}
                           className="w-full outline-none  text-gray-900
                           invoice-number-class"
@@ -830,10 +920,12 @@ export default function SaleEdit() {
                         <input
                           type="text"
                           id=" Invoice_Date"
+                          
                           //value={toLocalDateString(Invoice_Date) || ""}
                           style={{ marginBottom: 0, width: "50%", border: "none" }}
-                          //{...register("Invoice_Date")}
+                          {...register("Invoice_Date")}
                           //placeholder=" Invoice_Date"
+                          readOnly
                           className="w-full outline-none invoice-date-class text-gray-900"
                         
                         />
@@ -1665,7 +1757,7 @@ export default function SaleEdit() {
                               onChange={(e) => {
                                 const isChecked = e.target.checked;
                                 const totalAmount = parseFloat(watch("Total_Amount"));
-                                const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                                const totalPaid = parseFloat(watch("Total_Paid")) || 0;
 
                                 if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -1676,7 +1768,7 @@ export default function SaleEdit() {
                                   const rounded = Math.round(totalAmount);
 
                                   setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                                  setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                                  setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
 
                                 } else {
                                   if (originalTotal !== null) {
@@ -1684,7 +1776,7 @@ export default function SaleEdit() {
 
                                     setValue(
                                       "Balance_Due",
-                                      (originalTotal - totalReceived).toFixed(2),
+                                      (originalTotal - totalPaid).toFixed(2),
                                       { shouldValidate: true }
                                     );
                                   }
@@ -1705,7 +1797,7 @@ export default function SaleEdit() {
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value) || 0;
                                 const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                                const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                                const totalPaid = parseFloat(watch("Total_Paid")) || 0;
 
                                 if (isNaN(totalAmount)) return;
 
@@ -1713,7 +1805,7 @@ export default function SaleEdit() {
                                 const newTotal = totalAmount + val;
 
                                 setValue("Total_Amount", newTotal.toFixed(2));
-                                setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
+                                setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
                               }}
                             // disabled={!watch("roundOffCheck") && originalTotal === null}
                             />
@@ -1757,18 +1849,18 @@ export default function SaleEdit() {
 
 
                                       // Clear both fields to stay consistent
-                                      setValue("Total_Received", "");
+                                      setValue("Total_Paid", "");
                                       setValue("Balance_Due", "");
                                       return;
                                     }
 
                                     if (isChecked) {
                                       // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
-                                      setValue("Total_Received", totalAmount.toFixed(2));
+                                      setValue("Total_Paid", totalAmount.toFixed(2));
                                       setValue("Balance_Due", 0);
                                     } else {
                                       // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                      setValue("Total_Received", "");
+                                      setValue("Total_Paid", "");
                                       setValue("Balance_Due", totalAmount.toFixed(2));
                                     }
                                   }}
@@ -1777,7 +1869,7 @@ export default function SaleEdit() {
                                   htmlFor="totalReceivedCheck"
                                   className="font-medium whitespace-nowrap"
                                 >
-                                  Total Received
+                                  Total Paid
                                 </span>
 
                               </div>
@@ -1785,7 +1877,7 @@ export default function SaleEdit() {
 
                               <input
                                 type="text"
-                                {...register("Total_Received")}
+                                {...register("Total_Paid")}
                                 style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
                                 onChange={(e) => {
                                   let val = e.target.value.replace(/[^0-9.]/g, "");
@@ -1801,11 +1893,11 @@ export default function SaleEdit() {
                                   }
 
                                   e.target.value = val;
-                                  setValue("Total_Received", val);
+                                  setValue("Total_Paid", val);
 
-                                  const totalReceived = parseFloat(val || 0);
+                                  const totalPaid = parseFloat(val || 0);
                                   const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                                  setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                                  setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
                                 }}
                               // className="form-control"
                               />
@@ -1837,13 +1929,9 @@ export default function SaleEdit() {
                     </div>
                   </div>
                   <div className="flex justify-end gap-4 mt-4">
-                    <button
+                    {/* <button
                       type="button"
-                      //          onClick={()=> navigate({
-                      // pathname: "/sale/all-sales",
-                      //   search: location.search,
-                      // })
-                      //          }
+                     
                       onClick={() => {
                         if (from === "party-sales-purchases-details") {
 
@@ -1874,14 +1962,14 @@ export default function SaleEdit() {
                       style={{ backgroundColor: "#4CA1AF" }}
                     >
                       Cancel
-                    </button>
+                    </button> */}
                     <button
                       type="submit"
-                      disabled={formValues.errorCount > 0 || isEditingSale}
+                      disabled={formValues.errorCount > 0 || isCreating}
                       className=" text-white font-bold py-2 px-4 rounded"
                       style={{ backgroundColor: "#4CA1AF" }}
                     >
-                      {isEditingSale ? "Updating..." : "Update Sale"}
+                      {isCreating ? "Saving..." : "Save"}
                     </button>
                   </div>
                 </form>
@@ -1913,21 +2001,7 @@ export default function SaleEdit() {
             setShowAddUnitModal(false);
             setActiveUnitRow(null);
           }}
-        // onSave={({  unitKey }) => {
-        //   // 1️⃣ Add unit to dropdown list
-        //   // setItemUnits((prev) => ({
-        //   //   ...prev,
-        //   //   [unitKey]: unitName,
-        //   // }));
-
-        //   // 2️⃣ Auto-select newly added unit
-        //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
-        //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
-
-        //   // 3️⃣ Close modal
-        //   setShowAddUnitModal(false);
-        //   setActiveUnitRow(null);
-        // }}
+        
         />
       )}
       <style>

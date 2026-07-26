@@ -18,7 +18,7 @@ export const saleReturnApi = createApi({
 
     /* GET SINGLE */
     getSaleReturnById: builder.query({
-      query: (id) => `/sale-return/${id}`,
+      query: (Sale_Return_Id) => `/sale-return/${Sale_Return_Id}`,
       providesTags: (_r, _e, id) => [{ type: "SaleReturn", id }],
     }),
 
@@ -33,9 +33,9 @@ export const saleReturnApi = createApi({
     }),
 
     /* EDIT */
-    editSaleReturn: builder.mutation({
-      query: ({ id, ...body }) => ({
-        url: `/sale-return/${id}`,
+    updateSaleReturn: builder.mutation({
+      query: ({ Sale_Return_Id, ...body }) => ({
+        url: `/sale-return/${Sale_Return_Id}`,
         method: "PUT",
         body,
       }),
@@ -57,6 +57,6 @@ export const {
   useGetAllSaleReturnsQuery,
   useGetSaleReturnByIdQuery,
   useCreateSaleReturnMutation,
-  useEditSaleReturnMutation,
+  useUpdateSaleReturnMutation,
   useDeleteSaleReturnMutation,
 } = saleReturnApi;
