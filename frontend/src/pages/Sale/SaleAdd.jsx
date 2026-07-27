@@ -20,6 +20,7 @@ import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 
 
@@ -422,6 +423,7 @@ const onSubmit = async(data) => {
     const resData = res?.data || res;
     dispatch(itemApi.util.invalidateTags(["Item"]));
     dispatch(saleApi.util.invalidateTags(["Sale"]));
+    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
     if(!resData?.success){
       toast.error("Failed to add new sale");
       return;

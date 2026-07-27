@@ -64,12 +64,15 @@ const priceStringDigits = z
   // 🔹 Optional but digits if provided
   Total_Paid: z.string().optional().or(digitsOnly("Total_Paid", false)),
 
-   Payment_Type: z
-      .enum(["Cash", "Cheque", "Neft"])
-      .or(z.literal("")) // allow blank select
-      .refine((val) => val !== "", {
-        message: "Please select a payment type.",
-      }),
+ Payment_Type: z
+  .enum(["Cash", "Cheque", "Neft", "Bank"])
+  .or(z.literal(""))
+  .refine((val) => val !== "", {
+    message: "Please select a payment type.",
+  }),
+      Bank_Account_Id: z
+        .union([z.number(), z.string(), z.null(), z.undefined()])
+        .optional(),
   // Payment_Type: z.enum(["Cash", "Cheque", "Neft"]).default("Cash"),
  Reference_Number: z
   .string()
@@ -149,6 +152,12 @@ Purchase_Price:priceStringDigits,
       })
     )
     .nonempty("At least one item must be added"),
-});
+}) .refine(
+    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+    {
+      message: "Please select a bank account.",
+      path: ["Bank_Account_Id"],
+    }
+  );
 
 export default purchaseSchema

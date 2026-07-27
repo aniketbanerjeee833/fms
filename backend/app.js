@@ -12,6 +12,8 @@ import saleReturnRoutes from "./routes/saleReturnRoutes.js"
 import paymentRoutes from "./routes/paymentOutRoutes.js"
 import paymentInRoutes from "./routes/paymentInRoutes.js";
 import saleRoutes from "./routes/saleRoutes.js";
+import cashInHandRoutes from "./routes/cashInHandRoutes.js";
+import bankAccountRoutes from "./routes/bankAccountRoutes.js";
 import dailyExpenseRoutes from "./routes/dailyExpense.js";
 import financialYearRoutes from "./routes/financialYearRoutes.js";
 import miscellaneousRoutes from "./routes/miscellaneousRoutes.js";
@@ -136,6 +138,8 @@ app.use("/api/purchase", purchaseRoutes);
 app.use("/api/payment-out", paymentRoutes)
 app.use("/api/payment-in", paymentInRoutes);
 app.use("/api/sale", saleRoutes);
+app.use("/api/cash-in-hand", cashInHandRoutes);
+app.use("/api/bank", bankAccountRoutes); 
 app.use("/api/daily-expense",dailyExpenseRoutes);
 app.use("/api/financial-year",financialYearRoutes)
 app.use("/api/misc",miscellaneousRoutes)

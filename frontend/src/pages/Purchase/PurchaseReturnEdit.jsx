@@ -24,6 +24,7 @@ import { saleReturnApi } from "../../redux/api/saleReturnApi";
 
 import { purchaseReturnApi, useGetPurchaseReturnByIdQuery, useUpdatePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
 import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 
 
@@ -476,6 +477,7 @@ const onSubmit = async (data) => {
     // invalidate so list refetches
     dispatch(purchaseReturnApi.util.invalidateTags(["PurchaseReturn"]));
     dispatch(itemApi.util.invalidateTags(["Item"]));
+    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
     if (!res?.success) {
       toast.error("Failed to update debit note");
       return;

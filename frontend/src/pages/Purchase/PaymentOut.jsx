@@ -8,6 +8,8 @@ import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useState } from "react";
 import { useAddPaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
 import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 
 export default function PaymentOut() {
@@ -17,6 +19,7 @@ export default function PaymentOut() {
 
     // const [selectedPurchase, setSelectedpaymentOutData] = useState(null);
     // const navigate = useNavigate();
+    const dispatch = useDispatch();
     const [searchParams, setSearchParams] = useSearchParams();
     //const location = useLocation();
     const page = Number(searchParams.get("page")) || 1;
@@ -99,6 +102,7 @@ const handleSavePaymentOut = async (formData) => {
       } else {
         await addPaymentOut(formData).unwrap();
       }
+       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
       setModal({ open: false, mode: "add", data: null });
       toast.success("New Payment Out added")
     } catch (err) {

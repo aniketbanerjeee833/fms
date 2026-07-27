@@ -17,6 +17,8 @@ import { LayoutDashboard } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { dashboardApi } from "../../redux/api/dashboardApi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 export default function PurchaseEdit() {
   const location = useLocation();
@@ -56,6 +58,7 @@ export default function PurchaseEdit() {
   const { data: items } = useGetAllItemsQuery();
 
   const { data: categories } = useGetAllCategoriesQuery()
+   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const { data: purchase }
     = useGetSinglePurchaseQuery(Purchase_Id)
   const [open, setOpen] = useState(false);
@@ -500,6 +503,7 @@ export default function PurchaseEdit() {
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
 
       dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
       // if(from === "party-payables"){
       //   dispatch(partyApi.util.invalidateTags(["Party"]));
       // }
@@ -2120,6 +2124,22 @@ style={{ marginBottom: 0, marginTop: "4px",border: "none",
                               <option value="Cash">Cash</option>
                               <option value="Cheque">Cheque</option>
                               <option value="Neft">Neft</option>
+                              {/* {banks?.bankAccounts?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={bank.Account_Display_Name}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))} */}
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={bank.Account_Display_Name}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
                             </select>
                             {errors?.Payment_Type && (
                               <p className="text-red-500 text-xs mt-1">

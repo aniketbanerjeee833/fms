@@ -6,6 +6,7 @@ import { compressAndSavePurchaseBill } from "../utils/purchaseBillUpload.js";
 // import { parseInvoiceText } from "../utils/invoiceParser.js";
 import { extractInvoiceWithAI } from "../utils/invoiceAIParser.js";
 import ExcelJS from "exceljs";
+import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 
 
 
@@ -421,7 +422,6 @@ const normalizeNumber = (val) =>
 //     if (connection) connection.release(); // ✅ Always release connection
 //   }
 // };
-
 const addPurchase = async (req, res, next) => {
   let connection;
   try {
@@ -447,6 +447,7 @@ const addPurchase = async (req, res, next) => {
       Total_Paid,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,          // 🔹 new
       Reference_Number,
       items,
     } = validation.data;
@@ -463,6 +464,12 @@ const addPurchase = async (req, res, next) => {
       return res
         .status(400)
         .json({ message: "Star marked fields missing or items empty." });
+    }
+
+    // 🔹 guard: Bank payment type must carry a valid Bank_Account_Id
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
     }
 
     const itemNameSet = new Set();
@@ -525,13 +532,13 @@ const addPurchase = async (req, res, next) => {
         ? totalAmount - totalPaid
         : Number(Balance_Due);
 
-    // ✅ INSERT WITHOUT Purchase_Id
+    //  INSERT WITHOUT Purchase_Id
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase 
        (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
-        Total_Amount, Total_Paid, Balance_Due, Payment_Type, Reference_Number, 
+        Total_Amount, Total_Paid, Balance_Due, Payment_Type, Bank_Account_Id, Reference_Number, 
         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         Party_Id,
         Bill_Number,
@@ -542,6 +549,7 @@ const addPurchase = async (req, res, next) => {
         totalPaid,
         balanceDue,
         cleanValue(Payment_Type),
+        Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 new
         cleanValue(Reference_Number),
       ]
     );
@@ -555,6 +563,19 @@ const addPurchase = async (req, res, next) => {
       `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
       [newPurchaseId, purchaseIdNumber]
     );
+
+    // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
+    if (Payment_Type === "Bank" && Bank_Account_Id && totalPaid > 0) {
+      await recordBankTransaction({
+        connection,
+        bankAccountId: Bank_Account_Id,
+        txnType: "Purchase",
+        referenceId: purchaseIdNumber,
+        amount: totalPaid,
+        txnDate: Bill_Date,
+        remarks: `Purchase ${newPurchaseId}`,
+      });
+    }
 
     // 🔹 LOOP ITEMS
     for (const item of items) {
@@ -581,7 +602,6 @@ const addPurchase = async (req, res, next) => {
       let Item_Id;
 
       if (itemRows.length === 0) {
-        // ✅ INSERT ITEM WITHOUT Item_Id
         const [itemResult] = await connection.execute(
           `INSERT INTO add_item 
            (Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category, Stock_Quantity, created_at, updated_at)
@@ -615,7 +635,6 @@ const addPurchase = async (req, res, next) => {
         );
       }
 
-      // ✅ INSERT PURCHASE ITEM WITHOUT ID
       const [pitResult] = await connection.execute(
         `INSERT INTO add_purchase_items 
          (Purchase_Id, Item_Id, Quantity, Purchase_Price,
@@ -660,111 +679,245 @@ const addPurchase = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-const getAllPurchases = async (req, res, next) => {
-  let connection;
+// const addPurchase = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+//     await connection.beginTransaction();
 
-  try {
-    connection = await db.getConnection();
+//     console.log(req.body);
 
-    /* ---------- PAGINATION ---------- */
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
+//     const cleanData = sanitizeObject(req.body);
+//     const validation = purchaseSchema.safeParse(cleanData);
+//     if (!validation.success) {
+//       await connection.rollback();
+//       return res.status(400).json({ errors: validation.error.errors });
+//     }
 
-    /* ---------- FILTERS ---------- */
-    const search = req.query.search?.trim().toLowerCase() || "";
-    const fromDate = req.query.fromDate || null;
-    const toDate = req.query.toDate || null;
+//     const {
+//       Party_Name,
+//       GSTIN,
+//       Bill_Number,
+//       Bill_Date,
+//       State_Of_Supply,
+//       Total_Amount,
+//       Total_Paid,
+//       Balance_Due,
+//       Payment_Type,
+//       Reference_Number,
+//       items,
+//     } = validation.data;
 
-    let whereClauses = [];
-    let params = [];
+//     if (
+//       !Party_Name ||
+//       !Bill_Number ||
+//       !Bill_Date ||
+//       !State_Of_Supply ||
+//       !Array.isArray(items) ||
+//       items.length === 0
+//     ) {
+//       await connection.rollback();
+//       return res
+//         .status(400)
+//         .json({ message: "Star marked fields missing or items empty." });
+//     }
 
-    /* ---------- SEARCH ---------- */
-    if (search) {
-      whereClauses.push(`
-        (
-          LOWER(a.Party_Name) LIKE ?
-          OR LOWER(p.Payment_Type) LIKE ?
-          OR CAST(p.Total_Amount AS CHAR) LIKE ?
-          OR CAST(p.Balance_Due AS CHAR) LIKE ?
-        )
-      `);
-      const like = `%${search}%`;
-      params.push(like, like, like, like);
-    }
+//     const itemNameSet = new Set();
 
-    /* ---------- DATE FILTER ---------- */
-    if (fromDate && toDate) {
-      whereClauses.push(`DATE(p.Bill_Date) BETWEEN ? AND ?`);
-      params.push(fromDate, toDate);
-    } else if (fromDate) {
-      whereClauses.push(`DATE(p.Bill_Date) >= ?`);
-      params.push(fromDate);
-    } else if (toDate) {
-      whereClauses.push(`DATE(p.Bill_Date) <= ?`);
-      params.push(toDate);
-    }
+//     for (const item of items) {
+//       const itemName = item.Item_Name?.trim().toLowerCase();
 
-    const whereSQL = whereClauses.length
-      ? `WHERE ${whereClauses.join(" AND ")}`
-      : "";
+//       if (!itemName) {
+//         await connection.rollback();
+//         return res.status(400).json({ message: "Item name missing." });
+//       }
 
-    /* ---------- MAIN QUERY ---------- */
-    const purchasesQuery = `
-      SELECT p.*, a.Party_Name
-      FROM add_purchase p
-      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-      ${whereSQL}
-      ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `;
+//       if (itemNameSet.has(itemName)) {
+//         await connection.rollback();
+//         return res.status(400).json({
+//           message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+//         });
+//       }
 
-    const [rows] = await db.query(purchasesQuery, [
-      ...params,
-      limit,
-      offset,
-    ]);
+//       itemNameSet.add(itemName);
+//     }
 
-    /* ---------- COUNT QUERY ---------- */
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM add_purchase p
-      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-      ${whereSQL}
-    `;
+//     const [partyRows] = await connection.execute(
+//       "SELECT Party_Id,GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
+//       [Party_Name]
+//     );
 
-    const [countResult] = await db.query(countQuery, params);
+//     if (partyRows.length === 0) {
+//       await connection.rollback();
+//       return res.status(404).json({ message: "Party not found." });
+//     }
 
-    /* ---------- TOTALS QUERY ---------- */
-    const totalsQuery = `
-      SELECT
-        COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
-        COALESCE(SUM(p.Balance_Due), 0) AS totalUnpaid,
-        COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
-      FROM add_purchase p
-      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-      ${whereSQL}
-    `;
+//     const Party_Id = partyRows[0].Party_Id;
 
-    const [totalsResult] = await db.query(totalsQuery, params);
+//     const [fy] = await connection.query(
+//       `SELECT Financial_Year 
+//        FROM financial_year 
+//        WHERE Current_Financial_Year = 1
+//        LIMIT 1`
+//     );
 
-    /* ---------- RESPONSE ---------- */
-    return res.status(200).json({
-      success: true,
-      currentPage: page,
-      totalPages: Math.ceil(countResult[0].total / limit),
-      totalPurchases: countResult[0].total,
-      purchases: rows,
-      totals: totalsResult[0],
-    });
+//     if (fy.length === 0) {
+//       await connection.rollback();
+//       return res.status(400).json({
+//         message: "No active financial year found. Please set one in settings.",
+//       });
+//     }
 
-  } catch (err) {
-    console.error("❌ Error fetching purchases:", err);
-    next(err);
-  } finally {
-    if (connection) connection.release();
-  }
-};
+//     const activeFY = fy[0].Financial_Year;
+
+//     const totalAmount = Number(Total_Amount) || 0;
+
+//     const totalPaid =
+//       Total_Paid === "" || Total_Paid === undefined
+//         ? 0
+//         : Number(Total_Paid);
+
+//     const balanceDue =
+//       Balance_Due === "" || Balance_Due === undefined
+//         ? totalAmount - totalPaid
+//         : Number(Balance_Due);
+
+//     // ✅ INSERT WITHOUT Purchase_Id
+//     const [purchaseResult] = await connection.execute(
+//       `INSERT INTO add_purchase 
+//        (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
+//         Total_Amount, Total_Paid, Balance_Due, Payment_Type, Reference_Number, 
+//         created_at, updated_at)
+//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//       [
+//         Party_Id,
+//         Bill_Number,
+//         Bill_Date,
+//         activeFY,
+//         State_Of_Supply,
+//         totalAmount,
+//         totalPaid,
+//         balanceDue,
+//         cleanValue(Payment_Type),
+//         cleanValue(Reference_Number),
+//       ]
+//     );
+
+//     const purchaseIdNumber = purchaseResult.insertId;
+//     const newPurchaseId =
+//       "PUR" + purchaseIdNumber.toString().padStart(3, "0");
+
+//     // ✅ UPDATE WITH FORMATTED ID
+//     await connection.execute(
+//       `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
+//       [newPurchaseId, purchaseIdNumber]
+//     );
+
+//     // 🔹 LOOP ITEMS
+//     for (const item of items) {
+//       const {
+//         Item_Category,
+//         Item_Name,
+//         Item_HSN,
+//         Quantity,
+//         Item_Unit,
+//         Purchase_Price,
+//         Discount_On_Purchase_Price,
+//         Discount_Type_On_Purchase_Price,
+//         Tax_Type,
+//         Tax_Amount,
+//         Amount,
+//         Item_Image,
+//       } = item;
+
+//       const [itemRows] = await connection.execute(
+//         "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+//         [Item_Name]
+//       );
+
+//       let Item_Id;
+
+//       if (itemRows.length === 0) {
+//         // ✅ INSERT ITEM WITHOUT Item_Id
+//         const [itemResult] = await connection.execute(
+//           `INSERT INTO add_item 
+//            (Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category, Stock_Quantity, created_at, updated_at)
+//            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//           [
+//             Item_Name,
+//             Item_HSN || "",
+//             Item_Unit || "",
+//             cleanValue(Item_Image),
+//             Item_Category || "",
+//             normalizeNumber(Quantity),
+//           ]
+//         );
+
+//         const itemIdNum = itemResult.insertId;
+//         Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
+
+//         await connection.execute(
+//           `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
+//           [Item_Id, itemIdNum]
+//         );
+//       } else {
+//         const existingItem = itemRows[0];
+//         Item_Id = existingItem.Item_Id;
+
+//         await connection.execute(
+//           `UPDATE add_item 
+//            SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
+//            WHERE Item_Id = ?`,
+//           [normalizeNumber(Quantity), Item_Id]
+//         );
+//       }
+
+//       // ✅ INSERT PURCHASE ITEM WITHOUT ID
+//       const [pitResult] = await connection.execute(
+//         `INSERT INTO add_purchase_items 
+//          (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+//           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+//           Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//         [
+//           newPurchaseId,
+//           Item_Id,
+//           normalizeNumber(Quantity),
+//           normalizeNumber(Purchase_Price),
+//           cleanDiscount(Discount_On_Purchase_Price),
+//           cleanValue(Discount_Type_On_Purchase_Price),
+//           cleanValue(Tax_Type),
+//           normalizeNumber(Tax_Amount),
+//           normalizeNumber(Amount),
+//         ]
+//       );
+
+//       const pitId = pitResult.insertId;
+//       const newPurchaseItemId =
+//         "PIT" + pitId.toString().padStart(3, "0");
+
+//       await connection.execute(
+//         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
+//         [newPurchaseItemId, pitId]
+//       );
+//     }
+
+//     await connection.commit();
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Purchase and items added successfully",
+//       purchaseId: newPurchaseId,
+//     });
+//   } catch (err) {
+//     if (connection) await connection.rollback();
+//     console.error("❌ Error adding purchase:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+
 const exportAllPurchasesReportToExcel = async (req, res, next) => {
   let connection;
   try {
@@ -982,6 +1135,225 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
  
   } catch (err) {
     console.error("❌ Purchase Excel export error:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+// const getAllPurchases = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     connection = await db.getConnection();
+
+//     /* ---------- PAGINATION ---------- */
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = 10;
+//     const offset = (page - 1) * limit;
+
+//     /* ---------- FILTERS ---------- */
+//     const search = req.query.search?.trim().toLowerCase() || "";
+//     const fromDate = req.query.fromDate || null;
+//     const toDate = req.query.toDate || null;
+
+//     let whereClauses = [];
+//     let params = [];
+
+//     /* ---------- SEARCH ---------- */
+//     if (search) {
+//       whereClauses.push(`
+//         (
+//           LOWER(a.Party_Name) LIKE ?
+//           OR LOWER(p.Payment_Type) LIKE ?
+//           OR CAST(p.Total_Amount AS CHAR) LIKE ?
+//           OR CAST(p.Balance_Due AS CHAR) LIKE ?
+//         )
+//       `);
+//       const like = `%${search}%`;
+//       params.push(like, like, like, like);
+//     }
+
+//     /* ---------- DATE FILTER ---------- */
+//     if (fromDate && toDate) {
+//       whereClauses.push(`DATE(p.Bill_Date) BETWEEN ? AND ?`);
+//       params.push(fromDate, toDate);
+//     } else if (fromDate) {
+//       whereClauses.push(`DATE(p.Bill_Date) >= ?`);
+//       params.push(fromDate);
+//     } else if (toDate) {
+//       whereClauses.push(`DATE(p.Bill_Date) <= ?`);
+//       params.push(toDate);
+//     }
+
+//     const whereSQL = whereClauses.length
+//       ? `WHERE ${whereClauses.join(" AND ")}`
+//       : "";
+
+//     /* ---------- MAIN QUERY ---------- */
+//     const purchasesQuery = `
+//       SELECT p.*, a.Party_Name
+//       FROM add_purchase p
+//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+//       ${whereSQL}
+//       ORDER BY p.created_at DESC
+//       LIMIT ? OFFSET ?
+//     `;
+
+//     const [rows] = await db.query(purchasesQuery, [
+//       ...params,
+//       limit,
+//       offset,
+//     ]);
+
+//     /* ---------- COUNT QUERY ---------- */
+//     const countQuery = `
+//       SELECT COUNT(*) AS total
+//       FROM add_purchase p
+//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+//       ${whereSQL}
+//     `;
+
+//     const [countResult] = await db.query(countQuery, params);
+
+//     /* ---------- TOTALS QUERY ---------- */
+//     const totalsQuery = `
+//       SELECT
+//         COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
+//         COALESCE(SUM(p.Balance_Due), 0) AS totalUnpaid,
+//         COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
+//       FROM add_purchase p
+//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+//       ${whereSQL}
+//     `;
+
+//     const [totalsResult] = await db.query(totalsQuery, params);
+
+//     /* ---------- RESPONSE ---------- */
+//     return res.status(200).json({
+//       success: true,
+//       currentPage: page,
+//       totalPages: Math.ceil(countResult[0].total / limit),
+//       totalPurchases: countResult[0].total,
+//       purchases: rows,
+//       totals: totalsResult[0],
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Error fetching purchases:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+const getAllPurchases = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    /* ---------- PAGINATION ---------- */
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
+
+    /* ---------- FILTERS ---------- */
+    const search = req.query.search?.trim().toLowerCase() || "";
+    const fromDate = req.query.fromDate || null;
+    const toDate = req.query.toDate || null;
+
+    let whereClauses = [];
+    let params = [];
+
+    /* ---------- SEARCH ---------- */
+    if (search) {
+      whereClauses.push(`
+        (
+          LOWER(a.Party_Name) LIKE ?
+          OR LOWER(p.Payment_Type) LIKE ?
+          OR LOWER(ba.Account_Display_Name) LIKE ?
+          OR CAST(p.Total_Amount AS CHAR) LIKE ?
+          OR CAST(p.Balance_Due AS CHAR) LIKE ?
+        )
+      `);
+      const like = `%${search}%`;
+      params.push(like, like, like, like, like);
+    }
+
+    /* ---------- DATE FILTER ---------- */
+    if (fromDate && toDate) {
+      whereClauses.push(`DATE(p.Bill_Date) BETWEEN ? AND ?`);
+      params.push(fromDate, toDate);
+    } else if (fromDate) {
+      whereClauses.push(`DATE(p.Bill_Date) >= ?`);
+      params.push(fromDate);
+    } else if (toDate) {
+      whereClauses.push(`DATE(p.Bill_Date) <= ?`);
+      params.push(toDate);
+    }
+
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
+    /* ---------- MAIN QUERY ---------- */
+    const purchasesQuery = `
+      SELECT p.*, a.Party_Name,
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE 
+          WHEN p.Payment_Type = 'Bank' THEN ba.Account_Display_Name
+          ELSE p.Payment_Type
+        END AS Payment_Type_Display
+      FROM add_purchase p
+      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+      LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
+      ${whereSQL}
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await db.query(purchasesQuery, [
+      ...params,
+      limit,
+      offset,
+    ]);
+
+    /* ---------- COUNT QUERY ---------- */
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM add_purchase p
+      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+      LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
+      ${whereSQL}
+    `;
+
+    const [countResult] = await db.query(countQuery, params);
+
+    /* ---------- TOTALS QUERY ---------- */
+    const totalsQuery = `
+      SELECT
+        COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
+        COALESCE(SUM(p.Balance_Due), 0) AS totalUnpaid,
+        COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
+      FROM add_purchase p
+      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+      LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
+      ${whereSQL}
+    `;
+
+    const [totalsResult] = await db.query(totalsQuery, params);
+
+    /* ---------- RESPONSE ---------- */
+    return res.status(200).json({
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(countResult[0].total / limit),
+      totalPurchases: countResult[0].total,
+      purchases: rows,
+      totals: totalsResult[0],
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching purchases:", err);
     next(err);
   } finally {
     if (connection) connection.release();

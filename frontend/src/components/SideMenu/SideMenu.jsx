@@ -1,7 +1,7 @@
 import  { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings } from 'lucide-react'
+import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet } from 'lucide-react'
 
 const REACT_APP_API_URL = "http://localhost:4000";
 
@@ -43,6 +43,13 @@ const currentPath = location.pathname;
     currentPath.startsWith("/sale/return"))
      {
       setOpenMenu("Sales");
+      
+    }
+      if(currentPath.startsWith("/cash-bank/cash-in-hand") || 
+    currentPath.startsWith("/cash-bank/bank-accounts") )
+    
+     {
+      setOpenMenu("Cash and Bank");
       
     }
  
@@ -266,6 +273,12 @@ if (
              { to: "/sale/payment-in", text: "Payment In" },
              { to: "/sale/all-sales", text: " All Sales" },
           
+          ])}
+
+           {renderMenu("Cash and Bank", <Wallet  size={20} />, [
+           
+            { to: "/cash-bank/cash-in-hand", text: "Cash In Hand" },
+            { to: "/cash-bank/bank-accounts", text: " Bank Accounts" },
           ])}
            {renderMenu("Daily Expense", <CalendarDays  size={20} />, [
            

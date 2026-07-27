@@ -22,6 +22,7 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 import { saleReturnApi, useCreateSaleReturnMutation } from "../../redux/api/saleReturnApi";
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 
 
@@ -583,6 +584,7 @@ const onSubmit = async (data) => {
     // invalidate so list refetches
     dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
    dispatch(itemApi.util.invalidateTags(["Item"]));
+   dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
     if (!res?.success) {
       toast.error("Failed to add credit note");
       return;

@@ -60,6 +60,10 @@ const SaleEdit = lazy(() => import('./pages/Sale/SaleEdit'));
 const AddDailyExpense = lazy(() => import('./pages/DailyExpense/AddDailyExpense'));
 const DailyExpenseList = lazy(() => import('./pages/DailyExpense/DailyExpenseList'));
 
+
+const CashInHand= lazy(() => import('./pages/CashAndBank/CashInHand'));
+const BankAccounts= lazy(() => import('./pages/CashAndBank/BankAccounts'));
+
 const FinancialYear = lazy(() => import('./pages/Settings/FinancialYear'));
 // const Reports = lazy(() => import('./pages/Reports'));
 
@@ -333,6 +337,23 @@ function RouterWrapper() {
               element={
                 <Layout>
                   <AllPurchasesList />
+                </Layout>
+              }
+            />
+
+              <Route
+              path="/cash-bank/cash-in-hand"
+              element={
+                <Layout>
+                  <CashInHand/>
+                </Layout>
+              }
+            />
+             <Route
+              path="/cash-bank/bank-accounts"
+              element={
+                <Layout>
+                  <BankAccounts/>
                 </Layout>
               }
             />

@@ -1,42 +1,38 @@
 
-import { NavLink,  useSearchParams } from "react-router-dom";
 
-// import { useGetAllpaymentOutDataQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
-import PaymentOutModal from "../../components/Modal/PaymentOutModal";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { NavLink, useLocation, useSearchParams } from "react-router-dom";
+
+;
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
+import {  useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
 import { useState } from "react";
+import CashAdjustmentModal from "../../components/Modal/CashAdjustmentModal";
 
-import { toast } from "react-toastify";
-import { useAddPaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
-import PaymentInModal from "../../components/Modal/PaymentInModal";
-import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useDispatch } from "react-redux";
-
-
-export default function PaymentIn() {
-
-    // const [page, setPage] = useState(1);
-    const dispatch = useDispatch();
-
-    // const [selectedPurchase, setSelectedpaymentOutData] = useState(null);
-    // const navigate = useNavigate();
+// import { SiMicrosoftexcel } from "react-icons/si";
+export default function CashInHand() {
     const [searchParams, setSearchParams] = useSearchParams();
-    //const location = useLocation();
+    const location = useLocation();
     const page = Number(searchParams.get("page")) || 1;
     const searchTerm = searchParams.get("search") || "";
     // const [page, setPage] = useState(1);
     //const [searchTerm, setSearchTerm] = useState("");
     const fromDate = searchParams.get("fromDate") || "";
     const toDate = searchParams.get("toDate") || "";
+    const [cashAdjustmentModal, setCashAdjustmentModal] = useState({ open: false, mode: "add", data: null })
     // const [fromDate, setFromDate] = useState('');
     // const [toDate, setToDate] = useState('');
-    const [modal, setModal] = useState({ open: false, mode: "add", data: null });
-    const { data: partiesList } = useGetAllPartiesQuery();
+    //   const { data: cashInHand, isLoading } = useGetAllSalesQuery({
+    //     page,
+    //     search: searchTerm,
+    //     fromDate,
+    //     toDate,
+    //   });
+    //  const { data: balanceData } = useGetAllAdjustmentsQuery();
+    const { data: cashInHand, isLoading } = useGetCashInHandQuery({ fromDate, toDate, page, search: searchTerm });
+    console.log(cashInHand);
+
     // const[selecedSales,setSelectedSales]= useState(null);
-     const [addPaymentIn, { isLoading: isAdding }] = useAddPaymentInMutation();
-  const [updatePaymentIn, { isLoading: isUpdating }] = useUpdatePaymentInMutation();
-  const isSaving = isAdding || isUpdating;
+
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -66,56 +62,41 @@ export default function PaymentIn() {
             toDate,
         });
     };
-   
-      const { data: paymentInData, isLoading } = useGetAllPaymentInsQuery({
-    page,
-    search: searchTerm,
-    fromDate,
-    toDate,
-  });
-    console.log(paymentInData, fromDate, toDate);
-    const handleExportExcel = () => {
-        const params = new URLSearchParams();
-        if (searchTerm) params.set("search", searchTerm);
-        if (fromDate) params.set("fromDate", fromDate);
-        if (toDate) params.set("toDate", toDate);
+    //   const handleExportExcel = () => {
+    //     const params = new URLSearchParams();
+    //     if (searchTerm) params.set("search", searchTerm);
+    //     if (fromDate) params.set("fromDate", fromDate);
+    //     if (toDate) params.set("toDate", toDate);
 
-        const a = document.createElement("a");
-        a.href = `http://localhost:4000/api/paymentIn/export-paymentIn-excel?${params.toString()}`;
-        a.download = "";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    };
+    //     // anchor download 
+    //     const url = `http://localhost:4000/api/sale/export-sale-excel?${params.toString()}`;
+    //     const a = document.createElement("a");
+    //     a.href = url;
+    //     a.download = "";          // filename comes from Content-Disposition header
+    //     document.body.appendChild(a);
+    //     a.click();
+    //     document.body.removeChild(a);
+    //   };
 
-const handleSavePaymentIn = async (formData) => {
-    try {
-      if (modal.mode === "edit") {
-        await updatePaymentIn({ id: modal.data.id, ...formData }).unwrap();
-      } else {
-        await addPaymentIn(formData).unwrap();
-      }
-       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      setModal({ open: false, mode: "add", data: null });
-      toast.success("New Payment In added");
-    } catch (err) {
-      console.error("Failed to save payment in:", err);
-      toast.error(err?.data?.message || "Failed to save payment in. Please try again.");
-    }
-  };
+
+    //console.log(cashInHand?.cashInHand);
+
     return (
         <>
-            
+            {/* // <div className="container-fluid sb2  ">
+        //     <div className="row">
+               
+        //         <div className="sb2-1">
+
+        //             <SideMenu/>
+        //         </div>
+
+               
+        //         <div className="sb2-2"> */}
             <div className="sb2-2-2">
                 <ul >
                     <li>
-                        {/* <NavLink
-                            to="/"
 
-                        >
-                            <i className="fa fa-home mr-2" aria-hidden="true"></i>
-                            Dashboard
-                        </NavLink> */}
                         <NavLink style={{ display: "flex", flexDirection: "row" }}
                             to="/home"
 
@@ -133,17 +114,16 @@ const handleSavePaymentIn = async (formData) => {
           <div className="col-md-12">
             <div className="box-inn-sp"> */}
 
-            <div className="flex flex-col bg-white">
-
+            <div className="flex flex-col bg-white ">
 
                 <div className="inn-title">
                     <div className="flex flex-col sm:flex-col lg:flex-row justify-between lg:items-center">
 
                         <div className="flex flex-row justify-between items-center mb-4 sm:mb-4">
                             <div>
-                                <h4 className="text-2xl font-bold mb-1">Payment In</h4>
+                                <h4 className="text-2xl font-bold mb-1">Cash In Hand</h4>
                                 <p className="text-gray-500 text-sm sm:text-base">
-                                    All Payment In Details
+                                    All Cash In  Details
                                 </p>
                             </div>
 
@@ -155,21 +135,23 @@ const handleSavePaymentIn = async (formData) => {
                                     backgroundColor: "#4CA1AF",
                                 }}
                                 className="text-white px-4 py-2 rounded-md sm:hidden"
-                                onClick={() => setModal({ open: true, mode: "add", data: null })}
+                                // onClick={() => navigate("/sale/add")}
+                                onClick={() => setCashAdjustmentModal({ open: true, mode: "add", data: null })}
                             >
-                                Add Payment In
+                                Adjust Cash
                             </button>
                         </div>
 
 
                         <div
-                            className="
-        flex flex-col gap-2 sm:flex-row sm:flex-wrap gap-0
-        sm:space-x-4 space-y-3 sm:space-y-0
-        sm:items-center
-        sm:justify-between
 
-      "
+                            className="
+                      flex flex-col gap-2 md:flex-row md:gap-2 sm:flex-row sm:flex-wrap 
+                        sm:space-x-4 space-y-3 sm:space-y-0 
+                        sm:items-center 
+                      sm:justify-between
+        
+                                  "
                         >
 
                             <div className="flex flex-col">
@@ -239,62 +221,81 @@ const handleSavePaymentIn = async (formData) => {
                                         backgroundColor: "#4CA1AF",
                                     }}
                                     className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
-                                //   onClick={() => navigate("/paymentIn/add")}
-                                  onClick={() => setModal({ open: true, mode: "add", data: null })}
+                                    onClick={() => setCashAdjustmentModal({ open: true, mode: "add", data: null })}
+                                //   onClick={() => navigate("/sale/add")}
                                 >
-                                    Add  Payment In
+                                    Adjust Cash
                                 </button>
                             </div>
                         </div>
+
+
                     </div>
 
+                    {/* <div className="flex flex-col bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
 
-                    {/* Paid + Unpaid = Total */}
-                    <div className="flex flex-col bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
+            
+            <div className="mb-2 text-left">
+              <p className="text-sm font-medium text-black">Total Sales Amount</p>
+              <h4 className="text-3xl font-bold text-black">₹ {cashInHand?.totals?.totalAmount}</h4>
+            </div>
 
-                        {/* Total Sales */}
-                        <div className="mb-2 text-left">
-                            <p className="text-sm font-medium text-black">Total Amount</p>
-                            <h4 className="text-3xl font-bold text-black">₹  {paymentInData?.totals?.totalAmount}</h4>
-                        </div>
+           
+            <div className="border-t border-gray-300 mb-2"></div>
 
-                        {/* Divider */}
-                        <div className="border-t border-gray-300 mb-2"></div>
+           
+            <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
+              <div className="flex  ">
+                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
+                <span className="text-sm font-semibold text-black">₹ {cashInHand?.totals?.totalReceived}</span>
+              </div>
 
-                        {/* Received & Balance */}
-                        <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
-                            <div className="flex  ">
-                                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                                <span className="text-sm font-semibold text-black">₹ {paymentInData?.totals?.totalPaid}</span>
-                            </div>
+              <div className="flex">
+                <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
+                <span className="text-sm font-semibold text-black">₹ {cashInHand?.totals?.totalBalance}</span>
+              </div>
+            </div>
 
-                            <div className="flex">
-                                <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                                <span className="text-sm font-semibold text-black">₹{paymentInData?.totals?.totalUnpaid}</span>
-                            </div>
-                        </div>
+          </div> */}
 
-                    </div>
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            onClick={handleExportExcel}
-                            className="flex items-center justify-center rounded-xl bg-emerald-600 p-2.5 text-white shadow-md transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
-                            title="Export to Excel"
+                    <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
+                        {/* <p className="text-sm font-medium text-gray-500 mb-2">
+                            Cash In Hand
+                        </p> */}
+
+                        {/* <h4
+                            className={`text-3xl font-bold ${Number(cashInHand?.cashInHand) < 0 ? "text-red-600" : "text-green-600"
+                                }`}
                         >
-                            <FileSpreadsheet size={22} strokeWidth={2} />
-                        </button>
-
-
-
+                            ₹ {Number(cashInHand?.cashInHand ?? 0).toLocaleString("en-IN")}
+                        </h4> */}
+                        <h4
+                            style={{
+                                fontSize: "26px",
+                                fontWeight: "700",
+                                margin: 0,
+                                color:
+                                    Number(cashInHand?.cashInHand) < 0
+                                        ? "#DC2626" // red
+                                        : "#16A34A", // green
+                            }}
+                        >
+                            ₹ {Number(cashInHand?.cashInHand ?? 0).toLocaleString("en-IN")}
+                        </h4>
                     </div>
+
                 </div>
+
+
+
+
+
                 <div className="tab-inn">
                     <div className="table-responsive table-desi">
                         {isLoading ? (
-                            <p className="text-center mt-4">Fetching payment In Data...</p>
-                        ) : paymentInData?.length === 0 ? (
-                            <p className="text-center mt-4">No paymentIn Data found.</p>
+                            <p className="text-center mt-4">Fetching ...</p>
+                        ) : cashInHand?.length === 0 ? (
+                            <p className="text-center mt-4">No cash in hand found.</p>
                         ) : (
 
 
@@ -305,80 +306,90 @@ const handleSavePaymentIn = async (formData) => {
                                 <thead>
                                     <tr>
                                         <th className="text-left">Sl.No</th>
-                                        <th className="text-left ">Date</th>
-                                        <th className="text-left ">Party Name</th>
-                                        <th className="text-left">Payment Type</th>
-                                        <th className="text-left">Total Received</th>
-                                        <th className="text-left">Balance Due</th>
-                                        <th>View</th>
-                                        <th>Edit</th>
+                                        <th className="text-left ">Type</th>
+                                        <th className="text-left ">Name</th>
+                                        <th className="text-left">Date</th>
+                                        <th className="text-left">Amount </th>
+                                        {/* <th className="text-left">Balance Due</th> */}
+                                        <th>View/Edit</th>
+                                        {/* <th>Edit</th> */}
+                                        {/* <th>Return</th> */}
+
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {paymentInData && paymentInData?.paymentIns?.length > 0 ? (
-                                        paymentInData?.paymentIns?.map((paymentIn, idx) => (
-                                            <tr key={paymentIn?.id}>
+                                    {cashInHand && cashInHand?.ledger?.length > 0 ? (
+                                        cashInHand?.ledger?.map((sale, idx) => (
+                                            <tr key={idx}>
                                                 <td>
-                                                    {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.
+                                                    {(cashInHand?.currentPage - 1) * 10 + (idx + 1)}.
                                                 </td>
+                                                {/* <td >
+                          {sale?.Invoice_Date
+                            ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "numeric",
+                              year: "numeric",
+                            })
+                            : "N/A"}
+                        </td> */}
                                                 {/* <td>
-  {paymentIn?.Bill_Date
-    ? paymentIn.Bill_Date.split("T")[0]
-    : "N/A"}
-</td> */}
-                                                <td>
-                                                    {paymentIn?.Payment_Date
-                                                        ? new Date(paymentIn?.Payment_Date).toLocaleDateString("en-IN", {
+                                {sale?.Invoice_Date
+                                  ? sale?.Invoice_Date.split("T")[0]
+                                  : "N/A"}
+                              </td> */}
+                                                <td>{sale?.source_type || "N/A"}</td>
+                                                <td>{sale?.party_name || "N/A"}</td>
+                                                <td >
+                                                    {sale?.txn_date
+                                                        ? new Date(sale?.txn_date).toLocaleDateString("en-IN", {
                                                             day: "numeric",
                                                             month: "numeric",
                                                             year: "numeric",
                                                         })
                                                         : "N/A"}
                                                 </td>
-                                                <td>{paymentIn?.Party_Name || "N/A"}</td>
-                                                <td>{paymentIn?.Payment_Type || "N/A"}</td>
-                                                <td>{paymentIn?.Received || "N/A"}</td>
-                                                <td>{paymentIn?.Balance_Due || "N/A"}</td>
+                                                <td>{sale?.amount || "N/A"}</td>
+                                                {/* //<td>{sale?.Balance_Due || "N/A"}</td> */}
 
+                                                {/* <td >
+                       
+                          <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
+                            state={{ from: "all-sale-list" }}>
+                            <Eye
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
+                      
+                        </td> */}
                                                 <td>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setModal({
-                                                                open: true,
-                                                                mode: "view",
-                                                                data: paymentIn,
-                                                            })
-                                                        }
-                                                        className="p-1 rounded-md hover:bg-slate-100 transition-colors"
-                                                        style={{ background: "transparent", border: "none", cursor: "pointer" }}
+                                                    {/* <NavLink to={`/sale/edit/${sale?.Sale_Id}`}
+                                                                state={{from:"all-sale-list"}}>               */}
+                                                    <NavLink
+                                                        to={`/sale/edit/${sale.Sale_Id}${location.search}`}
+                                                        state={{ from: "all-sale-list" }}
+
                                                     >
-                                                        <Eye size={18} color="#4CA1AF" />
-                                                    </button>
+
+                                                        <SquarePen
+                                                            style={{
+                                                                cursor: "pointer",
+                                                                backgroundColor: "transparent",
+                                                                color: "#4CA1AF"
+                                                            }} />
+                                                    </NavLink>
+
                                                 </td>
 
-                                                <td>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setModal({
-                                                                open: true,
-                                                                mode: "edit",
-                                                                data: paymentIn,
-                                                            })
-                                                        }
-                                                        className="p-1 rounded-md hover:bg-slate-100 transition-colors"
-                                                        style={{ background: "transparent", border: "none", cursor: "pointer" }}
-                                                    >
-                                                        <SquarePen size={18} color="#4CA1AF" />
-                                                    </button>
-                                                </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td className="mx-auto text-center" colSpan={9}>
-                                                No payment out found
+                                            <td className="mx-auto text-center" colSpan={10}>
+                                                No cash in hand found
                                             </td>
                                         </tr>
                                     )}
@@ -431,7 +442,7 @@ const handleSavePaymentIn = async (formData) => {
         </button>
       ))} */}
                             {(() => {
-                                const totalPages = paymentInData?.totalPages || 1;
+                                const totalPages = cashInHand?.totalPages || 1;
                                 const maxVisible = 5; // how many pages around current
                                 const pages = [];
 
@@ -508,18 +519,18 @@ const handleSavePaymentIn = async (formData) => {
 
                         {/* CURRENT PAGE — MOBILE ONLY */}
                         <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-                            Page {page} / {paymentInData?.totalPages || 1}
+                            Page {page} / {cashInHand?.totalPages || 1}
                         </div>
 
                         {/* NEXT */}
                         <button
                             type="button"
                             onClick={() => handleNextPage()}
-                            disabled={page === paymentInData?.totalPages ||
-                                paymentInData?.totalPages === 0}
+                            disabled={page === cashInHand?.totalPages ||
+                                cashInHand?.totalPages === 0}
                             className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === paymentInData?.totalPages ||
-                                    paymentInData?.totalPages === 0
+        ${page === cashInHand?.totalPages ||
+                                    cashInHand?.totalPages === 0
                                     ? 'opacity-50 '
                                     : ''
                                 }
@@ -530,22 +541,34 @@ const handleSavePaymentIn = async (formData) => {
 
                     </div>
                 </div>
-              
-            </div>
-        {modal.open && (
-        <PaymentInModal
-          mode={modal.mode}
-          initialData={modal.data}
-          parties={partiesList}
-          onClose={() => setModal({ open: false, mode: "add", data: null })}
-          onSave={handleSavePaymentIn}
-          isSaving={isSaving}
-        />
-      )}
-         
 
+            </div>
+
+            {cashAdjustmentModal.open && (
+                <CashAdjustmentModal
+                    mode={cashAdjustmentModal.mode}
+                    data={cashAdjustmentModal.data}
+                     currentBalance={Number(cashInHand?.cashInHand ?? 0)}
+                    onClose={() => setCashAdjustmentModal({ open: false, mode: "add", data: null })}
+                />
+            )}
         </>
 
 
     )
 }
+
+{/* <div className="flex justify-end sm: mt-4">
+        
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet
+                size={22}
+                className="transition-transform duration-200 group-hover:scale-110"
+              />
+            </button>
+          </div> */}

@@ -20,6 +20,7 @@ import { LayoutDashboard } from "lucide-react";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { dashboardApi } from "../../redux/api/dashboardApi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 
 
@@ -471,6 +472,7 @@ export default function SaleEdit() {
       dispatch(saleApi.util.invalidateTags(["Sale"]));
 
       dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
 
       toast.success("Sale updated successfully!");
       //   navigate({
