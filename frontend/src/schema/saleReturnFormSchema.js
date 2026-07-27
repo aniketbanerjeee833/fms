@@ -36,18 +36,26 @@ const saleReturnItemSchema = z.object({
       .regex(/^\d+$/, "HSN Code must contain only digits (0-9).")
   ),
 
-  Quantity: z.preprocess(
-    (val) => {
-      if (val === "" || val === undefined || val === null) return undefined;
-      return Number(val);
-    },
-    z
-      .number({
-        required_error: "Quantity is required",
-        invalid_type_error: "Quantity must be a number",
-      })
-      .min(1, "Quantity must be at least 1")
-  ),
+  // Quantity: z.preprocess(
+  //   (val) => {
+  //     if (val === "" || val === undefined || val === null) return undefined;
+  //     return Number(val);
+  //   },
+  //   z
+  //     .number({
+  //       required_error: "Quantity is required",
+  //       invalid_type_error: "Quantity must be a number",
+  //     })
+  //     .min(1, "Quantity must be at least 1")
+  // ),
+    Quantity: z.preprocess(
+  (val) => {
+    if (val === "" || val === undefined || val === null) return 0;
+    const n = Number(val);
+    return isNaN(n) ? 0 : n;
+  },
+  z.number().min(1, "Quantity must be greater than zero")
+),
 
   Item_Unit: z.string().min(1, "Unit is required"),
 
@@ -74,7 +82,13 @@ const saleReturnItemSchema = z.object({
   Tax_Amount: digitsOnly("Tax_Amount", false),
 
   Amount: digitsOnly("Amount", false),
-});
+}).refine(
+    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+    {
+      message: "Please select a bank account.",
+      path: ["Bank_Account_Id"],
+    }
+  );
 
 /* ─────────────────────────────────────────────────────────────
    SALE RETURN SCHEMA
@@ -137,13 +151,17 @@ export const saleReturnFormSchema = z.object({
   Balance_Due: digitsOnly("Balance_Due", true),
 
   /* ── Payment ── */
-  Payment_Type: z
-    .enum(["Cash", "Cheque", "Neft"])
-    .or(z.literal(""))
-    .refine((val) => val !== "", {
-      message: "Please select a payment type",
-    }),
+   Payment_Type: z
+      .enum(["Cash", "Cheque", "Neft", "Bank"])
+      .or(z.literal("")) // allow blank select
+      .refine((val) => val !== "", {
+        message: "Please select a payment type.",
+      }),
 
+    // 🔹 Required only when Payment_Type === "Bank"
+    Bank_Account_Id: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .optional(),
   Reference_Number: z
     .string()
     .trim()
@@ -155,4 +173,10 @@ export const saleReturnFormSchema = z.object({
   items: z
     .array(saleReturnItemSchema)
     .nonempty("At least one item must be added"),
-});
+}).refine(
+    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+    {
+      message: "Please select a bank account.",
+      path: ["Bank_Account_Id"],
+    }
+  );

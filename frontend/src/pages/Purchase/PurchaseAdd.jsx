@@ -55,7 +55,7 @@ export default function PurchaseAdd() {
   // console.log(items, parties);
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-  console.log(banks, "banks");
+  //console.log(banks, "banks");
   const [open, setOpen] = useState(false);
   //console.log(categories, "categories");
   //const[categoryOpen,setCategoryOpen] = useState(false);
@@ -285,9 +285,31 @@ export default function PurchaseAdd() {
   };
 
   const handleDeleteRow = (i) => {
-    setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-    remove(i); // remove from form
-  };
+  // 1. get current items BEFORE removal
+  const currentItems = watch("items");
+ 
+  // 2. calculate new total excluding the deleted row
+  const newTotal = currentItems.reduce((sum, row, idx) => {
+    if (idx === i) return sum;                    // skip deleted row
+    return sum + parseFloat(row.Amount || 0);
+  }, 0);
+ 
+  const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+  const newBalanceDue = newTotal - currentTotalPaid;
+ 
+  // 3. remove from UI state and form
+  setRows((prev) => prev.filter((_, idx) => idx !== i));
+  remove(i);
+ 
+  // 4. update totals
+  setValue("Total_Amount", newTotal.toFixed(2),      { shouldValidate: true });
+  setValue("Balance_Due",  newBalanceDue.toFixed(2), { shouldValidate: true });
+};
+
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
 
   const itemsValues = watch("items");   // watch all item rows
   const totalPaid = watch("Total_Paid"); // watch Total_Paid
@@ -1474,10 +1496,18 @@ export default function PurchaseAdd() {
                           onChange={(e) => {
 
                             e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            setValue(`items.${i}.Quantity`, e.target.value, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
                             if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                               return;
                             }
-
+                            // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                            //   ...itemsValues[i],
+                            //   Quantity: e.target.value,
+                            // });
 
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                               {
@@ -1888,16 +1918,7 @@ export default function PurchaseAdd() {
                             {bank.Account_Display_Name}
                           </option>
                         ))}
-                        {/* 
-                        {banks?.length > 0 && (
-                          <optgroup label="Bank Accounts">
-                            {banks.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )} */}
+                       
                       </select>
 
                       {errors?.Payment_Type && (

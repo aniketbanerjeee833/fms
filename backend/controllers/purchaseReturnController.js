@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
  
 ═══════════════════════════════════════════════════════════════════ */
  import db from "../config/db.js";
+import { recordBankTransaction } from "../utils/bankAccountHelper.js";
  
 /* ═══════════════════════════════════════════════════════════════════
    2. CONTROLLERS  (purchaseReturnController.js)
@@ -162,8 +163,15 @@ const getPurchaseReturnById = async (req, res, next) => {
  
     const [[header]] = await connection.query(
       `SELECT pr.*, a.Party_Name
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE
+          WHEN pr.Payment_Type = 'Bank'
+          THEN ba.Account_Display_Name
+          ELSE pr.Payment_Type
+        END AS Payment_Type_Display
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
+        LEFT JOIN bank_accounts ba ON ba.id = pr.Bank_Account_Id
        WHERE pr.id = ?`,
       [Purchase_Return_Id]
     );
@@ -188,19 +196,21 @@ const getPurchaseReturnById = async (req, res, next) => {
   }
 };
  
+
+
 /* ── CREATE ───────────────────────────────────────────────── */
 const createPurchaseReturn = async (req, res, next) => {
   let connection;
- 
+
   try {
-    const { Purchase_Id } = req.params;  // comes from  POST /purchase-return/:Purchase_Id
- 
+    const { Purchase_Id } = req.params;
+
     connection = await db.getConnection();
     await connection.beginTransaction();
- 
+
     const {
       Party_Name,
-      Return_Number,      // ← what frontend sends
+      Return_Number,
       Bill_Number,
       Bill_Date,
       Return_Date,
@@ -209,10 +219,11 @@ const createPurchaseReturn = async (req, res, next) => {
       Total_Received,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,        // 🔹 added
       Reference_Number,
       items,
     } = req.body;
- 
+
     /* ── validate ── */
     if (!Purchase_Id || !Party_Name || !Return_Date || !items?.length) {
       await connection.rollback();
@@ -221,7 +232,12 @@ const createPurchaseReturn = async (req, res, next) => {
         message: "Purchase_Id, Party, Return Date and items are required",
       });
     }
- 
+
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+    }
+
     /* ── party lookup ── */
     const [[party]] = await connection.query(
       `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
@@ -231,22 +247,22 @@ const createPurchaseReturn = async (req, res, next) => {
       await connection.rollback();
       return res.status(404).json({ success: false, message: "Party not found" });
     }
- 
+
     const totalAmount   = Number(Total_Amount)   || 0;
     const totalReceived = Number(Total_Received)  || 0;
     const balanceDue    = Number(Balance_Due)     || totalAmount - totalReceived;
- 
+
     /* ── insert header ── get insertId for items ── */
     const [headerResult] = await connection.query(
       `INSERT INTO purchase_return
          (Purchase_Id, Party_Id, Return_Number, Bill_Number,
           Bill_Date, Return_Date, State_Of_Supply,
-          Total_Amount, Total_Received, Balance_Due, Payment_Type,Reference_Number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          Total_Amount, Total_Received, Balance_Due, Payment_Type, Bank_Account_Id, Reference_Number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Purchase_Id,
         party.Party_Id,
-        Return_Number  || null,   // ✅ was Return_Number (undefined) — now uses destructured value
+        Return_Number  || null,
         Bill_Number    || null,
         Bill_Date      || null,
         Return_Date,
@@ -255,12 +271,26 @@ const createPurchaseReturn = async (req, res, next) => {
         totalReceived,
         balanceDue,
         Payment_Type   || "Cash",
+        Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 added
         Reference_Number || null
       ]
     );
- 
-    const Purchase_Return_Id = headerResult.insertId;  // ✅ now defined — was missing before
- 
+
+    const Purchase_Return_Id = headerResult.insertId;
+
+    /* 🔹 record bank ledger — money coming IN from vendor refund */
+    if (Payment_Type === "Bank" && Bank_Account_Id && totalReceived > 0) {
+      await recordBankTransaction({
+        connection,
+        bankAccountId: Bank_Account_Id,
+        txnType: "Purchase_Return",
+        referenceId: Purchase_Return_Id,
+        partyName: Party_Name,
+        amount: totalReceived,
+        txnDate: Return_Date,
+      });
+    }
+
     /* ── insert items + reverse stock ── */
     for (const item of items) {
       const {
@@ -276,15 +306,14 @@ const createPurchaseReturn = async (req, res, next) => {
         Tax_Amount,
         Amount,
       } = item;
- 
-      /* find item */
+
       const [[existingItem]] = await connection.query(
         `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
         [Item_Name]
       );
- 
+
       let Item_Id;
- 
+
       if (!existingItem) {
         const [ins] = await connection.execute(
           `INSERT INTO add_item
@@ -300,7 +329,7 @@ const createPurchaseReturn = async (req, res, next) => {
       } else {
         Item_Id = existingItem.Item_Id;
       }
- 
+
       await connection.query(
         `INSERT INTO purchase_return_items
            (Purchase_Return_Id, Item_Id, Item_Name,
@@ -309,7 +338,7 @@ const createPurchaseReturn = async (req, res, next) => {
             Tax_Type, Tax_Amount, Amount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          Purchase_Return_Id,           // ✅ now correctly set from insertId
+          Purchase_Return_Id,
           Item_Id,
           Item_Name,
           Item_Category  || "",
@@ -324,7 +353,7 @@ const createPurchaseReturn = async (req, res, next) => {
           Number(Amount),
         ]
       );
- 
+
       /* reverse stock */
       await connection.query(
         `UPDATE add_item
@@ -333,14 +362,14 @@ const createPurchaseReturn = async (req, res, next) => {
         [Number(Quantity), Item_Id]
       );
     }
- 
+
     await connection.commit();
     return res.status(201).json({
       success: true,
       message: "Purchase Return created",
       Purchase_Return_Id,
     });
- 
+
   } catch (err) {
     if (connection) await connection.rollback();
     console.error("❌ createPurchaseReturn:", err);
@@ -349,16 +378,16 @@ const createPurchaseReturn = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
- 
+
 /* ── EDIT ─────────────────────────────────────────────────── */
 const editPurchaseReturn = async (req, res, next) => {
   let connection;
   try {
     const { Purchase_Return_Id } = req.params;
- 
+
     connection = await db.getConnection();
     await connection.beginTransaction();
- 
+
     /* check exists */
     const [[existing]] = await connection.query(
       `SELECT * FROM purchase_return WHERE id = ?`,
@@ -368,7 +397,7 @@ const editPurchaseReturn = async (req, res, next) => {
       await connection.rollback();
       return res.status(404).json({ success: false, message: "Purchase Return not found" });
     }
- 
+
     const {
       Party_Name,
       Return_Number,
@@ -377,12 +406,18 @@ const editPurchaseReturn = async (req, res, next) => {
       Return_Date,
       State_Of_Supply,
       Total_Amount,
-     Total_Received,
+      Total_Received,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,        // 🔹 added
       items,
     } = req.body;
- 
+
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+    }
+
     /* party */
     const [[party]] = await connection.query(
       `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
@@ -392,18 +427,18 @@ const editPurchaseReturn = async (req, res, next) => {
       await connection.rollback();
       return res.status(404).json({ success: false, message: "Party not found" });
     }
- 
+
     const totalAmount = Number(Total_Amount) || 0;
     const totalReceived = Number(Total_Received) || 0;
     const balanceDue  = Number(Balance_Due)  || totalAmount - totalReceived;
- 
+
     /* update header */
     await connection.query(
       `UPDATE purchase_return SET
          Party_Id = ?, Return_Number = ?, Bill_Number = ?, Bill_Date = ?,
          Return_Date = ?, State_Of_Supply = ?,
-         Total_Amount = ?,Total_Received = ?, Balance_Due = ?,
-         Payment_Type = ?, updated_at = NOW()
+         Total_Amount = ?, Total_Received = ?, Balance_Due = ?,
+         Payment_Type = ?, Bank_Account_Id = ?, updated_at = NOW()
        WHERE id = ?`,
       [
         party.Party_Id,
@@ -416,10 +451,23 @@ const editPurchaseReturn = async (req, res, next) => {
         totalReceived,
         balanceDue,
         Payment_Type || "Cash",
+        Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 added
         Purchase_Return_Id,
       ]
     );
- 
+
+    /* 🔹 always call — helper handles insert / update / delete internally
+       (covers Cash→Bank, Bank→Cash, Bank→Bank switch, and amount edits) */
+    await recordBankTransaction({
+      connection,
+      bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+      txnType: "Purchase_Return",
+      referenceId: Number(Purchase_Return_Id),
+      partyName: Party_Name,
+      amount: totalReceived,
+      txnDate: Return_Date,
+    });
+
     /* fetch old items */
     const [oldItems] = await connection.query(
       `SELECT * FROM purchase_return_items WHERE Purchase_Return_Id = ?`,
@@ -427,7 +475,7 @@ const editPurchaseReturn = async (req, res, next) => {
     );
     const oldMap = new Map(oldItems.map((i) => [i.Item_Id, i]));
     const newItemIds = new Set();
- 
+
     /* upsert new items */
     for (const item of items) {
       const {
@@ -436,12 +484,12 @@ const editPurchaseReturn = async (req, res, next) => {
         Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
         Tax_Type, Tax_Amount, Amount,
       } = item;
- 
+
       const [[existingItem]] = await connection.query(
         `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
         [Item_Name]
       );
- 
+
       let Item_Id;
       if (!existingItem) {
         const [ins] = await connection.execute(
@@ -455,12 +503,11 @@ const editPurchaseReturn = async (req, res, next) => {
       } else {
         Item_Id = existingItem.Item_Id;
       }
- 
+
       newItemIds.add(Item_Id);
       const old = oldMap.get(Item_Id);
- 
+
       if (old) {
-        /* update existing return item */
         await connection.query(
           `UPDATE purchase_return_items SET
              Quantity = ?, Purchase_Price = ?,
@@ -476,8 +523,7 @@ const editPurchaseReturn = async (req, res, next) => {
             old.id,
           ]
         );
- 
-        /* stock diff: old qty was already deducted, adjust difference */
+
         const diff = Number(Quantity) - old.Quantity;
         if (diff !== 0) {
           await connection.query(
@@ -487,8 +533,6 @@ const editPurchaseReturn = async (req, res, next) => {
           );
         }
       } else {
-        /* insert new return item */
-        const Purchase_Return_Item_Id = await generateReturnItemId(connection);
         await connection.query(
           `INSERT INTO purchase_return_items
              ( Purchase_Return_Id, Item_Id, Item_Name,
@@ -505,7 +549,6 @@ const editPurchaseReturn = async (req, res, next) => {
             Tax_Type || null, Number(Tax_Amount) || 0, Number(Amount),
           ]
         );
-        /* deduct new stock */
         await connection.query(
           `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
            WHERE Item_Id = ?`,
@@ -513,7 +556,7 @@ const editPurchaseReturn = async (req, res, next) => {
         );
       }
     }
- 
+
     /* delete removed items — restore stock */
     for (const old of oldItems) {
       if (!newItemIds.has(old.Item_Id)) {
@@ -521,7 +564,6 @@ const editPurchaseReturn = async (req, res, next) => {
           `DELETE FROM purchase_return_items WHERE id = ?`,
           [old.id]
         );
-        /* restore stock because we un-returned these items */
         await connection.query(
           `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
            WHERE Item_Id = ?`,
@@ -529,7 +571,7 @@ const editPurchaseReturn = async (req, res, next) => {
         );
       }
     }
- 
+
     await connection.commit();
     return res.status(200).json({ success: true, message: "Purchase Return updated", Purchase_Return_Id });
   } catch (err) {
@@ -540,7 +582,6 @@ const editPurchaseReturn = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
- 
 /* ── DELETE ───────────────────────────────────────────────── */
 const deletePurchaseReturn = async (req, res, next) => {
   let connection;

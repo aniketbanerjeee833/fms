@@ -12,6 +12,7 @@ import { useAddPaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMu
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
+import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 export default function PaymentIn() {
@@ -36,6 +37,7 @@ export default function PaymentIn() {
     // const[selecedSales,setSelectedSales]= useState(null);
      const [addPaymentIn, { isLoading: isAdding }] = useAddPaymentInMutation();
   const [updatePaymentIn, { isLoading: isUpdating }] = useUpdatePaymentInMutation();
+    const { data: banks = [] } = useGetAllBankAccountsQuery();
   const isSaving = isAdding || isUpdating;
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
@@ -310,8 +312,8 @@ const handleSavePaymentIn = async (formData) => {
                                         <th className="text-left">Payment Type</th>
                                         <th className="text-left">Total Received</th>
                                         <th className="text-left">Balance Due</th>
-                                        <th>View</th>
-                                        <th>Edit</th>
+                                        <th>View/Edit</th>
+                                        {/* <th>Edit</th> */}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -340,7 +342,7 @@ const handleSavePaymentIn = async (formData) => {
                                                 <td>{paymentIn?.Received || "N/A"}</td>
                                                 <td>{paymentIn?.Balance_Due || "N/A"}</td>
 
-                                                <td>
+                                                {/* <td>
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -355,7 +357,7 @@ const handleSavePaymentIn = async (formData) => {
                                                     >
                                                         <Eye size={18} color="#4CA1AF" />
                                                     </button>
-                                                </td>
+                                                </td> */}
 
                                                 <td>
                                                     <button
@@ -537,6 +539,7 @@ const handleSavePaymentIn = async (formData) => {
           mode={modal.mode}
           initialData={modal.data}
           parties={partiesList}
+          banks={banks}
           onClose={() => setModal({ open: false, mode: "add", data: null })}
           onSave={handleSavePaymentIn}
           isSaving={isSaving}

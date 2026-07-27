@@ -58,7 +58,14 @@ export const purchaseFormSchema = z
       .union([z.number(), z.string(), z.null(), z.undefined()])
       .optional(),
 
-    Reference_Number: z.string().trim().optional().or(z.literal("")),
+       Reference_Number: z
+  .string()
+  .trim()
+  .nullable()
+  .optional()
+  .transform((val) => val ?? ""),
+
+    // Reference_Number: z.string().trim().optional().or(z.literal("")),
 
     // Stock_Quantity: digitsOnly("Stock_Quantity"),
 
@@ -77,19 +84,26 @@ export const purchaseFormSchema = z
             .regex(/^\d+$/, "HSN Code must contain only digits (0-9).")
           ),
 
-          Quantity: z.preprocess(
-            (val) => {
-              if (val === "" || val === undefined || val === null) return undefined;
-              return Number(val);
-            },
-            z
-              .number({
-                required_error: "Quantity is required",
-                invalid_type_error: "Quantity must be a number",
-              })
-              .min(1, "Quantity must be greater than zero")
-          ),
-
+          // Quantity: z.preprocess(
+          //   (val) => {
+          //     if (val === "" || val === undefined || val === null) return undefined;
+          //     return Number(val);
+          //   },
+          //   z
+          //     .number({
+          //       required_error: "Quantity is required",
+          //       invalid_type_error: "Quantity must be a number",
+          //     })
+          //     .min(1, "Quantity must be greater than zero")
+          // ),
+  Quantity: z.preprocess(
+  (val) => {
+    if (val === "" || val === undefined || val === null) return 0;
+    const n = Number(val);
+    return isNaN(n) ? 0 : n;
+  },
+  z.number().min(1, "Quantity must be greater than zero")
+),
           Item_Unit: z.string().min(1, "Unit is required"),
 
           Purchase_Price: digitsOnly("Purchase_Price", true).refine(

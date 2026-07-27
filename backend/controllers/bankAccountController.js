@@ -195,7 +195,6 @@ ORDER BY ba.Account_Display_Name;
       Amount,
       Running_Balance,
       Txn_Date,
-      Remarks,
       Reference_Id
    FROM bank_transactions
    WHERE Bank_Account_Id = ?

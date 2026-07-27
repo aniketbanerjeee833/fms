@@ -16,13 +16,14 @@ export default function PaymentOutModal({
   initialData = null,        // existing payment-out record for edit/view
   parties = [],               // array of { Party_Id, Party_Name, Phone_Number, GSTIN } (or { parties: [...] })
   onClose,
-  onSave,                     // (formData) => call your existing save/update controller
+  onSave,
+  banks,                     // (formData) => call your existing save/update controller
   //onAddParty,                 // optional: (partyName) => Promise<{Party_Id, Party_Name}> - called from "+ Add Party"
   PartyAddModal,               // optional: pass your own <AddParty> component in as a prop
   isSaving = false,
 }) {
   const isView = mode === "view";
-  console.log(initialData)
+  console.log(initialData,banks)
   // Normalize parties prop - accepts either an array or { parties: [...] }
   const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
 const formatDateForInput = (date) => {
@@ -48,6 +49,7 @@ const formatDateForInput = (date) => {
       Party_Name: initialData?.Party_Name || "",
       Receipt_No: initialData?.Receipt_No || "",
       Payment_Type: initialData?.Payment_Type || "",
+      Bank_Account_Id: initialData?.Bank_Account_Id || "",
     
   Payment_Date: formatDateForInput(initialData?.Payment_Date) || "",
 
@@ -249,7 +251,7 @@ const formatDateForInput = (date) => {
             </div>
 
             {/* Payment Type */}
-            <div className="flex flex-col">
+            {/* <div className="flex flex-col">
               <span className="active">
                 Payment Type
                 <span className="text-red-500">&nbsp;*</span>
@@ -267,7 +269,52 @@ const formatDateForInput = (date) => {
               {errors?.Payment_Type && (
                 <p className="text-red-500 text-xs mt-1">{errors.Payment_Type.message}</p>
               )}
-            </div>
+            </div> */}
+
+               <div className="flex flex-col">
+                      <span className="active">Payment Type</span>
+
+                      <select
+                        id="Payment_Type"
+                        value={
+                          watch("Payment_Type") === "Bank"
+                            ? `bank_${watch("Bank_Account_Id") || ""}`
+                            : watch("Payment_Type") || ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.startsWith("bank_")) {
+                            const bankId = val.replace("bank_", "");
+                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                          } else {
+                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                          }
+                        }}
+                      >
+                        <option value="">Select Payment Type</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Neft">Neft</option>
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={`bank_${bank.Bank_Account_Id}`}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
+                       
+                      </select>
+
+                      {errors?.Payment_Type && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
+                      )}
+                      {errors?.Bank_Account_Id && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
+                      )}
+                    </div>
 
             {/* Date */}
             <div className="flex flex-col">

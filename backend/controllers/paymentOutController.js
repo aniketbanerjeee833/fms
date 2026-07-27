@@ -23,9 +23,10 @@ CREATE TABLE IF NOT EXISTS payment_out (
    2. BACKEND CONTROLLERS  (paymentOutController.js)
 ═══════════════════════════════════════════════════════════════════ */
 import db from "../config/db.js"; // mysql2/promise connection
+import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+
 
  
-/* ── GET ALL ──────────────────────────────────────────────── */
 const getAllPaymentOuts = async (req, res, next) => {
   let connection;
   try {
@@ -67,9 +68,16 @@ const getAllPaymentOuts = async (req, res, next) => {
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
  
     const [rows] = await connection.query(
-      `SELECT po.*, a.Party_Name
+      `SELECT po.*, a.Party_Name,
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE
+          WHEN po.Payment_Type = 'Bank'
+          THEN ba.Account_Display_Name
+          ELSE po.Payment_Type
+        END AS Payment_Type_Display
        FROM payment_out po
        LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
+       LEFT JOIN bank_accounts ba ON ba.id = po.Bank_Account_Id
        ${whereSQL}
        ORDER BY po.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -115,10 +123,17 @@ const getPaymentOutById = async (req, res, next) => {
     const { id } = req.params;
  
     const [[row]] = await connection.query(
-      `SELECT po.*, a.Party_Name
+      `SELECT po.*, a.Party_Name,
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE
+          WHEN po.Payment_Type = 'Bank'
+          THEN ba.Account_Display_Name
+          ELSE po.Payment_Type
+        END AS Payment_Type_Display
        FROM payment_out po
        LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
-       WHERE po.Payment_Out_Id = ?`,
+       LEFT JOIN bank_accounts ba ON ba.id = po.Bank_Account_Id
+       WHERE po.id = ?`,
       [id]
     );
  
@@ -138,25 +153,69 @@ const createPaymentOut = async (req, res, next) => {
   try {
     connection = await db.getConnection();
  
-    const { Party_Id, Receipt_No, Payment_Date, Payment_Type, Reference_No, Paid } = req.body;
+    const {
+      Party_Id,
+      Party_Name,       // needed by recordBankTransaction for the ledger row
+      Receipt_No,
+      Payment_Date,
+      Payment_Type,
+      Reference_No,
+      Bank_Account_Id,  // required only when Payment_Type === "Bank"
+      Paid,
+    } = req.body;
  
     if (!Party_Id || !Payment_Date || !Payment_Type || !Paid) {
       return res.status(400).json({ success: false, message: "Party, Date, Payment Type and Paid are required" });
     }
  
+    if (isNaN(Paid) || Number(Paid) <= 0) {
+      return res.status(400).json({ success: false, message: "Paid amount must be greater than 0" });
+    }
+ 
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      return res.status(400).json({ success: false, message: "Bank account is required when Payment Type is Bank" });
+    }
+ 
+    await connection.beginTransaction();
+ 
     const [result] = await connection.query(
       `INSERT INTO payment_out
-         (Party_Id, Receipt_No, Payment_Date, Payment_Type, Reference_No, Paid)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [Party_Id, Receipt_No || null, Payment_Date, Payment_Type, Reference_No || null, Number(Paid)]
+         (Party_Id, Receipt_No, Payment_Date, Payment_Type, Reference_No, Bank_Account_Id, Paid)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        Party_Id,
+        Receipt_No || null,
+        Payment_Date,
+        Payment_Type,
+        Reference_No || null,
+        Payment_Type === "Bank" ? Bank_Account_Id : null,
+        Number(Paid),
+      ]
     );
+ 
+    const Payment_Out_Id = result.insertId;
+ 
+    // Payment_Out is not in CREDIT_TYPES inside recordBankTransaction, so it's
+    // correctly posted as a Debit (money leaving the bank account).
+    await recordBankTransaction({
+      connection,
+      bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+      txnType: "Payment_Out",
+      referenceId: Payment_Out_Id,
+      partyName: Party_Name,
+      amount: Number(Paid),
+      txnDate: Payment_Date,
+    });
+ 
+    await connection.commit();
  
     return res.status(201).json({
       success: true,
       message: "Payment Out created",
-      Payment_Out_Id: result.insertId,
+      Payment_Out_Id,
     });
   } catch (err) {
+    if (connection) await connection.rollback();
     next(err);
   } finally {
     if (connection) connection.release();
@@ -169,22 +228,63 @@ const updatePaymentOut = async (req, res, next) => {
   try {
     connection = await db.getConnection();
     const { id } = req.params;
-    const { Party_Id, Receipt_No, Payment_Date, Payment_Type, Reference_No, Paid } = req.body;
+    const {
+      Party_Id,
+      Party_Name,
+      Receipt_No,
+      Payment_Date,
+      Payment_Type,
+      Reference_No,
+      Bank_Account_Id,
+      Paid,
+    } = req.body;
  
     if (!Party_Id || !Payment_Date || !Payment_Type || !Paid) {
       return res.status(400).json({ success: false, message: "Party, Date, Payment Type and Paid are required" });
     }
  
+    if (isNaN(Paid) || Number(Paid) <= 0) {
+      return res.status(400).json({ success: false, message: "Paid amount must be greater than 0" });
+    }
+ 
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      return res.status(400).json({ success: false, message: "Bank account is required when Payment Type is Bank" });
+    }
+ 
+    await connection.beginTransaction();
+ 
     await connection.query(
       `UPDATE payment_out
        SET Party_Id = ?, Receipt_No = ?, Payment_Date = ?,
-           Payment_Type = ?, Reference_No = ?, Paid = ?
+           Payment_Type = ?, Reference_No = ?, Bank_Account_Id = ?, Paid = ?
        WHERE id = ?`,
-      [Party_Id, Receipt_No || null, Payment_Date, Payment_Type, Reference_No || null, Number(Paid), id]
+      [
+        Party_Id,
+        Receipt_No || null,
+        Payment_Date,
+        Payment_Type,
+        Reference_No || null,
+        Payment_Type === "Bank" ? Bank_Account_Id : null,
+        Number(Paid),
+        id,
+      ]
     );
+ 
+    await recordBankTransaction({
+      connection,
+      bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+      txnType: "Payment_Out",
+      referenceId: id,
+      partyName: Party_Name,
+      amount: Number(Paid),
+      txnDate: Payment_Date,
+    });
+ 
+    await connection.commit();
  
     return res.status(200).json({ success: true, message: "Payment Out updated" });
   } catch (err) {
+    if (connection) await connection.rollback();
     next(err);
   } finally {
     if (connection) connection.release();

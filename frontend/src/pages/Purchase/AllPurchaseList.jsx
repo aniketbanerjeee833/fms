@@ -398,7 +398,7 @@ export default function AllPurchaseList() {
                     <th className="text-left">Balance Due</th>
                     <th>View</th>
                     <th>Edit</th>
-                     <th>Return</th>
+                    <th>Return</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -423,12 +423,19 @@ export default function AllPurchaseList() {
                             : "N/A"}
                         </td>
                         <td>{purchase?.Party_Name || "N/A"}</td>
-                        <td>{purchase?.Payment_Type || "N/A"}</td>
+                        <td>
+                          {purchase?.Payment_Type
+                            ? purchase.Payment_Type === "Bank"
+                              ? `Bank (${purchase?.Bank_Display_Name || "N/A"})`
+                              : purchase.Payment_Type
+                            : "N/A"}
+                        </td>
+                        {/* <td>{purchase?.Payment_Type  || "N/A"}</td> */}
                         <td>{purchase?.Total_Amount || "N/A"}</td>
                         <td>{purchase?.Balance_Due || "N/A"}</td>
 
                         <td >
-                          
+
                           <NavLink to={`/purchase/view/${purchase?.Purchase_Id}${location.search}`}
                             state={{ from: "all-purchase-list" }}>
                             <Eye
@@ -454,7 +461,7 @@ export default function AllPurchaseList() {
                                 color: "#4CA1AF"
                               }} />
                           </NavLink>
-                          </td>
+                        </td>
                         <td>
                           <NavLink
                             to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
@@ -468,7 +475,7 @@ export default function AllPurchaseList() {
                               }}
                             />
                           </NavLink>
-                        
+
 
                         </td>
                       </tr>

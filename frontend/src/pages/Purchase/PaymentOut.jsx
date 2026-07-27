@@ -10,6 +10,7 @@ import { useAddPaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOu
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 export default function PaymentOut() {
@@ -35,6 +36,7 @@ export default function PaymentOut() {
     // const[selecedSales,setSelectedSales]= useState(null);
     const [addPaymentOut, { isLoading: isAdding }] = useAddPaymentOutMutation();
   const [updatePaymentOut, { isLoading: isUpdating }] = useUpdatePaymentOutMutation();
+  const { data: banks = [] } = useGetAllBankAccountsQuery();
   const isSaving = isAdding || isUpdating;
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
@@ -326,8 +328,8 @@ const handleSavePaymentOut = async (formData) => {
                                         <th className="text-left">Payment Type</th>
                                         <th className="text-left">Total Paid</th>
                                         <th className="text-left">Balance Due</th>
-                                        <th>View</th>
-                                        <th>Edit</th>
+                                        <th>View/Edit</th>
+                                        {/* <th>Edit</th> */}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -391,7 +393,7 @@ const handleSavePaymentOut = async (formData) => {
                                   }} /> 
 
                           </td> */}
-                                                <td>
+                                                {/* <td>
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -406,7 +408,7 @@ const handleSavePaymentOut = async (formData) => {
                                                     >
                                                         <Eye size={18} color="#4CA1AF" />
                                                     </button>
-                                                </td>
+                                                </td> */}
 
                                                 <td>
                                                     <button
@@ -581,41 +583,7 @@ const handleSavePaymentOut = async (formData) => {
 
                     </div>
                 </div>
-                {/* <div className="flex justify-center align-center space-x-2 p-4">
-                <button type="button"
-                  onClick={() => handlePreviousPage()}
-                  disabled={page === 1}
-                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-                ${page === 1 ? 'opacity-50 ' : ''}
-                `}
-                >
-                  ← Previous
-                </button>
-                {[...Array(paymentOutData?.totalPages).keys()].map((index) => (
-                  <button
-                    key={index}
-                    onClick={() => handlePageChange(index + 1)}
-                    //   className={`px-3 py-1 rounded ${page === index + 1 ? 'bg-[#7346ff] text-white' : 'bg-gray-200 hover:bg-gray-300'
-                    //     }`}
-                    className={
-                      `px-3 py-1 rounded ${page === index + 1 ? 'bg-[#4CA1AF] text-white' :
-                        'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-
-                <button type="button"
-                  onClick={() => handleNextPage()}
-                  disabled={page === paymentOutData?.totalPages || paymentOutData?.totalPages === 0}
-                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-                ${page === paymentOutData?.totalPages || paymentOutData?.totalPages === 0 ? 'opacity-50 ' : ''}
-                `}
-                >
-                  Next →
-                </button>
-              </div> */}
+               
             </div>
              {modal.open && (
         <PaymentOutModal
@@ -624,6 +592,7 @@ const handleSavePaymentOut = async (formData) => {
           parties={partiesList}
           onClose={() => setModal({ open: false, mode: "add", data: null })}
           onSave={handleSavePaymentOut}
+          banks={banks}
           isSaving={isSaving}
         />
       )}

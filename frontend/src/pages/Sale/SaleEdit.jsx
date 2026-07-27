@@ -21,6 +21,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 
@@ -33,6 +34,7 @@ export default function SaleEdit() {
   const Item_Id = location.state?.itemId
   console.log("Edit page query:", location.search);
   const { id: Sale_Id } = useParams();
+  const { data: banks = [] } = useGetAllBankAccountsQuery();
   const dispatch = useDispatch();
   const TAX_RATES = {
     "GST0": 0,
@@ -160,6 +162,7 @@ export default function SaleEdit() {
       Balance_Due: "",
       Total_Received: "",
       Payment_Type: "Cash",
+       Bank_Account_Id: null,   // 🔹 added
       Reference_Number: "",
       items: [{
 
@@ -385,6 +388,7 @@ export default function SaleEdit() {
         Total_Received: sale.invoicePartyDetails?.Total_Received || "",
         Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
         Payment_Type: sale.invoicePartyDetails?.Payment_Type || "",
+         Bank_Account_Id: sale.invoicePartyDetails?.Bank_Account_Id, // ✅ Add this
         Reference_Number: sale.invoicePartyDetails?.Reference_Number || "",
 
         items: sale.items || [],
@@ -394,7 +398,7 @@ export default function SaleEdit() {
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
-  const paymentType = watch("Payment_Type", "");
+ // const paymentType = watch("Payment_Type", "");
   useEffect(() => {
     if (sale) {
 
@@ -1370,38 +1374,6 @@ export default function SaleEdit() {
                             </td>
 
 
-                            {/* Unit */}
-                            {/* <td style={{ padding: "0px",width: "6%" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Item_Unit`}
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select "
-                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      handleRowChange(i, "Item_Unit", value);
-                                      setValue(`items.${i}.Item_Unit`, value);
-                                    }}
-                                  >
-                                    <option value="">Select</option>
-                                    {Object.entries(itemUnits).map(([key, value]) => (
-                                      <option key={key} value={key}>
-                                        {`${value} (${key})`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              />
-                              {errors?.items?.[i]?.Item_Unit && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_Unit.message}
-                                </p>
-                              )}
-                            </td> */}
                             <td style={{ padding: "0px", width: "12%" }}>
                               <Controller
                                 control={control}
@@ -1752,7 +1724,7 @@ export default function SaleEdit() {
                         </button>
                         <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
                         >
-                          <div className="flex flex-col w-full">
+                          {/* <div className="flex flex-col w-full">
                             <div className="input-field   ">
                               <span className="active">Payment Type</span>
 
@@ -1797,7 +1769,51 @@ export default function SaleEdit() {
                               </div>
 
                             )}
-                          </div>
+                          </div> */}
+                           <div className="flex flex-col w-full">
+                      <span className="active">Payment Type</span>
+
+                      <select
+                        id="Payment_Type"
+                        value={
+                          watch("Payment_Type") === "Bank"
+                            ? `bank_${watch("Bank_Account_Id") || ""}`
+                            : watch("Payment_Type") || ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.startsWith("bank_")) {
+                            const bankId = val.replace("bank_", "");
+                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                          } else {
+                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                          }
+                        }}
+                      >
+                        <option value="">Select Payment Type</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Neft">Neft</option>
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={`bank_${bank.Bank_Account_Id}`}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
+                       
+                      </select>
+
+                      {errors?.Payment_Type && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
+                      )}
+                      {errors?.Bank_Account_Id && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
+                      )}
+                    </div>
                         </div>
                       </div>
 

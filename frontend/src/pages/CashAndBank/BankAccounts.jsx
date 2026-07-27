@@ -68,7 +68,7 @@ function BankDetailPanel({ bankId, onEdit }) {
       {/* ── BANK SUMMARY CARD ── */}
       <div
         className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-        style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
+        //style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
       >
         {/* <div className="flex items-center gap-4">
           <div

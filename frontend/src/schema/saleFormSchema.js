@@ -73,17 +73,22 @@ export const saleFormSchema = z.object({
   // 🔹 Optional but digits if provided
   Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
   Payment_Type: z
-      .enum(["Cash", "Cheque", "Neft"])
+      .enum(["Cash", "Cheque", "Neft", "Bank"])
       .or(z.literal("")) // allow blank select
       .refine((val) => val !== "", {
         message: "Please select a payment type.",
       }),
-  // Payment_Type: z.enum(["Cash", "Cheque", "Neft"]).default("Cash"),
+
+    // 🔹 Required only when Payment_Type === "Bank"
+    Bank_Account_Id: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .optional(),
   Reference_Number: z
   .string()
   .trim()
+  .nullable()
   .optional()
-  .or(z.literal("")),
+  .transform((val) => val ?? ""),
 
   // Stock_Quantity: digitsOnly("Stock_Quantity"),
 
@@ -115,18 +120,26 @@ Item_HSN: z
   .refine((val) => /^\d+$/.test(val), { message: "HSN Code must contain only digits (0-9)." })
   .refine((val) => val.length >= 4, { message: "HSN Code must be at least 4 digits." })
   .refine((val) => val.length <= 8, { message: "HSN Code must be at most 8 digits." }),
-           Quantity: z.preprocess(
-   (val) => {
-     if (val === "" || val === undefined || val === null) return undefined;
-     return Number(val);
-   },
-   z
-     .number({
-       required_error: "Quantity is required",
-       invalid_type_error: "Quantity must be a number",
-     })
-     .min(1, "Quantity must be greater than zero")
- ),
+//            Quantity: z.preprocess(
+//    (val) => {
+//      if (val === "" || val === undefined || val === null) return undefined;
+//      return Number(val);
+//    },
+//    z
+//      .number({
+//        required_error: "Quantity is required",
+//        invalid_type_error: "Quantity must be a number",
+//      })
+//      .min(1, "Quantity must be greater than zero")
+//  ),
+  Quantity: z.preprocess(
+  (val) => {
+    if (val === "" || val === undefined || val === null) return 0;
+    const n = Number(val);
+    return isNaN(n) ? 0 : n;
+  },
+  z.number().min(1, "Quantity must be greater than zero")
+),
   
         Item_Unit: z.string().min(1, "Unit is required"),
      
@@ -145,4 +158,10 @@ Item_HSN: z
       })
     )
     .nonempty("At least one item must be added"),
-});
+}).refine(
+    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+    {
+      message: "Please select a bank account.",
+      path: ["Bank_Account_Id"],
+    }
+  );

@@ -5,6 +5,7 @@ import { saleNewItemFormSchema } from "../validators/saleNewItemFormSchema.js";
 import saleSchema from "../validators/saleSchema.js";
 import PdfPrinter from "pdfmake";
 import ExcelJS from "exceljs";
+import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 // import puppeteer from "puppeteer";
 //import pdf from "html-pdf-node";
     const TAX_TYPES = {
@@ -325,6 +326,7 @@ const addSale = async (req, res, next) => {
       Total_Received,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,  
       Reference_Number,
       items,
     } = validation.data;
@@ -342,7 +344,10 @@ const addSale = async (req, res, next) => {
         message: "Star marked fields missing or items empty",
       });
     }
-
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+    }
     // 2️⃣ Check duplicate items
     const itemCountMap = new Map();
     for (const item of items) {
@@ -412,9 +417,9 @@ const addSale = async (req, res, next) => {
     const [saleResult] = await connection.execute(
       `INSERT INTO add_sale 
        (Party_Id, Invoice_Number, Invoice_Date, State_Of_Supply,
-        Total_Amount, Total_Received, Balance_Due, Payment_Type, Reference_Number,
+        Total_Amount, Total_Received, Balance_Due, Payment_Type,Bank_Account_Id, Reference_Number,
         Financial_Year, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, NOW(), NOW())`,
       [
         Party_Id,
         Invoice_Number,
@@ -424,6 +429,7 @@ const addSale = async (req, res, next) => {
         totalReceived,
         balanceDue,
         cleanValue(Payment_Type),
+         Payment_Type === "Bank" ? Bank_Account_Id : null,
         cleanValue(Reference_Number),
         activeFY,
       ]
@@ -437,6 +443,18 @@ const addSale = async (req, res, next) => {
       `UPDATE add_sale SET Sale_Id = ? WHERE id = ?`,
       [newSaleId, saleIdNumber]
     );
+
+    if (Payment_Type === "Bank" && Bank_Account_Id && totalReceived > 0) {
+  await recordBankTransaction({
+    connection,
+    bankAccountId: Bank_Account_Id,
+    txnType: "Sale",
+    referenceId: saleIdNumber,        // ✅ numeric id, not "SAL001"
+    partyName: Party_Name,
+    amount: totalReceived,
+    txnDate: Invoice_Date
+  });
+}
 
     // 9️⃣ Insert sale items
     for (const item of items) {
@@ -1055,28 +1073,7 @@ const getAllSales = async (req, res, next) => {
       params.push(like, like, like, like);
     }
 
-    // 📅 Date Range
-    // if (fromDate && toDate) {
-    //   whereClauses.push("DATE(s.created_at) BETWEEN ? AND ?");
-    //   params.push(fromDate, toDate);
-    // } else if (fromDate) {
-    //   whereClauses.push("DATE(s.created_at) >= ?");
-    //   params.push(fromDate);
-    // } else if (toDate) {
-    //   whereClauses.push("DATE(s.created_at) <= ?");
-    //   params.push(toDate);
-    // }
-// if (fromDate && toDate) {
-//       whereClauses.push(`DATE(s.Invoice_Date) BETWEEN ? AND ?`);
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(s.Invoice_Date) >= ?`);
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(s.Invoice_Date) <= ?`);
-//       params.push(toDate);
-//     }
-// 📅 Date Range (Invoice_Date is DATETIME / TIMESTAMP)
+ 
 if (fromDate && toDate) {
   whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
   params.push(
@@ -1501,448 +1498,7 @@ if (fromDate && toDate) {
     if(connection)  connection.release();
   }
 };
-// const getSingleSale = async (req, res, next) => {
-//   try {
-//     const { Sale_Id: saleId } = req.params;
 
-//     if (!saleId) {
-//       return res.status(400).json({ success: false, message: "Sale ID is required." });
-//     }
-
-//     // ✅ Fetch sale header (includes invoice + party info)
-//     const [saleData] = await db.query(
-//       `
-//       SELECT 
-//         s.Sale_Id,
-//         s.Invoice_Number,
-//         s.Invoice_Date,
-//         s.Reference_Number,
-//         s.State_Of_Supply,
-//         s.Payment_Type,
-//         s.Total_Amount,
-//         s.Total_Received,
-//         s.Balance_Due,
-//         s.Party_Id,
-//         p.Party_Name,
-//         p.GSTIN,
-//         p.Billing_Address,
-//         p.Shipping_Address
-//       FROM add_sale s
-//       LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
-//       WHERE s.Sale_Id = ?
-//       `,
-//       [saleId]
-//     );
-
-//     if (saleData.length === 0) {
-//       return res.status(404).json({ success: false, message: "Sale not found." });
-//     }
-
-//     const saleHeader = saleData[0];
-
-//     // ✅ Fetch all sale items related to that Sale_Id
-//     const [items] = await db.query(
-//       `
-//       SELECT 
-//         si.Sale_Items_Id,
-//         si.Item_Id,
-//         i.Item_Name,
-//         i.Item_HSN,
-//         i.Item_Unit,
-//         i.Item_Category,
-//         si.Quantity,
-//         si.Sale_Price,
-//         si.Discount_On_Sale_Price,
-//         si.Discount_Type_On_Sale_Price,
-//         si.Tax_Amount,
-//         // si.Tax_Type,
-//         si.Amount,
-//         si.created_at
-//       FROM add_sale_items si
-//       LEFT JOIN add_item i ON si.Item_Id = i.Item_Id
-//       WHERE si.Sale_Id = ?
-//       ORDER BY si.created_at DESC
-//       `,
-//       [saleId]
-//     );
-
-//     const [Tax_Types]= await db.query(
-//       `SELECT p.Tax_Type FROM add_purchase_items p 
-//       LEFT JOIN add_item i ON p.Item_Id = i.Item_Id
-//       WHERE p.Item_Id = ?`,
-//       [ items[0].Item_Id]
-//     )
-//     if (items.length === 0) {
-//       return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
-//     }
-
-   
-
-//     // ✅ Combine and send response
-//     const response = {
-//       success: true,
-//       invoicePartyDetails: {
-//         Sale_Id: saleHeader.Sale_Id,
-//         Party_Name: saleHeader.Party_Name,
-//         GSTIN: saleHeader.GSTIN,
-//         State_Of_Supply: saleHeader.State_Of_Supply,
-//         Reference_Number: saleHeader.Reference_Number,
-//         Invoice_Number: saleHeader.Invoice_Number,
-//         Invoice_Date: saleHeader.Invoice_Date,
-//         Payment_Type: saleHeader.Payment_Type,
-//         Total_Amount: saleHeader.Total_Amount,
-//         Total_Received: saleHeader.Total_Received,
-//         Balance_Due: saleHeader.Balance_Due,
-//         Billing_Address: saleHeader.Billing_Address,
-//         Shipping_Address: saleHeader.Shipping_Address,
-//       },
-//       items: items.map((it) => ({
-//         Sale_Items_Id: it.Sale_Items_Id,
-//         Item_Id: it.Item_Id,
-//         Item_Name: it.Item_Name,
-//         Item_HSN: it.Item_HSN,
-//         Item_Unit: it.Item_Unit,
-//         Item_Category: it.Item_Category,
-//         Quantity: it.Quantity,
-//         Sale_Price: it.Sale_Price,
-//         Discount_On_Sale_Price: it.Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price,
-//         Tax_Amount: it.Tax_Amount,
-//            Tax_Type: Tax_Types[0].Tax_Type,
-//         // Tax_Type: it.Tax_Type,
-//         Amount: it.Amount,
-//         created_at: it.created_at,
-//       })),
-//     };
-
-//     return res.status(200).json(response);
-//   } catch (err) {
-//     console.error("❌ Error getting single sale:", err);
-//     next(err);
-//   }
-// };
-
-// const getSingleSale= async (req, res, next) => {
-
-//     try{
-//       //const saleId=req.params.id;
-//         const {Sale_Id:saleId} = req.params;
-
-//         if(!saleId){
-//             return res.status(400).json({message:"Sale id is required"});
-//         }
-//         const [sale] = await db.query("SELECT * FROM add_sale WHERE Sale_Id = ?", [saleId]);
-//         if(sale.length === 0){
-//             return res.status(404).json({message:"Sale not found"});
-//         }
-//         const [saleItems] = await db.query(`SELECT * FROM add_sale_items WHERE Sale_Id IN (
-//             SELECT Sale_Id FROM add_sale WHERE Sale_Id = ?
-//         )`, 
-//         [saleId]);
-
-//         if(saleItems.length === 0){
-//             return res.status(404).json({message:"Sale items not found"});
-//         }
-//         let itemIds=[];
-//         let saleIds=[]
-//         saleItems.forEach((item) => {
-
-//           itemIds.push(item.Item_Id);
-//           saleIds.push(item.Sale_Id);
-
-//         })
-//         const[items]=await db.query("SELECT * FROM add_item WHERE Item_Id IN (?)", [itemIds]);
-
-//         const[salePartyDetails]=await db.query("SELECT * FROM add_sale WHERE Sale_Id IN (?)", [saleIds]);
-
-//           let partyIds=[];
-//           salePartyDetails.forEach((item) => {
-//             console.log(item.Party_Id)
-//             partyIds.push(item.Party_Id);
-//           })
-//           const[partyNames]=await db.query("SELECT * FROM add_party WHERE Party_Id IN (?)", [partyIds]);
-//         //  console.log(items,salePartyDetails);
-//       //   const combinedSaleItemsDetails = saleItems.map((item) => ({
-//       //     ...item,
-//       //     GSTIN: partyNames.find((p) => p.Party_Id === salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Party_Id)?.GSTIN || "",
-//       //     Party_Id: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Party_Id || "",
-//       //     State_Of_Supply: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.State_Of_Supply || "",
-//       //     Invoice_Date: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Invoice_Date || "",
-//       //     Invoice_Number: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Invoice_Number || "",
-//       //     Reference_Number: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Reference_Number || "",
-//       //     Payment_Type: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Payment_Type || "",
-//       // Party_Name: partyNames.find((p) => p.Party_Id === salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Party_Id)?.Party_Name || "",
-//       //     Item_Name: items.find((i) => i.Item_Id === item.Item_Id)?.Item_Name || "",
-//       //     Item_HSN: items.find((i) => i.Item_Id === item.Item_Id)?.Item_HSN || "",
-//       //     Item_Unit: items.find((i) => i.Item_Id === item.Item_Id)?.Item_Unit || "",
-//       //     Item_Category: items.find((i) => i.Item_Id === item.Item_Id)?.Item_Category || "",
-
-//       //   }))
-//       const combinedSaleItemsDetails=new Map();
-//       saleItems.forEach((item) => {
-//         const saleId = item.Sale_Id;
-//         if (!combinedSaleItemsDetails.has(saleId)) {
-//           combinedSaleItemsDetails.set(saleId, {
-//             ...item,
-//             GSTIN: partyNames.find((p) => p.Party_Id === salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Party_Id)?.GSTIN || "",
-//             Party_Id: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Party_Id || "",
-//             State_Of_Supply: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.State_Of_Supply || "",
-//             Invoice_Date: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Invoice_Date || "",
-//             Invoice_Number: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Invoice_Number || "",
-//             Reference_Number: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Reference_Number || "",
-//             Payment_Type: salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Payment_Type || "",
-//             Party_Name: partyNames.find((p) => p.Party_Id === salePartyDetails.find((s) => s.Sale_Id === item.Sale_Id)?.Party_Id)?.Party_Name || "",
-
-//             Item_Name: items.find((i) => i.Item_Id === item.Item_Id)?.Item_Name || "",
-//             Item_HSN: items.find((i) => i.Item_Id === item.Item_Id)?.Item_HSN || "",
-//             Item_Unit: items.find((i) => i.Item_Id === item.Item_Id)?.Item_Unit || "",
-//             Item_Category: items.find((i) => i.Item_Id === item.Item_Id)?.Item_Category || "",
-//           });
-//       }else{
-//         combinedSaleItemsDetails.set(saleId, {
-//           ...combinedSaleItemsDetails.get(saleId),
-//           ...item
-//         })
-//       }
-//       });
-//       console.log(Array.from(combinedSaleItemsDetails.values()));  
-//         return res.status(200).json({ success: true, saleItems: Array.from(combinedSaleItemsDetails.values()) });
-//     }catch(err){
-//         console.error("❌ Error getting single sale:", err);
-//         next(err);
-//         // return res.status(500).json({ message: "Internal Server Error" });
-//     }
-// }
-// const getLatestInvoiceNumber = async (req, res, next) => {
-//   try {
-//     // Fetch the latest invoice by creation date
-//     const [rows] = await db.query(`
-//       SELECT 
-//         Invoice_Number AS latestInvoice, 
-//         created_at AS createdAt
-//       FROM add_sale
-//       ORDER BY created_at DESC
-//       LIMIT 1
-//     `);
-
-//     const[InvoiceName]=await db.query("SELECT * FROM add_invoice ");
-//     let newInvoiceNumber = "001";
-//     let latestInvoiceInfo = null;
-
-//     if (rows.length > 0 && rows[0].latestInvoice) {
-//       // const lastInvoice = rows[0].latestInvoice;
-//       // const num = parseInt(lastInvoice.replace("INV", "")) + 1;
-//       // newInvoiceNumber = "INV" + num.toString().padStart(3, "0");
-
-//      const lastInvoice = rows[0].latestInvoice;
-//      const num= parseInt(lastInvoice.replace(InvoiceName[0].Invoice_Name, "")) + 1;
-//      newInvoiceNumber = InvoiceName[0].Invoice_Name + num.toString()
-//       latestInvoiceInfo = {
-//         lastInvoiceNumber: lastInvoice,
-//         createdAt: rows[0].createdAt,
-//       };
-//     }
-
-//     return res.status(200).json({
-//       newInvoiceNumber,
-//       latestInvoiceInfo,
-//     });
-//   } catch (err) {
-//     console.error("❌ Error getting latest invoice number:", err);
-//     next(err);
-//     return res.status(500).json({ message: "Internal Server Error" });
-//   }
-// };
-// const getLatestInvoiceNumber = async (req, res, next) => {
-//   try {
-//     // 1️⃣ Fetch latest invoice (if any)
-//     const [rows] = await db.query(`
-//       SELECT 
-//         Invoice_Number AS latestInvoice, 
-//         created_at AS createdAt
-//       FROM add_sale
-//       ORDER BY created_at DESC
-//       LIMIT 1
-//     `);
-
-//     // 2️⃣ Fetch user-defined invoice prefix
-//     const [invoiceSettings] = await db.query(`SELECT Invoice_Name FROM add_invoice LIMIT 1`);
-
-//     // 3️⃣ Validate that prefix exists
-//     if (!invoiceSettings || invoiceSettings.length === 0 || !invoiceSettings[0].Invoice_Name) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Invoice prefix not set. Please configure an invoice prefix in settings before generating invoices.",
-//       });
-//     }
-
-//     const prefix = invoiceSettings[0].Invoice_Name.trim();
-//     let newInvoiceNumber = `${prefix}001`;
-//     let latestInvoiceInfo = null;
-
-//     // 4️⃣ If previous invoices exist, increment the number
-//     if (rows.length > 0 && rows[0].latestInvoice) {
-//       const lastInvoice = rows[0].latestInvoice;
-
-//       // remove prefix to get numeric part
-//       const numericPart = lastInvoice.replace(prefix, "").trim();
-//       const num = isNaN(parseInt(numericPart)) ? 1 : parseInt(numericPart) + 1;
-
-//       // pad the number with leading zeros
-//       newInvoiceNumber = `${prefix}${num.toString().padStart(4, "0")}`;
-
-//       latestInvoiceInfo = {
-//         lastInvoiceNumber: lastInvoice,
-//         createdAt: rows[0].createdAt,
-//       };
-//     }
-
-//     // 5️⃣ Send response
-//     return res.status(200).json({
-//       success: true,
-//       newInvoiceNumber,
-//       latestInvoiceInfo,
-//     });
-//   } catch (err) {
-//     console.error("❌ Error getting latest invoice number:", err);
-//     next(err);
-//     // return res.status(500).json({ message: "Internal Server Error" });
-//   }
-// };
-
-// const getSingleSale = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const { Sale_Id: saleId } = req.params;
-//     const isSaleForItemSale = saleId.startsWith("SALS");
-//     const itemTable = isSaleForItemSale ? "add_item_sale" : "add_item";
-//     const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
-//     const salesTable = isSaleForItemSale ? "add_new_sale" : "add_sale";
-//     const taxTypeTable = isSaleForItemSale ? "add_new_sale_items" : "add_purchase_items";
-//     if (!saleId) {
-//       return res.status(400).json({ success: false, message: "Sale ID is required." });
-//     }
-
-//     // 1️⃣ Fetch Sale Header
-//     const [saleData] = await db.query(
-//       `
-//       SELECT 
-//         s.Sale_Id,
-//         s.Invoice_Number,
-//         s.Invoice_Date,
-//         s.Reference_Number,
-//         s.State_Of_Supply,
-//         s.Payment_Type,
-//         s.Total_Amount,
-//         s.Total_Received,
-//         s.Balance_Due,
-//         s.Party_Id,
-//         p.Party_Name,
-//         p.GSTIN,
-//         p.Billing_Address,
-//         p.Shipping_Address
-//       FROM ${salesTable} s
-//       LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
-//       WHERE s.Sale_Id = ?
-//       `,
-//       [saleId]
-//     );
-
-//     if (!saleData.length) {
-//       return res.status(404).json({ success: false, message: "Sale not found." });
-//     }
-
-//     const saleHeader = saleData[0];
-
-//     // 2️⃣ Determine which item table to use
-
-
-//     // 3️⃣ Fetch items for this sale
-//     const [items] = await db.query(
-//       `
-//       SELECT 
-//         si.Sale_Items_Id,
-//         si.Item_Id,
-//         i.Item_Name,
-//         i.Item_HSN,
-//         i.Item_Unit,
-//         i.Item_Category,
-//         si.Quantity,
-//         si.Sale_Price,
-//         si.Discount_On_Sale_Price,
-//         si.Discount_Type_On_Sale_Price,
-//         si.Tax_Amount,
-//         si.Amount,
-//         si.created_at,
-//         (
-//           SELECT p.Tax_Type 
-//           FROM ${taxTypeTable} p
-//           WHERE p.Item_Id = si.Item_Id
-//           ORDER BY GREATEST(p.created_at, p.updated_at) DESC 
-//           LIMIT 1
-//         ) AS Tax_Type
-//       FROM ${saleItemTable} si
-//       LEFT JOIN ${itemTable} i ON si.Item_Id = i.Item_Id
-//       WHERE si.Sale_Id = ?
-//       ORDER BY si.created_at DESC
-//       `,
-//       [saleId]
-//     );
-
-//     if (!items.length) {
-//       return res.status(404).json({ success: false, message: 
-//         "No sale items found for this invoice." });
-//     }
-
-//     // 4️⃣ Format response
-//     const response = {
-//       success: true,
-//       invoicePartyDetails: {
-//         Sale_Id: saleHeader.Sale_Id,
-//         Party_Name: saleHeader.Party_Name,
-//         GSTIN: saleHeader.GSTIN,
-//         State_Of_Supply: saleHeader.State_Of_Supply,
-//         Reference_Number: saleHeader.Reference_Number,
-//         Payment_Type: saleHeader.Payment_Type,
-//         Invoice_Number: saleHeader.Invoice_Number,
-//         Invoice_Date: saleHeader.Invoice_Date,
-//         Payment_Type: saleHeader.Payment_Type,
-//         Total_Amount: saleHeader.Total_Amount,
-//         Total_Received: saleHeader.Total_Received,
-//         Balance_Due: saleHeader.Balance_Due,
-//         Billing_Address: saleHeader.Billing_Address,
-//         Shipping_Address: saleHeader.Shipping_Address,
-//       },
-//       items: items.map((it) => ({
-//         Sale_Items_Id: it.Sale_Items_Id,
-//         Item_Id: it.Item_Id,
-//         Item_Name: it.Item_Name,
-//         Item_HSN: it.Item_HSN,
-//         Item_Unit: it.Item_Unit,
-//         Item_Category: it.Item_Category,
-//         Quantity: it.Quantity,
-//         Sale_Price: it.Sale_Price,
-//         Discount_On_Sale_Price: it.Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price,
-//         Tax_Amount: it.Tax_Amount,
-//         Tax_Type: it.Tax_Type || "None",
-//         Amount: it.Amount,
-//         created_at: it.created_at,
-//       })),
-//     };
-
-//     return res.status(200).json(response);
-
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error getting single sale:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const getSingleSale = async (req, res, next) => {
   let connection;
 
@@ -1978,6 +1534,7 @@ const getSingleSale = async (req, res, next) => {
         s.Reference_Number,
         s.State_Of_Supply,
         s.Payment_Type,
+        s.Bank_Account_Id,
         s.Total_Amount,
         s.Total_Received,
         s.Balance_Due,
@@ -1985,9 +1542,16 @@ const getSingleSale = async (req, res, next) => {
         p.Party_Name,
         p.GSTIN,
         p.Billing_Address,
-        p.Shipping_Address
+        p.Shipping_Address,
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE
+          WHEN s.Payment_Type = 'Bank'
+          THEN ba.Account_Display_Name
+          ELSE s.Payment_Type
+        END AS Payment_Type_Display
       FROM ${salesTable} s
       LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
+      LEFT JOIN bank_accounts ba ON s.Bank_Account_Id = ba.id
       WHERE s.Sale_Id = ?
       `,
       [saleId]
@@ -2053,6 +1617,9 @@ const getSingleSale = async (req, res, next) => {
         State_Of_Supply: saleHeader.State_Of_Supply,
         Reference_Number: saleHeader.Reference_Number,
         Payment_Type: saleHeader.Payment_Type,
+        Payment_Type_Display: saleHeader.Payment_Type_Display,
+        Bank_Account_Id: saleHeader.Bank_Account_Id,
+        Bank_Display_Name: saleHeader.Bank_Display_Name,
         Invoice_Number: saleHeader.Invoice_Number,
         Invoice_Date: saleHeader.Invoice_Date,
         Total_Amount: saleHeader.Total_Amount,
@@ -2971,7 +2538,7 @@ const editSale = async (req, res, next) => {
     if (existingSale.length === 0) {
       return res.status(404).json({ message: "No such Sale found." });
     }
-
+const saleIdNumber = existingSale[0].id;  
     const cleanData = sanitizeObject(req.body);
     const validation = saleSchema.safeParse(cleanData);
     if (!validation.success) {
@@ -2987,12 +2554,20 @@ const editSale = async (req, res, next) => {
       Total_Received,
       Balance_Due,
       Payment_Type,
+       Bank_Account_Id, 
       Reference_Number,
       items,
     } = validation.data;
 
     await connection.beginTransaction();
-
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+    }
+    const totalReceived =
+  Total_Received === "" || Total_Received === undefined
+    ? 0
+    : Number(Total_Received);
     // 🔹 Duplicate check
     const itemNameSet = new Set();
     for (const item of items) {
@@ -3038,7 +2613,7 @@ const editSale = async (req, res, next) => {
       `UPDATE add_sale SET 
         Party_Id=?, Invoice_Number=?, Invoice_Date=?, State_Of_Supply=?,
         Total_Amount=?, Total_Received=?, Balance_Due=?,
-        Payment_Type=?, Reference_Number=?, updated_at=NOW()
+        Payment_Type=?, Bank_Account_Id=?, Reference_Number=?, updated_at=NOW()
        WHERE Sale_Id=?`,
       [
         Party_Id,
@@ -3049,10 +2624,21 @@ const editSale = async (req, res, next) => {
         Number(Total_Received) || 0,
         Number(Balance_Due) || 0,
         cleanValue(Payment_Type),
+         Payment_Type === "Bank" ? Bank_Account_Id : null,
         cleanValue(Reference_Number),
         saleId,
       ]
     );
+   
+  await recordBankTransaction({
+    connection,
+   bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+    txnType: "Sale",
+    referenceId: saleIdNumber,        // ✅ numeric, matches addSale's insertId
+    partyName: Party_Name,
+    amount: totalReceived,
+    txnDate: Invoice_Date
+  });
 
     // 🔥 LOOP ITEMS
     for (const item of items) {
@@ -3487,70 +3073,7 @@ const getLatestInvoiceNumber = async (req, res, next) => {
   }
 };
 
-// const getLatestInvoiceNumber = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     // 1️⃣ Fetch user-defined invoice prefix
-//     const [invoiceSettings] = await db.query(`SELECT Invoice_Name FROM add_invoice LIMIT 1`);
 
-//     if (!invoiceSettings || invoiceSettings.length === 0 || !invoiceSettings[0].Invoice_Name) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Invoice prefix not set. Please configure an invoice prefix in settings before generating invoices.",
-//       });
-//     }
-
-//     const prefix = invoiceSettings[0].Invoice_Name.trim();
-
-//     // 2️⃣ Fetch latest invoice based on numeric part of invoice number
-//     const [rows] = await db.query(`
-//       SELECT 
-//         Invoice_Number AS latestInvoice,
-//         created_at AS createdAt
-//       FROM add_sale
-//       WHERE Invoice_Number LIKE '${prefix}%'
-//       ORDER BY 
-//         CAST(SUBSTRING(Invoice_Number, LENGTH('${prefix}') + 1) AS UNSIGNED) DESC
-//       LIMIT 1
-//     `);
-
-//     // 3️⃣ Default new invoice number
-//     let newInvoiceNumber = `${prefix}0001`;
-//     let latestInvoiceInfo = null;
-
-//     // 4️⃣ Increment if previous invoices exist
-//     if (rows.length > 0 && rows[0].latestInvoice) {
-//       const lastInvoice = rows[0].latestInvoice;
-
-//       // Extract numeric part safely
-//       const numericPart = lastInvoice.replace(prefix, "").trim();
-//       const num = isNaN(parseInt(numericPart)) ? 1 : parseInt(numericPart) + 1;
-
-//       // Generate next invoice number
-//       newInvoiceNumber = `${prefix}${num.toString().padStart(4, "0")}`;
-
-//       latestInvoiceInfo = {
-//         lastInvoiceNumber: lastInvoice,
-//         createdAt: rows[0].createdAt,
-//       };
-//     }
-
-//     // 5️⃣ Return clean response
-//     return res.status(200).json({
-//       success: true,
-//       newInvoiceNumber,
-//       latestInvoiceInfo,
-//     });
-//   } catch (err) {
-//     if(connection ) connection.release();
-//     console.error("❌ Error getting latest invoice number:", err);
-//     next(err);
-//   }finally {
-//     if(connection) connection.release();
-//   }
-// };
 const getNewSaleLatestInvoiceNumber = async (req, res, next) => {
   let connection;
   try {
@@ -3653,82 +3176,6 @@ const getTotalNewSalesEachDay = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-// const getTotalSalesEachDay = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     // ✅ Correct SQL: group by date, count total sales per day
-//     const [rows] = await connection.query(
-//       `
-//       SELECT 
-//         DATE_FORMAT(created_at, '%Y-%m-%d') AS sale_date,
-//         COUNT(*) AS total_sales
-//       FROM add_sale
-//       GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
-//       ORDER BY sale_date ASC;
-//       `
-//     );
-
-//     // ✅ Format response
-//     const result = rows.map((r) => ({
-//       date: r.sale_date,
-//       total_sales: r.total_sales,
-//     }));
-
-//     return res.status(200).json({
-//       success: true,
-//       data: result,
-//     });
-//   } catch (err) {
-//     if(connection) connection.release();
-//     console.error("❌ Error getting total new sales by day:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-
-// const getTopSellingItemsPerMonth = async (req, res, next) => {
-
-//     let connection;
-//   try {
-
-//     const year=req.params.year
-//     connection = await db.getConnection();
-//     const [items]= await connection.query(
-//       `
-// SELECT *
-// FROM (
-//     SELECT
-//         Sale_Id,
-//         MONTH(Invoice_Date) AS month,
-//         Total_Amount,
-//         RANK() OVER(
-//             PARTITION BY MONTH(Invoice_Date)
-//             ORDER BY Total_Amount DESC
-//         ) r
-//     FROM add_sale
-//     WHERE YEAR(Invoice_Date) = ?
-// ) t
-
-//       `
-//       ,[year]
-
-//     )
-
-//     return res.status(200).json({
-//       success: true,
-//       data: items,
-//     });
-//   }catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error getting total sales each day:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 const getTotalSalesEachDay = async (req, res, next) => {
   let connection;

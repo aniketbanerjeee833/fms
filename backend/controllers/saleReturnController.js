@@ -1,4 +1,5 @@
 import db from "../config/db.js";
+import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 
 /* ── GET ALL ──────────────────────────────────────────────── */
 const getAllSaleReturns = async (req, res, next) => {
@@ -92,9 +93,16 @@ const getSaleReturnById = async (req, res, next) => {
     const { Sale_Return_Id } = req.params;
 
     const [[header]] = await connection.query(
-      `SELECT sr.*, p.Party_Name
+      `SELECT sr.*, p.Party_Name,
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE
+          WHEN sr.Payment_Type = 'Bank'
+          THEN ba.Account_Display_Name
+          ELSE sr.Payment_Type
+        END AS Payment_Type_Display
        FROM sale_return sr
        LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
+       LEFT JOIN bank_accounts ba ON ba.id = sr.Bank_Account_Id
        WHERE sr.id = ?`,
       [Sale_Return_Id]
     );
@@ -118,13 +126,11 @@ const getSaleReturnById = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-
-/* ── CREATE ───────────────────────────────────────────────── */
 const createSaleReturn = async (req, res, next) => {
   let connection;
 
   try {
-    const { Sale_Id } = req.params;  // POST /sale-return/:Sale_Id
+    const { Sale_Id } = req.params;
 
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -140,6 +146,7 @@ const createSaleReturn = async (req, res, next) => {
       Total_Paid,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,        // 🔹 added
       Reference_Number,
       items,
     } = req.body;
@@ -151,6 +158,11 @@ const createSaleReturn = async (req, res, next) => {
         success: false,
         message: "Sale_Id, Customer, Return Date and items are required",
       });
+    }
+
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
     }
 
     /* ── party lookup ── */
@@ -172,8 +184,8 @@ const createSaleReturn = async (req, res, next) => {
       `INSERT INTO sale_return
          (Sale_Id, Party_Id, Return_Number, Invoice_Number,
           Invoice_Date, Return_Date, State_Of_Supply,
-          Total_Amount, Total_Paid, Balance_Due, Payment_Type, Reference_Number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          Total_Amount, Total_Paid, Balance_Due, Payment_Type, Bank_Account_Id, Reference_Number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Sale_Id,
         party.Party_Id,
@@ -186,11 +198,25 @@ const createSaleReturn = async (req, res, next) => {
         totalPaid,
         balanceDue,
         Payment_Type    || "Cash",
+        Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 added
         Reference_Number || null,
       ]
     );
 
     const Sale_Return_Id = headerResult.insertId;
+
+    /* 🔹 record bank ledger — refund money going OUT to customer */
+    if (Payment_Type === "Bank" && Bank_Account_Id && totalPaid > 0) {
+      await recordBankTransaction({
+        connection,
+        bankAccountId: Bank_Account_Id,
+        txnType: "Sale_Return",
+        referenceId: Sale_Return_Id,
+        partyName: Party_Name,
+        amount: totalPaid,
+        txnDate: Return_Date,
+      });
+    }
 
     /* ── insert items + restore stock ── */
     for (const item of items) {
@@ -208,7 +234,6 @@ const createSaleReturn = async (req, res, next) => {
         Amount,
       } = item;
 
-      /* find item */
       const [[existingItem]] = await connection.query(
         `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
         [Item_Name]
@@ -311,9 +336,15 @@ const editSaleReturn = async (req, res, next) => {
       Total_Paid,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,        // 🔹 added
       Reference_Number,
       items,
     } = req.body;
+
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+    }
 
     /* party */
     const [[party]] = await connection.query(
@@ -335,7 +366,7 @@ const editSaleReturn = async (req, res, next) => {
          Party_Id = ?, Return_Number = ?, Invoice_Number = ?, Invoice_Date= ?,
          Return_Date = ?, State_Of_Supply = ?,
          Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
-         Payment_Type = ?, Reference_Number = ?, updated_at = NOW()
+         Payment_Type = ?, Bank_Account_Id = ?, Reference_Number = ?, updated_at = NOW()
        WHERE id = ?`,
       [
         party.Party_Id,
@@ -348,10 +379,23 @@ const editSaleReturn = async (req, res, next) => {
         totalPaid,
         balanceDue,
         Payment_Type    || "Cash",
+        Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 added
         Reference_Number || null,
         Sale_Return_Id,
       ]
     );
+
+    /* 🔹 always call — helper handles insert / update / delete internally
+       (covers Cash→Bank, Bank→Cash, Bank→Bank switch, and amount edits) */
+    await recordBankTransaction({
+      connection,
+      bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+      txnType: "Sale_Return",
+      referenceId: Number(Sale_Return_Id),
+      partyName: Party_Name,
+      amount: totalPaid,
+      txnDate: Return_Date,
+    });
 
     /* fetch old items */
     const [oldItems] = await connection.query(
@@ -393,7 +437,6 @@ const editSaleReturn = async (req, res, next) => {
       const old = oldMap.get(Item_Id);
 
       if (old) {
-        /* update existing return item */
         await connection.query(
           `UPDATE sale_return_items SET
              Quantity = ?, Sale_Price = ?,
@@ -410,7 +453,6 @@ const editSaleReturn = async (req, res, next) => {
           ]
         );
 
-        /* stock diff: old qty was already restored, adjust difference */
         const diff = Number(Quantity) - old.Quantity;
         if (diff !== 0) {
           await connection.query(
@@ -420,7 +462,6 @@ const editSaleReturn = async (req, res, next) => {
           );
         }
       } else {
-        /* insert new return item */
         await connection.query(
           `INSERT INTO sale_return_items
              (Sale_Return_Id, Item_Id, Item_Name,
@@ -437,7 +478,6 @@ const editSaleReturn = async (req, res, next) => {
             Tax_Type || null, Number(Tax_Amount) || 0, Number(Amount),
           ]
         );
-        /* restore stock for newly added item */
         await connection.query(
           `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
            WHERE Item_Id = ?`,
@@ -453,7 +493,6 @@ const editSaleReturn = async (req, res, next) => {
           `DELETE FROM sale_return_items WHERE id = ?`,
           [old.id]
         );
-        /* un-restore stock because item is no longer part of the return */
         await connection.query(
           `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
            WHERE Item_Id = ?`,

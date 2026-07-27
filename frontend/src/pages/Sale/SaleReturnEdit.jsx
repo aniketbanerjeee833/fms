@@ -23,6 +23,7 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { saleReturnApi, useUpdateSaleReturnMutation, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 
@@ -104,6 +105,7 @@ export default function SaleReturndEdit() {
       skip: Sale_Return_Id === undefined,
     });
   const { data: parties } = useGetAllPartiesQuery();
+  const { data: banks = [] } = useGetAllBankAccountsQuery();
   const { data: items } = useGetAllItemsQuery();
   // console.log(items);
   //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
@@ -164,6 +166,7 @@ export default function SaleReturndEdit() {
       Balance_Due: "",
       Total_Paid: "",
       Payment_Type: "Cash",
+      Bank_Account_Id: null,   // 🔹 added
       Reference_Number: "",
       items: [{
 
@@ -414,6 +417,7 @@ export default function SaleReturndEdit() {
         Balance_Due: sale.saleReturn?.Balance_Due || "",
         //Balance_Due: sale.saleReturn?.Balance_Due || "",
         Payment_Type: sale.saleReturn?.Payment_Type || "",
+         Bank_Account_Id: sale.saleReturn?.Bank_Account_Id, // ✅ Add this
         Reference_Number: sale.saleReturn?.Reference_Number || "",
 
         items: sale.saleReturn.items|| [],
@@ -1586,52 +1590,50 @@ const onSubmit = async (data) => {
                         </button>
                         <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
                         >
-                          <div className="flex flex-col w-full">
-                            <div className="input-field   ">
-                              <span className="active">Payment Type</span>
+                             <div className="flex flex-col w-full">
+                      <span className="active">Payment Type</span>
 
-                              <select id="Payment_Type" {...register("Payment_Type")}
-                              >
-                                <option value="">Select Payment Type</option>
-                                <option value="Cash">Cash</option>
-                                <option value="Cheque">Cheque</option>
-                                <option value="Neft">Neft</option>
-                              </select>
-                              {errors?.Payment_Type && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors?.Payment_Type?.message}
-                                </p>
-                              )}
-                            </div>
+                      <select
+                        id="Payment_Type"
+                        value={
+                          watch("Payment_Type") === "Bank"
+                            ? `bank_${watch("Bank_Account_Id") || ""}`
+                            : watch("Payment_Type") || ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.startsWith("bank_")) {
+                            const bankId = val.replace("bank_", "");
+                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                          } else {
+                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                          }
+                        }}
+                      >
+                        <option value="">Select Payment Type</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Neft">Neft</option>
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={`bank_${bank.Bank_Account_Id}`}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
+                       
+                      </select>
 
-
-
-
-                            {(paymentType === "Cheque" || paymentType === "Neft") && (
-
-                              <div className="flex flex-col w-full ">
-
-                                <span className="active whitespace-nowrap">
-                                  {paymentType === "Cheque" ? "Cheque Number" : "NEFT Reference Number"}
-                                </span>
-
-                                <input
-                                  type="text"
-                                  id="Reference_Number"
-                                  {...register("Reference_Number")}
-                                  placeholder={`Enter ${paymentType} number`}
-                                  className="w-full outline-none border-b-2 text-gray-900"
-                                />
-
-                                {errors?.Reference_Number && (
-                                  <p className="text-red-500 text-xs mt-1">
-                                    {errors?.Reference_Number?.message}
-                                  </p>
-                                )}
-                              </div>
-
-                            )}
-                          </div>
+                      {errors?.Payment_Type && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
+                      )}
+                      {errors?.Bank_Account_Id && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
+                      )}
+                    </div>
                         </div>
                       </div>
 

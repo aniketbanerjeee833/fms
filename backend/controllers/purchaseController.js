@@ -41,7 +41,7 @@ const normalizeNumber = (val) =>
 //     const fromDate = req.query.fromDate || null;
 //     const toDate = req.query.toDate || null;
 
-    
+
 
 //     let whereClauses = [];
 //     let params = [];
@@ -171,7 +171,7 @@ const normalizeNumber = (val) =>
 //   //   for (const item of items) {
 //   //     const itemName = item.Item_Name?.trim().toLowerCase();
 //   //     if (!itemName) {
-        
+
 //   //       return res.status(400).json({ message: "Item name missing." });
 //   //     }
 
@@ -182,7 +182,7 @@ const normalizeNumber = (val) =>
 //   //   );
 //   //   if (duplicates.length > 0) {
 //   //     const names = duplicates.map(([n]) => `'${n}'`).join(", ");
-    
+
 //   //     return res.status(400).json({
 //   //       message: `Duplicate items detected: ${names}. Please ensure each item appears only once.`,
 //   //     });
@@ -281,7 +281,7 @@ const normalizeNumber = (val) =>
 //       ]
 //     );
 
-  
+
 //     const [maxRow] = await connection.query(
 //   `SELECT MAX(CAST(SUBSTRING(Purchase_items_Id, 4) AS UNSIGNED)) 
 //   AS maxNum FROM add_purchase_items`
@@ -570,6 +570,7 @@ const addPurchase = async (req, res, next) => {
         connection,
         bankAccountId: Bank_Account_Id,
         txnType: "Purchase",
+        partyName: Party_Name,          // ✅ add this
         referenceId: purchaseIdNumber,
         amount: totalPaid,
         txnDate: Bill_Date,
@@ -922,15 +923,15 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
- 
-    const search   = req.query.search   ? req.query.search.trim().toLowerCase() : "";
+
+    const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
- 
+    const toDate = req.query.toDate || null;
+
     /* ── same WHERE logic as getAllPurchases ── */
     const whereClauses = [];
-    const params       = [];
- 
+    const params = [];
+
     if (search) {
       whereClauses.push(`
         (
@@ -943,7 +944,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
       const like = `%${search}%`;
       params.push(like, like, like, like);
     }
- 
+
     if (fromDate && toDate) {
       whereClauses.push(`DATE(p.Bill_Date) BETWEEN ? AND ?`);
       params.push(fromDate, toDate);
@@ -954,9 +955,9 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
       whereClauses.push(`DATE(p.Bill_Date) <= ?`);
       params.push(toDate);
     }
- 
+
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
- 
+
     /* ── ALL rows, no pagination ── */
     const [rows] = await connection.query(
       `SELECT p.*, a.Party_Name, a.GSTIN
@@ -966,7 +967,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
        ORDER BY p.Bill_Date DESC`,
       params
     );
- 
+
     /* ── totals ── */
     const [[totals]] = await connection.query(
       `SELECT
@@ -978,112 +979,112 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
        ${whereSQL}`,
       params
     );
- 
+
     /* ════════════════════════════════════════════════════════
        BUILD WORKBOOK  —  plain / no color, matches sale report
     ════════════════════════════════════════════════════════ */
-    const workbook      = new ExcelJS.Workbook();
-    const sheet         = workbook.addWorksheet("Purchase Report");
-    const itemSheet     = workbook.addWorksheet("Item Details");
- 
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Purchase Report");
+    const itemSheet = workbook.addWorksheet("Item Details");
+
     /* ── column widths (8 cols: A–H) ── */
     sheet.columns = [
-      { key: "date",     width: 14 },   // A  Bill Date
-      { key: "bill_no",  width: 18 },   // B  Bill No / Purchase Id
-      { key: "party",    width: 36 },   // C  Party Name
-      { key: "gstin",    width: 22 },   // D  GSTIN
-      { key: "amount",   width: 16 },   // E  Total Amount
-      { key: "payment",  width: 16 },   // F  Payment Type
-      { key: "paid",     width: 20 },   // G  Total Paid
-      { key: "balance",  width: 16 },   // H  Balance Due
+      { key: "date", width: 14 },   // A  Bill Date
+      { key: "bill_no", width: 18 },   // B  Bill No / Purchase Id
+      { key: "party", width: 36 },   // C  Party Name
+      { key: "gstin", width: 22 },   // D  GSTIN
+      { key: "amount", width: 16 },   // E  Total Amount
+      { key: "payment", width: 16 },   // F  Payment Type
+      { key: "paid", width: 20 },   // G  Total Paid
+      { key: "balance", width: 16 },   // H  Balance Due
     ];
- 
+
     const LAST_COL = "H";
- 
+
     /* ── ROW 1 : title ── */
     sheet.mergeCells(`A1:${LAST_COL}1`);
-    const titleCell     = sheet.getCell("A1");
-    titleCell.value     = "PURCHASE REPORT";
-    titleCell.font      = { name: "Calibri", bold: true, size: 14 };
+    const titleCell = sheet.getCell("A1");
+    titleCell.value = "PURCHASE REPORT";
+    titleCell.font = { name: "Calibri", bold: true, size: 14 };
     titleCell.alignment = { horizontal: "center", vertical: "middle" };
     sheet.getRow(1).height = 28;
- 
+
     /* ── ROW 2 : generated-on stamp ── */
     sheet.mergeCells(`A2:${LAST_COL}2`);
-    const generatedOn   = new Date().toLocaleString("en-IN", {
+    const generatedOn = new Date().toLocaleString("en-IN", {
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: true,
     });
-    const stampCell     = sheet.getCell("A2");
-    stampCell.value     = `Generated on ${generatedOn}`;
-    stampCell.font      = { name: "Calibri", size: 10, italic: true };
+    const stampCell = sheet.getCell("A2");
+    stampCell.value = `Generated on ${generatedOn}`;
+    stampCell.font = { name: "Calibri", size: 10, italic: true };
     stampCell.alignment = { horizontal: "left", vertical: "middle" };
     sheet.getRow(2).height = 18;
- 
+
     /* ── ROW 3 : blank spacer ── */
     sheet.addRow([]);
     sheet.getRow(3).height = 6;
- 
+
     /* ── ROW 4 : column headers ── */
     const headerRow = sheet.addRow([
       "Date", "Bill No", "Party Name", "GSTIN",
       "Total Amount", "Payment Type", "Total Paid", "Balance Due",
     ]);
- 
+
     headerRow.eachCell((cell) => {
-      cell.font      = { name: "Calibri", bold: true, size: 10 };
+      cell.font = { name: "Calibri", bold: true, size: 10 };
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      cell.border    = {
-        top:    { style: "thin" },
-        left:   { style: "thin" },
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
         bottom: { style: "medium" },   // thicker bottom on header
-        right:  { style: "thin" },
+        right: { style: "thin" },
       };
     });
     sheet.getRow(4).height = 22;
- 
+
     /* ── DATA ROWS (row 5 onward) ── */
     const FIRST_DATA = 5;
- 
+
     rows.forEach((purchase) => {
       const dataRow = sheet.addRow([
         purchase.Bill_Date
           ? new Date(purchase.Bill_Date).toLocaleDateString("en-IN", {
-              day: "2-digit", month: "2-digit", year: "numeric",
-            })
+            day: "2-digit", month: "2-digit", year: "numeric",
+          })
           : "N/A",
-        purchase.Purchase_Id  || purchase.Bill_No || "N/A",
-        purchase.Party_Name   || "N/A",
-        purchase.GSTIN        || "",
+        purchase.Purchase_Id || purchase.Bill_No || "N/A",
+        purchase.Party_Name || "N/A",
+        purchase.GSTIN || "",
         Number(purchase.Total_Amount || 0),
         purchase.Payment_Type || "N/A",
-        Number(purchase.Total_Paid   || 0),
-        Number(purchase.Balance_Due  || 0),
+        Number(purchase.Total_Paid || 0),
+        Number(purchase.Balance_Due || 0),
       ]);
- 
+
       dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        cell.font      = { name: "Calibri", size: 10 };
+        cell.font = { name: "Calibri", size: 10 };
         cell.alignment = { vertical: "middle" };
-        cell.border    = {
-          top:    { style: "hair" },
-          left:   { style: "hair" },
+        cell.border = {
+          top: { style: "hair" },
+          left: { style: "hair" },
           bottom: { style: "hair" },
-          right:  { style: "hair" },
+          right: { style: "hair" },
         };
- 
+
         /* right-align + currency format for numeric cols E(5), G(7), H(8) */
         if (colNumber === 5 || colNumber === 7 || colNumber === 8) {
-          cell.numFmt    = "#,##0.00";
+          cell.numFmt = "#,##0.00";
           cell.alignment = { horizontal: "right", vertical: "middle" };
         }
       });
- 
+
       dataRow.height = 18;
     });
- 
+
     /* ── TOTAL ROW ── */
     const lastDataRow = sheet.rowCount;
- 
+
     const totalRow = sheet.addRow([
       "", "", "", "TOTAL",
       { formula: `SUM(E${FIRST_DATA}:E${lastDataRow})` },   // Total Amount
@@ -1091,36 +1092,36 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
       { formula: `SUM(G${FIRST_DATA}:G${lastDataRow})` },   // Total Paid
       { formula: `SUM(H${FIRST_DATA}:H${lastDataRow})` },   // Balance Due
     ]);
- 
+
     totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      cell.font      = { name: "Calibri", bold: true, size: 11 };
+      cell.font = { name: "Calibri", bold: true, size: 11 };
       cell.alignment = { horizontal: "right", vertical: "middle" };
-      cell.border    = {
-        top:    { style: "medium" },
-        left:   { style: "thin" },
+      cell.border = {
+        top: { style: "medium" },
+        left: { style: "thin" },
         bottom: { style: "medium" },
-        right:  { style: "thin" },
+        right: { style: "thin" },
       };
       if (colNumber === 5 || colNumber === 7 || colNumber === 8) {
         cell.numFmt = "#,##0.00";
       }
     });
     totalRow.height = 22;
- 
+
     /* ── freeze top 4 rows (title + stamp + spacer + header) ── */
     sheet.views = [{ state: "frozen", ySplit: 4 }];
- 
+
     /* ── Item Details tab placeholder ── */
     itemSheet.columns = [{ width: 30 }];
     itemSheet.addRow(["Item-level detail export — coming soon"]);
- 
+
     /* ════════════════════════════════════════════════════════
        STREAM TO CLIENT
     ════════════════════════════════════════════════════════ */
     const label = fromDate && toDate
       ? `PurchaseReport_${fromDate}_to_${toDate}`
       : `PurchaseReport_${new Date().toISOString().slice(0, 10)}`;
- 
+
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1129,10 +1130,10 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
       "Content-Disposition",
       `attachment; filename="${label}.xlsx"`
     );
- 
+
     await workbook.xlsx.write(res);
     res.end();
- 
+
   } catch (err) {
     console.error("❌ Purchase Excel export error:", err);
     next(err);
@@ -1377,7 +1378,7 @@ const editPurchase = async (req, res, next) => {
     if (existingPurchase.length === 0) {
       return res.status(404).json({ message: "No such Purchase found." });
     }
-
+    const purchaseIdNumber = existingPurchase[0].id;  
     console.log(req.body);
 
     // 2️⃣ Validate
@@ -1399,6 +1400,7 @@ const editPurchase = async (req, res, next) => {
       Total_Paid,
       Balance_Due,
       Payment_Type,
+      Bank_Account_Id,          // 🔹 new
       Reference_Number,
       items,
     } = validation.data;
@@ -1408,6 +1410,10 @@ const editPurchase = async (req, res, next) => {
       return res.status(400).json({
         message: "No purchase items provided",
       });
+    }
+    if (Payment_Type === "Bank" && !Bank_Account_Id) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
     }
 
     // 3️⃣ Duplicate check
@@ -1452,7 +1458,7 @@ const editPurchase = async (req, res, next) => {
       `UPDATE add_purchase SET 
         Party_Id=?, Bill_Number=?, Bill_Date=?, State_Of_Supply=?,
         Total_Amount=?, Total_Paid=?, Balance_Due=?,
-        Payment_Type=?, Reference_Number=?, updated_at=NOW()
+        Payment_Type=?,Bank_Account_Id=?, Reference_Number=?, updated_at=NOW()
        WHERE Purchase_Id=?`,
       [
         Party_Id,
@@ -1463,6 +1469,7 @@ const editPurchase = async (req, res, next) => {
         totalPaid,
         balanceDue,
         cleanValue(Payment_Type),
+        Payment_Type === "Bank" ? Bank_Account_Id : null,
         cleanValue(Reference_Number),
         purchaseId,
       ]
@@ -1478,6 +1485,20 @@ const editPurchase = async (req, res, next) => {
     oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
 
     const newItemIds = new Set();
+
+    // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
+    
+      await recordBankTransaction({
+        connection,
+        bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+        txnType: "Purchase",
+        referenceId: purchaseIdNumber,        // ✅ fixed
+        partyName: Party_Name,          // ✅ add this
+        amount: totalPaid,
+        txnDate: Bill_Date
+      });
+    
+
 
     // 7️⃣ Loop new items
     for (const item of items) {
@@ -1665,7 +1686,7 @@ const editPurchase = async (req, res, next) => {
 //     }
 
 //     const {
-     
+
 //             Party_Name,
 //             GSTIN,
 //       Bill_Number,
@@ -1755,7 +1776,7 @@ const editPurchase = async (req, res, next) => {
 //       );
 //     }
 
- 
+
 // const totalAmount = Number(Total_Amount) || 0;
 
 // const totalPaid =
@@ -1815,7 +1836,7 @@ const editPurchase = async (req, res, next) => {
 //     // Delete old sale items (to reinsert updated)
 //     await connection.query("DELETE FROM add_purchase_items WHERE Purchase_Id = ?", [purchaseId]);
 
-    
+
 // const [maxItemRow] = await connection.query(`
 //   SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxItem 
 //   FROM add_item
@@ -1867,7 +1888,7 @@ const editPurchase = async (req, res, next) => {
 // }
 
 //   // if (existingItem.length === 0) {
- 
+
 //   // Item_Id = "ITM" + nextItemNum.toString().padStart(3, "0");
 //   //   nextItemNum++; // increment counter safely for next item
 //   //   await connection.query(
@@ -1969,24 +1990,37 @@ const getSinglePurchase = async (req, res, next) => {
     // ✅ Fetch sale header (includes invoice + party info)
     const [purchaseData] = await db.query(
       `
-      SELECT 
-        pu.Purchase_Id,
-        pu.Bill_Number,
-        pu.Bill_Date,
-        pu.Reference_Number,
-        pu.State_Of_Supply,
-        pu.Payment_Type,
-        pu.Total_Amount,
-        pu.Total_Paid,
-        pu.Balance_Due,
-        pu.Party_Id,
-        p.Party_Name,
-        p.GSTIN,
-        p.Billing_Address,
-        p.Shipping_Address
-      FROM add_purchase pu
-      LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
-      WHERE pu.Purchase_Id = ?
+     SELECT 
+    pu.Purchase_Id,
+    pu.Bill_Number,
+    pu.Bill_Date,
+    pu.Reference_Number,
+    pu.State_Of_Supply,
+    pu.Payment_Type,
+    pu.Bank_Account_Id,
+    pu.Total_Amount,
+    pu.Total_Paid,
+    pu.Balance_Due,
+    pu.Party_Id,
+
+    p.Party_Name,
+    p.GSTIN,
+    p.Billing_Address,
+    p.Shipping_Address,
+
+    ba.Account_Display_Name AS Bank_Display_Name,
+    CASE
+        WHEN pu.Payment_Type = 'Bank'
+        THEN ba.Account_Display_Name
+        ELSE pu.Payment_Type
+    END AS Payment_Type_Display
+
+FROM add_purchase pu
+LEFT JOIN add_party p
+    ON pu.Party_Id = p.Party_Id
+LEFT JOIN bank_accounts ba
+    ON pu.Bank_Account_Id = ba.id
+WHERE pu.Purchase_Id = ?
       `,
       [purchaseId]
     );
@@ -2040,6 +2074,10 @@ const getSinglePurchase = async (req, res, next) => {
         Bill_Number: purchaseHeader.Bill_Number,
         Bill_Date: purchaseHeader.Bill_Date,
         Payment_Type: purchaseHeader.Payment_Type,
+        Payment_Type_Display: purchaseHeader.Payment_Type_Display,
+
+        Bank_Account_Id: purchaseHeader.Bank_Account_Id,
+        Bank_Display_Name: purchaseHeader.Bank_Display_Name,
         Total_Amount: purchaseHeader.Total_Amount,
         Total_Paid: purchaseHeader.Total_Paid,
         Balance_Due: purchaseHeader.Balance_Due,
@@ -2066,49 +2104,14 @@ const getSinglePurchase = async (req, res, next) => {
 
     return res.status(200).json(response);
   } catch (err) {
-        if (connection) connection.release();
+    if (connection) connection.release();
     console.error("❌ Error getting single sale:", err);
     next(err);
-  }finally {
+  } finally {
     if (connection) connection.release();
   }
 };
 
-// const getTotalPurchasesEachDay = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     // ✅ Correct SQL: group by date, count total sales per day
-//     const [rows] = await connection.query(
-//       `
-//       SELECT 
-//         DATE_FORMAT(created_at, '%Y-%m-%d') AS purchase_date,
-//         COUNT(*) AS total_purchases
-//       FROM add_purchase
-//       GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
-//       ORDER BY purchase_date ASC;
-//       `
-//     );
-
-//     // ✅ Format response
-//     const result = rows.map((r) => ({
-//       date: r.purchase_date,
-//       total_purchases: r.total_purchases,
-//     }));
-
-//     return res.status(200).json({
-//       success: true,
-//       data: result,
-//     });
-//   } catch (err) {
-//     if(connection) connection.release();
-//     console.error("❌ Error getting total new sales by day:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 const getTotalPurchasesEachDay = async (req, res, next) => {
   let connection;
@@ -2146,14 +2149,14 @@ const getTotalPurchasesEachDay = async (req, res, next) => {
   }
 };
 
- const uploadBillAndCreatePurchase = async (req, res, next) => {
+const uploadBillAndCreatePurchase = async (req, res, next) => {
 
   try {
 
     if (!req.file) {
       return res.status(400).json({
-        success:false,
-        message:"Invoice image required"
+        success: false,
+        message: "Invoice image required"
       });
     }
 
@@ -2167,7 +2170,7 @@ const getTotalPurchasesEachDay = async (req, res, next) => {
 
     // 3️⃣ return to frontend
     return res.json({
-      success:true,
+      success: true,
       data: parsedData
     });
 
@@ -2176,17 +2179,18 @@ const getTotalPurchasesEachDay = async (req, res, next) => {
     console.error(err);
 
     res.status(500).json({
-      success:false,
-      message:err.message
+      success: false,
+      message: err.message
     });
 
   }
 
 };
-export  { addPurchase,editPurchase,getSinglePurchase,getAllPurchases,exportAllPurchasesReportToExcel,getTotalPurchasesEachDay,
+export {
+  addPurchase, editPurchase, getSinglePurchase, getAllPurchases, exportAllPurchasesReportToExcel, getTotalPurchasesEachDay,
 
   uploadBillAndCreatePurchase
- };
+};
 
 
 
@@ -2196,8 +2200,8 @@ export  { addPurchase,editPurchase,getSinglePurchase,getAllPurchases,exportAllPu
 
 //     // 1️⃣ Get active financial year
 //     const [fy] = await connection.query(
-//       `SELECT Financial_Year 
-//        FROM financial_year 
+//       `SELECT Financial_Year
+//        FROM financial_year
 //        WHERE Current_Financial_Year = 1
 //        LIMIT 1`
 //     );
@@ -2214,7 +2218,7 @@ export  { addPurchase,editPurchase,getSinglePurchase,getAllPurchases,exportAllPu
 //     // 2️⃣ Get purchase count per day inside financial year
 //     const [rows] = await connection.query(
 //       `
-//       SELECT 
+//       SELECT
 //         DATE_FORMAT(Bill_Date, '%Y-%m-%d') AS purchase_date,
 //         COUNT(*) AS total_purchases
 //       FROM add_purchase
