@@ -19,7 +19,7 @@ import { FileText, LayoutDashboard, Upload } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 export default function PurchaseAdd() {
@@ -449,6 +449,10 @@ export default function PurchaseAdd() {
       const resData = res?.data || res;
       dispatch(itemApi.util.invalidateTags(["Item"]));
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+        dispatch(bankAccountApi.util.invalidateTags([
+               { type: "BankAccount", id: payload.Bank_Account_Id },
+               "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+             ]));
       if (!resData?.success) {
         toast.error("Failed to add new purchase");
         return;

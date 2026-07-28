@@ -194,7 +194,7 @@ const handleEdit = async () => {
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.3)", // dim background
     backdropFilter: "blur(4px)", // blur effect
-    zIndex: 50,
+    zIndex: 100,
     padding: "1rem", // ensures spacing on small screens
   }}
 >

@@ -94,17 +94,15 @@ import db from "../config/db.js";
 
 export const recordBankTransaction = async ({
   connection,
-  bankAccountId,      // null/undefined if payment type is no longer Bank
+  bankAccountId,
   txnType,
   referenceId,
   partyName,
   amount,
-  txnDate,
-  remarks = null,
+  txnDate
 }) => {
   const CREDIT_TYPES = ["Sale", "Payment_In", "Purchase_Return"];
 
-  // 🔹 find any existing ledger row for this transaction, regardless of bank account
   const [[existingTxn]] = await connection.query(
     `SELECT * FROM bank_transactions
      WHERE Txn_Type = ? AND Reference_Id = ?
@@ -112,24 +110,17 @@ export const recordBankTransaction = async ({
     [txnType, referenceId]
   );
 
-  /* ══════════════════════════════════════════
-     CASE 1: No longer Bank (switched to Cash/Cheque/Neft)
-     → delete the stale row if one exists, re-shift later balances
-  ══════════════════════════════════════════ */
   if (!bankAccountId) {
     if (existingTxn) {
       await reverseAndDeleteTxn(connection, existingTxn);
     }
-    return null; // nothing to record
+    return null;
   }
 
   const direction = CREDIT_TYPES.includes(txnType) ? "Credit" : "Debit";
 
-  /* ══════════════════════════════════════════
-     CASE 2: Existing row found
-  ══════════════════════════════════════════ */
   if (existingTxn) {
-    // 2a — bank account itself changed (e.g. Bank AEPL → Bank HDFC)
+    // bank account itself changed — full delete + reinsert
     if (existingTxn.Bank_Account_Id !== bankAccountId) {
       await reverseAndDeleteTxn(connection, existingTxn);
       return insertBankTxn(connection, {
@@ -137,14 +128,11 @@ export const recordBankTransaction = async ({
       });
     }
 
-    // 2b — same bank account, amount may have changed
+    // same bank account — always update the row's fields
     const oldAmount = Number(existingTxn.Amount);
     const amountDiff = Number(amount) - oldAmount;
 
-    if (amountDiff === 0) {
-      return Number(existingTxn.Running_Balance); // no-op
-    }
-
+    // 🔹 always write Party_Name / Txn_Date / Amount, regardless of whether amount changed
     await connection.query(
       `UPDATE bank_transactions
        SET Amount = ?, Party_Name = ?, Txn_Date = ?, updated_at = NOW()
@@ -152,13 +140,16 @@ export const recordBankTransaction = async ({
       [amount, partyName, txnDate, existingTxn.id]
     );
 
-    const shift = direction === "Credit" ? amountDiff : -amountDiff;
-    await connection.query(
-      `UPDATE bank_transactions
-       SET Running_Balance = Running_Balance + ?
-       WHERE Bank_Account_Id = ? AND id >= ?`,
-      [shift, bankAccountId, existingTxn.id]
-    );
+    // 🔹 only shift later balances if the amount actually changed
+    if (amountDiff !== 0) {
+      const shift = direction === "Credit" ? amountDiff : -amountDiff;
+      await connection.query(
+        `UPDATE bank_transactions
+         SET Running_Balance = Running_Balance + ?
+         WHERE Bank_Account_Id = ? AND id >= ?`,
+        [shift, bankAccountId, existingTxn.id]
+      );
+    }
 
     const [[updated]] = await connection.query(
       `SELECT Running_Balance FROM bank_transactions WHERE id = ?`,
@@ -167,14 +158,12 @@ export const recordBankTransaction = async ({
     return Number(updated.Running_Balance);
   }
 
-  /* ══════════════════════════════════════════
-     CASE 3: No existing row — newly switched to Bank (Cash → Bank)
-     → plain insert
-  ══════════════════════════════════════════ */
   return insertBankTxn(connection, {
     bankAccountId, txnType, referenceId, partyName, amount, txnDate, direction,
   });
 };
+
+/* insertBankTxn and reverseAndDeleteTxn unchanged */
 
 /* ── helper: insert a fresh ledger row ── */
 async function insertBankTxn(connection, { bankAccountId, txnType, referenceId, partyName, amount, txnDate, direction }) {

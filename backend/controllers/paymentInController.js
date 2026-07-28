@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS payment_in (
 ═══════════════════════════════════════════════════════════════════ */
 import db from "../config/db.js"; // mysql2/promise connection
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 
 
 /* ── GET ALL ──────────────────────────────────────────────── */
@@ -30,29 +31,31 @@ const getAllPaymentIns = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
- 
-    const page     = parseInt(req.query.page, 10) || 1;
-    const limit    = 10;
-    const offset   = (page - 1) * limit;
-    const search   = req.query.search?.trim().toLowerCase() || "";
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
+    const search = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
- 
+    const toDate = req.query.toDate || null;
+
     const whereClauses = [];
-    const params       = [];
- 
+    const params = [];
+
     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)       LIKE ? OR
-        LOWER(pi.Payment_Type)    LIKE ? OR
-        LOWER(pi.Receipt_No)      LIKE ? OR
-        LOWER(pi.Reference_No)    LIKE ? OR
+        LOWER(a.Party_Name) LIKE ? OR
+        LOWER(pi.Payment_Type) LIKE ? OR
+        LOWER(pi.Receipt_No) LIKE ? OR
+        LOWER(pi.Reference_No) LIKE ? OR
+        LOWER(ba.Account_Display_Name) LIKE ? OR
         CAST(pi.Received AS CHAR) LIKE ?
       )`);
+
       const like = `%${search}%`;
-      params.push(like, like, like, like, like);
+      params.push(like, like, like, like, like, like);
     }
- 
+
     if (fromDate && toDate) {
       whereClauses.push(`DATE(pi.Payment_Date) BETWEEN ? AND ?`);
       params.push(fromDate, toDate);
@@ -63,48 +66,61 @@ const getAllPaymentIns = async (req, res, next) => {
       whereClauses.push(`DATE(pi.Payment_Date) <= ?`);
       params.push(toDate);
     }
- 
-    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
- 
+
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
     const [rows] = await connection.query(
-      `SELECT pi.*, a.Party_Name,
-        ba.Account_Display_Name AS Bank_Display_Name,
-        CASE
-          WHEN pi.Payment_Type = 'Bank'
-          THEN ba.Account_Display_Name
-          ELSE pi.Payment_Type
-        END AS Payment_Type_Display
+      `SELECT
+          pi.*,
+          a.Party_Name,
+          ba.Account_Display_Name AS Bank_Display_Name,
+          CASE
+            WHEN pi.Payment_Type = 'Bank'
+              THEN ba.Account_Display_Name
+            ELSE pi.Payment_Type
+          END AS Payment_Type_Display
        FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
-       LEFT JOIN bank_accounts ba ON ba.id = pi.Bank_Account_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = pi.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = pi.Bank_Account_Id
        ${whereSQL}
        ORDER BY pi.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
- 
+
     const [[{ total }]] = await connection.query(
       `SELECT COUNT(*) AS total
        FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = pi.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = pi.Bank_Account_Id
        ${whereSQL}`,
       params
     );
- 
+
     const [[totals]] = await connection.query(
-      `SELECT COALESCE(SUM(pi.Received), 0) AS totalReceived
+      `SELECT
+          COALESCE(SUM(pi.Received), 0) AS totalReceived
        FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = pi.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = pi.Bank_Account_Id
        ${whereSQL}`,
       params
     );
- 
+
     return res.status(200).json({
-      success:        true,
-      currentPage:    page,
-      totalPages:     Math.ceil(total / limit),
-      totalPayments:  total,
-      paymentIns:     rows,
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalPayments: total,
+      paymentIns: rows,
       totals,
     });
   } catch (err) {
@@ -192,7 +208,7 @@ const createPaymentIn = async (req, res, next) => {
     );
  
     const Id = result.insertId;
- 
+   if (Payment_Type === "Bank" && Bank_Account_Id) {
     await recordBankTransaction({
       connection,
       bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
@@ -202,6 +218,16 @@ const createPaymentIn = async (req, res, next) => {
       amount: Number(Received),
       txnDate: Payment_Date,
     });
+  }
+    await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Payment_In",
+  referenceId: Id,
+  partyName:   Party_Name,
+  amount: Number(Received),
+  txnDate:     Payment_Date,
+});
  
     await connection.commit();
  
@@ -275,7 +301,15 @@ const updatePaymentIn = async (req, res, next) => {
       amount: Number(Received),
       txnDate: Payment_Date,
     });
- 
+  await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Payment_In",
+  referenceId: id,
+  partyName:   Party_Name,
+  amount: Number(Received),
+  txnDate:     Payment_Date,
+});
     await connection.commit();
  
     return res.status(200).json({ success: true, message: "Payment In updated" });

@@ -22,7 +22,8 @@ export const bankAccountApi = createApi({
       query: ({ Bank_Account_Id, page = 1, limit = 10 }) =>
         `/bank/bank-account/${Bank_Account_Id}?page=${page}&limit=${limit}`,
       providesTags: (result, error, { Bank_Account_Id }) => [
-        { type: "BankAccount", Bank_Account_Id },
+         { type: "BankAccount", id: Bank_Account_Id },
+        // { type: "BankAccount", Bank_Account_Id },
       ],
     }),
 

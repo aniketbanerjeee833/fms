@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
 ═══════════════════════════════════════════════════════════════════ */
  import db from "../config/db.js";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
  
 /* ═══════════════════════════════════════════════════════════════════
    2. CONTROLLERS  (purchaseReturnController.js)
@@ -75,28 +76,29 @@ const getAllPurchaseReturns = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
- 
+
     const page     = parseInt(req.query.page, 10) || 1;
     const limit    = 10;
     const offset   = (page - 1) * limit;
     const search   = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
     const toDate   = req.query.toDate   || null;
- 
+
     const whereClauses = [];
     const params       = [];
- 
+
     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)      LIKE ? OR
-        LOWER(pr.Return_Number)      LIKE ? OR
-        LOWER(pr.Bill_Number)    LIKE ? OR
+        LOWER(a.Party_Name)         LIKE ? OR
+        LOWER(pr.Return_Number)     LIKE ? OR
+        LOWER(pr.Bill_Number)       LIKE ? OR
+        LOWER(ba.Account_Display_Name) LIKE ? OR
         CAST(pr.Total_Amount AS CHAR) LIKE ?
       )`);
       const like = `%${search}%`;
-      params.push(like, like, like, like);
+      params.push(like, like, like, like, like);
     }
- 
+
     if (fromDate && toDate) {
       whereClauses.push(`DATE(pr.Return_Date) BETWEEN ? AND ?`);
       params.push(fromDate, toDate);
@@ -107,27 +109,34 @@ const getAllPurchaseReturns = async (req, res, next) => {
       whereClauses.push(`DATE(pr.Return_Date) <= ?`);
       params.push(toDate);
     }
- 
+
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
- 
+
     const [rows] = await connection.query(
-      `SELECT pr.*, a.Party_Name
+      `SELECT pr.*, a.Party_Name,
+         ba.Account_Display_Name AS Bank_Display_Name,
+         CASE
+           WHEN pr.Payment_Type = 'Bank' THEN ba.Account_Display_Name
+           ELSE pr.Payment_Type
+         END AS Payment_Type_Display
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
+       LEFT JOIN bank_accounts ba ON pr.Bank_Account_Id = ba.id
        ${whereSQL}
        ORDER BY pr.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
- 
+
     const [[{ total }]] = await connection.query(
       `SELECT COUNT(*) AS total
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
+       LEFT JOIN bank_accounts ba ON pr.Bank_Account_Id = ba.id
        ${whereSQL}`,
       params
     );
- 
+
     const [[totals]] = await connection.query(
       `SELECT
          COALESCE(SUM(pr.Total_Amount), 0) AS totalAmount,
@@ -135,16 +144,17 @@ const getAllPurchaseReturns = async (req, res, next) => {
          COALESCE(SUM(pr.Balance_Due),  0) AS totalBalance
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
+       LEFT JOIN bank_accounts ba ON pr.Bank_Account_Id = ba.id
        ${whereSQL}`,
       params
     );
- 
+
     return res.status(200).json({
       success:       true,
       currentPage:   page,
       totalPages:    Math.ceil(total / limit),
       totalReturns:  total,
-      purchaseReturns:       rows,
+      purchaseReturns: rows,
       totals,
     });
   } catch (err) {
@@ -153,7 +163,6 @@ const getAllPurchaseReturns = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
- 
 /* ── GET SINGLE (with items) ──────────────────────────────── */
 const getPurchaseReturnById = async (req, res, next) => {
   let connection;
@@ -162,7 +171,7 @@ const getPurchaseReturnById = async (req, res, next) => {
     const { Purchase_Return_Id } = req.params;
  
     const [[header]] = await connection.query(
-      `SELECT pr.*, a.Party_Name
+      `SELECT pr.*, a.Party_Name,
         ba.Account_Display_Name AS Bank_Display_Name,
         CASE
           WHEN pr.Payment_Type = 'Bank'
@@ -290,7 +299,17 @@ const createPurchaseReturn = async (req, res, next) => {
         txnDate: Return_Date,
       });
     }
-
+  if(Payment_Type === "Cash" && totalReceived > 0){  
+await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Purchase_Return",
+  referenceId: Purchase_Return_Id,
+  partyName:   Party_Name,
+  amount:      totalReceived,
+  txnDate:     Return_Date,
+})
+  }
     /* ── insert items + reverse stock ── */
     for (const item of items) {
       const {
@@ -467,6 +486,18 @@ const editPurchaseReturn = async (req, res, next) => {
       amount: totalReceived,
       txnDate: Return_Date,
     });
+
+     
+await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Purchase_Return",
+  referenceId: Number(Purchase_Return_Id),
+  partyName:   Party_Name,
+  amount:      totalReceived,
+  txnDate:     Return_Date,
+})
+  
 
     /* fetch old items */
     const [oldItems] = await connection.query(

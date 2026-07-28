@@ -6,6 +6,7 @@ import saleSchema from "../validators/saleSchema.js";
 import PdfPrinter from "pdfmake";
 import ExcelJS from "exceljs";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 // import puppeteer from "puppeteer";
 //import pdf from "html-pdf-node";
     const TAX_TYPES = {
@@ -455,6 +456,18 @@ const addSale = async (req, res, next) => {
     txnDate: Invoice_Date
   });
 }
+ if (Payment_Type === "Cash" && totalPaid > 0){
+await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Sale",
+  referenceId: result.insertId,           // sale's id
+  partyName:   Party_Name,
+  amount:      Total_Received || Total_Amount,
+  txnDate:     Invoice_Date,
+})
+ }
+
 
     // 9️⃣ Insert sale items
     for (const item of items) {
@@ -1066,11 +1079,12 @@ const getAllSales = async (req, res, next) => {
       whereClauses.push(`
         (LOWER(a.Party_Name) LIKE ? 
          OR LOWER(s.Payment_Type) LIKE ? 
+         OR LOWER(ba.Account_Display_Name) LIKE ?
           OR CAST(s.Total_Amount AS CHAR) LIKE ?
           OR CAST(s.Balance_Due AS CHAR) LIKE ?)
       `);
       const like = `%${search}%`;
-      params.push(like, like, like, like);
+      params.push(like, like, like, like, like);
     }
 
  
@@ -1090,35 +1104,40 @@ if (fromDate && toDate) {
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     // 🧠 Main Paginated Query
-    const query = `
-      SELECT s.*, a.Party_Name
-      
+     const query = `
+      SELECT s.*, a.Party_Name,
+        ba.Account_Display_Name AS Bank_Display_Name,
+        CASE 
+          WHEN s.Payment_Type = 'Bank' THEN ba.Account_Display_Name
+          ELSE s.Payment_Type
+        END AS Payment_Type_Display
       FROM add_sale s
       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+      LEFT JOIN bank_accounts ba ON s.Bank_Account_Id = ba.id
       ${whereSQL}
       ORDER BY s.created_at DESC 
       LIMIT ? OFFSET ?
     `;
+    // const query = `
+    //   SELECT s.*, a.Party_Name
+      
+    //   FROM add_sale s
+    //   LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+    //   ${whereSQL}
+    //   ORDER BY s.created_at DESC 
+    //   LIMIT ? OFFSET ?
+    // `;
     params.push(limit, offset);
 
     const [rows] = await db.query(query, params);
 
-    //const [rows] = await db.query(query, params);
-
-
-    // const [rows] = await db.query(
-    //   `SELECT s.*, a.Party_Name 
-    //    FROM add_sale s
-    //    LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-    //    ORDER BY s.created_at DESC
-    //    LIMIT ? OFFSET ?`,
-    //   [limit, offset]
-    // );
+    
     const [count] = await db.query(
       `
       SELECT COUNT(*) AS total
       FROM add_sale s
       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+      LEFT JOIN bank_accounts ba ON s.Bank_Account_Id = ba.id
       ${whereSQL}
       `,
       params.slice(0, params.length - 2)
@@ -1136,6 +1155,8 @@ if (fromDate && toDate) {
       FROM add_sale s
       LEFT JOIN add_party a 
         ON s.Party_Id = a.Party_Id
+      LEFT JOIN bank_accounts ba 
+        ON s.Bank_Account_Id = ba.id
       ${whereSQL}
     `;
 
@@ -2639,6 +2660,15 @@ const saleIdNumber = existingSale[0].id;
     amount: totalReceived,
     txnDate: Invoice_Date
   });
+  await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",   // new payment type
+  txnType:     "Sale",
+  referenceId: saleIdNumber,                   // existing sale's id
+  partyName:   Party_Name,
+  amount:      Total_Received || Total_Amount,
+  txnDate:     Invoice_Date,
+});
 
     // 🔥 LOOP ITEMS
     for (const item of items) {

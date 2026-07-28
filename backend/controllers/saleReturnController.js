@@ -1,5 +1,6 @@
 import db from "../config/db.js";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 
 /* ── GET ALL ──────────────────────────────────────────────── */
 const getAllSaleReturns = async (req, res, next) => {
@@ -12,20 +13,22 @@ const getAllSaleReturns = async (req, res, next) => {
     const offset   = (page - 1) * limit;
     const search   = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
+    const toDate   = req.query.toDate || null;
 
     const whereClauses = [];
-    const params       = [];
+    const params = [];
 
     if (search) {
       whereClauses.push(`(
-        LOWER(p.Party_Name)   LIKE ? OR
-        LOWER(sr.Return_Number)      LIKE ? OR
-        LOWER(sr.Invoice_Number)    LIKE ? OR
+        LOWER(p.Party_Name) LIKE ? OR
+        LOWER(sr.Return_Number) LIKE ? OR
+        LOWER(sr.Invoice_Number) LIKE ? OR
+        LOWER(ba.Account_Display_Name) LIKE ? OR
         CAST(sr.Total_Amount AS CHAR) LIKE ?
       )`);
+
       const like = `%${search}%`;
-      params.push(like, like, like, like);
+      params.push(like, like, like, like, like);
     }
 
     if (fromDate && toDate) {
@@ -39,12 +42,25 @@ const getAllSaleReturns = async (req, res, next) => {
       params.push(toDate);
     }
 
-    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
 
     const [rows] = await connection.query(
-      `SELECT sr.*, p.Party_Name
+      `SELECT
+          sr.*,
+          p.Party_Name,
+          ba.Account_Display_Name AS Bank_Display_Name,
+          CASE
+            WHEN sr.Payment_Type = 'Bank'
+              THEN ba.Account_Display_Name
+            ELSE sr.Payment_Type
+          END AS Payment_Type_Display
        FROM sale_return sr
-       LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
+       LEFT JOIN add_party p
+         ON p.Party_Id = sr.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = sr.Bank_Account_Id
        ${whereSQL}
        ORDER BY sr.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -54,28 +70,34 @@ const getAllSaleReturns = async (req, res, next) => {
     const [[{ total }]] = await connection.query(
       `SELECT COUNT(*) AS total
        FROM sale_return sr
-       LEFT JOIN add_party c ON c.Party_Id = sr.Party_Id
+       LEFT JOIN add_party p
+         ON p.Party_Id = sr.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = sr.Bank_Account_Id
        ${whereSQL}`,
       params
     );
 
     const [[totals]] = await connection.query(
       `SELECT
-         COALESCE(SUM(sr.Total_Amount), 0) AS totalAmount,
-         COALESCE(SUM(sr.Total_Paid),    0) AS totalPaid,
-         COALESCE(SUM(sr.Balance_Due),   0) AS totalBalance
+          COALESCE(SUM(sr.Total_Amount), 0) AS totalAmount,
+          COALESCE(SUM(sr.Total_Paid), 0) AS totalPaid,
+          COALESCE(SUM(sr.Balance_Due), 0) AS totalBalance
        FROM sale_return sr
-       LEFT JOIN add_party c ON c.Party_Id = sr.Party_Id
+       LEFT JOIN add_party p
+         ON p.Party_Id = sr.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = sr.Bank_Account_Id
        ${whereSQL}`,
       params
     );
 
     return res.status(200).json({
-      success:      true,
-      currentPage:  page,
-      totalPages:   Math.ceil(total / limit),
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
       totalReturns: total,
-      saleReturns:  rows,
+      saleReturns: rows,
       totals,
     });
   } catch (err) {
@@ -217,7 +239,17 @@ const createSaleReturn = async (req, res, next) => {
         txnDate: Return_Date,
       });
     }
-
+     if(Payment_Type === "Cash" && totalPaid > 0){  
+await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Sale_Return",
+  referenceId: Sale_Return_Id,
+  partyName:   Party_Name,
+   amount: totalPaid,
+  txnDate:     Return_Date,
+})
+  }
     /* ── insert items + restore stock ── */
     for (const item of items) {
       const {
@@ -396,6 +428,16 @@ const editSaleReturn = async (req, res, next) => {
       amount: totalPaid,
       txnDate: Return_Date,
     });
+
+    await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Sale_Return",
+   referenceId: Number(Sale_Return_Id),
+  partyName:   Party_Name,
+   amount: totalPaid,
+  txnDate:     Return_Date,
+})
 
     /* fetch old items */
     const [oldItems] = await connection.query(

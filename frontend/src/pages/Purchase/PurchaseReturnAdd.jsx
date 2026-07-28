@@ -20,7 +20,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { purchaseReturnApi, useCreatePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
 import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 export default function PurchaseReturnAdd() {
   const location = useLocation();
@@ -533,6 +533,10 @@ const onSubmit = async (data) => {
     dispatch(purchaseReturnApi.util.invalidateTags(["PurchaseReturn"]));
    dispatch(itemApi.util.invalidateTags(["Item"]));
    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+       dispatch(bankAccountApi.util.invalidateTags([
+     { type: "BankAccount", id: payload.Bank_Account_Id },
+     "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+   ]));
     if (!res?.success) {
       toast.error("Failed to add debit note");
       return;

@@ -1,9 +1,9 @@
 
 import { NavLink,  useSearchParams } from "react-router-dom";
 
-// import { useGetAllpaymentOutDataQuery } from "../../redux/api/purchaseApi";
+// import { useGetAllpaymentInDataQuery } from "../../redux/api/purchaseApi";
 import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
-import PaymentOutModal from "../../components/Modal/PaymentOutModal";
+
 import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useState } from "react";
 
@@ -12,7 +12,8 @@ import { useAddPaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMu
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import PartyAddModal from "../../components/Modal/PartyAddModal";
 
 
 export default function PaymentIn() {
@@ -20,7 +21,7 @@ export default function PaymentIn() {
     // const [page, setPage] = useState(1);
     const dispatch = useDispatch();
 
-    // const [selectedPurchase, setSelectedpaymentOutData] = useState(null);
+    // const [selectedPurchase, setSelectedpaymentInData] = useState(null);
     // const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     //const location = useLocation();
@@ -98,6 +99,10 @@ const handleSavePaymentIn = async (formData) => {
         await addPaymentIn(formData).unwrap();
       }
        dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+         dispatch(bankAccountApi.util.invalidateTags([
+         { type: "BankAccount", id: formData.Bank_Account_Id },
+         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+       ]));
       setModal({ open: false, mode: "add", data: null });
       toast.success("New Payment In added");
     } catch (err) {
@@ -338,7 +343,13 @@ const handleSavePaymentIn = async (formData) => {
                                                         : "N/A"}
                                                 </td>
                                                 <td>{paymentIn?.Party_Name || "N/A"}</td>
-                                                <td>{paymentIn?.Payment_Type || "N/A"}</td>
+                                                 <td>
+                                                    {paymentIn?.Payment_Type
+                                                        ? paymentIn.Payment_Type === "Bank"
+                                                            ? `Bank (${paymentIn?.Bank_Display_Name || "N/A"})`
+                                                            : paymentIn.Payment_Type
+                                                        : "N/A"}
+                                                </td>
                                                 <td>{paymentIn?.Received || "N/A"}</td>
                                                 <td>{paymentIn?.Balance_Due || "N/A"}</td>
 
@@ -417,21 +428,7 @@ const handleSavePaymentIn = async (formData) => {
                         {/* PAGE NUMBERS — DESKTOP / TABLET */}
                         <div style={{ marginRight: "0px" }}
                             className="hidden sm:flex space-x-2">
-                            {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
-        <button
-          key={index}
-          onClick={() => handlePageChange(index + 1)}
-          className={
-            `px-3 py-1 rounded ${
-              page === index + 1
-                ? 'bg-[#ff0000] text-white'
-                : 'bg-gray-200 hover:bg-gray-300'
-            }`
-          }
-        >
-          {index + 1}
-        </button>
-      ))} */}
+              
                             {(() => {
                                 const totalPages = paymentInData?.totalPages || 1;
                                 const maxVisible = 5; // how many pages around current
@@ -543,6 +540,7 @@ const handleSavePaymentIn = async (formData) => {
           onClose={() => setModal({ open: false, mode: "add", data: null })}
           onSave={handleSavePaymentIn}
           isSaving={isSaving}
+           PartyAddModal={PartyAddModal} 
         />
       )}
          

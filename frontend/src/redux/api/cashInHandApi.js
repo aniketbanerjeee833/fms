@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+
  
 export const cashInHandApi = createApi({
   reducerPath: "cashInHandApi",
@@ -13,6 +14,10 @@ export const cashInHandApi = createApi({
         const params = new URLSearchParams({ fromDate, toDate, page, limit,search });
         return `/cash-in-hand?${params.toString()}`;
       },
+      providesTags: ["CashInHand"],
+    }),
+    getCashBalance: builder.query({
+      query: () => `/cash-in-hand/cash-balance`,
       providesTags: ["CashInHand"],
     }),
  
@@ -56,6 +61,7 @@ export const cashInHandApi = createApi({
  
 export const {
   useGetCashInHandQuery,
+  useGetCashBalanceQuery,
   useGetAllAdjustmentsQuery,
   useCreateAdjustmentMutation,
   useEditAdjustmentMutation,

@@ -23,7 +23,7 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { saleReturnApi, useCreateSaleReturnMutation } from "../../redux/api/saleReturnApi";
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 
@@ -428,7 +428,7 @@ export default function SaleReturnAdd() {
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
-  const paymentType = watch("Payment_Type", "");
+  //const paymentType = watch("Payment_Type", "");
   useEffect(() => {
     if (sale) {
 
@@ -588,6 +588,10 @@ const onSubmit = async (data) => {
     dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
    dispatch(itemApi.util.invalidateTags(["Item"]));
    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+     dispatch(bankAccountApi.util.invalidateTags([
+            { type: "BankAccount", id: payload.Bank_Account_Id },
+            "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+          ]));
     if (!res?.success) {
       toast.error("Failed to add credit note");
       return;

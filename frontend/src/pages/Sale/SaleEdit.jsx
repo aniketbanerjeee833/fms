@@ -5,7 +5,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
 
@@ -21,7 +21,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
 
@@ -32,7 +32,8 @@ export default function SaleEdit() {
   const from = location.state?.from
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
-  console.log("Edit page query:", location.search);
+  const bankId = location.state?.bankId;
+  console.log("Edit page query:", bankId);
   const { id: Sale_Id } = useParams();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const dispatch = useDispatch();
@@ -162,7 +163,7 @@ export default function SaleEdit() {
       Balance_Due: "",
       Total_Received: "",
       Payment_Type: "Cash",
-       Bank_Account_Id: null,   // 🔹 added
+      Bank_Account_Id: null,   // 🔹 added
       Reference_Number: "",
       items: [{
 
@@ -388,7 +389,7 @@ export default function SaleEdit() {
         Total_Received: sale.invoicePartyDetails?.Total_Received || "",
         Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
         Payment_Type: sale.invoicePartyDetails?.Payment_Type || "",
-         Bank_Account_Id: sale.invoicePartyDetails?.Bank_Account_Id, // ✅ Add this
+        Bank_Account_Id: sale.invoicePartyDetails?.Bank_Account_Id, // ✅ Add this
         Reference_Number: sale.invoicePartyDetails?.Reference_Number || "",
 
         items: sale.items || [],
@@ -398,7 +399,7 @@ export default function SaleEdit() {
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
- // const paymentType = watch("Payment_Type", "");
+  // const paymentType = watch("Payment_Type", "");
   useEffect(() => {
     if (sale) {
 
@@ -472,11 +473,15 @@ export default function SaleEdit() {
       }
 
       // ✅ Refresh & navigate
-     
+
       dispatch(saleApi.util.invalidateTags(["Sale"]));
 
       dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: payload.Bank_Account_Id },
+        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+      ]));
 
       toast.success("Sale updated successfully!");
       //   navigate({
@@ -497,14 +502,29 @@ export default function SaleEdit() {
         })
         dispatch(partyApi.util.invalidateTags(["Party"]));
       }
-       else if (from === "item-sales-purchases-details") {
-                          navigate({
-                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                            search: location.search,
-                          })
-                           dispatch(itemApi.util.invalidateTags(["Item"]));
-                          // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                        } 
+      else if (from === "item-sales-purchases-details") {
+        navigate({
+          pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+          search: location.search,
+        })
+        //dispatch(itemApi.util.invalidateTags(["Item"]));
+        // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+      }
+      else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/bank-accounts`,
+          search: `?bankId=${bankId}`,
+        });
+      }
+      else if (from === "cash-in-hand") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/cash-in-hand`,
+
+        });
+      }
+
       else {
         navigate({
           pathname: "/sale/all-sales",
@@ -544,13 +564,13 @@ export default function SaleEdit() {
           <div className="col-md-12">
             <div style={{ padding: "20px" }}
               className="box-inn-sp"> */}
-      
-            <div style={{ padding: "20px" }}
-              className="flex flex-col bg-white ">
 
-              <div className="inn-title w-full px-2 py-3">
+      <div style={{ padding: "20px" }}
+        className="flex flex-col bg-white ">
 
-                <div className="
+        <div className="inn-title w-full px-2 py-3">
+
+          <div className="
     flex flex-col sm:flex-row 
     justify-between 
     items-start sm:items-center 
@@ -559,872 +579,696 @@ export default function SaleEdit() {
     mt-4               /* ⭐ Adds spacing from top header */
   ">
 
-                  {/* LEFT HEADER */}
-                  <div className="w-full sm:w-auto">
-                    <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Edit Sale</h4>
-                    {/* <p className="text-gray-500 mb-2 sm:mb-4">
+            {/* LEFT HEADER */}
+            <div className="w-full sm:w-auto">
+              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Edit Sale</h4>
+              {/* <p className="text-gray-500 mb-2 sm:mb-4">
            Edit sale details
       </p> */}
-                  </div>
+            </div>
 
-                  {/* RIGHT BUTTON SECTION */}
-                  <div className="
+            {/* RIGHT BUTTON SECTION */}
+            <div className="
       w-full sm:w-auto 
       flex flex-wrap sm:flex-nowrap 
       justify-start sm:justify-end 
       gap-3
     ">
-                    <button
-                      type="button"
-                      onClick={() => {
+              <button
+                type="button"
+                onClick={() => {
 
-                        if (from === "party-receivables") {
-                          navigate({
-                            pathname: `/party/receivables`,
-                            search: location.search,
-                          })
-                        }
-                        else if (from === "party-sales-purchases-details") {
+                  if (from === "party-receivables") {
+                    navigate({
+                      pathname: `/party/receivables`,
+                      search: location.search,
+                    })
+                  }
+                  else if (from === "party-sales-purchases-details") {
 
-                          navigate({
-                            pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                            search: location.search,
-                          })
+                    navigate({
+                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                      search: location.search,
+                    })
 
-                        }
-                         else if (from === "item-sales-purchases-details") {
-                          navigate({
-                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                            search: location.search,
-                          })
-                          // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                        } 
-                        else {
-                          navigate({
-                            pathname: "/sale/all-sales",
-                            search: location.search,
-                          })
-                        }
-                      }}
+                  }
+                  else if (from === "bank-accounts") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/bank-accounts`,
+                      search: `?bankId=${bankId}`,
+                    });
+                  }
+                  else if (from === "cash-in-hand") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/cash-in-hand`,
 
-                      //            else if (from === "party-receivables") {
+                    });
+                  }
+                  else if (from === "item-sales-purchases-details") {
+                    navigate({
+                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                      search: location.search,
+                    })
+                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else {
+                    navigate({
+                      pathname: "/sale/all-sales",
+                      search: location.search,
+                    })
+                  }
+                }}
 
-                      //       navigate({
-                      //   pathname: `/party/receivables`,
-                      //   search: location.search,
-                      // })
-                      //       // navigate(`/party/party-receivables-left/${Party_Id}`);
-                      //     }
-                      // onClick={() => navigate("/sale/all-sales")}
-                      className="text-white font-bold py-2 px-4 rounded"
-                      style={{ backgroundColor: "#4CA1AF" }}
+                //            else if (from === "party-receivables") {
+
+                //       navigate({
+                //   pathname: `/party/receivables`,
+                //   search: location.search,
+                // })
+                //       // navigate(`/party/party-receivables-left/${Party_Id}`);
+                //     }
+                // onClick={() => navigate("/sale/all-sales")}
+                className="text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/sale/all-sales")}
+                className="text-white py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                All Sales
+              </button>
+            </div>
+
+          </div>
+        </div>
+        <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+              {/* <div className="row"> */}
+              <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
+                <div className=" flex flex-col relative mt-2 gap-2 party-class"
+                  style={{ marginBottom: "0px", marginTop: "0px" }}>
+                  {/* <div className="input-field col s6 mt-4 relative"> */}
+
+                  <span className="active">
+                    Party
+                    <span className="text-red-500">*</span>
+                  </span>
+
+
+                  <div className="relative w-full">
+                    <div
+                      className="flex flex-row border rounded-md bg-white cursor-pointer"
+                      onClick={() => setOpen((prev) => !prev)}
                     >
-                      Back
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate("/sale/all-sales")}
-                      className="text-white py-2 px-4 rounded"
-                      style={{ backgroundColor: "#4CA1AF" }}
-                    >
-                      All Sales
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-              <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
-                <form onSubmit={handleSubmit(onSubmit)}>
-                  <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
-                    {/* <div className="row"> */}
-                    <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-                      <div className=" flex flex-col relative mt-2 gap-2 party-class"
-                        style={{ marginBottom: "0px", marginTop: "0px" }}>
-                        {/* <div className="input-field col s6 mt-4 relative"> */}
-
-                        <span className="active">
-                          Party
-                          <span className="text-red-500">*</span>
-                        </span>
-                        {/* <div className="relative w-full">
-    <div
-    className="flex  justify-between border rounded-md  bg-white cursor-pointer"
-    onClick={() => setOpen((prev) => !prev)}
-  >
                       <input
                         type="text"
                         id="Party_Name"
                         value={partySearch}
+                        // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
                         onChange={(e) => {
                           const value = e.target.value;
                           setPartySearch(value);
                           setValue("Party_Name", value, { shouldValidate: true });
                           setOpen(true);
                         }}
-                        onClick={() => setOpen((prev) => !prev)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(true);
+                        }}
                         onBlur={() => {
-                          const typedValue = partySearch.trim().toLowerCase();
+                          setTimeout(() => {
+                            const typedValue = partySearch?.trim()?.toLowerCase();
+                            const matchedParty = parties?.parties?.find(
+                              (p) => p.Party_Name.toLowerCase() === typedValue
+                            );
 
-                          // ✅ Full match only (not partial)
-                          const matchedParty = parties?.parties?.find(
-                            (party) => party.Party_Name.toLowerCase() === typedValue
-                          );
-
-                          if (matchedParty) {
-                            // ✅ Set full party info
-                            setPartySearch(matchedParty.Party_Name);
-                            setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-
-                            // ✅ Check GSTIN (must be present)
-                            if (!matchedParty.GSTIN || matchedParty.GSTIN.trim() === "") {
-
-                              setValue("GSTIN", "", { shouldValidate: true });
-                            } else {
-                              setValue("GSTIN", matchedParty.GSTIN, { shouldValidate: true, shouldDirty: true });
+                            if (matchedParty) {
+                              setPartySearch(matchedParty.Party_Name);
+                              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
                             }
 
-
-                          } else {
-                            // ❌ Not an exact match → clear field
-                            setPartySearch("");
-                            setValue("Party_Name", "");
-                          }
-
-                          setTimeout(() => setOpen(false), 150);
+                            setOpen(false);
+                          }, 150);
                         }}
-                        placeholder="Search By Name/phone"
+                        placeholder="Search By Name/Phone"
                         className="w-full outline-none py-1 px-2 text-gray-900"
-                         style={{ marginBottom: 0, marginTop: "4px",border: "none",
-        height:"2rem",borderBottom: "0px" }}
+                        style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
                       />
-  <span className="ml-2  absolute right-5 top-1/4  text-gray-700">
-      ▼
-    </span>
-    </div>
-                    
-                      {open && (
-                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 
-                        rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          <span
-                            onClick={() => setShowPartyModal(true)}
-                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                      <div className="w-10 "></div>
+                      <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
+                    </div>
+
+                    {open && (
+                      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        <span
+                          onClick={() => setShowPartyModal(true)}
+                          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                        >
+                          + Add Party
+                        </span>
+
+                        {parties?.parties
+                          ?.filter(
+                            (party) =>
+                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                              party?.Phone_Number?.includes(partySearch)
+                          )
+                          .map((party, i) => (
+                            <div
+                              key={i}
+                              onClick={() => {
+                                setPartySearch(party.Party_Name);
+                                setValue("Party_Name", party.Party_Name, { shouldValidate: true });
+                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
+                                setOpen(false);
+                              }}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                            >
+                              {party.Party_Name} ({party.Phone_Number})
+                            </div>
+                          ))}
+
+                        {parties?.parties?.filter((party) =>
+                          party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+                        ).length === 0 && (
+                            <p className="px-3 py-2 text-gray-500">No Party found</p>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                  {showPartyModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={(newParty) => {
+                        setPartySearch(newParty);
+                        setValue("Party_Name", newParty, { shouldValidate: true });
+                        setShowPartyModal(false);
+                      }}
+                    />
+                  )}
+
+                </div>
+                <div className="input-field  flex gap-4
+                              justify-center items-center  gstin-class">
+                  {/* <div className="input-field col s6 mt-4"> */}
+                  <span className="whitespace-nowrap active">
+                    GSTIN
+
+                  </span>
+
+                  <input
+                    type="text"
+                    id=" GSTIN"
+                    style={{ marginBottom: "0px" }}
+                    value={showGSTIN || ""}
+                    {...register("GSTIN")}
+                    placeholder="GSTIN"
+                    className="w-full outline-none border-b-2 text-gray-900"
+                    readOnly
+                  />
+                  {errors?.GSTIN && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.GSTIN?.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
+          ml-auto gap-0  mr-2">
+                <div className="flex items-center w-full gap-3  justify-end">
+                  {/* <div className="row  "> */}
+
+                  {/* Invoice Number */}
+                  {/* <div className="input-field col s6 mt-4"> */}
+                  <span className="whitespace-nowrap ">
+                    Invoice Number <span className="text-red-500">*</span>
+                  </span>
+
+                  <input
+                    type="text"
+                    id=" Invoice_Number"
+                    {...register("Invoice_Number")}
+                    placeholder=" Invoice_Number"
+                    style={{ marginBottom: 0, border: "none", width: "50%" }}
+                    className="w-full outline-none  text-gray-900
+                          invoice-number-class"
+                    readOnly
+                  />
+                  {errors?.Invoice_Number && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.Invoice_Number?.message}
+                    </p>
+                  )}
+                </div>
+
+
+
+                {/* Invoice Date */}
+                <div className="flex items-center w-full  gap-3 justify-end">
+                  {/* <div className="input-field col s6 mt-4"> */}
+                  <span className=" whitespace-nowrap active">
+                    Invoice Date
+                    <span className="text-red-500">*</span>
+                  </span>
+
+                  <input
+                    type="date"
+                    id=" Invoice_Date"
+                    style={{ marginBottom: 0, width: "50%", border: "none" }}
+                    {...register("Invoice_Date")}
+                    placeholder=" Invoice_Date"
+                    className="w-full outline-none invoice-date-class text-gray-900"
+                  //                       min={
+                  //   latestInvoiceNumber?.latestInvoiceInfo?.createdAt
+                  //     ? new Date(latestInvoiceNumber?.latestInvoiceInfo?.createdAt).toISOString().split("T")[0]
+                  //     : ""
+                  // } // ✅ Prevent earlier dates
+                  />
+                  {errors?.Invoice_Date && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.Invoice_Date?.message}
+                    </p>
+                  )}
+                </div>
+
+
+
+                <div className="flex items-center w-full gap-3 justify-end
+                                           state-of-supply-class">
+                  {/* <div className="row w-1/2"> */}
+
+                  {/* State of Supply */}
+                  {/* <div className="input-field col s6"> */}
+                  <span className=" whitespace-nowrap active">
+                    State of Supply
+                    <span className="text-red-500">*</span>
+                  </span>
+                  <select
+                    style={{ marginBottom: "0px", width: "50%", border: "none" }}
+                    id="stateOfSupply"
+                    className="validate mt-2"
+
+                    {...register("State_Of_Supply")}
+                  >
+                    <option value="">Select State</option>
+                    {states.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
+                  {errors?.State_Of_Supply && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.State_Of_Supply?.message}
+                    </p>
+                  )}
+                </div>
+
+
+              </div>
+
+            </div>
+
+
+
+
+
+
+
+            <div className="table-responsive table-desi mt-4">
+              <table className="table table-hover">
+                <thead>
+                  <tr>
+
+                    <th>Sl.No</th>
+                    <th>Category</th>
+                    <th>Item</th>
+                    <th>Item_HSN</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Price/Unit</th>
+                    <th>Discount</th>
+                    <th>Tax</th>
+                    <th>Tax Amount</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
+                  {fields.map((field, i) => (
+                    <tr key={field.id}>
+                      {/* Action + Serial Number */}
+                      <td style={{ padding: "0px", textAlign: "center", verticalAlign: "middle" }}>
+                        <div
+                          className="flex align-center justify-center text-center gap-2"
+                          style={{ whiteSpace: "nowrap" }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRow(i)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "red",
+                              cursor: "pointer",
+                            }}
                           >
-                            + Add Party
-                          </span>
-
-                          {parties?.parties
-                            ?.filter(
-                              (party) =>
-                                party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase()) ||
-                                party?.Phone_Number?.includes(partySearch)
-                            )
-                            .map((party, i) => (
-                              <div
-                                key={i}
-                                onClick={() => {
-                                  // Select from dropdown
-                                  setPartySearch(party.Party_Name);
-                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-
-                                  // ✅ GSTIN validation on selection
-                                  if (!party.GSTIN || party.GSTIN.trim() === "") {
-
-                                    setValue("GSTIN", "", { shouldValidate: true });
-                                  } else {
-                                    setValue("GSTIN", party.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                  }
-
-
-                                  setOpen(false);
-                                }}
-                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                              >
-                                {party.Party_Name} ({party.Phone_Number})
-                              </div>
-                            ))}
-
-                          {parties?.parties?.filter((party) =>
-                            party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase())
-                          ).length === 0 && (
-                              <p className="px-3 py-2 text-gray-500">No Party found</p>
-                            )}
+                            🗑
+                          </button>
+                          <span>{i + 1}</span>
                         </div>
-                      )}
+                      </td>
 
-                   
-                    
-                      {errors?.Party_Name && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
-                      )}
-                    </div> */}
-                        {/* <div className="relative w-full">
-  <div
-    className="flex justify-between border rounded-md bg-white cursor-pointer"
-    onClick={() => setOpen((prev) => !prev)}
-  >
-    <input
-      type="text"
-      id="Party_Name"
-      value={partySearch}
-      onChange={(e) => {
-        const value = e.target.value;
-        setPartySearch(value);
-        setValue("Party_Name", value, { shouldValidate: true });
-        setOpen(true);
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        setOpen(true);
-      }}
-      onBlur={() => {
-        setTimeout(() => {
-          const typedValue = partySearch.trim().toLowerCase();
-          const matchedParty = parties?.parties?.find(
-            (p) => p.Party_Name.toLowerCase() === typedValue
-          );
+                      <td
+                        style={{ padding: "0px", position: "relative" }}>
 
-          if (matchedParty) {
-            setPartySearch(matchedParty.Party_Name);
-            setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
-            setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
-          }
+                        <div ref={(el) => (categoryRefs.current[i] = el)}>
 
-          setOpen(false);
-        }, 150);
-      }}
-      placeholder="Search By Name/Phone"
-      className="w-full outline-none py-1 px-2 text-gray-900"
-      style={{ marginBottom: 0, marginTop: "4px", border: "none", height: "2rem" }}
-    />
-    <span className="ml-2 absolute right-5 top-1/3 text-gray-700">▼</span>
-  </div>
 
-  {open && (
-    <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-      <span
-        onClick={() => setShowPartyModal(true)}
-        className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-      >
-        + Add Party
-      </span>
 
-      {parties?.parties
-        ?.filter(
-          (party) =>
-            party.Party_Name.toLowerCase().includes(partySearch.toLowerCase()) ||
-            party.Phone_Number.includes(partySearch)
-        )
-        .map((party, i) => (
-          <div
-            key={i}
-            onClick={() => {
-              setPartySearch(party.Party_Name);
-              setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-              setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
-              setOpen(false);
-            }}
-            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-          >
-            {party.Party_Name} ({party.Phone_Number})
-          </div>
-        ))}
+                          <input
+                            type="text"
+                            value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
+                            style={{ marginBottom: "0px" }}
+                            readOnly
 
-      {parties?.parties?.filter((party) =>
-        party.Party_Name.toLowerCase().includes(partySearch.toLowerCase())
-      ).length === 0 && (
-        <p className="px-3 py-2 text-gray-500">No Party found</p>
-      )}
-    </div>
-  )}
-</div> */}
+                            placeholder="Category"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                          // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
+                          />
 
-                        <div className="relative w-full">
-                          <div
-                            className="flex flex-row border rounded-md bg-white cursor-pointer"
-                            onClick={() => setOpen((prev) => !prev)}
-                          >
-                            <input
-                              type="text"
-                              id="Party_Name"
-                              value={partySearch}
-                              // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setPartySearch(value);
-                                setValue("Party_Name", value, { shouldValidate: true });
-                                setOpen(true);
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpen(true);
-                              }}
-                              onBlur={() => {
-                                setTimeout(() => {
-                                  const typedValue = partySearch?.trim()?.toLowerCase();
-                                  const matchedParty = parties?.parties?.find(
-                                    (p) => p.Party_Name.toLowerCase() === typedValue
-                                  );
+                          {errors?.items?.[i]?.Item_Category && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_Category.message}
+                            </p>
+                          )}
 
-                                  if (matchedParty) {
-                                    setPartySearch(matchedParty.Party_Name);
-                                    setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
-                                    setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
-                                  }
 
-                                  setOpen(false);
-                                }, 150);
-                              }}
-                              placeholder="Search By Name/Phone"
-                              className="w-full outline-none py-1 px-2 text-gray-900"
-                              style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-                            />
-                            <div className="w-10 "></div>
-                            <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
-                          </div>
 
-                          {open && (
-                            <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                              <span
-                                onClick={() => setShowPartyModal(true)}
-                                className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                              >
-                                + Add Party
-                              </span>
+                        </div>
+                        {/* Modal */}
 
-                              {parties?.parties
-                                ?.filter(
-                                  (party) =>
-                                    party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                                    party?.Phone_Number?.includes(partySearch)
-                                )
-                                .map((party, i) => (
-                                  <div
-                                    key={i}
-                                    onClick={() => {
-                                      setPartySearch(party.Party_Name);
-                                      setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-                                      setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
-                                      setOpen(false);
-                                    }}
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {party.Party_Name} ({party.Phone_Number})
-                                  </div>
-                                ))}
+                      </td>
 
-                              {parties?.parties?.filter((party) =>
-                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
-                              ).length === 0 && (
-                                  <p className="px-3 py-2 text-gray-500">No Party found</p>
-                                )}
+                      {/* Item Dropdown */}
+                      <td style={{ padding: "0px", width: "20%", position: "relative" }}>
+                        <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
+                          <input
+                            type="text"
+                            value={rows[i]?.itemSearch || ""}
+                            onChange={(e) => {
+                              const typedValue = e.target.value;
+                              handleRowChange(i, "itemSearch", typedValue);
+                              handleRowChange(i, "CategoryOpen", false);
+                              // setValue(`items.${i}.Item_Name`, typedValue);
+                              handleRowChange(i, "isHSNLocked", false);
+                              handleRowChange(i, "isExistingItem", false);
+                              handleRowChange(i, "isUnitLocked", false);
+
+                              const exists = items?.items?.find(
+                                (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                              );
+                              if (exists) {
+                                // ✅ Only store if it's a valid item
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
+                                handleRowChange(i, "isExistingItem", true);
+                              } else {
+                                // ❌ Clear Item_Name in RHF to trigger error
+                                setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
+                                handleRowChange(i, "isExistingItem", false);
+                              }
+                              //handleRowChange(i, "isExistingItem", exists); // false if new item
+                            }}
+
+                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            placeholder="Item Name"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                          />
+
+                          {errors?.items?.[i]?.Item_Name && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_Name.message}
+                            </p>
+                          )}
+
+
+
+                          {/* Dropdown List */}
+                          {rows[i]?.itemOpen && (
+                            <div
+                              style={{ width: "40rem" }}
+                              className="absolute z-20  w-full bg-white border
+      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                            >
+                              <table className="w-full text-sm border-collapse">
+                                <thead className="bg-gray-100 border-b">
+                                  <tr>
+                                    <th>Sl.No</th>
+                                    <th className="text-left px-3 py-2">Item Name</th>
+                                    <th className="text-left px-3 py-2">Sale Price</th>
+                                    <th className="text-left px-3 py-2">Purchase Price</th>
+                                    <th className="text-left px-3 py-2">Stock</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {items?.items
+                                    ?.filter((it) =>
+                                      it.Item_Name.toLowerCase().includes(
+                                        (rows[i]?.itemSearch || "").toLowerCase()
+                                      )
+                                    )
+                                    .map((it, idx) => (
+                                      <tr
+                                        key={idx}
+                                        onClick={() => {
+
+                                          setRows((prev) => {
+                                            const updated = [...prev];
+                                            updated[i] = {
+                                              ...updated[i],
+                                              Item_Category: it.Item_Category || "",
+                                              Item_HSN: it.Item_HSN || "",
+                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
+                                              isExistingItem: true,   // lock category
+                                              isHSNLocked: true,      // lock HSN
+                                              isUnitLocked: true,     // lock unit
+                                              itemQuantity: it.Stock_Quantity || 0,
+                                            };
+                                            return updated;
+                                          });
+                                          handleRowChange(i, "itemSearch", it.Item_Name);
+                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
+                                          handleRowChange(i, "CategoryOpen", false);
+                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
+                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
+                                          setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
+                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
+                                          setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
+                                          handleRowChange(i, "itemOpen", false);
+
+
+                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                            {
+                                              ...itemsValues[i],
+                                              Item_Name: it.Item_Name,
+                                              Sale_Price: it.Sale_Price || 0,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
+                                              Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
+                                              Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
+                                              Tax_Type: itemsValues[i]?.Tax_Type
+                                            },
+                                            i,
+                                            itemsValues
+                                          );
+
+                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                                          setValue(`items.${i}.Amount`, Amount);
+                                          setValue(`Total_Amount`, Total_Amount);
+                                          setValue(`Balance_Due`, Balance_Due);
+                                        }}
+
+                                        className="hover:bg-gray-100 cursor-pointer border-b"
+                                      >
+                                        <td>{idx + 1}</td>
+                                        <td className="px-3 py-2">{it.Item_Name}</td>
+                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
+                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
+                                        <td
+                                          style={{
+                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                            fontWeight: "500", // optional: matches Tailwind's medium weight
+                                          }}
+                                        >
+                                          {it.Stock_Quantity || 0}
+                                        </td>
+                                      </tr>
+                                    ))}
+
+                                  {items?.items?.filter((it) =>
+                                    it.Item_Name.toLowerCase().includes(
+                                      (rows[i]?.itemSearch || "").toLowerCase()
+                                    )
+                                  ).length === 0 && (
+                                      <tr>
+                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
+                                          No Item found
+                                        </td>
+                                      </tr>
+                                    )}
+                                </tbody>
+                              </table>
                             </div>
                           )}
+
+                          {/* RHF error */}
+
                         </div>
-                        {showPartyModal && (
-                          <PartyAddModal
-                            onClose={() => setShowPartyModal(false)}
-                            onSave={(newParty) => {
-                              setPartySearch(newParty);
-                              setValue("Party_Name", newParty, { shouldValidate: true });
-                              setShowPartyModal(false);
-                            }}
-                          />
-                        )}
+                      </td>
 
-                      </div>
-                      <div className="input-field  flex gap-4
-                              justify-center items-center  gstin-class">
-                        {/* <div className="input-field col s6 mt-4"> */}
-                        <span className="whitespace-nowrap active">
-                          GSTIN
-
-                        </span>
-
+                      {/*HSN Code */}
+                      <td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
-                          id=" GSTIN"
-                          style={{ marginBottom: "0px" }}
-                          value={showGSTIN || ""}
-                          {...register("GSTIN")}
-                          placeholder="GSTIN"
+                          readOnly
+                          value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
+                          // onChange={(e) => {
+                          //   if (!rows[i]?.isHSNLocked) {
+                          //     handleRowChange(i, "Item_HSN", e.target.value);
+                          //     setValue(`items.${i}.Item_HSN`, e.target.value);
+                          //   }
+                          // }}
+                          placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
-                          readOnly
+                        // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
                         />
-                        {errors?.GSTIN && (
+                        {errors?.items?.[i]?.Item_HSN && (
                           <p className="text-red-500 text-xs mt-1">
-                            {errors?.GSTIN?.message}
+                            {errors.items[i].Item_HSN.message}
                           </p>
                         )}
-                      </div>
-                    </div>
+                      </td>
 
-                    <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
-          ml-auto gap-0  mr-2">
-                      <div className="flex items-center w-full gap-3  justify-end">
-                        {/* <div className="row  "> */}
-
-                        {/* Invoice Number */}
-                        {/* <div className="input-field col s6 mt-4"> */}
-                        <span className="whitespace-nowrap ">
-                          Invoice Number <span className="text-red-500">*</span>
-                        </span>
-
+                      {/* Quantity */}
+                      <td style={{ padding: "0px", width: "4%" }}>
                         <input
                           type="text"
-                          id=" Invoice_Number"
-                          {...register("Invoice_Number")}
-                          placeholder=" Invoice_Number"
-                          style={{ marginBottom: 0, border: "none", width: "50%" }}
-                          className="w-full outline-none  text-gray-900
-                          invoice-number-class"
-                          readOnly
+                          className="form-control"
+                          style={{ width: "100%" }}
+                          value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                          {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
+                          onChange={(e) => {
+                            let value = e.target.value.replace(/[^0-9]/g, "");
+                            // let currentItemName = itemsValues[i]?.Item_Name?.trim();
+                            // if (!currentItemName) return;
+
+                            // // 🔹 Fetch the item’s DB stock (available stock now)
+                            // const stockItem = items?.items?.find(
+                            //   (item) => item.Item_Name === currentItemName
+                            // );
+                            // const currentStock = Number(stockItem?.Stock_Quantity || 0);
+
+                            // // 🔹 Get the old quantity from the sale being edited (previously sold)
+                            // const previousQuantity = Number(rows[i]?.itemQuantity || 0);
+
+                            // // ✅ Effective available stock = stock + previously sold quantity
+                            // const effectiveAvailableStock = currentStock + previousQuantity;
+
+                            let num = parseInt(value, 10);
+                            if (isNaN(num) || num < 0) num = 0;
+                            // if (num > effectiveAvailableStock) num = effectiveAvailableStock;
+
+                            // ✅ Update via RHF
+                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true });
+
+                            // ✅ Recalculate row + totals
+                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
+                              calculateRowAmount(
+                                { ...itemsValues[i], Quantity: num || 0 },
+                                i,
+                                itemsValues
+                              );
+
+                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                            setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                          }}
+                          placeholder="Qty"
                         />
-                        {errors?.Invoice_Number && (
+
+                        {errors?.items?.[i]?.Quantity && (
+
                           <p className="text-red-500 text-xs mt-1">
-                            {errors?.Invoice_Number?.message}
+                            {errors.items[i].Quantity.message}
                           </p>
                         )}
-                      </div>
+                      </td>
 
 
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
+                              disabled={rows[i]?.isUnitLocked}
+                              onChange={(e) => {
+                                const value = e.target.value;
 
-                      {/* Invoice Date */}
-                      <div className="flex items-center w-full  gap-3 justify-end">
-                        {/* <div className="input-field col s6 mt-4"> */}
-                        <span className=" whitespace-nowrap active">
-                          Invoice Date
-                          <span className="text-red-500">*</span>
-                        </span>
+                                // ➕ ADD UNIT
+                                if (value === "__ADD_UNIT__") {
+                                  setActiveUnitRow(i);
+                                  setShowAddUnitModal(true);
+                                  return;
+                                }
 
-                        <input
-                          type="date"
-                          id=" Invoice_Date"
-                          style={{ marginBottom: 0, width: "50%", border: "none" }}
-                          {...register("Invoice_Date")}
-                          placeholder=" Invoice_Date"
-                          className="w-full outline-none invoice-date-class text-gray-900"
-                        //                       min={
-                        //   latestInvoiceNumber?.latestInvoiceInfo?.createdAt
-                        //     ? new Date(latestInvoiceNumber?.latestInvoiceInfo?.createdAt).toISOString().split("T")[0]
-                        //     : ""
-                        // } // ✅ Prevent earlier dates
+                                handleRowChange(i, "Item_Unit", value);
+                                setValue(`items.${i}.Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
+                              }}
+                            >
+                              <option value=""></option>
+                              <option value="__ADD_UNIT__">➕ Add Unit</option>
+                              {Array.isArray(itemUnits) &&
+                                itemUnits.map((unit) => (
+                                  <option
+                                    key={unit.Unit_Shorthand}
+                                    value={unit.Unit_Shorthand}
+                                  >
+                                    {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
+                                  </option>
+                                ))}
+
+                              {/* ➕ Add Unit always at bottom */}
+
+                            </select>
+                          )}
                         />
-                        {errors?.Invoice_Date && (
+                        {errors?.items?.[i]?.Item_Unit && (
                           <p className="text-red-500 text-xs mt-1">
-                            {errors?.Invoice_Date?.message}
+                            {errors.items[i].Item_Unit.message}
                           </p>
                         )}
-                      </div>
+                      </td>
 
 
-
-                      <div className="flex items-center w-full gap-3 justify-end
-                                           state-of-supply-class">
-                        {/* <div className="row w-1/2"> */}
-
-                        {/* State of Supply */}
-                        {/* <div className="input-field col s6"> */}
-                        <span className=" whitespace-nowrap active">
-                          State of Supply
-                          <span className="text-red-500">*</span>
-                        </span>
-                        <select
-                          style={{ marginBottom: "0px", width: "50%", border: "none" }}
-                          id="stateOfSupply"
-                          className="validate mt-2"
-
-                          {...register("State_Of_Supply")}
-                        >
-                          <option value="">Select State</option>
-                          {states.map((state) => (
-                            <option key={state} value={state}>
-                              {state}
-                            </option>
-                          ))}
-                        </select>
-                        {errors?.State_Of_Supply && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors?.State_Of_Supply?.message}
-                          </p>
-                        )}
-                      </div>
-
-
-                    </div>
-
-                  </div>
-
-
-
-
-
-
-
-                  <div className="table-responsive table-desi mt-4">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-
-                          <th>Sl.No</th>
-                          <th>Category</th>
-                          <th>Item</th>
-                          <th>Item_HSN</th>
-                          <th>Qty</th>
-                          <th>Unit</th>
-                          <th>Price/Unit</th>
-                          <th>Discount</th>
-                          <th>Tax</th>
-                          <th>Tax Amount</th>
-                          <th>Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
-                        {fields.map((field, i) => (
-                          <tr key={field.id}>
-                            {/* Action + Serial Number */}
-                            <td style={{ padding: "0px", textAlign: "center", verticalAlign: "middle" }}>
-                              <div
-                                className="flex align-center justify-center text-center gap-2"
-                                style={{ whiteSpace: "nowrap" }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteRow(i)}
-                                  style={{
-                                    background: "transparent",
-                                    border: "none",
-                                    color: "red",
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  🗑
-                                </button>
-                                <span>{i + 1}</span>
-                              </div>
-                            </td>
-
-                            <td
-                              style={{ padding: "0px", position: "relative" }}>
-
-                              <div ref={(el) => (categoryRefs.current[i] = el)}>
-
-
-
-                                <input
-                                  type="text"
-                                  value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
-                                  style={{ marginBottom: "0px" }}
-                                  readOnly
-
-                                  placeholder="Category"
-                                  className="w-full outline-none border-b-2 text-gray-900"
-                                // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
-                                />
-
-                                {errors?.items?.[i]?.Item_Category && (
-                                  <p className="text-red-500 text-xs mt-1">
-                                    {errors.items[i].Item_Category.message}
-                                  </p>
-                                )}
-
-
-
-                              </div>
-                              {/* Modal */}
-
-                            </td>
-
-                            {/* Item Dropdown */}
-                            <td style={{ padding: "0px", width: "20%", position: "relative" }}>
-                              <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
-                                <input
-                                  type="text"
-                                  value={rows[i]?.itemSearch || ""}
-                                  onChange={(e) => {
-                                    const typedValue = e.target.value;
-                                    handleRowChange(i, "itemSearch", typedValue);
-                                    handleRowChange(i, "CategoryOpen", false);
-                                    // setValue(`items.${i}.Item_Name`, typedValue);
-                                    handleRowChange(i, "isHSNLocked", false);
-                                    handleRowChange(i, "isExistingItem", false);
-                                    handleRowChange(i, "isUnitLocked", false);
-
-                                    const exists = items?.items?.find(
-                                      (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                                    );
-                                    if (exists) {
-                                      // ✅ Only store if it's a valid item
-                                      setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                                      handleRowChange(i, "isExistingItem", true);
-                                    } else {
-                                      // ❌ Clear Item_Name in RHF to trigger error
-                                      setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
-                                      handleRowChange(i, "isExistingItem", false);
-                                    }
-                                    //handleRowChange(i, "isExistingItem", exists); // false if new item
-                                  }}
-
-                                  onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
-                                  placeholder="Item Name"
-                                  className="w-full outline-none border-b-2 text-gray-900"
-                                />
-
-                                {errors?.items?.[i]?.Item_Name && (
-                                  <p className="text-red-500 text-xs mt-1">
-                                    {errors.items[i].Item_Name.message}
-                                  </p>
-                                )}
-
-
-
-                                {/* Dropdown List */}
-                                {rows[i]?.itemOpen && (
-                                  <div
-                                    style={{ width: "40rem" }}
-                                    className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                                  >
-                                    <table className="w-full text-sm border-collapse">
-                                      <thead className="bg-gray-100 border-b">
-                                        <tr>
-                                          <th>Sl.No</th>
-                                          <th className="text-left px-3 py-2">Item Name</th>
-                                          <th className="text-left px-3 py-2">Sale Price</th>
-                                          <th className="text-left px-3 py-2">Purchase Price</th>
-                                          <th className="text-left px-3 py-2">Stock</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {items?.items
-                                          ?.filter((it) =>
-                                            it.Item_Name.toLowerCase().includes(
-                                              (rows[i]?.itemSearch || "").toLowerCase()
-                                            )
-                                          )
-                                          .map((it, idx) => (
-                                            <tr
-                                              key={idx}
-                                              onClick={() => {
-
-                                                setRows((prev) => {
-                                                  const updated = [...prev];
-                                                  updated[i] = {
-                                                    ...updated[i],
-                                                    Item_Category: it.Item_Category || "",
-                                                    Item_HSN: it.Item_HSN || "",
-                                                    categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                                    isExistingItem: true,   // lock category
-                                                    isHSNLocked: true,      // lock HSN
-                                                    isUnitLocked: true,     // lock unit
-                                                    itemQuantity: it.Stock_Quantity || 0,
-                                                  };
-                                                  return updated;
-                                                });
-                                                handleRowChange(i, "itemSearch", it.Item_Name);
-                                                handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                                handleRowChange(i, "CategoryOpen", false);
-                                                setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
-                                                setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                                setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
-                                                setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
-                                                setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
-                                                setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
-                                                setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
-                                                handleRowChange(i, "itemOpen", false);
-
-
-                                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                                  {
-                                                    ...itemsValues[i],
-                                                    Item_Name: it.Item_Name,
-                                                    Sale_Price: it.Sale_Price || 0,
-                                                    Quantity: itemsValues[i]?.Quantity || 0,
-                                                    Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
-                                                    Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
-                                                    Tax_Type: itemsValues[i]?.Tax_Type
-                                                  },
-                                                  i,
-                                                  itemsValues
-                                                );
-
-                                                setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                                setValue(`items.${i}.Amount`, Amount);
-                                                setValue(`Total_Amount`, Total_Amount);
-                                                setValue(`Balance_Due`, Balance_Due);
-                                              }}
-
-                                              className="hover:bg-gray-100 cursor-pointer border-b"
-                                            >
-                                              <td>{idx + 1}</td>
-                                              <td className="px-3 py-2">{it.Item_Name}</td>
-                                              <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                              <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                              {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
-                                              <td
-                                                style={{
-                                                  padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                                  color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                                  fontWeight: "500", // optional: matches Tailwind's medium weight
-                                                }}
-                                              >
-                                                {it.Stock_Quantity || 0}
-                                              </td>
-                                            </tr>
-                                          ))}
-
-                                        {items?.items?.filter((it) =>
-                                          it.Item_Name.toLowerCase().includes(
-                                            (rows[i]?.itemSearch || "").toLowerCase()
-                                          )
-                                        ).length === 0 && (
-                                            <tr>
-                                              <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                                No Item found
-                                              </td>
-                                            </tr>
-                                          )}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                )}
-
-                                {/* RHF error */}
-
-                              </div>
-                            </td>
-
-                            {/*HSN Code */}
-                            <td style={{ padding: "0px", width: "8%" }}>
-                              <input
-                                type="text"
-                                readOnly
-                                value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-                                // onChange={(e) => {
-                                //   if (!rows[i]?.isHSNLocked) {
-                                //     handleRowChange(i, "Item_HSN", e.target.value);
-                                //     setValue(`items.${i}.Item_HSN`, e.target.value);
-                                //   }
-                                // }}
-                                placeholder="HSN Code"
-                                className="w-full outline-none border-b-2 text-gray-900"
-                              // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
-                              />
-                              {errors?.items?.[i]?.Item_HSN && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_HSN.message}
-                                </p>
-                              )}
-                            </td>
-
-                            {/* Quantity */}
-                            <td style={{ padding: "0px", width: "4%" }}>
-                              <input
-                                type="text"
-                                className="form-control"
-                                style={{ width: "100%" }}
-                                value={watch(`items.${i}.Quantity`)?.toString() || ""}
-                                {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
-                                onChange={(e) => {
-                                  let value = e.target.value.replace(/[^0-9]/g, "");
-                                  // let currentItemName = itemsValues[i]?.Item_Name?.trim();
-                                  // if (!currentItemName) return;
-
-                                  // // 🔹 Fetch the item’s DB stock (available stock now)
-                                  // const stockItem = items?.items?.find(
-                                  //   (item) => item.Item_Name === currentItemName
-                                  // );
-                                  // const currentStock = Number(stockItem?.Stock_Quantity || 0);
-
-                                  // // 🔹 Get the old quantity from the sale being edited (previously sold)
-                                  // const previousQuantity = Number(rows[i]?.itemQuantity || 0);
-
-                                  // // ✅ Effective available stock = stock + previously sold quantity
-                                  // const effectiveAvailableStock = currentStock + previousQuantity;
-
-                                  let num = parseInt(value, 10);
-                                  if (isNaN(num) || num < 0) num = 0;
-                                  // if (num > effectiveAvailableStock) num = effectiveAvailableStock;
-
-                                  // ✅ Update via RHF
-                                  setValue(`items.${i}.Quantity`, num, { shouldValidate: true });
-
-                                  // ✅ Recalculate row + totals
-                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
-                                    calculateRowAmount(
-                                      { ...itemsValues[i], Quantity: num || 0 },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
-                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                                }}
-                                placeholder="Qty"
-                              />
-
-                              {errors?.items?.[i]?.Quantity && (
-
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Quantity.message}
-                                </p>
-                              )}
-                            </td>
-
-
-                            <td style={{ padding: "0px", width: "12%" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Item_Unit`}
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select"
-                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                    disabled={rows[i]?.isUnitLocked}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-
-                                      // ➕ ADD UNIT
-                                      if (value === "__ADD_UNIT__") {
-                                        setActiveUnitRow(i);
-                                        setShowAddUnitModal(true);
-                                        return;
-                                      }
-
-                                      handleRowChange(i, "Item_Unit", value);
-                                      setValue(`items.${i}.Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
-                                    }}
-                                  >
-                                    <option value=""></option>
-                                    <option value="__ADD_UNIT__">➕ Add Unit</option>
-                                    {Array.isArray(itemUnits) &&
-                                      itemUnits.map((unit) => (
-                                        <option
-                                          key={unit.Unit_Shorthand}
-                                          value={unit.Unit_Shorthand}
-                                        >
-                                          {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
-                                        </option>
-                                      ))}
-
-                                    {/* ➕ Add Unit always at bottom */}
-
-                                  </select>
-                                )}
-                              />
-                              {errors?.items?.[i]?.Item_Unit && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_Unit.message}
-                                </p>
-                              )}
-                            </td>
-
-
-                            {/* Price/Unit */}
-                            {/* <td style={{ padding: "0px" ,width: "6%"}}>
+                      {/* Price/Unit */}
+                      {/* <td style={{ padding: "0px" ,width: "6%"}}>
                               <div className="d-flex align-items-center">
                                 <input
                                   type="text"
@@ -1481,250 +1325,250 @@ export default function SaleEdit() {
                                 </p>
                               )}
                             </td> */}
-                            <td style={{ padding: "0px", width: "6%" }}>
-                              <div className="d-flex align-items-center">
-                                <input
-                                  type="text"
-                                  className="form-control"
-                                  style={{ width: "100%", marginBottom: "0px" }}
-                                  {...register(`items.${i}.Sale_Price`)}
+                      <td style={{ padding: "0px", width: "6%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ width: "100%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Sale_Price`)}
 
-                                  onChange={(e) => {
-                                    let val = e.target.value.replace(/[^0-9.]/g, "");
-                                    const parts = val.split(".");
-                                    if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-                                    if (val.includes(".")) {
-                                      const [intPart, decPart] = val.split(".");
-                                      val = intPart + "." + decPart.slice(0, 2);
-                                    }
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
+                              const parts = val.split(".");
+                              if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+                              if (val.includes(".")) {
+                                const [intPart, decPart] = val.split(".");
+                                val = intPart + "." + decPart.slice(0, 2);
+                              }
 
-                                    e.target.value = val;
+                              e.target.value = val;
 
-                                    // 🟩 Update RHF internal state FOR VALIDATION
-                                    setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
+                              // 🟩 Update RHF internal state FOR VALIDATION
+                              setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
 
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Sale_Price: val },
-                                      i,
-                                      itemsValues
-                                    );
+                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                { ...itemsValues[i], Sale_Price: val },
+                                i,
+                                itemsValues
+                              );
 
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                    setValue(`items.${i}.Amount`, Amount);
-                                    setValue("Total_Amount", Total_Amount);
-                                    setValue("Balance_Due", Balance_Due);
-                                  }}
-
-
-                                  placeholder="Price"
-                                />
-
-                              </div>
-                              {errors?.items?.[i]?.Sale_Price && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Sale_Price.message}
-                                </p>
-                              )}
-                            </td>
-                            {/* Discount */}
-                            <td style={{ padding: "0px", width: "14%" }}>
-                              <div className="d-flex align-items-center">
-                                <input
-                                  type="text"
-                                  className="form-control"
-                                  style={{ width: "50%", marginBottom: "0px" }}
-                                  {...register(`items.${i}.Discount_On_Sale_Price`)}
-                                  // onInput={(e) => {
-                                  //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                                  //   //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
-                                  //   //   ...itemsValues[i],
-
-                                  //   //   Discount_On_Purchase_Price: e.target.value,
-
-                                  //   // });
-                                  //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                  //     { ...itemsValues[i], Discount_On_Sale_Price: e.target.value },
-                                  //     i,
-                                  //     itemsValues
-                                  //   );
-
-                                  //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
-                                  //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                  //   setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                  //   setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                                  //   // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                  //   // setValue(`items.${i}.Amount`, Amount);
-
-                                  // }}
-                                  onInput={(e) => {
-                                    let val = e.target.value;
-
-                                    // allow digits + 1 dot
-                                    val = val.replace(/[^0-9.]/g, "");
-
-                                    const parts = val.split(".");
-                                    if (parts.length > 2) {
-                                      val = parts[0] + "." + parts.slice(1).join("");
-                                    }
-
-                                    if (val.includes(".")) {
-                                      const [int, dec] = val.split(".");
-                                      val = int + "." + dec.slice(0, 2);
-                                    }
-
-                                    e.target.value = val;
-
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Discount_On_Sale_Price: val },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                    setValue(`items.${i}.Amount`, Amount);
-                                    setValue("Total_Amount", Total_Amount);
-                                    setValue("Balance_Due", Balance_Due);
-                                  }}
-                                  placeholder="Discount"
-                                />
-                                <Controller
-                                  control={control}
-                                  name={`items.${i}.Discount_Type_On_Sale_Price`}
-                                  render={({ field }) => (
-                                    <select
-                                      {...field}
-                                      className="form-select ms-2"
-                                      style={{ width: "50%", fontSize: "12px" }}
-                                      onChange={(e) => {
-                                        field.onChange(e); // ✅ let RHF handle its state
-
-                                        // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                                        //   ...itemsValues[i],
-                                        //   Discount_Type_On_Purchase_Price: e.target.value,
-                                        // });
-
-                                        const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                          { ...itemsValues[i], Discount_Type_On_Sale_Price: e.target.value },
-                                          i,
-                                          itemsValues
-                                        );
-
-                                        setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
-                                        setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                        setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                        setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                                      }}
-                                    >
-                                      <option value="Percentage">%</option>
-                                      <option value="Amount">Amount</option>
-                                    </select>
-                                  )}
-                                />
-                              </div>
-                            </td>
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                              setValue(`items.${i}.Amount`, Amount);
+                              setValue("Total_Amount", Total_Amount);
+                              setValue("Balance_Due", Balance_Due);
+                            }}
 
 
-                            <td style={{ padding: "0px", width: "12%" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Tax_Type`} // ✅ remove disabled here
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select bg-gray-100 text-gray-700"
-                                    style={{
-                                      width: "100%",
-                                      fontSize: "12px",
-                                      marginBottom: "0px",
-                                      pointerEvents: "none", // ✅ visually disabled
-                                      cursor: "not-allowed",
-                                      backgroundColor: "#f3f4f6", // light gray
-                                    }}
-                                    onChange={(e) => {
-                                      field.onChange(e);
+                            placeholder="Price"
+                          />
 
-                                      // ✅ Recalculate amounts on Tax_Type change
-                                      const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
-                                        calculateRowAmount(
-                                          { ...itemsValues[i], Tax_Type: e.target.value },
-                                          i,
-                                          itemsValues
-                                        );
+                        </div>
+                        {errors?.items?.[i]?.Sale_Price && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Sale_Price.message}
+                          </p>
+                        )}
+                      </td>
+                      {/* Discount */}
+                      <td style={{ padding: "0px", width: "14%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ width: "50%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Discount_On_Sale_Price`)}
+                            // onInput={(e) => {
+                            //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            //   //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
+                            //   //   ...itemsValues[i],
 
-                                      setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
-                                        shouldValidate: true,
-                                      });
-                                      setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                      setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                      setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                                    }}
-                                  >
-                                    <option value="None">None</option>
-                                    <option value="GST0">GST @0%</option>
-                                    <option value="IGST0">IGST @0%</option>
-                                    <option value="GST0.25">GST @0.25%</option>
-                                    <option value="IGST0.25">IGST @0.25%</option>
-                                    <option value="GST3">GST @3%</option>
-                                    <option value="IGST3">IGST @3%</option>
-                                    <option value="GST5">GST @5%</option>
-                                    <option value="IGST5">IGST @5%</option>
-                                    <option value="GST12">GST @12%</option>
-                                    <option value="IGST12">IGST @12%</option>
-                                    <option value="GST18">GST @18%</option>
-                                    <option value="IGST18">IGST @18%</option>
-                                    <option value="GST28">GST @28%</option>
-                                    <option value="IGST28">IGST @28%</option>
-                                    <option value="GST40">GST @40%</option>
-                                    <option value="IGST40">IGST @40%</option>
-                                  </select>
-                                )}
-                              />
-                            </td>
+                            //   //   Discount_On_Purchase_Price: e.target.value,
+
+                            //   // });
+                            //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                            //     { ...itemsValues[i], Discount_On_Sale_Price: e.target.value },
+                            //     i,
+                            //     itemsValues
+                            //   );
+
+                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                            //   // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                            //   // setValue(`items.${i}.Amount`, Amount);
+
+                            // }}
+                            onInput={(e) => {
+                              let val = e.target.value;
+
+                              // allow digits + 1 dot
+                              val = val.replace(/[^0-9.]/g, "");
+
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join("");
+                              }
+
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
+
+                              e.target.value = val;
+
+                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                { ...itemsValues[i], Discount_On_Sale_Price: val },
+                                i,
+                                itemsValues
+                              );
+
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                              setValue(`items.${i}.Amount`, Amount);
+                              setValue("Total_Amount", Total_Amount);
+                              setValue("Balance_Due", Balance_Due);
+                            }}
+                            placeholder="Discount"
+                          />
+                          <Controller
+                            control={control}
+                            name={`items.${i}.Discount_Type_On_Sale_Price`}
+                            render={({ field }) => (
+                              <select
+                                {...field}
+                                className="form-select ms-2"
+                                style={{ width: "50%", fontSize: "12px" }}
+                                onChange={(e) => {
+                                  field.onChange(e); // ✅ let RHF handle its state
+
+                                  // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                  //   ...itemsValues[i],
+                                  //   Discount_Type_On_Purchase_Price: e.target.value,
+                                  // });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    { ...itemsValues[i], Discount_Type_On_Sale_Price: e.target.value },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                                }}
+                              >
+                                <option value="Percentage">%</option>
+                                <option value="Amount">Amount</option>
+                              </select>
+                            )}
+                          />
+                        </div>
+                      </td>
 
 
-                            {/* Tax Amount */}
-                            <td style={{ width: "8%" }}>
-                              <input
-                                type="text"
-                                className="form-control"
-                                style={{ backgroundColor: "transparent" }}
-                                {...register(`items.${i}.Tax_Amount`)}
-                                readOnly
-                              />
-                            </td>
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`} // ✅ remove disabled here
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select bg-gray-100 text-gray-700"
+                              style={{
+                                width: "100%",
+                                fontSize: "12px",
+                                marginBottom: "0px",
+                                pointerEvents: "none", // ✅ visually disabled
+                                cursor: "not-allowed",
+                                backgroundColor: "#f3f4f6", // light gray
+                              }}
+                              onChange={(e) => {
+                                field.onChange(e);
 
-                            {/* Amount */}
-                            <td style={{ width: "8%" }}>
-                              <input
-                                type="text"
-                                className="form-control"
-                                style={{ backgroundColor: "transparent" }}
-                                {...register(`items.${i}.Amount`)}
-                                readOnly
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
+                                // ✅ Recalculate amounts on Tax_Type change
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
+                                  calculateRowAmount(
+                                    { ...itemsValues[i], Tax_Type: e.target.value },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                  shouldValidate: true,
+                                });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                              }}
+                            >
+                              <option value="None">None</option>
+                              <option value="GST0">GST @0%</option>
+                              <option value="IGST0">IGST @0%</option>
+                              <option value="GST0.25">GST @0.25%</option>
+                              <option value="IGST0.25">IGST @0.25%</option>
+                              <option value="GST3">GST @3%</option>
+                              <option value="IGST3">IGST @3%</option>
+                              <option value="GST5">GST @5%</option>
+                              <option value="IGST5">IGST @5%</option>
+                              <option value="GST12">GST @12%</option>
+                              <option value="IGST12">IGST @12%</option>
+                              <option value="GST18">GST @18%</option>
+                              <option value="IGST18">IGST @18%</option>
+                              <option value="GST28">GST @28%</option>
+                              <option value="IGST28">IGST @28%</option>
+                              <option value="GST40">GST @40%</option>
+                              <option value="IGST40">IGST @40%</option>
+                            </select>
+                          )}
+                        />
+                      </td>
 
 
-                    </table>
+                      {/* Tax Amount */}
+                      <td style={{ width: "8%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ backgroundColor: "transparent" }}
+                          {...register(`items.${i}.Tax_Amount`)}
+                          readOnly
+                        />
+                      </td>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full sale-wrapper">
+                      {/* Amount */}
+                      <td style={{ width: "8%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ backgroundColor: "transparent" }}
+                          {...register(`items.${i}.Amount`)}
+                          readOnly
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
 
-                      <div className="flex flex-col px-2 w-full sm:w-64 sale-left">
-                        {/* <div className="flex flex-col w-1/8"> */}
-                        <button
-                          type="button"
-                          onClick={handleAddRow}
-                          className=" text-white font-bold py-2 px-4 w-1/2 rounded  "
-                          style={{ backgroundColor: "#4CA1AF" }}
-                        >
-                          + Add Row
-                        </button>
-                        <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
-                        >
-                          {/* <div className="flex flex-col w-full">
+
+              </table>
+
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full sale-wrapper">
+
+                <div className="flex flex-col px-2 w-full sm:w-64 sale-left">
+                  {/* <div className="flex flex-col w-1/8"> */}
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className=" text-white font-bold py-2 px-4 w-1/2 rounded  "
+                    style={{ backgroundColor: "#4CA1AF" }}
+                  >
+                    + Add Row
+                  </button>
+                  <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
+                  >
+                    {/* <div className="flex flex-col w-full">
                             <div className="input-field   ">
                               <span className="active">Payment Type</span>
 
@@ -1770,7 +1614,7 @@ export default function SaleEdit() {
 
                             )}
                           </div> */}
-                           <div className="flex flex-col w-full">
+                    <div className="flex flex-col w-full">
                       <span className="active">Payment Type</span>
 
                       <select
@@ -1804,7 +1648,7 @@ export default function SaleEdit() {
                             {bank.Account_Display_Name}
                           </option>
                         ))}
-                       
+
                       </select>
 
                       {errors?.Payment_Type && (
@@ -1814,249 +1658,249 @@ export default function SaleEdit() {
                         <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <div style={{ width: "100%" }}
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right">
+
+
+                  <div style={{ width: "100%" }}
+                    className="flex justify-between items-start gap-6 w-full mr-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          const totalAmount = parseFloat(watch("Total_Amount"));
+                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+
+                          if (!totalAmount || isNaN(totalAmount)) return;
+
+                          if (isChecked) {
+                            setOriginalTotal(totalAmount);
+
+                            // Round off to nearest integer
+                            const rounded = Math.round(totalAmount);
+
+                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+
+                          } else {
+                            if (originalTotal !== null) {
+                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+
+                              setValue(
+                                "Balance_Due",
+                                (originalTotal - totalReceived).toFixed(2),
+                                { shouldValidate: true }
+                              );
+                            }
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+
+                      <input
+
+                        type="text"
+
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="w-3  border border-gray-300  text-right text-sm"
+                        {...register("Round_Off")}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
+                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+
+                          if (isNaN(totalAmount)) return;
+
+                          // New Total
+                          const newTotal = totalAmount + val;
+
+                          setValue("Total_Amount", newTotal.toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
+                        }}
+                      // disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div>
+
+                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+                      <div className="flex gap-3 items-center  w-full sm:w-auto">
+
+                        <div style={{ width: "100%" }} className="flex gap-2 ">
+                          <span className="font-medium whitespace-nowrap">Total Amount</span>
+
+                          <input
+                            style={{ backgroundColor: "transparent", height: "1rem" }}
+                            type="text"
+                            className="form-control"
+                            {...register("Total_Amount")}
+                            readOnly
+                          />
                         </div>
                       </div>
 
-                      <div style={{ width: "100%" }}
-                        className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right">
 
 
-                        <div style={{ width: "100%" }}
-                          className="flex justify-between items-start gap-6 w-full mr-4">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id="roundOffCheck"
-                              className="w-4 h-4 cursor-pointer"
-                              onChange={(e) => {
-                                const isChecked = e.target.checked;
-                                const totalAmount = parseFloat(watch("Total_Amount"));
-                                const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                      <div className="flex items-center  gap-3 relative ">
 
-                                if (!totalAmount || isNaN(totalAmount)) return;
+                        <div className="flex items-center gap-2 relative">
 
-                                if (isChecked) {
-                                  setOriginalTotal(totalAmount);
-
-                                  // Round off to nearest integer
-                                  const rounded = Math.round(totalAmount);
-
-                                  setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                                  setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
-
-                                } else {
-                                  if (originalTotal !== null) {
-                                    setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
-
-                                    setValue(
-                                      "Balance_Due",
-                                      (originalTotal - totalReceived).toFixed(2),
-                                      { shouldValidate: true }
-                                    );
-                                  }
-                                }
-                              }}
-                            />
-
-                            <span className="font-medium whitespace-nowrap">Round Off</span>
+                          <input
+                            type="checkbox"
 
 
-                            <input
+                            id="totalReceivedCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              const totalAmount = parseFloat(watch("Total_Amount"));
 
-                              type="text"
-
-                              style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                              className="w-3  border border-gray-300  text-right text-sm"
-                              {...register("Round_Off")}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                                const totalReceived = parseFloat(watch("Total_Received")) || 0;
-
-                                if (isNaN(totalAmount)) return;
-
-                                // New Total
-                                const newTotal = totalAmount + val;
-
-                                setValue("Total_Amount", newTotal.toFixed(2));
-                                setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                              }}
-                            // disabled={!watch("roundOffCheck") && originalTotal === null}
-                            />
-                          </div>
-
-                          <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                            <div className="flex gap-3 items-center  w-full sm:w-auto">
-
-                              <div style={{ width: "100%" }} className="flex gap-2 ">
-                                <span className="font-medium whitespace-nowrap">Total Amount</span>
-
-                                <input
-                                  style={{ backgroundColor: "transparent", height: "1rem" }}
-                                  type="text"
-                                  className="form-control"
-                                  {...register("Total_Amount")}
-                                  readOnly
-                                />
-                              </div>
-                            </div>
+                              // 🧠 If no total amount entered, do nothing
+                              if (!totalAmount || isNaN(totalAmount)) {
+                                // Optional: visually reset the checkbox
 
 
+                                // Clear both fields to stay consistent
+                                setValue("Total_Received", "");
+                                setValue("Balance_Due", "");
+                                return;
+                              }
 
-                            <div className="flex items-center  gap-3 relative ">
+                              if (isChecked) {
+                                // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
+                                setValue("Total_Received", totalAmount.toFixed(2));
+                                setValue("Balance_Due", 0);
+                              } else {
+                                // ✅ When unchecked, restore Balance_Due = Total_Amount
+                                setValue("Total_Received", "");
+                                setValue("Balance_Due", totalAmount.toFixed(2));
+                              }
+                            }}
+                          />
+                          <span
+                            htmlFor="totalReceivedCheck"
+                            className="font-medium whitespace-nowrap"
+                          >
+                            Total Received
+                          </span>
 
-                              <div className="flex items-center gap-2 relative">
-
-                                <input
-                                  type="checkbox"
-
-
-                                  id="totalReceivedCheck"
-                                  className="w-4 h-4 cursor-pointer"
-                                  onChange={(e) => {
-                                    const isChecked = e.target.checked;
-                                    const totalAmount = parseFloat(watch("Total_Amount"));
-
-                                    // 🧠 If no total amount entered, do nothing
-                                    if (!totalAmount || isNaN(totalAmount)) {
-                                      // Optional: visually reset the checkbox
-
-
-                                      // Clear both fields to stay consistent
-                                      setValue("Total_Received", "");
-                                      setValue("Balance_Due", "");
-                                      return;
-                                    }
-
-                                    if (isChecked) {
-                                      // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
-                                      setValue("Total_Received", totalAmount.toFixed(2));
-                                      setValue("Balance_Due", 0);
-                                    } else {
-                                      // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                      setValue("Total_Received", "");
-                                      setValue("Balance_Due", totalAmount.toFixed(2));
-                                    }
-                                  }}
-                                />
-                                <span
-                                  htmlFor="totalReceivedCheck"
-                                  className="font-medium whitespace-nowrap"
-                                >
-                                  Total Received
-                                </span>
-
-                              </div>
-
-
-                              <input
-                                type="text"
-                                {...register("Total_Received")}
-                                style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(/[^0-9.]/g, "");
-
-                                  // Allow only one dot
-                                  const parts = val.split(".");
-                                  if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-                                  // Limit to 2 decimals
-                                  if (val.includes(".")) {
-                                    const [int, dec] = val.split(".");
-                                    val = int + "." + dec.slice(0, 2);
-                                  }
-
-                                  e.target.value = val;
-                                  setValue("Total_Received", val);
-
-                                  const totalReceived = parseFloat(val || 0);
-                                  const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                                  setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                                }}
-                              // className="form-control"
-                              />
-                            </div>
-
-
-
-
-                            <div className="flex  gap-2 items-center ">
-
-                              <span className="font-medium whitespace-nowrap">Balance Due</span>
-                              <input
-                                style={{
-                                  backgroundColor: "transparent",
-                                  marginBottom: "0px", height: "1rem", width: "100%"
-                                }}
-                                type="text"
-                                className="form-control  "
-                                {...register("Balance_Due")}
-
-                                readOnly
-                              />
-                            </div>
-                          </div>
                         </div>
 
 
+                        <input
+                          type="text"
+                          {...register("Total_Received")}
+                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                            // Allow only one dot
+                            const parts = val.split(".");
+                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+
+                            // Limit to 2 decimals
+                            if (val.includes(".")) {
+                              const [int, dec] = val.split(".");
+                              val = int + "." + dec.slice(0, 2);
+                            }
+
+                            e.target.value = val;
+                            setValue("Total_Received", val);
+
+                            const totalReceived = parseFloat(val || 0);
+                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
+                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                          }}
+                        // className="form-control"
+                        />
+                      </div>
+
+
+
+
+                      <div className="flex  gap-2 items-center ">
+
+                        <span className="font-medium whitespace-nowrap">Balance Due</span>
+                        <input
+                          style={{
+                            backgroundColor: "transparent",
+                            marginBottom: "0px", height: "1rem", width: "100%"
+                          }}
+                          type="text"
+                          className="form-control  "
+                          {...register("Balance_Due")}
+
+                          readOnly
+                        />
                       </div>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-4 mt-4">
-                    <button
-                      type="button"
-                      //          onClick={()=> navigate({
-                      // pathname: "/sale/all-sales",
-                      //   search: location.search,
-                      // })
-                      //          }
-                      onClick={() => {
-                        if (from === "party-sales-purchases-details") {
 
-                          navigate({
-                            pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                            search: location.search,
-                          })
-                          
-                        } 
-                        else if (from === "item-sales-purchases-details") {
-                          navigate({
-                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                            search: location.search,
-                          })
-                          // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                        } 
-                        else {
-                          navigate({
-                            pathname: "/sale/all-sales",
-                            search: location.search,
-                          })
 
-                          // navigate("/sale/all-sales");
-                        }
-                      }}
-                      // onClick={() => navigate("/sale/all-sales")}
-                      className=" text-white font-bold py-2 px-4 rounded"
-                      style={{ backgroundColor: "#4CA1AF" }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={formValues.errorCount > 0 || isEditingSale}
-                      className=" text-white font-bold py-2 px-4 rounded"
-                      style={{ backgroundColor: "#4CA1AF" }}
-                    >
-                      {isEditingSale ? "Updating..." : "Update Sale"}
-                    </button>
-                  </div>
-                </form>
-
+                </div>
               </div>
-
-
             </div>
-          
+            <div className="flex justify-end gap-4 mt-4">
+              <button
+                type="button"
+                //          onClick={()=> navigate({
+                // pathname: "/sale/all-sales",
+                //   search: location.search,
+                // })
+                //          }
+                onClick={() => {
+                  if (from === "party-sales-purchases-details") {
+
+                    navigate({
+                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                      search: location.search,
+                    })
+
+                  }
+                  else if (from === "item-sales-purchases-details") {
+                    navigate({
+                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                      search: location.search,
+                    })
+                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else {
+                    navigate({
+                      pathname: "/sale/all-sales",
+                      search: location.search,
+                    })
+
+                    // navigate("/sale/all-sales");
+                  }
+                }}
+                // onClick={() => navigate("/sale/all-sales")}
+                className=" text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={formValues.errorCount > 0 || isEditingSale}
+                className=" text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                {isEditingSale ? "Updating..." : "Update Sale"}
+              </button>
+            </div>
+          </form>
+
+        </div>
+
+
+      </div>
+
       {showAddUnitModal && (
         <AddUnitModal
           onClose={() => {

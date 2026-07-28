@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS payment_out (
 ═══════════════════════════════════════════════════════════════════ */
 import db from "../config/db.js"; // mysql2/promise connection
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 
 
  
@@ -31,29 +32,31 @@ const getAllPaymentOuts = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
- 
+
     const page     = parseInt(req.query.page, 10) || 1;
     const limit    = 10;
     const offset   = (page - 1) * limit;
     const search   = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
- 
+    const toDate   = req.query.toDate || null;
+
     const whereClauses = [];
-    const params       = [];
- 
+    const params = [];
+
     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)      LIKE ? OR
-        LOWER(po.Payment_Type)   LIKE ? OR
-        LOWER(po.Receipt_No)     LIKE ? OR
-        LOWER(po.Reference_No)   LIKE ? OR
-        CAST(po.Paid AS CHAR)    LIKE ?
+        LOWER(a.Party_Name) LIKE ? OR
+        LOWER(po.Payment_Type) LIKE ? OR
+        LOWER(po.Receipt_No) LIKE ? OR
+        LOWER(po.Reference_No) LIKE ? OR
+        LOWER(ba.Account_Display_Name) LIKE ? OR
+        CAST(po.Paid AS CHAR) LIKE ?
       )`);
+
       const like = `%${search}%`;
-      params.push(like, like, like, like, like);
+      params.push(like, like, like, like, like, like);
     }
- 
+
     if (fromDate && toDate) {
       whereClauses.push(`DATE(po.Payment_Date) BETWEEN ? AND ?`);
       params.push(fromDate, toDate);
@@ -64,48 +67,61 @@ const getAllPaymentOuts = async (req, res, next) => {
       whereClauses.push(`DATE(po.Payment_Date) <= ?`);
       params.push(toDate);
     }
- 
-    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
- 
+
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
     const [rows] = await connection.query(
-      `SELECT po.*, a.Party_Name,
-        ba.Account_Display_Name AS Bank_Display_Name,
-        CASE
-          WHEN po.Payment_Type = 'Bank'
-          THEN ba.Account_Display_Name
-          ELSE po.Payment_Type
-        END AS Payment_Type_Display
+      `SELECT
+          po.*,
+          a.Party_Name,
+          ba.Account_Display_Name AS Bank_Display_Name,
+          CASE
+            WHEN po.Payment_Type = 'Bank'
+              THEN ba.Account_Display_Name
+            ELSE po.Payment_Type
+          END AS Payment_Type_Display
        FROM payment_out po
-       LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
-       LEFT JOIN bank_accounts ba ON ba.id = po.Bank_Account_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = po.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = po.Bank_Account_Id
        ${whereSQL}
        ORDER BY po.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
- 
+
     const [[{ total }]] = await connection.query(
       `SELECT COUNT(*) AS total
        FROM payment_out po
-       LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = po.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = po.Bank_Account_Id
        ${whereSQL}`,
       params
     );
- 
+
     const [[totals]] = await connection.query(
-      `SELECT COALESCE(SUM(po.Paid), 0) AS totalPaid
+      `SELECT
+          COALESCE(SUM(po.Paid), 0) AS totalPaid
        FROM payment_out po
-       LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = po.Party_Id
+       LEFT JOIN bank_accounts ba
+         ON ba.id = po.Bank_Account_Id
        ${whereSQL}`,
       params
     );
- 
+
     return res.status(200).json({
-      success:        true,
-      currentPage:    page,
-      totalPages:     Math.ceil(total / limit),
-      totalPayments:  total,
-      paymentOuts:    rows,
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalPayments: total,
+      paymentOuts: rows,
       totals,
     });
   } catch (err) {
@@ -197,7 +213,8 @@ const createPaymentOut = async (req, res, next) => {
  
     // Payment_Out is not in CREDIT_TYPES inside recordBankTransaction, so it's
     // correctly posted as a Debit (money leaving the bank account).
-    await recordBankTransaction({
+     if (Payment_Type === "Bank" && Bank_Account_Id) {
+        await recordBankTransaction({
       connection,
       bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
       txnType: "Payment_Out",
@@ -205,7 +222,19 @@ const createPaymentOut = async (req, res, next) => {
       partyName: Party_Name,
       amount: Number(Paid),
       txnDate: Payment_Date,
-    });
+    })
+     }
+   
+    await recordCashTransaction({
+  connection,
+  isCash:      Payment_Type === "Cash",
+  txnType:     "Payment_Out",
+  referenceId: Payment_Out_Id,
+  partyName:   Party_Name,
+  amount: Number(Paid),
+  txnDate:     Payment_Date,
+});
+ 
  
     await connection.commit();
  
@@ -279,7 +308,15 @@ const updatePaymentOut = async (req, res, next) => {
       amount: Number(Paid),
       txnDate: Payment_Date,
     });
- 
+  await recordCashTransaction({
+      connection,
+      isCash:      Payment_Type === "Cash",
+      txnType: "Payment_Out",
+      referenceId: id,
+      partyName: Party_Name,
+      amount: Number(Paid),
+      txnDate: Payment_Date,
+    });
     await connection.commit();
  
     return res.status(200).json({ success: true, message: "Payment Out updated" });

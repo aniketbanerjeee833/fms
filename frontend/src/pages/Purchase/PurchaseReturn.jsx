@@ -316,7 +316,13 @@ export default function PurchaseReturn() {
                               : "N/A"}
                           </td>
                           <td>{purchaseReturn?.Party_Name || "N/A"}</td>
-                          <td>{purchaseReturn?.Payment_Type || "N/A"}</td>
+                          <td>
+                          {purchaseReturn?.Payment_Type
+                            ? purchaseReturn.Payment_Type === "Bank"
+                              ? `Bank (${purchaseReturn?.Bank_Display_Name || "N/A"})`
+                              : purchaseReturn.Payment_Type
+                            : "N/A"}
+                        </td>
                           <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
                           <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
 
@@ -347,12 +353,7 @@ export default function PurchaseReturn() {
                                   color: "#4CA1AF"
                                 }} />
                             </NavLink>
-                            {/* <SquarePen onClick={() => navigate(`/purchaseReturn/edit/${purchaseReturn?.Purchase_Id}`)}
-                                  style={{
-                                    cursor: "pointer",
-                                    backgroundColor: "transparent",
-                                    color: "#4CA1AF"
-                                  }} /> */}
+                          
 
                           </td>
                         </tr>

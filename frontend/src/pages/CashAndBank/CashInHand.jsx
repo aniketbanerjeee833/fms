@@ -1,19 +1,85 @@
 
 
-import { NavLink, useLocation, useSearchParams } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 
 ;
 import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
-import {  useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
+import { cashInHandApi, useGetCashBalanceQuery, useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
 import { useState } from "react";
 import CashAdjustmentModal from "../../components/Modal/CashAdjustmentModal";
+import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import PaymentOutModal from "../../components/Modal/PaymentOutModal";
+import PaymentInModal from "../../components/Modal/PaymentInModal";
+import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import PartyAddModal from "../../components/Modal/PartyAddModal";
 
-// import { SiMicrosoftexcel } from "react-icons/si";
+function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving,parties  }) {
+  const { data: record, isLoading } = useGetPaymentInByIdQuery(id);
+  if (isLoading || !record) return null;
+
+  return (
+    <PaymentInModal
+      mode="edit"          // or "edit" if you want it editable from here
+      initialData={record?.paymentIn}
+      onClose={onClose}
+      banks={banks}
+      onSave={onSave}
+      isSaving={isSaving}
+      parties={parties}
+      PartyAddModal={PartyAddModal} 
+
+    />
+  );
+}
+
+function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving,parties  }) {
+  const { data: record, isLoading } = useGetPaymentOutByIdQuery(id);
+  console.log(record, "BankAccounts Payment Out");
+  if (isLoading || !record) return null;
+
+  return (
+    <PaymentOutModal
+      mode="edit"
+      initialData={record?.paymentOut}
+      banks={banks}
+      onClose={onClose}
+      onSave={onSave}
+      isSaving={isSaving}
+      parties={parties}
+      PartyAddModal={PartyAddModal} 
+    />
+  );
+}
 export default function CashInHand() {
+    const TYPE_META = {
+        sale: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
+        purchase: { label: "Purchase", color: "#dc2626", bg: "#fff1f2", dir: "out" },
+        payment_in: { label: "Payment In", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
+        payment_out: { label: "Payment Out", color: "#dc2626", bg: "#fff1f2", dir: "out" },
+        purchase_return: { label: "Purchase Return", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
+        sale_return: { label: "Sale Return", color: "#dc2626", bg: "#fff1f2", dir: "out" },
+        adjustment: { label: "Adjustment", color: "#4CA1AF", bg: "#f0f9ff", dir: "in" },
+    };
+    const TXN_TYPE_ROUTE_MAP = {
+        Sale: "sale",
+        Purchase: "purchase",
+
+        Sale_Return: "sale/return",
+        Purchase_Return: "purchase/return",
+    };
+    const MODAL_TXN_TYPES = ["Payment_In", "Payment_Out"];
+    const [modalState, setModalState] = useState({ open: false, type: null, id: null });
+    const openModal = (type, id) => setModalState({ open: true, type, id });
+    const closeModal = () => setModalState({ open: false, type: null, id: null });
     const [searchParams, setSearchParams] = useSearchParams();
-    const location = useLocation();
+    //const location = useLocation();
     const page = Number(searchParams.get("page")) || 1;
     const searchTerm = searchParams.get("search") || "";
+      const dispatch = useDispatch();
     // const [page, setPage] = useState(1);
     //const [searchTerm, setSearchTerm] = useState("");
     const fromDate = searchParams.get("fromDate") || "";
@@ -27,10 +93,13 @@ export default function CashInHand() {
     //     fromDate,
     //     toDate,
     //   });
-    //  const { data: balanceData } = useGetAllAdjustmentsQuery();
+    const { data: cashBalance } = useGetCashBalanceQuery();
     const { data: cashInHand, isLoading } = useGetCashInHandQuery({ fromDate, toDate, page, search: searchTerm });
-    console.log(cashInHand);
-
+    console.log(cashInHand, "cashInHand", cashBalance, "cashBalance");
+  const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
+  const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
+    const { data: banks = [] } = useGetAllBankAccountsQuery();
+    const { data: partiesList } = useGetAllPartiesQuery();
     // const[selecedSales,setSelectedSales]= useState(null);
 
     //const navigate = useNavigate();
@@ -80,11 +149,43 @@ export default function CashInHand() {
 
 
     //console.log(cashInHand?.cashInHand);
+const handleSavePaymentIn = async (formData) => {
+    try {
+      await updatePaymentIn({ id: modalState.id, ...formData }).unwrap();
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: formData.Bank_Account_Id },
+        "BankAccount",
+      ]));
+      /* reset scroll so updated data reloads */
+     
+      closeModal();
+      toast.success("Payment In updated");
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to save payment in.");
+    }
+  };
 
+  const handleSavePaymentOut = async (formData) => {
+    try {
+      await updatePaymentOut({ id: modalState.id, ...formData }).unwrap();
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: formData.Bank_Account_Id },
+        "BankAccount",
+      ]));
+     
+     
+      closeModal();
+      toast.success("Payment Out updated");
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to save payment out.");
+    }
+  };
     return (
         <>
             {/* // <div className="container-fluid sb2  ">
-        //     <div className="row">
+        //     <div className="sale">
                
         //         <div className="sb2-1">
 
@@ -319,40 +420,36 @@ export default function CashInHand() {
                                 </thead>
                                 <tbody>
                                     {cashInHand && cashInHand?.ledger?.length > 0 ? (
-                                        cashInHand?.ledger?.map((sale, idx) => (
-                                            <tr key={idx}>
-                                                <td>
-                                                    {(cashInHand?.currentPage - 1) * 10 + (idx + 1)}.
-                                                </td>
-                                                {/* <td >
-                          {sale?.Invoice_Date
-                            ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "numeric",
-                              year: "numeric",
-                            })
-                            : "N/A"}
-                        </td> */}
-                                                {/* <td>
-                                {sale?.Invoice_Date
-                                  ? sale?.Invoice_Date.split("T")[0]
-                                  : "N/A"}
-                              </td> */}
-                                                <td>{sale?.source_type || "N/A"}</td>
-                                                <td>{sale?.party_name || "N/A"}</td>
-                                                <td >
-                                                    {sale?.txn_date
-                                                        ? new Date(sale?.txn_date).toLocaleDateString("en-IN", {
-                                                            day: "numeric",
-                                                            month: "numeric",
-                                                            year: "numeric",
-                                                        })
-                                                        : "N/A"}
-                                                </td>
-                                                <td>{sale?.amount || "N/A"}</td>
-                                                {/* //<td>{sale?.Balance_Due || "N/A"}</td> */}
+                                        cashInHand?.ledger?.map((sale, idx) => {
+                                            const meta =
+                                                TYPE_META[sale.Txn_Type?.toLowerCase()] ?? {
+                                                    label: sale.Txn_Type,
+                                                    color: "#6b7280",
+                                                    dir: sale.Direction === "Credit" ? "in" : "out",
+                                                };
+                                            return (
+                                                <tr key={idx}>
+                                                    <td>
+                                                        {(cashInHand?.currentPage - 1) * 10 + (idx + 1)}.
+                                                    </td>
 
-                                                {/* <td >
+
+                                                    <td>{sale?.Txn_Type || "N/A"}</td>
+                                                    <td>{sale?.Party_Name || "N/A"}</td>
+                                                    <td >
+                                                        {sale?.Txn_Date
+                                                            ? new Date(sale?.Txn_Date).toLocaleDateString("en-IN", {
+                                                                day: "numeric",
+                                                                month: "numeric",
+                                                                year: "numeric",
+                                                            })
+                                                            : "N/A"}
+                                                    </td>
+                                                    <td style={{ color: meta.color, fontWeight: 600 }}>
+                                                        {sale?.Amount || "N/A"}</td>
+                                                    {/* //<td>{sale?.Balance_Due || "N/A"}</td> */}
+
+                                                    {/* <td >
                        
                           <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
                             state={{ from: "all-sale-list" }}>
@@ -365,9 +462,25 @@ export default function CashInHand() {
                           </NavLink>
                       
                         </td> */}
-                                                <td>
-                                                    {/* <NavLink to={`/sale/edit/${sale?.Sale_Id}`}
-                                                                state={{from:"all-sale-list"}}>               */}
+                                                    <td>
+                                                        {sale.Formatted_Reference_Id && (
+                                                            MODAL_TXN_TYPES.includes(sale.Txn_Type) ? (
+                                                                <Eye
+                                                                    style={{ cursor: "pointer", color: "#4CA1AF" }}
+                                                                    onClick={() => openModal(sale.Txn_Type, sale.Formatted_Reference_Id)}
+                                                                />
+                                                            ) : (
+                                                                <NavLink
+                                                                    to={`/${TXN_TYPE_ROUTE_MAP[sale.Txn_Type]}/edit/${sale.Formatted_Reference_Id}`}
+                                                                state={{ from: "cash-in-hand" }}
+                                                                >
+                                                                    <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
+                                                                </NavLink>
+                                                            )
+                                                        )}
+                                                    </td>
+                                                    {/* <td>
+                                                  
                                                     <NavLink
                                                         to={`/sale/edit/${sale.Sale_Id}${location.search}`}
                                                         state={{ from: "all-sale-list" }}
@@ -382,10 +495,11 @@ export default function CashInHand() {
                                                             }} />
                                                     </NavLink>
 
-                                                </td>
+                                                </td> */}
 
-                                            </tr>
-                                        ))
+                                                </tr>
+                                            )
+                                        })
                                     ) : (
                                         <tr>
                                             <td className="mx-auto text-center" colSpan={10}>
@@ -548,27 +662,33 @@ export default function CashInHand() {
                 <CashAdjustmentModal
                     mode={cashAdjustmentModal.mode}
                     data={cashAdjustmentModal.data}
-                     currentBalance={Number(cashInHand?.cashInHand ?? 0)}
+                    currentBalance={Number(cashInHand?.cashInHand ?? 0)}
                     onClose={() => setCashAdjustmentModal({ open: false, mode: "add", data: null })}
                 />
             )}
+            {modalState.open && modalState.type === "Payment_In" && (
+        <PaymentInModalLoader
+          id={modalState.id}
+          banks={banks}
+          onClose={closeModal}
+          onSave={handleSavePaymentIn}
+          isSaving={isUpdatingPaymentIn}
+          parties={partiesList}
+        />
+      )}
+      {modalState.open && modalState.type === "Payment_Out" && (
+        <PaymentOutModalLoader
+          id={modalState.id}
+          banks={banks}
+          onClose={closeModal}
+          onSave={handleSavePaymentOut}
+          isSaving={isUpdatingPaymentOut}
+          parties={partiesList}
+        />
+      )}
         </>
 
 
     )
 }
 
-{/* <div className="flex justify-end sm: mt-4">
-        
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
-              title="Export to Excel"
-            >
-              <FileSpreadsheet
-                size={22}
-                className="transition-transform duration-200 group-hover:scale-110"
-              />
-            </button>
-          </div> */}

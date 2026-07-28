@@ -1,5 +1,5 @@
 
-import { NavLink,  useSearchParams } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 
 // import { useGetAllpaymentOutDataQuery } from "../../redux/api/purchaseApi";
 import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
@@ -10,7 +10,8 @@ import { useAddPaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOu
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import PartyAddModal from "../../components/Modal/PartyAddModal";
 
 
 export default function PaymentOut() {
@@ -35,9 +36,9 @@ export default function PaymentOut() {
     const { data: partiesList } = useGetAllPartiesQuery();
     // const[selecedSales,setSelectedSales]= useState(null);
     const [addPaymentOut, { isLoading: isAdding }] = useAddPaymentOutMutation();
-  const [updatePaymentOut, { isLoading: isUpdating }] = useUpdatePaymentOutMutation();
-  const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const isSaving = isAdding || isUpdating;
+    const [updatePaymentOut, { isLoading: isUpdating }] = useUpdatePaymentOutMutation();
+    const { data: banks = [] } = useGetAllBankAccountsQuery();
+    const isSaving = isAdding || isUpdating;
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -77,11 +78,11 @@ export default function PaymentOut() {
     //     toDate,
     // });
     const { data: paymentOutData, isLoading } = useGetAllPaymentOutsQuery({
-    page,
-    search: searchTerm,
-    fromDate,
-    toDate,
-  });
+        page,
+        search: searchTerm,
+        fromDate,
+        toDate,
+    });
     console.log(paymentOutData, fromDate, toDate);
     const handleExportExcel = () => {
         const params = new URLSearchParams();
@@ -97,21 +98,25 @@ export default function PaymentOut() {
         document.body.removeChild(a);
     };
 
-const handleSavePaymentOut = async (formData) => {
-    try {
-      if (modal.mode === "edit") {
-        await updatePaymentOut({ id: modal.data.id, ...formData }).unwrap();
-      } else {
-        await addPaymentOut(formData).unwrap();
-      }
-       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      setModal({ open: false, mode: "add", data: null });
-      toast.success("New Payment Out added")
-    } catch (err) {
-      console.error("Failed to save payment out:", err);
-      toast.error(err?.data?.message || "Failed to save payment out. Please try again.");
-    }
-  };
+    const handleSavePaymentOut = async (formData) => {
+        try {
+            if (modal.mode === "edit") {
+                await updatePaymentOut({ id: modal.data.id, ...formData }).unwrap();
+            } else {
+                await addPaymentOut(formData).unwrap();
+            }
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(bankAccountApi.util.invalidateTags([
+                { type: "BankAccount", id: formData.Bank_Account_Id },
+                "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+            ]));
+            setModal({ open: false, mode: "add", data: null });
+            toast.success("New Payment Out added")
+        } catch (err) {
+            console.error("Failed to save payment out:", err);
+            toast.error(err?.data?.message || "Failed to save payment out. Please try again.");
+        }
+    };
     return (
         <>
             {/* // <div className="container-fluid sb2  ">
@@ -257,8 +262,8 @@ const handleSavePaymentOut = async (formData) => {
                                         backgroundColor: "#4CA1AF",
                                     }}
                                     className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
-                                //   onClick={() => navigate("/paymentOut/add")}
-                                  onClick={() => setModal({ open: true, mode: "add", data: null })}
+                                    //   onClick={() => navigate("/paymentOut/add")}
+                                    onClick={() => setModal({ open: true, mode: "add", data: null })}
                                 >
                                     Add  Payment Out
                                 </button>
@@ -354,7 +359,13 @@ const handleSavePaymentOut = async (formData) => {
                                                         : "N/A"}
                                                 </td>
                                                 <td>{paymentOut?.Party_Name || "N/A"}</td>
-                                                <td>{paymentOut?.Payment_Type || "N/A"}</td>
+                                                <td>
+                                                    {paymentOut?.Payment_Type
+                                                        ? paymentOut.Payment_Type === "Bank"
+                                                            ? `Bank (${paymentOut?.Bank_Display_Name || "N/A"})`
+                                                            : paymentOut.Payment_Type
+                                                        : "N/A"}
+                                                </td>
                                                 <td>{paymentOut?.Paid || "N/A"}</td>
                                                 <td>{paymentOut?.Balance_Due || "N/A"}</td>
 
@@ -583,19 +594,20 @@ const handleSavePaymentOut = async (formData) => {
 
                     </div>
                 </div>
-               
+
             </div>
-             {modal.open && (
-        <PaymentOutModal
-          mode={modal.mode}
-          initialData={modal.data}
-          parties={partiesList}
-          onClose={() => setModal({ open: false, mode: "add", data: null })}
-          onSave={handleSavePaymentOut}
-          banks={banks}
-          isSaving={isSaving}
-        />
-      )}
+            {modal.open && (
+                <PaymentOutModal
+                    mode={modal.mode}
+                    initialData={modal.data}
+                    parties={partiesList}
+                    onClose={() => setModal({ open: false, mode: "add", data: null })}
+                    onSave={handleSavePaymentOut}
+                    banks={banks}
+                    isSaving={isSaving}
+                    PartyAddModal={PartyAddModal}
+                />
+            )}
             {/* {modal.open && (
                 <PaymentOutModal
                     mode={modal.mode}

@@ -18,7 +18,7 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
-import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
+import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 export default function PurchaseEdit() {
   const location = useLocation();
@@ -26,7 +26,8 @@ export default function PurchaseEdit() {
 
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
-  console.log("Edit page query:", location.search);
+  const bankId = location.state?.bankId;
+  console.log("Edit page query:", location.search,from);
   const { id: Purchase_Id } = useParams();
   const dispatch = useDispatch();
   const TAX_RATES = {
@@ -311,27 +312,27 @@ export default function PurchaseEdit() {
   //   remove(i); // remove from form
   // };
 
-    const handleDeleteRow = (i) => {
-  // 1. get current items BEFORE removal
-  const currentItems = watch("items");
- 
-  // 2. calculate new total excluding the deleted row
-  const newTotal = currentItems.reduce((sum, row, idx) => {
-    if (idx === i) return sum;                    // skip deleted row
-    return sum + parseFloat(row.Amount || 0);
-  }, 0);
- 
-  const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  const newBalanceDue = newTotal - currentTotalPaid;
- 
-  // 3. remove from UI state and form
-  setRows((prev) => prev.filter((_, idx) => idx !== i));
-  remove(i);
- 
-  // 4. update totals
-  setValue("Total_Amount", newTotal.toFixed(2),      { shouldValidate: true });
-  setValue("Balance_Due",  newBalanceDue.toFixed(2), { shouldValidate: true });
-};
+  const handleDeleteRow = (i) => {
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;                    // skip deleted row
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+    const newBalanceDue = newTotal - currentTotalPaid;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  };
 
   const itemsValues = watch("items");   // watch all item rows
   const totalPaid = watch("Total_Paid"); // watch Total_Paid
@@ -528,6 +529,10 @@ export default function PurchaseEdit() {
 
       dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: payload.Bank_Account_Id },
+        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+      ]));
       // if(from === "party-payables"){
       //   dispatch(partyApi.util.invalidateTags(["Party"]));
       // }
@@ -556,7 +561,19 @@ export default function PurchaseEdit() {
             search: location.search,
           })
           dispatch(itemApi.util.invalidateTags(["Item"]));
-        }
+        }        else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/bank-accounts`,
+           search: `?bankId=${bankId}`,
+        });
+      }else if (from === "cash-in-hand") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/cash-in-hand`,
+          
+        });
+      }
         else {
           navigate({
             pathname: "/purchase/all-purchases",
@@ -664,7 +681,20 @@ export default function PurchaseEdit() {
                       pathname: `/item/item-sales-purchases-details/${Item_Id}`,
                       search: location.search,
                     })
+                  } else if (from === "bank-accounts") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/bank-accounts`,
+                      search: `?bankId=${bankId}`,
+                    })
                   }
+                  else if (from === "cash-in-hand") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/cash-in-hand`,
+          
+        });
+      }
                   else {
                     navigate({
                       pathname: "/purchase/all-purchases",
@@ -711,193 +741,7 @@ export default function PurchaseEdit() {
                     Party
                     <span className="text-red-500">*</span>
                   </span>
-                  {/* <div className="relative w-full">
-
-                         
-                          <div
-                            className="flex  justify-between border rounded-md  bg-white cursor-pointer"
-                            onClick={() => setOpen((prev) => !prev)}
-                          >
-                      <input
-                        type="text"
-                        id="Party_Name"
-                        value={partySearch}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPartySearch(value);
-                          setValue("Party_Name", value, { shouldValidate: true });
-                          setOpen(true);
-                        }}
-                        onClick={() => setOpen((prev) => !prev)}
-                        onBlur={() => {
-                          const typedValue = partySearch.trim().toLowerCase();
-
-                          // ✅ Full match only (not partial)
-                          const matchedParty = parties?.parties?.find(
-                            (party) => party.Party_Name.toLowerCase() === typedValue
-                          );
-
-                          if (matchedParty) {
-                            // ✅ Set full party info
-                            setPartySearch(matchedParty.Party_Name);
-                            setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-
-                            // ✅ Check GSTIN (must be present)
-                            if (!matchedParty.GSTIN || matchedParty.GSTIN.trim() === "") {
-
-                              setValue("GSTIN", "", { shouldValidate: true });
-                            } else {
-                              setValue("GSTIN", matchedParty.GSTIN, { shouldValidate: true, shouldDirty: true });
-                            }
-
-
-                          } else {
-                            // ❌ Not an exact match → clear field
-                            setPartySearch("");
-                            setValue("Party_Name", "");
-                          }
-
-                          setTimeout(() => setOpen(false), 150);
-                        }}
-                        placeholder="Party Name"
-                        className="w-full outline-none border-b-2 py-1 px-2  text-gray-900"
-style={{ marginBottom: 0, marginTop: "4px",border: "none",
-        height:"2rem",borderBottom: "0px" }}
-                      />
-                        <span className="ml-2  absolute right-5 top-1/3  text-gray-700">
-                              ▼
-                            </span>
-
-    </div>                  
-                      {open && (
-                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          <span
-                            onClick={() => setShowPartyModal(true)}
-                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                          >
-                            + Add Party
-                          </span>
-
-                          {parties?.parties
-                            ?.filter(
-                              (party) =>
-                                party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase()) ||
-                                party?.Phone_Number?.includes(partySearch)
-                            )
-                            .map((party, i) => (
-                              <div
-                                key={i}
-                                onClick={() => {
-                                  // Select from dropdown
-                                  setPartySearch(party.Party_Name);
-                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-
-                                  // ✅ GSTIN validation on selection
-                                  if (!party.GSTIN || party.GSTIN.trim() === "") {
-
-                                    setValue("GSTIN", "", { shouldValidate: true });
-                                  } else {
-                                    setValue("GSTIN", party.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                  }
-
-
-                                  setOpen(false);
-                                }}
-                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                              >
-                                {party.Party_Name} ({party.Phone_Number})
-                              </div>
-                            ))}
-
-                          {
-                          {parties?.parties?.filter((party) =>
-                            party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase())
-                          ).length === 0 && (
-                              <p className="px-3 py-2 text-gray-500">No Party found</p>
-                            )}
-                        </div>
-                      )}
-  </div> */}
-                  {/* <div className="relative w-full">
-  <div
-    className="flex justify-between border rounded-md bg-white cursor-pointer"
-    onClick={() => setOpen((prev) => !prev)}
-  >
-    <input
-      type="text"
-      id="Party_Name"
-      value={partySearch}
-      onChange={(e) => {
-        const value = e.target.value;
-        setPartySearch(value);
-        setValue("Party_Name", value, { shouldValidate: true });
-        setOpen(true);
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        setOpen(true);
-      }}
-      onBlur={() => {
-        setTimeout(() => {
-          const typedValue = partySearch.trim().toLowerCase();
-          const matchedParty = parties?.parties?.find(
-            (p) => p.Party_Name.toLowerCase() === typedValue
-          );
-
-          if (matchedParty) {
-            setPartySearch(matchedParty.Party_Name);
-            setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
-            setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
-          }
-
-          setOpen(false);
-        }, 150);
-      }}
-      placeholder="Search By Name/Phone"
-      className="w-full outline-none py-1 px-2 text-gray-900"
-      style={{ marginBottom: 0, marginTop: "4px", border: "none", height: "2rem" }}
-    />
-    <span className="ml-2 absolute right-5 top-1/3 text-gray-700">▼</span>
-  </div>
-
-  {open && (
-    <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-      <span
-        onClick={() => setShowPartyModal(true)}
-        className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-      >
-        + Add Party
-      </span>
-
-      {parties?.parties
-        ?.filter(
-          (party) =>
-            party.Party_Name.toLowerCase().includes(partySearch.toLowerCase()) ||
-            party.Phone_Number.includes(partySearch)
-        )
-        .map((party, i) => (
-          <div
-            key={i}
-            onClick={() => {
-              setPartySearch(party.Party_Name);
-              setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-              setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
-              setOpen(false);
-            }}
-            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-          >
-            {party.Party_Name} ({party.Phone_Number})
-          </div>
-        ))}
-
-      {parties?.parties?.filter((party) =>
-        party.Party_Name.toLowerCase().includes(partySearch.toLowerCase())
-      ).length === 0 && (
-        <p className="px-3 py-2 text-gray-500">No Party found</p>
-      )}
-    </div>
-  )}
-</div> */}
+                  
 
                   <div className="relative w-full">
                     <div
@@ -1754,7 +1598,7 @@ style={{ marginBottom: 0, marginTop: "4px",border: "none",
                           style={{ width: "100%" }}
 
                           // {...register(`items.${i}.Quantity`)}
-                           {...register(`items.${i}.Quantity`)}
+                          {...register(`items.${i}.Quantity`)}
 
                           onChange={(e) => {
 
@@ -1795,7 +1639,7 @@ style={{ marginBottom: 0, marginTop: "4px",border: "none",
                         )}
                       </td>
 
-                     
+
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}

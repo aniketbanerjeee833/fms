@@ -324,7 +324,13 @@ export default function AllSaleList() {
                                   : "N/A"}
                               </td> */}
                         <td>{sale?.Party_Name || "N/A"}</td>
-                        <td>{sale?.Payment_Type || "N/A"}</td>
+                         <td>
+                          {sale?.Payment_Type
+                            ? sale.Payment_Type === "Bank"
+                              ? `Bank (${sale?.Bank_Display_Name || "N/A"})`
+                              : sale.Payment_Type
+                            : "N/A"}
+                        </td>
                         <td>{sale?.Total_Amount || "N/A"}</td>
                         <td>{sale?.Balance_Due || "N/A"}</td>
 
