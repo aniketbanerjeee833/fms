@@ -17,6 +17,7 @@ import bankAccountRoutes from "./routes/bankAccountRoutes.js";
 import dailyExpenseRoutes from "./routes/dailyExpense.js";
 import financialYearRoutes from "./routes/financialYearRoutes.js";
 import miscellaneousRoutes from "./routes/miscellaneousRoutes.js";
+import { expenseCategoryRouter, expenseRouter } from "./routes/expenseRoutes.js";
 
 import "dotenv/config";
 import express from "express";
@@ -143,56 +144,22 @@ app.use("/api/bank", bankAccountRoutes);
 app.use("/api/daily-expense",dailyExpenseRoutes);
 app.use("/api/financial-year",financialYearRoutes)
 app.use("/api/misc",miscellaneousRoutes)
+
+//EXPENSE
+app.use("/api/expense-category", expenseCategoryRouter);
+app.use("/api/expense", expenseRouter);
 app.use(errorHandler)
-const PORT = process.env.PORT || 5000;
+// const PORT = process.env.PORT || 5000;
+const PORT = 4000;
 clearExpiredSessions();
 clearExpiredLoginAttempts();
 
 app.listen(PORT, (err) => {
   if (err) {
-    logger.error(`❌ Failed to start server on port ${PORT}`, err);
+    console.error(`❌ Failed to start server on port ${PORT}`, err);
     process.exit(1);
   } else {
     console.log(`Server running on port ${PORT}`); // optional plain console
   }
 });
-
-// i will make expenses section in  my acounts project 1..items willl have with gst
-
-// Item_Name VARCHAR(255) NOT NULL,
-//     Item_Id VARCHAR(255) NOT NULL UNIQUE,
-   
-//     Item_HSN VARCHAR(20) NOT NULL, 2..expense category will have category name direct/indirect expense.....
-
-// with gst expenses wiol have item name,,hsn code,,5	Quantity	int(10)			No	None			Change Change	Drop Drop	
-// 	6	_Price	decimal(10,2)			Yes	NULL			Change Change	Drop Drop	
-// 	7	Discount_On__Price	decimal(10,2)			No	0.00			Change Change	Drop Drop	
-// 	8	Discount_Type_On__Price	enum('Percentage', 'Amount')	utf8mb4_general_ci		No	Percentage			Change Change	Drop Drop	
-// 	9	Tax_Type	varchar(255)	utf8mb4_general_ci		No	None			Change Change	Drop Drop	
-// 	10	Tax_Amount	decimal(10,2)			Yes	NULL			Change Change	Drop Drop	
-// 	11	Amount	decimal(10,2)iscount_Type ENUM('Percentage', 'Amount') DEFAULT 'Percentage',
-
-// without gst quantity price ,,9	Tax_Type	varchar(255)	utf8mb4_general_ci		No	None			Change Change	Drop Drop	
-// 	10	Tax_Amount	decimal(10,2)			Yes	NULL			Change Change	Drop Drop	
-// 	11	Amount	decimal(10,2)iscount_Type ENUM('Percentage', 'Amount') DEFAULT 'Percentage',
-
-
-
-
-
-// expense category will have expense category name direct /indirect expense
-
-
-
-// at top of expense page i will choose  option a>>>>>expense with gst then items with gst or option b>>>> expense without gst thn items with gst
-
-
-
-// for expense with gst party name and sate of supply comes  and date becomes bill date in addittion to expense number and date  and category.
-
-// for expense without gst   and expense number and date  and category.................................................
-
-
-
-// in ui  left side category amount and right side 
 

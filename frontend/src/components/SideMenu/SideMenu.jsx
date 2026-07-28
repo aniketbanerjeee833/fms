@@ -61,10 +61,16 @@ const currentPath = location.pathname;
       
     }
 
-    if(currentPath.startsWith("/daily-expense/add") || 
-    currentPath.startsWith("/daily-expense/all-expense") )
+    // if(currentPath.startsWith("/daily-expense/add") || 
+    // currentPath.startsWith("/daily-expense/all-expense") )
+    //  {
+    //   setOpenMenu("Expense");
+      
+    // }
+    if(currentPath.startsWith("/expense/categories") || 
+    currentPath.startsWith("/expense/items") )
      {
-      setOpenMenu("Daily Expense");
+      setOpenMenu("Expense");
       
     }
 
@@ -145,10 +151,16 @@ if (
   )
     return true;
 
-    if((cleanLink==="/daily-expense/add" && current.startsWith("/daily-expense/add"))||
-    (cleanLink==="/daily-expense/all-expense" && current.startsWith("/daily-expense/all-expense"))
-  )
-    return true;
+  //   if((cleanLink==="/daily-expense/add" && current.startsWith("/daily-expense/add"))||
+  //   (cleanLink==="/daily-expense/all-expense" && current.startsWith("/daily-expense/all-expense"))
+  // )
+  //   return true;
+
+    if(
+      (cleanLink==="/expense/categories" && current.startsWith("/expense/categories")) ||
+      (cleanLink==="/expense/items" && current.startsWith("/expense/items"))
+    )
+      return true;
 
     if(cleanLink==="/financial-year/add" && current.startsWith("/financial-year/add"))
       return true;
@@ -280,10 +292,11 @@ if (
             { to: "/cash-bank/cash-in-hand", text: "Cash In Hand" },
             { to: "/cash-bank/bank-accounts", text: " Bank Accounts" },
           ])}
-           {renderMenu("Daily Expense", <CalendarDays  size={20} />, [
+           {renderMenu("Expense", <CalendarDays  size={20} />, [
            
-            { to: "/daily-expense/add", text: "Add Daily Expense" },
-            { to: "/daily-expense/all-expense", text: " Daily Expense List" },
+            // { to: "/expense/add", text: "Add Expense" },
+            { to: "/expense/categories", text: "Categories" },
+             { to: "/expense/items", text: "Items" },
           ])}
            {renderMenu("Settings", <Settings  size={20} />, [
            

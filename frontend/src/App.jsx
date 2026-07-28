@@ -57,8 +57,9 @@ const SaleView = lazy(() => import('./pages/Sale/SaleView'));
 const SaleEdit = lazy(() => import('./pages/Sale/SaleEdit'));
 
 
-const AddDailyExpense = lazy(() => import('./pages/DailyExpense/AddDailyExpense'));
-const DailyExpenseList = lazy(() => import('./pages/DailyExpense/DailyExpenseList'));
+// const AddDailyExpense = lazy(() => import('./pages/DailyExpense/AddDailyExpense'));
+const ExpensesByCategories = lazy(() => import('./pages/Expense/ExpensesByCategories'));
+const ExpensesByItems = lazy(() => import('./pages/Expense/ExpensesByItems'));
 
 
 const CashInHand= lazy(() => import('./pages/CashAndBank/CashInHand'));
@@ -358,22 +359,31 @@ function RouterWrapper() {
               }
             />
 
-            <Route
+            {/* <Route
               path="/daily-expense/add"
               element={
                 <Layout>
                   <AddDailyExpense/>
                 </Layout>
               }
-            />
+            /> */}
              <Route
-              path="/daily-expense/all-expense"
+              path="/expense/categories"
               element={
                 <Layout>
-                  <DailyExpenseList/>
+                  <ExpensesByCategories/>
                 </Layout>
               }
             />
+             <Route
+              path="/expense/items"
+              element={
+                <Layout>
+                  <ExpensesByItems/>
+                </Layout>
+              }
+            />
+             
             {/* <Route
               path="/reports"
               element={

@@ -20,6 +20,7 @@ import { purchaseReturnApi } from "./api/purchaseReturnApi";
 import { saleReturnApi } from "./api/saleReturnApi";
 import { cashInHandApi } from "./api/cashInHandApi";
 import { bankAccountApi } from "./api/bankAccountApi";
+import { expenseApi } from "./api/expenseApi";
 
 
 // ✅ Combine reducers
@@ -40,6 +41,7 @@ const rootReducer = combineReducers({
   [paymentInApi.reducerPath]: paymentInApi.reducer,
   [cashInHandApi.reducerPath]: cashInHandApi.reducer,
   [bankAccountApi.reducerPath]: bankAccountApi.reducer,
+  [expenseApi.reducerPath]: expenseApi.reducer,
   [reportApi.reducerPath]: reportApi.reducer,
   [settingsApi.reducerPath]: settingsApi.reducer
 
@@ -75,6 +77,7 @@ const store = configureStore({
       paymentInApi.middleware,
       cashInHandApi.middleware,
       bankAccountApi.middleware,
+      expenseApi.middleware,
       reportApi.middleware,
       settingsApi.middleware
      
