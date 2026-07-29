@@ -1,48 +1,47 @@
 import { useState, useEffect, useRef } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
-import { Trash2 } from "lucide-react";
+import { useForm, Controller } from "react-hook-form";
+
 /**
- * PaymentInModal
+ * PaymentOutModal
  *
  * Mandatory fields (must match backend):
- *   Party_Id, Payment_Date, Payment_Type, Received
+ *   Party_Id, Payment_Date, Payment_Type, Paid
  *
  * Backend check being satisfied:
- *   const { Party_Id, Receipt_No, Payment_Date, Payment_Type, Received } = req.body;
- *   if (!Party_Id || !Payment_Date || !Payment_Type || !Received) { ... }
+ *   const { Party_Id, Receipt_No, Payment_Date, Payment_Type, Paid } = req.body;
+ *   if (!Party_Id || !Payment_Date || !Payment_Type || !Paid) { ... }
  */
-export default function PaymentInModal({
+export default function PaymentOutModal({
   mode = "add",              // "add" | "edit" | "view"
-  initialData = null,        // existing payment-in record for edit/view
+  initialData = null,        // existing payment-out record for edit/view
   parties = [],               // array of { Party_Id, Party_Name, Phone_Number, GSTIN } (or { parties: [...] })
   onClose,
   onSave,
-  banks,
+  banks,                     // (formData) => call your existing save/update controller
+  //onAddParty,                 // optional: (partyName) => Promise<{Party_Id, Party_Name}> - called from "+ Add Party"
   PartyAddModal,               // optional: pass your own <AddParty> component in as a prop
   isSaving = false,
 }) {
   const isView = mode === "view";
-  console.log(initialData);
+  console.log(initialData,banks)
   // Normalize parties prop - accepts either an array or { parties: [...] }
   const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
+const formatDateForInput = (date) => {
+  if (!date) return "";
 
-  const formatDateForInput = (date) => {
-    if (!date) return "";
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
 
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  };
-
+  return `${year}-${month}-${day}`;
+};
   const {
     register,
     handleSubmit,
+    //control,
     setValue,
     watch,
-    control,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -51,44 +50,19 @@ export default function PaymentInModal({
       Receipt_No: initialData?.Receipt_No || "",
       Payment_Type: initialData?.Payment_Type || "",
       Bank_Account_Id: initialData?.Bank_Account_Id || "",
-
-      Payment_Date: formatDateForInput(initialData?.Payment_Date) || "",
+    
+  Payment_Date: formatDateForInput(initialData?.Payment_Date) || "",
 
       Reference_No: initialData?.Reference_No || "",
-      Received: initialData?.Received ?? "",
-      splits: initialData?.splits?.length
-        ? initialData.splits
-        : [{ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
-
+      Paid: initialData?.Paid ?? "",
     },
     mode: "onSubmit",
   });
 
   const paymentType = watch("Payment_Type");
-  const { fields, append, remove } = useFieldArray({ control, name: "splits" });
+
   const [open, setOpen] = useState(false);
   const [partySearch, setPartySearch] = useState(initialData?.Party_Name || "");
-  const [showSplitBox, setShowSplitBox] = useState(
-    isView ? (initialData?.splits?.length > 0) : (initialData?.splits?.length > 1)
-  );
-
-  const handleAddPaymentType = () => {
-    // seed splits with whatever is currently in the single dropdown, so it's not lost
-    const currentType = watch("Payment_Type");
-    const currentBankId = watch("Bank_Account_Id");
-    const currentAmount = watch("Received") || "";
-
-    append(
-      fields.length === 0
-        ? [
-          { Payment_Type: currentType || "", Bank_Account_Id: currentBankId || null, Reference_Number: "", Amount: currentAmount },
-          { Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" },
-        ]
-        : { Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" }
-    );
-
-    setShowSplitBox(true);
-  };
   const [showPartyModal, setShowPartyModal] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -128,8 +102,8 @@ export default function PaymentInModal({
     setShowPartyModal(false);
   };
 
-  const formValues = watch();
-  console.log(formValues);
+    const formValues = watch();
+    console.log(formValues)
   const onSubmit = (data) => {
     if (isView) return;
     onSave(data);
@@ -157,7 +131,7 @@ export default function PaymentInModal({
           style={{ marginBottom: "20px", paddingBottom: "10px" }}
         >
           <h4 className="text-xl font-semibold text-gray-900">
-            {mode === "add" ? "Payment-In" : mode === "edit" ? "Edit Payment-In" : "View Payment-In"}
+            {mode === "add" ? "Payment-Out" : mode === "edit" ? "Edit Payment-Out" : "View Payment-Out"}
           </h4>
           <button
             type="button"
@@ -277,8 +251,27 @@ export default function PaymentInModal({
             </div>
 
             {/* Payment Type */}
-
             {/* <div className="flex flex-col">
+              <span className="active">
+                Payment Type
+                <span className="text-red-500">&nbsp;*</span>
+              </span>
+              <select
+                disabled={isView}
+                className="w-full outline-none border-b-2 text-gray-900 py-1"
+                {...register("Payment_Type", { required: "Payment Type is required" })}
+              >
+                <option value="">Select Payment Type</option>
+                <option value="Cash">Cash</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Neft">Neft</option>
+              </select>
+              {errors?.Payment_Type && (
+                <p className="text-red-500 text-xs mt-1">{errors.Payment_Type.message}</p>
+              )}
+            </div> */}
+
+               <div className="flex flex-col">
                       <span className="active">Payment Type</span>
 
                       <select
@@ -321,164 +314,7 @@ export default function PaymentInModal({
                       {errors?.Bank_Account_Id && (
                         <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
                       )}
-                    </div> */}
-            {/* Payment Splits */}
-            {/* Payment Type */}
-            <div className="flex flex-col col-span-2">
-              <span className="active">
-                Payment Type
-                <span className="text-red-500">&nbsp;*</span>
-              </span>
-
-              {!showSplitBox ? (
-                <>
-                  <select
-                    id="Payment_Type"
-                    disabled={isView}
-                    value={
-                      watch("Payment_Type") === "Bank"
-                        ? `bank_${watch("Bank_Account_Id") || ""}`
-                        : watch("Payment_Type") || ""
-                    }
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.startsWith("bank_")) {
-                        const bankId = val.replace("bank_", "");
-                        setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                        setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                      } else {
-                        setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                        setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                      }
-                    }}
-                  >
-                    <option value="">Select Payment Type</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Neft">Neft</option>
-                    {banks?.map((bank) => (
-                      <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                        {bank.Account_Display_Name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {errors?.Payment_Type && (
-                    <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
-                  )}
-
-                  {!isView && (
-                    <button
-                      type="button"
-                      onClick={handleAddPaymentType}
-                      className="text-[#4CA1AF] text-sm font-medium hover:underline self-start mt-2"
-                      style={{ background: "transparent", border: "none", padding: 0 }}
-                    >
-                      + Add Payment Type
-                    </button>
-                  )}
-                </>
-              ) : (
-                <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3 mt-2">
-                  {fields.map((field, index) => {
-                    const rowType = watch(`splits.${index}.Payment_Type`);
-                    const needsRef = rowType === "Cheque" || rowType === "Neft";
-
-                    return (
-                      <div key={field.id} className="flex flex-col gap-2">
-                        <div className="flex items-center gap-3">
-                          <div className="flex flex-col flex-1">
-                            <span className="text-xs text-gray-500">Payment Type</span>
-                            <select
-                              disabled={isView}
-                              value={
-                                rowType === "Bank"
-                                  ? `bank_${watch(`splits.${index}.Bank_Account_Id`) || ""}`
-                                  : rowType || ""
-                              }
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val.startsWith("bank_")) {
-                                  setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                  setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                } else {
-                                  setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                  setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                }
-                              }}
-                              className="border rounded-md px-2 py-1.5"
-                            >
-                              <option value="">Select Type</option>
-                              <option value="Cash">Cash</option>
-                              <option value="Cheque">Cheque</option>
-                              <option value="Neft">Neft</option>
-                              {banks?.map((bank) => (
-                                <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                  {bank.Account_Display_Name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="flex flex-col flex-1 mt-2">
-                            <span className="text-xs text-gray-500">Amount</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              readOnly={isView}
-                              placeholder="Amount"
-                              className="border rounded-md px-2 py-1.5"
-                              {...register(`splits.${index}.Amount`, {
-                                required: "Required",
-                                validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
-                              })}
-                            />
-                          </div>
-
-                          {!isView && fields.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => remove(index)}
-                              className="mt-4 text-gray-500 hover:text-red-500"
-                              style={{ background: "transparent", border: "none" }}
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          )}
-                        </div>
-
-                        {needsRef && (
-                          <input
-                            type="text"
-                            readOnly={isView}
-                            placeholder="Reference No."
-                            className="border rounded-md px-2 py-1.5 w-full"
-                            {...register(`splits.${index}.Reference_Number`)}
-                          />
-                        )}
-
-                        {errors?.splits?.[index]?.Amount && (
-                          <p className="text-red-500 text-xs">{errors.splits[index].Amount.message}</p>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {!isView && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                      }
-                      className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                      style={{ background: "transparent", border: "none" }}
-                    >
-                      + Add Another Payment
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+                    </div>
 
             {/* Date */}
             <div className="flex flex-col">
@@ -513,10 +349,10 @@ export default function PaymentInModal({
               </div>
             )}
 
-            {/* Received */}
+            {/* Paid */}
             <div className="flex flex-col">
               <span className="active">
-                Received
+                Paid
                 <span className="text-red-500">&nbsp;*</span>
               </span>
               <input
@@ -524,14 +360,14 @@ export default function PaymentInModal({
                 step="0.01"
                 readOnly={isView}
                 className="w-full outline-none border-b-2 text-gray-900 py-1"
-                {...register("Received", {
-                  required: "Received amount is required",
+                {...register("Paid", {
+                  required: "Paid amount is required",
                   validate: (v) =>
                     (v !== "" && !isNaN(v) && Number(v) > 0) || "Enter a valid amount greater than 0",
                 })}
               />
-              {errors?.Received && (
-                <p className="text-red-500 text-xs mt-1">{errors.Received.message}</p>
+              {errors?.Paid && (
+                <p className="text-red-500 text-xs mt-1">{errors.Paid.message}</p>
               )}
             </div>
           </div>

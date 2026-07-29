@@ -316,13 +316,14 @@ export default function PurchaseReturn() {
                               : "N/A"}
                           </td>
                           <td>{purchaseReturn?.Party_Name || "N/A"}</td>
-                          <td>
+                          {/* <td>
                           {purchaseReturn?.Payment_Type
                             ? purchaseReturn.Payment_Type === "Bank"
                               ? `Bank (${purchaseReturn?.Bank_Display_Name || "N/A"})`
                               : purchaseReturn.Payment_Type
                             : "N/A"}
-                        </td>
+                        </td> */}
+                        <td>{purchaseReturn?.Payment_Type_Display || "N/A"}</td>
                           <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
                           <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
 

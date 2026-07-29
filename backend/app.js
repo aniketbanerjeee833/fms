@@ -163,3 +163,8 @@ app.listen(PORT, (err) => {
   }
 });
 
+// ALTER TABLE payment_in
+//   DROP COLUMN Payment_Type,
+//   DROP COLUMN Reference_No,
+// 	DROP COLUMN Bank_Account_Id;
+

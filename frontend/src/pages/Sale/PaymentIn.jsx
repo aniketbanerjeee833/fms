@@ -1,5 +1,5 @@
 
-import { NavLink,  useSearchParams } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 
 // import { useGetAllpaymentInDataQuery } from "../../redux/api/purchaseApi";
 import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
@@ -36,10 +36,10 @@ export default function PaymentIn() {
     const [modal, setModal] = useState({ open: false, mode: "add", data: null });
     const { data: partiesList } = useGetAllPartiesQuery();
     // const[selecedSales,setSelectedSales]= useState(null);
-     const [addPaymentIn, { isLoading: isAdding }] = useAddPaymentInMutation();
-  const [updatePaymentIn, { isLoading: isUpdating }] = useUpdatePaymentInMutation();
+    const [addPaymentIn, { isLoading: isAdding }] = useAddPaymentInMutation();
+    const [updatePaymentIn, { isLoading: isUpdating }] = useUpdatePaymentInMutation();
     const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const isSaving = isAdding || isUpdating;
+    const isSaving = isAdding || isUpdating;
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -69,13 +69,13 @@ export default function PaymentIn() {
             toDate,
         });
     };
-   
-      const { data: paymentInData, isLoading } = useGetAllPaymentInsQuery({
-    page,
-    search: searchTerm,
-    fromDate,
-    toDate,
-  });
+
+    const { data: paymentInData, isLoading } = useGetAllPaymentInsQuery({
+        page,
+        search: searchTerm,
+        fromDate,
+        toDate,
+    });
     console.log(paymentInData, fromDate, toDate);
     const handleExportExcel = () => {
         const params = new URLSearchParams();
@@ -91,28 +91,28 @@ export default function PaymentIn() {
         document.body.removeChild(a);
     };
 
-const handleSavePaymentIn = async (formData) => {
-    try {
-      if (modal.mode === "edit") {
-        await updatePaymentIn({ id: modal.data.id, ...formData }).unwrap();
-      } else {
-        await addPaymentIn(formData).unwrap();
-      }
-       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-         dispatch(bankAccountApi.util.invalidateTags([
-         { type: "BankAccount", id: formData.Bank_Account_Id },
-         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-       ]));
-      setModal({ open: false, mode: "add", data: null });
-      toast.success("New Payment In added");
-    } catch (err) {
-      console.error("Failed to save payment in:", err);
-      toast.error(err?.data?.message || "Failed to save payment in. Please try again.");
-    }
-  };
+    const handleSavePaymentIn = async (formData) => {
+        try {
+            if (modal.mode === "edit") {
+                await updatePaymentIn({ id: modal.data.id, ...formData }).unwrap();
+            } else {
+                await addPaymentIn(formData).unwrap();
+            }
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(bankAccountApi.util.invalidateTags([
+                { type: "BankAccount", id: formData.Bank_Account_Id },
+                "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+            ]));
+            setModal({ open: false, mode: "add", data: null });
+            toast.success("New Payment In added");
+        } catch (err) {
+            console.error("Failed to save payment in:", err);
+            toast.error(err?.data?.message || "Failed to save payment in. Please try again.");
+        }
+    };
     return (
         <>
-            
+
             <div className="sb2-2-2">
                 <ul >
                     <li>
@@ -246,8 +246,8 @@ const handleSavePaymentIn = async (formData) => {
                                         backgroundColor: "#4CA1AF",
                                     }}
                                     className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
-                                //   onClick={() => navigate("/paymentIn/add")}
-                                  onClick={() => setModal({ open: true, mode: "add", data: null })}
+                                    //   onClick={() => navigate("/paymentIn/add")}
+                                    onClick={() => setModal({ open: true, mode: "add", data: null })}
                                 >
                                     Add  Payment In
                                 </button>
@@ -316,7 +316,7 @@ const handleSavePaymentIn = async (formData) => {
                                         <th className="text-left ">Party Name</th>
                                         <th className="text-left">Payment Type</th>
                                         <th className="text-left">Total Received</th>
-                                        <th className="text-left">Balance Due</th>
+                                        {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
                                         {/* <th>Edit</th> */}
                                     </tr>
@@ -343,15 +343,18 @@ const handleSavePaymentIn = async (formData) => {
                                                         : "N/A"}
                                                 </td>
                                                 <td>{paymentIn?.Party_Name || "N/A"}</td>
-                                                 <td>
+                                                <td>
+                                                    {paymentIn?.Payment_Type_Display || "N/A"}
+                                                </td>
+                                                {/* <td>
                                                     {paymentIn?.Payment_Type
                                                         ? paymentIn.Payment_Type === "Bank"
                                                             ? `Bank (${paymentIn?.Bank_Display_Name || "N/A"})`
                                                             : paymentIn.Payment_Type
                                                         : "N/A"}
-                                                </td>
+                                                </td> */}
                                                 <td>{paymentIn?.Received || "N/A"}</td>
-                                                <td>{paymentIn?.Balance_Due || "N/A"}</td>
+                                                {/* <td>{paymentIn?.Balance_Due || "N/A"}</td> */}
 
                                                 {/* <td>
                                                     <button
@@ -428,7 +431,7 @@ const handleSavePaymentIn = async (formData) => {
                         {/* PAGE NUMBERS — DESKTOP / TABLET */}
                         <div style={{ marginRight: "0px" }}
                             className="hidden sm:flex space-x-2">
-              
+
                             {(() => {
                                 const totalPages = paymentInData?.totalPages || 1;
                                 const maxVisible = 5; // how many pages around current
@@ -529,21 +532,21 @@ const handleSavePaymentIn = async (formData) => {
 
                     </div>
                 </div>
-              
+
             </div>
-        {modal.open && (
-        <PaymentInModal
-          mode={modal.mode}
-          initialData={modal.data}
-          parties={partiesList}
-          banks={banks}
-          onClose={() => setModal({ open: false, mode: "add", data: null })}
-          onSave={handleSavePaymentIn}
-          isSaving={isSaving}
-           PartyAddModal={PartyAddModal} 
-        />
-      )}
-         
+            {modal.open && (
+                <PaymentInModal
+                    mode={modal.mode}
+                    initialData={modal.data}
+                    parties={partiesList}
+                    banks={banks}
+                    onClose={() => setModal({ open: false, mode: "add", data: null })}
+                    onSave={handleSavePaymentIn}
+                    isSaving={isSaving}
+                    PartyAddModal={PartyAddModal}
+                />
+            )}
+
 
         </>
 

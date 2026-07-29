@@ -1679,7 +1679,142 @@ const editPurchase = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+//OLD
+// const getSinglePurchase = async (req, res, next) => {
+//   let connection;
+//   try {
+//     const { Purchase_Id: purchaseId } = req.params;
 
+//     connection = await db.getConnection();
+
+//     if (!purchaseId) {
+//       return res.status(400).json({ success: false, message: "Purchase ID is required." });
+//     }
+
+//     // ✅ Fetch sale header (includes invoice + party info)
+//     const [purchaseData] = await db.query(
+//       `
+//      SELECT 
+//     pu.Purchase_Id,
+//     pu.Bill_Number,
+//     pu.Bill_Date,
+//     pu.Reference_Number,
+//     pu.State_Of_Supply,
+//     pu.Payment_Type,
+//     pu.Bank_Account_Id,
+//     pu.Total_Amount,
+//     pu.Total_Paid,
+//     pu.Balance_Due,
+//     pu.Party_Id,
+
+//     p.Party_Name,
+//     p.GSTIN,
+//     p.Billing_Address,
+//     p.Shipping_Address,
+
+//     ba.Account_Display_Name AS Bank_Display_Name,
+//     CASE
+//         WHEN pu.Payment_Type = 'Bank'
+//         THEN ba.Account_Display_Name
+//         ELSE pu.Payment_Type
+//     END AS Payment_Type_Display
+
+// FROM add_purchase pu
+// LEFT JOIN add_party p
+//     ON pu.Party_Id = p.Party_Id
+// LEFT JOIN bank_accounts ba
+//     ON pu.Bank_Account_Id = ba.id
+// WHERE pu.Purchase_Id = ?
+//       `,
+//       [purchaseId]
+//     );
+
+//     if (purchaseData.length === 0) {
+//       return res.status(404).json({ success: false, message: "Sale not found." });
+//     }
+
+//     const purchaseHeader = purchaseData[0];
+
+//     // ✅ Fetch all sale items related to that Sale_Id
+//     const [items] = await db.query(
+//       `
+//       SELECT 
+//         pi.Purchase_Items_Id,
+//         pi.Item_Id,
+//         i.Item_Name,
+//         i.Item_HSN,
+//         i.Item_Unit,
+//         i.Item_Category,
+//         pi.Quantity,
+//         pi.Purchase_Price,
+//         pi.Discount_On_Purchase_Price,
+//         pi.Discount_Type_On_Purchase_Price,
+//         pi.Tax_Amount,
+//         pi.Tax_Type,
+//         pi.Amount,
+//         pi.created_at
+//       FROM add_purchase_items pi
+//       LEFT JOIN add_item i ON pi.Item_Id = i.Item_Id
+//       WHERE pi.Purchase_Id = ?
+//       ORDER BY pi.created_at DESC
+//       `,
+//       [purchaseId]
+//     );
+
+//     if (items.length === 0) {
+//       return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
+//     }
+
+//     // ✅ Combine and send response
+//     const response = {
+//       success: true,
+//       billPurchaseDetails: {
+//         Purchase_Id: purchaseHeader.Purchase_Id,
+//         Party_Name: purchaseHeader.Party_Name,
+//         GSTIN: purchaseHeader.GSTIN,
+//         State_Of_Supply: purchaseHeader.State_Of_Supply,
+//         Payment_Type: purchaseHeader.Payment_Type,
+//         Reference_Number: purchaseHeader.Reference_Number,
+//         Bill_Number: purchaseHeader.Bill_Number,
+//         Bill_Date: purchaseHeader.Bill_Date,
+//         Payment_Type: purchaseHeader.Payment_Type,
+//         Payment_Type_Display: purchaseHeader.Payment_Type_Display,
+
+//         Bank_Account_Id: purchaseHeader.Bank_Account_Id,
+//         Bank_Display_Name: purchaseHeader.Bank_Display_Name,
+//         Total_Amount: purchaseHeader.Total_Amount,
+//         Total_Paid: purchaseHeader.Total_Paid,
+//         Balance_Due: purchaseHeader.Balance_Due,
+//         Billing_Address: purchaseHeader.Billing_Address,
+//         Shipping_Address: purchaseHeader.Shipping_Address,
+//       },
+//       items: items.map((it) => ({
+//         Purchase_Items_Id: it.Purchase_Items_Id,
+//         Item_Id: it.Item_Id,
+//         Item_Name: it.Item_Name,
+//         Item_HSN: it.Item_HSN,
+//         Item_Unit: it.Item_Unit,
+//         Item_Category: it.Item_Category,
+//         Quantity: it.Quantity,
+//         Purchase_Price: it.Purchase_Price,
+//         Discount_On_Purchase_Price: it.Discount_On_Purchase_Price,
+//         Discount_Type_On_Purchase_Price: it.Discount_Type_On_Purchase_Price,
+//         Tax_Amount: it.Tax_Amount,
+//         Tax_Type: it.Tax_Type,
+//         Amount: it.Amount,
+//         created_at: it.created_at,
+//       })),
+//     };
+
+//     return res.status(200).json(response);
+//   } catch (err) {
+//     if (connection) connection.release();
+//     console.error("❌ Error getting single sale:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getSinglePurchase = async (req, res, next) => {
   let connection;
   try {
@@ -1691,125 +1826,136 @@ const getSinglePurchase = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Purchase ID is required." });
     }
 
-    // ✅ Fetch sale header (includes invoice + party info)
-    const [purchaseData] = await db.query(
-      `
-     SELECT 
-    pu.Purchase_Id,
-    pu.Bill_Number,
-    pu.Bill_Date,
-    pu.Reference_Number,
-    pu.State_Of_Supply,
-    pu.Payment_Type,
-    pu.Bank_Account_Id,
-    pu.Total_Amount,
-    pu.Total_Paid,
-    pu.Balance_Due,
-    pu.Party_Id,
-
-    p.Party_Name,
-    p.GSTIN,
-    p.Billing_Address,
-    p.Shipping_Address,
-
-    ba.Account_Display_Name AS Bank_Display_Name,
-    CASE
-        WHEN pu.Payment_Type = 'Bank'
-        THEN ba.Account_Display_Name
-        ELSE pu.Payment_Type
-    END AS Payment_Type_Display
-
-FROM add_purchase pu
-LEFT JOIN add_party p
-    ON pu.Party_Id = p.Party_Id
-LEFT JOIN bank_accounts ba
-    ON pu.Bank_Account_Id = ba.id
-WHERE pu.Purchase_Id = ?
-      `,
+    // ✅ Fetch purchase header — no Payment_Type/Bank_Account_Id anymore
+    const [purchaseData] = await connection.query(
+      `SELECT
+      pu.id,
+         pu.Purchase_Id,
+         pu.Bill_Number,
+         pu.Bill_Date,
+         pu.Reference_Number,
+         pu.State_Of_Supply,
+         pu.Total_Amount,
+         pu.Total_Paid,
+         pu.Balance_Due,
+         pu.Party_Id,
+         p.Party_Name,
+         p.GSTIN,
+         p.Billing_Address,
+         p.Shipping_Address
+       FROM add_purchase pu
+       LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
+       WHERE pu.Purchase_Id = ?`,
       [purchaseId]
     );
 
     if (purchaseData.length === 0) {
-      return res.status(404).json({ success: false, message: "Sale not found." });
+      return res.status(404).json({ success: false, message: "Purchase not found." });
     }
 
     const purchaseHeader = purchaseData[0];
 
-    // ✅ Fetch all sale items related to that Sale_Id
-    const [items] = await db.query(
-      `
-      SELECT 
-        pi.Purchase_Items_Id,
-        pi.Item_Id,
-        i.Item_Name,
-        i.Item_HSN,
-        i.Item_Unit,
-        i.Item_Category,
-        pi.Quantity,
-        pi.Purchase_Price,
-        pi.Discount_On_Purchase_Price,
-        pi.Discount_Type_On_Purchase_Price,
-        pi.Tax_Amount,
-        pi.Tax_Type,
-        pi.Amount,
-        pi.created_at
-      FROM add_purchase_items pi
-      LEFT JOIN add_item i ON pi.Item_Id = i.Item_Id
-      WHERE pi.Purchase_Id = ?
-      ORDER BY pi.created_at DESC
-      `,
+    // ✅ Fetch purchase items
+    const [items] = await connection.query(
+      `SELECT 
+         pi.Purchase_Items_Id,
+         pi.Item_Id,
+         i.Item_Name,
+         i.Item_HSN,
+         i.Item_Unit,
+         i.Item_Category,
+         pi.Quantity,
+         pi.Purchase_Price,
+         pi.Discount_On_Purchase_Price,
+         pi.Discount_Type_On_Purchase_Price,
+         pi.Tax_Amount,
+         pi.Tax_Type,
+         pi.Amount,
+         pi.created_at
+       FROM add_purchase_items pi
+       LEFT JOIN add_item i ON pi.Item_Id = i.Item_Id
+       WHERE pi.Purchase_Id = ?
+       ORDER BY pi.created_at DESC`,
       [purchaseId]
     );
 
     if (items.length === 0) {
-      return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
+      return res.status(404).json({ success: false, message: "No purchase items found for this invoice." });
     }
 
-    // ✅ Combine and send response
-    const response = {
+    // ✅ Fetch payment splits for this purchase
+    const [splits] = await connection.query(
+      `SELECT
+         ps.id,
+         ps.Payment_Type,
+         ps.Bank_Account_Id,
+         ps.Reference_Number,
+         ps.Amount,
+         ba.Account_Display_Name,
+         CASE
+           WHEN ps.Payment_Type = 'Bank' THEN ba.Account_Display_Name
+           ELSE ps.Payment_Type
+         END AS Payment_Type_Display
+       FROM payment_splits ps
+       LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+       WHERE ps.Source_Type = 'Purchase' AND ps.Source_Id = ?
+       ORDER BY ps.id ASC`,
+        [purchaseHeader.id]
+      //[purchaseHeader.id ?? purchaseId]  
+      
+      // use numeric id if your splits store numeric; adjust if stored as 'PUR001'
+    );
+
+    // ✅ Build a human-readable summary of splits for easy display
+    const splitSummary = splits.map((s) => s.Payment_Type_Display).join(" + ") || "—";
+
+    return res.status(200).json({
       success: true,
       billPurchaseDetails: {
-        Purchase_Id: purchaseHeader.Purchase_Id,
-        Party_Name: purchaseHeader.Party_Name,
-        GSTIN: purchaseHeader.GSTIN,
-        State_Of_Supply: purchaseHeader.State_Of_Supply,
-        Payment_Type: purchaseHeader.Payment_Type,
+        Purchase_Id:      purchaseHeader.Purchase_Id,
+        Party_Name:       purchaseHeader.Party_Name,
+        GSTIN:            purchaseHeader.GSTIN,
+        State_Of_Supply:  purchaseHeader.State_Of_Supply,
+        Bill_Number:      purchaseHeader.Bill_Number,
+        Bill_Date:        purchaseHeader.Bill_Date,
         Reference_Number: purchaseHeader.Reference_Number,
-        Bill_Number: purchaseHeader.Bill_Number,
-        Bill_Date: purchaseHeader.Bill_Date,
-        Payment_Type: purchaseHeader.Payment_Type,
-        Payment_Type_Display: purchaseHeader.Payment_Type_Display,
-
-        Bank_Account_Id: purchaseHeader.Bank_Account_Id,
-        Bank_Display_Name: purchaseHeader.Bank_Display_Name,
-        Total_Amount: purchaseHeader.Total_Amount,
-        Total_Paid: purchaseHeader.Total_Paid,
-        Balance_Due: purchaseHeader.Balance_Due,
-        Billing_Address: purchaseHeader.Billing_Address,
+        Total_Amount:     purchaseHeader.Total_Amount,
+        Total_Paid:       purchaseHeader.Total_Paid,
+        Balance_Due:      purchaseHeader.Balance_Due,
+        Billing_Address:  purchaseHeader.Billing_Address,
         Shipping_Address: purchaseHeader.Shipping_Address,
+        // 🔹 split summary for display in UI header
+        Payment_Type_Display: splitSummary,
       },
-      items: items.map((it) => ({
-        Purchase_Items_Id: it.Purchase_Items_Id,
-        Item_Id: it.Item_Id,
-        Item_Name: it.Item_Name,
-        Item_HSN: it.Item_HSN,
-        Item_Unit: it.Item_Unit,
-        Item_Category: it.Item_Category,
-        Quantity: it.Quantity,
-        Purchase_Price: it.Purchase_Price,
-        Discount_On_Purchase_Price: it.Discount_On_Purchase_Price,
-        Discount_Type_On_Purchase_Price: it.Discount_Type_On_Purchase_Price,
-        Tax_Amount: it.Tax_Amount,
-        Tax_Type: it.Tax_Type,
-        Amount: it.Amount,
-        created_at: it.created_at,
+      // 🔹 full splits array — frontend uses this to pre-fill the payment split UI
+      splits: splits.map((s) => ({
+        id:                   s.id,
+        Payment_Type:         s.Payment_Type,
+        Bank_Account_Id:      s.Bank_Account_Id,
+        Account_Display_Name: s.Account_Display_Name,
+        Payment_Type_Display: s.Payment_Type_Display,
+        Reference_Number:     s.Reference_Number,
+        Amount:               s.Amount,
       })),
-    };
-
-    return res.status(200).json(response);
+      items: items.map((it) => ({
+        Purchase_Items_Id:               it.Purchase_Items_Id,
+        Item_Id:                         it.Item_Id,
+        Item_Name:                       it.Item_Name,
+        Item_HSN:                        it.Item_HSN,
+        Item_Unit:                       it.Item_Unit,
+        Item_Category:                   it.Item_Category,
+        Quantity:                        it.Quantity,
+        Purchase_Price:                  it.Purchase_Price,
+        Discount_On_Purchase_Price:      it.Discount_On_Purchase_Price,
+        Discount_Type_On_Purchase_Price: it.Discount_Type_On_Purchase_Price,
+        Tax_Amount:                      it.Tax_Amount,
+        Tax_Type:                        it.Tax_Type,
+        Amount:                          it.Amount,
+        created_at:                      it.created_at,
+      })),
+    });
   } catch (err) {
-    if (connection) connection.release();
-    console.error("❌ Error getting single sale:", err);
+    console.error("❌ Error getting single purchase:", err);
     next(err);
   } finally {
     if (connection) connection.release();

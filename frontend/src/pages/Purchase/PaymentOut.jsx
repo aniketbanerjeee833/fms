@@ -332,7 +332,7 @@ export default function PaymentOut() {
                                         <th className="text-left ">Party Name</th>
                                         <th className="text-left">Payment Type</th>
                                         <th className="text-left">Total Paid</th>
-                                        <th className="text-left">Balance Due</th>
+                                        {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
                                         {/* <th>Edit</th> */}
                                     </tr>
@@ -359,15 +359,18 @@ export default function PaymentOut() {
                                                         : "N/A"}
                                                 </td>
                                                 <td>{paymentOut?.Party_Name || "N/A"}</td>
-                                                <td>
+                                                {/* <td>
                                                     {paymentOut?.Payment_Type
                                                         ? paymentOut.Payment_Type === "Bank"
                                                             ? `Bank (${paymentOut?.Bank_Display_Name || "N/A"})`
                                                             : paymentOut.Payment_Type
                                                         : "N/A"}
+                                                </td> */}
+                                                <td>
+                                                    {paymentOut?.Payment_Type_Display || "N/A"}
                                                 </td>
                                                 <td>{paymentOut?.Paid || "N/A"}</td>
-                                                <td>{paymentOut?.Balance_Due || "N/A"}</td>
+                                                {/* <td>{paymentOut?.Balance_Due || "N/A"}</td> */}
 
                                                 {/* <td >
                         
