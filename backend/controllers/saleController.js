@@ -376,22 +376,27 @@ const addSale = async (req, res, next) => {
     }
 
     // duplicate item check
-    const itemCountMap = new Map();
-    for (const item of items) {
-      const itemName = item.Item_Name?.trim().toLowerCase();
-      if (!itemName) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Item name missing." });
-      }
-      itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + 1);
-      if (itemCountMap.get(itemName) > 1) {
-        await connection.rollback();
-        return res.status(400).json({
-          message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-        });
-      }
-    }
-
+    // const itemCountMap = new Map();
+    // for (const item of items) {
+    //   const itemName = item.Item_Name?.trim().toLowerCase();
+    //   if (!itemName) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: "Item name missing." });
+    //   }
+    //   itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + 1);
+    //   if (itemCountMap.get(itemName) > 1) {
+    //     await connection.rollback();
+    //     return res.status(400).json({
+    //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+    //     });
+    //   }
+    // }
+for (const item of items) {
+  if (!item.Item_Name?.trim()) {
+    await connection.rollback();
+    return res.status(400).json({ message: "Item name missing." });
+  }
+}
     const [partyRows] = await connection.query(
       "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
       [Party_Name]
@@ -451,70 +456,214 @@ const addSale = async (req, res, next) => {
     }
 
     // items loop — unchanged
-    for (const item of items) {
-      const {
+    // for (const item of items) {
+    //   const {
+    //     Item_Name,
+    //     Item_HSN,
+    //     Item_Category,
+    //     Quantity,
+    //     Item_Unit,
+    //     Sale_Price,
+    //     Discount_On_Sale_Price,
+    //     Discount_Type_On_Sale_Price,
+    //     Tax_Type,
+    //     Tax_Amount,
+    //     Amount,
+    //   } = item;
+
+    //   const [itemRows] = await connection.query(
+    //     "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+    //     [Item_Name]
+    //   );
+    //   if (itemRows.length === 0) {
+    //     await connection.rollback();
+    //     return res.status(404).json({ message: `Item '${Item_Name}' not found in inventory.` });
+    //   }
+
+    //   const Item_Id = itemRows[0].Item_Id;
+
+    //   const [purchaseTax] = await connection.query(
+    //     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+    //     [Item_Id]
+    //   );
+    //   const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+
+    //   await connection.query(
+    //     `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //     [normalizeNumber(Quantity), Item_Id]
+    //   );
+
+    //   const [saleItemResult] = await connection.execute(
+    //     `INSERT INTO add_sale_items
+    //      (Sale_Id, Item_Id, Quantity, Sale_Price,
+    //       Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+    //       Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+    //      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    //     [
+    //       newSaleId,
+    //       Item_Id,
+    //       normalizeNumber(Quantity),
+    //       normalizeNumber(Sale_Price),
+    //       cleanDiscount(Discount_On_Sale_Price),
+    //       cleanValue(Discount_Type_On_Sale_Price),
+    //       cleanValue(safeTaxType),
+    //       normalizeNumber(Tax_Amount),
+    //       normalizeNumber(Amount),
+    //     ]
+    //   );
+
+    //   const id           = saleItemResult.insertId;
+    //   const newSaleItemId = "SIT" + id.toString().padStart(3, "0");
+
+    //   await connection.execute(
+    //     `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
+    //     [newSaleItemId, id]
+    //   );
+    // }
+
+  for (const item of items) {
+  const {
+    Item_Name,
+    Item_HSN,
+    Item_Category,
+    Quantity,
+    Item_Unit,
+    Sale_Price,
+    Discount_On_Sale_Price,
+    Discount_Type_On_Sale_Price,
+    Tax_Type,
+    Tax_Amount,
+    Amount,
+  } = item;
+
+  // Check if item already exists
+  const [itemRows] = await connection.query(
+    "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+    [Item_Name]
+  );
+
+  let Item_Id;
+
+  if (itemRows.length === 0) {
+    // ===============================
+    // Create new item
+    // ===============================
+    const [newItemResult] = await connection.execute(
+      `INSERT INTO add_item
+      (
         Item_Name,
-        Item_HSN,
         Item_Category,
-        Quantity,
+        Item_HSN,
         Item_Unit,
-        Sale_Price,
-        Discount_On_Sale_Price,
-        Discount_Type_On_Sale_Price,
-        Tax_Type,
-        Tax_Amount,
-        Amount,
-      } = item;
+        Stock_Quantity,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        Item_Name,
+        cleanValue(Item_Category),
+        cleanValue(Item_HSN),
+        cleanValue(Item_Unit),
+        -normalizeNumber(Quantity), // Allow negative stock
+      ]
+    );
 
-      const [itemRows] = await connection.query(
-        "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
-        [Item_Name]
-      );
-      if (itemRows.length === 0) {
-        await connection.rollback();
-        return res.status(404).json({ message: `Item '${Item_Name}' not found in inventory.` });
-      }
+    const autoId = newItemResult.insertId;
 
-      const Item_Id = itemRows[0].Item_Id;
+    // Generate ITM001, ITM002...
+    Item_Id = "ITM" + autoId.toString().padStart(3, "0");
 
-      const [purchaseTax] = await connection.query(
-        `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-        [Item_Id]
-      );
-      const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+    // Update Item_Id
+    await connection.execute(
+      `UPDATE add_item
+       SET Item_Id = ?
+       WHERE id = ?`,
+      [Item_Id, autoId]
+    );
+  } else {
+    // ===============================
+    // Existing item
+    // ===============================
+    Item_Id = itemRows[0].Item_Id;
 
-      await connection.query(
-        `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-        [normalizeNumber(Quantity), Item_Id]
-      );
+    await connection.execute(
+      `UPDATE add_item
+       SET Stock_Quantity = Stock_Quantity - ?,
+           Item_HSN = ?,
+           updated_at = NOW()
+       WHERE Item_Id = ?`,
+      [
+        normalizeNumber(Quantity),
+        cleanValue(Item_HSN) || itemRows[0].Item_HSN,
+        Item_Id,
+      ]
+    );
+  }
 
-      const [saleItemResult] = await connection.execute(
-        `INSERT INTO add_sale_items
-         (Sale_Id, Item_Id, Quantity, Sale_Price,
-          Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-          Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          newSaleId,
-          Item_Id,
-          normalizeNumber(Quantity),
-          normalizeNumber(Sale_Price),
-          cleanDiscount(Discount_On_Sale_Price),
-          cleanValue(Discount_Type_On_Sale_Price),
-          cleanValue(safeTaxType),
-          normalizeNumber(Tax_Amount),
-          normalizeNumber(Amount),
-        ]
-      );
+  // Verify Item_Id exists
+  const [checkItem] = await connection.query(
+    `SELECT Item_Id FROM add_item WHERE Item_Id = ?`,
+    [Item_Id]
+  );
 
-      const id           = saleItemResult.insertId;
-      const newSaleItemId = "SIT" + id.toString().padStart(3, "0");
+  if (checkItem.length === 0) {
+    throw new Error(`Item_Id ${Item_Id} not found in add_item`);
+  }
 
-      await connection.execute(
-        `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
-        [newSaleItemId, id]
-      );
-    }
+  // Get latest purchase tax
+  const [purchaseTax] = await connection.query(
+    `SELECT Tax_Type
+     FROM add_purchase_items
+     WHERE Item_Id = ?
+     ORDER BY id DESC
+     LIMIT 1`,
+    [Item_Id]
+  );
+
+  const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+
+  // Insert Sale Item
+  const [saleItemResult] = await connection.execute(
+    `INSERT INTO add_sale_items
+    (
+      Sale_Id,
+      Item_Id,
+      Quantity,
+      Sale_Price,
+      Discount_On_Sale_Price,
+      Discount_Type_On_Sale_Price,
+      Tax_Type,
+      Tax_Amount,
+      Amount,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    [
+      newSaleId,
+      Item_Id,
+      normalizeNumber(Quantity),
+      normalizeNumber(Sale_Price),
+      cleanDiscount(Discount_On_Sale_Price),
+      cleanValue(Discount_Type_On_Sale_Price),
+      cleanValue(safeTaxType),
+      normalizeNumber(Tax_Amount),
+      normalizeNumber(Amount),
+    ]
+  );
+
+  // Generate Sale_Items_Id
+  const saleItemAutoId = saleItemResult.insertId;
+  const newSaleItemId = "SIT" + saleItemAutoId.toString().padStart(3, "0");
+
+  await connection.execute(
+    `UPDATE add_sale_items
+     SET Sale_Items_Id = ?
+     WHERE id = ?`,
+    [newSaleItemId, saleItemAutoId]
+  );
+}
 
     await connection.commit();
 
@@ -2764,19 +2913,25 @@ const editSale = async (req, res, next) => {
     }
 
     // duplicate item check
-    const itemNameSet = new Set();
+    // const itemNameSet = new Set();
+    // for (const item of items) {
+    //   const name = item.Item_Name?.trim().toLowerCase();
+    //   if (!name) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: "Item name missing." });
+    //   }
+    //   if (itemNameSet.has(name)) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: `Duplicate item '${item.Item_Name}'` });
+    //   }
+    //   itemNameSet.add(name);
+    // }
     for (const item of items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      if (!name) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Item name missing." });
-      }
-      if (itemNameSet.has(name)) {
-        await connection.rollback();
-        return res.status(400).json({ message: `Duplicate item '${item.Item_Name}'` });
-      }
-      itemNameSet.add(name);
-    }
+  if (!item.Item_Name?.trim()) {
+    await connection.rollback();
+    return res.status(400).json({ message: "Item name missing." });
+  }
+}
 
     const [partyRows] = await connection.query(
       "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
@@ -2840,107 +2995,252 @@ const editSale = async (req, res, next) => {
     }
 
     // items loop — unchanged from your original
+    // const [oldItems] = await connection.query(
+    //   "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
+    //   [saleId]
+    // );
+
+    // const oldMap    = new Map();
+    // oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
+    // const newItemIds = new Set();
+
+    // for (const item of items) {
+    //   const [dbItem] = await connection.query(
+    //     "SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1",
+    //     [item.Item_Name]
+    //   );
+    //   const Item_Id = dbItem[0]?.Item_Id;
+    //   if (!Item_Id) {
+    //     await connection.rollback();
+    //     return res.status(404).json({ message: `Item '${item.Item_Name}' not found.` });
+    //   }
+
+    //   newItemIds.add(Item_Id);
+
+    //   const old = oldMap.get(Item_Id);
+
+    //   const [purchaseTax] = await connection.query(
+    //     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+    //     [Item_Id]
+    //   );
+    //   const safeTaxType = purchaseTax[0]?.Tax_Type || item.Tax_Type || "None";
+
+    //   if (old) {
+    //     await connection.query(
+    //       `UPDATE add_sale_items SET
+    //          Quantity = ?, Sale_Price = ?,
+    //          Discount_On_Sale_Price = ?, Discount_Type_On_Sale_Price = ?,
+    //          Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
+    //        WHERE Sale_Items_Id = ?`,
+    //       [
+    //         normalizeNumber(item.Quantity),
+    //         normalizeNumber(item.Sale_Price),
+    //         cleanDiscount(item.Discount_On_Sale_Price),
+    //         cleanValue(item.Discount_Type_On_Sale_Price),
+    //         cleanValue(safeTaxType),
+    //         normalizeNumber(item.Tax_Amount),
+    //         normalizeNumber(item.Amount),
+    //         old.Sale_Items_Id,
+    //       ]
+    //     );
+
+    //     const diff = normalizeNumber(item.Quantity) - old.Quantity;
+    //     if (diff !== 0) {
+    //       await connection.query(
+    //         `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //         [diff, Item_Id]
+    //       );
+    //     }
+    //   } else {
+    //     const [res] = await connection.execute(
+    //       `INSERT INTO add_sale_items
+    //        (Sale_Id, Item_Id, Quantity, Sale_Price,
+    //         Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+    //         Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+    //        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    //       [
+    //         saleId,
+    //         Item_Id,
+    //         normalizeNumber(item.Quantity),
+    //         normalizeNumber(item.Sale_Price),
+    //         cleanDiscount(item.Discount_On_Sale_Price),
+    //         cleanValue(item.Discount_Type_On_Sale_Price),
+    //         cleanValue(safeTaxType),
+    //         normalizeNumber(item.Tax_Amount),
+    //         normalizeNumber(item.Amount),
+    //       ]
+    //     );
+    //     const id    = res.insertId;
+    //     const newId = "SIT" + id.toString().padStart(3, "0");
+    //     await connection.execute(
+    //       `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
+    //       [newId, id]
+    //     );
+    //     await connection.query(
+    //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //       [normalizeNumber(item.Quantity), Item_Id]
+    //     );
+    //   }
+    // }
+
+    // // delete removed items + restore stock
+    // for (const old of oldItems) {
+    //   if (!newItemIds.has(old.Item_Id)) {
+    //     await connection.query(
+    //       `DELETE FROM add_sale_items WHERE Sale_Items_Id = ?`,
+    //       [old.Sale_Items_Id]
+    //     );
+    //     await connection.query(
+    //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //       [old.Quantity, old.Item_Id]
+    //     );
+    //   }
+    // }
     const [oldItems] = await connection.query(
-      "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
-      [saleId]
+  "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
+  [saleId]
+);
+
+const oldMap     = new Map();
+oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
+const newItemIds = new Set();
+
+for (const item of items) {
+  let Item_Id = item.Item_Id || null;
+  let dbItemRow = null;
+
+  if (Item_Id) {
+    // 🔹 Trust the Item_Id if the frontend sent one (existing item, editing this row)
+    const [rows] = await connection.query(
+      "SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1",
+      [Item_Id]
+    );
+    dbItemRow = rows[0] || null;
+  } else {
+    // 🔹 No Item_Id — try resolve by name (existing item picked fresh / typed matching name)
+    const [rows] = await connection.query(
+      "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+      [item.Item_Name]
+    );
+    dbItemRow = rows[0] || null;
+    Item_Id = dbItemRow?.Item_Id || null;
+  }
+
+  if (!dbItemRow) {
+    // 🔹 Brand-new item — create it, stock can go negative
+    const [maxRow] = await connection.query(
+      `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
+    );
+    const autoId = (maxRow[0]?.maxId || 0) + 1;
+    Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+
+    await connection.execute(
+      `INSERT INTO add_item
+       (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit, 
+        Stock_Quantity, created_at, updated_at)
+       VALUES (?, ?, ?, ?,  ?, ?, NOW(), NOW())`,
+      [
+        Item_Id,
+        item.Item_Name,
+        cleanValue(item.Item_Category),
+        cleanValue(item.Item_HSN),
+        cleanValue(item.Item_Unit),
+       
+        -normalizeNumber(item.Quantity),
+      ]
+    );
+  } else {
+    // 🔹 Existing item — sync HSN to master if changed (propagates everywhere, since master is the single source of truth)
+    if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+      await connection.query(
+        `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
+        [item.Item_HSN, Item_Id]
+      );
+    }
+  }
+
+  newItemIds.add(Item_Id);
+
+  const old = oldMap.get(Item_Id);
+
+  const [purchaseTax] = await connection.query(
+    `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+    [Item_Id]
+  );
+  // 🔹 Tax_Type on the sale row itself is user-editable per line — no longer forced from purchase history
+  const safeTaxType = item.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+
+  if (old) {
+    await connection.query(
+      `UPDATE add_sale_items SET
+         Quantity = ?, Sale_Price = ?,
+         Discount_On_Sale_Price = ?, Discount_Type_On_Sale_Price = ?,
+         Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
+       WHERE Sale_Items_Id = ?`,
+      [
+        normalizeNumber(item.Quantity),
+        normalizeNumber(item.Sale_Price),
+        cleanDiscount(item.Discount_On_Sale_Price),
+        cleanValue(item.Discount_Type_On_Sale_Price),
+        cleanValue(safeTaxType),
+        normalizeNumber(item.Tax_Amount),
+        normalizeNumber(item.Amount),
+        old.Sale_Items_Id,
+      ]
     );
 
-    const oldMap    = new Map();
-    oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
-    const newItemIds = new Set();
-
-    for (const item of items) {
-      const [dbItem] = await connection.query(
-        "SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1",
-        [item.Item_Name]
+    const diff = normalizeNumber(item.Quantity) - old.Quantity;
+    if (diff !== 0) {
+      await connection.query(
+        `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+        [diff, Item_Id]
       );
-      const Item_Id = dbItem[0]?.Item_Id;
-      if (!Item_Id) {
-        await connection.rollback();
-        return res.status(404).json({ message: `Item '${item.Item_Name}' not found.` });
-      }
-
-      newItemIds.add(Item_Id);
-
-      const old = oldMap.get(Item_Id);
-
-      const [purchaseTax] = await connection.query(
-        `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-        [Item_Id]
-      );
-      const safeTaxType = purchaseTax[0]?.Tax_Type || item.Tax_Type || "None";
-
-      if (old) {
-        await connection.query(
-          `UPDATE add_sale_items SET
-             Quantity = ?, Sale_Price = ?,
-             Discount_On_Sale_Price = ?, Discount_Type_On_Sale_Price = ?,
-             Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
-           WHERE Sale_Items_Id = ?`,
-          [
-            normalizeNumber(item.Quantity),
-            normalizeNumber(item.Sale_Price),
-            cleanDiscount(item.Discount_On_Sale_Price),
-            cleanValue(item.Discount_Type_On_Sale_Price),
-            cleanValue(safeTaxType),
-            normalizeNumber(item.Tax_Amount),
-            normalizeNumber(item.Amount),
-            old.Sale_Items_Id,
-          ]
-        );
-
-        const diff = normalizeNumber(item.Quantity) - old.Quantity;
-        if (diff !== 0) {
-          await connection.query(
-            `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-            [diff, Item_Id]
-          );
-        }
-      } else {
-        const [res] = await connection.execute(
-          `INSERT INTO add_sale_items
-           (Sale_Id, Item_Id, Quantity, Sale_Price,
-            Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-            Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          [
-            saleId,
-            Item_Id,
-            normalizeNumber(item.Quantity),
-            normalizeNumber(item.Sale_Price),
-            cleanDiscount(item.Discount_On_Sale_Price),
-            cleanValue(item.Discount_Type_On_Sale_Price),
-            cleanValue(safeTaxType),
-            normalizeNumber(item.Tax_Amount),
-            normalizeNumber(item.Amount),
-          ]
-        );
-        const id    = res.insertId;
-        const newId = "SIT" + id.toString().padStart(3, "0");
-        await connection.execute(
-          `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
-          [newId, id]
-        );
-        await connection.query(
-          `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-          [normalizeNumber(item.Quantity), Item_Id]
-        );
-      }
     }
+  } else {
+    const [insertRes] = await connection.execute(
+      `INSERT INTO add_sale_items
+       (Sale_Id, Item_Id, Quantity, Sale_Price,
+        Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+        Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        saleId,
+        Item_Id,
+        normalizeNumber(item.Quantity),
+        normalizeNumber(item.Sale_Price),
+        cleanDiscount(item.Discount_On_Sale_Price),
+        cleanValue(item.Discount_Type_On_Sale_Price),
+        cleanValue(safeTaxType),
+        normalizeNumber(item.Tax_Amount),
+        normalizeNumber(item.Amount),
+      ]
+    );
+    const id    = insertRes.insertId;
+    const newId = "SIT" + id.toString().padStart(3, "0");
+    await connection.execute(
+      `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
+      [newId, id]
+    );
+    await connection.query(
+      `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+      [normalizeNumber(item.Quantity), Item_Id]
+    );
+  }
+}
 
-    // delete removed items + restore stock
-    for (const old of oldItems) {
-      if (!newItemIds.has(old.Item_Id)) {
-        await connection.query(
-          `DELETE FROM add_sale_items WHERE Sale_Items_Id = ?`,
-          [old.Sale_Items_Id]
-        );
-        await connection.query(
-          `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-          [old.Quantity, old.Item_Id]
-        );
-      }
-    }
+// delete removed items + restore stock — unchanged
+for (const old of oldItems) {
+  if (!newItemIds.has(old.Item_Id)) {
+    await connection.query(
+      `DELETE FROM add_sale_items WHERE Sale_Items_Id = ?`,
+      [old.Sale_Items_Id]
+    );
+    await connection.query(
+      `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+      [old.Quantity, old.Item_Id]
+    );
+  }
+}
 
     await connection.commit();
 

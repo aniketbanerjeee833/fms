@@ -5,7 +5,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
 
@@ -24,7 +24,7 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
-import {Trash2} from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 export default function SaleAdd() {
 
@@ -96,17 +96,18 @@ export default function SaleAdd() {
   const { data: items } = useGetAllItemsQuery();
   //console.log(items,parties);
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-  //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
+  const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
   //const[categoryOpen,setCategoryOpen] = useState(false);
   //const [showModal, setShowModal] = useState(false);
   //const[selected,setSelected] = useState([]);
   const [partySearch, setPartySearch] = useState("");
+  const [newCategory, setNewCategory] = useState("");
   const [originalTotal, setOriginalTotal] = useState(null);
-const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
   // const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
-   const [showSplitBox, setShowSplitBox] = useState(false);
+  const [showSplitBox, setShowSplitBox] = useState(false);
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     item: null,
@@ -128,8 +129,10 @@ const today = new Date().toISOString().split("T")[0];
   //     "pcs": "Piece",
 
   //   }
+  const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   // const [newUnitKey, setNewUnitKey] = useState("");
   // const [newUnitName, setNewUnitName] = useState("");
   //  const itemUnitsFetched = {
@@ -169,6 +172,57 @@ const today = new Date().toISOString().split("T")[0];
       };
       return updated;
     });
+  };
+  const handleSelect = (rowIndex, categoryName) => {
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[rowIndex] = {
+        ...updated[rowIndex],
+        Item_Category: categoryName,
+        CategoryOpen: false,
+        isExistingItem: false,   // user-typed, so still editable
+      };
+      return updated;
+    });
+
+    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  };
+  const handleAddCategory = async () => {
+
+    if (newCategory.trim() === "") {
+      return
+    }
+    else if (newCategory.trim() !== "") {
+      try {
+        // ✅ Call backend
+        const res = await addCategory({
+          body: { Item_Category: newCategory.trim() },
+        });
+
+        // Some RTK Query wrappers put the response under `.data`
+        const data = res?.data || res;
+
+        if (data?.success) {
+          const addedCat = newCategory.trim();
+
+          // ✅ Auto-select the new category (single value)
+          //setSelected(addedCat);
+          setValue("Item_Category", addedCat); // directly set single category
+
+          // ✅ Refresh cache
+          dispatch(itemApi.util.invalidateTags(["Category"]));
+
+          // ✅ Reset modal & input
+          setShowModal(false);
+          // setNewCategory("");
+          // setOpen(true);
+        } else {
+          console.warn("⚠️ Category not added. Response:", data);
+        }
+      } catch (err) {
+        console.error("❌ Error adding category:", err);
+      }
+    }
   };
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -251,7 +305,7 @@ const today = new Date().toISOString().split("T")[0];
     name: "items",
   });
 
-const {
+  const {
     fields: splitFields,
     append: appendSplit,
     remove: removeSplit,
@@ -347,10 +401,10 @@ const {
 
 
 
- 
+
   const formValues = watch();
 
-const sanitizeAmount = (value) => {
+  const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
     const parts = val.split(".");
     if (parts.length > 2) {
@@ -421,88 +475,160 @@ const sanitizeAmount = (value) => {
   }, [totalAmountWatch, computedTotalReceived]);
 
 
-  const onSubmit = async (data) => {
-    console.log("Form Data (from RHF):", data);
+  // const onSubmit = async (data) => {
+  //   console.log("Form Data (from RHF):", data);
 
 
-    if (!data.items || data.items.length === 0) {
-      toast.error("Please add at least one item before saving the sale.");
-      return;
-    }
+  //   if (!data.items || data.items.length === 0) {
+  //     toast.error("Please add at least one item before saving the sale.");
+  //     return;
+  //   }
 
-    // ✅ Clean up items (optional safety — remove blank rows)
-    const cleanedItems = data.items.filter(
-      (it) => it.Item_Name && it.Item_Name.trim() !== ""
-    );
+  //   // ✅ Clean up items (optional safety — remove blank rows)
+  //   const cleanedItems = data.items.filter(
+  //     (it) => it.Item_Name && it.Item_Name.trim() !== ""
+  //   );
 
-    if (cleanedItems.length === 0) {
-      toast.error("Please add at least one valid item with a name.");
-      return;
-    }
+  //   if (cleanedItems.length === 0) {
+  //     toast.error("Please add at least one valid item with a name.");
+  //     return;
+  //   }
 
-    // ✅ Validate no duplicates
-    const seenItems = new Set();
-    for (const item of cleanedItems) {
-      const name = item.Item_Name?.trim().toLowerCase();
+  //   // ✅ Validate no duplicates
+  //   const seenItems = new Set();
+  //   for (const item of cleanedItems) {
+  //     const name = item.Item_Name?.trim().toLowerCase();
 
-      if (seenItems.has(name)) {
-        toast.error(`Duplicate item '${item.Item_Name}' found.`);
-        return;
-      }
-      seenItems.add(name);
-    }
+  //     if (seenItems.has(name)) {
+  //       toast.error(`Duplicate item '${item.Item_Name}' found.`);
+  //       return;
+  //     }
+  //     seenItems.add(name);
+  //   }
 
-    // ✅ Ensure all items have tax & amount values (since auto-calculated)
-    const itemsWithDefaults = cleanedItems.map((item) => ({
-      ...item,
-      Tax_Type: item.Tax_Type || "None",
-      Tax_Amount: item.Tax_Amount || "0.00",
-      Amount: item.Amount || "0.00",
-    }));
+  //   // ✅ Ensure all items have tax & amount values (since auto-calculated)
+  //   const itemsWithDefaults = cleanedItems.map((item) => ({
+  //     ...item,
+  //     Tax_Type: item.Tax_Type || "None",
+  //     Tax_Amount: item.Tax_Amount || "0.00",
+  //     Amount: item.Amount || "0.00",
+  //   }));
 
-    // ✅ Build final payload
-    const payload = {
-      ...data,
-      items: itemsWithDefaults,
-      Total_Amount: data.Total_Amount || 0,
-      Total_Received: data.Total_Received || 0,
-      Balance_Due:
-        data.Balance_Due ||
-        ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-    };
+  //   // ✅ Build final payload
+  //   const payload = {
+  //     ...data,
+  //     items: itemsWithDefaults,
+  //     Total_Amount: data.Total_Amount || 0,
+  //     Total_Received: data.Total_Received || 0,
+  //     Balance_Due:
+  //       data.Balance_Due ||
+  //       ((data.Total_Amount || 0) - (data.Total_Received || 0)),
+  //   };
 
-    console.log("📦 Final Payload Sent:", payload);
+  //   console.log("📦 Final Payload Sent:", payload);
 
-    try {
-      const res = await addSale({
-        body: payload,
-      }).unwrap();
-      console.log(" successfully:", res);
-      const resData = res?.data || res;
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(saleApi.util.invalidateTags(["Sale"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-      if (!resData?.success) {
-        toast.error("Failed to add new sale");
-        return;
-      } else {
-        toast.success("New Sale added successfully!");
-        navigate("/sale/all-sales");
-      }
+  //   try {
+  //     const res = await addSale({
+  //       body: payload,
+  //     }).unwrap();
+  //     console.log(" successfully:", res);
+  //     const resData = res?.data || res;
+  //     dispatch(itemApi.util.invalidateTags(["Item"]));
+  //     dispatch(saleApi.util.invalidateTags(["Sale"]));
+  //     dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+  //     dispatch(bankAccountApi.util.invalidateTags([
+  //       { type: "BankAccount", id: payload.Bank_Account_Id },
+  //       "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+  //     ]));
+  //     if (!resData?.success) {
+  //       toast.error("Failed to add new sale");
+  //       return;
+  //     } else {
+  //       toast.success("New Sale added successfully!");
+  //       navigate("/sale/all-sales");
+  //     }
 
-    } catch (error) {
-      const errorMessage =
-        error?.data?.message || error?.message || "Failed to add new sale";
-      toast.error(errorMessage);
-      // toast.error("Failed to add lead");
-      console.error("Submission failed", error);
-    }
+  //   } catch (error) {
+  //     const errorMessage =
+  //       error?.data?.message || error?.message || "Failed to add new sale";
+  //     toast.error(errorMessage);
+  //     // toast.error("Failed to add lead");
+  //     console.error("Submission failed", error);
+  //   }
+  // }
+const onSubmit = async (data) => {
+  console.log("Form Data (from RHF):", data);
+
+  if (!data.items || data.items.length === 0) {
+    toast.error("Please add at least one item before saving the sale.");
+    return;
   }
 
+  // ✅ Clean up items (remove blank rows)
+  const cleanedItems = data.items.filter(
+    (it) => it.Item_Name && it.Item_Name.trim() !== ""
+  );
+
+  if (cleanedItems.length === 0) {
+    toast.error("Please add at least one valid item with a name.");
+    return;
+  }
+
+  // ✅ Ensure all items have tax & amount values
+  const itemsWithDefaults = cleanedItems.map((item) => ({
+    ...item,
+    Tax_Type: item.Tax_Type || "None",
+    Tax_Amount: item.Tax_Amount || "0.00",
+    Amount: item.Amount || "0.00",
+  }));
+
+  // ✅ Build final payload
+  const payload = {
+    ...data,
+    items: itemsWithDefaults,
+    Total_Amount: data.Total_Amount || 0,
+    Total_Received: data.Total_Received || 0,
+    Balance_Due:
+      data.Balance_Due ||
+      ((data.Total_Amount || 0) - (data.Total_Received || 0)),
+  };
+
+  console.log("📦 Final Payload Sent:", payload);
+
+  try {
+    const res = await addSale({
+      body: payload,
+    }).unwrap();
+
+    console.log("Successfully:", res);
+
+    const resData = res?.data || res;
+
+    dispatch(itemApi.util.invalidateTags(["Item"]));
+    dispatch(saleApi.util.invalidateTags(["Sale"]));
+    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: payload.Bank_Account_Id },
+        "BankAccount",
+      ])
+    );
+
+    if (!resData?.success) {
+      toast.error("Failed to add new sale");
+      return;
+    }
+
+    toast.success("New Sale added successfully!");
+    navigate("/sale/all-sales");
+  } catch (error) {
+    const errorMessage =
+      error?.data?.message || error?.message || "Failed to add new sale";
+
+    toast.error(errorMessage);
+    console.error("Submission failed", error);
+  }
+};
 
   useEffect(() => {
     const gstin = parties?.parties?.find(
@@ -523,7 +649,7 @@ const sanitizeAmount = (value) => {
         Item_HSN: it.Item_HSN || "",
         categorySearch: it.Item_Category || "",
         isExistingItem: true,
-        isHSNLocked: true,
+        isHSNLocked: false,
         isUnitLocked: true,
       };
       return updated;
@@ -563,7 +689,7 @@ const sanitizeAmount = (value) => {
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
-   const paymentType = watch("splits.0.Payment_Type");
+  const paymentType = watch("splits.0.Payment_Type");
   console.log(itemsValues, "itemsValues");
   return (
     <>
@@ -667,7 +793,7 @@ const sanitizeAmount = (value) => {
                   </span>
 
 
-                  
+
 
                   <div className="relative w-full">
                     <div
@@ -954,7 +1080,7 @@ const sanitizeAmount = (value) => {
                         </div>
                       </td>
 
-                      <td
+                      {/* <td
                         style={{ padding: "0px", position: "relative" }}>
 
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
@@ -965,7 +1091,8 @@ const sanitizeAmount = (value) => {
                             type="text"
                             value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
                             style={{ marginBottom: "0px" }}
-                            readOnly
+                            // readOnly
+                            readOnly={rows[i]?.isExistingItem}
 
                             placeholder="Category"
                             className="w-full outline-none border-b-2 text-gray-900"
@@ -981,7 +1108,145 @@ const sanitizeAmount = (value) => {
 
                         </div>
 
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <div ref={(el) => (categoryRefs.current[i] = el)}>
+                          <input
+                            type="text"
+                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
+                            style={{ marginBottom: "0px" }}
+                            readOnly={rows[i]?.isExistingItem}
+                            placeholder="Category"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                            onClick={() => {
+                              setShowModal(false);
+                              if (!rows[i]?.isExistingItem) {
+                                setRows((prev) =>
+                                  prev.map((row, idx) => ({
+                                    ...row,
+                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
+                                  }))
+                                );
+                              }
+                            }}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleRowChange(i, "categorySearch", value);
+                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
+                              handleRowChange(i, "isExistingItem", false);
+                            }}
+                          />
+
+
+                          {errors?.items?.[i]?.Item_Category && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_Category.message}
+                            </p>
+                          )}
+
+                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setShowModal(true);
+                                  handleRowChange(i, "CategoryOpen", false);
+                                }}>
+                                + Add Category
+                              </span>
+
+                              {categories
+                                ?.filter((cat) =>
+                                  cat.Item_Category.toLowerCase().startsWith(
+                                    (rows[i]?.categorySearch || "").toLowerCase()
+                                  )
+                                )
+                                .map((cat, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      handleSelect(i, cat.Item_Category);
+                                      handleRowChange(i, "categorySearch", cat.Item_Category);
+                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
+                                      handleRowChange(i, "CategoryOpen", false);
+                                    }}
+                                    // onClick={() => {
+                                    //   handleSelect(i, cat.Item_Category);
+                                    //   handleRowChange(i, "categorySearch", cat.Item_Category);
+                                    //   handleRowChange(i, "CategoryOpen", false);
+                                    // }}
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    {cat.Item_Category}
+                                  </div>
+                                ))}
+
+                              {categories?.filter((cat) =>
+                                cat.Item_Category.toLowerCase().startsWith(
+                                  (rows[i]?.categorySearch || "").toLowerCase()
+                                )
+                              ).length === 0 && (
+                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
+                                )}
+                            </div>
+                          )}
+                        </div>
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed",
+                              inset: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)",
+                              backdropFilter: "blur(4px)",
+                              zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-128 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md
+           p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+
+                              <div className="flex justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowModal(false)}
+                                  style={{ backgroundColor: "lightgray" }}
+                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleAddCategory}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </td>
+
 
 
                       <td style={{ padding: "0px", width: "18%", position: "relative" }}>
@@ -1007,7 +1272,9 @@ const sanitizeAmount = (value) => {
                                 handleRowChange(i, "isExistingItem", true);
                               } else {
                                 // ❌ Clear Item_Name in RHF to trigger error
-                                setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                                // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                                // handleRowChange(i, "isExistingItem", false);
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
                                 handleRowChange(i, "isExistingItem", false);
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
@@ -1155,11 +1422,15 @@ const sanitizeAmount = (value) => {
                       <td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
-                          readOnly
+                          //readOnly
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
 
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
+                          onChange={(e) => {
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                          }}
                         // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
                         />
                         {errors?.items?.[i]?.Item_HSN && (
@@ -1383,28 +1654,7 @@ const sanitizeAmount = (value) => {
                             className="form-control"
                             style={{ width: "50%", marginBottom: "0px" }}
                             {...register(`items.${i}.Discount_On_Sale_Price`)}
-                            //           onInput={(e) => {
-                            //             e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                            // //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
-                            // //   ...itemsValues[i],
-
-                            // //   Discount_On_Purchase_Price: e.target.value,
-
-                            // // });
-                            //     const { Tax_Amount, Amount, Total_Amount,Balance_Due } = calculateRowAmount(
-                            //   { ...itemsValues[i], Discount_On_Sale_Price: e.target.value },
-                            //   i,
-                            //   itemsValues
-                            // );
-
-                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                            // // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                            // // setValue(`items.${i}.Amount`, Amount);
-
-                            //           }}
+                           
                             onInput={(e) => {
                               let val = e.target.value;
 
@@ -1479,12 +1729,12 @@ const sanitizeAmount = (value) => {
                             <select
                               {...field}
                               className="form-select"
-                              style={{
-                                width: "100%", fontSize: "12px", marginBottom: "0px",
-                                pointerEvents: "none", // ✅ visually disabled
-                                cursor: "not-allowed",
-                                backgroundColor: "#f3f4f6", // light gray
-                              }}
+                              // style={{
+                              //   width: "100%", fontSize: "12px", marginBottom: "0px",
+                              //   pointerEvents: "none", // ✅ visually disabled
+                              //   cursor: "not-allowed",
+                              //   backgroundColor: "#f3f4f6", // light gray
+                              // }}
                               onChange={(e) => {
                                 field.onChange(e); // ✅ update RHF value
 
@@ -1616,18 +1866,18 @@ const sanitizeAmount = (value) => {
                           )}
                         </div>
 
-                     
+
                         {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                    <div className="mt-3 flex flex-col">
-                      <label className="text-sm">Reference Number</label>
-                      <input
-                        type="text"
-                        //readOnly={isView}
-                        style={{ marginBottom:"0px"}}
-                        {...register("splits.0.Reference_Number")}
-                      />
-                    </div>
-                  )}
+                          <div className="mt-3 flex flex-col">
+                            <label className="text-sm">Reference Number</label>
+                            <input
+                              type="text"
+                              //readOnly={isView}
+                              style={{ marginBottom: "0px" }}
+                              {...register("splits.0.Reference_Number")}
+                            />
+                          </div>
+                        )}
 
                         <button
                           type="button"
@@ -1690,7 +1940,7 @@ const sanitizeAmount = (value) => {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`); 
+                                      clearErrors(`splits.${index}.Amount`);
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -1714,7 +1964,7 @@ const sanitizeAmount = (value) => {
                                 <input
                                   type="text"
                                   placeholder="Reference Number"
-                                  style={{width:"80%"}}
+                                  style={{ width: "80%" }}
                                   // className="border rounded-md px-2 py-1.5 w-full"
                                   {...register(`splits.${index}.Reference_Number`)}
                                 />
@@ -1829,7 +2079,7 @@ const sanitizeAmount = (value) => {
 
                       <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                       <div className="flex items-center gap-2 relative">
+                        <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
@@ -2152,101 +2402,3 @@ const sanitizeAmount = (value) => {
 
 }
 
-
-//#4CA1AF
-{/* <input
-                                            type="text"
-                                            style={{marginBottom:"0px",marginTop:"0px"}}
-                                            id="Party_Name"
-                                            value={partySearch}
-                                            onChange={(e) => {
-                                              const value = e.target.value;
-                                              setPartySearch(value);
-                                              setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
-                                              setOpen(true);
-                                            }}
-                                            onClick={() => setOpen((prev) => !prev)}
-                                            onBlur={() => {
-                                              const typedValue = partySearch.trim().toLowerCase();
-                                        
-                                              // ✅ Full match only (not partial)
-                                              const matchedParty = parties?.parties?.find(
-                                                (party) => party.Party_Name.toLowerCase() === typedValue
-                                              );
-                                        
-                                              if (matchedParty) {
-                                                // ✅ Set full party info
-                                                setPartySearch(matchedParty.Party_Name);
-                                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                        
-                                                // ✅ Check GSTIN (must be present)
-                                                if (!matchedParty.GSTIN || matchedParty.GSTIN.trim() === "") {
-                                               
-                                                  setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                                                } else {
-                                                  setValue("GSTIN", matchedParty.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                                }
-                                        
-                                               
-                                              } else {
-                                                // ❌ Not an exact match → clear field
-                                                setPartySearch("");
-                                                setValue("Party_Name", "");
-                                              }
-                                        
-                                              setTimeout(() => setOpen(false), 150);
-                                            }}
-                                            placeholder="Party Name"
-                                            className="w-full outline-none border-b-2 text-gray-900"
-                                          />
-                                        
-                                
-                                          {open && (
-                                            <div className="absolute top-20 z-20 flex flex-col mt-1
-                                             w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                              <span
-                                                onClick={() => setShowPartyModal(true)}
-                                                className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                              >
-                                                + Add Party
-                                              </span>
-                                        
-                                              {parties?.parties
-                                                ?.filter(
-                                                  (party) =>
-                                                    party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase()) ||
-                                                    party?.Phone_Number?.includes(partySearch)
-                                                )
-                                                .map((party, i) => (
-                                                  <div
-                                                    key={i}
-                                                    onClick={() => {
-                                                      // Select from dropdown
-                                                      setPartySearch(party.Party_Name);
-                                                      setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                        
-                                                      // ✅ GSTIN validation on selection
-                                                      if (!party.GSTIN || party.GSTIN.trim() === "") {
-                                                        
-                                                        setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                                                      } else {
-                                                        setValue("GSTIN", party.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                                      }
-                                        
-                                                     
-                                                      setOpen(false);
-                                                    }}
-                                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                  >
-                                                    {party.Party_Name} ({party.Phone_Number})
-                                                  </div>
-                                                ))}
-                                        
-                                             
-                                              {parties?.parties?.filter((party) =>
-                                                party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase())
-                                              ).length === 0 && (
-                                                <p className="px-3 py-2 text-gray-500">No Party found</p>
-                                              )}
-                                            </div>
-                                          )} */}
