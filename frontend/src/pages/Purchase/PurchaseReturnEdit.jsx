@@ -5,7 +5,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
 
@@ -26,7 +26,7 @@ import { purchaseReturnApi, useGetPurchaseReturnByIdQuery, useUpdatePurchaseRetu
 import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-
+import { Trash2 } from "lucide-react";
 
 
 
@@ -110,26 +110,24 @@ export default function PurchaseReturndEdit() {
 
   const { data: parties } = useGetAllPartiesQuery();
   const { data: items } = useGetAllItemsQuery();
+  const { data: categories } = useGetAllCategoriesQuery()
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   // console.log(items);
   //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
-
+  const [showModal, setShowModal] = useState(false);
+  //const[selected,setSelected] = useState([]);
   const [partySearch, setPartySearch] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+
   //const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
 
+  const [addCategory] = useAddCategoryMutation();
+  const [showSplitBox, setShowSplitBox] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
-  //console.log(latestInvoiceNumber,"latestInvoiceNumber");
 
-  // const itemUnits = {
-  //   "gm": "Gram",
-  //   "Kg": "Kilogram",
-  //   "lt": "Litre",
-  //   "pcs": "Piece",
-
-  // }
 
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
@@ -159,45 +157,84 @@ export default function PurchaseReturndEdit() {
   } = useForm({
     resolver: zodResolver(purchaseReturnFormSchema),
     defaultValues: {
-      Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
-      Return_Number: "",
       Party_Name: "",
-      GSTIN: "",
+      Return_Number: "",
       Bill_Number: "",
       Bill_Date: "",
+      Return_Date: new Date().toISOString().slice(0, 10),
       State_Of_Supply: "",
       Total_Amount: "",
       Balance_Due: "",
       Total_Received: "",
-      Payment_Type: "Cash",
-      Bank_Account_Id: null,   // 🔹 added
-      Reference_Number: "",
-      items: [{
-
-
-        Item_Category: "",
-        Item_Name: "",
-        Quantity: 0,
-        Item_Unit: "",
-        Purchase_Price: "",
-
-        Discount_On_Purchase_Price: "",
-        Discount_Type_On_Purchase_Price: "Percentage",
-        Tax_Type: "None",
-        Tax_Amount: "",
-        Amount: "",
-      }
-      ]
-    }
-
-  })
+      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
+      items: [
+        {
+          Item_Category: "",
+          Item_Name: "",
+          Quantity: 1,
+          Item_Unit: "",
+          Purchase_Price: "",
+          Discount_On_Purchase_Price: "",
+          Discount_Type_On_Purchase_Price: "Percentage",
+          Tax_Type: "None",
+          Tax_Amount: "",
+          Amount: "",
+        },
+      ],
+    },
+  });
   const { fields, append, remove } = useFieldArray({
     control,
     name: "items",
   });
 
+  const {
+    fields: splitFields,
+    append: appendSplit,
+    remove: removeSplit,
+  } = useFieldArray({
+    control,
+    name: "splits",
+  });
 
 
+  const handleAddCategory = async () => {
+
+    if (newCategory.trim() === "") {
+      return
+    }
+    else if (newCategory.trim() !== "") {
+      try {
+        // ✅ Call backend
+        const res = await addCategory({
+          body: { Item_Category: newCategory.trim() },
+        });
+
+        // Some RTK Query wrappers put the response under `.data`
+        const data = res?.data || res;
+
+        if (data?.success) {
+          const addedCat = newCategory.trim();
+
+          // ✅ Auto-select the new category (single value)
+          //setSelected(addedCat);
+          setValue("Item_Category", addedCat); // directly set single category
+
+          // ✅ Refresh cache
+          dispatch(itemApi.util.invalidateTags(["Category"]));
+
+          // ✅ Reset modal & input
+          setShowModal(false);
+          setNewCategory("");
+          setOpen(true);
+        } else {
+          console.warn("⚠️ Category not added. Response:", data);
+        }
+      } catch (err) {
+        console.error("❌ Error adding category:", err);
+      }
+    }
+  };
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
@@ -253,7 +290,20 @@ export default function PurchaseReturndEdit() {
 
 
 
+  const handleSelect = (rowIndex, categoryName) => {
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[rowIndex] = {
+        ...updated[rowIndex],
+        Item_Category: categoryName,
+        CategoryOpen: false,
+        isExistingItem: false,   // user-typed, so still editable
+      };
+      return updated;
+    });
 
+    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  };
 
   const handleAddRow = () => {
     setRows((prev) => [
@@ -317,7 +367,7 @@ export default function PurchaseReturndEdit() {
   };
 
   const itemsValues = watch("items");   // watch all item rows
-  const totalPaid = watch("Total_Received"); // watch Total_Received
+  const totalReceived = watch("Total_Received"); // watch Total_Received
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
 
   // helper to calculate amount in a specific row
@@ -357,7 +407,7 @@ export default function PurchaseReturndEdit() {
       Tax_Amount: taxAmount.toFixed(2),
       Amount: finalAmount.toFixed(2),
       Total_Amount: totalAmount.toFixed(2), // ✅ correct grand total
-      Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
+      Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
     };
   };
 
@@ -379,7 +429,7 @@ export default function PurchaseReturndEdit() {
 
     setShowGSTIN(gstin || ""); // ✅ never undefined
   }, [watch("Party_Name"), parties]);
-  console.log(purchase)
+  // console.log(purchase)
   const toLocalDateString = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -420,12 +470,28 @@ export default function PurchaseReturndEdit() {
         //Total_Received: purchase.purchaseReturn?.Total_Received || "",
         Balance_Due: purchase.purchaseReturn?.Balance_Due || "",
 
-        Payment_Type: purchase.purchaseReturn?.Payment_Type || "",
-        Bank_Account_Id: purchase.purchaseReturn?.Bank_Account_Id, // ✅ Add this
-        Reference_Number: purchase.purchaseReturn?.Reference_Number || "",
-
+        // Payment_Type: purchase.purchaseReturn?.Payment_Type || "",
+        // Bank_Account_Id: purchase.purchaseReturn?.Bank_Account_Id, // ✅ Add this
+        // Reference_Number: purchase.purchaseReturn?.Reference_Number || "",
+        splits:
+          purchase?.purchaseReturn?.splits?.length > 0
+            ? purchase.purchaseReturn?.splits.map((split) => ({
+              Payment_Type: split.Payment_Type,
+              Bank_Account_Id: split.Bank_Account_Id,
+              Reference_Number: split.Reference_Number || "",
+              Amount: split.Amount, // or split.Amount if you want to prefill the original amount
+            }))
+            : [
+              {
+                Payment_Type: "Cash",
+                Bank_Account_Id: null,
+                Reference_Number: "",
+                Amount: "",
+              },
+            ],
         items: purchase.purchaseReturn.items || [],
       })
+      setShowSplitBox((purchase?.purchaseReturn?.splits?.length || 0) > 1);
     }
   }, [purchase]);
   //const Invoice_Number=purchase.purchaseReturn?.Invoice_Number 
@@ -442,7 +508,75 @@ export default function PurchaseReturndEdit() {
     }
   }, [purchase]);
 
+  const sanitizeAmount = (value) => {
+    let val = value.replace(/[^0-9.]/g, "");
+    const parts = val.split(".");
+    if (parts.length > 2) {
+      val = parts[0] + "." + parts.slice(1).join("");
+    }
+    return val;
+  };
 
+  // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
+  // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
+  const buildPaymentTypeOptions = (banks) => [
+    { value: "Cash", label: "Cash", repeatable: false },
+    { value: "Cheque", label: "Cheque", repeatable: true },
+    { value: "Neft", label: "Neft", repeatable: true },
+    ...(banks || []).map((bank) => ({
+      value: `bank_${bank.Bank_Account_Id}`,
+      label: bank.Account_Display_Name,
+      repeatable: false,
+    })),
+  ];
+
+  const getRowIdentifier = (type, bankId) =>
+    type === "Bank" ? `bank_${bankId ?? ""}` : type;
+
+  //Inside the component:
+
+  const getUsedIdentifiers = (excludeIndex) => {
+    const splitValues = watch("splits") || [];
+    return splitValues
+      .map((s, i) =>
+        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+      )
+      .filter(Boolean);
+  };
+
+  const getAvailableOptions = (excludeIndex) => {
+    const used = getUsedIdentifiers(excludeIndex);
+    return buildPaymentTypeOptions(banks).filter(
+      (opt) => opt.repeatable || !used.includes(opt.value)
+    );
+  };
+
+  const handleAddPaymentType = () => {
+    appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+    setShowSplitBox(true);
+  };
+
+  // live-derived total — never stored as a separate field
+  const splitsWatch = watch("splits") || [];
+  const computedTotalReceived = splitsWatch.reduce(
+    (sum, s) => sum + (parseFloat(s.Amount) || 0),
+    0
+  );
+
+  // one-directional: recompute Balance_Due whenever the total-amount or splits change.
+  // (One-directional only — do NOT also sync splits from Balance_Due, that
+  // two-way sync is exactly what caused the "value shown but still required"
+  // bug in the Payment-Out modal.)
+  const totalAmountWatch = watch("Total_Amount");
+  useEffect(() => {
+    const bal = (Number(totalAmountWatch) || 0) - computedTotalReceived;
+    setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
+    setValue("Total_Received", computedTotalReceived.toFixed(2), {
+      shouldValidate: false,
+      shouldDirty: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalAmountWatch, computedTotalReceived]);
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
@@ -530,6 +664,9 @@ export default function PurchaseReturndEdit() {
     }
   };
 
+  console.log("Current form values:", formValues);
+  console.log("Form errors:", errors);
+  const paymentType = watch("splits.0.Payment_Type");
   return (
     <>
       <div className="sb2-2-2">
@@ -974,23 +1111,33 @@ export default function PurchaseReturndEdit() {
                         </div>
                       </td>
 
-                      <td
-                        style={{ padding: "0px", position: "relative" }}>
-
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
-
-
-
                           <input
                             type="text"
-                            value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
+                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
                             style={{ marginBottom: "0px" }}
-                            readOnly
-
+                            readOnly={rows[i]?.isExistingItem}
                             placeholder="Category"
                             className="w-full outline-none border-b-2 text-gray-900"
-                          // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
+                            onClick={() => {
+                              if (!rows[i]?.isExistingItem) {
+                                setRows((prev) =>
+                                  prev.map((row, idx) => ({
+                                    ...row,
+                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
+                                  }))
+                                );
+                              }
+                            }}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleRowChange(i, "categorySearch", value);
+                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
+                              handleRowChange(i, "isExistingItem", false);
+                            }}
                           />
+
 
                           {errors?.items?.[i]?.Item_Category && (
                             <p className="text-red-500 text-xs mt-1">
@@ -998,10 +1145,103 @@ export default function PurchaseReturndEdit() {
                             </p>
                           )}
 
+                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setShowModal(true);
+                                  handleRowChange(i, "CategoryOpen", false);
+                                }}>
+                                + Add Category
+                              </span>
 
+                              {categories
+                                ?.filter((cat) =>
+                                  cat.Item_Category.toLowerCase().startsWith(
+                                    (rows[i]?.categorySearch || "").toLowerCase()
+                                  )
+                                )
+                                .map((cat, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      handleSelect(i, cat.Item_Category);
+                                      handleRowChange(i, "categorySearch", cat.Item_Category);
+                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
+                                      handleRowChange(i, "CategoryOpen", false);
+                                    }}
 
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    {cat.Item_Category}
+                                  </div>
+                                ))}
+
+                              {categories?.filter((cat) =>
+                                cat.Item_Category.toLowerCase().startsWith(
+                                  (rows[i]?.categorySearch || "").toLowerCase()
+                                )
+                              ).length === 0 && (
+                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
+                                )}
+                            </div>
+                          )}
                         </div>
-                        {/* Modal */}
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed",
+                              inset: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)",
+                              backdropFilter: "blur(4px)",
+                              zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+
+                              <div className="flex justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowModal(false)}
+
+                                  style={{ backgroundColor: "lightgray" }}
+                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                >
+                                  Cancel
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={handleAddCategory}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                       </td>
 
@@ -1581,10 +1821,10 @@ export default function PurchaseReturndEdit() {
 
               </table>
 
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full purchase-wrapper">
+              {/* <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full purchase-wrapper"> */}
 
-                <div className="flex flex-col px-2 w-full sm:w-64 purchase-left">
-                  {/* <div className="flex flex-col w-1/8"> */}
+              {/* <div className="flex flex-col px-2 w-full sm:w-64 purchase-left">
+                  {/* <div className="flex flex-col w-1/8"> 
                   <button
                     type="button"
                     onClick={handleAddRow}
@@ -1640,11 +1880,196 @@ export default function PurchaseReturndEdit() {
                       )}
                     </div>
                   </div>
+                </div> */}
+              <div className="flex sm:w-1/4 p-2">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  + Add Row
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2 w-full purchase-wrapper">
+                <div className="flex flex-col px-2">
+                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+
+
+                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                    {!showSplitBox ? (
+                      <>
+                        <div className="flex flex-col w-full">
+                          <span className="active">Payment Type</span>
+
+                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
+                            it's driven by setValue in the onChange below, not a native <select {...register}> */}
+                          <input
+                            type="hidden"
+                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
+                          />
+
+                          <select
+                            id="Payment_Type"
+                            value={
+                              paymentType === "Bank"
+                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                : paymentType || ""
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val.startsWith("bank_")) {
+                                const bankId = val.replace("bank_", "");
+                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                              }
+                            }}
+                          >
+                            <option value="">Select Payment Type</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Neft">Neft</option>
+                            {banks?.map((bank) => (
+                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
+                                {bank.Account_Display_Name}
+                              </option>
+                            ))}
+                          </select>
+
+                          {errors?.splits?.[0]?.Payment_Type && (
+                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
+                          )}
+                        </div>
+
+                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                          <div className="mt-3 flex flex-col">
+                            <label className="text-sm">Reference Number</label>
+                            <input
+                              type="text"
+                              //readOnly={isView}
+                              style={{ marginBottom: "0px" }}
+                              {...register("splits.0.Reference_Number")}
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handleAddPaymentType}
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none", padding: 0 }}
+                        >
+                          + Add Payment Type
+                        </button>
+                      </>
+                    ) : (
+                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
+                        {splitFields.map((field, index) => {
+                          const rowType = watch(`splits.${index}.Payment_Type`);
+                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
+                          const rowOptions = getAvailableOptions(index);
+                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
+                          const amountField = register(`splits.${index}.Amount`, {
+                            required: "Required",
+                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                          });
+
+                          return (
+                            <div key={field.id} className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                  <select
+                                    value={currentIdentifier || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                    className="border rounded-md px-2 py-1.5"
+                                  >
+                                    <option value="">Select Type</option>
+                                    {rowOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Amount"
+                                    style={{ marginBottom: "0px", width: "80%" }}
+                                    className="border rounded-md px-2 py-1.5"
+                                    {...amountField}
+                                    onChange={(e) => {
+                                      e.target.value = sanitizeAmount(e.target.value);
+                                      amountField.onChange(e);
+                                    }}
+                                  />
+                                  {errors?.splits?.[index]?.Amount && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                  )}
+                                </div>
+
+                                {splitFields.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSplit(index)}
+                                    className="text-gray-500 mb-2 mt-4"
+                                    style={{ background: "transparent", border: "none" }}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {needsRef && (
+                                <input
+                                  type="text"
+                                  placeholder="Reference Number"
+                                  style={{ width: "80%" }}
+                                  // className="border rounded-md px-2 py-1.5 w-full"
+                                  {...register(`splits.${index}.Reference_Number`)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                          }
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none" }}
+                        >
+                          + Add Another Payment
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {/* <div style={{ width: "100%" }}
+                                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
+                                  > */}
 
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 purchase-right">
-
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
+                >
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
@@ -1656,7 +2081,7 @@ export default function PurchaseReturndEdit() {
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalPaid = parseFloat(watch("Total_Received")) || 0;
+                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -1667,7 +2092,7 @@ export default function PurchaseReturndEdit() {
                             const rounded = Math.round(totalAmount);
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
 
                           } else {
                             if (originalTotal !== null) {
@@ -1675,7 +2100,7 @@ export default function PurchaseReturndEdit() {
 
                               setValue(
                                 "Balance_Due",
-                                (originalTotal - totalPaid).toFixed(2),
+                                (originalTotal - totalReceived).toFixed(2),
                                 { shouldValidate: true }
                               );
                             }
@@ -1696,7 +2121,7 @@ export default function PurchaseReturndEdit() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
                           const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalPaid = parseFloat(watch("Total_Received")) || 0;
+                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
 
                           if (isNaN(totalAmount)) return;
 
@@ -1704,9 +2129,9 @@ export default function PurchaseReturndEdit() {
                           const newTotal = totalAmount + val;
 
                           setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
-                      // disabled={!watch("roundOffCheck") && originalTotal === null}
+                      //disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div>
 
@@ -1728,7 +2153,7 @@ export default function PurchaseReturndEdit() {
 
 
 
-                      <div className="flex items-center  gap-3 relative ">
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
                         <div className="flex items-center gap-2 relative">
 
@@ -1736,9 +2161,12 @@ export default function PurchaseReturndEdit() {
                             type="checkbox"
 
 
-                            id="totalReceivedCheck"
+                            id="totalPaidCheck"
                             className="w-4 h-4 cursor-pointer"
+                            disabled={splitsWatch.length > 1}   // 🔹 add this
+
                             onChange={(e) => {
+
                               const isChecked = e.target.checked;
                               const totalAmount = parseFloat(watch("Total_Amount"));
 
@@ -1768,7 +2196,7 @@ export default function PurchaseReturndEdit() {
                             htmlFor="totalReceivedCheck"
                             className="font-medium whitespace-nowrap"
                           >
-                            Total Paid
+                            Total Received
                           </span>
 
                         </div>
@@ -1778,7 +2206,9 @@ export default function PurchaseReturndEdit() {
                           type="text"
                           {...register("Total_Received")}
                           style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                          readOnly={splitsWatch.length > 1}
                           onChange={(e) => {
+                            if (splitsWatch.length > 1) return;
                             let val = e.target.value.replace(/[^0-9.]/g, "");
 
                             // Allow only one dot
@@ -1794,24 +2224,29 @@ export default function PurchaseReturndEdit() {
                             e.target.value = val;
                             setValue("Total_Received", val);
 
-                            const totalPaid = parseFloat(val || 0);
+                            const totalReceived = parseFloat(val || 0);
                             const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
+                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                            if (splitsWatch.length === 1) {
+                              const val = e.target.value;
+                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                            }
                           }}
-                        // className="form-control"
+                          className="form-control"
                         />
                       </div>
 
 
 
 
-                      <div className="flex  gap-2 items-center ">
+                      <div style={{ width: "100%" }}
+                        className="flex  gap-2 items-center ">
 
                         <span className="font-medium whitespace-nowrap">Balance Due</span>
                         <input
                           style={{
-                            backgroundColor: "transparent",
-                            marginBottom: "0px", height: "1rem", width: "100%"
+                            backgroundColor: "transparent", marginBottom: "0px",
+                            height: "1rem", width: "100%"
                           }}
                           type="text"
                           className="form-control  "
@@ -1826,6 +2261,9 @@ export default function PurchaseReturndEdit() {
 
                 </div>
               </div>
+
+
+
             </div>
             <div className="flex justify-end gap-4 mt-4">
               {/* <button

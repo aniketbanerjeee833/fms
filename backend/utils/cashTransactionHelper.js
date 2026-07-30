@@ -56,9 +56,9 @@ export const recordCashTransaction = async ({
   // 🔹 always update the row
   await connection.query(
     `UPDATE cash_transactions
-     SET Amount = ?, Party_Name = ?, Txn_Date = ?, Remarks = ?, updated_at = NOW()
+     SET Amount = ?, Party_Name = ?, Txn_Date = ?,  updated_at = NOW()
      WHERE id = ?`,
-    [amount, partyName, txnDate, remarks, existingTxn.id]
+    [amount, partyName, txnDate,  existingTxn.id]
   );
 
   // 🔹 only shift when amount actually changed

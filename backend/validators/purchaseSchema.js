@@ -1,6 +1,18 @@
 import { z } from "zod";
-const HSN_REGEX = /^\d{4,8}$/;
 
+
+// const digitsOnly = (fieldName, required = true) =>
+//   z.union([z.string(), z.number()])
+//     .transform((val) => String(val ?? "").trim())
+//     .refine(
+//       (val) => (required ? val !== "" : true),
+//       { message: `${fieldName} is required` }
+//     )
+//     .refine(
+//       (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+//       { message: `${fieldName} must be a valid number` }
+//     )
+//     .transform((val) => (val === "" ? 0 : Number(val)));
 const digitsOnly = (fieldName, required = true) =>
   z.union([z.string(), z.number()])
     .transform((val) => String(val ?? "").trim())
@@ -9,10 +21,37 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} is required` }
     )
     .refine(
-      (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+      (val) => val === "" || /^-?\d+(\.\d{1,2})?$/.test(val),   // ← added -? here
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
+    const paymentSplitSchema = z
+      .object({
+        Payment_Type: z
+          .enum(["Cash", "Cheque", "Neft", "Bank"])
+          .or(z.literal("")) // allow blank select
+          .refine((val) => val !== "", {
+            message: "Please select a payment type.",
+          }),
+    
+        // Required only when Payment_Type === "Bank"
+        Bank_Account_Id: z
+          .union([z.number(), z.string(), z.null(), z.undefined()])
+          .optional(),
+    
+        Reference_Number: z
+          .string()
+          .trim()
+          .nullable()
+          .optional()
+          .transform((val) => val ?? ""),
+    
+        Amount: digitsOnly("Amount", true),
+      })
+      .refine((data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id, {
+        message: "Please select a bank account.",
+        path: ["Bank_Account_Id"],
+      });
 // ✅ Schema
 // Accept string or number, then validate up to 2 decimals, then convert to Number and min 1
 const priceStringDigits = z
@@ -64,39 +103,61 @@ const priceStringDigits = z
   // 🔹 Optional but digits if provided
   Total_Paid: z.string().optional().or(digitsOnly("Total_Paid", false)),
 
- Payment_Type: z
-  .enum(["Cash", "Cheque", "Neft", "Bank"])
-  .or(z.literal(""))
-  .refine((val) => val !== "", {
-    message: "Please select a payment type.",
-  }),
-      Bank_Account_Id: z
-        .union([z.number(), z.string(), z.null(), z.undefined()])
-        .optional(),
-  // Payment_Type: z.enum(["Cash", "Cheque", "Neft"]).default("Cash"),
- Reference_Number: z
-  .string()
-  .trim()
-  .optional()
-  .or(z.literal("")),
+//  Payment_Type: z
+//   .enum(["Cash", "Cheque", "Neft", "Bank"])
+//   .or(z.literal(""))
+//   .refine((val) => val !== "", {
+//     message: "Please select a payment type.",
+//   }),
+//       Bank_Account_Id: z
+//         .union([z.number(), z.string(), z.null(), z.undefined()])
+//         .optional(),
+//   // Payment_Type: z.enum(["Cash", "Cheque", "Neft"]).default("Cash"),
+//  Reference_Number: z
+//   .string()
+//   .trim()
+//   .optional()
+//   .or(z.literal("")),
 
   // Stock_Quantity: digitsOnly("Stock_Quantity"),
+ splits: z
+      .array(paymentSplitSchema)
+      .min(1, "At least one payment split is required")
+      .superRefine((splits, ctx) => {
+        let cashSeen = false;
+        const seenBankAccounts = new Set();
 
+        splits.forEach((split, index) => {
+          if (split.Payment_Type === "Cash") {
+            if (cashSeen) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Only one Cash split is allowed.",
+                path: [index, "Payment_Type"],
+              });
+            }
+            cashSeen = true;
+          }
+
+          if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
+            if (seenBankAccounts.has(split.Bank_Account_Id)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "Each bank account can only be used once. Edit the existing split instead of adding a duplicate.",
+                path: [index, "Bank_Account_Id"],
+              });
+            }
+            seenBankAccounts.add(split.Bank_Account_Id);
+          }
+        });
+      }),
   items: z
     .array(
       z.object({
            Item_Category: z.string().min(1, "Item category is required"),
         Item_Name: z.string().min(1, "Item name is required"),
-    //      Item_HSN: z
-    // .string()
-    // .min(1, "HSN Code is required")
-    // .max(20, "HSN Code must be at most 20 characters"),
-            // Item_HSN: z.string()
-            //      // 1. Enforce length (4 to 8 characters)
-            //      .min(4, "HSN Code must be at least 4 digits.")
-            //      .max(8, "HSN Code must be at most 8 digits.")
-            //      // 2. Enforce only digits (0-9)
-            //      .regex(HSN_REGEX, "HSN Code must contain only digits (0-9)."),
+ 
             Item_HSN: z
               .union([
                 z.string(),
@@ -123,24 +184,7 @@ const priceStringDigits = z
 
 
         Item_Unit: z.string().min(1, "Unit is required"),
-        // Purchase_Price: digitsOnly("Purchase_Price"),
-        //        Purchase_Price: digitsOnly("Purchase_Price", true).refine(
-        //   (num) => num >= 1,
-        //   { message: "Purchase Price must be  greater than 0" }
-        // ),
-//    Purchase_Price: z.preprocess(
-//   (val) => Number(val),
-//   z.number().min(1, "Purchase Price must be greater than 0")
-// ),
-// Purchase_Price: z.string()
-//   .transform((val) => val.trim())
-//   .refine((val) => /^\d+(\.\d{1,2})?$/.test(val), {
-//     message: "Purchase Price must be a valid number with up to 2 decimals",
-//   })
-//   .transform((val) => Number(val))
-//   .refine((num) => num >= 1, {
-//     message: "Purchase Price must be greater than 0",
-//   }),
+       
 Purchase_Price:priceStringDigits,
 
         // Purchase_Price_Type: z.enum(["With Tax", "Without Tax"]),

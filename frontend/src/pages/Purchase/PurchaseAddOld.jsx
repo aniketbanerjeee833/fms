@@ -1,34 +1,29 @@
 import { useState } from "react";
-import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
 
-import { purchaseApi, useEditPurchaseMutation, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
+import {
+  useAddPurchaseMutation, useUploadPurchaseBillMutation
+} from "../../redux/api/purchaseApi";
 import { toast } from "react-toastify";
 
 import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
-import { LayoutDashboard } from "lucide-react";
+import { FileText, LayoutDashboard, Upload } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
-import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { Trash2 } from "lucide-react";
-export default function PurchaseEdit() {
-  const location = useLocation();
-  const from = location.state?.from
 
-  const Party_Id = location.state?.partyId;
-  const Item_Id = location.state?.itemId
-  const bankId = location.state?.bankId;
-  console.log("Edit page query:", location.search, from);
-  const { id: Purchase_Id } = useParams();
+
+export default function PurchaseAdd() {
+
   const dispatch = useDispatch();
   const TAX_RATES = {
     "GST0": 0,
@@ -56,73 +51,68 @@ export default function PurchaseEdit() {
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
-  const { data: items } = useGetAllItemsQuery();
-
+  const { data: items, } = useGetAllItemsQuery();
+  // console.log(items, parties);
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const { data: purchase }
-    = useGetSinglePurchaseQuery(Purchase_Id)
+  //console.log(banks, "banks");
   const [open, setOpen] = useState(false);
+  //console.log(categories, "categories");
   //const[categoryOpen,setCategoryOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  //const[selected,setSelected] = useState([]);
+
   const [partySearch, setPartySearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  // const dropdownRef=useRef(null);
-  // const[search,setSearch] = useState("");
-  const [showPartyModal, setShowPartyModal] = useState(false);
-  const [showSplitBox, setShowSplitBox] = useState(false);
 
+  const [showPartyModal, setShowPartyModal] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
   const [originalTotal, setOriginalTotal] = useState(null);
+  // const[chequeNumber,setChequeNumber]=useState(false);
+  // const[neftNumber,setNeftNumber]=useState(false);
+  // const [paymentType, setPaymentType] = useState("")
   const [addCategory] = useAddCategoryMutation();
-
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
+  // const [newUnitKey, setNewUnitKey] = useState("");
+  // const [newUnitName, setNewUnitName] = useState("");
+  //  const itemUnitsFetched = {
+  //     "gm": "Gram",
+  //     "Kg": "Kilogram",
+  //     "lt": "Litre",
+  //     "pcs": "Piece",
 
-  const states = [
-    "Andaman and Nicobar Islands",
-    "Andhra Pradesh",
-    "Arunachal Pradesh",
-    "Assam",
-    "Bihar",
-    "Chandigarh",
-    "Chhattisgarh",
-    "Dadra and Nagar Haveli and Daman and Diu",
-    "Delhi",
-    "Goa",
-    "Gujarat",
-    "Haryana",
-    "Himachal Pradesh",
-    "Jammu and Kashmir",
-    "Jharkhand",
-    "Karnataka",
-    "Kerala",
-    "Ladakh",
-    "Lakshadweep",
-    "Madhya Pradesh",
-    "Maharashtra",
-    "Manipur",
-    "Meghalaya",
-    "Mizoram",
-    "Nagaland",
-    "Odisha",
-    "Puducherry",
-    "Punjab",
-    "Rajasthan",
-    "Sikkim",
-    "Tamil Nadu",
-    "Telangana",
-    "Tripura",
-    "Uttar Pradesh",
-    "Uttarakhand",
-    "West Bengal"
-  ];
-  const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
-  // console.log(itemUnits, "itemUnits");
+  //   }
+  //const [itemUnitsSaved, setItemUnitsSaved] = useState({});
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
   // console.log(itemUnitsFetched, "itemUnitsFetched");
-  // const itemUnits=itemUnitsFetched
+  // // const itemUnits=itemUnitsFetched
+  //   const [itemUnits, setItemUnits] = useState(itemUnitsFetched);
+  const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
+  console.log(itemUnits, "itemUnits");
+
+  // const openAddUnitModal = (rowIndex) => {
+  //   setActiveRow(rowIndex);
+  //   setShowAddUnitModal(true);
+  // };
+
+  // const handleAddUnit = () => {
+  //   if (!newUnitKey || !newUnitName) return;
+
+  //   setItemUnits((prev) => ({
+  //     ...prev,
+  //     [newUnitKey]: newUnitName,
+  //   }));
+
+  //   // auto-select newly added unit
+  //   setValue(`items.${activeRow}.Item_Unit`, newUnitKey);
+  //   handleRowChange(activeRow, "Item_Unit", newUnitKey);
+
+  //   setShowAddUnit(false);
+  //   setNewUnitKey("");
+  //   setNewUnitName("");
+  // };
+
+
   const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {
@@ -150,8 +140,8 @@ export default function PurchaseEdit() {
 
           // ✅ Reset modal & input
           setShowModal(false);
-          setNewCategory("");
-          setOpen(true);
+          // setNewCategory("");
+          // setOpen(true);
         } else {
           console.warn("⚠️ Category not added. Response:", data);
         }
@@ -164,11 +154,11 @@ export default function PurchaseEdit() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: ""
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false
     }
   ]);
 
-  const [editPurchase, { isLoading: isEditingPurchase }] = useEditPurchaseMutation();
+  const [addPurchase, { isLoading: isAddingPurchase }] = useAddPurchaseMutation();
   // helper to update a field in a specific row
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -217,7 +207,6 @@ export default function PurchaseEdit() {
     handleSubmit,
     setValue,
     watch,
-    reset,
 
     formState: { errors },
   } = useForm({
@@ -231,10 +220,9 @@ export default function PurchaseEdit() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
-      // Payment_Type: "Cash",
-      // Reference_Number: "",
-      //Bank_Account_Id: null,   // 🔹 added
-      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
+      Payment_Type: "Cash",
+      Bank_Account_Id: null,   // 🔹 added
+      Reference_Number: "",
       items: [{
 
 
@@ -243,7 +231,7 @@ export default function PurchaseEdit() {
         Quantity: 1,
         Item_Unit: "",
         Purchase_Price: "",
-
+        Item_HSN: "",
         Discount_On_Purchase_Price: "",
         Discount_Type_On_Purchase_Price: "Percentage",
         Tax_Type: "None",
@@ -260,22 +248,14 @@ export default function PurchaseEdit() {
   });
 
 
-  const {
-    fields: splitFields,
-    append: appendSplit,
-    remove: removeSplit,
-  } = useFieldArray({
-    control,
-    name: "splits",
-  });
-
   const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
       ...prev.map((row) => ({
         ...row,
         CategoryOpen: false,
-        itemOpen: false, // also close item dropdown if open
+        itemOpen: false, // also close item dropdown if open,
+        addUnitModalOpen: false
       })),
       {
         itemSearch: "",
@@ -285,6 +265,7 @@ export default function PurchaseEdit() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
+        addUnitModalOpen: false
       },
     ]);
 
@@ -303,32 +284,32 @@ export default function PurchaseEdit() {
     });
   };
 
+  const handleDeleteRow = (i) => {
+  // 1. get current items BEFORE removal
+  const currentItems = watch("items");
+ 
+  // 2. calculate new total excluding the deleted row
+  const newTotal = currentItems.reduce((sum, row, idx) => {
+    if (idx === i) return sum;                    // skip deleted row
+    return sum + parseFloat(row.Amount || 0);
+  }, 0);
+ 
+  const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+  const newBalanceDue = newTotal - currentTotalPaid;
+ 
+  // 3. remove from UI state and form
+  setRows((prev) => prev.filter((_, idx) => idx !== i));
+  remove(i);
+ 
+  // 4. update totals
+  setValue("Total_Amount", newTotal.toFixed(2),      { shouldValidate: true });
+  setValue("Balance_Due",  newBalanceDue.toFixed(2), { shouldValidate: true });
+};
+
   // const handleDeleteRow = (i) => {
   //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
   //   remove(i); // remove from form
   // };
-
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
-
-    // 2. calculate new total excluding the deleted row
-    const newTotal = currentItems.reduce((sum, row, idx) => {
-      if (idx === i) return sum;                    // skip deleted row
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
-
-    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-    const newBalanceDue = newTotal - currentTotalPaid;
-
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
-
-    // 4. update totals
-    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  };
 
   const itemsValues = watch("items");   // watch all item rows
   const totalPaid = watch("Total_Paid"); // watch Total_Paid
@@ -375,6 +356,29 @@ export default function PurchaseEdit() {
 
 
 
+  // const calcAll = (data) => {
+  //   // ensure items exist & valid
+  //   const cleanedItems = (data.items || [])
+  //     .filter((it) => (it.Item_Name || "").trim() !== "")
+  //     .map(calculateRowAmount);
+
+  //   const totalAmount = cleanedItems.reduce(
+  //     (sum, it) => sum + num(it.Amount),
+  //     0
+  //   );
+
+  //   const totalPaid = num(data.Total_Paid); // optional
+  //   const balanceDue = totalAmount - totalPaid;
+
+  //   return {
+  //     items: cleanedItems,
+  //     totals: {
+  //       Total_Amount: totalAmount.toFixed(2),
+  //       Total_Paid: totalPaid.toFixed(2),
+  //       Balance_Due: balanceDue.toFixed(2),
+  //     },
+  //   };
+  // };
 
 
   //const itemsValues = watch("items"); // watch all rows
@@ -397,154 +401,15 @@ export default function PurchaseEdit() {
 
 
 
-  const sanitizeAmount = (value) => {
-    let val = value.replace(/[^0-9.]/g, "");
-    const parts = val.split(".");
-    if (parts.length > 2) {
-      val = parts[0] + "." + parts.slice(1).join("");
-    }
-    return val;
-  };
-
-  // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
-  // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
-
-  const getRowIdentifier = (type, bankId) =>
-    type === "Bank" ? `bank_${bankId ?? ""}` : type;
-
-  //Inside the component:
-
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
-
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
-
-  const handleAddPaymentType = () => {
-    appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
-    setShowSplitBox(true);
-  };
-
-  // live-derived total — never stored as a separate field
-  const splitsWatch = watch("splits") || [];
-  const computedTotalPaid = splitsWatch.reduce(
-    (sum, s) => sum + (parseFloat(s.Amount) || 0),
-    0
-  );
-
-  // one-directional: recompute Balance_Due whenever the total-amount or splits change.
-  // (One-directional only — do NOT also sync splits from Balance_Due, that
-  // two-way sync is exactly what caused the "value shown but still required"
-  // bug in the Payment-Out modal.)
-  const totalAmountWatch = watch("Total_Amount");
-  useEffect(() => {
-    const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
-    setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalAmountWatch, computedTotalPaid]);
-
-
-
-  useEffect(() => {
-    const gstin = parties?.parties?.find(
-      (party) => party.Party_Name === watch("Party_Name")
-    )?.GSTIN;
-
-    setShowGSTIN(gstin || ""); // ✅ never undefined
-  }, [watch("Party_Name"), parties]);
-  const toLocalDateString = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
-  };
-  useEffect(() => {
-    if (purchase) {
-      setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
-      const prefilledRows = purchase?.items?.map((item) => ({
-        ...item,
-        itemSearch: item.Item_Name,
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: true,
-        isUnitLocked: true,
-        isExistingItem: true,
-
-      }))
-      setRows(prefilledRows)
-      reset({
-        Party_Name: purchase?.billPurchaseDetails?.Party_Name,
-        GSTIN: purchase?.billPurchaseDetails?.GSTIN,
-        Bill_Number: purchase?.billPurchaseDetails?.Bill_Number,
-        Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
-        State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
-        Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
-        Total_Paid: purchase?.billPurchaseDetails?.Total_Paid,
-        Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
-        //Payment_Type: purchase?.billPurchaseDetails?.Payment_Type,
-        //Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id, // ✅ Add this
-        //Reference_Number: purchase?.billPurchaseDetails?.Reference_Number,
-        splits:
-          purchase?.splits?.length > 0
-            ? purchase.splits.map((split) => ({
-              Payment_Type: split.Payment_Type,
-              Bank_Account_Id: split.Bank_Account_Id,
-              Reference_Number: split.Reference_Number || "",
-              Amount: split.Amount, // or split.Amount if you want to prefill the original amount
-            }))
-            : [
-              {
-                Payment_Type: "Cash",
-                Bank_Account_Id: null,
-                Reference_Number: "",
-                Amount: "",
-              },
-            ],
-        items: purchase?.items
-      })
-      setShowSplitBox((purchase?.splits?.length || 0) > 1);
-    }
-  }, [purchase])
-  useEffect(() => {
-    if (purchase) {
-      setShowGSTIN(purchase.GSTIN || "");   // ✅ only UI update
-    }
-  }, [purchase]);
-
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
-    //const { items, totals } = calcAll(data);
+    // const { items, totals } = calcAll(data);
 
     // 2) build payload
     const payload = {
       ...data,
+      Total_Paid: data.Total_Paid || 0,
       // items,
       // Total_Amount: totals.Total_Amount,
       // Total_Paid: totals.Total_Paid,           // blank -> 0.00
@@ -577,230 +442,469 @@ export default function PurchaseEdit() {
     }
     console.log("payload:", payload);
     try {
-      const res = await editPurchase({
+      const res = await addPurchase({
         body: payload,
-        Purchase_Id
       }).unwrap();
       console.log(" successfully:", res);
       const resData = res?.data || res;
-
-      dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-
-      dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
+      dispatch(itemApi.util.invalidateTags(["Item"]));
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-      // if(from === "party-payables"){
-      //   dispatch(partyApi.util.invalidateTags(["Party"]));
-      // }
+        dispatch(bankAccountApi.util.invalidateTags([
+               { type: "BankAccount", id: payload.Bank_Account_Id },
+               "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+             ]));
       if (!resData?.success) {
-        toast.error("Failed to update purchase");
+        toast.error("Failed to add new purchase");
         return;
       } else {
         toast.success("New Purchase added successfully!");
-        if (from === "party-payables") {
-          navigate({
-            pathname: `/party/payables`,
-            search: location.search,
-          })
-        }
-        else if (from === "party-sales-purchases-details") {
-
-          navigate({
-            pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-            search: location.search,
-          })
-          dispatch(partyApi.util.invalidateTags(["Party"]));
-        }
-        else if (from === "item-sales-purchases-details") {
-          navigate({
-            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-            search: location.search,
-          })
-          dispatch(itemApi.util.invalidateTags(["Item"]));
-        } else if (from === "bank-accounts") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/cash-bank/bank-accounts`,
-            search: `?bankId=${bankId}`,
-          });
-        } else if (from === "cash-in-hand") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/cash-bank/cash-in-hand`,
-
-          });
-        }
-        else {
-          navigate({
-            pathname: "/purchase/all-purchases",
-            search: location.search,
-          });
-        }     // navigate("/purchase/all-purchases");
+        navigate("/purchase/all-purchases");
       }
 
     } catch (error) {
       const errorMessage =
-        error?.data?.message || error?.message || "Failed to update purchase.";
+        error?.data?.message || error?.message || "Failed to add new purchase";
       toast.error(errorMessage);
       // toast.error("Failed to add lead");
       console.error("Submission failed", error);
     }
   }
 
-  console.log(purchase);
+  const states = [
+    "Andaman and Nicobar Islands",
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chandigarh",
+    "Chhattisgarh",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jammu and Kashmir",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Ladakh",
+    "Lakshadweep",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Puducherry",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal"
+  ];
+
+  // useEffect(() => {
+  //   const gstin = parties?.parties?.find(
+  //     (party) => party.Party_Name === watch("Party_Name")
+  //   )?.GSTIN;
+
+  //   setShowGSTIN(gstin || ""); // ✅ never undefined
+  // }, [watch("Party_Name"), parties]);
+
+  useEffect(() => {
+
+    const party = parties?.parties?.find(
+      (p) => p.Party_Name === watch("Party_Name")
+    );
+
+    if (party?.GSTIN) {
+      setShowGSTIN(party.GSTIN);
+    }
+
+  }, [watch("Party_Name"), parties]);
+  console.log("showGSTIN:", showGSTIN, parties);
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
-  const paymentType = watch("splits.0.Payment_Type");
+
+  const paymentType = watch("Payment_Type", "");
+
+  // const formData = new FormData();
+
+  const [file, setFile] = useState(null);
+  const [uploadBill, { isLoading: isUploadBillLoading }] = useUploadPurchaseBillMutation();
+  //const [invoiceData,setInvoiceData] = useState(null);
+
+
+  const normalizeDate = (dateStr) => {
+
+    if (!dateStr) return "";
+
+    // replace separators
+    const clean = dateStr.replace(/[./]/g, "-");
+
+    const parts = clean.split("-");
+
+    if (parts.length === 3) {
+
+      let [d, m, y] = parts;
+
+      if (y.length === 2) y = "20" + y;
+
+      if (d.length === 1) d = "0" + d;
+      if (m.length === 1) m = "0" + m;
+
+      return `${y}-${m}-${d}`; // HTML date input format
+    }
+
+    // fallback if AI gives text date
+    const parsed = new Date(dateStr);
+
+    if (!isNaN(parsed)) {
+      return parsed.toISOString().split("T")[0];
+    }
+
+    return "";
+  };
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const uploadInvoice = async () => {
+
+    if (!file) {
+      alert("Please select invoice image");
+      return;
+    }
+
+    try {
+
+      const formData = new FormData();
+      formData.append("bill", file);
+
+      const res = await uploadBill({
+        body: formData,
+      }).unwrap();
+
+      const data = res.data;
+
+      console.log("AI DATA:", data);
+
+      // const formatDate = (dateStr) => {
+      //   if (!dateStr) return "";
+      //   const [d, m, y] = dateStr.split(".");
+      //   return `${y}-${m}-${d}`;
+      // };
+
+      setValue("Party_Name", data.Party_Name || "");
+      setPartySearch(data.Party_Name || "");
+      // setValue("GSTIN", data.GSTIN || "");
+      setShowGSTIN(data.GSTIN || "");
+      setValue("Bill_Number", data.Bill_Number || "");
+      setValue("Bill_Date", normalizeDate(data.Bill_Date));
+      // setValue("Bill_Date", formatDate(data.Bill_Date));
+      setValue("State_Of_Supply", data.State_Of_Supply || "");
+      setValue("Total_Amount", data.Total_Amount || "");
+      setValue("Total_Paid", data.Total_Amount || "");
+      setValue("Balance_Due", 0);
+
+      const formattedItems = (data.items || []).map((item) => ({
+        Item_Category: "",
+        Item_Name: item.Item_Name || "",
+        Item_HSN: item.Item_HSN || "",
+        Quantity: Number(item.Quantity) || 1,
+        Item_Unit: "",
+        Purchase_Price: item.Purchase_Price || "",
+        Discount_On_Purchase_Price: "",
+        Discount_Type_On_Purchase_Price: "Percentage",
+        Tax_Type: "None",
+        Tax_Amount: "",
+        Amount: item.Amount || "",
+      }));
+
+      remove();
+      formattedItems.forEach(item => append(item));
+
+      setRows(
+        formattedItems.map((item) => ({
+          itemSearch: item.Item_Name,   // 🔴 important
+          Item_HSN: item.Item_HSN || "",   // 🔴 important
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: false,
+          isExistingItem: false,
+          categorySearch: "",
+          addUnitModalOpen: false
+        }))
+      );
+
+      alert("Invoice scanned successfully");
+
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed");
+    }
+  };
+
+  //console.log("Invoice Data:", invoiceData);
   return (
     <>
-      <div className="sb2-2-2">
+
+
+      {/* <div className="sb2-2-2">
         <ul>
           <li>
             {/* <NavLink to="/">
                                 <i className="fa fa-home mr-2" aria-hidden="true"></i>
                                 Dashboard
-                            </NavLink> */}
+                            </NavLink>
             <NavLink style={{ display: "flex", flexDirection: "row" }}
               to="/home"
 
             >
               <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> *
               Dashboard
             </NavLink>
           </li>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
-      {/* <div className="sb2-2-3">
+      {/* <div   className="sb2-2-3" >
         <div className="row" style={{ margin: "0px" }}>
           <div className="col-md-12">
-            <div style={{ padding: "20px" }}
+              <div style={{ padding: "20px" }}
               className="box-inn-sp"> */}
 
       <div style={{ padding: "20px" }}
         className="flex flex-col bg-white ">
 
-        <div className="inn-title w-full px-2 py-3">
+        <div style={{ marginTop: "2rem" }} className="inn-title w-full px-2 py-3">
 
-          <div className="
+          {/*<div className="
     flex flex-col sm:flex-row 
     justify-between 
     items-start sm:items-center 
     w-full 
     
-    mt-4               /* ⭐ Adds spacing from top header */
+    mt-4               
   ">
 
-            {/* LEFT HEADER */}
-            <div className="w-full sm:w-auto">
-              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Edit Purchase</h4>
-              {/* <p className="text-gray-500 mb-2 sm:mb-4">
-        Add new purchase details
-      </p> */}
-            </div>
+                  {/* LEFT HEADER */}
+          {/* <div className="w-full sm:w-auto">
+                    <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Add New purchase</h4>
+            
+                  </div> */}
 
-            {/* RIGHT BUTTON SECTION */}
-            <div className="
+          {/* RIGHT BUTTON SECTION 
+                  <div className="flex flex-col  gap-4 sm:flex-row
+                     items-start sm:items-center sm:justify-end 
+    w-full ">
+                        <div className="flex flex-col justify-start w-full items-center gap-3 
+      bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 shadow-sm
+      sm:flex-row sm:w-auto ">
+
+  {/* Hidden File Input 
+  <input
+    type="file"
+    accept="image/*"
+    id="invoiceUpload"
+    className="hidden"
+    //onChange={(e) => handleFileChange(e)}
+  />
+
+  {/* Select File Button 
+  <label
+    htmlFor="invoiceUpload"
+    className="flex items-center gap-2 cursor-pointer 
+    bg-white border px-3 py-2 rounded-md hover:bg-gray-100"
+  >
+    <FileText size={18} className="text-[#4CA1AF]" />
+    <span className="text-sm font-medium text-gray-700">
+      Select Invoice
+    </span>
+  </label>
+
+  {/* Upload Button 
+  <button
+    type="button"
+    //onClick={uploadInvoice}
+    className="flex items-center gap-2 bg-[#4CA1AF] text-white px-4 py-2 rounded-md hover:bg-[#3c8c98] transition"
+  >
+    <Upload size={18} />
+    Upload
+  </button>
+
+</div>
+                  <div className="
       w-full sm:w-auto 
       flex flex-wrap sm:flex-nowrap 
       justify-start sm:justify-end 
       gap-3
     ">
-              <button
-                type="button"
-                // onClick={() => navigate("/purchase/all-purchases")}
-                //                                onClick={()=>navigate({
-                //   pathname: "/purchase/all-purchases",
-                //   search: location.search,
-                // })}
-                onClick={() => {
+        {/* <div className="flex">
+      <input type="file"  accept="image/*" 
+      // onChange={(e)=>handleFileChange(e)} 
+      />
+       <br /><br />
 
-                  if (from === "party-payables") {
-                    navigate({
-                      pathname: `/party/payables`,
-                      search: location.search,
-                    })
-                  }
-                  else if (from === "party-sales-purchases-details") {
+      <button type="button"
+       //onClick={()=>uploadInvoice()}
+       >
+        Upload Invoice
+      </button>
+      </div> 
+      
+      
 
-                    navigate({
-                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                      search: location.search,
-                    })
-                  }
-                  else if (from === "item-sales-purchases-details") {
-                    navigate({
-                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                      search: location.search,
-                    })
-                  } else if (from === "bank-accounts") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
-                    navigate({
-                      pathname: `/cash-bank/bank-accounts`,
-                      search: `?bankId=${bankId}`,
-                    })
-                  }
-                  else if (from === "cash-in-hand") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
-                    navigate({
-                      pathname: `/cash-bank/cash-in-hand`,
+      <div className="flex gap-2 mt-2 sm:mt-0">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/purchase/all-purchases")}
+                      className="text-white font-bold py-2 px-4 rounded"
+                      style={{ backgroundColor: "#4CA1AF" }}
+                    >
+                      Back
+                    </button>
 
-                    });
-                  }
-                  else {
-                    navigate({
-                      pathname: "/purchase/all-purchases",
-                      search: location.search,
-                    })
-                  }
-                }}
-                //     else if (from === "party-payables") {
+                    <button
+                      type="button"
+                      onClick={() => navigate("/purchase/all-purchases")}
+                      className="text-white py-2 px-4 rounded"
+                      style={{ backgroundColor: "#4CA1AF" }}
+                    >
+                      All Purchases
+                    </button>
+                    </div>
+                  </div>
+            </div>
+                </div>*/}
 
-
-                //       navigate({
-                //   pathname: `/party/payables`,
-                //   search: location.search,
-                // })
-                // }  
-                className="text-white font-bold py-2 px-4 rounded"
-                style={{ backgroundColor: "#4CA1AF" }}
-              >
-                Back
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/purchase/all-purchases")}
-                className="text-white py-2 px-4 rounded"
-                style={{ backgroundColor: "#4CA1AF" }}
-              >
-                All Purchases
-              </button>
+          <div
+            className="
+  flex flex-col sm:flex-row
+  justify-between
+  items-start sm:items-center
+  w-full
+  mt-4
+"
+          >
+            {/* LEFT HEADER */}
+            <div className="w-full sm:w-auto">
+              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">
+                Add New purchase
+              </h4>
             </div>
 
+            {/* RIGHT SECTION */}
+            <div
+              className="
+    flex flex-col sm:flex-row
+    items-start sm:items-center
+    gap-4
+    w-full sm:w-auto
+  "
+            >
+              {/* INVOICE UPLOAD */}
+              <div
+                className="
+      flex flex-col sm:flex-row
+      items-center
+      gap-3
+      bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 shadow-sm
+      w-auto sm:w-auto
+    "
+              >
+                {/* Hidden File Input  */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="invoiceUpload"
+                  className="hidden"
+                  onChange={(e) => handleFileChange(e)}
+                />
+
+                Select File
+                <label
+                  htmlFor="invoiceUpload"
+                  className="
+        flex items-center gap-2 cursor-pointer
+        bg-white border px-3 py-2 rounded-md hover:bg-gray-100
+      "
+                >
+                  <FileText size={18} className="text-[#4CA1AF]" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Select Invoice
+                  </span>
+                </label>
+
+                Upload
+                <button
+                  type="button"
+                  className="
+        flex items-center gap-2
+        bg-[#4CA1AF] text-white px-4 py-2 rounded-md
+        hover:bg-[#3c8c98] transition
+      "
+                  onClick={() => uploadInvoice()}
+                  disabled={isUploadBillLoading}
+                >
+                  <Upload size={18} />
+                  {isUploadBillLoading ? "Uploading..." : "Upload"}
+                </button>
+              </div>
+
+              {/* BUTTONS */}
+              <div
+                className="
+      flex  sm:flex-row
+      gap-2
+      w-full sm:w-auto
+    "
+              >
+                <button
+                  type="button"
+                  onClick={() => navigate("/purchase/all-purchases")}
+                  className="text-white font-bold py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  Back
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("/purchase/all-purchases")}
+                  className="text-white py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  All Purchases
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
         <div style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
+            {/* <div className="row"> */}
             <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
-
-
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-
+                {/* <div className="input-field col s6 relative"> */}
                 <div className=" flex flex-col relative mt-2 gap-2 party-class"
                   style={{ marginBottom: "0px", marginTop: "0px" }}>
                   <span className="whitespace-nowrap active ">
                     Party
                     <span className="text-red-500">*</span>
                   </span>
-
 
                   <div className="relative w-full">
                     <div
@@ -885,6 +989,7 @@ export default function PurchaseEdit() {
                     )}
                   </div>
 
+
                   {/* Add Party Modal */}
                   {showPartyModal && (
                     <PartyAddModal
@@ -903,7 +1008,7 @@ export default function PurchaseEdit() {
                   )}
                 </div>
                 <div className="input-field  flex gap-4
-                              justify-center items-center  gstin-class">
+                              justify-center items-center gstin-class">
                   <span className=" whitespace-nowrap active ">
                     GSTIN
 
@@ -914,9 +1019,9 @@ export default function PurchaseEdit() {
                     id=" GSTIN"
                     style={{ marginBottom: "0px" }}
                     value={showGSTIN || ""}
-                    {...register("GSTIN")}
                     placeholder="GSTIN"
-                    className="w-full outline-none border-b-2 text-gray-900"
+                    className="w-full outline-none border-b-2 text-gray-900
+                          gstin-class"
                     readOnly
                   />
                   {errors?.GSTIN && (
@@ -926,28 +1031,30 @@ export default function PurchaseEdit() {
                   )}
                 </div>
 
+
               </div>
+              {/* <div className="row  "> */}
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
 
 
 
 
-
                 {/* Bill Number */}
                 <div className="flex items-center w-full gap-3  justify-end">
+                  {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
                     Bill Number
                     <span className="text-red-500">*</span>
                   </span>
 
                   <input
-                    type="text"
                     style={{ marginBottom: 0, border: "none", width: "50%" }}
+                    type="text"
                     id=" Bill_Number"
                     {...register("Bill_Number")}
                     placeholder="Bill_Number"
-                    className="w-full outline-none invoice-number-class  text-gray-900"
+                    className=" invoice-number-class w-full outline-none text-gray-900"
                   />
                   {errors?.Bill_Number && (
                     <p className="text-red-500 text-xs mt-1">
@@ -955,20 +1062,20 @@ export default function PurchaseEdit() {
                     </p>
                   )}
                 </div>
-
                 <div className="flex items-center w-full gap-3  justify-end">
+                  {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
                     Bill Date
                     <span className="text-red-500">*</span>
                   </span>
 
                   <input
-                    style={{ marginBottom: 0, border: "none", width: "50%" }}
                     type="date"
+                    style={{ marginBottom: 0, width: "50%", border: "none" }}
                     id=" Bill_Date"
                     {...register("Bill_Date")}
                     placeholder=" Bill_Date"
-                    className="w-full outline-none invoice-date-class   text-gray-900"
+                    className="w-full outline-none invoice-date-class  text-gray-900"
                   />
                   {errors?.Bill_Date && (
                     <p className="text-red-500 text-xs mt-1">
@@ -980,11 +1087,12 @@ export default function PurchaseEdit() {
 
 
 
-
                 <div className="flex
                                            items-center w-full gap-3 justify-end
                                            state-of-supply-class">
-                  <span className="whitespace-nowrap ">
+                  {/* <div className="row w-1/2"> */}
+
+                  <span className=" whitespace-nowrap active">
                     State of Supply
                     <span className="text-red-500">*</span>
                   </span>
@@ -1001,9 +1109,9 @@ export default function PurchaseEdit() {
                       </option>
                     ))}
                     {/* <option value="West Bengal">West Bengal</option>
-                        <option value="Maharashtra">Maharashtra</option>
-                        <option value="Karnataka">Karnataka</option>
-                        <option value="Delhi">Delhi</option> */}
+                          <option value="Maharashtra">Maharashtra</option>
+                          <option value="Karnataka">Karnataka</option>
+                          <option value="Delhi">Delhi</option> */}
                   </select>
                   {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1011,10 +1119,10 @@ export default function PurchaseEdit() {
                     </p>
                   )}
                 </div>
+
+
+
               </div>
-
-
-
             </div>
 
 
@@ -1078,6 +1186,7 @@ export default function PurchaseEdit() {
                             placeholder="Category"
                             className="w-full outline-none border-b-2 text-gray-900"
                             onClick={() => {
+                              setShowModal(false);
                               if (!rows[i]?.isExistingItem) {
                                 setRows((prev) =>
                                   prev.map((row, idx) => ({
@@ -1127,7 +1236,11 @@ export default function PurchaseEdit() {
                                       setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
                                       handleRowChange(i, "CategoryOpen", false);
                                     }}
-
+                                    // onClick={() => {
+                                    //   handleSelect(i, cat.Item_Category);
+                                    //   handleRowChange(i, "categorySearch", cat.Item_Category);
+                                    //   handleRowChange(i, "CategoryOpen", false);
+                                    // }}
                                     className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                                   >
                                     {cat.Item_Category}
@@ -1144,6 +1257,7 @@ export default function PurchaseEdit() {
                             </div>
                           )}
                         </div>
+
                         {showModal && (
                           <div
                             style={{
@@ -1157,7 +1271,7 @@ export default function PurchaseEdit() {
                               zIndex: 30,
                             }}
                           >
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-128 relative">
                               <button
                                 type="button"
                                 onClick={() => setShowModal(false)}
@@ -1172,7 +1286,8 @@ export default function PurchaseEdit() {
                                 type="text"
                                 value={newCategory}
                                 onChange={(e) => setNewCategory(e.target.value)}
-                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                className="w-full border border-gray-300 rounded-md
+           p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
                                 placeholder="Enter category name"
                               />
 
@@ -1180,82 +1295,11 @@ export default function PurchaseEdit() {
                                 <button
                                   type="button"
                                   onClick={() => setShowModal(false)}
-
                                   style={{ backgroundColor: "lightgray" }}
                                   className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
                                 >
                                   Cancel
                                 </button>
-                                {/* <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (from === "party-sales-purchases-details") {
-
-                                            navigate({
-                                              pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                                              search: location.search,
-                                            })
-                                          }
-                                            //  navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                          // } else if (from === "item-sales-purchases-details") {
-                                          //   navigate({
-                                          //     pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                                          //     search: location.search,
-                                          //   })
-                                          //   // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                          // } 
-                                          else {
-                                            navigate({
-                                              pathname: "/purchase/all-purchases",
-                                              search: location.search,
-                                            })
-
-                                            // navigate("/sale/all-sales");
-                                          }
-                                        }}
-                                        //       onClick={() => {
-                                        //     if (from === "party-sales-purchases-details") {
-                                        //       navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                        // //        navigate({
-                                        // //   pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                                        // //   search: location.search,
-                                        // // })
-                                        //       //  navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                        //     } else if (from === "item-sales-purchases-details") {
-                                        //      navigate({
-                                        //   pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                                        //   search: location.search,
-                                        // })
-                                        //       // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                        //     } else {
-                                        //                                     navigate({
-                                        //   pathname: "/purchase/all-purchases",
-                                        //   search: location.search,
-                                        // })
-
-                                        //       // navigate("/sale/all-sales");
-                                        //     }
-                                        //   }}
-                                        //   onClick={() => {
-                                        //     if (from === "party-sales-purchases-details") {
-                                        //       navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                        //     } 
-
-                                        //     else if (from === "item-sales-purchases-details") {
-                                        //       navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                        //     }else {
-                                        //                                         navigate({
-                                        //   pathname: "/purchase/all-purchases",
-                                        //   search: location.search,
-                                        // })
-                                        //       // navigate(`/purchase/all-purchases`);
-                                        //     }
-                                        //   }}
-                                        className="text-white font-bold py-2 px-4 rounded"
-                                        style={{ backgroundColor: "#4CA1AF" }}
-                                      >
-                                        Cancel
-                                      </button> */}
                                 <button
                                   type="button"
                                   onClick={handleAddCategory}
@@ -1268,62 +1312,10 @@ export default function PurchaseEdit() {
                             </div>
                           </div>
                         )}
-                        {/* {showModal && (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.4)",
-        backdropFilter: "blur(4px)",
-        zIndex: 30,
-      }}
-    >
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-        <button
-          type="button"
-          onClick={() => setShowModal(false)}
-          style={{ backgroundColor: "transparent" }}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        >
-          ✕
-        </button>
-
-        <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-        <input
-          type="text"
-          value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-          placeholder="Enter category name"
-        />
-
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => setShowModal(false)}
-            style={{ backgroundColor: "lightgray" }}
-            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleAddCategory}
-            style={{ backgroundColor: "#4CA1AF" }}
-            className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
-          >
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  )} */}
                       </td>
+
                       {/* Item Dropdown */}
-                      <td style={{ padding: "0px", width: "18%", position: "relative" }}>
+                      <td style={{ padding: "0px", width: "20%", position: "relative" }}>
                         <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                           <input
                             type="text"
@@ -1333,6 +1325,7 @@ export default function PurchaseEdit() {
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
                               setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                              // setValue(`items.${i}.Item_Name`, typedValue);
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
                               handleRowChange(i, "isUnitLocked", false);
@@ -1473,12 +1466,15 @@ export default function PurchaseEdit() {
                       <td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
-                          maxLength={8}
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
+                          maxLength={8}              // limit to 8 digits
+
                           onChange={(e) => {
                             if (!rows[i]?.isHSNLocked) {
+                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
                               handleRowChange(i, "Item_HSN", e.target.value);
                               setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                              // setValue(`items.${i}.Item_HSN`, e.target.value);
                             }
                           }}
                           placeholder="HSN Code"
@@ -1498,9 +1494,8 @@ export default function PurchaseEdit() {
                           type="text"
                           className="form-control"
                           style={{ width: "100%" }}
-
-                          // {...register(`items.${i}.Quantity`)}
                           {...register(`items.${i}.Quantity`)}
+
 
                           onChange={(e) => {
 
@@ -1541,7 +1536,38 @@ export default function PurchaseEdit() {
                         )}
                       </td>
 
-
+                      {/* Unit */}
+                      {/* <td style={{ padding: "0px" }}>
+                              <Controller
+                                control={control}
+                                name={`items.${i}.Item_Unit`}
+                                render={({ field }) => (
+                                  <select
+                                    {...field}
+                                    className="form-select "
+                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
+                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      handleRowChange(i, "Item_Unit", value);
+                                      setValue(`items.${i}.Item_Unit`, value);
+                                    }}
+                                  >
+                                    <option value="">Select</option>
+                                    {Object.entries(itemUnits).map(([key, value]) => (
+                                      <option key={key} value={key}>
+                                        {`${value} (${key})`}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              />
+                              {errors?.items?.[i]?.Item_Unit && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.items[i].Item_Unit.message}
+                                </p>
+                              )}
+                            </td> */}
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
@@ -1601,10 +1627,10 @@ export default function PurchaseEdit() {
                             style={{ width: "100%", marginBottom: "0px" }}
                             {...register(`items.${i}.Purchase_Price`)}
                             onChange={(e) => {
-                              let val = e.target.value.replace(/[^0-9.]/g, "");;
+                              let val = e.target.value;
 
                               // ✅ allow digits and one dot
-
+                              val = val.replace(/[^0-9.]/g, "");
 
                               // ✅ if more than one dot, keep only the first
                               const parts = val.split(".");
@@ -1619,8 +1645,8 @@ export default function PurchaseEdit() {
                               }
 
                               e.target.value = val;
-                              setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
-                              //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
+                              setValue(`items.${i}.Purchase_Price`, val,
+                                { shouldValidate: true, shouldDirty: true });
                               if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                                 return;
                               }
@@ -1641,6 +1667,53 @@ export default function PurchaseEdit() {
                             placeholder="Price"
                           />
 
+                          {/* </div>
+                              {errors?.items?.[i]?.Purchase_Price && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.items[i].Purchase_Price.message}
+                                </p>
+                              )} */}
+
+                          {/* <input
+  type="text"
+  className="form-control"
+  style={{ width: "100%", marginBottom: "0px" }}
+  {...register(`items.${i}.Purchase_Price`)}
+  onChange={(e) => {
+    let val = e.target.value;
+
+    val = val.replace(/[^0-9.]/g, "");   // allow only digits + dot
+
+    const parts = val.split(".");
+    if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+
+    if (val.includes(".")) {
+      const [int, dec] = val.split(".");
+      val = int + "." + dec.slice(0, 2);     // limit decimals to 2
+    }
+
+    e.target.value = val;
+
+    const priceNumber = Number(val) || 0; // convert safely
+
+    setValue(`items.${i}.Purchase_Price`, priceNumber, { shouldValidate: true });
+
+    if (!itemsValues[i]?.Item_Name?.trim()) return;
+
+    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+      { ...itemsValues[i], Purchase_Price: priceNumber }, // numeric value
+      i,
+      itemsValues
+    );
+
+    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+    setValue(`items.${i}.Amount`, Amount);
+    setValue("Total_Amount", Total_Amount);
+    setValue("Balance_Due", Balance_Due);
+  }}
+  placeholder="Price"
+/> */}
+
                         </div>
                         {errors?.items?.[i]?.Purchase_Price && (
                           <p className="text-red-500 text-xs mt-1">
@@ -1648,6 +1721,7 @@ export default function PurchaseEdit() {
                           </p>
                         )}
                       </td>
+
                       {/* Discount */}
                       <td style={{ padding: "0px", width: "14%" }}>
                         <div className="d-flex align-items-center">
@@ -1681,10 +1755,10 @@ export default function PurchaseEdit() {
                                 itemsValues
                               );
 
-                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                              setValue(`items.${i}.Amount`, Amount);
-                              setValue("Total_Amount", Total_Amount);
-                              setValue("Balance_Due", Balance_Due);
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                             }}
 
                             placeholder="Discount"
@@ -1699,6 +1773,7 @@ export default function PurchaseEdit() {
                                 style={{ width: "50%", fontSize: "12px" }}
                                 onChange={(e) => {
                                   field.onChange(e); // ✅ let RHF handle its state
+
 
 
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
@@ -1734,12 +1809,16 @@ export default function PurchaseEdit() {
                               onChange={(e) => {
                                 field.onChange(e); // ✅ update RHF value
 
-
+                                // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                //   ...itemsValues[i],
+                                //   Tax_Type: e.target.value,
+                                // });
                                 const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                   { ...itemsValues[i], Tax_Type: e.target.value },
                                   i,
                                   itemsValues
                                 );
+
                                 setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
                                 setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
@@ -1780,7 +1859,7 @@ export default function PurchaseEdit() {
                       </td>
 
                       {/* Amount */}
-                      <td style={{ width: "8%" }}>
+                      <td style={{ width: "16%" }}>
                         <input
                           type="text"
                           className="form-control"
@@ -1795,196 +1874,119 @@ export default function PurchaseEdit() {
 
 
               </table>
-              <div className="flex sm:w-1/4 p-2">
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
-                  style={{ backgroundColor: "#4CA1AF" }}
-                >
-                  + Add Row
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
-                <div className="flex flex-col px-2">
-                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+              <div className="grid grid-cols-2 px-2 sm:grid-cols-2  gap-4 w-full sale-wrapper">
 
+                <div className="flex flex-col px-2 w-full sm:w-64 sale-left">
+                  {/* <div className="flex flex-col w-1/8"> */}
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className=" text-white font-bold py-2 px-4 w-1/2  rounded "
+                    style={{ backgroundColor: "#4CA1AF" }}
+                  >
+                    + Add Row
+                  </button>
+                  <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64">
+                    {/* <div className="flex flex-col  w-full mt-3"> */}
+                    <div className="flex flex-col w-full">
+                      <span className="active">Payment Type</span>
 
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
-                    {!showSplitBox ? (
-                      <>
-                        <div className="flex flex-col w-full">
-                          <span className="active">Payment Type</span>
-
-                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
-            it's driven by setValue in the onChange below, not a native <select {...register}> */}
-                          <input
-                            type="hidden"
-                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
-                          />
-
-                          <select
-                            id="Payment_Type"
-                            value={
-                              paymentType === "Bank"
-                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                                : paymentType || ""
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val.startsWith("bank_")) {
-                                const bankId = val.replace("bank_", "");
-                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                              } else {
-                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                              }
-                            }}
-                          >
-                            <option value="">Select Payment Type</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Neft">Neft</option>
-                            {banks?.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </select>
-
-                          {errors?.splits?.[0]?.Payment_Type && (
-                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
-                          )}
-                        </div>
-
-
-                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                          <div className="mt-3 flex flex-col">
-                            <label className="text-sm">Reference Number</label>
-                            <input
-                              type="text"
-                              //readOnly={isView}
-                              style={{ marginBottom: "0px" }}
-                              {...register("splits.0.Reference_Number")}
-                            />
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={handleAddPaymentType}
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none", padding: 0 }}
-                        >
-                          + Add Payment Type
-                        </button>
-                      </>
-                    ) : (
-                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
-                        {splitFields.map((field, index) => {
-                          const rowType = watch(`splits.${index}.Payment_Type`);
-                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
-                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
-                          const amountField = register(`splits.${index}.Amount`, {
-                            required: "Required",
-                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
-                          });
-
-                          return (
-                            <div key={field.id} className="flex flex-col gap-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
-                                    value={currentIdentifier || ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val.startsWith("bank_")) {
-                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                      } else {
-                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                      }
-                                    }}
-                                    className="border rounded-md px-2 py-1.5"
-                                  >
-                                    <option value="">Select Type</option>
-                                    {rowOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Amount"
-                                    style={{ marginBottom: "0px", width: "80%" }}
-                                    className="border rounded-md px-2 py-1.5"
-                                    {...amountField}
-                                    onChange={(e) => {
-                                      e.target.value = sanitizeAmount(e.target.value);
-                                      amountField.onChange(e);
-                                    }}
-                                  />
-                                  {errors?.splits?.[index]?.Amount && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
-                                  )}
-                                </div>
-
-                                {splitFields.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSplit(index)}
-                                    className="text-gray-500 mb-2 mt-4"
-                                    style={{ background: "transparent", border: "none" }}
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                )}
-                              </div>
-
-                              {needsRef && (
-                                <input
-                                  type="text"
-                                  placeholder="Reference Number"
-                                  style={{ width: "80%" }}
-                                  // className="border rounded-md px-2 py-1.5 w-full"
-                                  {...register(`splits.${index}.Reference_Number`)}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                      <select
+                        id="Payment_Type"
+                        value={
+                          watch("Payment_Type") === "Bank"
+                            ? `bank_${watch("Bank_Account_Id") || ""}`
+                            : watch("Payment_Type") || ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.startsWith("bank_")) {
+                            const bankId = val.replace("bank_", "");
+                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                          } else {
+                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
                           }
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none" }}
-                        >
-                          + Add Another Payment
-                        </button>
+                        }}
+                      >
+                        <option value="">Select Payment Type</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Neft">Neft</option>
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={`bank_${bank.Bank_Account_Id}`}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
+                       
+                      </select>
+
+                      {errors?.Payment_Type && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
+                      )}
+                      {errors?.Bank_Account_Id && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
+                      )}
+                    </div>
+                    {/* <div className="flex flex-col w-full">
+                      <span className="active">Payment Type</span>
+
+                      <select id="Payment_Type" {...register("Payment_Type")}
+                      >
+                        <option value="">Select Payment Type</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Neft">Neft</option>
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={bank.Account_Display_Name}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors?.Payment_Type && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors?.Payment_Type?.message}
+                        </p>
+                      )}
+                    </div> */}
+
+
+
+
+                    {(paymentType === "Cheque" || paymentType === "Neft") && (
+
+                      <div className="flex flex-col w-full ">
+                        <span className="active whitespace-nowrap">
+                          {paymentType === "Cheque" ? "Cheque Number" : "NEFT Reference Number"}
+                        </span>
+
+                        <input
+                          type="text"
+                          id="Reference_Number"
+                          {...register("Reference_Number")}
+                          placeholder={`Enter ${paymentType} number`}
+                          className="w-full outline-none border-b-2 text-gray-900"
+                        />
+
+                        {errors?.Reference_Number && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors?.Reference_Number?.message}
+                          </p>
+                        )}
                       </div>
+
                     )}
                   </div>
                 </div>
-                {/* <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
-                  > */}
-
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
-                >
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right">
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
@@ -1996,7 +1998,7 @@ export default function PurchaseEdit() {
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -2007,7 +2009,7 @@ export default function PurchaseEdit() {
                             const rounded = Math.round(totalAmount);
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
 
                           } else {
                             if (originalTotal !== null) {
@@ -2015,7 +2017,7 @@ export default function PurchaseEdit() {
 
                               setValue(
                                 "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
+                                (originalTotal - totalPaid).toFixed(2),
                                 { shouldValidate: true }
                               );
                             }
@@ -2036,7 +2038,7 @@ export default function PurchaseEdit() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
                           const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
 
                           if (isNaN(totalAmount)) return;
 
@@ -2044,13 +2046,14 @@ export default function PurchaseEdit() {
                           const newTotal = totalAmount + val;
 
                           setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
                         }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      // disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div>
 
-                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+                    <div style={{ width: "100%" }}
+                      className="flex flex-col gap-4 mt-3 w-full">
                       <div className="flex gap-3 items-center  w-full sm:w-auto">
 
                         <div style={{ width: "100%" }} className="flex gap-2 ">
@@ -2068,7 +2071,8 @@ export default function PurchaseEdit() {
 
 
 
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      <div
+                        style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
                         <div className="flex items-center gap-2 relative">
 
@@ -2078,10 +2082,7 @@ export default function PurchaseEdit() {
 
                             id="totalPaidCheck"
                             className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
                             onChange={(e) => {
-
                               const isChecked = e.target.checked;
                               const totalAmount = parseFloat(watch("Total_Amount"));
 
@@ -2093,9 +2094,6 @@ export default function PurchaseEdit() {
                                 // Clear both fields to stay consistent
                                 setValue("Total_Paid", "");
                                 setValue("Balance_Due", "");
-                                if (splitsWatch.length === 1) {
-                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
-                                }
                                 return;
                               }
 
@@ -2107,13 +2105,6 @@ export default function PurchaseEdit() {
                                 // ✅ When unchecked, restore Balance_Due = Total_Amount
                                 setValue("Total_Paid", "");
                                 setValue("Balance_Due", totalAmount.toFixed(2));
-                              }
-                              if (splitsWatch.length === 1) {
-                                setValue(
-                                  "splits.0.Amount",
-                                  isChecked ? totalAmount.toFixed(2) : "",
-                                  { shouldValidate: true, shouldDirty: true }
-                                );
                               }
                             }}
                           />
@@ -2131,9 +2122,8 @@ export default function PurchaseEdit() {
                           type="text"
                           {...register("Total_Paid")}
                           style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
+
                           onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
                             let val = e.target.value.replace(/[^0-9.]/g, "");
 
                             // Allow only one dot
@@ -2149,13 +2139,9 @@ export default function PurchaseEdit() {
                             e.target.value = val;
                             setValue("Total_Paid", val);
 
-                            const totalReceived = parseFloat(val || 0);
+                            const totalPaid = parseFloat(val || 0);
                             const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
+                            setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
                           }}
                           className="form-control"
                         />
@@ -2169,10 +2155,7 @@ export default function PurchaseEdit() {
 
                         <span className="font-medium whitespace-nowrap">Balance Due</span>
                         <input
-                          style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
-                          }}
+                          style={{ backgroundColor: "transparent", marginBottom: "0px", height: "1rem", width: "100%" }}
                           type="text"
                           className="form-control  "
                           {...register("Balance_Due")}
@@ -2190,36 +2173,8 @@ export default function PurchaseEdit() {
             <div className="flex justify-end gap-4 ">
               <button
                 type="button"
-                onClick={() => {
-                  // setShowModal(false)
-                  if (from === "party-sales-purchases-details") {
 
-                    navigate({
-                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                      search: location.search,
-                    })
-                  }
-                  else if (from === "item-sales-purchases-details") {
-                    navigate({
-                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                      search: location.search,
-                    })
-                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                  }
-                  else {
-                    navigate({
-                      pathname: "/purchase/all-purchases",
-                      search: location.search,
-                    })
-
-                    // navigate("/sale/all-sales");
-                  }
-                }}
-                // onClick={() => navigate({
-                //   pathname: "/purchase/all-purchases",
-                //   search: location.search,
-                // })}
-                // onClick={() => navigate("/purchase/all-purchases")}
+                onClick={() => navigate("/purchase/all-purchases")}
                 className=" text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
@@ -2227,16 +2182,34 @@ export default function PurchaseEdit() {
               </button>
               <button
                 type="submit"
-                disabled={formValues.errorCount > 0 || isEditingPurchase}
+                disabled={formValues.errorCount > 0 || isAddingPurchase}
                 className=" text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                {isEditingPurchase ? "Updating..." : "Update Purchase"}
+                {isAddingPurchase ? "Saving..." : "Save"}
               </button>
             </div>
           </form>
 
         </div>
+        {/* // : 
+              // (
+              //   <div className="flex flex-col justify-center items-center h-screen gap-4">
+
+              //     <div className="relative">
+              //       <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              //       <div className="absolute inset-0 flex items-center justify-center text-blue-500 text-xl">
+              //         📄
+              //       </div>
+              //     </div>
+
+              //     <p className="text-gray-700 font-medium">
+              //       AI is scanning the invoice...
+              //     </p>
+
+              //   </div>
+              // ) */}
+
 
 
       </div>
@@ -2263,16 +2236,22 @@ export default function PurchaseEdit() {
             setShowAddUnitModal(false);
             setActiveUnitRow(null);
           }}
-        // onSave={({  unitKey }) => {
-        //   // 1️⃣ Add unit to dropdown list
-        //   // setItemUnits((prev) => ({
-        //   //   ...prev,
-        //   //   [unitKey]: unitName,
-        //   // }));
+        // onSave={(newUnit) => {
+        //   // 1️⃣ Add new unit to dropdown list
+        //   setItemUnits((prev) => [...prev, newUnit]);
 
-        //   // 2️⃣ Auto-select newly added unit
-        //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
-        //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
+        //   // 2️⃣ Auto select newly added unit
+        //   setValue(
+        //     `items.${activeUnitRow}.Item_Unit`,
+        //     newUnit.Unit_Shorthand,
+        //     { shouldValidate: true, shouldDirty: true }
+        //   );
+
+        //   handleRowChange(
+        //     activeUnitRow,
+        //     "Item_Unit",
+        //     newUnit.Unit_Shorthand
+        //   );
 
         //   // 3️⃣ Close modal
         //   setShowAddUnitModal(false);
@@ -2280,6 +2259,29 @@ export default function PurchaseEdit() {
         // }}
         />
       )}
+      {/* {showAddUnitModal && (
+  <AddUnitModal
+    onClose={() => {
+      setShowAddUnitModal(false);
+      setActiveUnitRow(null);
+    }}
+    // onSave={({  unitKey }) => {
+    //   // 1️⃣ Add unit to dropdown list
+    //   // setItemUnits((prev) => ({
+    //   //   ...prev,
+    //   //   [unitKey]: unitName,
+    //   // }));
+
+    //   // 2️⃣ Auto-select newly added unit
+    //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
+    //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
+
+    //   // 3️⃣ Close modal
+    //   setShowAddUnitModal(false);
+    //   setActiveUnitRow(null);
+    // }}
+  />
+)} */}
       <style>
         {`
   /*  screens between 1000px and 640px */
@@ -2412,3 +2414,113 @@ export default function PurchaseEdit() {
     </>
   );
 }
+
+{/* <div className="relative w-full">
+
+                          
+                          <div
+                            className="flex  justify-between border rounded-md  bg-white cursor-pointer"
+                            onClick={() => setOpen((prev) => !prev)}
+                          >
+                            <input
+                              type="text"
+                              id="Party_Name"
+                              value={partySearch}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setPartySearch(value);
+                                setValue("Party_Name", value, { shouldValidate: true });
+                                setOpen(true);
+                              }}
+                              onClick={() => setOpen((prev) => !prev)}
+                              onBlur={() => {
+                                const typedValue = partySearch.trim().toLowerCase();
+
+                                // ✅ Full match only (not partial)
+                                const matchedParty = parties?.parties?.find(
+                                  (party) => party.Party_Name.toLowerCase() === typedValue
+                                );
+
+                                if (matchedParty) {
+                                  // ✅ Set full party info
+                                  setPartySearch(matchedParty.Party_Name);
+                                  setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+
+                                  // ✅ Check GSTIN (must be present)
+                                  if (!matchedParty.GSTIN || matchedParty.GSTIN.trim() === "") {
+
+                                    setValue("GSTIN", "", { shouldValidate: true });
+                                  } else {
+                                    setValue("GSTIN", matchedParty.GSTIN, { shouldValidate: true, shouldDirty: true });
+                                  }
+
+
+                                } else {
+                                  // ❌ Not an exact match → clear field
+                                  setPartySearch("");
+                                  setValue("Party_Name", "");
+                                }
+
+                                setTimeout(() => setOpen(false), 150);
+                              }}
+                              placeholder="Search By Name/Phone"
+                              className="w-full outline-none py-1 px-2  text-gray-900"
+                              style={{
+                                marginBottom: 0, marginTop: "4px", border: "none",
+                                height: "2rem", borderBottom: "0px"
+                              }}
+                            />
+                            <span className="ml-2  absolute right-5 top-1/3  text-gray-700">
+                              ▼
+                            </span>
+                          </div>
+                      
+                          {open && (
+                            <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              <span
+                                onClick={() => setShowPartyModal(true)}
+                                className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                              >
+                                + Add Party
+                              </span>
+
+                              {parties?.parties
+                                ?.filter(
+                                  (party) =>
+                                    party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase()) ||
+                                    party?.Phone_Number?.includes(partySearch)
+                                )
+                                .map((party, i) => (
+                                  <div
+                                    key={i}
+                                    onClick={() => {
+                                      // Select from dropdown
+                                      setPartySearch(party.Party_Name);
+                                      setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+
+                                      // ✅ GSTIN validation on selection
+                                      if (!party.GSTIN || party.GSTIN.trim() === "") {
+
+                                        setValue("GSTIN", "", { shouldValidate: true });
+                                      } else {
+                                        setValue("GSTIN", party.GSTIN, { shouldValidate: true, shouldDirty: true });
+                                      }
+
+
+                                      setOpen(false);
+                                    }}
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    {party.Party_Name} ({party.Phone_Number})
+                                  </div>
+                                ))}
+
+                            
+                              {parties?.parties?.filter((party) =>
+                                party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase())
+                              ).length === 0 && (
+                                  <p className="px-3 py-2 text-gray-500">No Party found</p>
+                                )}
+                            </div>
+                          )}
+                        </div> */}

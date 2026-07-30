@@ -777,7 +777,7 @@ const getPurchaseReturnById = async (req, res, next) => {
     const { Purchase_Return_Id } = req.params;
 
     const [[header]] = await connection.query(
-      `SELECT pr.*, a.Party_Name
+      `SELECT pr.*, a.Party_Name,a.GSTIN
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
        WHERE pr.id = ?`,
@@ -788,8 +788,19 @@ const getPurchaseReturnById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Purchase Return not found" });
     }
 
-    const [items] = await connection.query(
-      `SELECT pri.*, ai.Item_Name AS Item_Name_Ref
+    // const [items] = await connection.query(
+    //   `SELECT pri.*, ai.Item_Name AS Item_Name_Ref
+    //    FROM purchase_return_items pri
+    //    LEFT JOIN add_item ai ON ai.Item_Id = pri.Item_Id
+    //    WHERE pri.Purchase_Return_Id = ?`,
+    //   [Purchase_Return_Id]
+    // );
+       const [items] = await connection.query(
+      `SELECT pri.*,
+              ai.Item_Name AS Item_Name,
+              ai.Item_HSN  AS Item_HSN,
+              ai.Item_Unit AS Item_Unit,
+              ai.Item_Category AS Item_Category
        FROM purchase_return_items pri
        LEFT JOIN add_item ai ON ai.Item_Id = pri.Item_Id
        WHERE pri.Purchase_Return_Id = ?`,
@@ -856,7 +867,14 @@ const createPurchaseReturn = async (req, res, next) => {
 
     // Total_Received always derived from splits
     const totalReceived = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-
+ const totalAmount = Number(Total_Amount) || 0;
+    const balanceDue  = Number(Balance_Due)  ?? totalAmount - totalReceived;
+     if (totalReceived > totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Received amount should be less than or equal to Total Amount",
+      });
+    }
     if (isNaN(totalReceived) || totalReceived < 0) {
       await connection.rollback();
       return res.status(400).json({ success: false, message: "Split amounts must be valid numbers" });
@@ -878,8 +896,7 @@ const createPurchaseReturn = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Party not found" });
     }
 
-    const totalAmount = Number(Total_Amount) || 0;
-    const balanceDue  = Number(Balance_Due)  ?? totalAmount - totalReceived;
+   
 
     // 🔹 no Payment_Type / Bank_Account_Id / Reference_Number on header anymore
     const [headerResult] = await connection.query(
@@ -944,17 +961,22 @@ const createPurchaseReturn = async (req, res, next) => {
       } else {
         Item_Id = existingItem.Item_Id;
       }
+        //  Item_Name,
+          //   Item_Category, Item_HSN, Item_Unit, 
 
       await connection.query(
         `INSERT INTO purchase_return_items
-           (Purchase_Return_Id, Item_Id, Item_Name,
-            Item_Category, Item_HSN, Item_Unit, Quantity, Purchase_Price,
+           (Purchase_Return_Id, Item_Id, 
+        
+            Quantity, Purchase_Price,
             Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
             Tax_Type, Tax_Amount, Amount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          Purchase_Return_Id, Item_Id, Item_Name,
-          Item_Category  || "", Item_HSN || "", Item_Unit || "",
+          Purchase_Return_Id, Item_Id, 
+          // Item_Name,
+          // Item_Category  || "", Item_HSN || "", Item_Unit || "",
+
           Number(Quantity), Number(Purchase_Price),
           Number(Discount_On_Purchase_Price) || 0,
           Discount_Type_On_Purchase_Price    || "percentage",
@@ -1025,8 +1047,16 @@ const editPurchaseReturn = async (req, res, next) => {
     }
 
     // Total_Received always recalculated from splits
+     
     const totalReceived = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-
+      const totalAmount = Number(Total_Amount) || 0;
+    const balanceDue  = Number(Balance_Due)  ?? totalAmount - totalReceived;
+ if (totalReceived > totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Received amount should be less than or equal to Total Amount",
+      });
+    }
     if (isNaN(totalReceived) || totalReceived < 0) {
       await connection.rollback();
       return res.status(400).json({ success: false, message: "Split amounts must be valid numbers" });
@@ -1048,8 +1078,7 @@ const editPurchaseReturn = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Party not found" });
     }
 
-    const totalAmount = Number(Total_Amount) || 0;
-    const balanceDue  = Number(Balance_Due)  ?? totalAmount - totalReceived;
+ 
 
     await connection.query(
       `UPDATE purchase_return SET
@@ -1153,16 +1182,21 @@ const editPurchaseReturn = async (req, res, next) => {
           );
         }
       } else {
+         //  Item_Name,
+            //   Item_Category, Item_HSN, Item_Unit, 
         await connection.query(
           `INSERT INTO purchase_return_items
-             (Purchase_Return_Id, Item_Id, Item_Name,
-              Item_Category, Item_HSN, Item_Unit, Quantity, Purchase_Price,
+             (Purchase_Return_Id, Item_Id, 
+           
+              Quantity, Purchase_Price,
               Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
               Tax_Type, Tax_Amount, Amount)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            Purchase_Return_Id, Item_Id, Item_Name,
-            Item_Category || "", Item_HSN || "", Item_Unit || "",
+            Purchase_Return_Id, Item_Id, 
+            // Item_Name,
+            // Item_Category || "", Item_HSN || "", Item_Unit || "",
+
             Number(Quantity), Number(Purchase_Price),
             Number(Discount_On_Purchase_Price) || 0,
             Discount_Type_On_Purchase_Price    || "percentage",

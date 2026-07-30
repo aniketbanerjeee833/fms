@@ -1,35 +1,44 @@
-import { useState } from "react";
+import { useDispatch } from "react-redux";
+import { useState, useRef, useEffect } from "react";
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
-import { useRef } from "react";
-import { useEffect } from "react";
+import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
-import { useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
+
+
 import { toast } from "react-toastify";
 
-import { useDispatch } from "react-redux";
+
+
+
+
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
-import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import AddUnitModal from "../../components/Modal/AddUnitModal";
 
-import { purchaseReturnApi, useCreatePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
+// import { saleReturnApi } from "../../redux/api/saleReturnApi";
+
+import { purchaseReturnApi, useGetPurchaseReturnByIdQuery, useUpdatePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
 import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { Trash2 } from "lucide-react"
-export default function PurchaseReturnAdd() {
+
+
+
+
+export default function PurchaseReturnEdit() {
+
   const location = useLocation();
   const from = location.state?.from
-
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
-  console.log("Purchase Return page query:", location.search);
-  const { id: Purchase_Id } = useParams();
+  const bankId = location.state?.bankId;
+  console.log("Sale return Edit page query:", location.search);
+  const { id: Purchase_Return_Id } = useParams();
   const dispatch = useDispatch();
   const TAX_RATES = {
     "GST0": 0,
@@ -50,51 +59,6 @@ export default function PurchaseReturnAdd() {
     "IGST28": 28,
     "IGST40": 40,
   };
-
-  const categoryRefs = useRef([]); // store refs for category dropdowns
-  const itemRefs = useRef([]);     // store refs for item dropdowns
-
-
-  const navigate = useNavigate();
-  const { data: parties } = useGetAllPartiesQuery();
-  const { data: items } = useGetAllItemsQuery();
-
-  const { data: categories } = useGetAllCategoriesQuery()
-  const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const { data: purchase }
-    = useGetSinglePurchaseQuery(Purchase_Id)
-  const [open, setOpen] = useState(false);
-  //const[categoryOpen,setCategoryOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  //const[selected,setSelected] = useState([]);
-  const [partySearch, setPartySearch] = useState("");
-  const [newCategory, setNewCategory] = useState("");
-  // const dropdownRef=useRef(null);
-  // const[search,setSearch] = useState("");
-  const [showPartyModal, setShowPartyModal] = useState(false);
-  const [showGSTIN, setShowGSTIN] = useState("");
-  const [originalTotal, setOriginalTotal] = useState(null);
-  const [addCategory] = useAddCategoryMutation();
-  const [showSplitBox, setShowSplitBox] = useState(false);
-
-  // const itemUnits = {
-  //   "gm": "Gram",
-  //   "Kg": "Kilogram",
-  //   "lt": "Litre",
-  //   "pcs": "Piece",
-
-  // }
-  const [showAddUnitModal, setShowAddUnitModal] = useState(false);
-  const [activeUnitRow, setActiveUnitRow] = useState(null);
-  // const [newUnitKey, setNewUnitKey] = useState("");
-  // const [newUnitName, setNewUnitName] = useState("");
-  //  const itemUnitsFetched = {
-  //     "gm": "Gram",
-  //     "Kg": "Kilogram",
-  //     "lt": "Litre",
-  //     "pcs": "Piece",
-
-  //   }
   const states = [
     "Andaman and Nicobar Islands",
     "Andhra Pradesh",
@@ -133,59 +97,115 @@ export default function PurchaseReturnAdd() {
     "Uttarakhand",
     "West Bengal"
   ];
-  const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
+  const categoryRefs = useRef([]); // store refs for category dropdowns
+  const itemRefs = useRef([]);
 
+
+
+  const navigate = useNavigate();
+  const { data: purchase }
+    = useGetPurchaseReturnByIdQuery(Purchase_Return_Id, {
+      skip: Purchase_Return_Id === undefined,
+    });
+
+  const { data: parties } = useGetAllPartiesQuery();
+  const { data: items } = useGetAllItemsQuery();
+  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  // console.log(items);
+  //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
+  const [open, setOpen] = useState(false);
+
+  const [partySearch, setPartySearch] = useState("");
+  //const [newCategory, setNewCategory] = useState("");
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [originalTotal, setOriginalTotal] = useState(null);
+
+  const [showGSTIN, setShowGSTIN] = useState("");
+  //console.log(latestInvoiceNumber,"latestInvoiceNumber");
+
+  // const itemUnits = {
+  //   "gm": "Gram",
+  //   "Kg": "Kilogram",
+  //   "lt": "Litre",
+  //   "pcs": "Piece",
+
+  // }
+
+  const [showAddUnitModal, setShowAddUnitModal] = useState(false);
+  const [activeUnitRow, setActiveUnitRow] = useState(null);
+  // const [newUnitKey, setNewUnitKey] = useState("");
+  // const [newUnitName, setNewUnitName] = useState("");
+  //  const itemUnitsFetched = {
+  //     "gm": "Gram",
+  //     "Kg": "Kilogram",
+  //     "lt": "Litre",
+  //     "pcs": "Piece",
+
+  //   }
+  const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
+  console.log(itemUnits, "itemUnits");
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
   // console.log(itemUnitsFetched, "itemUnitsFetched");
   // const itemUnits=itemUnitsFetched
-  const handleAddCategory = async () => {
 
-    if (newCategory.trim() === "") {
-      return
-    }
-    else if (newCategory.trim() !== "") {
-      try {
-        // ✅ Call backend
-        const res = await addCategory({
-          body: { Item_Category: newCategory.trim() },
-        });
+  const {
+    control,
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(purchaseReturnFormSchema),
+    defaultValues: {
+      Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
+      Return_Number: "",
+      Party_Name: "",
+      GSTIN: "",
+      Bill_Number: "",
+      Bill_Date: "",
+      State_Of_Supply: "",
+      Total_Amount: "",
+      Balance_Due: "",
+      Total_Received: "",
+      Payment_Type: "Cash",
+      Bank_Account_Id: null,   // 🔹 added
+      Reference_Number: "",
+      items: [{
 
-        // Some RTK Query wrappers put the response under `.data`
-        const data = res?.data || res;
 
-        if (data?.success) {
-          const addedCat = newCategory.trim();
+        Item_Category: "",
+        Item_Name: "",
+        Quantity: 0,
+        Item_Unit: "",
+        Purchase_Price: "",
 
-          // ✅ Auto-select the new category (single value)
-          //setSelected(addedCat);
-          setValue("Item_Category", addedCat); // directly set single category
-
-          // ✅ Refresh cache
-          dispatch(itemApi.util.invalidateTags(["Category"]));
-
-          // ✅ Reset modal & input
-          setShowModal(false);
-          setNewCategory("");
-          setOpen(true);
-        } else {
-          console.warn("⚠️ Category not added. Response:", data);
-        }
-      } catch (err) {
-        console.error("❌ Error adding category:", err);
+        Discount_On_Purchase_Price: "",
+        Discount_Type_On_Purchase_Price: "Percentage",
+        Tax_Type: "None",
+        Tax_Amount: "",
+        Amount: "",
       }
+      ]
     }
-  };
+
+  })
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+
+
 
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: ""
-    }
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: ""
+    },
   ]);
 
-  const [createPurchaseReturn, { isLoading: isCreating }] = useCreatePurchaseReturnMutation();
-
-  // const [editPurchase, { isLoading: isEditingPurchase }] = useEditPurchaseMutation();
+  const [updatePurchaseReturn, { isLoading: isCreating }] = useUpdatePurchaseReturnMutation();
   // helper to update a field in a specific row
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -204,10 +224,13 @@ export default function PurchaseReturnAdd() {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
 
+
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
+
+
 
           // if clicked outside both → close
           if (!clickedInsideCategory && !clickedInsideItem) {
@@ -228,108 +251,17 @@ export default function PurchaseReturnAdd() {
 
 
 
-  // const {
-  //   control,
-  //   register,
-  //   handleSubmit,
-  //   setValue,
-  //   watch,
-  //   reset,
 
-  //   formState: { errors },
-  // } = useForm({
-  //   resolver: zodResolver(purchaseReturnFormSchema),
-  //   defaultValues: {
-  //     Party_Name: "",
-  //     Return_Number: "",
-  //     Bill_Number: "",
-  //     Bill_Date: "",
-  //     Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
-  //     State_Of_Supply: "",
-  //     Total_Amount: "",
-  //     Balance_Due: "",
-  //     Total_Received: "",
-  //     Payment_Type: "Cash",
-  //     Bank_Account_Id: null,   // 🔹 added
-  //     Reference_Number: "",
-  //     items: [{
-
-
-  //       Item_Category: "",
-  //       Item_Name: "",
-  //       Quantity: 1,
-  //       Item_Unit: "",
-  //       Purchase_Price: "",
-
-  //       Discount_On_Purchase_Price: "",
-  //       Discount_Type_On_Purchase_Price: "Percentage",
-  //       Tax_Type: "None",
-  //       Tax_Amount: "",
-  //       Amount: "",
-  //     }
-  //     ]
-  //   }
-
-  // })
-  const {
-    control,
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(purchaseReturnFormSchema),
-    defaultValues: {
-      Party_Name: "",
-      Return_Number: "",
-      Bill_Number: "",
-      Bill_Date: "",
-      Return_Date: new Date().toISOString().slice(0, 10),
-      State_Of_Supply: "",
-      Total_Amount: "",
-      Balance_Due: "",
-      Total_Received: "",
-      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
-      items: [
-        {
-          Item_Category: "",
-          Item_Name: "",
-          Quantity: 1,
-          Item_Unit: "",
-          Purchase_Price: "",
-          Discount_On_Purchase_Price: "",
-          Discount_Type_On_Purchase_Price: "Percentage",
-          Tax_Type: "None",
-          Tax_Amount: "",
-          Amount: "",
-        },
-      ],
-    },
-  });
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "items",
-  });
-
-  const {
-    fields: splitFields,
-    append: appendSplit,
-    remove: removeSplit,
-  } = useFieldArray({
-    control,
-    name: "splits",
-  });
 
 
 
   const handleAddRow = () => {
     setRows((prev) => [
+      // only close CategoryOpen, preserve lock states
       ...prev.map((row) => ({
         ...row,
         CategoryOpen: false,
-        itemOpen: false,
+        itemOpen: false, // also close item dropdown if open
       })),
       {
         itemSearch: "",
@@ -346,7 +278,7 @@ export default function PurchaseReturnAdd() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: "1",
+      Quantity: 0,
       Item_Unit: "",
       Purchase_Price: "",
       Discount_On_Purchase_Price: "",
@@ -355,14 +287,13 @@ export default function PurchaseReturnAdd() {
       Tax_Amount: "",
       Amount: "",
     });
-
-    // No total recalc needed — new row is empty (Amount = 0)
-    // Total_Amount stays the same, Balance_Due stays the same
   };
+
   // const handleDeleteRow = (i) => {
   //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
   //   remove(i); // remove from form
   // };
+
   const handleDeleteRow = (i) => {
     // 1. get current items BEFORE removal
     const currentItems = watch("items");
@@ -384,13 +315,16 @@ export default function PurchaseReturnAdd() {
     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
     setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
   };
+
   const itemsValues = watch("items");   // watch all item rows
-  const totalReceived = watch("Total_Received"); // watch Total_Received
+  const totalPaid = watch("Total_Received"); // watch Total_Received
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
 
+  // helper to calculate amount in a specific row
   const calculateRowAmount = (row, index, itemsValues) => {
+    console.log(row, "row", index, "index", itemsValues, "itemsValues");
     const price = num(row.Purchase_Price);
-    const qty = Math.max(1, num(row.Quantity)); // default 1
+    const qty = row.Quantity || 0; // default 0
     const subtotal = price * qty;
 
     // discount
@@ -419,35 +353,19 @@ export default function PurchaseReturnAdd() {
 
     return {
       ...row,
-      Quantity: String(qty),
+      Quantity: Number(qty),
       Tax_Amount: taxAmount.toFixed(2),
       Amount: finalAmount.toFixed(2),
       Total_Amount: totalAmount.toFixed(2), // ✅ correct grand total
-      Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
+      Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
 
 
 
 
-
-  //const itemsValues = watch("items"); // watch all rows
   const formValues = watch();
 
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
-
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
 
 
 
@@ -461,6 +379,7 @@ export default function PurchaseReturnAdd() {
 
     setShowGSTIN(gstin || ""); // ✅ never undefined
   }, [watch("Party_Name"), parties]);
+  console.log(purchase)
   const toLocalDateString = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -469,183 +388,61 @@ export default function PurchaseReturnAdd() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
-  // useEffect(() => {
-  //   if (purchase) {
-  //     setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
-  //     const prefilledRows = purchase?.items?.map((item) => ({
-  //       ...item,
-  //       itemSearch: item.Item_Name,
-  //       itemOpen: false,
-  //       CategoryOpen: false,
-  //       isHSNLocked: true,
-  //       isUnitLocked: true,
-  //       isExistingItem: true,
-
-  //     }))
-  //     setRows(prefilledRows)
-  //     reset({
-  //       Return_Date: new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
-  //       Return_Number: "",                                        // ✅ blank, user fills manually
-  //       Party_Name: purchase?.billPurchaseDetails?.Party_Name,
-  //       GSTIN: purchase?.billPurchaseDetails?.GSTIN,
-  //       Bill_Number: purchase?.billPurchaseDetails?.Bill_Number,
-  //       Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
-  //       State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
-  //       Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
-  //       Total_Received: "",
-  //       // Total_Received: purchase?.billPurchaseDetails?.Total_Received,
-  //       Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
-  //       Payment_Type: purchase?.billPurchaseDetails?.Payment_Type,
-  //       Reference_Number: purchase?.billPurchaseDetails?.Reference_Number,
-  //       splits: [
-  //       {
-  //         Payment_Type: purchase?.billPurchaseDetails?.Payment_Type || "Cash",
-  //         Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id || null,
-  //         Reference_Number: purchase?.billPurchaseDetails?.Reference_Number || "",
-  //         Amount: "",
-  //       },
-  //     ],
-  //       items: purchase?.items
-  //     })
-  //      setShowSplitBox(false);
-  //   }
-  // }, [purchase])
-
   useEffect(() => {
     if (purchase) {
-      setPartySearch(purchase?.billPurchaseDetails?.Party_Name);
-      const prefilledRows = purchase?.items?.map((item) => ({
-        ...item,
-        itemSearch: item.Item_Name,
-        itemOpen: false,
-        CategoryOpen: false,
+
+      setPartySearch(purchase.purchaseReturn.Party_Name);
+      const prefilledRows = purchase.purchaseReturn.items.map((it) => ({
+        ...it,
+        itemSearch: it.Item_Name || "", // for UI display
+        isExistingItem: true,           // lock category/HSN if needed
         isHSNLocked: true,
         isUnitLocked: true,
-        isExistingItem: true,
+        CategoryOpen: false,
+        itemOpen: false,
+        itemQuantity: it.Quantity || 0,
+        itemTaxType: it.Tax_Type || "None",
       }));
+
       setRows(prefilledRows);
 
       reset({
-        Return_Date: new Date().toISOString().slice(0, 10),
-        Return_Number: "",
-        Party_Name: purchase?.billPurchaseDetails?.Party_Name,
-        GSTIN: purchase?.billPurchaseDetails?.GSTIN,
-        Bill_Number: purchase?.billPurchaseDetails?.Bill_Number,
-        Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
-        State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
-        Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
-        Total_Received: "",
-        Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
-        // splits replaces Payment_Type / Bank_Account_Id / Reference_Number —
-        // seed row 1 with the original purchase's payment info as a starting
-        // suggestion; user can change it freely, it's just a convenience default
-        // splits: [
-        //   {
-        //     Payment_Type: purchase?.billPurchaseDetails?.Payment_Type || "Cash",
-        //     Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id || null,
-        //     Reference_Number: purchase?.billPurchaseDetails?.Reference_Number || "",
-        //     Amount: "",
-        //   },
-        // ],
-        splits:
-          purchase?.splits?.length > 0
-            ? purchase.splits.map((split) => ({
-              Payment_Type: split.Payment_Type,
-              Bank_Account_Id: split.Bank_Account_Id,
-              Reference_Number: split.Reference_Number || "",
-              Amount: split.Amount, // or split.Amount if you want to prefill the original amount
-            }))
-            : [
-              {
-                Payment_Type: "Cash",
-                Bank_Account_Id: null,
-                Reference_Number: "",
-                Amount: "",
-              },
-            ],
-        items: purchase?.items,
-      });
+        Return_Date: toLocalDateString(purchase.purchaseReturn?.Return_Date) || new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
+        Return_Number: purchase.purchaseReturn?.Return_Number || "",
+        Party_Name: purchase.purchaseReturn?.Party_Name || "",
+        GSTIN: purchase.purchaseReturn?.GSTIN || "",
+        Bill_Number: purchase.purchaseReturn?.Bill_Number || "",
 
-      // always start single-payment for a brand new return — there's no prior
-      // return record to inspect the way initialData.splits worked before
-      setShowSplitBox((purchase?.splits?.length || 0) > 1);
+        Bill_Date: toLocalDateString(purchase.purchaseReturn?.Bill_Date),
+        //  Invoice_Date: purchase.purchaseReturn?.Invoice_Date,
+        State_Of_Supply: purchase.purchaseReturn?.State_Of_Supply || "",
+        Total_Amount: purchase.purchaseReturn?.Total_Amount || "",
+        //Total_Received: purchase.purchaseReturn?.Total_Received || "",
+        Balance_Due: purchase.purchaseReturn?.Balance_Due || "",
+
+        Payment_Type: purchase.purchaseReturn?.Payment_Type || "",
+        Bank_Account_Id: purchase.purchaseReturn?.Bank_Account_Id, // ✅ Add this
+        Reference_Number: purchase.purchaseReturn?.Reference_Number || "",
+
+        items: purchase.purchaseReturn.items || [],
+      })
     }
   }, [purchase]);
+  //const Invoice_Number=purchase.purchaseReturn?.Invoice_Number 
+  //const Invoice_Date=purchase?.purchaseReturn?.Invoice_Date
+  console.log(purchase)
+  console.log("Current form values:", formValues);
+  console.log("Form errors:", errors);
+  //const paymentType = watch("Payment_Type", "");
   useEffect(() => {
     if (purchase) {
-      setShowGSTIN(purchase.GSTIN || "");   // ✅ only UI update
+
+      // setValue("GSTIN", purchase.GSTIN ? String(purchase.GSTIN) : "");
+      setShowGSTIN(purchase.GSTIN ? String(purchase.GSTIN) : "");
     }
   }, [purchase]);
-  // Keeps amount inputs numeric-only (digits + a single decimal point)
-  const sanitizeAmount = (value) => {
-    let val = value.replace(/[^0-9.]/g, "");
-    const parts = val.split(".");
-    if (parts.length > 2) {
-      val = parts[0] + "." + parts.slice(1).join("");
-    }
-    return val;
-  };
 
-  // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
-  // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
 
-  const getRowIdentifier = (type, bankId) =>
-    type === "Bank" ? `bank_${bankId ?? ""}` : type;
-
-  //Inside the component:
-
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
-
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
-
-  const handleAddPaymentType = () => {
-    appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
-    setShowSplitBox(true);
-  };
-
-  // live-derived total — never stored as a separate field
-  const splitsWatch = watch("splits") || [];
-  const computedTotalReceived = splitsWatch.reduce(
-    (sum, s) => sum + (parseFloat(s.Amount) || 0),
-    0
-  );
-
-  // one-directional: recompute Balance_Due whenever the total-amount or splits change.
-  // (One-directional only — do NOT also sync splits from Balance_Due, that
-  // two-way sync is exactly what caused the "value shown but still required"
-  // bug in the Payment-Out modal.)
-  const totalAmountWatch = watch("Total_Amount");
-  useEffect(() => {
-    const bal = (Number(totalAmountWatch) || 0) - computedTotalReceived;
-    setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-    setValue("Total_Received", computedTotalReceived.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalAmountWatch, computedTotalReceived]);
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
@@ -676,8 +473,8 @@ export default function PurchaseReturnAdd() {
     console.log("payload:", payload);
 
     try {
-      const res = await createPurchaseReturn({
-        Purchase_Id: Purchase_Id,   // ← from useParams() or props
+      const res = await updatePurchaseReturn({
+        Purchase_Return_Id: Purchase_Return_Id,   // ← from useParams() or props
         ...payload,                 // ← everything else (Party_Name, items, etc.)
       }).unwrap();
       //console.log("Created successfully:", res);
@@ -691,19 +488,34 @@ export default function PurchaseReturnAdd() {
         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
       ]));
       if (!res?.success) {
-        toast.error("Failed to add debit note");
+        toast.error("Failed to update debit note");
         return;
       }
 
-      toast.success("Debit Note added  successfull!");
+      toast.success("Debit Note updated  successfull!");
 
       // ── navigate back based on where user came from ──
-      if (from === "purchase-return-list") {
+      if (from === "all-purchase-return-list") {
         navigate({
           pathname: "/purchase/return",
           search: location.search,
         });
-      } else {
+      }
+      else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/bank-accounts`,
+          search: `?bankId=${bankId}`,
+        });
+      }
+      else if (from === "cash-in-hand") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/cash-in-hand`,
+
+        });
+      }
+      else {
         navigate({
           pathname: "/purchase/return",
           search: location.search,
@@ -712,35 +524,25 @@ export default function PurchaseReturnAdd() {
 
     } catch (error) {
       const errorMessage =
-        error?.data?.message || error?.message || "Failed to add new debit note.";
+        error?.data?.message || error?.message || "Failed to update debit note.";
       toast.error(errorMessage);
       //console.error("Submission failed", error);
     }
   };
 
-
-  // console.log("showGSTIN:", showGSTIN, purchase);
-
-  console.log("Current form values:", formValues);
-   
-  console.log("Form errors:", errors);
-    const paymentType = watch("splits.0.Payment_Type");
-  // const paymentType = watch("Payment_Type", "");
   return (
     <>
       <div className="sb2-2-2">
         <ul>
-          <li>
 
-            <NavLink style={{ display: "flex", flexDirection: "row" }}
-              to="/home"
+          <NavLink style={{ display: "flex", flexDirection: "row" }}
+            to="/home"
 
-            >
-              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
-              Dashboard
-            </NavLink>
-          </li>
+          >
+            <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
+            {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+            Dashboard
+          </NavLink>
 
         </ul>
       </div>
@@ -762,13 +564,13 @@ export default function PurchaseReturnAdd() {
     justify-between 
     items-start sm:items-center 
     w-full 
-    
+  
     mt-4               /* ⭐ Adds spacing from top header */
   ">
 
             {/* LEFT HEADER */}
             <div className="w-full sm:w-auto">
-              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Debit Note</h4>
+              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Edit Debit Note</h4>
 
             </div>
 
@@ -781,12 +583,11 @@ export default function PurchaseReturnAdd() {
     ">
               <button
                 type="button"
-
                 onClick={() => {
 
-                  if (from === "party-payables") {
+                  if (from === "party-receivables") {
                     navigate({
-                      pathname: `/party/payables`,
+                      pathname: `/party/receivables`,
                       search: location.search,
                     })
                   }
@@ -796,28 +597,45 @@ export default function PurchaseReturnAdd() {
                       pathname: `/party/party-sales-purchases-details/${Party_Id}`,
                       search: location.search,
                     })
+
                   }
                   else if (from === "item-sales-purchases-details") {
                     navigate({
                       pathname: `/item/item-sales-purchases-details/${Item_Id}`,
                       search: location.search,
                     })
+                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else if (from === "bank-accounts") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/bank-accounts`,
+                      search: `?bankId=${bankId}`,
+                    });
+                  } else if (from === "cash-in-hand") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/cash-in-hand`,
+
+                    });
                   }
                   else {
                     navigate({
-                      pathname: "/purchase/all-purchases",
+                      pathname: "/purchase/return",
                       search: location.search,
                     })
                   }
                 }}
-                //     else if (from === "party-payables") {
 
+                //            else if (from === "party-receivables") {
 
                 //       navigate({
-                //   pathname: `/party/payables`,
+                //   pathname: `/party/receivables`,
                 //   search: location.search,
                 // })
-                // }  
+                //       // navigate(`/party/party-receivables-left/${Party_Id}`);
+                //     }
+                // onClick={() => navigate("/purchase/all-sales")}
                 className="text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
@@ -826,26 +644,26 @@ export default function PurchaseReturnAdd() {
 
               <button
                 type="button"
-                onClick={() => navigate("/purchase/all-purchases")}
+                onClick={() => navigate("/purchase/return")}
                 className="text-white py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                All Purchases
+                All Debit Notes
               </button>
             </div>
 
           </div>
         </div>
-        <div style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} className="tab-inn">
+        <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
-
-
+              {/* <div className="row"> */}
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-
                 <div className=" flex flex-col relative mt-2 gap-2 party-class"
                   style={{ marginBottom: "0px", marginTop: "0px" }}>
-                  <span className="whitespace-nowrap active ">
+                  {/* <div className="input-field col s6 mt-4 relative"> */}
+
+                  <span className="active">
                     Party
                     <span className="text-red-500">*</span>
                   </span>
@@ -933,8 +751,6 @@ export default function PurchaseReturnAdd() {
                       </div>
                     )}
                   </div>
-
-                  {/* Add Party Modal */}
                   {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
@@ -946,14 +762,11 @@ export default function PurchaseReturnAdd() {
                     />
                   )}
 
-                  {/* RHF Error */}
-                  {errors?.Party_Name && (
-                    <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
-                  )}
                 </div>
                 <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
-                  <span className=" whitespace-nowrap active ">
+                  {/* <div className="input-field col s6 mt-4"> */}
+                  <span className="whitespace-nowrap active">
                     GSTIN
 
                   </span>
@@ -974,15 +787,10 @@ export default function PurchaseReturnAdd() {
                     </p>
                   )}
                 </div>
-
               </div>
+
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
-
-
-
-
-                {/* Return Number */}
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Return Number
@@ -1003,48 +811,64 @@ export default function PurchaseReturnAdd() {
                     </p>
                   )}
                 </div>
-                {/* Bill Number */}
                 <div className="flex items-center w-full gap-3  justify-end">
+                  {/* <div className="row  "> */}
+
+                  {/* Invoice Number */}
+                  {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
-                    Bill Number
-                    <span className="text-red-500">*</span>
+                    Bill Number <span className="text-red-500">*</span>
                   </span>
 
                   <input
                     type="text"
-                    style={{ marginBottom: 0, border: "none", width: "50%" }}
-                    id=" Bill_Number"
+                    id=" Invoice_Number"
+                    //value={Invoice_Number}
+
                     {...register("Bill_Number")}
-                    placeholder="Bill_Number"
-                    className="w-full outline-none invoice-number-class  text-gray-900"
+                    placeholder=" Bill_Number"
+                    style={{ marginBottom: 0, border: "none", width: "50%" }}
+                    className="w-full outline-none  text-gray-900
+                          invoice-number-class"
+                    readOnly
                   />
-                  {errors?.Bill_Number && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.Bill_Number?.message}
-                    </p>
-                  )}
+                  {/* {errors?.Invoice_Number && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors?.Invoice_Number?.message}
+                          </p>
+                        )} */}
                 </div>
 
-                <div className="flex items-center w-full gap-3  justify-end">
-                  <span className="whitespace-nowrap ">
+
+
+                {/* Invoice Date */}
+                <div className="flex items-center w-full  gap-3 justify-end">
+                  {/* <div className="input-field col s6 mt-4"> */}
+                  <span className=" whitespace-nowrap active">
                     Bill Date
                     <span className="text-red-500">*</span>
                   </span>
 
                   <input
-                    style={{ marginBottom: 0, border: "none", width: "50%" }}
-                    type="date"
+                    type="text"
                     id=" Bill_Date"
+
+                    //value={toLocalDateString(Invoice_Date) || ""}
+                    style={{ marginBottom: 0, width: "50%", border: "none" }}
                     {...register("Bill_Date")}
-                    placeholder=" Bill_Date"
-                    className="w-full outline-none invoice-date-class   text-gray-900"
+                    //placeholder=" Invoice_Date"
+                    readOnly
+                    className="w-full outline-none invoice-date-class text-gray-900"
+
                   />
-                  {errors?.Bill_Date && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.Bill_Date?.message}
-                    </p>
-                  )}
+                  {/* {errors?.Invoice_Date && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors?.Invoice_Date?.message}
+                          </p>
+                        )} */}
                 </div>
+
+                {/* Date */}
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Date
@@ -1065,15 +889,13 @@ export default function PurchaseReturnAdd() {
                     </p>
                   )}
                 </div>
-                {/* State of Supply */}
-
-
-
-
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
+                <div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
-                  <span className="whitespace-nowrap ">
+                  {/* <div className="row w-1/2"> */}
+
+                  {/* State of Supply */}
+                  {/* <div className="input-field col s6"> */}
+                  <span className=" whitespace-nowrap active">
                     State of Supply
                     <span className="text-red-500">*</span>
                   </span>
@@ -1081,6 +903,7 @@ export default function PurchaseReturnAdd() {
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
                     id="stateOfSupply"
                     className="validate mt-2"
+
                     {...register("State_Of_Supply")}
                   >
                     <option value="">Select State</option>
@@ -1089,10 +912,6 @@ export default function PurchaseReturnAdd() {
                         {state}
                       </option>
                     ))}
-                    {/* <option value="West Bengal">West Bengal</option>
-                        <option value="Maharashtra">Maharashtra</option>
-                        <option value="Karnataka">Karnataka</option>
-                        <option value="Delhi">Delhi</option> */}
                   </select>
                   {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1100,12 +919,11 @@ export default function PurchaseReturnAdd() {
                     </p>
                   )}
                 </div>
+
+
               </div>
 
-
-
             </div>
-
 
 
 
@@ -1156,34 +974,23 @@ export default function PurchaseReturnAdd() {
                         </div>
                       </td>
 
+                      <td
+                        style={{ padding: "0px", position: "relative" }}>
 
-                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
+
+
+
                           <input
                             type="text"
-                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
+                            value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
                             style={{ marginBottom: "0px" }}
-                            readOnly={rows[i]?.isExistingItem}
+                            readOnly
+
                             placeholder="Category"
                             className="w-full outline-none border-b-2 text-gray-900"
-                            onClick={() => {
-                              if (!rows[i]?.isExistingItem) {
-                                setRows((prev) =>
-                                  prev.map((row, idx) => ({
-                                    ...row,
-                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
-                                  }))
-                                );
-                              }
-                            }}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              handleRowChange(i, "categorySearch", value);
-                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
-                              handleRowChange(i, "isExistingItem", false);
-                            }}
+                          // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
                           />
-
 
                           {errors?.items?.[i]?.Item_Category && (
                             <p className="text-red-500 text-xs mt-1">
@@ -1191,107 +998,15 @@ export default function PurchaseReturnAdd() {
                             </p>
                           )}
 
-                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setShowModal(true);
-                                  handleRowChange(i, "CategoryOpen", false);
-                                }}>
-                                + Add Category
-                              </span>
 
-                              {categories
-                                ?.filter((cat) =>
-                                  cat.Item_Category.toLowerCase().startsWith(
-                                    (rows[i]?.categorySearch || "").toLowerCase()
-                                  )
-                                )
-                                .map((cat, idx) => (
-                                  <div
-                                    key={idx}
-                                    onClick={() => {
-                                      handleSelect(i, cat.Item_Category);
-                                      handleRowChange(i, "categorySearch", cat.Item_Category);
-                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
-                                      handleRowChange(i, "CategoryOpen", false);
-                                    }}
 
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {cat.Item_Category}
-                                  </div>
-                                ))}
-
-                              {categories?.filter((cat) =>
-                                cat.Item_Category.toLowerCase().startsWith(
-                                  (rows[i]?.categorySearch || "").toLowerCase()
-                                )
-                              ).length === 0 && (
-                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
-                                )}
-                            </div>
-                          )}
                         </div>
-                        {showModal && (
-                          <div
-                            style={{
-                              position: "fixed",
-                              inset: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "rgba(0,0,0,0.4)",
-                              backdropFilter: "blur(4px)",
-                              zIndex: 30,
-                            }}
-                          >
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowModal(false)}
-                                style={{ backgroundColor: "transparent" }}
-                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                              >
-                                ✕
-                              </button>
-
-                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                              <input
-                                type="text"
-                                value={newCategory}
-                                onChange={(e) => setNewCategory(e.target.value)}
-                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                placeholder="Enter category name"
-                              />
-
-                              <div className="flex justify-end gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setShowModal(false)}
-
-                                  style={{ backgroundColor: "lightgray" }}
-                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-                                >
-                                  Cancel
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={handleAddCategory}
-                                  style={{ backgroundColor: "#4CA1AF" }}
-                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
-                                >
-                                  Add
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                        {/* Modal */}
 
                       </td>
+
                       {/* Item Dropdown */}
-                      <td style={{ padding: "0px", width: "18%", position: "relative" }}>
+                      <td style={{ padding: "0px", width: "20%", position: "relative" }}>
                         <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                           <input
                             type="text"
@@ -1300,26 +1015,39 @@ export default function PurchaseReturnAdd() {
                               const typedValue = e.target.value;
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
-                              setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                              // setValue(`items.${i}.Item_Name`, typedValue);
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
                               handleRowChange(i, "isUnitLocked", false);
-                              // ✅ If typed value doesn’t match any existing item → unlock category
-                              const exists = items?.items?.some(
+
+                              const exists = items?.items?.find(
                                 (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                               );
-                              handleRowChange(i, "isExistingItem", exists); // false if new item
+                              if (exists) {
+                                // ✅ Only store if it's a valid item
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
+                                handleRowChange(i, "isExistingItem", true);
+                              } else {
+                                // ❌ Clear Item_Name in RHF to trigger error
+                                setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
+                                handleRowChange(i, "isExistingItem", false);
+                              }
+                              //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
+
                             onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
-                          {/* RHF error */}
+
                           {errors?.items?.[i]?.Item_Name && (
                             <p className="text-red-500 text-xs mt-1">
-                              {errors?.items?.[i]?.Item_Name?.message}
+                              {errors.items[i].Item_Name.message}
                             </p>
                           )}
+
+
+
                           {/* Dropdown List */}
                           {rows[i]?.itemOpen && (
                             <div
@@ -1359,19 +1087,20 @@ export default function PurchaseReturnAdd() {
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: true,      // lock HSN
                                               isUnitLocked: true,     // lock unit
+                                              itemQuantity: it.Stock_Quantity || 0,
                                             };
                                             return updated;
                                           });
                                           handleRowChange(i, "itemSearch", it.Item_Name);
                                           handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
                                           handleRowChange(i, "CategoryOpen", false);
-                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-
+                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
+                                          setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0.00, { shouldValidate: true });
+                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
+                                          setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -1380,7 +1109,7 @@ export default function PurchaseReturnAdd() {
                                               ...itemsValues[i],
                                               Item_Name: it.Item_Name,
                                               Purchase_Price: it.Purchase_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 1,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
                                               Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
                                               Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
                                               Tax_Type: itemsValues[i]?.Tax_Type
@@ -1389,21 +1118,19 @@ export default function PurchaseReturnAdd() {
                                             itemsValues
                                           );
 
-                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                                          setValue(`items.${i}.Amount`, Amount);
+                                          setValue(`Total_Amount`, Total_Amount);
+                                          setValue(`Balance_Due`, Balance_Due);
                                         }}
 
                                         className="hover:bg-gray-100 cursor-pointer border-b"
                                       >
                                         <td>{idx + 1}</td>
                                         <td className="px-3 py-2">{it.Item_Name}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        {/* <td style={{color:"transparent"}}
-              className={`px-3 py-2 ${it.Stock_Quantity <= 0 ? "text-red-500" : "text-green-500"}`}>
-                {it.Stock_Quantity || 0}</td> */}
+                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
                                         <td
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
@@ -1432,7 +1159,7 @@ export default function PurchaseReturnAdd() {
                             </div>
                           )}
 
-
+                          {/* RHF error */}
 
                         </div>
                       </td>
@@ -1441,17 +1168,17 @@ export default function PurchaseReturnAdd() {
                       <td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
-                          maxLength={8}
+                          readOnly
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-                          onChange={(e) => {
-                            if (!rows[i]?.isHSNLocked) {
-                              handleRowChange(i, "Item_HSN", e.target.value);
-                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                            }
-                          }}
+                          // onChange={(e) => {
+                          //   if (!rows[i]?.isHSNLocked) {
+                          //     handleRowChange(i, "Item_HSN", e.target.value);
+                          //     setValue(`items.${i}.Item_HSN`, e.target.value);
+                          //   }
+                          // }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
-                          readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
+                        // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
                         />
                         {errors?.items?.[i]?.Item_HSN && (
                           <p className="text-red-500 text-xs mt-1">
@@ -1460,81 +1187,64 @@ export default function PurchaseReturnAdd() {
                         )}
                       </td>
 
-                      {/* Qty */}
+                      {/* Quantity */}
                       <td style={{ padding: "0px", width: "4%" }}>
                         <input
                           type="text"
                           className="form-control"
                           style={{ width: "100%" }}
-                          {...register(`items.${i}.Quantity`)}
-
-
+                          value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                          {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
                           onChange={(e) => {
+                            let value = e.target.value.replace(/[^0-9]/g, "");
+                            // let currentItemName = itemsValues[i]?.Item_Name?.trim();
+                            // if (!currentItemName) return;
 
-                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                            if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                              return;
-                            }
-                            // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                            //   ...itemsValues[i],
-                            //   Quantity: e.target.value,
-                            // });
+                            // // 🔹 Fetch the item’s DB stock (available stock now)
+                            // const stockItem = items?.items?.find(
+                            //   (item) => item.Item_Name === currentItemName
+                            // );
+                            // const currentStock = Number(stockItem?.Stock_Quantity || 0);
 
-                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              {
-                                ...itemsValues[i],
-                                Quantity: Number(e.target.value),
-                              },
-                              i,
-                              itemsValues
-                            );
+                            // // 🔹 Get the old quantity from the purchase being edited (previously sold)
+                            // const previousQuantity = Number(rows[i]?.itemQuantity || 0);
 
-                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            // // ✅ Effective available stock = stock + previously sold quantity
+                            // const effectiveAvailableStock = currentStock + previousQuantity;
+
+                            let num = parseInt(value, 10);
+                            if (isNaN(num) || num < 0) num = 0;
+                            // if (num > effectiveAvailableStock) num = effectiveAvailableStock;
+
+                            // ✅ Update via RHF
+                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true });
+
+                            // ✅ Recalculate row + totals
+                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
+                              calculateRowAmount(
+                                { ...itemsValues[i], Quantity: num || 0 },
+                                i,
+                                itemsValues
+                              );
+
+                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                            setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                           }}
                           placeholder="Qty"
                         />
+
                         {errors?.items?.[i]?.Quantity && (
+
                           <p className="text-red-500 text-xs mt-1">
                             {errors.items[i].Quantity.message}
                           </p>
                         )}
                       </td>
 
-                      {/* Unit */}
-                      {/* <td style={{ padding: "0px" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Item_Unit`}
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select "
-                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      handleRowChange(i, "Item_Unit", value);
-                                      setValue(`items.${i}.Item_Unit`, value);
-                                    }}
-                                  >
-                                    <option value="">Select</option>
-                                    {Object.entries(itemUnits).map(([key, value]) => (
-                                      <option key={key} value={key}>
-                                        {`${value} (${key})`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              />
-                              {errors?.items?.[i]?.Item_Unit && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_Unit.message}
-                                </p>
-                              )}
-                            </td> */}
+
+
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
@@ -1585,7 +1295,7 @@ export default function PurchaseReturnAdd() {
 
 
                       {/* Price/Unit */}
-                      {/* <td style={{ padding: "0px",width: "6%" }}>
+                      {/* <td style={{ padding: "0px" ,width: "6%"}}>
                               <div className="d-flex align-items-center">
                                 <input
                                   type="text"
@@ -1611,11 +1321,15 @@ export default function PurchaseReturnAdd() {
                                     }
 
                                     e.target.value = val;
-                                       setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
+                                    //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
                                     if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                                       return;
                                     }
 
+                                    // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                    //   ...itemsValues[i],
+                                    //   Purchase_Price: val,
+                                    // });
                                     const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                       { ...itemsValues[i], Purchase_Price: val },
                                       i,
@@ -1632,13 +1346,12 @@ export default function PurchaseReturnAdd() {
                                 />
 
                               </div>
-                                                     {errors?.items?.[i]?.Purchase_Price && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors.items[i].Purchase_Price.message}
-          </p>
-        )}
+                              {errors?.items?.[i]?.Purchase_Price && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.items[i].Purchase_Price.message}
+                                </p>
+                              )}
                             </td> */}
-                      {/* Price/Unit */}
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
@@ -1646,31 +1359,20 @@ export default function PurchaseReturnAdd() {
                             className="form-control"
                             style={{ width: "100%", marginBottom: "0px" }}
                             {...register(`items.${i}.Purchase_Price`)}
+
                             onChange={(e) => {
-                              let val = e.target.value.replace(/[^0-9.]/g, "");;
-
-                              // ✅ allow digits and one dot
-
-
-                              // ✅ if more than one dot, keep only the first
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
                               const parts = val.split(".");
-                              if (parts.length > 2) {
-                                val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                              }
-
-                              // ✅ limit to 2 decimal places
+                              if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
                               if (val.includes(".")) {
-                                const [int, dec] = val.split(".");
-                                val = int + "." + dec.slice(0, 2);
+                                const [intPart, decPart] = val.split(".");
+                                val = intPart + "." + decPart.slice(0, 2);
                               }
 
                               e.target.value = val;
-                              setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
-                              //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
-                              if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                return;
-                              }
 
+                              // 🟩 Update RHF internal state FOR VALIDATION
+                              setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Purchase_Price: val },
@@ -1678,11 +1380,12 @@ export default function PurchaseReturnAdd() {
                                 itemsValues
                               );
 
-                              setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                              setValue(`items.${i}.Amount`, Amount);
+                              setValue("Total_Amount", Total_Amount);
+                              setValue("Balance_Due", Balance_Due);
                             }}
+
 
                             placeholder="Price"
                           />
@@ -1702,7 +1405,28 @@ export default function PurchaseReturnAdd() {
                             className="form-control"
                             style={{ width: "50%", marginBottom: "0px" }}
                             {...register(`items.${i}.Discount_On_Purchase_Price`)}
+                            // onInput={(e) => {
+                            //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            //   //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
+                            //   //   ...itemsValues[i],
 
+                            //   //   Discount_On_Purchase_Price: e.target.value,
+
+                            //   // });
+                            //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                            //     { ...itemsValues[i], Discount_On_Purchase_Price: e.target.value },
+                            //     i,
+                            //     itemsValues
+                            //   );
+
+                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                            //   // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                            //   // setValue(`items.${i}.Amount`, Amount);
+
+                            // }}
                             onInput={(e) => {
                               let val = e.target.value;
 
@@ -1732,7 +1456,6 @@ export default function PurchaseReturnAdd() {
                               setValue("Total_Amount", Total_Amount);
                               setValue("Balance_Due", Balance_Due);
                             }}
-
                             placeholder="Discount"
                           />
                           <Controller
@@ -1746,6 +1469,10 @@ export default function PurchaseReturnAdd() {
                                 onChange={(e) => {
                                   field.onChange(e); // ✅ let RHF handle its state
 
+                                  // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                  //   ...itemsValues[i],
+                                  //   Discount_Type_On_Purchase_Price: e.target.value,
+                                  // });
 
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
@@ -1753,10 +1480,10 @@ export default function PurchaseReturnAdd() {
                                     itemsValues
                                   );
 
-                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                                 }}
                               >
                                 <option value="Percentage">%</option>
@@ -1771,25 +1498,36 @@ export default function PurchaseReturnAdd() {
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
-                          name={`items.${i}.Tax_Type`}
+                          name={`items.${i}.Tax_Type`} // ✅ remove disabled here
                           render={({ field }) => (
                             <select
                               {...field}
-                              className="form-select"
-                              style={{ width: "100%", fontSize: "12px", marginBottom: "0px" }}
+                              className="form-select bg-gray-100 text-gray-700"
+                              style={{
+                                width: "100%",
+                                fontSize: "12px",
+                                marginBottom: "0px",
+                                pointerEvents: "none", // ✅ visually disabled
+                                cursor: "not-allowed",
+                                backgroundColor: "#f3f4f6", // light gray
+                              }}
                               onChange={(e) => {
-                                field.onChange(e); // ✅ update RHF value
+                                field.onChange(e);
 
+                                // ✅ Recalculate amounts on Tax_Type change
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
+                                  calculateRowAmount(
+                                    { ...itemsValues[i], Tax_Type: e.target.value },
+                                    i,
+                                    itemsValues
+                                  );
 
-                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                  { ...itemsValues[i], Tax_Type: e.target.value },
-                                  i,
-                                  itemsValues
-                                );
-                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                  shouldValidate: true,
+                                });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                               }}
                             >
                               <option value="None">None</option>
@@ -1813,6 +1551,7 @@ export default function PurchaseReturnAdd() {
                           )}
                         />
                       </td>
+
 
                       {/* Tax Amount */}
                       <td style={{ width: "8%" }}>
@@ -1842,9 +1581,21 @@ export default function PurchaseReturnAdd() {
 
               </table>
 
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full purchase-wrapper">
 
-              {/* <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64">
-                          <div className="flex flex-col w-full">
+                <div className="flex flex-col px-2 w-full sm:w-64 purchase-left">
+                  {/* <div className="flex flex-col w-1/8"> */}
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className=" text-white font-bold py-2 px-4 w-1/2 rounded  "
+                    style={{ backgroundColor: "#4CA1AF" }}
+                  >
+                    + Add Row
+                  </button>
+                  <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
+                  >
+                    <div className="flex flex-col w-full">
                       <span className="active">Payment Type</span>
 
                       <select
@@ -1878,7 +1629,7 @@ export default function PurchaseReturnAdd() {
                             {bank.Account_Display_Name}
                           </option>
                         ))}
-                       
+
                       </select>
 
                       {errors?.Payment_Type && (
@@ -1888,240 +1639,12 @@ export default function PurchaseReturnAdd() {
                         <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
                       )}
                     </div>
-
-
-
-
-                          {(paymentType === "Cheque" || paymentType === "Neft") && (
-
-                            <div className="flex flex-col w-full ">
-                              <span className="active whitespace-nowrap">
-                                {paymentType === "Cheque" ? "Cheque Number" : "NEFT Reference Number"}
-                              </span>
-
-                              <input
-                                type="text"
-                                id="Reference_Number"
-                                {...register("Reference_Number")}
-                                placeholder={`Enter ${paymentType} number`}
-                                className="w-full outline-none border-b-2 text-gray-900"
-                              />
-
-                              {errors?.Reference_Number && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors?.Reference_Number?.message}
-                                </p>
-                              )}
-                            </div>
-
-                          )}
-                        </div> */}
-              {/* Payment Type — single payment or split box, same pattern as Payment-In/Payment-Out */}
-              <div className="flex sm:w-1/4 p-2">
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
-                  style={{ backgroundColor: "#4CA1AF" }}
-                >
-                  + Add Row
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
-                <div className="flex flex-col px-2">
-                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
-
-
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
-                    {!showSplitBox ? (
-                      <>
-                        <div className="flex flex-col w-full">
-                          <span className="active">Payment Type</span>
-
-                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
-            it's driven by setValue in the onChange below, not a native <select {...register}> */}
-                          <input
-                            type="hidden"
-                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
-                          />
-
-                          <select
-                            id="Payment_Type"
-                            value={
-                              paymentType === "Bank"
-                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                                : paymentType || ""
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val.startsWith("bank_")) {
-                                const bankId = val.replace("bank_", "");
-                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                              } else {
-                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                              }
-                            }}
-                          >
-                            <option value="">Select Payment Type</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Neft">Neft</option>
-                            {banks?.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </select>
-
-                          {errors?.splits?.[0]?.Payment_Type && (
-                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
-                          )}
-                        </div>
-
-                        {/* {(paymentType === "Cheque" || paymentType === "Neft") && (
-                          <div className="flex flex-col w-full">
-                            <span className="active whitespace-nowrap">
-                              {paymentType === "Cheque" ? "Cheque Number" : "NEFT Reference Number"}
-                            </span>
-
-                            <input
-                              type="text"
-                              id="Reference_Number"
-                              {...register("splits.0.Reference_Number")}
-                               style={{ width: "80%" }}
-                              placeholder={`Enter ${paymentType} number`}
-                              // className="w-full outline-none border-b-2 text-gray-900"
-                            />
-                          </div>
-                        )} */}
-                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                    <div className="mt-3 flex flex-col">
-                      <label className="text-sm">Reference Number</label>
-                      <input
-                        type="text"
-                        //readOnly={isView}
-                        style={{ width: "80%" ,marginBottom:"0px"}}
-                        {...register("splits.0.Reference_Number")}
-                      />
-                    </div>
-                  )}
-
-                        <button
-                          type="button"
-                          onClick={handleAddPaymentType}
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none", padding: 0 }}
-                        >
-                          + Add Payment Type
-                        </button>
-                      </>
-                    ) : (
-                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
-                        {splitFields.map((field, index) => {
-                          const rowType = watch(`splits.${index}.Payment_Type`);
-                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
-                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
-                          const amountField = register(`splits.${index}.Amount`, {
-                            required: "Required",
-                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
-                          });
-
-                          return (
-                            <div key={field.id} className="flex flex-col gap-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
-                                    value={currentIdentifier || ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val.startsWith("bank_")) {
-                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                      } else {
-                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                      }
-                                    }}
-                                    className="border rounded-md px-2 py-1.5"
-                                  >
-                                    <option value="">Select Type</option>
-                                    {rowOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Amount"
-                                    style={{ marginBottom: "0px", width: "80%" }}
-                                    className="border rounded-md px-2 py-1.5"
-                                    {...amountField}
-                                    onChange={(e) => {
-                                      e.target.value = sanitizeAmount(e.target.value);
-                                      amountField.onChange(e);
-                                    }}
-                                  />
-                                  {errors?.splits?.[index]?.Amount && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
-                                  )}
-                                </div>
-
-                                {splitFields.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSplit(index)}
-                                    className="text-gray-500 mb-2 mt-4"
-                                    style={{ background: "transparent", border: "none" }}
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                )}
-                              </div>
-
-                              {needsRef && (
-                                <input
-                                  type="text"
-                                  placeholder="Reference Number"
-                                  style={{width:"80%"}}
-                                  // className="border rounded-md px-2 py-1.5 w-full"
-                                  {...register(`splits.${index}.Reference_Number`)}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                          }
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none" }}
-                        >
-                          + Add Another Payment
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
-                {/* <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
-                  > */}
 
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
-                >
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 purchase-right">
+
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
@@ -2133,7 +1656,7 @@ export default function PurchaseReturnAdd() {
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                          const totalPaid = parseFloat(watch("Total_Received")) || 0;
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -2144,7 +1667,7 @@ export default function PurchaseReturnAdd() {
                             const rounded = Math.round(totalAmount);
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
 
                           } else {
                             if (originalTotal !== null) {
@@ -2152,7 +1675,7 @@ export default function PurchaseReturnAdd() {
 
                               setValue(
                                 "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
+                                (originalTotal - totalPaid).toFixed(2),
                                 { shouldValidate: true }
                               );
                             }
@@ -2173,7 +1696,7 @@ export default function PurchaseReturnAdd() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
                           const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                          const totalPaid = parseFloat(watch("Total_Received")) || 0;
 
                           if (isNaN(totalAmount)) return;
 
@@ -2181,9 +1704,9 @@ export default function PurchaseReturnAdd() {
                           const newTotal = totalAmount + val;
 
                           setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
                         }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      // disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div>
 
@@ -2205,7 +1728,7 @@ export default function PurchaseReturnAdd() {
 
 
 
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      <div className="flex items-center  gap-3 relative ">
 
                         <div className="flex items-center gap-2 relative">
 
@@ -2213,12 +1736,9 @@ export default function PurchaseReturnAdd() {
                             type="checkbox"
 
 
-                            id="totalPaidCheck"
+                            id="totalReceivedCheck"
                             className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
                             onChange={(e) => {
-
                               const isChecked = e.target.checked;
                               const totalAmount = parseFloat(watch("Total_Amount"));
 
@@ -2248,7 +1768,7 @@ export default function PurchaseReturnAdd() {
                             htmlFor="totalReceivedCheck"
                             className="font-medium whitespace-nowrap"
                           >
-                            Total Received
+                            Total Paid
                           </span>
 
                         </div>
@@ -2258,9 +1778,7 @@ export default function PurchaseReturnAdd() {
                           type="text"
                           {...register("Total_Received")}
                           style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
                           onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
                             let val = e.target.value.replace(/[^0-9.]/g, "");
 
                             // Allow only one dot
@@ -2276,29 +1794,24 @@ export default function PurchaseReturnAdd() {
                             e.target.value = val;
                             setValue("Total_Received", val);
 
-                            const totalReceived = parseFloat(val || 0);
+                            const totalPaid = parseFloat(val || 0);
                             const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
+                            setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
                           }}
-                          className="form-control"
+                        // className="form-control"
                         />
                       </div>
 
 
 
 
-                      <div style={{ width: "100%" }}
-                        className="flex  gap-2 items-center ">
+                      <div className="flex  gap-2 items-center ">
 
                         <span className="font-medium whitespace-nowrap">Balance Due</span>
                         <input
                           style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
+                            backgroundColor: "transparent",
+                            marginBottom: "0px", height: "1rem", width: "100%"
                           }}
                           type="text"
                           className="form-control  "
@@ -2314,39 +1827,36 @@ export default function PurchaseReturnAdd() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-4 ">
+            <div className="flex justify-end gap-4 mt-4">
               {/* <button
                       type="button"
-                         onClick={() => {
-                                          // setShowModal(false)
-                                          if (from === "party-sales-purchases-details") {
+                     
+                      onClick={() => {
+                        if (from === "party-sales-purchases-details") {
 
-                                            navigate({
-                                              pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                                              search: location.search,
-                                            })
-                                          }
-                                              else if (from === "item-sales-purchases-details") {
-                                               navigate({
-                                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                                            search: location.search,
-                                          })
-                                                // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                              } 
-                                          else {
-                                            navigate({
-                                              pathname: "/purchase/return",
-                                              search: location.search,
-                                            })
+                          navigate({
+                            pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                            search: location.search,
+                          })
+                          
+                        } 
+                        else if (from === "item-sales-purchases-details") {
+                          navigate({
+                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                            search: location.search,
+                          })
+                          // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                        } 
+                        else {
+                          navigate({
+                            pathname: "/purchase/all-sales",
+                            search: location.search,
+                          })
 
-                                            // navigate("/sale/all-sales");
-                                          }
-                                        }}
-                      // onClick={() => navigate({
-                      //   pathname: "/purchase/all-purchases",
-                      //   search: location.search,
-                      // })}
-                      // onClick={() => navigate("/purchase/all-purchases")}
+                          // navigate("/purchase/all-sales");
+                        }
+                      }}
+                      // onClick={() => navigate("/purchase/all-sales")}
                       className=" text-white font-bold py-2 px-4 rounded"
                       style={{ backgroundColor: "#4CA1AF" }}
                     >
@@ -2398,26 +1908,26 @@ export default function PurchaseReturnAdd() {
   /*  screens between 1000px and 640px */
   @media (max-width: 1000px) and (min-width: 641px) {
 
-    /* Keep sale-wrapper horizontal but avoid tight spacing */
-    .sale-wrapper{
+    /* Keep purchase-wrapper horizontal but avoid tight spacing */
+    .purchase-wrapper{
       flex-direction: row !important;
       gap: 10px !important;
     }
 
     /* Left section slightly wider */
-    .sale-left {
+    .purchase-left {
       width: 45% !important;
     }
 
     /* Right section slightly narrower */
-    .sale-right {
+    .purchase-right {
       width: 55% !important;
       margin-left: 0 !important;
       margin-right: 0 !important;
     }
 
     /* Inputs must not stretch too much */
-    .sale-right > div > input {
+    .purchase-right > div > input {
       width: 80% !important;
     }
 
@@ -2489,34 +1999,34 @@ export default function PurchaseReturnAdd() {
       width: 100% !important;
     }
 
-    .sale-wrapper {
+    .purchase-wrapper {
       flex-direction: column !important;
       gap: 20px !important;
     }
 
-    .sale-left {
+    .purchase-left {
       width: 100% !important;
     }
 
-    .sale-right {
+    .purchase-right {
       width: 100% !important;
       margin-left: 0 !important;
       margin-right: 0 !important;
     }
 
-    .sale-right > div {
+    .purchase-right > div {
       width: 100% !important;
     }
 
-    .sale-right > div > input {
+    .purchase-right > div > input {
       width: 100% !important;
     }
 
-    .sale-input {
+    .purchase-input {
       width: 100% !important;
     }
 
-    .sale-checkbox-label {
+    .purchase-checkbox-label {
       padding-left: 30px !important;
     }
   }

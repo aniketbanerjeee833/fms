@@ -5,20 +5,31 @@ import { z } from "zod";
 /* ─────────────────────────────────────────────────────────────
    SHARED HELPERS  (same as purchaseFormSchema)
 ───────────────────────────────────────────────────────────────*/
+// const digitsOnly = (fieldName, required = true) =>
+//   z
+//     .union([z.string(), z.number()])
+//     .transform((val) => String(val ?? "").trim())
+//     .refine(
+//       (val) => (required ? val !== "" : true),
+//       { message: `${fieldName} is required` }
+//     )
+//     .refine(
+//       (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+//       { message: `${fieldName} must be a valid number` }
+//     )
+//     .transform((val) => (val === "" ? 0 : Number(val)));
 const digitsOnly = (fieldName, required = true) =>
-  z
-    .union([z.string(), z.number()])
+  z.union([z.string(), z.number()])
     .transform((val) => String(val ?? "").trim())
     .refine(
       (val) => (required ? val !== "" : true),
       { message: `${fieldName} is required` }
     )
     .refine(
-      (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+      (val) => val === "" || /^-?\d+(\.\d{1,2})?$/.test(val),   // ← added -? here
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
-
 /* ─────────────────────────────────────────────────────────────
    SHARED ITEM ROW SCHEMA  (identical to purchase — reused)
 ───────────────────────────────────────────────────────────────*/
@@ -205,7 +216,7 @@ export const purchaseReturnFormSchema = z
     items: z
       .array(purchaseReturnItemSchema)
       .nonempty("At least one item must be added"),
-  });
+  })
   
 // export const purchaseReturnFormSchema = z.object({
 

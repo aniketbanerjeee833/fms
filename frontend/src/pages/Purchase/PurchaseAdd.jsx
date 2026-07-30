@@ -21,7 +21,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
-
+import {Trash2} from "lucide-react";
 export default function PurchaseAdd() {
 
   const dispatch = useDispatch();
@@ -65,6 +65,7 @@ export default function PurchaseAdd() {
   const [newCategory, setNewCategory] = useState("");
 
   const [showPartyModal, setShowPartyModal] = useState(false);
+    const [showSplitBox, setShowSplitBox] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
   const [originalTotal, setOriginalTotal] = useState(null);
   // const[chequeNumber,setChequeNumber]=useState(false);
@@ -214,15 +215,16 @@ export default function PurchaseAdd() {
     defaultValues: {
       Party_Name: "",
 
-      Bill_Number: "",
+       Bill_Number: "",
       Bill_Date: "",
       State_Of_Supply: "",
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
-      Payment_Type: "Cash",
-      Bank_Account_Id: null,   // 🔹 added
-      Reference_Number: "",
+      //Payment_Type: "Cash",
+      //Bank_Account_Id: null,   // 🔹 added
+      //Reference_Number: "",
+       splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
       items: [{
 
 
@@ -247,7 +249,14 @@ export default function PurchaseAdd() {
     name: "items",
   });
 
-
+const {
+    fields: splitFields,
+    append: appendSplit,
+    remove: removeSplit,
+  } = useFieldArray({
+    control,
+    name: "splits",
+  });
   const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
@@ -399,7 +408,75 @@ export default function PurchaseAdd() {
     setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
   };
 
+const sanitizeAmount = (value) => {
+    let val = value.replace(/[^0-9.]/g, "");
+    const parts = val.split(".");
+    if (parts.length > 2) {
+      val = parts[0] + "." + parts.slice(1).join("");
+    }
+    return val;
+  };
 
+  // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
+  // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
+  const buildPaymentTypeOptions = (banks) => [
+    { value: "Cash", label: "Cash", repeatable: false },
+    { value: "Cheque", label: "Cheque", repeatable: true },
+    { value: "Neft", label: "Neft", repeatable: true },
+    ...(banks || []).map((bank) => ({
+      value: `bank_${bank.Bank_Account_Id}`,
+      label: bank.Account_Display_Name,
+      repeatable: false,
+    })),
+  ];
+
+  const getRowIdentifier = (type, bankId) =>
+    type === "Bank" ? `bank_${bankId ?? ""}` : type;
+
+  //Inside the component:
+
+  const getUsedIdentifiers = (excludeIndex) => {
+    const splitValues = watch("splits") || [];
+    return splitValues
+      .map((s, i) =>
+        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+      )
+      .filter(Boolean);
+  };
+
+  const getAvailableOptions = (excludeIndex) => {
+    const used = getUsedIdentifiers(excludeIndex);
+    return buildPaymentTypeOptions(banks).filter(
+      (opt) => opt.repeatable || !used.includes(opt.value)
+    );
+  };
+
+  const handleAddPaymentType = () => {
+    appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+    setShowSplitBox(true);
+  };
+
+  // live-derived total — never stored as a separate field
+  const splitsWatch = watch("splits") || [];
+  const computedTotalPaid = splitsWatch.reduce(
+    (sum, s) => sum + (parseFloat(s.Amount) || 0),
+    0
+  );
+
+  // one-directional: recompute Balance_Due whenever the total-amount or splits change.
+  // (One-directional only — do NOT also sync splits from Balance_Due, that
+  // two-way sync is exactly what caused the "value shown but still required"
+  // bug in the Payment-Out modal.)
+  const totalAmountWatch = watch("Total_Amount");
+  useEffect(() => {
+    const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
+    setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
+    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+      shouldValidate: false,
+      shouldDirty: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalAmountWatch, computedTotalPaid]);
 
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
@@ -509,13 +586,7 @@ export default function PurchaseAdd() {
     "West Bengal"
   ];
 
-  // useEffect(() => {
-  //   const gstin = parties?.parties?.find(
-  //     (party) => party.Party_Name === watch("Party_Name")
-  //   )?.GSTIN;
 
-  //   setShowGSTIN(gstin || ""); // ✅ never undefined
-  // }, [watch("Party_Name"), parties]);
 
   useEffect(() => {
 
@@ -1874,119 +1945,196 @@ export default function PurchaseAdd() {
 
 
               </table>
-              <div className="grid grid-cols-2 px-2 sm:grid-cols-2  gap-4 w-full sale-wrapper">
+              <div className="flex sm:w-1/4 p-2">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  + Add Row
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
+                <div className="flex flex-col px-2">
+                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
-                <div className="flex flex-col px-2 w-full sm:w-64 sale-left">
-                  {/* <div className="flex flex-col w-1/8"> */}
-                  <button
-                    type="button"
-                    onClick={handleAddRow}
-                    className=" text-white font-bold py-2 px-4 w-1/2  rounded "
-                    style={{ backgroundColor: "#4CA1AF" }}
-                  >
-                    + Add Row
-                  </button>
-                  <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64">
-                    {/* <div className="flex flex-col  w-full mt-3"> */}
-                    <div className="flex flex-col w-full">
-                      <span className="active">Payment Type</span>
 
-                      <select
-                        id="Payment_Type"
-                        value={
-                          watch("Payment_Type") === "Bank"
-                            ? `bank_${watch("Bank_Account_Id") || ""}`
-                            : watch("Payment_Type") || ""
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val.startsWith("bank_")) {
-                            const bankId = val.replace("bank_", "");
-                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                          } else {
-                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                          }
-                        }}
-                      >
-                        <option value="">Select Payment Type</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Neft">Neft</option>
-                        {banks?.map((bank) => (
-                          <option
-                            key={bank.Bank_Account_Id}
-                            value={`bank_${bank.Bank_Account_Id}`}
+                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                    {!showSplitBox ? (
+                      <>
+                        <div className="flex flex-col w-full">
+                          <span className="active">Payment Type</span>
+
+                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
+            it's driven by setValue in the onChange below, not a native <select {...register}> */}
+                          <input
+                            type="hidden"
+                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
+                          />
+
+                          <select
+                            id="Payment_Type"
+                            value={
+                              paymentType === "Bank"
+                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                : paymentType || ""
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val.startsWith("bank_")) {
+                                const bankId = val.replace("bank_", "");
+                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                              }
+                            }}
                           >
-                            {bank.Account_Display_Name}
-                          </option>
-                        ))}
-                       
-                      </select>
+                            <option value="">Select Payment Type</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Neft">Neft</option>
+                            {banks?.map((bank) => (
+                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
+                                {bank.Account_Display_Name}
+                              </option>
+                            ))}
+                          </select>
 
-                      {errors?.Payment_Type && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
-                      )}
-                      {errors?.Bank_Account_Id && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
-                      )}
+                          {errors?.splits?.[0]?.Payment_Type && (
+                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
+                          )}
+                        </div>
+
+                     
+                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                    <div className="mt-3 flex flex-col">
+                      <label className="text-sm">Reference Number</label>
+                      <input
+                        type="text"
+                        //readOnly={isView}
+                        style={{ marginBottom:"0px"}}
+                        {...register("splits.0.Reference_Number")}
+                      />
                     </div>
-                    {/* <div className="flex flex-col w-full">
-                      <span className="active">Payment Type</span>
+                  )}
 
-                      <select id="Payment_Type" {...register("Payment_Type")}
-                      >
-                        <option value="">Select Payment Type</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Neft">Neft</option>
-                        {banks?.map((bank) => (
-                          <option
-                            key={bank.Bank_Account_Id}
-                            value={bank.Account_Display_Name}
-                          >
-                            {bank.Account_Display_Name}
-                          </option>
-                        ))}
-                      </select>
-                      {errors?.Payment_Type && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {errors?.Payment_Type?.message}
-                        </p>
-                      )}
-                    </div> */}
+                        <button
+                          type="button"
+                          onClick={handleAddPaymentType}
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none", padding: 0 }}
+                        >
+                          + Add Payment Type
+                        </button>
+                      </>
+                    ) : (
+                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
+                        {splitFields.map((field, index) => {
+                          const rowType = watch(`splits.${index}.Payment_Type`);
+                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
+                          const rowOptions = getAvailableOptions(index);
+                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
+                          const amountField = register(`splits.${index}.Amount`, {
+                            required: "Required",
+                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                          });
 
+                          return (
+                            <div key={field.id} className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                  <select
+                                    value={currentIdentifier || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                    className="border rounded-md px-2 py-1.5"
+                                  >
+                                    <option value="">Select Type</option>
+                                    {rowOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
 
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Amount"
+                                    style={{ marginBottom: "0px", width: "80%" }}
+                                    className="border rounded-md px-2 py-1.5"
+                                    {...amountField}
+                                    onChange={(e) => {
+                                      e.target.value = sanitizeAmount(e.target.value);
+                                      amountField.onChange(e);
+                                    }}
+                                  />
+                                  {errors?.splits?.[index]?.Amount && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                  )}
+                                </div>
 
+                                {splitFields.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSplit(index)}
+                                    className="text-gray-500 mb-2 mt-4"
+                                    style={{ background: "transparent", border: "none" }}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
 
-                    {(paymentType === "Cheque" || paymentType === "Neft") && (
+                              {needsRef && (
+                                <input
+                                  type="text"
+                                  placeholder="Reference Number"
+                                  style={{width:"80%"}}
+                                  // className="border rounded-md px-2 py-1.5 w-full"
+                                  {...register(`splits.${index}.Reference_Number`)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
 
-                      <div className="flex flex-col w-full ">
-                        <span className="active whitespace-nowrap">
-                          {paymentType === "Cheque" ? "Cheque Number" : "NEFT Reference Number"}
-                        </span>
-
-                        <input
-                          type="text"
-                          id="Reference_Number"
-                          {...register("Reference_Number")}
-                          placeholder={`Enter ${paymentType} number`}
-                          className="w-full outline-none border-b-2 text-gray-900"
-                        />
-
-                        {errors?.Reference_Number && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors?.Reference_Number?.message}
-                          </p>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                          }
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none" }}
+                        >
+                          + Add Another Payment
+                        </button>
                       </div>
-
                     )}
                   </div>
                 </div>
+                {/* <div style={{ width: "100%" }}
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
+                  > */}
+
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right">
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
+                >
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
@@ -1998,7 +2146,7 @@ export default function PurchaseAdd() {
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
+                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -2009,7 +2157,7 @@ export default function PurchaseAdd() {
                             const rounded = Math.round(totalAmount);
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
 
                           } else {
                             if (originalTotal !== null) {
@@ -2017,7 +2165,7 @@ export default function PurchaseAdd() {
 
                               setValue(
                                 "Balance_Due",
-                                (originalTotal - totalPaid).toFixed(2),
+                                (originalTotal - totalReceived).toFixed(2),
                                 { shouldValidate: true }
                               );
                             }
@@ -2038,7 +2186,7 @@ export default function PurchaseAdd() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
                           const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
+                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
 
                           if (isNaN(totalAmount)) return;
 
@@ -2046,14 +2194,13 @@ export default function PurchaseAdd() {
                           const newTotal = totalAmount + val;
 
                           setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
-                      // disabled={!watch("roundOffCheck") && originalTotal === null}
+                      //disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div>
 
-                    <div style={{ width: "100%" }}
-                      className="flex flex-col gap-4 mt-3 w-full">
+                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
                       <div className="flex gap-3 items-center  w-full sm:w-auto">
 
                         <div style={{ width: "100%" }} className="flex gap-2 ">
@@ -2071,10 +2218,9 @@ export default function PurchaseAdd() {
 
 
 
-                      <div
-                        style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                        <div className="flex items-center gap-2 relative">
+                       <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
@@ -2082,7 +2228,10 @@ export default function PurchaseAdd() {
 
                             id="totalPaidCheck"
                             className="w-4 h-4 cursor-pointer"
+                            disabled={splitsWatch.length > 1}   // 🔹 add this
+
                             onChange={(e) => {
+
                               const isChecked = e.target.checked;
                               const totalAmount = parseFloat(watch("Total_Amount"));
 
@@ -2094,6 +2243,9 @@ export default function PurchaseAdd() {
                                 // Clear both fields to stay consistent
                                 setValue("Total_Paid", "");
                                 setValue("Balance_Due", "");
+                                if (splitsWatch.length === 1) {
+                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                }
                                 return;
                               }
 
@@ -2105,6 +2257,13 @@ export default function PurchaseAdd() {
                                 // ✅ When unchecked, restore Balance_Due = Total_Amount
                                 setValue("Total_Paid", "");
                                 setValue("Balance_Due", totalAmount.toFixed(2));
+                              }
+                              if (splitsWatch.length === 1) {
+                                setValue(
+                                  "splits.0.Amount",
+                                  isChecked ? totalAmount.toFixed(2) : "",
+                                  { shouldValidate: true, shouldDirty: true }
+                                );
                               }
                             }}
                           />
@@ -2122,8 +2281,9 @@ export default function PurchaseAdd() {
                           type="text"
                           {...register("Total_Paid")}
                           style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-
+                          readOnly={splitsWatch.length > 1}
                           onChange={(e) => {
+                            if (splitsWatch.length > 1) return;
                             let val = e.target.value.replace(/[^0-9.]/g, "");
 
                             // Allow only one dot
@@ -2139,9 +2299,13 @@ export default function PurchaseAdd() {
                             e.target.value = val;
                             setValue("Total_Paid", val);
 
-                            const totalPaid = parseFloat(val || 0);
+                            const totalReceived = parseFloat(val || 0);
                             const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
+                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                            if (splitsWatch.length === 1) {
+                              const val = e.target.value;
+                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                            }
                           }}
                           className="form-control"
                         />
@@ -2155,7 +2319,10 @@ export default function PurchaseAdd() {
 
                         <span className="font-medium whitespace-nowrap">Balance Due</span>
                         <input
-                          style={{ backgroundColor: "transparent", marginBottom: "0px", height: "1rem", width: "100%" }}
+                          style={{
+                            backgroundColor: "transparent", marginBottom: "0px",
+                            height: "1rem", width: "100%"
+                          }}
                           type="text"
                           className="form-control  "
                           {...register("Balance_Due")}
@@ -2415,112 +2582,3 @@ export default function PurchaseAdd() {
   );
 }
 
-{/* <div className="relative w-full">
-
-                          
-                          <div
-                            className="flex  justify-between border rounded-md  bg-white cursor-pointer"
-                            onClick={() => setOpen((prev) => !prev)}
-                          >
-                            <input
-                              type="text"
-                              id="Party_Name"
-                              value={partySearch}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setPartySearch(value);
-                                setValue("Party_Name", value, { shouldValidate: true });
-                                setOpen(true);
-                              }}
-                              onClick={() => setOpen((prev) => !prev)}
-                              onBlur={() => {
-                                const typedValue = partySearch.trim().toLowerCase();
-
-                                // ✅ Full match only (not partial)
-                                const matchedParty = parties?.parties?.find(
-                                  (party) => party.Party_Name.toLowerCase() === typedValue
-                                );
-
-                                if (matchedParty) {
-                                  // ✅ Set full party info
-                                  setPartySearch(matchedParty.Party_Name);
-                                  setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-
-                                  // ✅ Check GSTIN (must be present)
-                                  if (!matchedParty.GSTIN || matchedParty.GSTIN.trim() === "") {
-
-                                    setValue("GSTIN", "", { shouldValidate: true });
-                                  } else {
-                                    setValue("GSTIN", matchedParty.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                  }
-
-
-                                } else {
-                                  // ❌ Not an exact match → clear field
-                                  setPartySearch("");
-                                  setValue("Party_Name", "");
-                                }
-
-                                setTimeout(() => setOpen(false), 150);
-                              }}
-                              placeholder="Search By Name/Phone"
-                              className="w-full outline-none py-1 px-2  text-gray-900"
-                              style={{
-                                marginBottom: 0, marginTop: "4px", border: "none",
-                                height: "2rem", borderBottom: "0px"
-                              }}
-                            />
-                            <span className="ml-2  absolute right-5 top-1/3  text-gray-700">
-                              ▼
-                            </span>
-                          </div>
-                      
-                          {open && (
-                            <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                              <span
-                                onClick={() => setShowPartyModal(true)}
-                                className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                              >
-                                + Add Party
-                              </span>
-
-                              {parties?.parties
-                                ?.filter(
-                                  (party) =>
-                                    party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase()) ||
-                                    party?.Phone_Number?.includes(partySearch)
-                                )
-                                .map((party, i) => (
-                                  <div
-                                    key={i}
-                                    onClick={() => {
-                                      // Select from dropdown
-                                      setPartySearch(party.Party_Name);
-                                      setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-
-                                      // ✅ GSTIN validation on selection
-                                      if (!party.GSTIN || party.GSTIN.trim() === "") {
-
-                                        setValue("GSTIN", "", { shouldValidate: true });
-                                      } else {
-                                        setValue("GSTIN", party.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                      }
-
-
-                                      setOpen(false);
-                                    }}
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {party.Party_Name} ({party.Phone_Number})
-                                  </div>
-                                ))}
-
-                            
-                              {parties?.parties?.filter((party) =>
-                                party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase())
-                              ).length === 0 && (
-                                  <p className="px-3 py-2 text-gray-500">No Party found</p>
-                                )}
-                            </div>
-                          )}
-                        </div> */}

@@ -8,6 +8,7 @@ import { extractInvoiceWithAI } from "../utils/invoiceAIParser.js";
 import ExcelJS from "exceljs";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 
 
 
@@ -30,668 +31,9 @@ const normalizeNumber = (val) =>
     : null;
 
 
-// const getAllPurchases = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
 
-//     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
 
 
-
-//     let whereClauses = [];
-//     let params = [];
-
-//     // 🔎 Search
-//     if (search) {
-//       whereClauses.push(`
-//         (LOWER(a.Party_Name) LIKE ? 
-//          OR LOWER(p.Payment_Type) LIKE ? 
-//          OR LOWER(p.Balance_Due) LIKE ? 
-//          OR LOWER(p.Total_Amount) LIKE ?)
-//       `);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like);
-//     }
-
-//     // 📅 Date Range
-//     if (fromDate && toDate) {
-//       whereClauses.push("DATE(p.created_at) BETWEEN ? AND ?");
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push("DATE(p.created_at) >= ?");
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push("DATE(p.created_at) <= ?");
-//       params.push(toDate);
-//     }
-
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-//     // 🧠 Main Paginated Query
-//     const query = `
-//       SELECT p.*, a.Party_Name
-//       FROM add_purchase p
-//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-//       ${whereSQL}
-//      ORDER BY p.created_at DESC
-//       LIMIT ? OFFSET ?
-//     `;
-//     params.push(limit, offset);
-
-//     const [rows] = await db.query(query, params);
-
-//     // 🧾 Get total count
-//     const [countResult] = await db.query(
-//       `
-//       SELECT COUNT(*) AS total
-//       FROM add_purchase p
-//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-//       ${whereSQL}
-//       `,
-//       params.slice(0, params.length - 2)
-//     );
-
-//       const totalsQuery = `
-//       SELECT
-//         COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
-//         COALESCE(SUM(p.Balance_Due), 0) AS totalBalance,
-//         COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
-//       FROM add_purchase p
-//       LEFT JOIN add_party a 
-//         ON p.Party_Id = a.Party_Id
-//       ${whereSQL}
-//     `;
-
-//     const [totalsResult] = await db.query(totalsQuery, params);
-//     return res.status(200).json({
-//       success: true,
-//       currentPage: page,
-//       totalPages: Math.ceil(countResult[0].total / limit),
-//       totalPurchases: countResult[0].total,
-//       purchases: rows,
-//       totals: totalsResult[0],
-//     });
-//   } catch (err) {
-//      if (connection) connection.release();
-//     console.error("❌ Error fetching purchases:", err);
-//     next(err);
-//     //return res.status(500).json({ message: "Internal Server Error" });
-//   }finally {
-//     if (connection) connection.release();
-//   }
-// };
-
-//OLD DUPLICACY ARISE
-// const addPurchase = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     await connection.beginTransaction(); // ✅ Start transaction
-// console.log(req.body);
-//     const cleanData = sanitizeObject(req.body);
-//     const validation = purchaseSchema.safeParse(cleanData);
-//     if (!validation.success) {
-//       await connection.rollback();
-//       return res.status(400).json({ errors: validation.error.errors });
-//     }
-
-//     const {
-//       Party_Name,
-//       GSTIN,
-//       Bill_Number,
-//       Bill_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       Total_Paid,
-//       Balance_Due,
-//       Payment_Type,
-//       Reference_Number,
-//       items,
-//     } = validation.data;
-
-//     if (
-//       !Party_Name ||
-//       !Bill_Number ||
-//       !Bill_Date ||
-//       !State_Of_Supply ||
-//       !Array.isArray(items) ||
-//       items.length === 0
-//     ) {
-//       await connection.rollback();
-//       return res
-//         .status(400)
-//         .json({ message: "Star marked fields missing or items empty." });
-//     }
-//   //  const itemCountMap = new Map();
-//   //   for (const item of items) {
-//   //     const itemName = item.Item_Name?.trim().toLowerCase();
-//   //     if (!itemName) {
-
-//   //       return res.status(400).json({ message: "Item name missing." });
-//   //     }
-
-//   //     const qty = Number(item.Quantity) || 0;
-//   //     itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + qty);
-//   //         const duplicates = [...itemCountMap.entries()].filter(([name]) =>
-//   //     items.filter((it) => it.Item_Name?.trim().toLowerCase() === name).length > 1
-//   //   );
-//   //   if (duplicates.length > 0) {
-//   //     const names = duplicates.map(([n]) => `'${n}'`).join(", ");
-
-//   //     return res.status(400).json({
-//   //       message: `Duplicate items detected: ${names}. Please ensure each item appears only once.`,
-//   //     });
-//   //   }
-//   //   }
-//   const itemNameSet = new Set();
-
-// for (const item of items) {
-//   const itemName = item.Item_Name?.trim().toLowerCase();
-
-//   if (!itemName) {
-//     await connection.rollback();
-//     return res.status(400).json({ message: "Item name missing." });
-//   }
-
-//   if (itemNameSet.has(itemName)) {
-//     await connection.rollback();
-//     return res.status(400).json({
-//       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-//     });
-//   }
-
-//   itemNameSet.add(itemName);
-// }
-//     // 🔹 Get Party_Id
-//     const [partyRows] = await connection.execute(
-//       "SELECT Party_Id,GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
-//       [Party_Name]
-//     );
-//     if (partyRows.length === 0) {
-//       await connection.rollback();
-//       return res.status(404).json({ message: "Party not found." });
-//     }
-// //    if (partyRows[0].GSTIN && partyRows[0].GSTIN !== GSTIN) {
-// //   await connection.rollback();
-// //   return res.status(400).json({
-// //     message: "GSTIN does not match with selected party.",
-// //   });
-// // }
-//     const Party_Id = partyRows[0].Party_Id;
-
-//     // 🔹 Generate new Purchase_Id
-//     const [lastPurchase] = await connection.query(
-//       "SELECT Purchase_Id FROM add_purchase ORDER BY id DESC LIMIT 1"
-//     );
-//     let newPurchaseId = "PUR001";
-//     if (lastPurchase.length > 0) {
-//       const lastNum = parseInt(lastPurchase[0].Purchase_Id.replace("PUR", "")) + 1;
-//       newPurchaseId = "PUR" + lastNum.toString().padStart(3, "0");
-//     }
-//  const [fy] = await connection.query(
-//       `SELECT Financial_Year 
-//        FROM financial_year 
-//        WHERE Current_Financial_Year = 1
-//        LIMIT 1`
-//     );
-
-//     if (fy.length === 0) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         message: "No active financial year found. Please set one in settings.",
-//       });
-//     }
-
-//     const activeFY = fy[0].Financial_Year; 
-//     const totalAmount = Number(Total_Amount) || 0;
-
-// const totalPaid =
-//   Total_Paid === "" || Total_Paid === undefined
-//     ? 0
-//     : Number(Total_Paid);
-
-// const balanceDue =
-//   Balance_Due === "" || Balance_Due === undefined
-//     ? totalAmount - totalPaid
-//     : Number(Balance_Due);
-//     // 🔹 Insert Purchase Master
-//     await connection.execute(
-//       `INSERT INTO add_purchase 
-//        (Party_Id, Purchase_Id, Bill_Number, Bill_Date,financial_year, State_Of_Supply,
-//         Total_Amount, Total_Paid, Balance_Due, Payment_Type, Reference_Number, 
-//         created_at, updated_at)
-//        VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//       [
-//         Party_Id,
-//         newPurchaseId,
-//         Bill_Number,
-//         Bill_Date,
-//         activeFY,
-//         State_Of_Supply,
-//         totalAmount,
-//         totalPaid,
-//         balanceDue,
-//         cleanValue(Payment_Type),
-//         cleanValue(Reference_Number),
-//       ]
-//     );
-
-
-//     const [maxRow] = await connection.query(
-//   `SELECT MAX(CAST(SUBSTRING(Purchase_items_Id, 4) AS UNSIGNED)) 
-//   AS maxNum FROM add_purchase_items`
-// );
-// let nextPurchaseItemNum = (maxRow[0]?.maxNum || 0) + 1;
-//     console.log("nextPurchaseItemNum", nextPurchaseItemNum);
-//     // 🔹 Loop through items
-//     for (const item of items) {
-//       const {
-//         Item_Category,
-//         Item_Name,
-//         Item_HSN,
-//         Quantity,
-//         Item_Unit,
-//         Purchase_Price,
-//         Discount_On_Purchase_Price,
-//         Discount_Type_On_Purchase_Price,
-//         Tax_Type,
-//         Tax_Amount,
-//         Amount,
-//         Item_Image,
-//       } = item;
-
-//       // Check for duplicate HSNs
-//       // if (Item_HSN) {
-//       //   const [hsnCheck] = await connection.execute(
-//       //     `SELECT Item_Name FROM add_item WHERE Item_HSN = ? AND Item_Name != ? LIMIT 1`,
-//       //     [Item_HSN, Item_Name]
-//       //   );
-//       //   if (hsnCheck.length > 0) {
-//       //     await connection.rollback();
-//       //     return res.status(400).json({
-//       //       message: `HSN '${Item_HSN}' already belongs to another item '${hsnCheck[0].Item_Name}'.`,
-//       //     });
-//       //   }
-//       // }
-
-//       // Check if item already exists
-//       const [itemRows] = await connection.execute(
-//         "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
-//         [Item_Name]
-//       );
-
-//       let Item_Id;
-//       if (itemRows.length === 0) {
-//         // Create new item
-//         const [lastItem] = await connection.query(
-//           "SELECT Item_Id FROM add_item ORDER BY id DESC LIMIT 1"
-//         );
-
-//         let newItemId = "ITM001";
-//         if (lastItem.length > 0) {
-//           const lastNum = parseInt(lastItem[0].Item_Id.replace("ITM", "")) + 1;
-//           newItemId = "ITM" + lastNum.toString().padStart(3, "0");
-//         }
-
-//         await connection.execute(
-//           `INSERT INTO add_item 
-//            (Item_Id, Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category, Stock_Quantity, created_at, updated_at)
-//            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//           [
-//             newItemId,
-//             Item_Name,
-//             Item_HSN || "",
-//             Item_Unit || "",
-//             cleanValue(Item_Image),
-//             Item_Category || "",
-//             normalizeNumber(Quantity),
-//           ]
-//         );
-
-//         Item_Id = newItemId;
-//       } else {
-//         // Existing item → update stock
-//         const existingItem = itemRows[0];
-//         Item_Id = existingItem.Item_Id;
-
-//         if (
-//           existingItem.Item_HSN &&
-//           Item_HSN &&
-//           existingItem.Item_HSN.trim() !== Item_HSN.trim()
-//         ) {
-//           await connection.rollback();
-//           return res.status(400).json({
-//             message: `Item '${Item_Name}' already exists with different HSN (${existingItem.Item_HSN}).`,
-//           });
-//         }
-
-//         await connection.execute(
-//           `UPDATE add_item 
-//            SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
-//            WHERE Item_Id = ?`,
-//           [normalizeNumber(Quantity), Item_Id]
-//         );
-//       }
-
-//       // Generate unique Purchase_items_Id
-//       // const newPurchaseItemId =
-//       //   "PIT" + nextPurchaseItemNum.toString().padStart(3, "0");
-//       // nextPurchaseItemNum++;
-//    const newPurchaseItemId = "PIT" + nextPurchaseItemNum.toString().padStart(3, "0");
-//       nextPurchaseItemNum++;
-
-//       // Insert purchase item
-//       await connection.execute(
-//         `INSERT INTO add_purchase_items 
-//          (Purchase_items_Id, Purchase_Id, Item_Id, Quantity, Purchase_Price,
-//           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//           Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//         [
-//           newPurchaseItemId,
-//           newPurchaseId,
-//           Item_Id,
-//           normalizeNumber(Quantity),
-//           normalizeNumber(Purchase_Price),
-//           cleanDiscount(Discount_On_Purchase_Price),
-//           cleanValue(Discount_Type_On_Purchase_Price),
-//           cleanValue(Tax_Type),
-//           normalizeNumber(Tax_Amount),
-//           normalizeNumber(Amount),
-//         ]
-//       );
-//     }
-
-//     await connection.commit(); // ✅ Commit only if all inserts succeed
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Purchase and items added successfully",
-//       purchaseId: newPurchaseId,
-//     });
-//   } catch (err) {
-//     if (connection) await connection.rollback(); // ❌ Rollback everything on failure
-//     console.error("❌ Error adding purchase:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release(); // ✅ Always release connection
-//   }
-// };
-const addPurchase = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    console.log(req.body);
-
-    const cleanData = sanitizeObject(req.body);
-    const validation = purchaseSchema.safeParse(cleanData);
-    if (!validation.success) {
-      await connection.rollback();
-      return res.status(400).json({ errors: validation.error.errors });
-    }
-
-    const {
-      Party_Name,
-      GSTIN,
-      Bill_Number,
-      Bill_Date,
-      State_Of_Supply,
-      Total_Amount,
-      Total_Paid,
-      Balance_Due,
-      Payment_Type,
-      Bank_Account_Id,          // 🔹 new
-      Reference_Number,
-      items,
-    } = validation.data;
-
-    if (
-      !Party_Name ||
-      !Bill_Number ||
-      !Bill_Date ||
-      !State_Of_Supply ||
-      !Array.isArray(items) ||
-      items.length === 0
-    ) {
-      await connection.rollback();
-      return res
-        .status(400)
-        .json({ message: "Star marked fields missing or items empty." });
-    }
-
-    // 🔹 guard: Bank payment type must carry a valid Bank_Account_Id
-    if (Payment_Type === "Bank" && !Bank_Account_Id) {
-      await connection.rollback();
-      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
-    }
-
-    const itemNameSet = new Set();
-
-    for (const item of items) {
-      const itemName = item.Item_Name?.trim().toLowerCase();
-
-      if (!itemName) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Item name missing." });
-      }
-
-      if (itemNameSet.has(itemName)) {
-        await connection.rollback();
-        return res.status(400).json({
-          message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-        });
-      }
-
-      itemNameSet.add(itemName);
-    }
-
-    const [partyRows] = await connection.execute(
-      "SELECT Party_Id,GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
-      [Party_Name]
-    );
-
-    if (partyRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ message: "Party not found." });
-    }
-
-    const Party_Id = partyRows[0].Party_Id;
-
-    const [fy] = await connection.query(
-      `SELECT Financial_Year 
-       FROM financial_year 
-       WHERE Current_Financial_Year = 1
-       LIMIT 1`
-    );
-
-    if (fy.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({
-        message: "No active financial year found. Please set one in settings.",
-      });
-    }
-
-    const activeFY = fy[0].Financial_Year;
-
-    const totalAmount = Number(Total_Amount) || 0;
-
-    const totalPaid =
-      Total_Paid === "" || Total_Paid === undefined
-        ? 0
-        : Number(Total_Paid);
-
-    const balanceDue =
-      Balance_Due === "" || Balance_Due === undefined
-        ? totalAmount - totalPaid
-        : Number(Balance_Due);
-
-    //  INSERT WITHOUT Purchase_Id
-    const [purchaseResult] = await connection.execute(
-      `INSERT INTO add_purchase 
-       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
-        Total_Amount, Total_Paid, Balance_Due, Payment_Type, Bank_Account_Id, Reference_Number, 
-        created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [
-        Party_Id,
-        Bill_Number,
-        Bill_Date,
-        activeFY,
-        State_Of_Supply,
-        totalAmount,
-        totalPaid,
-        balanceDue,
-        cleanValue(Payment_Type),
-        Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 new
-        cleanValue(Reference_Number),
-      ]
-    );
-
-    const purchaseIdNumber = purchaseResult.insertId;
-    const newPurchaseId =
-      "PUR" + purchaseIdNumber.toString().padStart(3, "0");
-
-    // ✅ UPDATE WITH FORMATTED ID
-    await connection.execute(
-      `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
-      [newPurchaseId, purchaseIdNumber]
-    );
-
-    // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
-    if (Payment_Type === "Bank" && Bank_Account_Id && totalPaid > 0) {
-      await recordBankTransaction({
-        connection,
-        bankAccountId: Bank_Account_Id,
-        txnType: "Purchase",
-        partyName: Party_Name,          // ✅ add this
-        referenceId: purchaseIdNumber,
-        amount: totalPaid,
-        txnDate: Bill_Date,
-        remarks: `Purchase ${newPurchaseId}`,
-      });
-    }
-      if (Payment_Type === "Cash" && totalPaid > 0) {
-      await recordCashTransaction({
-        connection,
-        isCash: true,
-        txnType: "Purchase",
-        referenceId: purchaseIdNumber,
-        partyName: Party_Name,
-        amount: totalPaid || totalAmount,
-        txnDate: Bill_Date,
-      });
-    }
-
-    // 🔹 LOOP ITEMS
-    for (const item of items) {
-      const {
-        Item_Category,
-        Item_Name,
-        Item_HSN,
-        Quantity,
-        Item_Unit,
-        Purchase_Price,
-        Discount_On_Purchase_Price,
-        Discount_Type_On_Purchase_Price,
-        Tax_Type,
-        Tax_Amount,
-        Amount,
-        Item_Image,
-      } = item;
-
-      const [itemRows] = await connection.execute(
-        "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
-        [Item_Name]
-      );
-
-      let Item_Id;
-
-      if (itemRows.length === 0) {
-        const [itemResult] = await connection.execute(
-          `INSERT INTO add_item 
-           (Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category, Stock_Quantity, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          [
-            Item_Name,
-            Item_HSN || "",
-            Item_Unit || "",
-            cleanValue(Item_Image),
-            Item_Category || "",
-            normalizeNumber(Quantity),
-          ]
-        );
-
-        const itemIdNum = itemResult.insertId;
-        Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
-
-        await connection.execute(
-          `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-          [Item_Id, itemIdNum]
-        );
-      } else {
-        const existingItem = itemRows[0];
-        Item_Id = existingItem.Item_Id;
-
-        await connection.execute(
-          `UPDATE add_item 
-           SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
-           WHERE Item_Id = ?`,
-          [normalizeNumber(Quantity), Item_Id]
-        );
-      }
-
-      const [pitResult] = await connection.execute(
-        `INSERT INTO add_purchase_items 
-         (Purchase_Id, Item_Id, Quantity, Purchase_Price,
-          Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-          Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          newPurchaseId,
-          Item_Id,
-          normalizeNumber(Quantity),
-          normalizeNumber(Purchase_Price),
-          cleanDiscount(Discount_On_Purchase_Price),
-          cleanValue(Discount_Type_On_Purchase_Price),
-          cleanValue(Tax_Type),
-          normalizeNumber(Tax_Amount),
-          normalizeNumber(Amount),
-        ]
-      );
-
-      const pitId = pitResult.insertId;
-      const newPurchaseItemId =
-        "PIT" + pitId.toString().padStart(3, "0");
-
-      await connection.execute(
-        `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
-        [newPurchaseItemId, pitId]
-      );
-    }
-
-    await connection.commit();
-
-    return res.status(201).json({
-      success: true,
-      message: "Purchase and items added successfully",
-      purchaseId: newPurchaseId,
-    });
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Error adding purchase:", err);
-    next(err);
-  } finally {
-    if (connection) connection.release();
-  }
-};
 // const addPurchase = async (req, res, next) => {
 //   let connection;
 //   try {
@@ -717,6 +59,7 @@ const addPurchase = async (req, res, next) => {
 //       Total_Paid,
 //       Balance_Due,
 //       Payment_Type,
+//       Bank_Account_Id,          // 🔹 new
 //       Reference_Number,
 //       items,
 //     } = validation.data;
@@ -733,6 +76,12 @@ const addPurchase = async (req, res, next) => {
 //       return res
 //         .status(400)
 //         .json({ message: "Star marked fields missing or items empty." });
+//     }
+
+//     // 🔹 guard: Bank payment type must carry a valid Bank_Account_Id
+//     if (Payment_Type === "Bank" && !Bank_Account_Id) {
+//       await connection.rollback();
+//       return res.status(400).json({ message: "Bank account is required for Bank payment type." });
 //     }
 
 //     const itemNameSet = new Set();
@@ -794,14 +143,19 @@ const addPurchase = async (req, res, next) => {
 //       Balance_Due === "" || Balance_Due === undefined
 //         ? totalAmount - totalPaid
 //         : Number(Balance_Due);
-
-//     // ✅ INSERT WITHOUT Purchase_Id
+//  if (totalPaid > totalAmount) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Received amount should be less than or equal to Total Amount",
+//       });
+//     }
+//     //  INSERT WITHOUT Purchase_Id
 //     const [purchaseResult] = await connection.execute(
 //       `INSERT INTO add_purchase 
 //        (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
-//         Total_Amount, Total_Paid, Balance_Due, Payment_Type, Reference_Number, 
+//         Total_Amount, Total_Paid, Balance_Due, Payment_Type, Bank_Account_Id, Reference_Number, 
 //         created_at, updated_at)
-//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 //       [
 //         Party_Id,
 //         Bill_Number,
@@ -812,6 +166,7 @@ const addPurchase = async (req, res, next) => {
 //         totalPaid,
 //         balanceDue,
 //         cleanValue(Payment_Type),
+//         Payment_Type === "Bank" ? Bank_Account_Id : null,   // 🔹 new
 //         cleanValue(Reference_Number),
 //       ]
 //     );
@@ -825,6 +180,31 @@ const addPurchase = async (req, res, next) => {
 //       `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
 //       [newPurchaseId, purchaseIdNumber]
 //     );
+
+//     // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
+//     if (Payment_Type === "Bank" && Bank_Account_Id && totalPaid > 0) {
+//       await recordBankTransaction({
+//         connection,
+//         bankAccountId: Bank_Account_Id,
+//         txnType: "Purchase",
+//         partyName: Party_Name,          // ✅ add this
+//         referenceId: purchaseIdNumber,
+//         amount: totalPaid,
+//         txnDate: Bill_Date,
+//         remarks: `Purchase ${newPurchaseId}`,
+//       });
+//     }
+//       if (Payment_Type === "Cash" && totalPaid > 0) {
+//       await recordCashTransaction({
+//         connection,
+//         isCash: true,
+//         txnType: "Purchase",
+//         referenceId: purchaseIdNumber,
+//         partyName: Party_Name,
+//         amount: totalPaid || totalAmount,
+//         txnDate: Bill_Date,
+//       });
+//     }
 
 //     // 🔹 LOOP ITEMS
 //     for (const item of items) {
@@ -851,7 +231,6 @@ const addPurchase = async (req, res, next) => {
 //       let Item_Id;
 
 //       if (itemRows.length === 0) {
-//         // ✅ INSERT ITEM WITHOUT Item_Id
 //         const [itemResult] = await connection.execute(
 //           `INSERT INTO add_item 
 //            (Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category, Stock_Quantity, created_at, updated_at)
@@ -885,7 +264,6 @@ const addPurchase = async (req, res, next) => {
 //         );
 //       }
 
-//       // ✅ INSERT PURCHASE ITEM WITHOUT ID
 //       const [pitResult] = await connection.execute(
 //         `INSERT INTO add_purchase_items 
 //          (Purchase_Id, Item_Id, Quantity, Purchase_Price,
@@ -930,7 +308,242 @@ const addPurchase = async (req, res, next) => {
 //     if (connection) connection.release();
 //   }
 // };
+const addPurchase = async (req, res, next) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
 
+    console.log(req.body);
+
+    const cleanData = sanitizeObject(req.body);
+    const validation = purchaseSchema.safeParse(cleanData);
+    if (!validation.success) {
+      await connection.rollback();
+      return res.status(400).json({ errors: validation.error.errors });
+    }
+
+    const {
+      Party_Name,
+      GSTIN,
+      Bill_Number,
+      Bill_Date,
+      State_Of_Supply,
+      Total_Amount,
+      Total_Paid,
+      Balance_Due,
+      Reference_Number,
+      splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
+      items,
+    } = validation.data;
+
+    if (
+      !Party_Name ||
+      !Bill_Number ||
+      !Bill_Date ||
+      !State_Of_Supply ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Star marked fields missing or items empty." });
+    }
+
+    const totalAmount = Number(Total_Amount) || 0;
+    const totalPaid   = Total_Paid === "" || Total_Paid === undefined ? 0 : Number(Total_Paid);
+    const balanceDue  = Balance_Due === "" || Balance_Due === undefined
+      ? totalAmount - totalPaid
+      : Number(Balance_Due);
+
+    // 🔹 total paid cannot exceed total amount
+    if (totalPaid > totalAmount) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Received amount should be less than or equal to Total Amount",
+      });
+    }
+
+    // 🔹 validate splits — sum must equal totalPaid
+    if (totalPaid > 0) {
+      try {
+        validateSplits(splits, totalPaid);
+      } catch (validationErr) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: validationErr.message });
+      }
+    }
+
+    // duplicate item check
+    const itemNameSet = new Set();
+    for (const item of items) {
+      const itemName = item.Item_Name?.trim().toLowerCase();
+      if (!itemName) {
+        await connection.rollback();
+        return res.status(400).json({ message: "Item name missing." });
+      }
+      if (itemNameSet.has(itemName)) {
+        await connection.rollback();
+        return res.status(400).json({
+          message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+        });
+      }
+      itemNameSet.add(itemName);
+    }
+
+    const [partyRows] = await connection.execute(
+      "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
+      [Party_Name]
+    );
+    if (partyRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Party not found." });
+    }
+    const Party_Id = partyRows[0].Party_Id;
+
+    const [fy] = await connection.query(
+      `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
+    );
+    if (fy.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ message: "No active financial year found. Please set one in settings." });
+    }
+    const activeFY = fy[0].Financial_Year;
+
+    // 🔹 Payment_Type on parent = comma-joined summary for display only (optional)
+    // or just leave it NULL — the real source of truth is payment_splits
+    const [purchaseResult] = await connection.execute(
+      `INSERT INTO add_purchase
+       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
+        Total_Amount, Total_Paid, Balance_Due, Reference_Number,
+        created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        Party_Id,
+        Bill_Number,
+        Bill_Date,
+        activeFY,
+        State_Of_Supply,
+        totalAmount,
+        totalPaid,
+        balanceDue,
+        cleanValue(Reference_Number),
+      ]
+    );
+
+    const purchaseIdNumber = purchaseResult.insertId;
+    const newPurchaseId    = "PUR" + purchaseIdNumber.toString().padStart(3, "0");
+
+    await connection.execute(
+      `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
+      [newPurchaseId, purchaseIdNumber]
+    );
+
+    // 🔹 insert splits + fan out to bank/cash ledgers
+    if (totalPaid > 0 && Array.isArray(splits) && splits.length > 0) {
+      await insertPaymentSplits({
+        connection,
+        sourceType: "Purchase",
+        sourceId:   purchaseIdNumber,
+        partyName:  Party_Name,
+        txnDate:    Bill_Date,
+        splits,
+      });
+    }
+
+    // items loop — unchanged
+    for (const item of items) {
+      const {
+        Item_Category,
+        Item_Name,
+        Item_HSN,
+        Quantity,
+        Item_Unit,
+        Purchase_Price,
+        Discount_On_Purchase_Price,
+        Discount_Type_On_Purchase_Price,
+        Tax_Type,
+        Tax_Amount,
+        Amount,
+        Item_Image,
+      } = item;
+
+      const [itemRows] = await connection.execute(
+        "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+        [Item_Name]
+      );
+
+      let Item_Id;
+
+      if (itemRows.length === 0) {
+        const [itemResult] = await connection.execute(
+          `INSERT INTO add_item
+           (Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category, Stock_Quantity, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          [
+            Item_Name,
+            Item_HSN || "",
+            Item_Unit || "",
+            cleanValue(Item_Image),
+            Item_Category || "",
+            normalizeNumber(Quantity),
+          ]
+        );
+        const itemIdNum = itemResult.insertId;
+        Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
+        await connection.execute(
+          `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
+          [Item_Id, itemIdNum]
+        );
+      } else {
+        Item_Id = itemRows[0].Item_Id;
+        await connection.execute(
+          `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+          [normalizeNumber(Quantity), Item_Id]
+        );
+      }
+
+      const [pitResult] = await connection.execute(
+        `INSERT INTO add_purchase_items
+         (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+          Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+          Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          newPurchaseId,
+          Item_Id,
+          normalizeNumber(Quantity),
+          normalizeNumber(Purchase_Price),
+          cleanDiscount(Discount_On_Purchase_Price),
+          cleanValue(Discount_Type_On_Purchase_Price),
+          cleanValue(Tax_Type),
+          normalizeNumber(Tax_Amount),
+          normalizeNumber(Amount),
+        ]
+      );
+      const pitId = pitResult.insertId;
+      const newPurchaseItemId = "PIT" + pitId.toString().padStart(3, "0");
+      await connection.execute(
+        `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
+        [newPurchaseItemId, pitId]
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Purchase and items added successfully",
+      purchaseId: newPurchaseId,
+    });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("❌ Error adding purchase:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
 const exportAllPurchasesReportToExcel = async (req, res, next) => {
   let connection;
   try {
@@ -1153,6 +766,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+
 // const getAllPurchases = async (req, res, next) => {
 //   let connection;
 
@@ -1178,12 +792,13 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
 //         (
 //           LOWER(a.Party_Name) LIKE ?
 //           OR LOWER(p.Payment_Type) LIKE ?
+//           OR LOWER(ba.Account_Display_Name) LIKE ?
 //           OR CAST(p.Total_Amount AS CHAR) LIKE ?
 //           OR CAST(p.Balance_Due AS CHAR) LIKE ?
 //         )
 //       `);
 //       const like = `%${search}%`;
-//       params.push(like, like, like, like);
+//       params.push(like, like, like, like, like);
 //     }
 
 //     /* ---------- DATE FILTER ---------- */
@@ -1204,9 +819,15 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
 
 //     /* ---------- MAIN QUERY ---------- */
 //     const purchasesQuery = `
-//       SELECT p.*, a.Party_Name
+//       SELECT p.*, a.Party_Name,
+//         ba.Account_Display_Name AS Bank_Display_Name,
+//         CASE 
+//           WHEN p.Payment_Type = 'Bank' THEN ba.Account_Display_Name
+//           ELSE p.Payment_Type
+//         END AS Payment_Type_Display
 //       FROM add_purchase p
 //       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+//       LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
 //       ${whereSQL}
 //       ORDER BY p.created_at DESC
 //       LIMIT ? OFFSET ?
@@ -1223,6 +844,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
 //       SELECT COUNT(*) AS total
 //       FROM add_purchase p
 //       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+//       LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
 //       ${whereSQL}
 //     `;
 
@@ -1236,6 +858,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
 //         COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
 //       FROM add_purchase p
 //       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
+//       LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
 //       ${whereSQL}
 //     `;
 
@@ -1258,38 +881,34 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
 //     if (connection) connection.release();
 //   }
 // };
+
 const getAllPurchases = async (req, res, next) => {
   let connection;
-
   try {
     connection = await db.getConnection();
 
     /* ---------- PAGINATION ---------- */
-    const page = parseInt(req.query.page, 10) || 1;
+    const page  = parseInt(req.query.page, 10) || 1;
     const limit = 10;
     const offset = (page - 1) * limit;
 
     /* ---------- FILTERS ---------- */
-    const search = req.query.search?.trim().toLowerCase() || "";
+    const search   = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
-    const toDate = req.query.toDate || null;
+    const toDate   = req.query.toDate   || null;
 
-    let whereClauses = [];
-    let params = [];
+    const whereClauses = [];
+    const params        = [];
 
     /* ---------- SEARCH ---------- */
     if (search) {
-      whereClauses.push(`
-        (
-          LOWER(a.Party_Name) LIKE ?
-          OR LOWER(p.Payment_Type) LIKE ?
-          OR LOWER(ba.Account_Display_Name) LIKE ?
-          OR CAST(p.Total_Amount AS CHAR) LIKE ?
-          OR CAST(p.Balance_Due AS CHAR) LIKE ?
-        )
-      `);
+      whereClauses.push(`(
+        LOWER(a.Party_Name)           LIKE ? OR
+        CAST(p.Total_Amount AS CHAR)  LIKE ? OR
+        CAST(p.Balance_Due AS CHAR)   LIKE ?
+      )`);
       const like = `%${search}%`;
-      params.push(like, like, like, like, like);
+      params.push(like, like, like);
     }
 
     /* ---------- DATE FILTER ---------- */
@@ -1304,67 +923,81 @@ const getAllPurchases = async (req, res, next) => {
       params.push(toDate);
     }
 
-    const whereSQL = whereClauses.length
-      ? `WHERE ${whereClauses.join(" AND ")}`
-      : "";
+    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     /* ---------- MAIN QUERY ---------- */
-    const purchasesQuery = `
-      SELECT p.*, a.Party_Name,
-        ba.Account_Display_Name AS Bank_Display_Name,
-        CASE 
-          WHEN p.Payment_Type = 'Bank' THEN ba.Account_Display_Name
-          ELSE p.Payment_Type
-        END AS Payment_Type_Display
-      FROM add_purchase p
-      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-      LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
-      ${whereSQL}
-      ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `;
+    const [rows] = await connection.query(
+      `SELECT p.*, a.Party_Name
+       FROM add_purchase p
+       LEFT JOIN add_party a ON a.Party_Id = p.Party_Id
+       ${whereSQL}
+       ORDER BY p.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
 
-    const [rows] = await db.query(purchasesQuery, [
-      ...params,
-      limit,
-      offset,
-    ]);
+    /* ---------- ATTACH SPLIT PAYMENT-TYPE LABELS PER ROW ---------- */
+    const purchaseIds = rows.map((r) => r.id);
+
+    if (purchaseIds.length > 0) {
+      const placeholders = purchaseIds.map(() => "?").join(",");
+      const [splits] = await connection.query(
+        `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
+         FROM payment_splits ps
+         LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+         WHERE ps.Source_Type = 'Purchase'
+           AND ps.Source_Id IN (${placeholders})`,
+        purchaseIds
+      );
+
+      const splitMap = {};
+      for (const s of splits) {
+        if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
+        splitMap[s.Source_Id].push(
+          s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+        );
+      }
+
+      for (const row of rows) {
+        const labels = splitMap[row.id] || [];
+        const counts = {};
+        labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
+        row.Payment_Type_Display = Object.entries(counts)
+          .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
+          .join(" , ") || "—";
+      }
+    }
 
     /* ---------- COUNT QUERY ---------- */
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM add_purchase p
-      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-      LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
-      ${whereSQL}
-    `;
-
-    const [countResult] = await db.query(countQuery, params);
+    const [[{ total }]] = await connection.query(
+      `SELECT COUNT(*) AS total
+       FROM add_purchase p
+       LEFT JOIN add_party a ON a.Party_Id = p.Party_Id
+       ${whereSQL}`,
+      params
+    );
 
     /* ---------- TOTALS QUERY ---------- */
-    const totalsQuery = `
-      SELECT
-        COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
-        COALESCE(SUM(p.Balance_Due), 0) AS totalUnpaid,
-        COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
-      FROM add_purchase p
-      LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-      LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
-      ${whereSQL}
-    `;
-
-    const [totalsResult] = await db.query(totalsQuery, params);
+    const [[totals]] = await connection.query(
+      `SELECT
+         COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
+         COALESCE(SUM(p.Balance_Due),  0) AS totalUnpaid,
+         COALESCE(SUM(p.Total_Paid),   0) AS totalPaid
+       FROM add_purchase p
+       LEFT JOIN add_party a ON a.Party_Id = p.Party_Id
+       ${whereSQL}`,
+      params
+    );
 
     /* ---------- RESPONSE ---------- */
     return res.status(200).json({
-      success: true,
-      currentPage: page,
-      totalPages: Math.ceil(countResult[0].total / limit),
-      totalPurchases: countResult[0].total,
-      purchases: rows,
-      totals: totalsResult[0],
+      success:       true,
+      currentPage:   page,
+      totalPages:    Math.ceil(total / limit),
+      totalPurchases: total,
+      purchases:     rows,
+      totals,
     });
-
   } catch (err) {
     console.error("❌ Error fetching purchases:", err);
     next(err);
@@ -1373,6 +1006,312 @@ const getAllPurchases = async (req, res, next) => {
   }
 };
 //TRYING
+// const editPurchase = async (req, res, next) => {
+//   let connection;
+//   try {
+//     const { Purchase_Id: purchaseId } = req.params;
+
+//     connection = await db.getConnection();
+//     await connection.beginTransaction();
+
+//     // 1️⃣ Check purchase exists
+//     const [existingPurchase] = await connection.query(
+//       "SELECT * FROM add_purchase WHERE Purchase_Id = ?",
+//       [purchaseId]
+//     );
+
+//     if (existingPurchase.length === 0) {
+//       return res.status(404).json({ message: "No such Purchase found." });
+//     }
+//     const purchaseIdNumber = existingPurchase[0].id;  
+//     console.log(req.body);
+
+//     // 2️⃣ Validate
+//     const cleanData = sanitizeObject(req.body);
+//     const validation = purchaseSchema.safeParse(cleanData);
+
+//     if (!validation.success) {
+//       await connection.rollback();
+//       return res.status(400).json({ errors: validation.error.errors });
+//     }
+
+//     const {
+//       Party_Name,
+//       GSTIN,
+//       Bill_Number,
+//       Bill_Date,
+//       State_Of_Supply,
+//       Total_Amount,
+//       Total_Paid,
+//       Balance_Due,
+//       Payment_Type,
+//       Bank_Account_Id,          // 🔹 new
+//       Reference_Number,
+//       items,
+//     } = validation.data;
+
+//     if (!Array.isArray(items) || items.length === 0) {
+//       await connection.rollback();
+//       return res.status(400).json({
+//         message: "No purchase items provided",
+//       });
+//     }
+//     if (Payment_Type === "Bank" && !Bank_Account_Id) {
+//       await connection.rollback();
+//       return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+//     }
+
+//     // 3️⃣ Duplicate check
+//     const itemNameSet = new Set();
+//     for (const item of items) {
+//       const name = item.Item_Name?.trim().toLowerCase();
+
+//       if (!name) {
+//         await connection.rollback();
+//         return res.status(400).json({ message: "Item name missing." });
+//       }
+
+//       if (itemNameSet.has(name)) {
+//         await connection.rollback();
+//         return res.status(400).json({
+//           message: `Duplicate item: ${item.Item_Name}`,
+//         });
+//       }
+
+//       itemNameSet.add(name);
+//     }
+
+//     // 4️⃣ Party check
+//     const [partyRows] = await connection.query(
+//       "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
+//       [Party_Name]
+//     );
+
+//     if (partyRows.length === 0) {
+//       await connection.rollback();
+//       return res.status(404).json({ message: "Party not found." });
+//     }
+
+//     const Party_Id = partyRows[0].Party_Id;
+
+//     // 5️⃣ Update purchase master
+//     const totalAmount = Number(Total_Amount) || 0;
+//     const totalPaid = Number(Total_Paid) || 0;
+//     const balanceDue = Number(Balance_Due) || totalAmount - totalPaid;
+
+//     await connection.query(
+//       `UPDATE add_purchase SET 
+//         Party_Id=?, Bill_Number=?, Bill_Date=?, State_Of_Supply=?,
+//         Total_Amount=?, Total_Paid=?, Balance_Due=?,
+//         Payment_Type=?,Bank_Account_Id=?, Reference_Number=?, updated_at=NOW()
+//        WHERE Purchase_Id=?`,
+//       [
+//         Party_Id,
+//         Bill_Number,
+//         Bill_Date,
+//         State_Of_Supply,
+//         totalAmount,
+//         totalPaid,
+//         balanceDue,
+//         cleanValue(Payment_Type),
+//         Payment_Type === "Bank" ? Bank_Account_Id : null,
+//         cleanValue(Reference_Number),
+//         purchaseId,
+//       ]
+//     );
+
+//     // 6️⃣ Fetch existing purchase items
+//     const [oldItems] = await connection.query(
+//       "SELECT * FROM add_purchase_items WHERE Purchase_Id = ?",
+//       [purchaseId]
+//     );
+
+//     const oldMap = new Map();
+//     oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
+
+//     const newItemIds = new Set();
+
+//     // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
+    
+//       await recordBankTransaction({
+//         connection,
+//         bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
+//         txnType: "Purchase",
+//         referenceId: purchaseIdNumber,        // ✅ fixed
+//         partyName: Party_Name,          // ✅ add this
+//         amount: totalPaid,
+//         txnDate: Bill_Date
+//       });
+//      await recordCashTransaction({
+//       connection,
+//       isCash: Payment_Type === "Cash",
+//       txnType: "Purchase",
+//       referenceId: purchaseIdNumber,
+//       partyName: Party_Name,
+//       amount: totalPaid || totalAmount,
+//       txnDate: Bill_Date,
+//     });
+
+
+//     // 7️⃣ Loop new items
+//     for (const item of items) {
+//       const {
+//         Item_Name,
+//         Item_Category,
+//         Item_HSN,
+//         Item_Unit,
+//         Quantity,
+//         Purchase_Price,
+//         Discount_On_Purchase_Price,
+//         Discount_Type_On_Purchase_Price,
+//         Tax_Type,
+//         Tax_Amount,
+//         Amount,
+//       } = item;
+
+//       // 🔹 get or create item
+//       const [existingItem] = await connection.query(
+//         "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+//         [Item_Name]
+//       );
+
+//       let Item_Id;
+
+//       if (existingItem.length === 0) {
+//         const [res] = await connection.execute(
+//           `INSERT INTO add_item 
+//            (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
+//            VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+//           [
+//             Item_Name,
+//             Item_Category || "",
+//             Item_HSN || "",
+//             Item_Unit || "",
+//             normalizeNumber(Quantity),
+//           ]
+//         );
+
+//         const id = res.insertId;
+//         Item_Id = "ITM" + id;
+
+//         await connection.execute(
+//           `UPDATE add_item SET Item_Id=? WHERE id=?`,
+//           [Item_Id, id]
+//         );
+//       } else {
+//         Item_Id = existingItem[0].Item_Id;
+//       }
+
+//       newItemIds.add(Item_Id);
+
+//       const old = oldMap.get(Item_Id);
+
+//       if (old) {
+//         // 🔥 UPDATE existing
+//         await connection.query(
+//           `UPDATE add_purchase_items SET 
+//            Quantity=?, Purchase_Price=?, 
+//            Discount_On_Purchase_Price=?, Discount_Type_On_Purchase_Price=?,
+//            Tax_Type=?,
+//             Tax_Amount=?,
+//              Amount=?, updated_at=NOW()
+//            WHERE Purchase_items_Id=?`,
+//           [
+//             normalizeNumber(Quantity),
+//             normalizeNumber(Purchase_Price),
+//             cleanDiscount(Discount_On_Purchase_Price),
+//             cleanValue(Discount_Type_On_Purchase_Price),
+//             cleanValue(Tax_Type),
+//             normalizeNumber(Tax_Amount),
+//             normalizeNumber(Amount),
+//             old.Purchase_items_Id,
+//           ]
+//         );
+
+//         // 🔥 stock adjust (diff)
+//         const diff = normalizeNumber(Quantity) - old.Quantity;
+
+//         if (diff !== 0) {
+//           await connection.query(
+//             `UPDATE add_item 
+//              SET Stock_Quantity = Stock_Quantity + ?, updated_at=NOW()
+//              WHERE Item_Id=?`,
+//             [diff, Item_Id]
+//           );
+//         }
+//       } else {
+//         // 🔥 INSERT new
+//         const [res] = await connection.execute(
+//           `INSERT INTO add_purchase_items
+//            (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+//             Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+//             Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+//            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//           [
+//             purchaseId,
+//             Item_Id,
+//             normalizeNumber(Quantity),
+//             normalizeNumber(Purchase_Price),
+//             cleanDiscount(Discount_On_Purchase_Price),
+//             cleanValue(Discount_Type_On_Purchase_Price),
+//             cleanValue(Tax_Type),
+//             normalizeNumber(Tax_Amount),
+//             normalizeNumber(Amount),
+//           ]
+//         );
+
+//         const id = res.insertId;
+//         const Purchase_items_Id = "PIT" + id;
+
+//         await connection.execute(
+//           `UPDATE add_purchase_items SET Purchase_items_Id=? WHERE id=?`,
+//           [Purchase_items_Id, id]
+//         );
+
+//         // 🔥 add stock
+//         await connection.query(
+//           `UPDATE add_item 
+//            SET Stock_Quantity = Stock_Quantity + ?, updated_at=NOW()
+//            WHERE Item_Id=?`,
+//           [normalizeNumber(Quantity), Item_Id]
+//         );
+//       }
+//     }
+
+//     // 8️⃣ Delete removed items
+//     for (const old of oldItems) {
+//       if (!newItemIds.has(old.Item_Id)) {
+//         await connection.query(
+//           `DELETE FROM add_purchase_items WHERE Purchase_items_Id=?`,
+//           [old.Purchase_items_Id]
+//         );
+
+//         // reduce stock
+//         await connection.query(
+//           `UPDATE add_item 
+//            SET Stock_Quantity = Stock_Quantity - ?, updated_at=NOW()
+//            WHERE Item_Id=?`,
+//           [old.Quantity, old.Item_Id]
+//         );
+//       }
+//     }
+
+//     await connection.commit();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Purchase updated successfully",
+//       purchaseId,
+//     });
+
+//   } catch (err) {
+//     if (connection) await connection.rollback();
+//     console.error("❌ Error editing purchase:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const editPurchase = async (req, res, next) => {
   let connection;
   try {
@@ -1381,22 +1320,19 @@ const editPurchase = async (req, res, next) => {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    // 1️⃣ Check purchase exists
     const [existingPurchase] = await connection.query(
       "SELECT * FROM add_purchase WHERE Purchase_Id = ?",
       [purchaseId]
     );
-
     if (existingPurchase.length === 0) {
       return res.status(404).json({ message: "No such Purchase found." });
     }
-    const purchaseIdNumber = existingPurchase[0].id;  
+    const purchaseIdNumber = existingPurchase[0].id;
+
     console.log(req.body);
 
-    // 2️⃣ Validate
-    const cleanData = sanitizeObject(req.body);
+    const cleanData  = sanitizeObject(req.body);
     const validation = purchaseSchema.safeParse(cleanData);
-
     if (!validation.success) {
       await connection.rollback();
       return res.status(400).json({ errors: validation.error.errors });
@@ -1411,67 +1347,71 @@ const editPurchase = async (req, res, next) => {
       Total_Amount,
       Total_Paid,
       Balance_Due,
-      Payment_Type,
-      Bank_Account_Id,          // 🔹 new
       Reference_Number,
+      splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
     } = validation.data;
 
     if (!Array.isArray(items) || items.length === 0) {
       await connection.rollback();
-      return res.status(400).json({
-        message: "No purchase items provided",
-      });
-    }
-    if (Payment_Type === "Bank" && !Bank_Account_Id) {
-      await connection.rollback();
-      return res.status(400).json({ message: "Bank account is required for Bank payment type." });
+      return res.status(400).json({ message: "No purchase items provided" });
     }
 
-    // 3️⃣ Duplicate check
+    const totalAmount = Number(Total_Amount) || 0;
+    const totalPaid   = Number(Total_Paid)   || 0;
+    const balanceDue  = Number(Balance_Due)  || totalAmount - totalPaid;
+
+    // 🔹 total paid cannot exceed total amount
+    if (totalPaid > totalAmount) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Received amount should be less than or equal to Total Amount",
+      });
+    }
+
+    // 🔹 validate splits sum === totalPaid
+    if (totalPaid > 0) {
+      try {
+        validateSplits(splits, totalPaid);
+      } catch (validationErr) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: validationErr.message });
+      }
+    }
+
+    // duplicate item check
     const itemNameSet = new Set();
     for (const item of items) {
       const name = item.Item_Name?.trim().toLowerCase();
-
       if (!name) {
         await connection.rollback();
         return res.status(400).json({ message: "Item name missing." });
       }
-
       if (itemNameSet.has(name)) {
         await connection.rollback();
-        return res.status(400).json({
-          message: `Duplicate item: ${item.Item_Name}`,
-        });
+        return res.status(400).json({ message: `Duplicate item: ${item.Item_Name}` });
       }
-
       itemNameSet.add(name);
     }
 
-    // 4️⃣ Party check
     const [partyRows] = await connection.query(
       "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
       [Party_Name]
     );
-
     if (partyRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ message: "Party not found." });
     }
-
     const Party_Id = partyRows[0].Party_Id;
 
-    // 5️⃣ Update purchase master
-    const totalAmount = Number(Total_Amount) || 0;
-    const totalPaid = Number(Total_Paid) || 0;
-    const balanceDue = Number(Balance_Due) || totalAmount - totalPaid;
-
+    // update parent row — no Payment_Type / Bank_Account_Id columns anymore
     await connection.query(
-      `UPDATE add_purchase SET 
-        Party_Id=?, Bill_Number=?, Bill_Date=?, State_Of_Supply=?,
-        Total_Amount=?, Total_Paid=?, Balance_Due=?,
-        Payment_Type=?,Bank_Account_Id=?, Reference_Number=?, updated_at=NOW()
-       WHERE Purchase_Id=?`,
+      `UPDATE add_purchase SET
+         Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
+         Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
+         Reference_Number = ?, updated_at = NOW()
+       WHERE Purchase_Id = ?`,
       [
         Party_Id,
         Bill_Number,
@@ -1480,14 +1420,30 @@ const editPurchase = async (req, res, next) => {
         totalAmount,
         totalPaid,
         balanceDue,
-        cleanValue(Payment_Type),
-        Payment_Type === "Bank" ? Bank_Account_Id : null,
         cleanValue(Reference_Number),
         purchaseId,
       ]
     );
 
-    // 6️⃣ Fetch existing purchase items
+    // 🔹 wipe old splits + ledger rows, re-insert fresh ones
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Purchase",
+      sourceId:   purchaseIdNumber,
+    });
+
+    if (totalPaid > 0 && Array.isArray(splits) && splits.length > 0) {
+      await insertPaymentSplits({
+        connection,
+        sourceType: "Purchase",
+        sourceId:   purchaseIdNumber,
+        partyName:  Party_Name,
+        txnDate:    Bill_Date,
+        splits,
+      });
+    }
+
+    // items loop — unchanged from your original
     const [oldItems] = await connection.query(
       "SELECT * FROM add_purchase_items WHERE Purchase_Id = ?",
       [purchaseId]
@@ -1498,29 +1454,6 @@ const editPurchase = async (req, res, next) => {
 
     const newItemIds = new Set();
 
-    // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
-    
-      await recordBankTransaction({
-        connection,
-        bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
-        txnType: "Purchase",
-        referenceId: purchaseIdNumber,        // ✅ fixed
-        partyName: Party_Name,          // ✅ add this
-        amount: totalPaid,
-        txnDate: Bill_Date
-      });
-     await recordCashTransaction({
-      connection,
-      isCash: Payment_Type === "Cash",
-      txnType: "Purchase",
-      referenceId: purchaseIdNumber,
-      partyName: Party_Name,
-      amount: totalPaid || totalAmount,
-      txnDate: Bill_Date,
-    });
-
-
-    // 7️⃣ Loop new items
     for (const item of items) {
       const {
         Item_Name,
@@ -1536,7 +1469,6 @@ const editPurchase = async (req, res, next) => {
         Amount,
       } = item;
 
-      // 🔹 get or create item
       const [existingItem] = await connection.query(
         "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
         [Item_Name]
@@ -1546,23 +1478,15 @@ const editPurchase = async (req, res, next) => {
 
       if (existingItem.length === 0) {
         const [res] = await connection.execute(
-          `INSERT INTO add_item 
+          `INSERT INTO add_item
            (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-          [
-            Item_Name,
-            Item_Category || "",
-            Item_HSN || "",
-            Item_Unit || "",
-            normalizeNumber(Quantity),
-          ]
+          [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || "", normalizeNumber(Quantity)]
         );
-
         const id = res.insertId;
-        Item_Id = "ITM" + id;
-
+        Item_Id  = "ITM" + id;
         await connection.execute(
-          `UPDATE add_item SET Item_Id=? WHERE id=?`,
+          `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
           [Item_Id, id]
         );
       } else {
@@ -1570,19 +1494,15 @@ const editPurchase = async (req, res, next) => {
       }
 
       newItemIds.add(Item_Id);
-
       const old = oldMap.get(Item_Id);
 
       if (old) {
-        // 🔥 UPDATE existing
         await connection.query(
-          `UPDATE add_purchase_items SET 
-           Quantity=?, Purchase_Price=?, 
-           Discount_On_Purchase_Price=?, Discount_Type_On_Purchase_Price=?,
-           Tax_Type=?,
-            Tax_Amount=?,
-             Amount=?, updated_at=NOW()
-           WHERE Purchase_items_Id=?`,
+          `UPDATE add_purchase_items SET
+             Quantity = ?, Purchase_Price = ?,
+             Discount_On_Purchase_Price = ?, Discount_Type_On_Purchase_Price = ?,
+             Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
+           WHERE Purchase_items_Id = ?`,
           [
             normalizeNumber(Quantity),
             normalizeNumber(Purchase_Price),
@@ -1594,20 +1514,14 @@ const editPurchase = async (req, res, next) => {
             old.Purchase_items_Id,
           ]
         );
-
-        // 🔥 stock adjust (diff)
         const diff = normalizeNumber(Quantity) - old.Quantity;
-
         if (diff !== 0) {
           await connection.query(
-            `UPDATE add_item 
-             SET Stock_Quantity = Stock_Quantity + ?, updated_at=NOW()
-             WHERE Item_Id=?`,
+            `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
             [diff, Item_Id]
           );
         }
       } else {
-        // 🔥 INSERT new
         const [res] = await connection.execute(
           `INSERT INTO add_purchase_items
            (Purchase_Id, Item_Id, Quantity, Purchase_Price,
@@ -1626,38 +1540,27 @@ const editPurchase = async (req, res, next) => {
             normalizeNumber(Amount),
           ]
         );
-
         const id = res.insertId;
-        const Purchase_items_Id = "PIT" + id;
-
         await connection.execute(
-          `UPDATE add_purchase_items SET Purchase_items_Id=? WHERE id=?`,
-          [Purchase_items_Id, id]
+          `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
+          ["PIT" + id, id]
         );
-
-        // 🔥 add stock
         await connection.query(
-          `UPDATE add_item 
-           SET Stock_Quantity = Stock_Quantity + ?, updated_at=NOW()
-           WHERE Item_Id=?`,
+          `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
           [normalizeNumber(Quantity), Item_Id]
         );
       }
     }
 
-    // 8️⃣ Delete removed items
+    // delete removed items + reverse their stock
     for (const old of oldItems) {
       if (!newItemIds.has(old.Item_Id)) {
         await connection.query(
-          `DELETE FROM add_purchase_items WHERE Purchase_items_Id=?`,
+          `DELETE FROM add_purchase_items WHERE Purchase_items_Id = ?`,
           [old.Purchase_items_Id]
         );
-
-        // reduce stock
         await connection.query(
-          `UPDATE add_item 
-           SET Stock_Quantity = Stock_Quantity - ?, updated_at=NOW()
-           WHERE Item_Id=?`,
+          `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
           [old.Quantity, old.Item_Id]
         );
       }
@@ -1670,7 +1573,6 @@ const editPurchase = async (req, res, next) => {
       message: "Purchase updated successfully",
       purchaseId,
     });
-
   } catch (err) {
     if (connection) await connection.rollback();
     console.error("❌ Error editing purchase:", err);

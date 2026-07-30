@@ -423,13 +423,14 @@ export default function AllPurchaseList() {
                             : "N/A"}
                         </td>
                         <td>{purchase?.Party_Name || "N/A"}</td>
-                        <td>
+                         <td>{purchase?.Payment_Type_Display || "N/A"}</td>
+                        {/* <td>
                           {purchase?.Payment_Type
                             ? purchase.Payment_Type === "Bank"
                               ? `Bank (${purchase?.Bank_Display_Name || "N/A"})`
                               : purchase.Payment_Type
                             : "N/A"}
-                        </td>
+                        </td> */}
                         {/* <td>{purchase?.Payment_Type  || "N/A"}</td> */}
                         <td>{purchase?.Total_Amount || "N/A"}</td>
                         <td>{purchase?.Balance_Due || "N/A"}</td>
