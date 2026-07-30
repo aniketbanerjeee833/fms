@@ -191,13 +191,13 @@ export const purchaseFormSchema = z
       )
       .nonempty("At least one item must be added"),
   })
-  .refine(
-    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
-    {
-      message: "Please select a bank account.",
-      path: ["Bank_Account_Id"],
-    }
-  )
+  // .refine(
+  //   (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+  //   {
+  //     message: "Please select a bank account.",
+  //     path: ["Bank_Account_Id"],
+  //   }
+  // )
   // .refine(
   //   (data) => Number(data.Balance_Due) >= 0,
   //   {

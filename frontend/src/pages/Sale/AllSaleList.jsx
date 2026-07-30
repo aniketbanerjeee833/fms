@@ -292,12 +292,13 @@ export default function AllSaleList() {
                   <tr>
                     <th className="text-left">Sl.No</th>
                     <th className="text-left ">Invoice Date</th>
+                     <th className="text-left ">Invoice Number</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
                     <th className="text-left">Balance Due</th>
-                    <th>View</th>
-                    <th>Edit</th>
+                    {/* <th>View</th> */}
+                    <th>View/Edit</th>
                     <th>Return</th>
 
                   </tr>
@@ -318,29 +319,25 @@ export default function AllSaleList() {
                             })
                             : "N/A"}
                         </td>
-                        {/* <td>
-                                {sale?.Invoice_Date
-                                  ? sale?.Invoice_Date.split("T")[0]
+                        <td>
+                                {sale?.Invoice_Number
+                                  ? sale?.Invoice_Number
                                   : "N/A"}
-                              </td> */}
+                              </td>
                         <td>{sale?.Party_Name || "N/A"}</td>
-                         <td>
+                         <td>{sale?.Payment_Type_Display || "N/A"}</td>
+                         {/* <td>
                           {sale?.Payment_Type
                             ? sale.Payment_Type === "Bank"
                               ? `Bank (${sale?.Bank_Display_Name || "N/A"})`
                               : sale.Payment_Type
                             : "N/A"}
-                        </td>
+                        </td> */}
                         <td>{sale?.Total_Amount || "N/A"}</td>
                         <td>{sale?.Balance_Due || "N/A"}</td>
 
-                        <td >
-                          {/* <NavLink
-                                  to={`/sale/edit/${sale.Sale_Id}${location.search}`}
-
-                                > */}
-                          {/* <NavLink to={`/sale/view/${sale?.Sale_Id}`}
-                                  state={{ from: "all-sale-list" }}> */}
+                        {/* <td >
+                         
                           <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
                             state={{ from: "all-sale-list" }}>
                             <Eye
@@ -350,14 +347,8 @@ export default function AllSaleList() {
                                 color: "#4CA1AF"
                               }} />
                           </NavLink>
-                          {/* <i
-                                                                    style={{
-                                                                        cursor: "pointer",
-                                                                        backgroundColor: "transparent",
-                                                                        color: "#7346ff"
-                                                                    }}
-                                                                    className="fa fa-eye mr-o" aria-hidden="true"></i> */}
-                        </td>
+                        
+                        </td> */}
                         <td>
                           {/* <NavLink to={`/sale/edit/${sale?.Sale_Id}`}
                                                                 state={{from:"all-sale-list"}}>               */}

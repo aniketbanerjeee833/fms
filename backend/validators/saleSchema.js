@@ -9,11 +9,38 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} is required` }
     )
     .refine(
-      (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+      (val) => val === "" || /^-?\d+(\.\d{1,2})?$/.test(val),   // ← added -? here
       { message: `${fieldName} must be a valid number` }
     )
-    .transform((val) => (val === "" ? undefined  : Number(val)));
+    .transform((val) => (val === "" ? 0 : Number(val)));
 // ✅ Schema
+ const paymentSplitSchema = z
+      .object({
+        Payment_Type: z
+          .enum(["Cash", "Cheque", "Neft", "Bank"])
+          .or(z.literal("")) // allow blank select
+          .refine((val) => val !== "", {
+            message: "Please select a payment type.",
+          }),
+    
+        // Required only when Payment_Type === "Bank"
+        Bank_Account_Id: z
+          .union([z.number(), z.string(), z.null(), z.undefined()])
+          .optional(),
+    
+        Reference_Number: z
+          .string()
+          .trim()
+          .nullable()
+          .optional()
+          .transform((val) => val ?? ""),
+    
+        Amount: digitsOnly("Amount", true),
+      })
+      .refine((data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id, {
+        message: "Please select a bank account.",
+        path: ["Bank_Account_Id"],
+      });
 const priceStringDigits = z
   .union([z.string(), z.number()])
   .transform((val) => String(val ?? "").trim())   // normalize everything to string
@@ -24,23 +51,7 @@ const priceStringDigits = z
   .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
  const saleSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"),
-  // GSTIN: z
-  // .string({
-  //   required_error: "GSTIN is required",
-  //   invalid_type_error: "GSTIN must be a string"
-  // })
-  // .trim()
-  // .refine(val => val.length === 15, {
-  //   message: "GSTIN must be exactly 15 characters"
-  // }),
-      // GSTIN: z
-      // .string()
-      // .trim()
-      // .refine(val => val.length === 15, {
-      //   message: "GSTIN must be exactly 15 characters"
-      // }),
-    // GSTIN: z.string().min(15, "GSTIN must be at least 15 characters")
-    //     .max(15, "GSTIN must be at most 15 characters"),
+
     GSTIN: z
   .string()
   .optional()
@@ -71,24 +82,39 @@ const priceStringDigits = z
   // 🔹 Optional but digits if provided
   Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
 
-  Payment_Type: z
-       .enum(["Cash", "Cheque", "Neft", "Bank"])
-       .or(z.literal("")) // allow blank select
-       .refine((val) => val !== "", {
-         message: "Please select a payment type.",
-       }),
  
-     // 🔹 Required only when Payment_Type === "Bank"
-     Bank_Account_Id: z
-       .union([z.number(), z.string(), z.null(), z.undefined()])
-       .optional(),
-  //Payment_Type: z.enum(["Cash", "Cheque", "Neft"]).default("Cash"),
-Reference_Number: z
-  .string()
-  .trim()
-  .optional()
-  .or(z.literal("")),
+ splits: z
+      .array(paymentSplitSchema)
+      .min(1, "At least one payment split is required")
+      .superRefine((splits, ctx) => {
+        let cashSeen = false;
+        const seenBankAccounts = new Set();
 
+        splits.forEach((split, index) => {
+          if (split.Payment_Type === "Cash") {
+            if (cashSeen) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Only one Cash split is allowed.",
+                path: [index, "Payment_Type"],
+              });
+            }
+            cashSeen = true;
+          }
+
+          if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
+            if (seenBankAccounts.has(split.Bank_Account_Id)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "Each bank account can only be used once. Edit the existing split instead of adding a duplicate.",
+                path: [index, "Bank_Account_Id"],
+              });
+            }
+            seenBankAccounts.add(split.Bank_Account_Id);
+          }
+        });
+      }),
   // Stock_Quantity: digitsOnly("Stock_Quantity"),
 
   items: z
@@ -96,12 +122,7 @@ Reference_Number: z
       z.object({
            Item_Category: z.string().min(1, "Item category is required"),
         Item_Name: z.string().min(1, "Item name is required"),
-              // Item_HSN: z.string()
-              //            // 1. Enforce length (4 to 8 characters)
-              //            .min(4, "HSN Code must be at least 4 digits.")
-              //            .max(8, "HSN Code must be at most 8 digits.")
-              //            // 2. Enforce only digits (0-9)
-              //            .regex(HSN_REGEX, "HSN Code must contain only digits (0-9)."),
+             
  Item_HSN: z.union([z.string(),z.number(), z.undefined(), z.null()])
                           .transform((val) => (val === undefined || val === null ? "" : String(val))) // ✅ Always a string
                           .refine((val) => val.trim() !== "", { message: "HSN Code is required." })
@@ -146,12 +167,13 @@ Sale_Price:priceStringDigits,
       })
     )
     .nonempty("At least one item must be added"),
-}).refine(
-    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
-    {
-      message: "Please select a bank account.",
-      path: ["Bank_Account_Id"],
-    }
-  );
+})
+// .refine(
+//     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+//     {
+//       message: "Please select a bank account.",
+//       path: ["Bank_Account_Id"],
+//     }
+//   );
 
 export default saleSchema;

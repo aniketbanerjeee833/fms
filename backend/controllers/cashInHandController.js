@@ -63,49 +63,60 @@ const getCashInHand = async (req, res, next) => {
 
     /* ── ledger (paginated) — adjustments excluded ── */
    const [ledgerRows] = await connection.query(
-  `SELECT
-      ct.*,
+  `
+  SELECT
+  ct.*,
+  ps.Source_Id,
+  CASE ct.Txn_Type
+    WHEN 'Sale'            THEN s.Sale_Id
+    WHEN 'Purchase'        THEN p.Purchase_Id
+    WHEN 'Payment_In'      THEN pi.id
+    WHEN 'Payment_Out'     THEN po.id
+    WHEN 'Sale_Return'     THEN sr.id
+    WHEN 'Purchase_Return' THEN pr.id
+    ELSE NULL
+  END AS Formatted_Reference_Id
 
-      CASE ct.Txn_Type
-        WHEN 'Sale'            THEN s.Sale_Id
-        WHEN 'Purchase'        THEN p.Purchase_Id
-         WHEN 'Payment_In' THEN ct.Reference_Id
-        WHEN 'Payment_Out' THEN ct.Reference_Id
-        WHEN 'Sale_Return'     THEN sr.id
-        WHEN 'Purchase_Return' THEN pr.id
-        ELSE NULL
-      END AS Formatted_Reference_Id
+FROM cash_transactions ct
 
-   FROM cash_transactions ct
+-- resolve split_id → parent source id
+LEFT JOIN payment_splits ps
+  ON ct.Reference_Id = ps.id
+  AND ct.Txn_Type IN (
+    'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
+    'Payment_In', 'Payment_Out'
+  )
 
-   LEFT JOIN add_sale s
-          ON ct.Txn_Type='Sale'
-         AND ct.Reference_Id=s.id
+-- now join parent tables via ps.Source_Id
+LEFT JOIN add_sale s
+  ON ct.Txn_Type = 'Sale'
+  AND ps.Source_Id = s.id
 
-   LEFT JOIN add_purchase p
-          ON ct.Txn_Type='Purchase'
-         AND ct.Reference_Id=p.id
+LEFT JOIN add_purchase p
+  ON ct.Txn_Type = 'Purchase'
+  AND ps.Source_Id = p.id
 
-   LEFT JOIN payment_in pi
-          ON ct.Txn_Type='Payment_In'
-         AND ct.Reference_Id=pi.id
+LEFT JOIN payment_in pi
+  ON ct.Txn_Type = 'Payment_In'
+  AND ps.Source_Id = pi.Id
 
-   LEFT JOIN payment_out po
-          ON ct.Txn_Type='Payment_Out'
-         AND ct.Reference_Id=po.id
+LEFT JOIN payment_out po
+  ON ct.Txn_Type = 'Payment_Out'
+  AND ps.Source_Id = po.id
 
-   LEFT JOIN sale_return sr
-          ON ct.Txn_Type='Sale_Return'
-         AND ct.Reference_Id=sr.id
+LEFT JOIN sale_return sr
+  ON ct.Txn_Type = 'Sale_Return'
+  AND ps.Source_Id = sr.id
 
-   LEFT JOIN purchase_return pr
-          ON ct.Txn_Type='Purchase_Return'
-         AND ct.Reference_Id=pr.id
+LEFT JOIN purchase_return pr
+  ON ct.Txn_Type = 'Purchase_Return'
+  AND ps.Source_Id = pr.id
 
-   ${whereSQL}
+${whereSQL}
 
-   ORDER BY ct.id DESC
-   LIMIT ? OFFSET ?`,
+ORDER BY ct.id DESC
+LIMIT ? OFFSET ?
+   `,
   [...params, limit, offset]
 );
 

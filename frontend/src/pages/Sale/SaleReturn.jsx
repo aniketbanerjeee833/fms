@@ -234,7 +234,7 @@ export default function SaleReturn() {
 
             {/* Total Sales */}
             <div className="mb-2 text-left">
-              <p className="text-sm font-medium text-black">Total Sales Amount</p>
+              <p className="text-sm font-medium text-black">Total  Amount</p>
               <h4 className="text-3xl font-bold text-black">₹ {saleReturns?.totals?.totalAmount}</h4>
             </div>
 
@@ -244,8 +244,8 @@ export default function SaleReturn() {
             {/* Received & Balance */}
             <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
               <div className="flex  ">
-                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {saleReturns?.totals?.totalReceived}</span>
+                <span className="text-sm font-medium text-gray-500">Total Paid &nbsp; &nbsp;</span>
+                <span className="text-sm font-semibold text-black">₹ {saleReturns?.totals?.totalPaid}</span>
               </div>
 
               <div className="flex">
@@ -302,6 +302,7 @@ export default function SaleReturn() {
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
+                     <th className="text-left">Paid</th>
                     <th className="text-left">Balance Due</th>
                     {/* <th>View</th> */}
                     <th>Edit/View</th>
@@ -326,14 +327,16 @@ export default function SaleReturn() {
                         </td>
                         
                         <td>{sale?.Party_Name || "N/A"}</td>
-                        <td>
+                        {/* <td>
                           {sale?.Payment_Type
                             ? sale.Payment_Type === "Bank"
                               ? `Bank (${sale?.Bank_Display_Name || "N/A"})`
                               : sale.Payment_Type
                             : "N/A"}
-                        </td>
+                        </td> */}
+                        <td>{sale?.Payment_Type_Display || "N/A"}</td>
                         <td>{sale?.Total_Amount || "N/A"}</td>
+                        <td>{sale?.Total_Paid || "N/A"}</td>
                         <td>{sale?.Balance_Due || "N/A"}</td>
 
                         {/* <td > */}

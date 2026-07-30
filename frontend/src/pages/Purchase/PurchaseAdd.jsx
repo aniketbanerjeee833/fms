@@ -74,44 +74,10 @@ export default function PurchaseAdd() {
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
-  // const [newUnitKey, setNewUnitKey] = useState("");
-  // const [newUnitName, setNewUnitName] = useState("");
-  //  const itemUnitsFetched = {
-  //     "gm": "Gram",
-  //     "Kg": "Kilogram",
-  //     "lt": "Litre",
-  //     "pcs": "Piece",
-
-  //   }
-  //const [itemUnitsSaved, setItemUnitsSaved] = useState({});
-  // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
-  // console.log(itemUnitsFetched, "itemUnitsFetched");
-  // // const itemUnits=itemUnitsFetched
-  //   const [itemUnits, setItemUnits] = useState(itemUnitsFetched);
+  
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   console.log(itemUnits, "itemUnits");
 
-  // const openAddUnitModal = (rowIndex) => {
-  //   setActiveRow(rowIndex);
-  //   setShowAddUnitModal(true);
-  // };
-
-  // const handleAddUnit = () => {
-  //   if (!newUnitKey || !newUnitName) return;
-
-  //   setItemUnits((prev) => ({
-  //     ...prev,
-  //     [newUnitKey]: newUnitName,
-  //   }));
-
-  //   // auto-select newly added unit
-  //   setValue(`items.${activeRow}.Item_Unit`, newUnitKey);
-  //   handleRowChange(activeRow, "Item_Unit", newUnitKey);
-
-  //   setShowAddUnit(false);
-  //   setNewUnitKey("");
-  //   setNewUnitName("");
-  // };
 
 
   const handleAddCategory = async () => {
@@ -208,7 +174,7 @@ export default function PurchaseAdd() {
     handleSubmit,
     setValue,
     watch,
-
+    clearErrors,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(purchaseFormSchema),
@@ -365,29 +331,7 @@ const {
 
 
 
-  // const calcAll = (data) => {
-  //   // ensure items exist & valid
-  //   const cleanedItems = (data.items || [])
-  //     .filter((it) => (it.Item_Name || "").trim() !== "")
-  //     .map(calculateRowAmount);
-
-  //   const totalAmount = cleanedItems.reduce(
-  //     (sum, it) => sum + num(it.Amount),
-  //     0
-  //   );
-
-  //   const totalPaid = num(data.Total_Paid); // optional
-  //   const balanceDue = totalAmount - totalPaid;
-
-  //   return {
-  //     items: cleanedItems,
-  //     totals: {
-  //       Total_Amount: totalAmount.toFixed(2),
-  //       Total_Paid: totalPaid.toFixed(2),
-  //       Balance_Due: balanceDue.toFixed(2),
-  //     },
-  //   };
-  // };
+  
 
 
   //const itemsValues = watch("items"); // watch all rows
@@ -604,8 +548,8 @@ const sanitizeAmount = (value) => {
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
 
-  const paymentType = watch("Payment_Type", "");
-
+  // const paymentType = watch("Payment_Type", "");
+ const paymentType = watch("splits.0.Payment_Type");
   // const formData = new FormData();
 
   const [file, setFile] = useState(null);
@@ -2082,6 +2026,7 @@ const sanitizeAmount = (value) => {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
+                                      clearErrors(`splits.${index}.Amount`); 
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -2306,6 +2251,7 @@ const sanitizeAmount = (value) => {
                               const val = e.target.value;
                               setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
                             }
+                            clearErrors("splits.0.Amount"); // already there ✅
                           }}
                           className="form-control"
                         />

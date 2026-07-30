@@ -24,7 +24,7 @@ export const validateSource = async (
     Purchase_Return: "purchase_return",
     Sale: "add_sale",
     Purchase: "add_purchase",
-    Expense: "expense",
+    Expense: "expenses",
   };
 
   const table = tableMap[sourceType];
@@ -58,7 +58,7 @@ export const validateSplits = (splits, expectedTotal=null) => {
 
     if (!Payment_Type) throw new Error("Payment Type is required for every split.");
     if (isNaN(Amount) || Number(Amount) <= 0) {
-      throw new Error("Each split amount must be greater than 0.");
+      throw new Error(" Payment Type amount must be greater than 0.");
     }
 
     if (Payment_Type === "Cash") {

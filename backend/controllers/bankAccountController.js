@@ -133,7 +133,7 @@ const editBankAccount = async (req, res, next) => {
   } finally {
     if (connection) connection.release();
   }
-}; 
+};
 // const editBankAccount = async (req, res, next) => {
 //   try {
 //     const { Bank_Account_Id } = req.params;
@@ -188,7 +188,7 @@ const editBankAccount = async (req, res, next) => {
 /* ═══════════════════════════════════════
    GET ALL BANK ACCOUNTS
 ═══════════════════════════════════════ */
- const getAllBankAccounts = async (req, res, next) => {
+const getAllBankAccounts = async (req, res, next) => {
   try {
     const [accounts] = await db.query(`
   SELECT
@@ -313,15 +313,15 @@ ORDER BY ba.Account_Display_Name;
 //     next(err);
 //   }
 // };
- const getBankAccountById = async (req, res, next) => {
+const getBankAccountById = async (req, res, next) => {
   try {
     const { Bank_Account_Id } = req.params;
-    const page  = Number(req.query.page)  || 1;
+    const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-       const [[account]] = await db.query(
-  `SELECT
+    const [[account]] = await db.query(
+      `SELECT
       id AS Bank_Account_Id,
       Account_Display_Name,
       Bank_Name,
@@ -333,8 +333,8 @@ ORDER BY ba.Account_Display_Name;
       As_Of_Date
    FROM bank_accounts
    WHERE id = ?`,
-  [Bank_Account_Id]
-);
+      [Bank_Account_Id]
+    );
     if (!account) {
       return res.status(404).json({ success: false, message: "Bank account not found" });
     }
@@ -345,24 +345,63 @@ ORDER BY ba.Account_Display_Name;
     );
 
     const [transactions] = await db.query(
-      `SELECT 
-         bt.*,
-         CASE bt.Txn_Type
-           WHEN 'Sale'             THEN s.Sale_Id
-           WHEN 'Purchase'         THEN p.Purchase_Id
-           WHEN 'Payment_In'       THEN bt.Reference_Id   -- these use raw numeric id in your routes already
-           WHEN 'Payment_Out'      THEN bt.Reference_Id
-           WHEN 'Sale_Return'      THEN sr.id
-           WHEN 'Purchase_Return'  THEN pr.id
-         END AS Formatted_Reference_Id
-       FROM bank_transactions bt
-       LEFT JOIN add_sale         s  ON bt.Txn_Type = 'Sale'             AND bt.Reference_Id = s.id
-       LEFT JOIN add_purchase     p  ON bt.Txn_Type = 'Purchase'         AND bt.Reference_Id = p.id
-       LEFT JOIN sale_return      sr ON bt.Txn_Type = 'Sale_Return'      AND bt.Reference_Id = sr.id
-       LEFT JOIN purchase_return  pr ON bt.Txn_Type = 'Purchase_Return'  AND bt.Reference_Id = pr.id
-       WHERE bt.Bank_Account_Id = ?
-       ORDER BY  bt.id DESC
-       LIMIT ? OFFSET ?`,
+      // `SELECT 
+      //    bt.*,
+      //    CASE bt.Txn_Type
+      //      WHEN 'Sale'             THEN s.Sale_Id
+      //      WHEN 'Purchase'         THEN p.Purchase_Id
+      //      WHEN 'Payment_In'       THEN bt.Reference_Id   -- these use raw numeric id in your routes already
+      //      WHEN 'Payment_Out'      THEN bt.Reference_Id
+      //      WHEN 'Sale_Return'      THEN sr.id
+      //      WHEN 'Purchase_Return'  THEN pr.id
+      //    END AS Formatted_Reference_Id
+      //  FROM bank_transactions bt
+      //  LEFT JOIN add_sale         s  ON bt.Txn_Type = 'Sale'             AND bt.Reference_Id = s.id
+      //  LEFT JOIN add_purchase     p  ON bt.Txn_Type = 'Purchase'         AND bt.Reference_Id = p.id
+      //  LEFT JOIN sale_return      sr ON bt.Txn_Type = 'Sale_Return'      AND bt.Reference_Id = sr.id
+      //  LEFT JOIN purchase_return  pr ON bt.Txn_Type = 'Purchase_Return'  AND bt.Reference_Id = pr.id
+      //  WHERE bt.Bank_Account_Id = ?
+      //  ORDER BY  bt.id DESC
+      //  LIMIT ? OFFSET ?`,
+      `WITH txn AS (
+  SELECT
+    bt.*,
+    ps.Source_Type,
+    ps.Source_Id
+  FROM bank_transactions bt
+  LEFT JOIN payment_splits ps
+    ON bt.Reference_Id = ps.id
+    AND bt.Txn_Type IN (
+      'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
+      'Payment_In', 'Payment_Out'
+    )
+  WHERE bt.Bank_Account_Id = ?
+)
+SELECT
+  txn.*,
+  CASE txn.Txn_Type
+    WHEN 'Sale'            THEN s.Sale_Id
+    WHEN 'Purchase'        THEN p.Purchase_Id
+    WHEN 'Sale_Return'     THEN sr.id
+    WHEN 'Purchase_Return' THEN pr.id
+    WHEN 'Payment_In'      THEN pi.id
+    WHEN 'Payment_Out'     THEN po.id
+  END AS Formatted_Reference_Id
+FROM txn
+LEFT JOIN add_sale s
+  ON txn.Txn_Type = 'Sale' AND txn.Source_Id = s.id
+LEFT JOIN add_purchase p
+  ON txn.Txn_Type = 'Purchase' AND txn.Source_Id = p.id
+LEFT JOIN sale_return sr
+  ON txn.Txn_Type = 'Sale_Return' AND txn.Source_Id = sr.id
+LEFT JOIN purchase_return pr
+  ON txn.Txn_Type = 'Purchase_Return' AND txn.Source_Id = pr.id
+LEFT JOIN payment_in pi
+  ON txn.Txn_Type = 'Payment_In' AND txn.Source_Id = pi.Id
+LEFT JOIN payment_out po
+  ON txn.Txn_Type = 'Payment_Out' AND txn.Source_Id = po.id
+ORDER BY txn.id DESC
+LIMIT ? OFFSET ?`,
       [Bank_Account_Id, limit, offset]
     );
 
@@ -373,7 +412,7 @@ ORDER BY ba.Account_Display_Name;
 
     res.status(200).json({
       success: true,
-       bankAccount: account,
+      bankAccount: account,
       currentBalance,
       transactions,
       currentPage: page,

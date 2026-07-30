@@ -674,10 +674,13 @@ const getAllPurchaseReturns = async (req, res, next) => {
         LOWER(a.Party_Name)           LIKE ? OR
         LOWER(pr.Return_Number)       LIKE ? OR
         LOWER(pr.Bill_Number)         LIKE ? OR
-        CAST(pr.Total_Amount AS CHAR) LIKE ?
+        CAST(pr.Total_Amount AS CHAR) LIKE ? OR
+        CAST(pr.Balance_Due AS CHAR)  LIKE ? OR
+        CAST(pr.Total_Received AS CHAR)  LIKE ?
+
       )`);
       const like = `%${search}%`;
-      params.push(like, like, like, like);
+      params.push(like, like, like, like, like, like);
     }
 
     if (fromDate && toDate) {

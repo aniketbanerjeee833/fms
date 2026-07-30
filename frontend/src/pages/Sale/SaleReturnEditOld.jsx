@@ -1,33 +1,42 @@
-
-import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { useState, useRef, useEffect } from "react";
+import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
-import { useRef } from "react";
-import { useEffect } from "react";
+
 
 
 import { toast } from "react-toastify";
 
-import { useDispatch } from "react-redux";
-import { saleApi, useAddSaleMutation, useGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
-import { saleFormSchema } from "../../schema/saleFormSchema";
+
+
+
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
+
+import { saleReturnApi, useUpdateSaleReturnMutation, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
+import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
-import {Trash2} from "lucide-react";
 
-export default function SaleAdd() {
 
+export default function SaleReturndEdit() {
+
+  const location = useLocation();
+  const from = location.state?.from
+  const Party_Id = location.state?.partyId;
+  const Item_Id = location.state?.itemId
+  const bankId = location.state?.bankId;
+  console.log("Sale return Edit page query:", location.search);
+  const { id: Sale_Return_Id } = useParams();
   const dispatch = useDispatch();
   const TAX_RATES = {
     "GST0": 0,
@@ -92,42 +101,33 @@ export default function SaleAdd() {
 
 
   const navigate = useNavigate();
+  const { data: sale }
+    = useGetSaleReturnByIdQuery(Sale_Return_Id, {
+      skip: Sale_Return_Id === undefined,
+    });
   const { data: parties } = useGetAllPartiesQuery();
-  const { data: items } = useGetAllItemsQuery();
-  //console.log(items,parties);
   const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const { data: items } = useGetAllItemsQuery();
+  // console.log(items);
   //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
-  //const[categoryOpen,setCategoryOpen] = useState(false);
-  //const [showModal, setShowModal] = useState(false);
-  //const[selected,setSelected] = useState([]);
+
   const [partySearch, setPartySearch] = useState("");
-  const [originalTotal, setOriginalTotal] = useState(null);
-const today = new Date().toISOString().split("T")[0];
-  // const [newCategory, setNewCategory] = useState("");
+  //const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
-   const [showSplitBox, setShowSplitBox] = useState(false);
-  const [confirmModal, setConfirmModal] = useState({
-    open: false,
-    item: null,
-    rowIndex: null
-  });
-  const { data: latestInvoiceNumber, refetch } = useGetLatestInvoiceNumberQuery();
+  const [originalTotal, setOriginalTotal] = useState(null);
 
-  // force refetch on component mount
-  useEffect(() => {
-    refetch();
-  }, []);
   const [showGSTIN, setShowGSTIN] = useState("");
-  console.log(latestInvoiceNumber, "latestInvoiceNumber");
+  //console.log(latestInvoiceNumber,"latestInvoiceNumber");
 
-  //  const itemUnits = {
-  //     "gm": "Gram",
-  //     "Kg": "Kilogram",
-  //     "lt": "Litre",
-  //     "pcs": "Piece",
+  // const itemUnits = {
+  //   "gm": "Gram",
+  //   "Kg": "Kilogram",
+  //   "lt": "Litre",
+  //   "pcs": "Piece",
 
-  //   }
+  // }
+
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   // const [newUnitKey, setNewUnitKey] = useState("");
@@ -144,21 +144,65 @@ const today = new Date().toISOString().split("T")[0];
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
   // console.log(itemUnitsFetched, "itemUnitsFetched");
   // const itemUnits=itemUnitsFetched
-  //     const [rows, setRows] = useState([
-  //   { itemSearch: "", itemOpen: false } // ✅ only UI state here
-  // ]);
-  useEffect(() => {
-    setValue("Invoice_Number", latestInvoiceNumber?.newInvoiceNumber);
-  }, [latestInvoiceNumber]);
+
+  const {
+    control,
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(saleReturnFormSchema),
+    defaultValues: {
+      Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
+      Return_Number: "",
+      Party_Name: "",
+      GSTIN: "",
+      Invoice_Number: "",
+      Invoice_Date: "",
+      State_Of_Supply: "",
+      Total_Amount: "",
+      Balance_Due: "",
+      Total_Paid: "",
+      Payment_Type: "Cash",
+      Bank_Account_Id: null,   // 🔹 added
+      Reference_Number: "",
+      items: [{
+
+
+        Item_Category: "",
+        Item_Name: "",
+        Quantity: 0,
+        Item_Unit: "",
+        Sale_Price: "",
+
+        Discount_On_Sale_Price: "",
+        Discount_Type_On_Sale_Price: "Percentage",
+        Tax_Type: "None",
+        Tax_Amount: "",
+        Amount: "",
+      }
+      ]
+    }
+
+  })
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+
+
 
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: ""
-    }
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: ""
+    },
   ]);
 
-  const [addSale, { isLoading: isAddingSale }] = useAddSaleMutation();
+  const [updateSaleReturn, { isLoading: isCreating }] = useUpdateSaleReturnMutation();
   // helper to update a field in a specific row
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -204,61 +248,8 @@ const today = new Date().toISOString().split("T")[0];
 
 
 
-  const {
-    control,
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    clearErrors,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(saleFormSchema),
-    defaultValues: {
-      Party_Name: "",
-      GSTIN: "",
-      Invoice_Number: "",
-      Invoice_Date: today,
-      State_Of_Supply: "",
-      Total_Amount: "",
-      Balance_Due: "",
-      Total_Received: "",
-      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
-      // Payment_Type: "Cash",
-      // Bank_Account_Id: null,   // 🔹 added
-      // Reference_Number: "",
-      items: [{
 
 
-        Item_Category: "",
-        Item_Name: "",
-        Quantity: 0,
-        Item_Unit: "",
-        Sale_Price: "",
-
-        Discount_On_Sale_Price: "",
-        Discount_Type_On_Sale_Price: "Percentage",
-        Tax_Type: "None",
-        Tax_Amount: "",
-        Amount: "",
-      }
-      ]
-    }
-
-  })
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "items",
-  });
-
-const {
-    fields: splitFields,
-    append: appendSplit,
-    remove: removeSplit,
-  } = useFieldArray({
-    control,
-    name: "splits",
-  });
 
 
   const handleAddRow = () => {
@@ -295,13 +286,35 @@ const {
     });
   };
 
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
+
   const handleDeleteRow = (i) => {
-    setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-    remove(i); // remove from form
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;                    // skip deleted row
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+    const newBalanceDue = newTotal - currentTotalPaid;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
   };
 
   const itemsValues = watch("items");   // watch all item rows
-  const totalReceived = watch("Total_Received"); // watch Total_Received
+  const totalPaid = watch("Total_Paid"); // watch Total_Paid
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
 
   // helper to calculate amount in a specific row
@@ -341,167 +354,19 @@ const {
       Tax_Amount: taxAmount.toFixed(2),
       Amount: finalAmount.toFixed(2),
       Total_Amount: totalAmount.toFixed(2), // ✅ correct grand total
-      Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
+      Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
 
 
 
- 
+
   const formValues = watch();
 
-const sanitizeAmount = (value) => {
-    let val = value.replace(/[^0-9.]/g, "");
-    const parts = val.split(".");
-    if (parts.length > 2) {
-      val = parts[0] + "." + parts.slice(1).join("");
-    }
-    return val;
-  };
-
-  // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
-  // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
-
-  const getRowIdentifier = (type, bankId) =>
-    type === "Bank" ? `bank_${bankId ?? ""}` : type;
-
-  //Inside the component:
-
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
-
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
-
-  const handleAddPaymentType = () => {
-    appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
-    setShowSplitBox(true);
-  };
-
-  // live-derived total — never stored as a separate field
-  const splitsWatch = watch("splits") || [];
-  const computedTotalReceived = splitsWatch.reduce(
-    (sum, s) => sum + (parseFloat(s.Amount) || 0),
-    0
-  );
-
-  // one-directional: recompute Balance_Due whenever the total-amount or splits change.
-  // (One-directional only — do NOT also sync splits from Balance_Due, that
-  // two-way sync is exactly what caused the "value shown but still required"
-  // bug in the Payment-Out modal.)
-  const totalAmountWatch = watch("Total_Amount");
-  useEffect(() => {
-    const bal = (Number(totalAmountWatch) || 0) - computedTotalReceived;
-    setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-    setValue("Total_Received", computedTotalReceived.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalAmountWatch, computedTotalReceived]);
 
 
-  const onSubmit = async (data) => {
-    console.log("Form Data (from RHF):", data);
 
 
-    if (!data.items || data.items.length === 0) {
-      toast.error("Please add at least one item before saving the sale.");
-      return;
-    }
-
-    // ✅ Clean up items (optional safety — remove blank rows)
-    const cleanedItems = data.items.filter(
-      (it) => it.Item_Name && it.Item_Name.trim() !== ""
-    );
-
-    if (cleanedItems.length === 0) {
-      toast.error("Please add at least one valid item with a name.");
-      return;
-    }
-
-    // ✅ Validate no duplicates
-    const seenItems = new Set();
-    for (const item of cleanedItems) {
-      const name = item.Item_Name?.trim().toLowerCase();
-
-      if (seenItems.has(name)) {
-        toast.error(`Duplicate item '${item.Item_Name}' found.`);
-        return;
-      }
-      seenItems.add(name);
-    }
-
-    // ✅ Ensure all items have tax & amount values (since auto-calculated)
-    const itemsWithDefaults = cleanedItems.map((item) => ({
-      ...item,
-      Tax_Type: item.Tax_Type || "None",
-      Tax_Amount: item.Tax_Amount || "0.00",
-      Amount: item.Amount || "0.00",
-    }));
-
-    // ✅ Build final payload
-    const payload = {
-      ...data,
-      items: itemsWithDefaults,
-      Total_Amount: data.Total_Amount || 0,
-      Total_Received: data.Total_Received || 0,
-      Balance_Due:
-        data.Balance_Due ||
-        ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-    };
-
-    console.log("📦 Final Payload Sent:", payload);
-
-    try {
-      const res = await addSale({
-        body: payload,
-      }).unwrap();
-      console.log(" successfully:", res);
-      const resData = res?.data || res;
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(saleApi.util.invalidateTags(["Sale"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-      if (!resData?.success) {
-        toast.error("Failed to add new sale");
-        return;
-      } else {
-        toast.success("New Sale added successfully!");
-        navigate("/sale/all-sales");
-      }
-
-    } catch (error) {
-      const errorMessage =
-        error?.data?.message || error?.message || "Failed to add new sale";
-      toast.error(errorMessage);
-      // toast.error("Failed to add lead");
-      console.error("Submission failed", error);
-    }
-  }
 
 
   useEffect(() => {
@@ -511,70 +376,162 @@ const sanitizeAmount = (value) => {
 
     setShowGSTIN(gstin || ""); // ✅ never undefined
   }, [watch("Party_Name"), parties]);
+  console.log(sale)
+  const toLocalDateString = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
+  };
+  useEffect(() => {
+    if (sale) {
 
-
-  const handleItemSelect = (it, i) => {
-    console.log("Selected Item:", it, "at row", i);
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[i] = {
-        ...updated[i],
-        Item_Category: it.Item_Category || "",
-        Item_HSN: it.Item_HSN || "",
-        categorySearch: it.Item_Category || "",
-        isExistingItem: true,
+      setPartySearch(sale.saleReturn.Party_Name);
+      const prefilledRows = sale.saleReturn.items.map((it) => ({
+        ...it,
+        itemSearch: it.Item_Name || "", // for UI display
+        isExistingItem: true,           // lock category/HSN if needed
         isHSNLocked: true,
         isUnitLocked: true,
-      };
-      return updated;
-    });
+        CategoryOpen: false,
+        itemOpen: false,
+        itemQuantity: it.Quantity || 0,
+        itemTaxType: it.Tax_Type || "None",
+      }));
 
-    handleRowChange(i, "itemSearch", it.Item_Name);
-    handleRowChange(i, "isExistingItem", true);
-    handleRowChange(i, "CategoryOpen", false);
+      setRows(prefilledRows);
 
-    setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-    setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-    setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-    setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.0, { shouldValidate: true, shouldDirty: true });
-    setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-    setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
-    handleRowChange(i, "itemOpen", false);
+      reset({
+        Return_Date: toLocalDateString(sale.saleReturn?.Return_Date) || new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
+        Return_Number: sale.saleReturn?.Return_Number || "",
+        Party_Name: sale.saleReturn?.Party_Name || "",
+        GSTIN: sale.saleReturn?.GSTIN || "",
+        Invoice_Number: sale.saleReturn?.Invoice_Number || "",
 
-    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-      {
-        ...itemsValues[i],
-        Item_Name: it.Item_Name,
-        Sale_Price: it.Sale_Price,
-        Quantity: itemsValues[i]?.Quantity || 0,
-        Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
-        Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
-        Tax_Type: itemsValues[i]?.Tax_Type,
-      },
-      i,
-      itemsValues
-    );
+        Invoice_Date: toLocalDateString(sale.saleReturn?.Invoice_Date),
+        //  Invoice_Date: sale.saleReturn?.Invoice_Date,
+        State_Of_Supply: sale.saleReturn?.State_Of_Supply || "",
+        Total_Amount: sale.saleReturn?.Total_Amount || "",
+        //Total_Paid: sale.saleReturn?.Total_Paid || "",
+        Balance_Due: sale.saleReturn?.Balance_Due || "",
+        //Balance_Due: sale.saleReturn?.Balance_Due || "",
+        Payment_Type: sale.saleReturn?.Payment_Type || "",
+        Bank_Account_Id: sale.saleReturn?.Bank_Account_Id, // ✅ Add this
+        Reference_Number: sale.saleReturn?.Reference_Number || "",
 
-    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-    setValue(`items.${i}.Amount`, Amount);
-    setValue(`Total_Amount`, Total_Amount);
-    setValue(`Balance_Due`, Balance_Due);
-  };
-
+        items: sale.saleReturn.items || [],
+      })
+    }
+  }, [sale]);
+  //const Invoice_Number=sale.saleReturn?.Invoice_Number 
+  //const Invoice_Date=sale?.saleReturn?.Invoice_Date
+  console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
-   const paymentType = watch("splits.0.Payment_Type");
-  console.log(itemsValues, "itemsValues");
+  //const paymentType = watch("Payment_Type", "");
+  useEffect(() => {
+    if (sale) {
+
+      // setValue("GSTIN", sale.GSTIN ? String(sale.GSTIN) : "");
+      setShowGSTIN(sale.GSTIN ? String(sale.GSTIN) : "");
+    }
+  }, [sale]);
+
+
+  const onSubmit = async (data) => {
+    console.log("Form Data (from RHF):", data);
+
+    const payload = { ...data };
+
+    // ── validate items ──
+    const seenItems = new Set();
+    for (const item of payload.items) {
+      const name = item.Item_Name?.trim().toLowerCase();
+      const category = item.Item_Category?.trim().toLowerCase();
+      const itemHSN = item.Item_HSN?.trim().toLowerCase();
+      const Quantity = item.Quantity;
+
+      if (!name || !category || !itemHSN || !Quantity) {
+        toast.error("Each item must have a valid name, category, HSN and quantity.");
+        return;
+      }
+
+      if (seenItems.has(name)) {
+        toast.error(
+          `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+        );
+        return;
+      }
+      seenItems.add(name);
+    }
+
+    console.log("payload:", payload);
+
+    try {
+      const res = await updateSaleReturn({
+        Sale_Return_Id: Sale_Return_Id,   // ← from useParams() or props
+        ...payload,                 // ← everything else (Party_Name, items, etc.)
+      }).unwrap();
+      //console.log("Created successfully:", res);
+
+      // invalidate so list refetches
+      dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
+      dispatch(itemApi.util.invalidateTags(["Item"]));
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: payload.Bank_Account_Id },
+        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+      ]));
+      if (!res?.success) {
+        toast.error("Failed to update credit note");
+        return;
+      }
+
+      toast.success("Credit note updated  successfull!");
+
+      // ── navigate back based on where user came from ──
+      if (from === "all-sale-return-list") {
+        navigate({
+          pathname: "/sale/return",
+          search: location.search,
+        });
+      }
+      else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/bank-accounts`,
+          search: `?bankId=${bankId}`,
+        });
+      }
+      else if (from === "cash-in-hand") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/cash-bank/cash-in-hand`,
+
+        });
+      }
+      else {
+        navigate({
+          pathname: "/sale/return",
+          search: location.search,
+        });
+      }
+
+    } catch (error) {
+      const errorMessage =
+        error?.data?.message || error?.message || "Failed to updae credit note.";
+      toast.error(errorMessage);
+      //console.error("Submission failed", error);
+    }
+  };
+
   return (
     <>
       <div className="sb2-2-2">
         <ul>
-          {/* <li>
-                            <NavLink to="/home">
-                                <i className="fa fa-home mr-2" aria-hidden="true"></i>
-                                Dashboard
-                            </NavLink>
-                        </li> */}
+
           <NavLink style={{ display: "flex", flexDirection: "row" }}
             to="/home"
 
@@ -589,10 +546,10 @@ const sanitizeAmount = (value) => {
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
-                    <div className="row" style={{margin: "0px"}}>
-                        <div className="col-md-12">
-                            <div style={{padding: "20px"}}
-                            className="box-inn-sp"> */}
+        <div className="row" style={{ margin: "0px" }}>
+          <div className="col-md-12">
+            <div style={{ padding: "20px" }}
+              className="box-inn-sp"> */}
 
       <div style={{ padding: "20px" }}
         className="flex flex-col bg-white ">
@@ -610,10 +567,8 @@ const sanitizeAmount = (value) => {
 
             {/* LEFT HEADER */}
             <div className="w-full sm:w-auto">
-              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Add New Sale</h4>
-              {/* <p className="text-gray-500 mb-2 sm:mb-4">
-        Add new sale details
-      </p> */}
+              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Edit Credit Note</h4>
+
             </div>
 
             {/* RIGHT BUTTON SECTION */}
@@ -625,7 +580,60 @@ const sanitizeAmount = (value) => {
     ">
               <button
                 type="button"
-                onClick={() => navigate("/sale/all-sales")}
+                onClick={() => {
+
+                  if (from === "party-receivables") {
+                    navigate({
+                      pathname: `/party/receivables`,
+                      search: location.search,
+                    })
+                  }
+                  else if (from === "party-sales-purchases-details") {
+
+                    navigate({
+                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                      search: location.search,
+                    })
+
+                  }
+                  else if (from === "item-sales-purchases-details") {
+                    navigate({
+                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                      search: location.search,
+                    })
+                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else if (from === "bank-accounts") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/bank-accounts`,
+                      search: `?bankId=${bankId}`,
+                    });
+                  }
+                  else if (from === "cash-in-hand") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/cash-bank/cash-in-hand`,
+
+                    });
+                  }
+                  else {
+                    navigate({
+                      pathname: "/sale/return",
+                      search: location.search,
+                    })
+                  }
+                }}
+
+                //            else if (from === "party-receivables") {
+
+                //       navigate({
+                //   pathname: `/party/receivables`,
+                //   search: location.search,
+                // })
+                //       // navigate(`/party/party-receivables-left/${Party_Id}`);
+                //     }
+                // onClick={() => navigate("/sale/all-sales")}
                 className="text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
@@ -634,40 +642,30 @@ const sanitizeAmount = (value) => {
 
               <button
                 type="button"
-                onClick={() => navigate("/sale/all-sales")}
+                onClick={() => navigate("/sale/return")}
                 className="text-white py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                All Sales
+                All Debit Notes
               </button>
             </div>
 
           </div>
         </div>
-
-
         <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
-
-
             <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
-              {/* <div className="flex flex-wrap justify-between gap-6 w-full "> */}
-
-              {/* <div className="flex justify-between"> */}
+              {/* <div className="row"> */}
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-
-                {/* <div className="input-field  relative"> */}
-                <div className="flex flex-col relative mt-2 gap-2 party-class"
+                <div className=" flex flex-col relative mt-2 gap-2 party-class"
                   style={{ marginBottom: "0px", marginTop: "0px" }}>
+                  {/* <div className="input-field col s6 mt-4 relative"> */}
 
-                  {/* <div className="grid grid-cols-[140px_1fr] items-center gap-2"> */}
-                  <span className="whitespace-nowrap active ">
+                  <span className="active">
                     Party
                     <span className="text-red-500">*</span>
                   </span>
 
-
-                  
 
                   <div className="relative w-full">
                     <div
@@ -682,7 +680,7 @@ const sanitizeAmount = (value) => {
                         onChange={(e) => {
                           const value = e.target.value;
                           setPartySearch(value);
-                          setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                          setValue("Party_Name", value, { shouldValidate: true });
                           setOpen(true);
                         }}
                         onClick={(e) => {
@@ -698,8 +696,8 @@ const sanitizeAmount = (value) => {
 
                             if (matchedParty) {
                               setPartySearch(matchedParty.Party_Name);
-                              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
                             }
 
                             setOpen(false);
@@ -733,8 +731,8 @@ const sanitizeAmount = (value) => {
                               key={i}
                               onClick={() => {
                                 setPartySearch(party.Party_Name);
-                                setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                setValue("Party_Name", party.Party_Name, { shouldValidate: true });
+                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
                                 setOpen(false);
                               }}
                               className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
@@ -751,38 +749,30 @@ const sanitizeAmount = (value) => {
                       </div>
                     )}
                   </div>
-
                   {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
                       onSave={(newParty) => {
                         setPartySearch(newParty);
-                        setValue("Party_Name", newParty, { shouldValidate: true, shouldDirty: true });
+                        setValue("Party_Name", newParty, { shouldValidate: true });
                         setShowPartyModal(false);
                       }}
                     />
                   )}
 
-                  {/* RHF Error */}
-                  {errors?.Party_Name && (
-                    <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
-                  )}
                 </div>
-
-                {/* <div className="input-field   "> */}
-
-
                 <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
-                  <span className=" whitespace-nowrap active ">
+                  {/* <div className="input-field col s6 mt-4"> */}
+                  <span className="whitespace-nowrap active">
                     GSTIN
 
                   </span>
 
                   <input
                     type="text"
-                    style={{ marginBottom: "0px" }}
                     id=" GSTIN"
+                    style={{ marginBottom: "0px" }}
                     value={showGSTIN || ""}
                     {...register("GSTIN")}
                     placeholder="GSTIN"
@@ -795,90 +785,114 @@ const sanitizeAmount = (value) => {
                     </p>
                   )}
                 </div>
-
-
               </div>
+
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
-
                 <div className="flex items-center w-full gap-3  justify-end">
+                  <span className="whitespace-nowrap ">
+                    Return Number
+                    <span className="text-red-500">*</span>
+                  </span>
 
-                  {/* Label */}
+                  <input
+                    type="text"
+                    style={{ marginBottom: 0, border: "none", width: "50%" }}
+                    id=" Return_Number"
+                    {...register("Return_Number")}
+                    placeholder="Return_Number"
+                    className="w-full outline-none invoice-number-class  text-gray-900"
+                  />
+                  {errors?.Return_Number && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.Return_Number?.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center w-full gap-3  justify-end">
+                  {/* <div className="row  "> */}
+
+                  {/* Invoice Number */}
+                  {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
                     Invoice Number <span className="text-red-500">*</span>
                   </span>
 
-                  {/* Input */}
                   <input
                     type="text"
-                    id="Invoice_Number"
+                    id=" Invoice_Number"
+                    //value={Invoice_Number}
+
                     {...register("Invoice_Number")}
-                    placeholder="Invoice Number"
-                    readOnly
-
-                    // className="  outline-none text-gray-900 py-1 bg-transparent"
-                    className="
-       invoice-number-class
-      outline-none 
-      text-gray-900 
-      py-1 
-      bg-transparent "
-
-
-
+                    placeholder=" Invoice_Number"
                     style={{ marginBottom: 0, border: "none", width: "50%" }}
+                    className="w-full outline-none  text-gray-900
+                          invoice-number-class"
+                    readOnly
                   />
-
+                  {/* {errors?.Invoice_Number && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors?.Invoice_Number?.message}
+                          </p>
+                        )} */}
                 </div>
-
-                {/* Error message */}
-                {errors?.Invoice_Number && (
-                  <p className="text-red-500 text-xs mt-1">{errors.Invoice_Number.message}</p>
-                )}
-
 
 
 
                 {/* Invoice Date */}
-                <div className="flex items-center w-full gap-3 justify-end">
-                  {/* <div className="grid grid-cols-[140px_0.9fr] items-center gap-2"> */}
-                  {/* <div className="input-field  "> */}
+                <div className="flex items-center w-full  gap-3 justify-end">
+                  {/* <div className="input-field col s6 mt-4"> */}
                   <span className=" whitespace-nowrap active">
                     Invoice Date
                     <span className="text-red-500">*</span>
                   </span>
 
                   <input
-                    style={{ marginBottom: 0, width: "50%", border: "none" }}
-                    type="date"
+                    type="text"
                     id=" Invoice_Date"
+
+                    //value={toLocalDateString(Invoice_Date) || ""}
+                    style={{ marginBottom: 0, width: "50%", border: "none" }}
                     {...register("Invoice_Date")}
-                    placeholder=" Invoice_Date"
-                    className="w-full outline-none text-gray-900 invoice-date-class"
-                    min={
-                      latestInvoiceNumber?.latestInvoiceInfo?.createdAt
-                        ? new Date(latestInvoiceNumber?.latestInvoiceInfo?.createdAt).toISOString().split("T")[0]
-                        : ""
-                    } // ✅ Prevent earlier dates
+                    //placeholder=" Invoice_Date"
+                    readOnly
+                    className="w-full outline-none invoice-date-class text-gray-900"
+
                   />
-                  {errors?.Invoice_Date && (
+                  {/* {errors?.Invoice_Date && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors?.Invoice_Date?.message}
+                          </p>
+                        )} */}
+                </div>
+
+                {/* Date */}
+                <div className="flex items-center w-full gap-3  justify-end">
+                  <span className="whitespace-nowrap ">
+                    Date
+                    <span className="text-red-500">*</span>
+                  </span>
+
+                  <input
+                    style={{ marginBottom: 0, border: "none", width: "50%" }}
+                    type="date"
+                    id=" Date"
+                    {...register("Return_Date")}
+                    placeholder="Date"
+                    className="w-full outline-none invoice-date-class   text-gray-900"
+                  />
+                  {errors?.Return_Date && (
                     <p className="text-red-500 text-xs mt-1">
-                      {errors?.Invoice_Date?.message}
+                      {errors?.Return_Date?.message}
                     </p>
                   )}
                 </div>
-
-
-
-
-
-
-                {/* State of Supply */}
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
+                <div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
-                  {/* <div className="grid grid-cols-[140px_0.9fr] items-center gap-2"> */}
-                  {/* <div className="input-field  "> */}
+                  {/* <div className="row w-1/2"> */}
+
+                  {/* State of Supply */}
+                  {/* <div className="input-field col s6"> */}
                   <span className=" whitespace-nowrap active">
                     State of Supply
                     <span className="text-red-500">*</span>
@@ -887,6 +901,7 @@ const sanitizeAmount = (value) => {
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
                     id="stateOfSupply"
                     className="validate mt-2"
+
                     {...register("State_Of_Supply")}
                   >
                     <option value="">Select State</option>
@@ -902,9 +917,12 @@ const sanitizeAmount = (value) => {
                     </p>
                   )}
                 </div>
+
+
               </div>
 
             </div>
+
 
 
 
@@ -929,7 +947,7 @@ const sanitizeAmount = (value) => {
                     <th>Amount</th>
                   </tr>
                 </thead>
-                <tbody style={{ maxHeight: "10rem", overflowY: "scroll", backgroundColor: "#f1f1f19d" }}>
+                <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
                   {fields.map((field, i) => (
                     <tr key={field.id}>
                       {/* Action + Serial Number */}
@@ -979,12 +997,14 @@ const sanitizeAmount = (value) => {
                           )}
 
 
+
                         </div>
+                        {/* Modal */}
 
                       </td>
 
-
-                      <td style={{ padding: "0px", width: "18%", position: "relative" }}>
+                      {/* Item Dropdown */}
+                      <td style={{ padding: "0px", width: "20%", position: "relative" }}>
                         <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                           <input
                             type="text"
@@ -1003,11 +1023,11 @@ const sanitizeAmount = (value) => {
                               );
                               if (exists) {
                                 // ✅ Only store if it's a valid item
-                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
                                 handleRowChange(i, "isExistingItem", true);
                               } else {
                                 // ❌ Clear Item_Name in RHF to trigger error
-                                setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
                                 handleRowChange(i, "isExistingItem", false);
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
@@ -1018,7 +1038,6 @@ const sanitizeAmount = (value) => {
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
 
-
                           {errors?.items?.[i]?.Item_Name && (
                             <p className="text-red-500 text-xs mt-1">
                               {errors.items[i].Item_Name.message}
@@ -1027,6 +1046,7 @@ const sanitizeAmount = (value) => {
 
 
 
+                          {/* Dropdown List */}
                           {rows[i]?.itemOpen && (
                             <div
                               style={{ width: "40rem" }}
@@ -1051,21 +1071,57 @@ const sanitizeAmount = (value) => {
                                       )
                                     )
                                     .map((it, idx) => (
-
-
-
                                       <tr
                                         key={idx}
                                         onClick={() => {
-                                          if (it.Stock_Quantity <= 0) {
-                                            // show confirmation modal instead of directly adding
-                                            setConfirmModal({ open: true, item: it, rowIndex: i });
-                                            return;
-                                          }
 
-                                          // ✅ proceed directly if stock > 0
-                                          handleItemSelect(it, i);
+                                          setRows((prev) => {
+                                            const updated = [...prev];
+                                            updated[i] = {
+                                              ...updated[i],
+                                              Item_Category: it.Item_Category || "",
+                                              Item_HSN: it.Item_HSN || "",
+                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
+                                              isExistingItem: true,   // lock category
+                                              isHSNLocked: true,      // lock HSN
+                                              isUnitLocked: true,     // lock unit
+                                              itemQuantity: it.Stock_Quantity || 0,
+                                            };
+                                            return updated;
+                                          });
+                                          handleRowChange(i, "itemSearch", it.Item_Name);
+                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
+                                          handleRowChange(i, "CategoryOpen", false);
+                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
+                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
+                                          setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
+                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
+                                          setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
+                                          handleRowChange(i, "itemOpen", false);
+
+
+                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                            {
+                                              ...itemsValues[i],
+                                              Item_Name: it.Item_Name,
+                                              Sale_Price: it.Sale_Price || 0,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
+                                              Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
+                                              Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
+                                              Tax_Type: itemsValues[i]?.Tax_Type
+                                            },
+                                            i,
+                                            itemsValues
+                                          );
+
+                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                                          setValue(`items.${i}.Amount`, Amount);
+                                          setValue(`Total_Amount`, Total_Amount);
+                                          setValue(`Balance_Due`, Balance_Due);
                                         }}
+
                                         className="hover:bg-gray-100 cursor-pointer border-b"
                                       >
                                         <td>{idx + 1}</td>
@@ -1100,55 +1156,10 @@ const sanitizeAmount = (value) => {
                               </table>
                             </div>
                           )}
-                          {confirmModal.open && (
-                            <div
-                              className="fixed inset-0 
-    flex items-center justify-center 
-    bg-white z-50 bg-opacity-50"
-                            >
-                              <div className="bg-white p-6 rounded-lg shadow-lg
-     w-96 relative">
-                                <h3 style={{ color: "red" }} className="text-lg font-semibold mb-4
-       text-center ">
-                                  ⚠ Item Out of Stock
-                                </h3>
-                                <p className="text-gray-700 text-center mb-6">
-                                  The item <b>{confirmModal.item?.Item_Name}</b> has 0 stock.<br />
-                                  Do you still want to add it?
-                                </p>
-                                <div className="flex justify-center gap-4">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleItemSelect(confirmModal.item, confirmModal.rowIndex);
-                                      setConfirmModal({ open: false, item: null, rowIndex: null });
-                                    }}
-                                    className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white 
-          hover:bg-[#4CA1AF]"
-                                  >
-                                    Yes, Add Item
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setConfirmModal({ open: false, item: null, rowIndex: null })
-                                    }
-                                    style={{ outline: "none", backgroundColor: "gray" }}
-                                    className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300
-           text-gray-700 "
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
 
                           {/* RHF error */}
 
                         </div>
-
                       </td>
 
                       {/*HSN Code */}
@@ -1157,7 +1168,12 @@ const sanitizeAmount = (value) => {
                           type="text"
                           readOnly
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-
+                          // onChange={(e) => {
+                          //   if (!rows[i]?.isHSNLocked) {
+                          //     handleRowChange(i, "Item_HSN", e.target.value);
+                          //     setValue(`items.${i}.Item_HSN`, e.target.value);
+                          //   }
+                          // }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
                         // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
@@ -1168,6 +1184,7 @@ const sanitizeAmount = (value) => {
                           </p>
                         )}
                       </td>
+
                       {/* Quantity */}
                       <td style={{ padding: "0px", width: "4%" }}>
                         <input
@@ -1178,33 +1195,46 @@ const sanitizeAmount = (value) => {
                           {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
                           onChange={(e) => {
                             let value = e.target.value.replace(/[^0-9]/g, "");
-                            //let stockQty = items?.items?.find((item) => item.Item_Name === itemsValues[i]?.Item_Name)?.Stock_Quantity || 0;
-                            //console.log(stockQty);
+                            // let currentItemName = itemsValues[i]?.Item_Name?.trim();
+                            // if (!currentItemName) return;
 
-                            if (!itemsValues[i]?.Item_Name?.trim()) return;
+                            // // 🔹 Fetch the item’s DB stock (available stock now)
+                            // const stockItem = items?.items?.find(
+                            //   (item) => item.Item_Name === currentItemName
+                            // );
+                            // const currentStock = Number(stockItem?.Stock_Quantity || 0);
 
-                            // ✅ Clamp value
+                            // // 🔹 Get the old quantity from the sale being edited (previously sold)
+                            // const previousQuantity = Number(rows[i]?.itemQuantity || 0);
+
+                            // // ✅ Effective available stock = stock + previously sold quantity
+                            // const effectiveAvailableStock = currentStock + previousQuantity;
+
                             let num = parseInt(value, 10);
+                            if (isNaN(num) || num < 0) num = 0;
+                            // if (num > effectiveAvailableStock) num = effectiveAvailableStock;
 
-                            if (isNaN(num) || num < 0) {
-                              num = 0; // reset to 0
-                            }
-
-                            // ✅ Update only via RHF
-                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true, shouldDirty: true });
+                            // ✅ Update via RHF
+                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true });
 
                             // ✅ Recalculate row + totals
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
-                              calculateRowAmount({ ...itemsValues[i], Quantity: num || 0 }, i, itemsValues);
+                              calculateRowAmount(
+                                { ...itemsValues[i], Quantity: num || 0 },
+                                i,
+                                itemsValues
+                              );
 
-                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                            setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                           }}
                           placeholder="Qty"
                         />
+
                         {errors?.items?.[i]?.Quantity && (
+
                           <p className="text-red-500 text-xs mt-1">
                             {errors.items[i].Quantity.message}
                           </p>
@@ -1213,37 +1243,37 @@ const sanitizeAmount = (value) => {
 
 
                       {/* Unit */}
-                      {/* <td style={{ padding: "0px" ,width: "8%" }}>
-  <Controller
-    control={control}
-    name={`items.${i}.Item_Unit`}
-    render={({ field }) => (
-      <select
-        {...field}
-        className="form-select "
-        style={{ width: "100%", fontSize: "12px",marginLeft:"0px" }}
-        disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
-        onChange={(e) => {
-          const value = e.target.value;
-          handleRowChange(i, "Item_Unit", value);
-          setValue(`items.${i}.Item_Unit`, value);
-        }}
-      >
-        <option value="">Select</option>
-        {Object.entries(itemUnits).map(([key, value]) => (
-          <option key={key} value={key}>
-            {`${value} (${key})`}
-          </option>
-        ))}
-      </select>
-    )}
-  />
-     {errors?.items?.[i]?.Item_Unit && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors.items[i].Item_Unit.message}
-          </p>
-        )}
-</td> */}
+                      {/* <td style={{ padding: "0px",width: "6%" }}>
+                              <Controller
+                                control={control}
+                                name={`items.${i}.Item_Unit`}
+                                render={({ field }) => (
+                                  <select
+                                    {...field}
+                                    className="form-select "
+                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
+                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      handleRowChange(i, "Item_Unit", value);
+                                      setValue(`items.${i}.Item_Unit`, value);
+                                    }}
+                                  >
+                                    <option value="">Select</option>
+                                    {Object.entries(itemUnits).map(([key, value]) => (
+                                      <option key={key} value={key}>
+                                        {`${value} (${key})`}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              />
+                              {errors?.items?.[i]?.Item_Unit && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.items[i].Item_Unit.message}
+                                </p>
+                              )}
+                            </td> */}
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
@@ -1294,6 +1324,63 @@ const sanitizeAmount = (value) => {
 
 
                       {/* Price/Unit */}
+                      {/* <td style={{ padding: "0px" ,width: "6%"}}>
+                              <div className="d-flex align-items-center">
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  style={{ width: "100%", marginBottom: "0px" }}
+                                  {...register(`items.${i}.Sale_Price`)}
+                                  onChange={(e) => {
+                                    let val = e.target.value;
+
+                                    // ✅ allow digits and one dot
+                                    val = val.replace(/[^0-9.]/g, "");
+
+                                    // ✅ if more than one dot, keep only the first
+                                    const parts = val.split(".");
+                                    if (parts.length > 2) {
+                                      val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
+                                    }
+
+                                    // ✅ limit to 2 decimal places
+                                    if (val.includes(".")) {
+                                      const [int, dec] = val.split(".");
+                                      val = int + "." + dec.slice(0, 2);
+                                    }
+
+                                    e.target.value = val;
+                                    //setValue(`items.${i}.Sale_Price`, Number(val), { shouldValidate: true });
+                                    if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                                      return;
+                                    }
+
+                                    // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                    //   ...itemsValues[i],
+                                    //   Purchase_Price: val,
+                                    // });
+                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                      { ...itemsValues[i], Sale_Price: val },
+                                      i,
+                                      itemsValues
+                                    );
+
+                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                                  }}
+
+                                  placeholder="Price"
+                                />
+
+                              </div>
+                              {errors?.items?.[i]?.Sale_Price && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors.items[i].Sale_Price.message}
+                                </p>
+                              )}
+                            </td> */}
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
@@ -1301,42 +1388,7 @@ const sanitizeAmount = (value) => {
                             className="form-control"
                             style={{ width: "100%", marginBottom: "0px" }}
                             {...register(`items.${i}.Sale_Price`)}
-                            //         onChange={(e) => {
-                            //   let val = e.target.value;
 
-                            //   // ✅ allow digits and one dot
-                            //   val = val.replace(/[^0-9.]/g, "");
-
-                            //   // ✅ if more than one dot, keep only the first
-                            //   const parts = val.split(".");
-                            //   if (parts.length > 2) {
-                            //     val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                            //   }
-
-                            //   // ✅ limit to 2 decimal places
-                            //   if (val.includes(".")) {
-                            //     const [int, dec] = val.split(".");
-                            //     val = int + "." + dec.slice(0, 2);
-                            //   }
-
-                            //   e.target.value = val;
-                            // //setValue(`items.${i}.Sale_Price`, Number(val), { shouldValidate: true, shouldDirty: true });
-                            //   if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                            //     return;
-                            //   }
-
-
-                            //     const { Tax_Amount, Amount, Total_Amount,Balance_Due } = calculateRowAmount(
-                            //     { ...itemsValues[i], Sale_Price: val },
-                            //     i,
-                            //     itemsValues
-                            //   );
-
-                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                            // }}
                             onChange={(e) => {
                               let val = e.target.value.replace(/[^0-9.]/g, "");
                               const parts = val.split(".");
@@ -1349,7 +1401,7 @@ const sanitizeAmount = (value) => {
                               e.target.value = val;
 
                               // 🟩 Update RHF internal state FOR VALIDATION
-                              setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true, shouldDirty: true });
+                              setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
@@ -1374,7 +1426,6 @@ const sanitizeAmount = (value) => {
                           </p>
                         )}
                       </td>
-
                       {/* Discount */}
                       <td style={{ padding: "0px", width: "14%" }}>
                         <div className="d-flex align-items-center">
@@ -1383,28 +1434,28 @@ const sanitizeAmount = (value) => {
                             className="form-control"
                             style={{ width: "50%", marginBottom: "0px" }}
                             {...register(`items.${i}.Discount_On_Sale_Price`)}
-                            //           onInput={(e) => {
-                            //             e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                            // //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
-                            // //   ...itemsValues[i],
+                            // onInput={(e) => {
+                            //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            //   //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
+                            //   //   ...itemsValues[i],
 
-                            // //   Discount_On_Purchase_Price: e.target.value,
+                            //   //   Discount_On_Purchase_Price: e.target.value,
 
-                            // // });
-                            //     const { Tax_Amount, Amount, Total_Amount,Balance_Due } = calculateRowAmount(
-                            //   { ...itemsValues[i], Discount_On_Sale_Price: e.target.value },
-                            //   i,
-                            //   itemsValues
-                            // );
+                            //   // });
+                            //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                            //     { ...itemsValues[i], Discount_On_Sale_Price: e.target.value },
+                            //     i,
+                            //     itemsValues
+                            //   );
 
-                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                            // // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                            // // setValue(`items.${i}.Amount`, Amount);
+                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                            //   // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                            //   // setValue(`items.${i}.Amount`, Amount);
 
-                            //           }}
+                            // }}
                             onInput={(e) => {
                               let val = e.target.value;
 
@@ -1418,7 +1469,7 @@ const sanitizeAmount = (value) => {
 
                               if (val.includes(".")) {
                                 const [int, dec] = val.split(".");
-                                val = int + "." + dec;
+                                val = int + "." + dec.slice(0, 2);
                               }
 
                               e.target.value = val;
@@ -1434,7 +1485,6 @@ const sanitizeAmount = (value) => {
                               setValue("Total_Amount", Total_Amount);
                               setValue("Balance_Due", Balance_Due);
                             }}
-
                             placeholder="Discount"
                           />
                           <Controller
@@ -1448,6 +1498,10 @@ const sanitizeAmount = (value) => {
                                 onChange={(e) => {
                                   field.onChange(e); // ✅ let RHF handle its state
 
+                                  // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                  //   ...itemsValues[i],
+                                  //   Discount_Type_On_Purchase_Price: e.target.value,
+                                  // });
 
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     { ...itemsValues[i], Discount_Type_On_Sale_Price: e.target.value },
@@ -1455,10 +1509,10 @@ const sanitizeAmount = (value) => {
                                     itemsValues
                                   );
 
-                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                                 }}
                               >
                                 <option value="Percentage">%</option>
@@ -1472,36 +1526,37 @@ const sanitizeAmount = (value) => {
 
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
-
                           control={control}
-                          name={`items.${i}.Tax_Type`}
+                          name={`items.${i}.Tax_Type`} // ✅ remove disabled here
                           render={({ field }) => (
                             <select
                               {...field}
-                              className="form-select"
+                              className="form-select bg-gray-100 text-gray-700"
                               style={{
-                                width: "100%", fontSize: "12px", marginBottom: "0px",
+                                width: "100%",
+                                fontSize: "12px",
+                                marginBottom: "0px",
                                 pointerEvents: "none", // ✅ visually disabled
                                 cursor: "not-allowed",
                                 backgroundColor: "#f3f4f6", // light gray
                               }}
                               onChange={(e) => {
-                                field.onChange(e); // ✅ update RHF value
+                                field.onChange(e);
 
-                                // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                                //   ...itemsValues[i],
-                                //   Tax_Type: e.target.value,
-                                // });
-                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                  { ...itemsValues[i], Tax_Type: e.target.value },
-                                  i,
-                                  itemsValues
-                                );
+                                // ✅ Recalculate amounts on Tax_Type change
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
+                                  calculateRowAmount(
+                                    { ...itemsValues[i], Tax_Type: e.target.value },
+                                    i,
+                                    itemsValues
+                                  );
 
-                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                  shouldValidate: true,
+                                });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
+                                setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                               }}
                             >
                               <option value="None">None</option>
@@ -1525,6 +1580,7 @@ const sanitizeAmount = (value) => {
                           )}
                         />
                       </td>
+
 
                       {/* Tax Amount */}
                       <td style={{ width: "8%" }}>
@@ -1553,197 +1609,71 @@ const sanitizeAmount = (value) => {
 
 
               </table>
-              <div className="flex sm:w-1/4 p-2">
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
-                  style={{ backgroundColor: "#4CA1AF" }}
-                >
-                  + Add Row
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
-                <div className="flex flex-col px-2">
-                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full sale-wrapper">
 
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
-                    {!showSplitBox ? (
-                      <>
-                        <div className="flex flex-col w-full">
-                          <span className="active">Payment Type</span>
+                <div className="flex flex-col px-2 w-full sm:w-64 sale-left">
+                  {/* <div className="flex flex-col w-1/8"> */}
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className=" text-white font-bold py-2 px-4 w-1/2 rounded  "
+                    style={{ backgroundColor: "#4CA1AF" }}
+                  >
+                    + Add Row
+                  </button>
+                  <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
+                  >
+                    <div className="flex flex-col w-full">
+                      <span className="active">Payment Type</span>
 
-                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
-            it's driven by setValue in the onChange below, not a native <select {...register}> */}
-                          <input
-                            type="hidden"
-                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
-                          />
-
-                          <select
-                            id="Payment_Type"
-                            value={
-                              paymentType === "Bank"
-                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                                : paymentType || ""
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val.startsWith("bank_")) {
-                                const bankId = val.replace("bank_", "");
-                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                              } else {
-                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                              }
-                            }}
-                          >
-                            <option value="">Select Payment Type</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Neft">Neft</option>
-                            {banks?.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </select>
-
-                          {errors?.splits?.[0]?.Payment_Type && (
-                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
-                          )}
-                        </div>
-
-                     
-                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                    <div className="mt-3 flex flex-col">
-                      <label className="text-sm">Reference Number</label>
-                      <input
-                        type="text"
-                        //readOnly={isView}
-                        style={{ marginBottom:"0px"}}
-                        {...register("splits.0.Reference_Number")}
-                      />
-                    </div>
-                  )}
-
-                        <button
-                          type="button"
-                          onClick={handleAddPaymentType}
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none", padding: 0 }}
-                        >
-                          + Add Payment Type
-                        </button>
-                      </>
-                    ) : (
-                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
-                        {splitFields.map((field, index) => {
-                          const rowType = watch(`splits.${index}.Payment_Type`);
-                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
-                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
-                          const amountField = register(`splits.${index}.Amount`, {
-                            required: "Required",
-                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
-                          });
-
-                          return (
-                            <div key={field.id} className="flex flex-col gap-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
-                                    value={currentIdentifier || ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val.startsWith("bank_")) {
-                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                      } else {
-                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                      }
-                                    }}
-                                    className="border rounded-md px-2 py-1.5"
-                                  >
-                                    <option value="">Select Type</option>
-                                    {rowOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Amount"
-                                    style={{ marginBottom: "0px", width: "80%" }}
-                                    className="border rounded-md px-2 py-1.5"
-                                    {...amountField}
-                                    onChange={(e) => {
-                                      e.target.value = sanitizeAmount(e.target.value);
-                                      amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`); 
-                                    }}
-                                  />
-                                  {errors?.splits?.[index]?.Amount && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
-                                  )}
-                                </div>
-
-                                {splitFields.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSplit(index)}
-                                    className="text-gray-500 mb-2 mt-4"
-                                    style={{ background: "transparent", border: "none" }}
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                )}
-                              </div>
-
-                              {needsRef && (
-                                <input
-                                  type="text"
-                                  placeholder="Reference Number"
-                                  style={{width:"80%"}}
-                                  // className="border rounded-md px-2 py-1.5 w-full"
-                                  {...register(`splits.${index}.Reference_Number`)}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                      <select
+                        id="Payment_Type"
+                        value={
+                          watch("Payment_Type") === "Bank"
+                            ? `bank_${watch("Bank_Account_Id") || ""}`
+                            : watch("Payment_Type") || ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.startsWith("bank_")) {
+                            const bankId = val.replace("bank_", "");
+                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                          } else {
+                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
                           }
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none" }}
-                        >
-                          + Add Another Payment
-                        </button>
-                      </div>
-                    )}
+                        }}
+                      >
+                        <option value="">Select Payment Type</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Neft">Neft</option>
+                        {banks?.map((bank) => (
+                          <option
+                            key={bank.Bank_Account_Id}
+                            value={`bank_${bank.Bank_Account_Id}`}
+                          >
+                            {bank.Account_Display_Name}
+                          </option>
+                        ))}
+
+                      </select>
+
+                      {errors?.Payment_Type && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
+                      )}
+                      {errors?.Bank_Account_Id && (
+                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {/* <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
-                  > */}
 
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
-                >
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right">
+
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
@@ -1755,7 +1685,7 @@ const sanitizeAmount = (value) => {
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -1766,7 +1696,7 @@ const sanitizeAmount = (value) => {
                             const rounded = Math.round(totalAmount);
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
 
                           } else {
                             if (originalTotal !== null) {
@@ -1774,7 +1704,7 @@ const sanitizeAmount = (value) => {
 
                               setValue(
                                 "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
+                                (originalTotal - totalPaid).toFixed(2),
                                 { shouldValidate: true }
                               );
                             }
@@ -1795,7 +1725,7 @@ const sanitizeAmount = (value) => {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
                           const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
 
                           if (isNaN(totalAmount)) return;
 
@@ -1803,9 +1733,9 @@ const sanitizeAmount = (value) => {
                           const newTotal = totalAmount + val;
 
                           setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
                         }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      // disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div>
 
@@ -1827,9 +1757,9 @@ const sanitizeAmount = (value) => {
 
 
 
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      <div className="flex items-center  gap-3 relative ">
 
-                       <div className="flex items-center gap-2 relative">
+                        <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
@@ -1837,10 +1767,7 @@ const sanitizeAmount = (value) => {
 
                             id="totalReceivedCheck"
                             className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
                             onChange={(e) => {
-
                               const isChecked = e.target.checked;
                               const totalAmount = parseFloat(watch("Total_Amount"));
 
@@ -1850,29 +1777,19 @@ const sanitizeAmount = (value) => {
 
 
                                 // Clear both fields to stay consistent
-                                setValue("Total_Received", "");
+                                setValue("Total_Paid", "");
                                 setValue("Balance_Due", "");
-                                if (splitsWatch.length === 1) {
-                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
-                                }
                                 return;
                               }
 
                               if (isChecked) {
-                                // ✅ Set Total_Received = Total_Amount, Balance_Due = 0
-                                setValue("Total_Received", totalAmount.toFixed(2));
+                                // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
+                                setValue("Total_Paid", totalAmount.toFixed(2));
                                 setValue("Balance_Due", 0);
                               } else {
                                 // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                setValue("Total_Received", "");
+                                setValue("Total_Paid", "");
                                 setValue("Balance_Due", totalAmount.toFixed(2));
-                              }
-                              if (splitsWatch.length === 1) {
-                                setValue(
-                                  "splits.0.Amount",
-                                  isChecked ? totalAmount.toFixed(2) : "",
-                                  { shouldValidate: true, shouldDirty: true }
-                                );
                               }
                             }}
                           />
@@ -1880,7 +1797,7 @@ const sanitizeAmount = (value) => {
                             htmlFor="totalReceivedCheck"
                             className="font-medium whitespace-nowrap"
                           >
-                            Total Received
+                            Total Paid
                           </span>
 
                         </div>
@@ -1888,11 +1805,9 @@ const sanitizeAmount = (value) => {
 
                         <input
                           type="text"
-                          {...register("Total_Received")}
+                          {...register("Total_Paid")}
                           style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
                           onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
                             let val = e.target.value.replace(/[^0-9.]/g, "");
 
                             // Allow only one dot
@@ -1906,32 +1821,26 @@ const sanitizeAmount = (value) => {
                             }
 
                             e.target.value = val;
-                            setValue("Total_Received", val);
+                            setValue("Total_Paid", val);
 
-                            const totalReceived = parseFloat(val || 0);
+                            const totalPaid = parseFloat(val || 0);
                             const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
-                            clearErrors("splits.0.Amount"); // already there ✅
+                            setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
                           }}
-                          className="form-control"
+                        // className="form-control"
                         />
                       </div>
 
 
 
 
-                      <div style={{ width: "100%" }}
-                        className="flex  gap-2 items-center ">
+                      <div className="flex  gap-2 items-center ">
 
                         <span className="font-medium whitespace-nowrap">Balance Due</span>
                         <input
                           style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
+                            backgroundColor: "transparent",
+                            marginBottom: "0px", height: "1rem", width: "100%"
                           }}
                           type="text"
                           className="form-control  "
@@ -1948,22 +1857,47 @@ const sanitizeAmount = (value) => {
               </div>
             </div>
             <div className="flex justify-end gap-4 mt-4">
-              <button
-                type="button"
+              {/* <button
+                      type="button"
+                     
+                      onClick={() => {
+                        if (from === "party-sales-purchases-details") {
 
-                onClick={() => navigate("/sale/all-sales")}
-                className=" text-white font-bold py-2 px-4 rounded"
-                style={{ backgroundColor: "#4CA1AF" }}
-              >
-                Cancel
-              </button>
+                          navigate({
+                            pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                            search: location.search,
+                          })
+                          
+                        } 
+                        else if (from === "item-sales-purchases-details") {
+                          navigate({
+                            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                            search: location.search,
+                          })
+                          // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                        } 
+                        else {
+                          navigate({
+                            pathname: "/sale/all-sales",
+                            search: location.search,
+                          })
+
+                          // navigate("/sale/all-sales");
+                        }
+                      }}
+                      // onClick={() => navigate("/sale/all-sales")}
+                      className=" text-white font-bold py-2 px-4 rounded"
+                      style={{ backgroundColor: "#4CA1AF" }}
+                    >
+                      Cancel
+                    </button> */}
               <button
                 type="submit"
-                disabled={formValues.errorCount > 0 || isAddingSale}
+                disabled={formValues.errorCount > 0 || isCreating}
                 className=" text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                {isAddingSale ? "Saving..." : "Save"}
+                {isCreating ? "Saving..." : "Save"}
               </button>
             </div>
           </form>
@@ -1995,21 +1929,7 @@ const sanitizeAmount = (value) => {
             setShowAddUnitModal(false);
             setActiveUnitRow(null);
           }}
-        // onSave={({  unitKey }) => {
-        //   // 1️⃣ Add unit to dropdown list
-        //   // setItemUnits((prev) => ({
-        //   //   ...prev,
-        //   //   [unitKey]: unitName,
-        //   // }));
 
-        //   // 2️⃣ Auto-select newly added unit
-        //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
-        //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
-
-        //   // 3️⃣ Close modal
-        //   setShowAddUnitModal(false);
-        //   setActiveUnitRow(null);
-        // }}
         />
       )}
       <style>
@@ -2074,11 +1994,7 @@ const sanitizeAmount = (value) => {
     width: 100% !important;
   }
 
-  /* Dropdown fix so it does NOT go off-screen */
-  // .party-class .absolute {
-  //   width: 100% !important;
-  //   left: 0 !important;
-  // }
+
 
   /* GSTIN block full width */
   .gstin-class {
@@ -2145,108 +2061,6 @@ const sanitizeAmount = (value) => {
   }
 `}
       </style>
-
     </>
-
   );
-
 }
-
-
-//#4CA1AF
-{/* <input
-                                            type="text"
-                                            style={{marginBottom:"0px",marginTop:"0px"}}
-                                            id="Party_Name"
-                                            value={partySearch}
-                                            onChange={(e) => {
-                                              const value = e.target.value;
-                                              setPartySearch(value);
-                                              setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
-                                              setOpen(true);
-                                            }}
-                                            onClick={() => setOpen((prev) => !prev)}
-                                            onBlur={() => {
-                                              const typedValue = partySearch.trim().toLowerCase();
-                                        
-                                              // ✅ Full match only (not partial)
-                                              const matchedParty = parties?.parties?.find(
-                                                (party) => party.Party_Name.toLowerCase() === typedValue
-                                              );
-                                        
-                                              if (matchedParty) {
-                                                // ✅ Set full party info
-                                                setPartySearch(matchedParty.Party_Name);
-                                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                        
-                                                // ✅ Check GSTIN (must be present)
-                                                if (!matchedParty.GSTIN || matchedParty.GSTIN.trim() === "") {
-                                               
-                                                  setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                                                } else {
-                                                  setValue("GSTIN", matchedParty.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                                }
-                                        
-                                               
-                                              } else {
-                                                // ❌ Not an exact match → clear field
-                                                setPartySearch("");
-                                                setValue("Party_Name", "");
-                                              }
-                                        
-                                              setTimeout(() => setOpen(false), 150);
-                                            }}
-                                            placeholder="Party Name"
-                                            className="w-full outline-none border-b-2 text-gray-900"
-                                          />
-                                        
-                                
-                                          {open && (
-                                            <div className="absolute top-20 z-20 flex flex-col mt-1
-                                             w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                              <span
-                                                onClick={() => setShowPartyModal(true)}
-                                                className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                              >
-                                                + Add Party
-                                              </span>
-                                        
-                                              {parties?.parties
-                                                ?.filter(
-                                                  (party) =>
-                                                    party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase()) ||
-                                                    party?.Phone_Number?.includes(partySearch)
-                                                )
-                                                .map((party, i) => (
-                                                  <div
-                                                    key={i}
-                                                    onClick={() => {
-                                                      // Select from dropdown
-                                                      setPartySearch(party.Party_Name);
-                                                      setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                        
-                                                      // ✅ GSTIN validation on selection
-                                                      if (!party.GSTIN || party.GSTIN.trim() === "") {
-                                                        
-                                                        setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                                                      } else {
-                                                        setValue("GSTIN", party.GSTIN, { shouldValidate: true, shouldDirty: true });
-                                                      }
-                                        
-                                                     
-                                                      setOpen(false);
-                                                    }}
-                                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                  >
-                                                    {party.Party_Name} ({party.Phone_Number})
-                                                  </div>
-                                                ))}
-                                        
-                                             
-                                              {parties?.parties?.filter((party) =>
-                                                party?.Party_Name?.toLowerCase().includes(partySearch.toLowerCase())
-                                              ).length === 0 && (
-                                                <p className="px-3 py-2 text-gray-500">No Party found</p>
-                                              )}
-                                            </div>
-                                          )} */}

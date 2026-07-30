@@ -340,7 +340,7 @@ export default function AllPurchaseList() {
 
             {/* Total Sales */}
             <div className="mb-2 text-left">
-              <p className="text-sm font-medium text-black">Total Amount</p>
+              <p className="text-sm font-medium text-black">Total Purchase Amount</p>
               <h4 className="text-3xl font-bold text-black">₹  {purchases?.totals?.totalAmount}</h4>
             </div>
 
@@ -392,12 +392,14 @@ export default function AllPurchaseList() {
                   <tr>
                     <th className="text-left">Sl.No</th>
                     <th className="text-left ">Bill Date</th>
+                    <th className="text-left ">Bill Number</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
+
                     <th className="text-left">Balance Due</th>
-                    <th>View</th>
-                    <th>Edit</th>
+                    {/* <th>View</th> */}
+                    <th>View/Edit</th>
                     <th>Return</th>
                   </tr>
                 </thead>
@@ -408,11 +410,7 @@ export default function AllPurchaseList() {
                         <td>
                           {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
-                        {/* <td>
-  {purchase?.Bill_Date
-    ? purchase.Bill_Date.split("T")[0]
-    : "N/A"}
-</td> */}
+                       
                         <td>
                           {purchase?.Bill_Date
                             ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
@@ -422,8 +420,13 @@ export default function AllPurchaseList() {
                             })
                             : "N/A"}
                         </td>
+                         <td>
+                          {purchase?.Bill_Number
+                            ? purchase.Bill_Number.split("T")[0]
+                            : "N/A"}
+                        </td>
                         <td>{purchase?.Party_Name || "N/A"}</td>
-                         <td>{purchase?.Payment_Type_Display || "N/A"}</td>
+                        <td>{purchase?.Payment_Type_Display || "N/A"}</td>
                         {/* <td>
                           {purchase?.Payment_Type
                             ? purchase.Payment_Type === "Bank"
@@ -435,7 +438,7 @@ export default function AllPurchaseList() {
                         <td>{purchase?.Total_Amount || "N/A"}</td>
                         <td>{purchase?.Balance_Due || "N/A"}</td>
 
-                        <td >
+                        {/* <td >
 
                           <NavLink to={`/purchase/view/${purchase?.Purchase_Id}${location.search}`}
                             state={{ from: "all-purchase-list" }}>
@@ -446,7 +449,7 @@ export default function AllPurchaseList() {
                                 color: "#4CA1AF"
                               }} />
                           </NavLink>
-                        </td>
+                        </td> */}
                         <td
                         >
                           <NavLink

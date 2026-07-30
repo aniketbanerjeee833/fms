@@ -350,8 +350,8 @@ const addPurchase = async (req, res, next) => {
     }
 
     const totalAmount = Number(Total_Amount) || 0;
-    const totalPaid   = Total_Paid === "" || Total_Paid === undefined ? 0 : Number(Total_Paid);
-    const balanceDue  = Balance_Due === "" || Balance_Due === undefined
+    const totalPaid = Total_Paid === "" || Total_Paid === undefined ? 0 : Number(Total_Paid);
+    const balanceDue = Balance_Due === "" || Balance_Due === undefined
       ? totalAmount - totalPaid
       : Number(Balance_Due);
 
@@ -432,7 +432,7 @@ const addPurchase = async (req, res, next) => {
     );
 
     const purchaseIdNumber = purchaseResult.insertId;
-    const newPurchaseId    = "PUR" + purchaseIdNumber.toString().padStart(3, "0");
+    const newPurchaseId = "PUR" + purchaseIdNumber.toString().padStart(3, "0");
 
     await connection.execute(
       `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
@@ -444,9 +444,9 @@ const addPurchase = async (req, res, next) => {
       await insertPaymentSplits({
         connection,
         sourceType: "Purchase",
-        sourceId:   purchaseIdNumber,
-        partyName:  Party_Name,
-        txnDate:    Bill_Date,
+        sourceId: purchaseIdNumber,
+        partyName: Party_Name,
+        txnDate: Bill_Date,
         splits,
       });
     }
@@ -678,7 +678,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
             day: "2-digit", month: "2-digit", year: "numeric",
           })
           : "N/A",
-        purchase.Purchase_Id || purchase.Bill_No || "N/A",
+        purchase.Bill_Number || "N/A",
         purchase.Party_Name || "N/A",
         purchase.GSTIN || "",
         Number(purchase.Total_Amount || 0),
@@ -888,17 +888,17 @@ const getAllPurchases = async (req, res, next) => {
     connection = await db.getConnection();
 
     /* ---------- PAGINATION ---------- */
-    const page  = parseInt(req.query.page, 10) || 1;
+    const page = parseInt(req.query.page, 10) || 1;
     const limit = 10;
     const offset = (page - 1) * limit;
 
     /* ---------- FILTERS ---------- */
-    const search   = req.query.search?.trim().toLowerCase() || "";
+    const search = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
+    const toDate = req.query.toDate || null;
 
     const whereClauses = [];
-    const params        = [];
+    const params = [];
 
     /* ---------- SEARCH ---------- */
     if (search) {
@@ -991,11 +991,11 @@ const getAllPurchases = async (req, res, next) => {
 
     /* ---------- RESPONSE ---------- */
     return res.status(200).json({
-      success:       true,
-      currentPage:   page,
-      totalPages:    Math.ceil(total / limit),
+      success: true,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
       totalPurchases: total,
-      purchases:     rows,
+      purchases: rows,
       totals,
     });
   } catch (err) {
@@ -1132,7 +1132,7 @@ const getAllPurchases = async (req, res, next) => {
 //     const newItemIds = new Set();
 
 //     // 🔹 record bank ledger entry when paid via bank, using the amount actually paid
-    
+
 //       await recordBankTransaction({
 //         connection,
 //         bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
@@ -1331,7 +1331,7 @@ const editPurchase = async (req, res, next) => {
 
     console.log(req.body);
 
-    const cleanData  = sanitizeObject(req.body);
+    const cleanData = sanitizeObject(req.body);
     const validation = purchaseSchema.safeParse(cleanData);
     if (!validation.success) {
       await connection.rollback();
@@ -1358,8 +1358,8 @@ const editPurchase = async (req, res, next) => {
     }
 
     const totalAmount = Number(Total_Amount) || 0;
-    const totalPaid   = Number(Total_Paid)   || 0;
-    const balanceDue  = Number(Balance_Due)  || totalAmount - totalPaid;
+    const totalPaid = Number(Total_Paid) || 0;
+    const balanceDue = Number(Balance_Due) || totalAmount - totalPaid;
 
     // 🔹 total paid cannot exceed total amount
     if (totalPaid > totalAmount) {
@@ -1424,21 +1424,33 @@ const editPurchase = async (req, res, next) => {
         purchaseId,
       ]
     );
-
+    await connection.query(
+      `UPDATE purchase_return
+   SET
+      Bill_Number = ?,
+      Bill_Date = ?,
+      updated_at = NOW()
+   WHERE Purchase_Id = ?`,
+      [
+        Bill_Number,
+        Bill_Date,
+        purchaseId
+      ]
+    );
     // 🔹 wipe old splits + ledger rows, re-insert fresh ones
     await deletePaymentSplits({
       connection,
       sourceType: "Purchase",
-      sourceId:   purchaseIdNumber,
+      sourceId: purchaseIdNumber,
     });
 
     if (totalPaid > 0 && Array.isArray(splits) && splits.length > 0) {
       await insertPaymentSplits({
         connection,
         sourceType: "Purchase",
-        sourceId:   purchaseIdNumber,
-        partyName:  Party_Name,
-        txnDate:    Bill_Date,
+        sourceId: purchaseIdNumber,
+        partyName: Party_Name,
+        txnDate: Bill_Date,
         splits,
       });
     }
@@ -1484,7 +1496,7 @@ const editPurchase = async (req, res, next) => {
           [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || "", normalizeNumber(Quantity)]
         );
         const id = res.insertId;
-        Item_Id  = "ITM" + id;
+        Item_Id = "ITM" + id;
         await connection.execute(
           `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
           [Item_Id, id]
@@ -1802,9 +1814,9 @@ const getSinglePurchase = async (req, res, next) => {
        LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
        WHERE ps.Source_Type = 'Purchase' AND ps.Source_Id = ?
        ORDER BY ps.id ASC`,
-        [purchaseHeader.id]
+      [purchaseHeader.id]
       //[purchaseHeader.id ?? purchaseId]  
-      
+
       // use numeric id if your splits store numeric; adjust if stored as 'PUR001'
     );
 
@@ -1814,46 +1826,46 @@ const getSinglePurchase = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       billPurchaseDetails: {
-        Purchase_Id:      purchaseHeader.Purchase_Id,
-        Party_Name:       purchaseHeader.Party_Name,
-        GSTIN:            purchaseHeader.GSTIN,
-        State_Of_Supply:  purchaseHeader.State_Of_Supply,
-        Bill_Number:      purchaseHeader.Bill_Number,
-        Bill_Date:        purchaseHeader.Bill_Date,
+        Purchase_Id: purchaseHeader.Purchase_Id,
+        Party_Name: purchaseHeader.Party_Name,
+        GSTIN: purchaseHeader.GSTIN,
+        State_Of_Supply: purchaseHeader.State_Of_Supply,
+        Bill_Number: purchaseHeader.Bill_Number,
+        Bill_Date: purchaseHeader.Bill_Date,
         Reference_Number: purchaseHeader.Reference_Number,
-        Total_Amount:     purchaseHeader.Total_Amount,
-        Total_Paid:       purchaseHeader.Total_Paid,
-        Balance_Due:      purchaseHeader.Balance_Due,
-        Billing_Address:  purchaseHeader.Billing_Address,
+        Total_Amount: purchaseHeader.Total_Amount,
+        Total_Paid: purchaseHeader.Total_Paid,
+        Balance_Due: purchaseHeader.Balance_Due,
+        Billing_Address: purchaseHeader.Billing_Address,
         Shipping_Address: purchaseHeader.Shipping_Address,
         // 🔹 split summary for display in UI header
         Payment_Type_Display: splitSummary,
       },
       // 🔹 full splits array — frontend uses this to pre-fill the payment split UI
       splits: splits.map((s) => ({
-        id:                   s.id,
-        Payment_Type:         s.Payment_Type,
-        Bank_Account_Id:      s.Bank_Account_Id,
+        id: s.id,
+        Payment_Type: s.Payment_Type,
+        Bank_Account_Id: s.Bank_Account_Id,
         Account_Display_Name: s.Account_Display_Name,
         Payment_Type_Display: s.Payment_Type_Display,
-        Reference_Number:     s.Reference_Number,
-        Amount:               s.Amount,
+        Reference_Number: s.Reference_Number,
+        Amount: s.Amount,
       })),
       items: items.map((it) => ({
-        Purchase_Items_Id:               it.Purchase_Items_Id,
-        Item_Id:                         it.Item_Id,
-        Item_Name:                       it.Item_Name,
-        Item_HSN:                        it.Item_HSN,
-        Item_Unit:                       it.Item_Unit,
-        Item_Category:                   it.Item_Category,
-        Quantity:                        it.Quantity,
-        Purchase_Price:                  it.Purchase_Price,
-        Discount_On_Purchase_Price:      it.Discount_On_Purchase_Price,
+        Purchase_Items_Id: it.Purchase_Items_Id,
+        Item_Id: it.Item_Id,
+        Item_Name: it.Item_Name,
+        Item_HSN: it.Item_HSN,
+        Item_Unit: it.Item_Unit,
+        Item_Category: it.Item_Category,
+        Quantity: it.Quantity,
+        Purchase_Price: it.Purchase_Price,
+        Discount_On_Purchase_Price: it.Discount_On_Purchase_Price,
         Discount_Type_On_Purchase_Price: it.Discount_Type_On_Purchase_Price,
-        Tax_Amount:                      it.Tax_Amount,
-        Tax_Type:                        it.Tax_Type,
-        Amount:                          it.Amount,
-        created_at:                      it.created_at,
+        Tax_Amount: it.Tax_Amount,
+        Tax_Type: it.Tax_Type,
+        Amount: it.Amount,
+        created_at: it.created_at,
       })),
     });
   } catch (err) {

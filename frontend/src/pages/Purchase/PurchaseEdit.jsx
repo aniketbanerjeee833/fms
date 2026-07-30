@@ -218,7 +218,7 @@ export default function PurchaseEdit() {
     setValue,
     watch,
     reset,
-
+    clearErrors,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(purchaseFormSchema),
@@ -476,6 +476,7 @@ export default function PurchaseEdit() {
 
     setShowGSTIN(gstin || ""); // ✅ never undefined
   }, [watch("Party_Name"), parties]);
+
   const toLocalDateString = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -1809,16 +1810,23 @@ export default function PurchaseEdit() {
                 <div className="flex flex-col px-2">
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
-
+                
+                           {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
+            it's driven by setValue in the onChange below, not a native <select {...register}> */}
+                          {/* <input
+                            type="hidden"
+                            {...register("splits.0.Amount", {
+                              required: "Amount is required",
+                              validate: (v) => (v !== "" && !isNaN(v) && Number(v) > 0) || "Enter a valid amount greater than 0",
+                            })}
+                          /> */}
                   <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
                     {!showSplitBox ? (
                       <>
                         <div className="flex flex-col w-full">
                           <span className="active">Payment Type</span>
 
-                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
-            it's driven by setValue in the onChange below, not a native <select {...register}> */}
-                          <input
+                           <input
                             type="hidden"
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
@@ -1932,6 +1940,7 @@ export default function PurchaseEdit() {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
+                                      clearErrors(`splits.${index}.Amount`); 
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -1997,6 +2006,7 @@ export default function PurchaseEdit() {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
                           const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -2070,7 +2080,7 @@ export default function PurchaseEdit() {
 
                       <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                        <div className="flex items-center gap-2 relative">
+                       <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
@@ -2156,11 +2166,11 @@ export default function PurchaseEdit() {
                               const val = e.target.value;
                               setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
                             }
+                            clearErrors("splits.0.Amount"); // already there ✅
                           }}
                           className="form-control"
                         />
                       </div>
-
 
 
 

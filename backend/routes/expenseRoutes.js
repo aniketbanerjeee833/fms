@@ -3,28 +3,59 @@ import userAuth from "../middleware/userAuth.js";
 import {
   createExpenseCategory,
   editExpenseCategory,
+  deleteExpenseCategory,
   getAllExpenseCategories,
+
+  createExpenseItemMaster,
+  editExpenseItemMaster,
+  deleteExpenseItemMaster,
+  getAllExpenseItemMasters,
+
   createExpense,
   editExpense,
+  deleteExpense,
   getExpenseById,
   getExpensesByCategory,
-  getDistinctExpenseItems,
   getExpenseItemUsage,
 } from "../controllers/expenseController.js";
 
 const expenseCategoryRouter = express.Router();
+const expenseItemRouter = express.Router();
 const expenseRouter = express.Router();
+
+/* ==========================
+   Expense Category Routes
+========================== */
 
 expenseCategoryRouter.post("/", userAuth, createExpenseCategory);
 expenseCategoryRouter.put("/:id", userAuth, editExpenseCategory);
+expenseCategoryRouter.delete("/:id", userAuth, deleteExpenseCategory);
 expenseCategoryRouter.get("/", userAuth, getAllExpenseCategories);
+
+/* ==========================
+   Expense Item Master Routes
+========================== */
+
+expenseItemRouter.post("/", userAuth, createExpenseItemMaster);
+expenseItemRouter.put("/:id", userAuth, editExpenseItemMaster);
+expenseItemRouter.delete("/:id", userAuth, deleteExpenseItemMaster);
+expenseItemRouter.get("/", userAuth, getAllExpenseItemMasters);
+
+/* ==========================
+   Expense Routes
+========================== */
 
 expenseRouter.post("/", userAuth, createExpense);
 expenseRouter.put("/:id", userAuth, editExpense);
-expenseRouter.get("/:id", userAuth, getExpenseById);
-expenseRouter.get("/by-category/:categoryId", userAuth, getExpensesByCategory);
-expenseRouter.get("/items", userAuth, getDistinctExpenseItems);
+expenseRouter.delete("/:id", userAuth, deleteExpense);
 expenseRouter.get("/item-usage", userAuth, getExpenseItemUsage);
+expenseRouter.get("/by-category/:categoryId", userAuth, getExpensesByCategory);
+expenseRouter.get("/:id", userAuth, getExpenseById);
 
-export { expenseCategoryRouter, expenseRouter };
+export {
+  expenseCategoryRouter,
+  expenseItemRouter,
+  expenseRouter,
+};
+
 export default expenseRouter;

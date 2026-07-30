@@ -347,7 +347,7 @@ const getPaymentInById = async (req, res, next) => {
     const [splits] = await connection.query(
       `SELECT ps.*, ba.Account_Display_Name
        FROM payment_splits ps
-       LEFT JOIN bank_accounts ba ON ba.Bank_Account_Id = ps.Bank_Account_Id
+       LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
        WHERE ps.Source_Type = 'Payment_In' AND ps.Source_Id = ?
        ORDER BY ps.id ASC`,
       [id]

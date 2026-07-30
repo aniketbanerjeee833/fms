@@ -1,43 +1,49 @@
 import { z } from "zod";
 
 
-const HSN_REGEX = /^\d{4,8}$/;
-// const digitsOnly = (fieldName, required = true) =>
-//   z.union([z.string(), z.number()])  // allow both
-//     .refine(
-//       (val) => {
-//         const strVal = String(val);
-//         if (!strVal) return !required;
-//         return /^\d+(\.\d{1,2})?$/.test(strVal);
-//       },
-//       { message: `${fieldName} is required and should be a number` }
-//     )
-//     .transform((val) => Number(val)); // ✅ always store as number
-// const digitsOnly = (fieldName, required = true) =>
-//   z.union([z.string(), z.number()])
-//     .transform((val) => String(val ?? "").trim())
-//     .refine(
-//       (val) => (required ? val !== "" : true),
-//       { message: `${fieldName} is required` }
-//     )
-//     .refine(
-//       (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
-//       { message: `${fieldName} must be a valid number` }
-//     )
-//     .transform((val) => (val === "" ? 0 : Number(val)));
+
+
 const digitsOnly = (fieldName, required = true) =>
   z.union([z.string(), z.number()])
     .transform((val) => String(val ?? "").trim())
-    .refine((val) => (required ? val !== "" : true), {
-      message: `${fieldName} is required`,
-    })
     .refine(
-      (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+      (val) => (required ? val !== "" : true),
+      { message: `${fieldName} is required` }
+    )
+    .refine(
+      (val) => val === "" || /^-?\d+(\.\d{1,2})?$/.test(val),   // ← added -? here
       { message: `${fieldName} must be a valid number` }
     )
-    .transform((val) => (val === "" ? undefined : Number(val)));  //  fixed
+    .transform((val) => (val === "" ? 0 : Number(val)));
 
-// ✅ Schema
+const paymentSplitSchema = z
+  .object({
+    Payment_Type: z
+      .enum(["Cash", "Cheque", "Neft", "Bank"])
+      .or(z.literal("")) // allow blank select
+      .refine((val) => val !== "", {
+        message: "Please select a payment type.",
+      }),
+
+    // Required only when Payment_Type === "Bank"
+    Bank_Account_Id: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .optional(),
+
+    Reference_Number: z
+      .string()
+      .trim()
+      .nullable()
+      .optional()
+      .transform((val) => val ?? ""),
+
+    Amount: digitsOnly("Amount", true),
+  })
+  .refine((data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id, {
+    message: "Please select a bank account.",
+    path: ["Bank_Account_Id"],
+  });
+
 export const saleFormSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"),
 
@@ -72,41 +78,47 @@ export const saleFormSchema = z.object({
 
   // 🔹 Optional but digits if provided
   Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
-  Payment_Type: z
-      .enum(["Cash", "Cheque", "Neft", "Bank"])
-      .or(z.literal("")) // allow blank select
-      .refine((val) => val !== "", {
-        message: "Please select a payment type.",
-      }),
-
-    // 🔹 Required only when Payment_Type === "Bank"
-    Bank_Account_Id: z
-      .union([z.number(), z.string(), z.null(), z.undefined()])
-      .optional(),
-  Reference_Number: z
-  .string()
-  .trim()
-  .nullable()
-  .optional()
-  .transform((val) => val ?? ""),
+  
 
   // Stock_Quantity: digitsOnly("Stock_Quantity"),
+splits: z
+      .array(paymentSplitSchema)
+      .min(1, "At least one payment split is required")
+      .superRefine((splits, ctx) => {
+        let cashSeen = false;
+        const seenBankAccounts = new Set();
 
+        splits.forEach((split, index) => {
+          if (split.Payment_Type === "Cash") {
+            if (cashSeen) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Only one Cash split is allowed.",
+                path: [index, "Payment_Type"],
+              });
+            }
+            cashSeen = true;
+          }
+
+          if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
+            if (seenBankAccounts.has(split.Bank_Account_Id)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "Each bank account can only be used once. Edit the existing split instead of adding a duplicate.",
+                path: [index, "Bank_Account_Id"],
+              });
+            }
+            seenBankAccounts.add(split.Bank_Account_Id);
+          }
+        });
+      }),
   items: z
     .array(
       z.object({
            Item_Category: z.string().min(1, "Item category is required"),
         Item_Name: z.string().min(1, "Item name is required"),
-    //      Item_HSN: z
-    // .string()
-    // .min(1, "HSN Code is required")
-    // .max(20, "HSN Code must be at most 20 characters"),
-            // Item_HSN: z.string()
-            //      // 1. Enforce length (4 to 8 characters)
-            //      .min(4, "HSN Code must be at least 4 digits.")
-            //      .max(8, "HSN Code must be at most 8 digits.")
-            //      // 2. Enforce only digits (0-9)
-            //      .regex(HSN_REGEX, "HSN Code must contain only digits (0-9)."),
+  
             
 Item_HSN: z
   .union([
@@ -120,18 +132,7 @@ Item_HSN: z
   .refine((val) => /^\d+$/.test(val), { message: "HSN Code must contain only digits (0-9)." })
   .refine((val) => val.length >= 4, { message: "HSN Code must be at least 4 digits." })
   .refine((val) => val.length <= 8, { message: "HSN Code must be at most 8 digits." }),
-//            Quantity: z.preprocess(
-//    (val) => {
-//      if (val === "" || val === undefined || val === null) return undefined;
-//      return Number(val);
-//    },
-//    z
-//      .number({
-//        required_error: "Quantity is required",
-//        invalid_type_error: "Quantity must be a number",
-//      })
-//      .min(1, "Quantity must be greater than zero")
-//  ),
+
   Quantity: z.preprocess(
   (val) => {
     if (val === "" || val === undefined || val === null) return 0;
@@ -158,10 +159,11 @@ Item_HSN: z
       })
     )
     .nonempty("At least one item must be added"),
-}).refine(
-    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
-    {
-      message: "Please select a bank account.",
-      path: ["Bank_Account_Id"],
-    }
-  );
+})
+// .refine(
+//     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+//     {
+//       message: "Please select a bank account.",
+//       path: ["Bank_Account_Id"],
+//     }
+//   );

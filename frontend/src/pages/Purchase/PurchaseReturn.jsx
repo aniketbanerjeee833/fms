@@ -245,12 +245,12 @@ export default function PurchaseReturn() {
             <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
               <div className="flex  ">
                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {purchaseReturns?.totals?.totalPaid}</span>
+                <span className="text-sm font-semibold text-black">₹ {purchaseReturns?.totals?.totalReceived}</span>
               </div>
 
               <div className="flex">
                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹{purchaseReturns?.totals?.totalUnpaid}</span>
+                <span className="text-sm font-semibold text-black">₹{purchaseReturns?.totals?.totalBalance}</span>
               </div>
             </div>
 
@@ -289,6 +289,7 @@ export default function PurchaseReturn() {
                       <th className="text-left ">Party Name</th>
                       <th className="text-left">Payment Type</th>
                       <th className="text-left">Amount </th>
+                       <th className="text-left">Received </th>
                       <th className="text-left">Balance Due</th>
                       <th>View/Edit</th>
                       {/* <th>Edit</th> */}
@@ -325,6 +326,7 @@ export default function PurchaseReturn() {
                         </td> */}
                         <td>{purchaseReturn?.Payment_Type_Display || "N/A"}</td>
                           <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
+                           <td>{purchaseReturn?.Total_Received || "N/A"}</td>
                           <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
 
                           {/* <td >

@@ -6,19 +6,43 @@ import { z } from "zod";
    SHARED HELPERS  (same as purchaseFormSchema / purchaseReturnFormSchema)
 ───────────────────────────────────────────────────────────────*/
 const digitsOnly = (fieldName, required = true) =>
-  z
-    .union([z.string(), z.number()])
+  z.union([z.string(), z.number()])
     .transform((val) => String(val ?? "").trim())
     .refine(
       (val) => (required ? val !== "" : true),
       { message: `${fieldName} is required` }
     )
     .refine(
-      (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+      (val) => val === "" || /^-?\d+(\.\d{1,2})?$/.test(val),   // ← added -? here
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
+const paymentSplitSchema = z
+  .object({
+    Payment_Type: z
+      .enum(["Cash", "Cheque", "Neft", "Bank"])
+      .or(z.literal("")) // allow blank select
+      .refine((val) => val !== "", {
+        message: "Please select a payment type.",
+      }),
 
+    // Required only when Payment_Type === "Bank"
+    Bank_Account_Id: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .optional(),
+
+    Reference_Number: z
+      .string()
+      .trim()
+      .nullable()
+      .optional()
+      .transform((val) => val ?? ""),
+
+    Amount: digitsOnly("Amount", true),
+  }) .refine(                                         
+    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+    { message: "Please select a bank account.", path: ["Bank_Account_Id"] }
+  );
 /* ─────────────────────────────────────────────────────────────
    SHARED ITEM ROW SCHEMA  (identical to purchase/purchase-return — reused)
 ───────────────────────────────────────────────────────────────*/
@@ -150,33 +174,50 @@ export const saleReturnFormSchema = z.object({
 
   Balance_Due: digitsOnly("Balance_Due", true),
 
-  /* ── Payment ── */
-   Payment_Type: z
-      .enum(["Cash", "Cheque", "Neft", "Bank"])
-      .or(z.literal("")) // allow blank select
-      .refine((val) => val !== "", {
-        message: "Please select a payment type.",
-      }),
+  
+  splits: z
+      .array(paymentSplitSchema)
+      .min(1, "At least one payment split is required")
+      .superRefine((splits, ctx) => {
+        let cashSeen = false;
+        const seenBankAccounts = new Set();
 
-    // 🔹 Required only when Payment_Type === "Bank"
-    Bank_Account_Id: z
-      .union([z.number(), z.string(), z.null(), z.undefined()])
-      .optional(),
-  Reference_Number: z
-    .string()
-    .trim()
-    .nullable()
-    .optional()
-    .transform((val) => val ?? ""),
+        splits.forEach((split, index) => {
+          if (split.Payment_Type === "Cash") {
+            if (cashSeen) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Only one Cash split is allowed.",
+                path: [index, "Payment_Type"],
+              });
+            }
+            cashSeen = true;
+          }
+
+          if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
+            if (seenBankAccounts.has(split.Bank_Account_Id)) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "Each bank account can only be used once. Edit the existing split instead of adding a duplicate.",
+                path: [index, "Bank_Account_Id"],
+              });
+            }
+            seenBankAccounts.add(split.Bank_Account_Id);
+          }
+        });
+      }),
 
   /* ── Items ── */
   items: z
     .array(saleReturnItemSchema)
     .nonempty("At least one item must be added"),
-}).refine(
-    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
-    {
-      message: "Please select a bank account.",
-      path: ["Bank_Account_Id"],
-    }
-  );
+})
+
+// .refine(
+//     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+//     {
+//       message: "Please select a bank account.",
+//       path: ["Bank_Account_Id"],
+//     }
+//   );

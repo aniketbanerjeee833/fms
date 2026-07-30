@@ -153,6 +153,7 @@ export default function PurchaseReturndEdit() {
     setValue,
     watch,
     reset,
+    clearErrors,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(purchaseReturnFormSchema),
@@ -2017,6 +2018,7 @@ export default function PurchaseReturndEdit() {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
+                                      clearErrors(`splits.${index}.Amount`); 
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -2153,15 +2155,15 @@ export default function PurchaseReturndEdit() {
 
 
 
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                     <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                        <div className="flex items-center gap-2 relative">
+                       <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
 
 
-                            id="totalPaidCheck"
+                            id="totalReceivedCheck"
                             className="w-4 h-4 cursor-pointer"
                             disabled={splitsWatch.length > 1}   // 🔹 add this
 
@@ -2178,6 +2180,9 @@ export default function PurchaseReturndEdit() {
                                 // Clear both fields to stay consistent
                                 setValue("Total_Received", "");
                                 setValue("Balance_Due", "");
+                                if (splitsWatch.length === 1) {
+                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                }
                                 return;
                               }
 
@@ -2189,6 +2194,13 @@ export default function PurchaseReturndEdit() {
                                 // ✅ When unchecked, restore Balance_Due = Total_Amount
                                 setValue("Total_Received", "");
                                 setValue("Balance_Due", totalAmount.toFixed(2));
+                              }
+                              if (splitsWatch.length === 1) {
+                                setValue(
+                                  "splits.0.Amount",
+                                  isChecked ? totalAmount.toFixed(2) : "",
+                                  { shouldValidate: true, shouldDirty: true }
+                                );
                               }
                             }}
                           />
@@ -2231,6 +2243,7 @@ export default function PurchaseReturndEdit() {
                               const val = e.target.value;
                               setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
                             }
+                            clearErrors("splits.0.Amount"); // already there ✅
                           }}
                           className="form-control"
                         />

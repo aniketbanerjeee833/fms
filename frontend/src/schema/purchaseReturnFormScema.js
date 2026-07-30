@@ -119,10 +119,10 @@ const paymentSplitSchema = z
 
     Amount: digitsOnly("Amount", true),
   })
-  .refine((data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id, {
-    message: "Please select a bank account.",
-    path: ["Bank_Account_Id"],
-  });
+ .refine(                                          
+    (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
+    { message: "Please select a bank account.", path: ["Bank_Account_Id"] }
+  );
 
 export const purchaseReturnFormSchema = z
   .object({

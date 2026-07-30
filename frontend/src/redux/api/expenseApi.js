@@ -6,7 +6,7 @@ export const expenseApi = createApi({
     baseUrl: "http://localhost:4000/api/",
     credentials: "include",
   }),
-  tagTypes: ["Expense", "ExpenseCategory"],
+  tagTypes: ["Expense", "ExpenseCategory", "ExpenseItem"],
   endpoints: (builder) => ({
     createExpenseCategory: builder.mutation({
       query: ({ body }) => ({
@@ -26,9 +26,53 @@ export const expenseApi = createApi({
       invalidatesTags: [{ type: "ExpenseCategory", id: "LIST" }],
     }),
 
+    deleteExpenseCategory: builder.mutation({
+      query: ({ id }) => ({
+        url: `expense-category/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ExpenseCategory", id: "LIST" }],
+    }),
+
     getAllExpenseCategories: builder.query({
       query: () => "expense-category/",
       providesTags: [{ type: "ExpenseCategory", id: "LIST" }],
+    }),
+
+    createExpenseItemMaster: builder.mutation({
+      query: ({ body }) => ({
+        url: "expense-item/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "ExpenseItem", id: "LIST" }],
+    }),
+
+    editExpenseItemMaster: builder.mutation({
+      query: ({ id, body }) => ({
+        url: `expense-item/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: [{ type: "ExpenseItem", id: "LIST" }],
+    }),
+
+    deleteExpenseItemMaster: builder.mutation({
+      query: ({ id }) => ({
+        url: `expense-item/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ExpenseItem", id: "LIST" }],
+    }),
+
+    getAllExpenseItemMasters: builder.query({
+      query: ({ search = "" } = {}) => {
+        const params = new URLSearchParams();
+        if (search) params.append("search", search);
+        const queryString = params.toString();
+        return `expense-item/${queryString ? `?${queryString}` : ""}`;
+      },
+      providesTags: [{ type: "ExpenseItem", id: "LIST" }],
     }),
 
     createExpense: builder.mutation({
@@ -45,6 +89,14 @@ export const expenseApi = createApi({
         url: `expense/${id}`,
         method: "PUT",
         body,
+      }),
+      invalidatesTags: [{ type: "Expense", id: "LIST" }],
+    }),
+
+    deleteExpense: builder.mutation({
+      query: ({ id }) => ({
+        url: `expense/${id}`,
+        method: "DELETE",
       }),
       invalidatesTags: [{ type: "Expense", id: "LIST" }],
     }),
@@ -67,20 +119,10 @@ export const expenseApi = createApi({
       providesTags: [{ type: "Expense", id: "LIST" }],
     }),
 
-    getDistinctExpenseItems: builder.query({
-      query: ({ search = "" } = {}) => {
-        const params = new URLSearchParams();
-        if (search) params.append("search", search);
-        const queryString = params.toString();
-        return `expense/items${queryString ? `?${queryString}` : ""}`;
-      },
-      providesTags: [{ type: "Expense", id: "ITEMS" }],
-    }),
-
     getExpenseItemUsage: builder.query({
-      query: ({ itemName, lastId }) => {
+      query: ({ masterItemId, lastId }) => {
         const params = new URLSearchParams();
-        if (itemName) params.append("itemName", itemName);
+        if (masterItemId) params.append("masterItemId", masterItemId);
         if (lastId) params.append("lastId", lastId);
         const queryString = params.toString();
         return `expense/item-usage${queryString ? `?${queryString}` : ""}`;
@@ -93,11 +135,16 @@ export const expenseApi = createApi({
 export const {
   useCreateExpenseCategoryMutation,
   useEditExpenseCategoryMutation,
+  useDeleteExpenseCategoryMutation,
   useGetAllExpenseCategoriesQuery,
+  useCreateExpenseItemMasterMutation,
+  useEditExpenseItemMasterMutation,
+  useDeleteExpenseItemMasterMutation,
+  useGetAllExpenseItemMastersQuery,
   useCreateExpenseMutation,
   useEditExpenseMutation,
+  useDeleteExpenseMutation,
   useGetExpenseByIdQuery,
   useGetExpensesByCategoryQuery,
-  useGetDistinctExpenseItemsQuery,
   useGetExpenseItemUsageQuery,
 } = expenseApi;
