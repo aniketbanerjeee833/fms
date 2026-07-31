@@ -82,10 +82,34 @@ export const partyApi = createApi({
       ],
     }),
 
+    // getSinglePartyDetailsSalesPurchases: builder.query({
+    //   query: ({Party_Id, page}) => `party/get-single-party-details-sales-purchases/${Party_Id}?page=${page}`,
+    //   providesTags: ["Party"],
+    // }),
     getSinglePartyDetailsSalesPurchases: builder.query({
-      query: ({Party_Id, page}) => `party/get-single-party-details-sales-purchases/${Party_Id}?page=${page}`,
-      providesTags: ["Party"],
-    }),
+  query: ({
+    Party_Id,
+    page = 1,
+    search = "",
+    date = "",
+  }) => {
+    const params = new URLSearchParams();
+
+    params.set("page", page);
+
+    if (search?.trim()) {
+      params.set("search", search.trim());
+    }
+
+    if (date) {
+      params.set("date", date);
+    }
+
+    return `party/get-single-party-details-sales-purchases/${Party_Id}?${params.toString()}`;
+  },
+
+  providesTags: ["Party"],
+}),
 
   printSinglePartyDetailsSalesPurchasesReport: builder.mutation({
   query: (payload) => ({

@@ -368,11 +368,10 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = 10;
     const offset = (page - 1) * limit;
-const salesCursor = req.query.salesCursor || null;
-const purchasesCursor = req.query.purchasesCursor || null;
-    const fromDate = req.query.fromDate || null;
-    const toDate = req.query.toDate || null;
-
+    const search= req.query.search ? req.query.search.trim().toLowerCase() : "";
+    // const fromDate = req.query.fromDate || null;
+    // const toDate = req.query.toDate || null;
+const searchDate = req.query.date || null;
     if (!Party_Id) {
       return res.status(400).json({
         success: false,
@@ -393,146 +392,476 @@ const purchasesCursor = req.query.purchasesCursor || null;
       });
     }
 
-    // Build date condition
-    let dateConditionSale = "";
-    let dateConditionPurchase = "";
-    const paramsSale = [Party_Id];
-    const paramsPurchase = [Party_Id];
+    // Build date conditions per table
+    //const dateRange = fromDate && toDate;
+    const paramsSale        = [Party_Id];
+    const paramsPurchase    = [Party_Id];
+    const paramsSaleReturn  = [Party_Id];
+    const paramsPurchReturn = [Party_Id];
+    const paramsPaymentIn   = [Party_Id];
+    const paramsPaymentOut  = [Party_Id];
 
-    if (fromDate && toDate) {
-      dateConditionSale = "AND Invoice_Date BETWEEN ? AND ?";
-      dateConditionPurchase = "AND Bill_Date BETWEEN ? AND ?";
-      paramsSale.push(fromDate, toDate);
-      paramsPurchase.push(fromDate, toDate);
-    }
+    let dateConditionSale        = "";
+    let dateConditionPurchase    = "";
+    let dateConditionSaleReturn  = "";
+    let dateConditionPurchReturn = "";
+    let dateConditionPaymentIn   = "";
+    let dateConditionPaymentOut  = "";
+    if (searchDate) {
+  dateConditionSale = "AND Invoice_Date = ?";
+  dateConditionPurchase = "AND Bill_Date = ?";
+  dateConditionSaleReturn = "AND Return_Date = ?";
+  dateConditionPurchReturn = "AND Return_Date = ?";
+  dateConditionPaymentIn = "AND Payment_Date = ?";
+  dateConditionPaymentOut = "AND Payment_Date = ?";
 
-    // Fetch purchases
+  paramsSale.push(searchDate);
+  paramsPurchase.push(searchDate);
+  paramsSaleReturn.push(searchDate);
+  paramsPurchReturn.push(searchDate);
+  paramsPaymentIn.push(searchDate);
+  paramsPaymentOut.push(searchDate);
+}
+let searchConditionSale = "";
+let searchConditionPurchase = "";
+let searchConditionSaleReturn = "";
+let searchConditionPurchReturn = "";
+let searchConditionPaymentIn = "";
+let searchConditionPaymentOut = "";
+
+if (search) {
+
+  // SALE
+  searchConditionSale = `
+    AND (
+      LOWER(Invoice_Number) LIKE ?
+      OR CAST(Total_Amount AS CHAR) LIKE ?
+      OR CAST(Total_Received AS CHAR) LIKE ?
+      OR CAST(Balance_Due AS CHAR) LIKE ?
+    )
+  `;
+
+  paramsSale.push(
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`
+  );
+
+
+  // PURCHASE
+  searchConditionPurchase = `
+    AND (
+      LOWER(Bill_Number) LIKE ?
+      OR CAST(Total_Amount AS CHAR) LIKE ?
+      OR CAST(Total_Paid AS CHAR) LIKE ?
+      OR CAST(Balance_Due AS CHAR) LIKE ?
+    )
+  `;
+
+  paramsPurchase.push(
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`
+  );
+
+
+  // SALE RETURN / CREDIT NOTE
+  searchConditionSaleReturn = `
+    AND (
+      LOWER(Return_Number) LIKE ?
+      OR LOWER(Invoice_Number) LIKE ?
+      OR CAST(Total_Amount AS CHAR) LIKE ?
+      OR CAST(Total_Paid AS CHAR) LIKE ?
+      OR CAST(Balance_Due AS CHAR) LIKE ?
+    )
+  `;
+
+  paramsSaleReturn.push(
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`
+  );
+
+
+  // PURCHASE RETURN / DEBIT NOTE
+  searchConditionPurchReturn = `
+    AND (
+      LOWER(Return_Number) LIKE ?
+      OR LOWER(Bill_Number) LIKE ?
+      OR CAST(Total_Amount AS CHAR) LIKE ?
+      OR CAST(Total_Received AS CHAR) LIKE ?
+      OR CAST(Balance_Due AS CHAR) LIKE ?
+    )
+  `;
+
+  paramsPurchReturn.push(
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`,
+    `%${search}%`
+  );
+
+
+  // PAYMENT IN
+  searchConditionPaymentIn = `
+    AND (
+      LOWER(Receipt_No) LIKE ?
+      OR CAST(Received AS CHAR) LIKE ?
+      
+    )
+  `;
+
+  paramsPaymentIn.push(
+    `%${search}%`,
+    `%${search}%`
+  );
+
+
+  // PAYMENT OUT
+  searchConditionPaymentOut = `
+    AND (
+      LOWER(Receipt_No) LIKE ?
+      OR CAST(Paid AS CHAR) LIKE ?
+    )
+  `;
+
+  paramsPaymentOut.push(
+    `%${search}%`,
+    `%${search}%`
+  );
+}
+    // if (dateRange) {
+    //   dateConditionSale        = "AND Invoice_Date BETWEEN ? AND ?";
+    //   dateConditionPurchase    = "AND Bill_Date BETWEEN ? AND ?";
+    //   dateConditionSaleReturn  = "AND Return_Date BETWEEN ? AND ?";
+    //   dateConditionPurchReturn = "AND Return_Date BETWEEN ? AND ?";
+    //   dateConditionPaymentIn   = "AND Payment_Date BETWEEN ? AND ?";
+    //   dateConditionPaymentOut  = "AND Payment_Date BETWEEN ? AND ?";
+    //   paramsSale.push(fromDate, toDate);
+    //   paramsPurchase.push(fromDate, toDate);
+    //   paramsSaleReturn.push(fromDate, toDate);
+    //   paramsPurchReturn.push(fromDate, toDate);
+    //   paramsPaymentIn.push(fromDate, toDate);
+    //   paramsPaymentOut.push(fromDate, toDate);
+    // }
+
+    // 🔹 Purchases
     const [purchases] = await connection.query(
-      `
-      SELECT 
-        Purchase_Id,
-        Bill_Date,
-        Bill_Number,
-        Total_Amount,
-        State_Of_Supply,
-        Total_Paid,
-        Balance_Due,
-        Payment_Type,
-        "Purchase" AS Type
-      FROM add_purchase
-      WHERE Party_Id=? ${dateConditionPurchase}
-      `,
+      `SELECT Purchase_Id AS Formatted_Reference_Id, Bill_Date, Bill_Number, Total_Amount,
+              State_Of_Supply, Total_Paid, Balance_Due,
+              "Purchase" AS Type
+       FROM add_purchase
+       WHERE Party_Id=? ${dateConditionPurchase} ${searchConditionPurchase}`,
       paramsPurchase
     );
 
-    // Fetch sales
+    // 🔹 Sales
     const [sales] = await connection.query(
-      `
-      SELECT 
-        Sale_Id,
-        Invoice_Date,
-        Invoice_Number,
-        Total_Amount,
-        State_Of_Supply,
-        Total_Received,
-        Balance_Due,
-        Payment_Type,
-        "Sale" AS Type
-      FROM add_sale
-      WHERE Party_Id=? ${dateConditionSale}
-      `,
+      `SELECT Sale_Id AS Formatted_Reference_Id, Invoice_Date, Invoice_Number, Total_Amount,
+              State_Of_Supply, Total_Received, Balance_Due,
+              "Sale" AS Type
+       FROM add_sale
+       WHERE Party_Id=? ${dateConditionSale} ${searchConditionSale}`,
       paramsSale
     );
 
-    // Combine transactions
+    // 🔹 Sale Returns (Credit Note)
+    const [saleReturns] = await connection.query(
+      `SELECT id AS  Formatted_Reference_Id,  Return_Date, Return_Number,
+              Invoice_Number, Total_Amount, Total_Paid, Balance_Due,
+              "Credit_Note" AS Type
+       FROM sale_return
+       WHERE Party_Id=? ${dateConditionSaleReturn} ${searchConditionSaleReturn}`,
+      paramsSaleReturn
+    );
+
+    // 🔹 Purchase Returns (Debit Note)
+    const [purchaseReturns] = await connection.query(
+      `SELECT id AS  Formatted_Reference_Id,  Return_Date, Return_Number,
+              Bill_Number, Total_Amount, Total_Received, Balance_Due,
+              "Debit_Note" AS Type
+       FROM purchase_return
+       WHERE Party_Id=? ${dateConditionPurchReturn} ${searchConditionPurchReturn}`,
+      paramsPurchReturn
+    );
+
+    // 🔹 Payment In (standalone receipts, not tied to a specific sale)
+    const [paymentIns] = await connection.query(
+      `SELECT id AS  Formatted_Reference_Id, Payment_Date, Receipt_No,
+              Received AS Total_Amount,
+              "Payment_In" AS Type
+       FROM payment_in
+       WHERE Party_Id=? ${dateConditionPaymentIn} ${searchConditionPaymentIn}`,
+      paramsPaymentIn
+    );
+
+    // 🔹 Payment Out (standalone payments, not tied to a specific purchase)
+    const [paymentOuts] = await connection.query(
+      `SELECT id AS  Formatted_Reference_Id, Payment_Date, Receipt_No,
+              Paid AS Total_Amount,
+              "Payment_Out" AS Type
+       FROM payment_out
+       WHERE Party_Id=? ${dateConditionPaymentOut} ${searchConditionPaymentOut}`,
+      paramsPaymentOut
+    );
+
+    // Combine all transaction types into one timeline
     const combined = [
-      ...purchases.map(p => ({
-        ...p,
-        date: p.Bill_Date
-      })),
-      ...sales.map(s => ({
-        ...s,
-        date: s.Invoice_Date
-      }))
+      ...purchases.map(p => ({ ...p, date: p.Bill_Date })),
+      ...sales.map(s => ({ ...s, date: s.Invoice_Date })),
+      ...saleReturns.map(r => ({ ...r, date: r.Return_Date })),
+      ...purchaseReturns.map(r => ({ ...r, date: r.Return_Date })),
+      ...paymentIns.map(p => ({ ...p, date: p.Payment_Date })),
+      ...paymentOuts.map(p => ({ ...p, date: p.Payment_Date })),
     ];
 
     // Sort latest first
     combined.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    const paged = combined.slice(offset, offset + limit);
-
-    // Separate again
-    let pagedPurchases = paged.filter(r => r.Type === "Purchase");
-    let pagedSales = paged.filter(r => r.Type === "Sale");
-
     const totalRecords = combined.length;
-    const totalPages = Math.ceil(totalRecords / limit);
+    const totalPages   = Math.ceil(totalRecords / limit);
+    const paged        = combined.slice(offset, offset + limit);
+    const hasMore = offset + paged.length < totalRecords;
 
-    // Fetch purchase items
+    // Split paged results back out by type
+    let pagedPurchases      = paged.filter(r => r.Type === "Purchase");
+    let pagedSales          = paged.filter(r => r.Type === "Sale");
+    let pagedSaleReturns    = paged.filter(r => r.Type === "Credit_Note");
+    let pagedPurchReturns   = paged.filter(r => r.Type === "Debit_Note");
+    let pagedPaymentIns     = paged.filter(r => r.Type === "Payment_In");
+    let pagedPaymentOuts    = paged.filter(r => r.Type === "Payment_Out");
+
+    // 🔹 Purchase items
     const purchaseIds = pagedPurchases.map(r => r.Purchase_Id);
-
     if (purchaseIds.length > 0) {
       const [purchaseItems] = await connection.query(
-        `
-        SELECT pi.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
-        FROM add_purchase_items pi
-        LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
-        WHERE pi.Purchase_Id IN (?)
-        `,
+        `SELECT pi.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
+         FROM add_purchase_items pi
+         LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
+         WHERE pi.Purchase_Id IN (?)`,
         [purchaseIds]
       );
-
       pagedPurchases = pagedPurchases.map(p => ({
         ...p,
-        items: purchaseItems.filter(i => i.Purchase_Id === p.Purchase_Id)
+        items: purchaseItems.filter(i => i.Purchase_Id === p.Purchase_Id),
       }));
     }
 
-    // Fetch sale items
+    // 🔹 Sale items
     const saleIds = pagedSales.map(r => r.Sale_Id);
-
     if (saleIds.length > 0) {
       const [saleItems] = await connection.query(
-        `
-        SELECT si.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
-        FROM add_sale_items si
-        LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
-        WHERE si.Sale_Id IN (?)
-        `,
+        `SELECT si.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
+         FROM add_sale_items si
+         LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
+         WHERE si.Sale_Id IN (?)`,
         [saleIds]
       );
-
       pagedSales = pagedSales.map(s => ({
         ...s,
-        items: saleItems.filter(i => i.Sale_Id === s.Sale_Id)
+        items: saleItems.filter(i => i.Sale_Id === s.Sale_Id),
       }));
     }
 
-    // Summary Purchases
-    const [[purchaseSummary]] = await connection.query(
-      `
-      SELECT 
-        COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-        COALESCE(SUM(Total_Paid),0) AS Total_Paid,
-        COALESCE(SUM(Balance_Due),0) AS Balance_Due
-      FROM add_purchase
-      WHERE Party_Id=? ${dateConditionPurchase}
-      `,
-      paramsPurchase
-    );
+    // 🔹 Sale Return items
+    const saleReturnIds = pagedSaleReturns.map(r => r.Sale_Return_Id);
+    if (saleReturnIds.length > 0) {
+      const [srItems] = await connection.query(
+        `SELECT sri.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
+         FROM sale_return_items sri
+         LEFT JOIN add_item it ON it.Item_Id = sri.Item_Id
+         WHERE sri.Sale_Return_Id IN (?)`,
+        [saleReturnIds]
+      );
+      pagedSaleReturns = pagedSaleReturns.map(r => ({
+        ...r,
+        items: srItems.filter(i => i.Sale_Return_Id === r.Sale_Return_Id),
+      }));
+    }
 
-    // Summary Sales
-    const [[salesSummary]] = await connection.query(
-      `
-      SELECT 
-        COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-        COALESCE(SUM(Total_Received),0) AS Total_Received,
-        COALESCE(SUM(Balance_Due),0) AS Balance_Due
-      FROM add_sale
-      WHERE Party_Id=? ${dateConditionSale}
-      `,
-      paramsSale
-    );
+    // 🔹 Purchase Return items
+    const purchReturnIds = pagedPurchReturns.map(r => r.Purchase_Return_Id);
+    if (purchReturnIds.length > 0) {
+      const [prItems] = await connection.query(
+        `SELECT pri.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
+         FROM purchase_return_items pri
+         LEFT JOIN add_item it ON it.Item_Id = pri.Item_Id
+         WHERE pri.Purchase_Return_Id IN (?)`,
+        [purchReturnIds]
+      );
+      pagedPurchReturns = pagedPurchReturns.map(r => ({
+        ...r,
+        items: prItems.filter(i => i.Purchase_Return_Id === r.Purchase_Return_Id),
+      }));
+    }
+
+    // 🔹 Payment splits for paged Payment In / Payment Out / Sale / Purchase / Returns
+    // (attach splits to every source type that uses payment_splits)
+    // const attachSplits = async (rows, sourceType, idField) => {
+    //   const ids = rows.map(r => r[idField]);
+    //   if (ids.length === 0) return rows;
+    //   const [splits] = await connection.query(
+    //     `SELECT * FROM payment_splits WHERE Source_Type = ? AND Source_Id IN (?)`,
+    //     [sourceType, ids]
+    //   );
+    //   return rows.map(r => ({
+    //     ...r,
+    //     splits: splits.filter(s => s.Source_Id === r[idField]),
+    //   }));
+    // };
+
+    // pagedSales        = await attachSplits(pagedSales, "Sale", "Sale_Id");
+    // pagedPurchases     = await attachSplits(pagedPurchases, "Purchase", "Purchase_Id");
+    // pagedSaleReturns   = await attachSplits(pagedSaleReturns, "Sale_Return", "Sale_Return_Id");
+    // pagedPurchReturns  = await attachSplits(pagedPurchReturns, "Purchase_Return", "Purchase_Return_Id");
+    // pagedPaymentIns    = await attachSplits(pagedPaymentIns, "Payment_In", "Payment_In_Id");
+    // pagedPaymentOuts   = await attachSplits(pagedPaymentOuts, "Payment_Out", "Payment_Out_Id");
+    // 🔹 Summary — Purchases (ALL TIME)
+const [[purchaseSummary]] = await connection.query(
+  `SELECT 
+      COALESCE(SUM(Total_Amount), 0) AS Total_Amount,
+      COALESCE(SUM(Total_Paid), 0) AS Total_Paid,
+      COALESCE(SUM(Balance_Due), 0) AS Balance_Due
+   FROM add_purchase
+   WHERE Party_Id = ?`,
+  [Party_Id]
+);
+
+// 🔹 Summary — Sales (ALL TIME)
+const [[salesSummary]] = await connection.query(
+  `SELECT 
+      COALESCE(SUM(Total_Amount), 0) AS Total_Amount,
+      COALESCE(SUM(Total_Received), 0) AS Total_Received,
+      COALESCE(SUM(Balance_Due), 0) AS Balance_Due
+   FROM add_sale
+   WHERE Party_Id = ?`,
+  [Party_Id]
+);
+
+// 🔹 Summary — Sale Returns / Credit Notes (ALL TIME)
+const [[saleReturnSummary]] = await connection.query(
+  `SELECT 
+      COALESCE(SUM(Total_Amount), 0) AS Total_Amount,
+      COALESCE(SUM(Total_Paid), 0) AS Total_Paid,
+      COALESCE(SUM(Balance_Due), 0) AS Balance_Due
+   FROM sale_return
+   WHERE Party_Id = ?`,
+  [Party_Id]
+);
+
+// 🔹 Summary — Purchase Returns / Debit Notes (ALL TIME)
+const [[purchaseReturnSummary]] = await connection.query(
+  `SELECT 
+      COALESCE(SUM(Total_Amount), 0) AS Total_Amount,
+      COALESCE(SUM(Total_Received), 0) AS Total_Received,
+      COALESCE(SUM(Balance_Due), 0) AS Balance_Due
+   FROM purchase_return
+   WHERE Party_Id = ?`,
+  [Party_Id]
+);
+
+// 🔹 Summary — Payment In (ALL TIME)
+const [[paymentInSummary]] = await connection.query(
+  `SELECT 
+      COALESCE(SUM(Received), 0) AS Total_Received
+   FROM payment_in
+   WHERE Party_Id = ?`,
+  [Party_Id]
+);
+
+// 🔹 Summary — Payment Out (ALL TIME)
+const [[paymentOutSummary]] = await connection.query(
+  `SELECT 
+      COALESCE(SUM(Paid), 0) AS Total_Paid
+   FROM payment_out
+   WHERE Party_Id = ?`,
+  [Party_Id]
+);
+
+    // // 🔹 Summary — Purchases
+    // const [[purchaseSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM add_purchase
+    //    WHERE Party_Id=? ${dateConditionPurchase} ${searchConditionPurchase}`,
+    //   paramsPurchase
+    // );
+
+    // // 🔹 Summary — Sales
+    // const [[salesSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Received),0) AS Total_Received,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM add_sale
+    //    WHERE Party_Id=? ${dateConditionSale} ${searchConditionSale}`,
+    //   paramsSale
+    // );
+
+    // // 🔹 Summary — Sale Returns (Credit Notes)
+    // const [[saleReturnSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM sale_return
+    //    WHERE Party_Id=? ${dateConditionSaleReturn}`,
+    //   paramsSaleReturn
+    // );
+
+    // // 🔹 Summary — Purchase Returns (Debit Notes)
+    // const [[purchaseReturnSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Received),0) AS Total_Received,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM purchase_return
+    //    WHERE Party_Id=? ${dateConditionPurchReturn}`,
+    //   paramsPurchReturn
+    // );
+
+    // // 🔹 Summary — Payment In
+    // const [[paymentInSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Received),0) AS Total_Received
+    //    FROM payment_in
+    //    WHERE Party_Id=? ${dateConditionPaymentIn}`,
+    //   paramsPaymentIn
+    // );
+
+    // // 🔹 Summary — Payment Out
+    // const [[paymentOutSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Paid),0) AS Total_Paid
+    //    FROM payment_out
+    //    WHERE Party_Id=? ${dateConditionPaymentOut}`,
+    //   paramsPaymentOut
+    // );
+
+    // 🔹 Net balance across everything:
+    // Party owes you: Sales - SaleReturns - PaymentIn (received against sales/standalone)
+    // You owe party: Purchases - PurchaseReturns - PaymentOut (paid against purchases/standalone)
+    const totalReceivable =
+      Number(salesSummary.Total_Amount) -
+      Number(saleReturnSummary.Total_Amount);
+
+    const totalReceived =
+      Number(salesSummary.Total_Received) +
+      Number(paymentInSummary.Total_Received) -
+      Number(saleReturnSummary.Total_Paid); // refunds paid out on credit notes reduce net received
+
+    const totalPayable =
+      Number(purchaseSummary.Total_Amount) -
+      Number(purchaseReturnSummary.Total_Amount);
+
+    const totalPaidOut =
+      Number(purchaseSummary.Total_Paid) +
+      Number(paymentOutSummary.Total_Paid) -
+      Number(purchaseReturnSummary.Total_Received); // refunds received on debit notes reduce net paid
+
+    const netBalance = (totalReceivable - totalReceived) - (totalPayable - totalPaidOut);
+    // positive => party owes you; negative => you owe party
 
     return res.status(200).json({
       success: true,
@@ -542,12 +871,22 @@ const purchasesCursor = req.query.purchasesCursor || null;
       totalPages,
       currentPage: page,
       limit,
+      hasMore, //  ADD THIS
       summary: {
-        purchases: purchaseSummary,
-        sales: salesSummary,
+        purchases:        purchaseSummary,
+        sales:             salesSummary,
+        saleReturns:       saleReturnSummary,
+        purchaseReturns:   purchaseReturnSummary,
+        paymentIns:        paymentInSummary,
+        paymentOuts:       paymentOutSummary,
+        netBalance, // + = receivable from party, - = payable to party
       },
-      purchases: pagedPurchases,
-      sales: pagedSales,
+      purchases:       pagedPurchases,
+      sales:            pagedSales,
+      saleReturns:      pagedSaleReturns,
+      purchaseReturns:  pagedPurchReturns,
+      paymentIns:       pagedPaymentIns,
+      paymentOuts:      pagedPaymentOuts,
     });
 
   } catch (err) {
@@ -565,385 +904,195 @@ const purchasesCursor = req.query.purchasesCursor || null;
 
 //     const { Party_Id } = req.params;
 //     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = parseInt(req.query.limit, 10) || 10;
+//     const limit = 10;
 //     const offset = (page - 1) * limit;
+// const salesCursor = req.query.salesCursor || null;
+// const purchasesCursor = req.query.purchasesCursor || null;
+//     const fromDate = req.query.fromDate || null;
+//     const toDate = req.query.toDate || null;
 
-//     // ---------------------------
-//     // 1️⃣ PURCHASES (paged)
-//     // ---------------------------
-//     const [purchaseRows] = await connection.query(
-//       `SELECT * 
-//        FROM add_purchase 
-//        WHERE Party_Id = ? 
-//        ORDER BY Bill_Date DESC 
-//        LIMIT ? OFFSET ?`,
-//       [Party_Id, limit, offset]
-//     );
+//     if (!Party_Id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Party Id is required",
+//       });
+//     }
 
-//     // total count of purchases (for pagination)
-//     const [[purchaseCount]] = await connection.query(
-//       `SELECT COUNT(*) AS total 
-//        FROM add_purchase 
-//        WHERE Party_Id = ?`,
+//     // Party Details
+//     const [partyDetails] = await connection.query(
+//       `SELECT * FROM add_party WHERE Party_Id=?`,
 //       [Party_Id]
 //     );
 
-//     // summary over ALL purchases of that party
-//     const [[purchaseSummary]] = await connection.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-//           COALESCE(SUM(Total_Paid),0)   AS Total_Paid,
-//           COALESCE(SUM(Balance_Due),0)  AS Balance_Due
-//        FROM add_purchase
-//        WHERE Party_Id = ?`,
-//       [Party_Id]
+//     if (!partyDetails.length) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Party not found",
+//       });
+//     }
+
+//     // Build date condition
+//     let dateConditionSale = "";
+//     let dateConditionPurchase = "";
+//     const paramsSale = [Party_Id];
+//     const paramsPurchase = [Party_Id];
+
+//     if (fromDate && toDate) {
+//       dateConditionSale = "AND Invoice_Date BETWEEN ? AND ?";
+//       dateConditionPurchase = "AND Bill_Date BETWEEN ? AND ?";
+//       paramsSale.push(fromDate, toDate);
+//       paramsPurchase.push(fromDate, toDate);
+//     }
+
+//     // Fetch purchases
+//     const [purchases] = await connection.query(
+//       `
+//       SELECT 
+//         Purchase_Id,
+//         Bill_Date,
+//         Bill_Number,
+//         Total_Amount,
+//         State_Of_Supply,
+//         Total_Paid,
+//         Balance_Due,
+//         Payment_Type,
+//         "Purchase" AS Type
+//       FROM add_purchase
+//       WHERE Party_Id=? ${dateConditionPurchase}
+//       `,
+//       paramsPurchase
 //     );
 
-//     // 🔹 Fetch all purchase items for ONLY these page purchases
-//     let purchaseItemsByPurchaseId = {};
-//     const purchaseIds = purchaseRows.map((p) => p.Purchase_Id);
+//     // Fetch sales
+//     const [sales] = await connection.query(
+//       `
+//       SELECT 
+//         Sale_Id,
+//         Invoice_Date,
+//         Invoice_Number,
+//         Total_Amount,
+//         State_Of_Supply,
+//         Total_Received,
+//         Balance_Due,
+//         Payment_Type,
+//         "Sale" AS Type
+//       FROM add_sale
+//       WHERE Party_Id=? ${dateConditionSale}
+//       `,
+//       paramsSale
+//     );
+
+//     // Combine transactions
+//     const combined = [
+//       ...purchases.map(p => ({
+//         ...p,
+//         date: p.Bill_Date
+//       })),
+//       ...sales.map(s => ({
+//         ...s,
+//         date: s.Invoice_Date
+//       }))
+//     ];
+
+//     // Sort latest first
+//     combined.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+//     const paged = combined.slice(offset, offset + limit);
+
+//     // Separate again
+//     let pagedPurchases = paged.filter(r => r.Type === "Purchase");
+//     let pagedSales = paged.filter(r => r.Type === "Sale");
+
+//     const totalRecords = combined.length;
+//     const totalPages = Math.ceil(totalRecords / limit);
+
+//     // Fetch purchase items
+//     const purchaseIds = pagedPurchases.map(r => r.Purchase_Id);
 
 //     if (purchaseIds.length > 0) {
 //       const [purchaseItems] = await connection.query(
-//         `SELECT pi.*, it.Item_Name,it.Item_HSN,it.Item_Category
-//          FROM add_purchase_items pi
-//          LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
-//          WHERE pi.Purchase_Id IN (?)
+//         `
+//         SELECT pi.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
+//         FROM add_purchase_items pi
+//         LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
+//         WHERE pi.Purchase_Id IN (?)
 //         `,
 //         [purchaseIds]
 //       );
 
-//       // group by Purchase_Id
-//       purchaseItemsByPurchaseId = purchaseItems.reduce((acc, item) => {
-//         if (!acc[item.Purchase_Id]) acc[item.Purchase_Id] = [];
-//         acc[item.Purchase_Id].push(item);
-//         return acc;
-//       }, {});
+//       pagedPurchases = pagedPurchases.map(p => ({
+//         ...p,
+//         items: purchaseItems.filter(i => i.Purchase_Id === p.Purchase_Id)
+//       }));
 //     }
 
-//     // ---------------------------
-//     // 2️⃣ SALES (paged)
-//     // ---------------------------
-//     const [salesRows] = await connection.query(
-//       `SELECT * 
-//        FROM add_sale 
-//        WHERE Party_Id = ? 
-//        ORDER BY Invoice_Date DESC 
-//        LIMIT ? OFFSET ?`,
-//       [Party_Id, limit, offset]
-//     );
-
-//     const [[salesCount]] = await connection.query(
-//       `SELECT COUNT(*) AS total 
-//        FROM add_sale 
-//        WHERE Party_Id = ?`,
-//       [Party_Id]
-//     );
-
-//     const [[salesSummary]] = await connection.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount),0)       AS Total_Amount,
-//           COALESCE(SUM(Total_Received),0)    AS Total_Received,
-//           COALESCE(SUM(Balance_Due),0)        AS Balance_Due
-//        FROM add_sale
-//        WHERE Party_Id = ?`,
-//       [Party_Id]
-//     );
-
-//     // 🔹 Fetch all sale items for ONLY these page sales
-//     let saleItemsBySaleId = {};
-//     const saleIds = salesRows.map((s) => s.Sale_Id);
+//     // Fetch sale items
+//     const saleIds = pagedSales.map(r => r.Sale_Id);
 
 //     if (saleIds.length > 0) {
 //       const [saleItems] = await connection.query(
-//         `SELECT si.*, it.Item_Name,it.Item_HSN,it.Item_Category
-//          FROM add_sale_items si
-//          LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
-//          WHERE si.Sale_Id IN (?)
-//          `,
+//         `
+//         SELECT si.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
+//         FROM add_sale_items si
+//         LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
+//         WHERE si.Sale_Id IN (?)
+//         `,
 //         [saleIds]
 //       );
 
-//       // group by Sale_Id
-//       saleItemsBySaleId = saleItems.reduce((acc, item) => {
-//         if (!acc[item.Sale_Id]) acc[item.Sale_Id] = [];
-//         acc[item.Sale_Id].push(item);
-//         return acc;
-//       }, {});
+//       pagedSales = pagedSales.map(s => ({
+//         ...s,
+//         items: saleItems.filter(i => i.Sale_Id === s.Sale_Id)
+//       }));
 //     }
 
-//     // ---------------------------
-//     // 3️⃣ Build final response
-//     // ---------------------------
+//     // Summary Purchases
+//     const [[purchaseSummary]] = await connection.query(
+//       `
+//       SELECT 
+//         COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+//         COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+//         COALESCE(SUM(Balance_Due),0) AS Balance_Due
+//       FROM add_purchase
+//       WHERE Party_Id=? ${dateConditionPurchase}
+//       `,
+//       paramsPurchase
+//     );
 
-//     const purchasesWithItems = purchaseRows.map((p) => ({
-//       ...p,
-//       Type: "Purchase",
-//       items: purchaseItemsByPurchaseId[p.Purchase_Id] || [],
-//     }));
-
-//     const salesWithItems = salesRows.map((s) => ({
-//       ...s,
-//       Type: "Sale",
-//       items: saleItemsBySaleId[s.Sale_Id] || [],
-//     }));
+//     // Summary Sales
+//     const [[salesSummary]] = await connection.query(
+//       `
+//       SELECT 
+//         COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+//         COALESCE(SUM(Total_Received),0) AS Total_Received,
+//         COALESCE(SUM(Balance_Due),0) AS Balance_Due
+//       FROM add_sale
+//       WHERE Party_Id=? ${dateConditionSale}
+//       `,
+//       paramsSale
+//     );
 
 //     return res.status(200).json({
 //       success: true,
 //       partyId: Party_Id,
-//       partyName: purchaseRows[0]?.Party_Name || salesRows[0]?.Party_Name || "",
-//       pagination: {
-//         page,
-//         limit,
-//         // totalPurchaseRecords: purchaseCount.total,
-//         // totalSalesRecords: salesCount.total,
-//         // totalPagesPurchases: Math.ceil(purchaseCount.total / limit),
-//         // totalPagesSales: Math.ceil(salesCount.total / limit),
-
-//         totalRecords: purchaseCount.total + salesCount.total,
-//         totalPages: Math.ceil((purchaseCount.total + salesCount.total) / limit),
-//       },
+//       partyDetails: partyDetails[0],
+//       totalRecords,
+//       totalPages,
+//       currentPage: page,
+//       limit,
 //       summary: {
-//         purchases: purchaseSummary, // { totalAmount, totalPaid, totalDue }
-//         sales: salesSummary,       // { totalAmount, totalReceived, totalDue }
+//         purchases: purchaseSummary,
+//         sales: salesSummary,
 //       },
-//       purchases: purchasesWithItems,
-//       sales: salesWithItems,
+//       purchases: pagedPurchases,
+//       sales: pagedSales,
 //     });
 
 //   } catch (err) {
-//     console.error("❌ Error - Party Details:", err);
+//     console.error("❌ Error:", err);
 //     next(err);
 //   } finally {
 //     if (connection) connection.release();
-//   }
-// };
-
-
-// const printSinglePartyDetailsSalesPurchasesReport = async (req, res) => {
-//   try {
-//     // Accept BOTH daily OR range
-//     const {
-//       sales = [],
-    
-//       purchases = [],
-
-//       date,        // for single-day
-//       fromDate,    // for range
-//       toDate,
-
-//       totalSalesAmount,
-//       totalSalesReceivedAmount,
-//       totalSalesBalanceDue,
-
-     
-
-//       totalPurchasesAmount,
-//       totalPurchasesPaidAmount,
-//       totalPurchasesBalanceDue
-//     } = req.body;
-
-//     // GLOBAL TOTALS
-//     const globalTotals = {
-//       totalSalesAmount: totalSalesAmount || 0,
-//       totalSalesReceivedAmount: totalSalesReceivedAmount || 0,
-//       totalSalesBalanceDue: totalSalesBalanceDue || 0,
-
-     
-
-//       totalPurchasesAmount: totalPurchasesAmount || 0,
-//       totalPurchasesPaidAmount: totalPurchasesPaidAmount || 0,
-//       totalPurchasesBalanceDue: totalPurchasesBalanceDue || 0
-//     };
-
-//     const safe = (v) => (v !== undefined && v !== null ? v : "N/A");
-
-  
-//   const buildSection = (title, list, type) => {
-//   if (!list || list.length === 0) return [];
-
-//   let rows = [
-//     {
-//       text: title.toUpperCase(),
-//       style: "sectionHeader",
-//       alignment: "center",
-//       margin: [0, 20, 0, 10]
-//     }
-//   ];
-
-//   list.forEach((entry, idx) => {
-//     rows.push({
-//       unbreakable: true,  // 🔥🔥🔥 THE MAGIC FIX
-//       stack: [
-//         {
-//           text: `${title.slice(0, -1)} ${idx + 1}`,
-//           style: "subTitle",
-//           alignment: "left",
-//           margin: [0, 0, 0, 5]
-//         },
-
-//         // PARTY DETAILS
-//         {
-//           columns: [
-//             {
-//               width: "48%",
-//               stack: [
-//                 { text: "Party Name", style: "label" },
-//                 { text: safe(entry.Party_Name), style: "value" },
-
-//                 { text: "GSTIN", style: "label" },
-//                 { text: safe(entry.GSTIN), style: "value" }
-//               ]
-//             },
-//             {
-//               width: "48%",
-//               alignment: "right",
-//               stack: [
-//                 {
-//                   text: type === "purchase" ? "Bill Number" : "Invoice Number",
-//                   style: "label"
-//                 },
-//                 {
-//                   text: safe(entry.Bill_Number|| entry.Invoice_Number),
-//                   style: "value"
-//                 },
-
-//                 {
-//                   text: type === "purchase" ? "Bill Date" : "Invoice Date",
-//                   style: "label"
-//                 },
-//                 {
-//                   text: safe(entry.Bill_Date|| entry.Invoice_Date),
-//                   style: "value"
-//                 }
-//               ]
-//             }
-//           ],
-//           columnGap: 20,
-//           margin: [0, 0, 0, 10]
-//         },
-
-//         // TABLE
-//         {
-//           style: "tableSmall",
-//           table: {
-//             headerRows: 1,
-//             widths: ["auto", "*", "*", "*", "*", "*", "*", "*"],
-//             body: [
-//               [
-//                 { text: "Sl", style: "tableHeader" },
-//                 { text: "Category", style: "tableHeader" },
-//                 { text: "Item", style: "tableHeader" },
-//                 { text: "HSN", style: "tableHeader" },
-//                 { text: "Qty", style: "tableHeader" },
-//                 { text: "Price", style: "tableHeader" },
-//                 { text: "Tax", style: "tableHeader" },
-//                 { text: "Amount", style: "tableHeader" }
-//               ],
-
-//               ...entry.items.map((it, i) => [
-//                 i + 1,
-//                 safe(it.Item_Category),
-//                 safe(it.Item_Name),
-//                 safe(it.Item_HSN),
-//                 safe(it.Quantity + " " + safe(it.Item_Unit)),
-//                 safe(it.Sale_Price || it.Purchase_Price),
-//                 safe(TAX_TYPES[it.Tax_Type] || it.Tax_Type),
-//                 Number(it.Amount || 0).toFixed(2)
-//               ])
-//             ]
-//           },
-//           layout: "lightHorizontalLines",
-//           margin: [0, 0, 0, 8]
-//         },
-
-//         // TOTALS SECTION
-//         {
-//           columns: [
-//             { width: "*", text: "" },
-//             {
-//               width: "40%",
-//               table: {
-//                 widths: ["*", "auto"],
-//                 body: [
-//                   ["Total Amount", safe(entry.Total_Amount)],
-//                   [
-//                     type === "purchase" ? "Paid" : "Received",
-//                     safe(entry.Total_Paid || entry.Total_Received)
-//                   ],
-//                   ["Balance Due", safe(entry.Balance_Due)]
-//                 ]
-//               },
-//               layout: "noBordersBox"
-//             }
-//           ],
-//           margin: [0, 0, 0, 15]
-//         }
-//       ]
-//     });
-//   });
-
-//   return rows;
-// };
-
-//     // HEADER TITLE
-//     let headerTitle = "";
-
-//     if (fromDate && toDate) {
-//       headerTitle = `DATE RANGE REPORT (${fromDate} to ${toDate})`;
-//     } else if (date) {
-//       headerTitle = `DAILY REPORT (${date})`;
-//     }
-
-    
-// const docDefinition = {
-//   pageMargins: [18, 18, 18, 30],
-//   defaultStyle: { font: "Helvetica" },
-
-//   footer: (p, pc) => ({
-//     text: `Page ${p} of ${pc}`,
-//     alignment: "center",
-//     margin: [10, 10, 10, 10]
-//   }),
-
-//   content: [
-//     {
-//       text: headerTitle,
-//       style: "header",
-//       alignment: "center",
-//       margin: [0, 0, 0, 10]
-//     },
-
-//     ...buildSection("Purchases", purchases, "purchase"),
-//     ...buildSection("Sales", sales, "sale"),
-    
-//   ],
-
-//   styles: {
-//     header: { fontSize: 20, bold: true },
-//     sectionHeader: { fontSize: 15, bold: true },
-//     subTitle: { fontSize: 12, bold: true },
-//     label: { bold: true, fontSize: 10 },
-//     value: { fontSize: 10 },
-//     tableHeader: { bold: true, fillColor: "#eee" },
-//     tableSmall: { fontSize: 9 }
-//   }
-// };
-
-//     const pdfDoc = printer.createPdfKitDocument(docDefinition);
-//     const chunks = [];
-
-//     pdfDoc.on("data", (c) => chunks.push(c));
-//     pdfDoc.on("end", () => {
-//       res.setHeader("Content-Type", "application/pdf");
-//       res.send(Buffer.concat(chunks));
-//     });
-
-//     pdfDoc.end();
-
-//   } catch (err) {
-//     console.error("Print failed:", err);
-//     res.status(500).json({ message: "PDF Print Error" });
 //   }
 // };
 

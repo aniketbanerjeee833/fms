@@ -29,7 +29,7 @@ const PartyReceivablesLeft = lazy(() => import('./pages/Party/PartyReceivablesLe
 
 const AddCategory = lazy(() => import('./pages/Items/AddCategories'));
 const PartyAdd = lazy(() => import('./pages/Party/PartyAdd'));
-const AllPartiesList = lazy(() => import('./pages/Party/AllPartiesList'));
+const Parties= lazy(() => import('./pages/Party/Parties'));
 const PartySalesPurchasesDetails = lazy(() => import('./pages/Party/PartySalesPurchasesDetails'));
 
 const Items = lazy(() => import('./pages/Items/Items'));
@@ -180,10 +180,10 @@ function RouterWrapper() {
               }
             />
             <Route
-              path="/party/all-parties"
+              path="/party/parties"
               element={
                 <Layout>
-                  <AllPartiesList />
+                  <Parties />
                 </Layout>
               }
             />

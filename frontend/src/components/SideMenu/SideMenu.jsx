@@ -112,7 +112,7 @@ const isLinkActive = (linkTo) => {
   // 🔹 Parties Section
   if (
     (cleanLink === "/party/add" && current.startsWith("/party/add")) ||
-    (cleanLink === "/party/all-parties" && current.startsWith("/party/all-parties"))
+    (cleanLink === "/party/parties" && current.startsWith("/party/parties"))
   )
     return true;
 
@@ -258,7 +258,7 @@ if (
             </NavLink>
                {renderMenu("Parties",     <Users size={20}/>, [
            { to: "/party/add", text: "Add Parties" },
-            { to: "/party/all-parties", text: "Party Details" },
+            { to: "/party/parties", text: "Party Details" },
              
           ])}
           {renderMenu("Items", <Package size={20} />, [
