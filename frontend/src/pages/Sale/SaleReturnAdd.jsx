@@ -5,7 +5,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {  useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import {  itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import {  itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
 
@@ -107,13 +107,14 @@ export default function SaleReturnAdd() {
   const { data: parties } = useGetAllPartiesQuery();
   const { data: items } = useGetAllItemsQuery();
      const { data: banks = [] } = useGetAllBankAccountsQuery();
-  // console.log(items);
-  //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
+  const [addCategory] = useAddCategoryMutation();
+ const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
-
+  const [showModal, setShowModal] = useState(false);
   const [partySearch, setPartySearch] = useState("");
-  //const [newCategory, setNewCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
+ 
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
 
@@ -202,7 +203,43 @@ const {
     control,
     name: "splits",
   });
+ const handleAddCategory = async () => {
 
+    if (newCategory.trim() === "") {
+      return
+    }
+    else if (newCategory.trim() !== "") {
+      try {
+        // ✅ Call backend
+        const res = await addCategory({
+          body: { Item_Category: newCategory.trim() },
+        });
+
+        // Some RTK Query wrappers put the response under `.data`
+        const data = res?.data || res;
+
+        if (data?.success) {
+          const addedCat = newCategory.trim();
+
+          // ✅ Auto-select the new category (single value)
+          //setSelected(addedCat);
+          setValue("Item_Category", addedCat); // directly set single category
+
+          // ✅ Refresh cache
+          dispatch(itemApi.util.invalidateTags(["Category"]));
+
+          // ✅ Reset modal & input
+          setShowModal(false);
+          setNewCategory("");
+          setOpen(true);
+        } else {
+          console.warn("⚠️ Category not added. Response:", data);
+        }
+      } catch (err) {
+        console.error("❌ Error adding category:", err);
+      }
+    }
+  };
 
   const [rows, setRows] = useState([
     {
@@ -222,6 +259,20 @@ const {
       };
       return updated;
     });
+  };
+    const handleSelect = (rowIndex, categoryName) => {
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[rowIndex] = {
+        ...updated[rowIndex],
+        Item_Category: categoryName,
+        CategoryOpen: false,
+        isExistingItem: false,   // user-typed, so still editable
+      };
+      return updated;
+    });
+
+    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
   };
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -402,7 +453,7 @@ const {
         ...it,
         itemSearch: it.Item_Name || "", // for UI display
         isExistingItem: true,           // lock category/HSN if needed
-        isHSNLocked: true,
+        isHSNLocked: false,
         isUnitLocked: true,
         CategoryOpen: false,
         itemOpen: false,
@@ -540,26 +591,38 @@ const onSubmit = async (data) => {
   const payload = { ...data };
  
   // ── validate items ──
-  const seenItems = new Set();
-  for (const item of payload.items) {
-    const name     = item.Item_Name?.trim().toLowerCase();
-    const category = item.Item_Category?.trim().toLowerCase();
-    const itemHSN  = item.Item_HSN?.trim().toLowerCase();
-    const Quantity = item.Quantity;
+  // const seenItems = new Set();
+  // for (const item of payload.items) {
+  //   const name     = item.Item_Name?.trim().toLowerCase();
+  //   const category = item.Item_Category?.trim().toLowerCase();
+  //   const itemHSN  = item.Item_HSN?.trim().toLowerCase();
+  //   const Quantity = item.Quantity;
  
-    if (!name || !category || !itemHSN || !Quantity) {
-      toast.error("Each item must have a valid name, category, HSN and quantity.");
-      return;
-    }
+  //   if (!name || !category || !itemHSN || !Quantity) {
+  //     toast.error("Each item must have a valid name, category, HSN and quantity.");
+  //     return;
+  //   }
  
-    if (seenItems.has(name)) {
-      toast.error(
-        `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-      );
-      return;
-    }
-    seenItems.add(name);
+  //   if (seenItems.has(name)) {
+  //     toast.error(
+  //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+  //     );
+  //     return;
+  //   }
+  //   seenItems.add(name);
+  // }
+  // ── validate items ──
+for (const item of payload.items) {
+  const name = item.Item_Name?.trim();
+  const category = item.Item_Category?.trim();
+  const itemHSN = item.Item_HSN?.trim();
+  const quantity = Number(item.Quantity);
+
+  if (!name || !category || !itemHSN || quantity <= 0) {
+    toast.error("Each item must have a valid name, category, HSN and quantity.");
+    return;
   }
+}
  
   // console.log("payload:", payload);
  
@@ -608,7 +671,7 @@ const onSubmit = async (data) => {
  const paymentType = watch("splits.0.Payment_Type");
   return (
     <>
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
 
           <NavLink style={{ display: "flex", flexDirection: "row" }}
@@ -616,12 +679,12 @@ const onSubmit = async (data) => {
 
           >
             <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-            {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+           
             Dashboard
           </NavLink>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -960,7 +1023,7 @@ const onSubmit = async (data) => {
                         {/* <div className="input-field col s6"> */}
                         <span className=" whitespace-nowrap active">
                           State of Supply
-                          <span className="text-red-500">*</span>
+                          {/* <span className="text-red-500">*</span> */}
                         </span>
                         <select
                           style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -976,11 +1039,11 @@ const onSubmit = async (data) => {
                             </option>
                           ))}
                         </select>
-                        {errors?.State_Of_Supply && (
+                        {/* {errors?.State_Of_Supply && (
                           <p className="text-red-500 text-xs mt-1">
                             {errors?.State_Of_Supply?.message}
                           </p>
-                        )}
+                        )} */}
                       </div>
 
 
@@ -1037,7 +1100,7 @@ const onSubmit = async (data) => {
                               </div>
                             </td>
 
-                            <td
+                            {/* <td
                               style={{ padding: "0px", position: "relative" }}>
 
                               <div ref={(el) => (categoryRefs.current[i] = el)}>
@@ -1064,9 +1127,143 @@ const onSubmit = async (data) => {
 
 
                               </div>
-                              {/* Modal */}
+                              {/* Modal 
 
-                            </td>
+                            </td> */}
+                            <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <div ref={(el) => (categoryRefs.current[i] = el)}>
+                          <input
+                            type="text"
+                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
+                            style={{ marginBottom: "0px" }}
+                            readOnly={rows[i]?.isExistingItem}
+                            placeholder="Category"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                            onClick={() => {
+                              if (!rows[i]?.isExistingItem) {
+                                setRows((prev) =>
+                                  prev.map((row, idx) => ({
+                                    ...row,
+                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
+                                  }))
+                                );
+                              }
+                            }}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleRowChange(i, "categorySearch", value);
+                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
+                              handleRowChange(i, "isExistingItem", false);
+                            }}
+                          />
+
+
+                          {errors?.items?.[i]?.Item_Category && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_Category.message}
+                            </p>
+                          )}
+
+                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setShowModal(true);
+                                  handleRowChange(i, "CategoryOpen", false);
+                                }}>
+                                + Add Category
+                              </span>
+
+                              {categories
+                                ?.filter((cat) =>
+                                  cat.Item_Category.toLowerCase().startsWith(
+                                    (rows[i]?.categorySearch || "").toLowerCase()
+                                  )
+                                )
+                                .map((cat, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      handleSelect(i, cat.Item_Category);
+                                      handleRowChange(i, "categorySearch", cat.Item_Category);
+                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
+                                      handleRowChange(i, "CategoryOpen", false);
+                                    }}
+
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    {cat.Item_Category}
+                                  </div>
+                                ))}
+
+                              {categories?.filter((cat) =>
+                                cat.Item_Category.toLowerCase().startsWith(
+                                  (rows[i]?.categorySearch || "").toLowerCase()
+                                )
+                              ).length === 0 && (
+                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
+                                )}
+                            </div>
+                          )}
+                        </div>
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed",
+                              inset: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)",
+                              backdropFilter: "blur(4px)",
+                              zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+
+                              <div className="flex justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowModal(false)}
+
+                                  style={{ backgroundColor: "lightgray" }}
+                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                >
+                                  Cancel
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={handleAddCategory}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                      </td>
+
 
                             {/* Item Dropdown */}
                             <td style={{ padding: "0px", width: "20%", position: "relative" }}>
@@ -1092,11 +1289,65 @@ const onSubmit = async (data) => {
                                       handleRowChange(i, "isExistingItem", true);
                                     } else {
                                       // ❌ Clear Item_Name in RHF to trigger error
-                                      setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
+                                      setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
                                       handleRowChange(i, "isExistingItem", false);
                                     }
                                     //handleRowChange(i, "isExistingItem", exists); // false if new item
                                   }}
+                                         onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
+                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                );
+
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: true,
+                                      itemOpen: false,
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
+                            }}
 
                                   onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                                   placeholder="Item Name"
@@ -1148,7 +1399,7 @@ const onSubmit = async (data) => {
                                                     Item_HSN: it.Item_HSN || "",
                                                     categorySearch: it.Item_Category || "", // ✅ sync UI state
                                                     isExistingItem: true,   // lock category
-                                                    isHSNLocked: true,      // lock HSN
+                                                    isHSNLocked: false,      // lock HSN
                                                     isUnitLocked: true,     // lock unit
                                                     itemQuantity: it.Stock_Quantity || 0,
                                                   };
@@ -1231,14 +1482,17 @@ const onSubmit = async (data) => {
                             <td style={{ padding: "0px", width: "8%" }}>
                               <input
                                 type="text"
-                                readOnly
+                                //readOnly
                                 value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-                                // onChange={(e) => {
-                                //   if (!rows[i]?.isHSNLocked) {
-                                //     handleRowChange(i, "Item_HSN", e.target.value);
-                                //     setValue(`items.${i}.Item_HSN`, e.target.value);
-                                //   }
-                                // }}
+                                 onChange={(e) => {
+                                  e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                              handleRowChange(i, "Item_HSN", e.target.value);
+                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // if (!rows[i]?.isHSNLocked) {
+                            //   handleRowChange(i, "Item_HSN", e.target.value);
+                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // }
+                          }}
                                 placeholder="HSN Code"
                                 className="w-full outline-none border-b-2 text-gray-900"
                               // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
@@ -1307,38 +1561,7 @@ const onSubmit = async (data) => {
                             </td>
 
 
-                            {/* Unit */}
-                            {/* <td style={{ padding: "0px",width: "6%" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Item_Unit`}
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select "
-                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      handleRowChange(i, "Item_Unit", value);
-                                      setValue(`items.${i}.Item_Unit`, value);
-                                    }}
-                                  >
-                                    <option value="">Select</option>
-                                    {Object.entries(itemUnits).map(([key, value]) => (
-                                      <option key={key} value={key}>
-                                        {`${value} (${key})`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              />
-                              {errors?.items?.[i]?.Item_Unit && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_Unit.message}
-                                </p>
-                              )}
-                            </td> */}
+                           
                             <td style={{ padding: "0px", width: "12%" }}>
                               <Controller
                                 control={control}
@@ -1540,14 +1763,14 @@ const onSubmit = async (data) => {
                                   <select
                                     {...field}
                                     className="form-select bg-gray-100 text-gray-700"
-                                    style={{
-                                      width: "100%",
-                                      fontSize: "12px",
-                                      marginBottom: "0px",
-                                      pointerEvents: "none", // ✅ visually disabled
-                                      cursor: "not-allowed",
-                                      backgroundColor: "#f3f4f6", // light gray
-                                    }}
+                                    // style={{
+                                    //   width: "100%",
+                                    //   fontSize: "12px",
+                                    //   marginBottom: "0px",
+                                    //   pointerEvents: "none", // ✅ visually disabled
+                                    //   cursor: "not-allowed",
+                                    //   backgroundColor: "#f3f4f6", // light gray
+                                    // }}
                                     onChange={(e) => {
                                       field.onChange(e);
 

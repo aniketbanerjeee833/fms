@@ -15,6 +15,22 @@ const createExpenseCategory = async (req, res, next) => {
     if (!["Direct", "Indirect"].includes(Category_Type)) {
       return res.status(400).json({ success: false, message: "Category Type must be Direct or Indirect" });
     }
+    const normalizedName = Category_Name.trim().toLowerCase();
+
+const [existing] = await db.query(
+  `SELECT id
+   FROM expense_categories
+   WHERE LOWER(TRIM(Category_Name)) = ?`,
+  [normalizedName]
+);
+
+if (existing.length > 0) {
+  return res.status(400).json({
+    success: false,
+    message: "Category already exists.",
+  });
+}
+    
     const [result] = await db.query(
       `INSERT INTO expense_categories (Category_Name, Category_Type) VALUES (?, ?)`,
       [Category_Name.trim(), Category_Type]
@@ -35,6 +51,22 @@ const editExpenseCategory = async (req, res, next) => {
     if (!["Direct", "Indirect"].includes(Category_Type)) {
       return res.status(400).json({ success: false, message: "Type must be Direct or Indirect" });
     }
+    const normalizedName = Category_Name.trim().toLowerCase();
+
+const [existing] = await db.query(
+  `SELECT id
+   FROM expense_categories
+   WHERE LOWER(TRIM(Category_Name)) = ?
+     AND id <> ?`,
+  [normalizedName, id]
+);
+
+if (existing.length > 0) {
+  return res.status(400).json({
+    success: false,
+    message: "Another category with this name already exists.",
+  });
+}
     await db.query(
       `UPDATE expense_categories SET Category_Name = ?, Category_Type = ? WHERE id = ?`,
       [Category_Name.trim(), Category_Type, id]

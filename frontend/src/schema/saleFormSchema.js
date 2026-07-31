@@ -70,8 +70,8 @@ export const saleFormSchema = z.object({
       message: "Invoice_Date must be a valid date",
     }),
 
-  State_Of_Supply: z.string().min(1, "State_Of_Supply is required"),
-
+  // State_Of_Supply: z.string().min(1, "State_Of_Supply is required"),
+  State_Of_Supply: z.string().nullable().optional(),
   // 🔹 Auto-calculated but cannot be empty
   Total_Amount: digitsOnly("Total_Amount", true),
   Balance_Due: digitsOnly("Balance_Due", true),

@@ -787,7 +787,7 @@ const createSaleReturn = async (req, res, next) => {
       Total_Amount,
       Total_Paid,
       Balance_Due,
-      Reference_Number,
+      //Reference_Number,
       splits,    // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
     } = req.body;
@@ -833,25 +833,33 @@ const createSaleReturn = async (req, res, next) => {
     }
 
     const [headerResult] = await connection.query(
-      `INSERT INTO sale_return
-         (Sale_Id, Party_Id, Return_Number, Invoice_Number,
-          Invoice_Date, Return_Date, State_Of_Supply,
-          Total_Amount, Total_Paid, Balance_Due, Reference_Number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        Sale_Id,
-        party.Party_Id,
-        Return_Number    || null,
-        Invoice_Number   || null,
-        Invoice_Date     || null,
-        Return_Date,
-        State_Of_Supply  || null,
-        totalAmount,
-        totalPaid,
-        balanceDue,
-        Reference_Number || null,
-      ]
-    );
+  `INSERT INTO sale_return
+    (
+      Sale_Id,
+      Party_Id,
+      Return_Number,
+      Invoice_Number,
+      Invoice_Date,
+      Return_Date,
+      State_Of_Supply,
+      Total_Amount,
+      Total_Paid,
+      Balance_Due
+    )
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [
+    Sale_Id,
+    party.Party_Id,
+    Return_Number || null,
+    Invoice_Number || null,
+    Invoice_Date || null,
+    Return_Date,
+    State_Of_Supply || null,
+    totalAmount,
+    totalPaid,
+    balanceDue,
+  ]
+);
 
     const Sale_Return_Id = headerResult.insertId;
 
@@ -883,28 +891,51 @@ const createSaleReturn = async (req, res, next) => {
         Amount,
       } = item;
 
-      const [[existingItem]] = await connection.query(
-        `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
+      // const [[existingItem]] = await connection.query(
+      //   `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
+      //   [Item_Name]
+      // );
+        const [[existingItem]] = await connection.query(
+        `SELECT Item_Id FROM add_item WHERE LOWER(TRIM(Item_Name)) = LOWER(TRIM(?)) LIMIT 1`,
         [Item_Name]
       );
 
-      let Item_Id;
-      if (!existingItem) {
-        const [ins] = await connection.execute(
-          `INSERT INTO add_item
-             (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-          [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
-        );
-        Item_Id = `ITM${ins.insertId}`;
-        await connection.execute(
-          `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-          [Item_Id, ins.insertId]
-        );
-      } else {
-        Item_Id = existingItem.Item_Id;
-      }
-
+      // let Item_Id;
+      // if (!existingItem) {
+      //   const [ins] = await connection.execute(
+      //     `INSERT INTO add_item
+      //        (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
+      //      VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
+      //     [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
+      //   );
+      //   Item_Id = `ITM${ins.insertId}`;
+      //   await connection.execute(
+      //     `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
+      //     [Item_Id, ins.insertId]
+      //   );
+      // } else {
+      //   Item_Id = existingItem.Item_Id;
+      // }
+  let Item_Id;
+if (!existingItem) {
+  const [ins] = await connection.execute(
+    `INSERT INTO add_item
+       (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
+    [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
+  );
+  Item_Id = `ITM${ins.insertId}`;
+  await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, ins.insertId]);
+} else {
+  Item_Id = existingItem.Item_Id;
+  // 🔹 sync HSN to master if changed
+  if (Item_HSN) {
+    await connection.query(
+      `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
+      [Item_HSN, Item_Id]
+    );
+  }
+}
       await connection.query(
         `INSERT INTO sale_return_items
            (Sale_Return_Id, Item_Id, Quantity, Sale_Price,
@@ -975,7 +1006,7 @@ const editSaleReturn = async (req, res, next) => {
       Total_Amount,
       Total_Paid,
       Balance_Due,
-      Reference_Number,
+      //Reference_Number,
       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
     } = req.body;
@@ -1017,7 +1048,7 @@ const editSaleReturn = async (req, res, next) => {
          Party_Id = ?, Return_Number = ?, Invoice_Number = ?, Invoice_Date = ?,
          Return_Date = ?, State_Of_Supply = ?,
          Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
-         Reference_Number = ?, updated_at = NOW()
+          updated_at = NOW()
        WHERE id = ?`,
       [
         party.Party_Id,
@@ -1029,7 +1060,7 @@ const editSaleReturn = async (req, res, next) => {
         totalAmount,
         totalPaid,
         balanceDue,
-        Reference_Number || null,
+        
         Sale_Return_Id,
       ]
     );
@@ -1053,112 +1084,193 @@ const editSaleReturn = async (req, res, next) => {
     }
 
     // items loop — unchanged
-    const [oldItems] = await connection.query(
-      `SELECT * FROM sale_return_items WHERE Sale_Return_Id = ?`,
-      [Sale_Return_Id]
+    // const [oldItems] = await connection.query(
+    //   `SELECT * FROM sale_return_items WHERE Sale_Return_Id = ?`,
+    //   [Sale_Return_Id]
+    // );
+    // const oldMap    = new Map(oldItems.map((i) => [i.Item_Id, i]));
+    // const newItemIds = new Set();
+
+    // for (const item of items) {
+    //   const {
+    //     Item_Name, Item_Category, Item_HSN, Item_Unit,
+    //     Quantity, Sale_Price,
+    //     Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+    //     Tax_Type, Tax_Amount, Amount,
+    //   } = item;
+
+    //   const [[existingItem]] = await connection.query(
+    //     `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
+    //     [Item_Name]
+    //   );
+
+    //   let Item_Id;
+    //   if (!existingItem) {
+    //     const [ins] = await connection.execute(
+    //       `INSERT INTO add_item
+    //          (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
+    //        VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
+    //       [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
+    //     );
+    //     Item_Id = `ITM${ins.insertId}`;
+    //     await connection.execute(
+    //       `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
+    //       [Item_Id, ins.insertId]
+    //     );
+    //   } else {
+    //     Item_Id = existingItem.Item_Id;
+    //   }
+
+    //   newItemIds.add(Item_Id);
+    //   const old = oldMap.get(Item_Id);
+
+    //   if (old) {
+    //     await connection.query(
+    //       `UPDATE sale_return_items SET
+    //          Quantity = ?, Sale_Price = ?,
+    //          Discount_On_Sale_Price = ?, Discount_Type_On_Sale_Price = ?,
+    //          Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
+    //        WHERE id = ?`,
+    //       [
+    //         Number(Quantity), Number(Sale_Price),
+    //         Number(Discount_On_Sale_Price) || 0,
+    //         Discount_Type_On_Sale_Price    || "Percentage",
+    //         Tax_Type || null,
+    //         Number(Tax_Amount) || 0,
+    //         Number(Amount),
+    //         old.id,
+    //       ]
+    //     );
+
+    //     const diff = Number(Quantity) - old.Quantity;
+    //     if (diff !== 0) {
+    //       await connection.query(
+    //         `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
+    //          WHERE Item_Id = ?`,
+    //         [diff, Item_Id]
+    //       );
+    //     }
+    //   } else {
+    //     await connection.query(
+    //       `INSERT INTO sale_return_items
+    //          (Sale_Return_Id, Item_Id, Quantity, Sale_Price,
+    //           Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+    //           Tax_Type, Tax_Amount, Amount)
+    //        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    //       [
+    //         Sale_Return_Id,
+    //         Item_Id,
+    //         Number(Quantity), Number(Sale_Price),
+    //         Number(Discount_On_Sale_Price) || 0,
+    //         Discount_Type_On_Sale_Price    || "Percentage",
+    //         Tax_Type || null,
+    //         Number(Tax_Amount) || 0,
+    //         Number(Amount),
+    //       ]
+    //     );
+    //     await connection.query(
+    //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
+    //        WHERE Item_Id = ?`,
+    //       [Number(Quantity), Item_Id]
+    //     );
+    //   }
+    // }
+
+    // // delete removed items — reverse stock restoration
+    // for (const old of oldItems) {
+    //   if (!newItemIds.has(old.Item_Id)) {
+    //     await connection.query(
+    //       `DELETE FROM sale_return_items WHERE id = ?`,
+    //       [old.id]
+    //     );
+    //     await connection.query(
+    //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
+    //        WHERE Item_Id = ?`,
+    //       [old.Quantity, old.Item_Id]
+    //     );
+    //   }
+    // }
+    // Step 1: resolve every line, create new items, sync HSN
+const [oldItems] = await connection.query(
+  `SELECT * FROM sale_return_items WHERE Sale_Return_Id = ?`,
+  [Sale_Return_Id]
+);
+
+const resolvedLines = [];
+for (const item of items) {
+  const { Item_Name, Item_Category, Item_HSN, Item_Unit, Quantity, Sale_Price,
+          Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+          Tax_Type, Tax_Amount, Amount } = item;
+
+  // const [[existingItem]] = await connection.query(
+  //   `SELECT Item_Id, Item_HSN FROM add_item WHERE Item_Name = ? LIMIT 1`,
+  //   [Item_Name]
+  // );
+   const [[existingItem]] = await connection.query(
+    `SELECT Item_Id, Item_HSN FROM add_item WHERE LOWER(TRIM(Item_Name)) = LOWER(TRIM(?)) LIMIT 1`,
+    [Item_Name]
+  );
+
+  let Item_Id;
+  if (!existingItem) {
+    const [ins] = await connection.execute(
+      `INSERT INTO add_item
+         (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
+      [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
     );
-    const oldMap    = new Map(oldItems.map((i) => [i.Item_Id, i]));
-    const newItemIds = new Set();
-
-    for (const item of items) {
-      const {
-        Item_Name, Item_Category, Item_HSN, Item_Unit,
-        Quantity, Sale_Price,
-        Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-        Tax_Type, Tax_Amount, Amount,
-      } = item;
-
-      const [[existingItem]] = await connection.query(
-        `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
-        [Item_Name]
+    Item_Id = `ITM${ins.insertId}`;
+    await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, ins.insertId]);
+  } else {
+    Item_Id = existingItem.Item_Id;
+    if (Item_HSN && Item_HSN !== existingItem.Item_HSN) {
+      await connection.query(
+        `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
+        [Item_HSN, Item_Id]
       );
-
-      let Item_Id;
-      if (!existingItem) {
-        const [ins] = await connection.execute(
-          `INSERT INTO add_item
-             (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-          [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
-        );
-        Item_Id = `ITM${ins.insertId}`;
-        await connection.execute(
-          `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-          [Item_Id, ins.insertId]
-        );
-      } else {
-        Item_Id = existingItem.Item_Id;
-      }
-
-      newItemIds.add(Item_Id);
-      const old = oldMap.get(Item_Id);
-
-      if (old) {
-        await connection.query(
-          `UPDATE sale_return_items SET
-             Quantity = ?, Sale_Price = ?,
-             Discount_On_Sale_Price = ?, Discount_Type_On_Sale_Price = ?,
-             Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
-           WHERE id = ?`,
-          [
-            Number(Quantity), Number(Sale_Price),
-            Number(Discount_On_Sale_Price) || 0,
-            Discount_Type_On_Sale_Price    || "Percentage",
-            Tax_Type || null,
-            Number(Tax_Amount) || 0,
-            Number(Amount),
-            old.id,
-          ]
-        );
-
-        const diff = Number(Quantity) - old.Quantity;
-        if (diff !== 0) {
-          await connection.query(
-            `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
-             WHERE Item_Id = ?`,
-            [diff, Item_Id]
-          );
-        }
-      } else {
-        await connection.query(
-          `INSERT INTO sale_return_items
-             (Sale_Return_Id, Item_Id, Quantity, Sale_Price,
-              Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-              Tax_Type, Tax_Amount, Amount)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            Sale_Return_Id,
-            Item_Id,
-            Number(Quantity), Number(Sale_Price),
-            Number(Discount_On_Sale_Price) || 0,
-            Discount_Type_On_Sale_Price    || "Percentage",
-            Tax_Type || null,
-            Number(Tax_Amount) || 0,
-            Number(Amount),
-          ]
-        );
-        await connection.query(
-          `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
-           WHERE Item_Id = ?`,
-          [Number(Quantity), Item_Id]
-        );
-      }
     }
+  }
 
-    // delete removed items — reverse stock restoration
-    for (const old of oldItems) {
-      if (!newItemIds.has(old.Item_Id)) {
-        await connection.query(
-          `DELETE FROM sale_return_items WHERE id = ?`,
-          [old.id]
-        );
-        await connection.query(
-          `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
-           WHERE Item_Id = ?`,
-          [old.Quantity, old.Item_Id]
-        );
-      }
-    }
+  resolvedLines.push({ Item_Id, Quantity, Sale_Price, Discount_On_Sale_Price,
+                        Discount_Type_On_Sale_Price, Tax_Type, Tax_Amount, Amount });
+}
+
+// Step 2: net stock delta per Item_Id (sale return ADDS stock back, diff applied as "+")
+const newQtyByItem = new Map();
+resolvedLines.forEach((l) => newQtyByItem.set(l.Item_Id, (newQtyByItem.get(l.Item_Id) || 0) + Number(l.Quantity)));
+const oldQtyByItem = new Map();
+oldItems.forEach((o) => oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity)));
+
+const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
+for (const itemId of allItemIds) {
+  const diff = (newQtyByItem.get(itemId) || 0) - (oldQtyByItem.get(itemId) || 0);
+  if (diff !== 0) {
+    await connection.query(
+      `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+      [diff, itemId]
+    );
+  }
+}
+
+// Step 3: delete old return items, reinsert fresh
+await connection.query(`DELETE FROM sale_return_items WHERE Sale_Return_Id = ?`, [Sale_Return_Id]);
+
+for (const line of resolvedLines) {
+  await connection.query(
+    `INSERT INTO sale_return_items
+       (Sale_Return_Id, Item_Id, Quantity, Sale_Price,
+        Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+        Tax_Type, Tax_Amount, Amount)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      Sale_Return_Id, line.Item_Id,
+      Number(line.Quantity), Number(line.Sale_Price),
+      Number(line.Discount_On_Sale_Price) || 0,
+      line.Discount_Type_On_Sale_Price || "Percentage",
+      line.Tax_Type || null, Number(line.Tax_Amount) || 0, Number(line.Amount),
+    ]
+  );
+}
 
     await connection.commit();
     return res.status(200).json({ success: true, message: "Sale Return updated", Sale_Return_Id });

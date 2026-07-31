@@ -332,7 +332,7 @@ const addPurchase = async (req, res, next) => {
       Total_Amount,
       Total_Paid,
       Balance_Due,
-      Reference_Number,
+      //Reference_Number,
       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
     } = validation.data;
@@ -341,7 +341,7 @@ const addPurchase = async (req, res, next) => {
       !Party_Name ||
       !Bill_Number ||
       !Bill_Date ||
-      !State_Of_Supply ||
+      // !State_Of_Supply ||
       !Array.isArray(items) ||
       items.length === 0
     ) {
@@ -375,22 +375,29 @@ const addPurchase = async (req, res, next) => {
     }
 
     // duplicate item check
-    const itemNameSet = new Set();
+    // const itemNameSet = new Set();
+    // for (const item of items) {
+    //   const itemName = item.Item_Name?.trim().toLowerCase();
+    //   if (!itemName) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: "Item name missing." });
+    //   }
+    //   if (itemNameSet.has(itemName)) {
+    //     await connection.rollback();
+    //     return res.status(400).json({
+    //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+    //     });
+    //   }
+    //   itemNameSet.add(itemName);
+    // }
     for (const item of items) {
-      const itemName = item.Item_Name?.trim().toLowerCase();
-      if (!itemName) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Item name missing." });
-      }
-      if (itemNameSet.has(itemName)) {
+      if (!item.Item_Name?.trim()) {
         await connection.rollback();
         return res.status(400).json({
-          message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+          message: "Item name missing.",
         });
       }
-      itemNameSet.add(itemName);
     }
-
     const [partyRows] = await connection.execute(
       "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
       [Party_Name]
@@ -415,19 +422,19 @@ const addPurchase = async (req, res, next) => {
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase
        (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
-        Total_Amount, Total_Paid, Balance_Due, Reference_Number,
+        Total_Amount, Total_Paid, Balance_Due, 
         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?,  NOW(), NOW())`,
       [
         Party_Id,
         Bill_Number,
         Bill_Date,
         activeFY,
-        State_Of_Supply,
+        cleanValue(State_Of_Supply),
         totalAmount,
         totalPaid,
-        balanceDue,
-        cleanValue(Reference_Number),
+        balanceDue
+        
       ]
     );
 
@@ -468,8 +475,12 @@ const addPurchase = async (req, res, next) => {
         Item_Image,
       } = item;
 
+      // const [itemRows] = await connection.execute(
+      //   "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+      //   [Item_Name]
+      // );
       const [itemRows] = await connection.execute(
-        "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+        "SELECT * FROM add_item WHERE LOWER(TRIM(Item_Name)) = LOWER(TRIM(?)) LIMIT 1",
         [Item_Name]
       );
 
@@ -498,9 +509,29 @@ const addPurchase = async (req, res, next) => {
       } else {
         Item_Id = itemRows[0].Item_Id;
         await connection.execute(
-          `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-          [normalizeNumber(Quantity), Item_Id]
+          `UPDATE add_item
+   SET Stock_Quantity = Stock_Quantity + ?,
+       Item_HSN = ?,
+       updated_at = NOW()
+   WHERE Item_Id = ?`,
+          [normalizeNumber(Quantity), cleanValue(Item_HSN) || itemRows[0].Item_HSN, Item_Id]
         );
+        //     await connection.execute(
+        //   `UPDATE add_item
+        //    SET Stock_Quantity = Stock_Quantity - ?,
+        //        Item_HSN = ?,
+        //        updated_at = NOW()
+        //    WHERE Item_Id = ?`,
+        //   [
+        //     normalizeNumber(Quantity),
+        //     cleanValue(Item_HSN) || itemRows[0].Item_HSN,
+        //     Item_Id,
+        //   ]
+        // );
+        // await connection.execute(
+        //   `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+        //   [normalizeNumber(Quantity), Item_Id]
+        // );
       }
 
       const [pitResult] = await connection.execute(
@@ -1347,7 +1378,7 @@ const editPurchase = async (req, res, next) => {
       Total_Amount,
       Total_Paid,
       Balance_Due,
-      Reference_Number,
+      //Reference_Number,
       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
     } = validation.data;
@@ -1381,18 +1412,24 @@ const editPurchase = async (req, res, next) => {
     }
 
     // duplicate item check
-    const itemNameSet = new Set();
+    // const itemNameSet = new Set();
+    // for (const item of items) {
+    //   const name = item.Item_Name?.trim().toLowerCase();
+    //   if (!name) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: "Item name missing." });
+    //   }
+    //   if (itemNameSet.has(name)) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: `Duplicate item: ${item.Item_Name}` });
+    //   }
+    //   itemNameSet.add(name);
+    // }
     for (const item of items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      if (!name) {
+      if (!item.Item_Name?.trim()) {
         await connection.rollback();
         return res.status(400).json({ message: "Item name missing." });
       }
-      if (itemNameSet.has(name)) {
-        await connection.rollback();
-        return res.status(400).json({ message: `Duplicate item: ${item.Item_Name}` });
-      }
-      itemNameSet.add(name);
     }
 
     const [partyRows] = await connection.query(
@@ -1410,17 +1447,17 @@ const editPurchase = async (req, res, next) => {
       `UPDATE add_purchase SET
          Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
          Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
-         Reference_Number = ?, updated_at = NOW()
+          updated_at = NOW()
        WHERE Purchase_Id = ?`,
       [
         Party_Id,
         Bill_Number,
         Bill_Date,
-        State_Of_Supply,
+        cleanValue(State_Of_Supply),
         totalAmount,
         totalPaid,
         balanceDue,
-        cleanValue(Reference_Number),
+        
         purchaseId,
       ]
     );
@@ -1456,127 +1493,239 @@ const editPurchase = async (req, res, next) => {
     }
 
     // items loop — unchanged from your original
+    // const [oldItems] = await connection.query(
+    //   "SELECT * FROM add_purchase_items WHERE Purchase_Id = ?",
+    //   [purchaseId]
+    // );
+
+    // const oldMap = new Map();
+    // oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
+
+    // const newItemIds = new Set();
+
+    // for (const item of items) {
+    //   const {
+    //     Item_Name,
+    //     Item_Category,
+    //     Item_HSN,
+    //     Item_Unit,
+    //     Quantity,
+    //     Purchase_Price,
+    //     Discount_On_Purchase_Price,
+    //     Discount_Type_On_Purchase_Price,
+    //     Tax_Type,
+    //     Tax_Amount,
+    //     Amount,
+    //   } = item;
+
+    //   const [existingItem] = await connection.query(
+    //     "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+    //     [Item_Name]
+    //   );
+
+    //   let Item_Id;
+
+    //   if (existingItem.length === 0) {
+    //     const [res] = await connection.execute(
+    //       `INSERT INTO add_item
+    //        (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
+    //        VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+    //       [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || "", normalizeNumber(Quantity)]
+    //     );
+    //     const id = res.insertId;
+    //     Item_Id = "ITM" + id;
+    //     await connection.execute(
+    //       `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
+    //       [Item_Id, id]
+    //     );
+    //   } else {
+    //     Item_Id = existingItem[0].Item_Id;
+    //   }
+
+    //   newItemIds.add(Item_Id);
+    //   const old = oldMap.get(Item_Id);
+
+    //   if (old) {
+    //     await connection.query(
+    //       `UPDATE add_purchase_items SET
+    //          Quantity = ?, Purchase_Price = ?,
+    //          Discount_On_Purchase_Price = ?, Discount_Type_On_Purchase_Price = ?,
+    //          Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
+    //        WHERE Purchase_items_Id = ?`,
+    //       [
+    //         normalizeNumber(Quantity),
+    //         normalizeNumber(Purchase_Price),
+    //         cleanDiscount(Discount_On_Purchase_Price),
+    //         cleanValue(Discount_Type_On_Purchase_Price),
+    //         cleanValue(Tax_Type),
+    //         normalizeNumber(Tax_Amount),
+    //         normalizeNumber(Amount),
+    //         old.Purchase_items_Id,
+    //       ]
+    //     );
+    //     const diff = normalizeNumber(Quantity) - old.Quantity;
+    //     if (diff !== 0) {
+    //       await connection.query(
+    //         `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //         [diff, Item_Id]
+    //       );
+    //     }
+    //   } else {
+    //     const [res] = await connection.execute(
+    //       `INSERT INTO add_purchase_items
+    //        (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+    //         Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+    //         Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+    //        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    //       [
+    //         purchaseId,
+    //         Item_Id,
+    //         normalizeNumber(Quantity),
+    //         normalizeNumber(Purchase_Price),
+    //         cleanDiscount(Discount_On_Purchase_Price),
+    //         cleanValue(Discount_Type_On_Purchase_Price),
+    //         cleanValue(Tax_Type),
+    //         normalizeNumber(Tax_Amount),
+    //         normalizeNumber(Amount),
+    //       ]
+    //     );
+    //     const id = res.insertId;
+    //     await connection.execute(
+    //       `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
+    //       ["PIT" + id, id]
+    //     );
+    //     await connection.query(
+    //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //       [normalizeNumber(Quantity), Item_Id]
+    //     );
+    //   }
+    // }
     const [oldItems] = await connection.query(
       "SELECT * FROM add_purchase_items WHERE Purchase_Id = ?",
       [purchaseId]
     );
 
-    const oldMap = new Map();
-    oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
-
-    const newItemIds = new Set();
-
+    // Step 1: resolve every line to its Item_Id (create new items if needed, sync HSN if changed)
+    const resolvedLines = [];
     for (const item of items) {
-      const {
-        Item_Name,
-        Item_Category,
-        Item_HSN,
-        Item_Unit,
-        Quantity,
-        Purchase_Price,
-        Discount_On_Purchase_Price,
-        Discount_Type_On_Purchase_Price,
-        Tax_Type,
-        Tax_Amount,
-        Amount,
-      } = item;
+      const { Item_Name, Item_Category, Item_HSN, Item_Unit, Quantity } = item;
 
-      const [existingItem] = await connection.query(
-        "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
-        [Item_Name]
-      );
+      let Item_Id = item.Item_Id || null;
+      let dbItemRow = null;
 
-      let Item_Id;
-
-      if (existingItem.length === 0) {
-        const [res] = await connection.execute(
-          `INSERT INTO add_item
-           (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-          [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || "", normalizeNumber(Quantity)]
-        );
-        const id = res.insertId;
-        Item_Id = "ITM" + id;
-        await connection.execute(
-          `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-          [Item_Id, id]
-        );
+      if (Item_Id) {
+        const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
+        dbItemRow = rows[0] || null;
       } else {
-        Item_Id = existingItem[0].Item_Id;
+        const [rows] = await connection.query(
+          "SELECT * FROM add_item WHERE LOWER(TRIM(Item_Name)) = LOWER(TRIM(?)) LIMIT 1",
+          [Item_Name]
+        );
+        // const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [Item_Name]);
+        dbItemRow = rows[0] || null;
+        Item_Id = dbItemRow?.Item_Id || null;
       }
 
-      newItemIds.add(Item_Id);
-      const old = oldMap.get(Item_Id);
+      if (!dbItemRow) {
+        const [maxRow] = await connection.query(
+          `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
+        );
+        const autoId = (maxRow[0]?.maxId || 0) + 1;
+        Item_Id = "ITM" + autoId.toString().padStart(3, "0");
 
-      if (old) {
-        await connection.query(
-          `UPDATE add_purchase_items SET
-             Quantity = ?, Purchase_Price = ?,
-             Discount_On_Purchase_Price = ?, Discount_Type_On_Purchase_Price = ?,
-             Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
-           WHERE Purchase_items_Id = ?`,
-          [
-            normalizeNumber(Quantity),
-            normalizeNumber(Purchase_Price),
-            cleanDiscount(Discount_On_Purchase_Price),
-            cleanValue(Discount_Type_On_Purchase_Price),
-            cleanValue(Tax_Type),
-            normalizeNumber(Tax_Amount),
-            normalizeNumber(Amount),
-            old.Purchase_items_Id,
-          ]
-        );
-        const diff = normalizeNumber(Quantity) - old.Quantity;
-        if (diff !== 0) {
-          await connection.query(
-            `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-            [diff, Item_Id]
-          );
-        }
-      } else {
-        const [res] = await connection.execute(
-          `INSERT INTO add_purchase_items
-           (Purchase_Id, Item_Id, Quantity, Purchase_Price,
-            Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-            Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          [
-            purchaseId,
-            Item_Id,
-            normalizeNumber(Quantity),
-            normalizeNumber(Purchase_Price),
-            cleanDiscount(Discount_On_Purchase_Price),
-            cleanValue(Discount_Type_On_Purchase_Price),
-            cleanValue(Tax_Type),
-            normalizeNumber(Tax_Amount),
-            normalizeNumber(Amount),
-          ]
-        );
-        const id = res.insertId;
         await connection.execute(
-          `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
-          ["PIT" + id, id]
+          `INSERT INTO add_item
+       (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit,
+        Stock_Quantity, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          [Item_Id, Item_Name, cleanValue(Item_Category), cleanValue(Item_HSN), cleanValue(Item_Unit), 0]
         );
+      } else if (Item_HSN && Item_HSN !== dbItemRow.Item_HSN) {
+        await connection.query(
+          `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
+          [Item_HSN, Item_Id]
+        );
+      }
+
+      resolvedLines.push({ ...item, Item_Id });
+    }
+
+    // Step 2: net stock delta per Item_Id — purchase adds stock, so diff is applied as "+"
+    const newQtyByItem = new Map();
+    for (const line of resolvedLines) {
+      newQtyByItem.set(line.Item_Id, (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity));
+    }
+    const oldQtyByItem = new Map();
+    oldItems.forEach((o) => {
+      oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
+    });
+
+    const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
+    for (const itemId of allItemIds) {
+      const newQty = newQtyByItem.get(itemId) || 0;
+      const oldQty = oldQtyByItem.get(itemId) || 0;
+      const diff = newQty - oldQty;
+      if (diff !== 0) {
         await connection.query(
           `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-          [normalizeNumber(Quantity), Item_Id]
+          [diff, itemId]
         );
       }
     }
 
-    // delete removed items + reverse their stock
+    // Step 3: delete old purchase_items rows, reinsert fresh (repeats-safe)
+    await connection.query(`DELETE FROM add_purchase_items WHERE Purchase_Id = ?`, [purchaseId]);
+
+    for (const line of resolvedLines) {
+      const [insertRes] = await connection.execute(
+        `INSERT INTO add_purchase_items
+     (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+      Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+      Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          purchaseId,
+          line.Item_Id,
+          normalizeNumber(line.Quantity),
+          normalizeNumber(line.Purchase_Price),
+          cleanDiscount(line.Discount_On_Purchase_Price),
+          cleanValue(line.Discount_Type_On_Purchase_Price),
+          cleanValue(line.Tax_Type),
+          normalizeNumber(line.Tax_Amount),
+          normalizeNumber(line.Amount),
+        ]
+      );
+      const id = insertRes.insertId;
+      await connection.execute(
+        `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
+        ["PIT" + id.toString().padStart(3, "0"), id]
+      );
+    }
+
+    // delete removed items + reverse their stock — unchanged, still correct
     for (const old of oldItems) {
-      if (!newItemIds.has(old.Item_Id)) {
-        await connection.query(
-          `DELETE FROM add_purchase_items WHERE Purchase_items_Id = ?`,
-          [old.Purchase_items_Id]
-        );
+      if (![...newQtyByItem.keys()].includes(old.Item_Id)) {
+        await connection.query(`DELETE FROM add_purchase_items WHERE Purchase_items_Id = ?`, [old.Purchase_items_Id]);
         await connection.query(
           `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
           [old.Quantity, old.Item_Id]
         );
       }
     }
+
+    // delete removed items + reverse their stock
+    // for (const old of oldItems) {
+    //   if (!newItemIds.has(old.Item_Id)) {
+    //     await connection.query(
+    //       `DELETE FROM add_purchase_items WHERE Purchase_items_Id = ?`,
+    //       [old.Purchase_items_Id]
+    //     );
+    //     await connection.query(
+    //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+    //       [old.Quantity, old.Item_Id]
+    //     );
+    //   }
+    // }
 
     await connection.commit();
 
@@ -1747,7 +1896,7 @@ const getSinglePurchase = async (req, res, next) => {
          pu.Purchase_Id,
          pu.Bill_Number,
          pu.Bill_Date,
-         pu.Reference_Number,
+        
          pu.State_Of_Supply,
          pu.Total_Amount,
          pu.Total_Paid,
@@ -1832,7 +1981,7 @@ const getSinglePurchase = async (req, res, next) => {
         State_Of_Supply: purchaseHeader.State_Of_Supply,
         Bill_Number: purchaseHeader.Bill_Number,
         Bill_Date: purchaseHeader.Bill_Date,
-        Reference_Number: purchaseHeader.Reference_Number,
+        //Reference_Number: purchaseHeader.Reference_Number,
         Total_Amount: purchaseHeader.Total_Amount,
         Total_Paid: purchaseHeader.Total_Paid,
         Balance_Due: purchaseHeader.Balance_Due,

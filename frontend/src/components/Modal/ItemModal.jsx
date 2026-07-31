@@ -156,33 +156,38 @@ if(!editingItem) return
 // const fetchEachItemBillAndSaleNumbers=async()=>{
 //     setEachItemBillAndInvoiceNumbersModalOpen(true)
 // }
-const handleEdit=async()=>{
-  if(!editingItem) return
-  try{
-    const res=await editItem({
-      body:formValues,
-      Item_Id:itemDetails.Item_Id
-    }).unwrap()
-    const resData=  res;
-    console.log(res,"res")
-    if(resData?.success){
-      toast.success("Item Updated Successfully")
-       setEachItemBillAndInvoiceNumbersModalOpen(false);
-      onClose()
-      dispatch(itemApi.util.invalidateTags(["Item"]))
-            // Invalidate purchase list (in purchaseApi file)
+const handleEdit = async () => {
+  if (!editingItem) return;
+
+  try {
+    const res = await editItem({
+      body: formValues,
+      Item_Id: itemDetails.Item_Id,
+    }).unwrap();
+
+    console.log(res, "res");
+
+    if (res?.success) {
+      toast.success(res?.message || "Item Updated Successfully");
+
+      setEachItemBillAndInvoiceNumbersModalOpen(false);
+      onClose();
+
+      dispatch(itemApi.util.invalidateTags(["Item"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-
-     //Invalidate sale list (in saleApi file)
       dispatch(saleApi.util.invalidateTags(["Sale"]));
-
     }
+  } catch (err) {
+    console.error("Failed to update item:", err);
+
+    // ✅ Show exact backend error message
+    toast.error(
+      err?.data?.message ||
+      err?.message ||
+      "Failed to update item"
+    );
   }
-  catch(err){
-    console.error(err)
-    toast.error("Failed to update item")
-  }
-}
+};
    return (
    
    <>

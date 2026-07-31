@@ -137,37 +137,61 @@ const handleAddCategory = async () => {
   console.log("Form errors:", errors);
 
 
-  const onSubmit = async (data) => {
-    console.log("Form Data (from RHF):", data);
-    try {
-      const res = await addItem({
-        body: data,
-      }).unwrap();
-      console.log(" successfully:", res);
-      const resData = res?.data || res;
-      if (resData?.success) {
+  // const onSubmit = async (data) => {
+  //   console.log("Form Data (from RHF):", data);
+  //   try {
+  //     const res = await addItem({
+  //       body: data,
+  //     }).unwrap();
+  //     console.log(" successfully:", res);
+  //     const resData = res?.data || res;
+  //     if (resData?.success) {
 
-        toast.success("New Item added successfully!");
-        navigate("/items/all-items");
-      } else {
-        toast.error("Failed to add new item");
-      }
+  //       toast.success("New Item added successfully!");
+  //       navigate("/items/all-items");
+  //     } else {
+  //       toast.error("Failed to add new item");
+  //     }
 
-    } catch (error) {
-      const errorMessage =
-        error?.data?.message || error?.message || "Failed to add new lead";
-      toast.error(errorMessage);
-      // toast.error("Failed to add lead");
-      console.error("Submission failed", error);
-    }
-  };
+  //   } catch (error) {
+  //     const errorMessage =
+  //       error?.data?.message || error?.message || "Failed to add new lead";
+  //     toast.error(errorMessage);
+  //     // toast.error("Failed to add lead");
+  //     console.error("Submission failed", error);
+  //   }
+  // };
 
+const onSubmit = async (data) => {
+  console.log("Form Data (from RHF):", data);
 
+  try {
+    const res = await addItem({
+      body: data,
+    }).unwrap();
+
+    console.log("Successfully:", res);
+
+    toast.success(res?.message || "New Item added successfully!");
+    navigate("/items/all-items");
+
+  } catch (error) {
+    console.error("Submission failed:", error);
+
+    // Shows exact message coming from backend
+    const backendMessage = error?.data?.message;
+    
+
+    toast.error(
+      backendMessage || "Failed to add new item"
+    );
+  }
+};
 const selectedUnit=watch("Item_Unit")
   return (<>
 
 
-    <div className="sb2-2-2">
+    {/* <div className="sb2-2-2">
       <ul >
         <li >
           <NavLink style={{display:"flex" ,flexDirection:"row"}}
@@ -175,13 +199,13 @@ const selectedUnit=watch("Item_Unit")
 
           >
             <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-            {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+           
             Dashboard
           </NavLink>
         </li>
 
       </ul>
-    </div>
+    </div> */}
     {/* <div className="sb2-2-3 ">
       <div className="row">
         <div className="col-md-12">

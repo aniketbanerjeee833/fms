@@ -133,15 +133,7 @@ export default function SaleAdd() {
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  // const [newUnitKey, setNewUnitKey] = useState("");
-  // const [newUnitName, setNewUnitName] = useState("");
-  //  const itemUnitsFetched = {
-  //     "gm": "Gram",
-  //     "Kg": "Kilogram",
-  //     "lt": "Litre",
-  //     "pcs": "Piece",
-
-  //   }
+  
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   console.log(itemUnits, "itemUnits");
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
@@ -693,25 +685,20 @@ const onSubmit = async (data) => {
   console.log(itemsValues, "itemsValues");
   return (
     <>
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
-          {/* <li>
-                            <NavLink to="/home">
-                                <i className="fa fa-home mr-2" aria-hidden="true"></i>
-                                Dashboard
-                            </NavLink>
-                        </li> */}
+        
           <NavLink style={{ display: "flex", flexDirection: "row" }}
             to="/home"
 
           >
             <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-            {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+           
             Dashboard
           </NavLink>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -1000,14 +987,12 @@ const onSubmit = async (data) => {
 
 
                 {/* State of Supply */}
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
-                                           state-of-supply-class">
+                <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
                   {/* <div className="grid grid-cols-[140px_0.9fr] items-center gap-2"> */}
                   {/* <div className="input-field  "> */}
                   <span className=" whitespace-nowrap active">
                     State of Supply
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
                   <select
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -1022,11 +1007,11 @@ const onSubmit = async (data) => {
                       </option>
                     ))}
                   </select>
-                  {errors?.State_Of_Supply && (
+                  {/* {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
                       {errors?.State_Of_Supply?.message}
                     </p>
-                  )}
+                  )} */}
                 </div>
               </div>
 
@@ -1279,6 +1264,60 @@ const onSubmit = async (data) => {
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
+                              onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
+                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                );
+
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: true,
+                                      itemOpen: false,
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
+                            }}
 
                             onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
@@ -1428,6 +1467,7 @@ const onSubmit = async (data) => {
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
                           onChange={(e) => {
+                             e.target.value = e.target.value.replace(/[^0-9]/g, "");
                             handleRowChange(i, "Item_HSN", e.target.value);
                             setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
                           }}
@@ -1850,7 +1890,7 @@ const onSubmit = async (data) => {
                               }
                             }}
                           >
-                            <option value="">Select Payment Type</option>
+                            {/* <option value="">Select Payment Type</option> */}
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Neft">Neft</option>

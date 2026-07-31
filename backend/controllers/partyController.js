@@ -53,7 +53,20 @@ if (existingParty.length > 0) {
     message: "GSTIN or Phone Number already exists for another party",
   });
 }
+// 🔥 Duplicate party name check (case-insensitive, trimmed)
+const [existingName] = await db.query(
+  `SELECT Party_Id FROM add_party 
+   WHERE LOWER(TRIM(Party_Name)) = LOWER(TRIM(?))
+   LIMIT 1`,
+  [Party_Name]
+);
 
+if (existingName.length > 0) {
+  await connection.rollback();
+  return res.status(400).json({
+    message: "Party name already exists",
+  });
+}
 
   // const [existingParty] = await db.query(
   //     "SELECT Party_Id, GSTIN, Phone_Number FROM add_party "
@@ -154,6 +167,21 @@ const editParty= async (req, res, next) => {
     const { Party_Id: partyId } = req.params;
 
  
+
+// 🔥 Duplicate party name check (excluding this party itself)
+const [existingName] = await db.query(
+  `SELECT Party_Id FROM add_party 
+   WHERE LOWER(TRIM(Party_Name)) = LOWER(TRIM(?)) AND Party_Id != ?
+   LIMIT 1`,
+  [Party_Name, partyId]
+);
+
+if (existingName.length > 0) {
+  await connection.rollback();
+  return res.status(400).json({
+    message: "Party name already exists",
+  });
+}
     const [result] = await db.execute(
       `UPDATE add_party 
        SET Party_Name = ?, GSTIN = ?, Phone_Number = ?, State = ?, Email_Id = ?, Billing_Address = ?, Shipping_Address = ?

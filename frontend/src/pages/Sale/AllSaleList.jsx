@@ -86,7 +86,7 @@ export default function AllSaleList() {
 
                
         //         <div className="sb2-2"> */}
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul >
           <li>
 
@@ -95,13 +95,13 @@ export default function AllSaleList() {
 
             >
               <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+             
               Dashboard
             </NavLink>
           </li>
 
         </ul>
-      </div>
+      </div> */}
       {/* <div className="sb2-2-3 ">
         <div className="row">
           <div className="col-md-12">

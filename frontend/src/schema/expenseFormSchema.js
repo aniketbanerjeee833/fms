@@ -212,8 +212,8 @@ const expenseWithGSTSchema = expenseBaseSchema
  
     Party_Name: z.string().trim().min(1, "Party is required"),
  
-   State_Of_Supply: z.string().optional(),
- 
+  //  State_Of_Supply: z.string().optional(),
+   State_Of_Supply: z.string().nullable().optional(),
     items: z
       .array(expenseItemWithGSTSchema)
       .nonempty("At least one item is required"),

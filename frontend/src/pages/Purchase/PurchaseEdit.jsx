@@ -18,6 +18,7 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
+
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { Trash2 } from "lucide-react";
 export default function PurchaseEdit() {
@@ -493,7 +494,7 @@ export default function PurchaseEdit() {
         itemSearch: item.Item_Name,
         itemOpen: false,
         CategoryOpen: false,
-        isHSNLocked: true,
+        isHSNLocked: false,
         isUnitLocked: true,
         isExistingItem: true,
 
@@ -551,31 +552,42 @@ export default function PurchaseEdit() {
       // Total_Paid: totals.Total_Paid,           // blank -> 0.00
       // Balance_Due: totals.Balance_Due,
     };
-    const seenItems = new Set();
+    // const seenItems = new Set();
 
 
+    // for (const item of payload.items) {
+    //   const name = item.Item_Name?.trim().toLowerCase();
+    //   const category = item.Item_Category?.trim().toLowerCase();
+    //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
+    //   const Quantity = item.Quantity
+
+    //   if (!name || !category || !itemHSN || !Quantity) {
+    //     toast.error("Each item must have a valid name, category, HSN and quantity.");
+    //     return;
+    //   }
+
+    //   // ❌ Prevent duplicates
+    //   if (seenItems.has(name)) {
+    //     toast.error(
+    //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+    //     );
+    //     return;
+    //   }
+    //   seenItems.add(name);
+
+
+    // }
     for (const item of payload.items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      const category = item.Item_Category?.trim().toLowerCase();
-      const itemHSN = item.Item_HSN?.trim().toLowerCase();
-      const Quantity = item.Quantity
+  const name = item.Item_Name?.trim();
+  const category = item.Item_Category?.trim();
+  const itemHSN = item.Item_HSN?.trim();
+  const quantity = Number(item.Quantity);
 
-      if (!name || !category || !itemHSN || !Quantity) {
-        toast.error("Each item must have a valid name, category, HSN and quantity.");
-        return;
-      }
-
-      // ❌ Prevent duplicates
-      if (seenItems.has(name)) {
-        toast.error(
-          `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-        );
-        return;
-      }
-      seenItems.add(name);
-
-
-    }
+  if (!name || !category || !itemHSN || quantity <= 0) {
+    toast.error("Each item must have a valid name, category, HSN and quantity.");
+    return;
+  }
+}
     console.log("payload:", payload);
     try {
       const res = await editPurchase({
@@ -586,7 +598,7 @@ export default function PurchaseEdit() {
       const resData = res?.data || res;
 
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-
+      dispatch(itemApi.util.invalidateTags(["Item"]));
       dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
       dispatch(bankAccountApi.util.invalidateTags([
@@ -600,7 +612,7 @@ export default function PurchaseEdit() {
         toast.error("Failed to update purchase");
         return;
       } else {
-        toast.success("New Purchase added successfully!");
+        toast.success(" Purchase updated successfully!");
         if (from === "party-payables") {
           navigate({
             pathname: `/party/payables`,
@@ -651,32 +663,29 @@ export default function PurchaseEdit() {
     }
   }
 
-  console.log(purchase);
+
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
   const paymentType = watch("splits.0.Payment_Type");
   return (
     <>
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
           <li>
-            {/* <NavLink to="/">
-                                <i className="fa fa-home mr-2" aria-hidden="true"></i>
-                                Dashboard
-                            </NavLink> */}
+         
             <NavLink style={{ display: "flex", flexDirection: "row" }}
               to="/home"
 
             >
               <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+             
               Dashboard
             </NavLink>
           </li>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -987,7 +996,7 @@ export default function PurchaseEdit() {
                                            state-of-supply-class">
                   <span className="whitespace-nowrap ">
                     State of Supply
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
                   <select
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -1338,10 +1347,64 @@ export default function PurchaseEdit() {
                               handleRowChange(i, "isExistingItem", false);
                               handleRowChange(i, "isUnitLocked", false);
                               // ✅ If typed value doesn’t match any existing item → unlock category
-                              const exists = items?.items?.some(
+                              const exists = items?.items?.find(
                                 (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                               );
                               handleRowChange(i, "isExistingItem", exists); // false if new item
+                            }}
+                              onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
+                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                );
+
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: true,
+                                      itemOpen: false,
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
                             }}
                             onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
@@ -1390,7 +1453,7 @@ export default function PurchaseEdit() {
                                               Item_HSN: it.Item_HSN || "",
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
-                                              isHSNLocked: true,      // lock HSN
+                                              isHSNLocked: false,      // lock HSN
                                               isUnitLocked: true,     // lock unit
                                             };
                                             return updated;
@@ -1477,14 +1540,17 @@ export default function PurchaseEdit() {
                           maxLength={8}
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
                           onChange={(e) => {
-                            if (!rows[i]?.isHSNLocked) {
+                            // if (!rows[i]?.isHSNLocked) {
+                            //   handleRowChange(i, "Item_HSN", e.target.value);
+                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // }
+                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
                               handleRowChange(i, "Item_HSN", e.target.value);
                               setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                            }
                           }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
-                          readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
+                          //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
                         />
                         {errors?.items?.[i]?.Item_HSN && (
                           <p className="text-red-500 text-xs mt-1">
@@ -1850,7 +1916,7 @@ export default function PurchaseEdit() {
                               }
                             }}
                           >
-                            <option value="">Select Payment Type</option>
+                            {/* <option value="">Select Payment Type</option> */}
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Neft">Neft</option>

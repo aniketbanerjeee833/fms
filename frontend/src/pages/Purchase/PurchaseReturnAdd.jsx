@@ -520,7 +520,7 @@ export default function PurchaseReturnAdd() {
         itemSearch: item.Item_Name,
         itemOpen: false,
         CategoryOpen: false,
-        isHSNLocked: true,
+        isHSNLocked: false,
         isUnitLocked: true,
         isExistingItem: true,
       }));
@@ -653,26 +653,39 @@ export default function PurchaseReturnAdd() {
     const payload = { ...data };
 
     // ── validate items ──
-    const seenItems = new Set();
-    for (const item of payload.items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      const category = item.Item_Category?.trim().toLowerCase();
-      const itemHSN = item.Item_HSN?.trim().toLowerCase();
-      const Quantity = item.Quantity;
+    // const seenItems = new Set();
+    // for (const item of payload.items) {
+    //   const name = item.Item_Name?.trim().toLowerCase();
+    //   const category = item.Item_Category?.trim().toLowerCase();
+    //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
+    //   const Quantity = item.Quantity;
 
-      if (!name || !category || !itemHSN || !Quantity) {
-        toast.error("Each item must have a valid name, category, HSN and quantity.");
-        return;
-      }
+    //   if (!name || !category || !itemHSN || !Quantity) {
+    //     toast.error("Each item must have a valid name, category, HSN and quantity.");
+    //     return;
+    //   }
 
-      if (seenItems.has(name)) {
-        toast.error(
-          `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-        );
-        return;
-      }
-      seenItems.add(name);
-    }
+    //   if (seenItems.has(name)) {
+    //     toast.error(
+    //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+    //     );
+    //     return;
+    //   }
+    //   seenItems.add(name);
+    // }
+
+    // ── validate items ──
+for (const item of payload.items) {
+  const name = item.Item_Name?.trim();
+  const category = item.Item_Category?.trim();
+  const itemHSN = item.Item_HSN?.trim();
+  const quantity = Number(item.Quantity);
+
+  if (!name || !category || !itemHSN || quantity <= 0) {
+    toast.error("Each item must have a valid name, category, HSN and quantity.");
+    return;
+  }
+}
 
     console.log("payload:", payload);
 
@@ -729,7 +742,7 @@ export default function PurchaseReturnAdd() {
   // const paymentType = watch("Payment_Type", "");
   return (
     <>
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
           <li>
 
@@ -738,13 +751,13 @@ export default function PurchaseReturnAdd() {
 
             >
               <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+              
               Dashboard
             </NavLink>
           </li>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -1076,7 +1089,7 @@ export default function PurchaseReturnAdd() {
                                            state-of-supply-class">
                   <span className="whitespace-nowrap ">
                     State of Supply
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
                   <select
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -1095,11 +1108,11 @@ export default function PurchaseReturnAdd() {
                         <option value="Karnataka">Karnataka</option>
                         <option value="Delhi">Delhi</option> */}
                   </select>
-                  {errors?.State_Of_Supply && (
+                  {/* {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
                       {errors?.State_Of_Supply?.message}
                     </p>
-                  )}
+                  )} */}
                 </div>
               </div>
 
@@ -1306,10 +1319,75 @@ export default function PurchaseReturnAdd() {
                               handleRowChange(i, "isExistingItem", false);
                               handleRowChange(i, "isUnitLocked", false);
                               // ✅ If typed value doesn’t match any existing item → unlock category
-                              const exists = items?.items?.some(
+                              const exists = items?.items?.find(
                                 (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                               );
-                              handleRowChange(i, "isExistingItem", exists); // false if new item
+                              if (exists) {
+                                // ✅ Only store if it's a valid item
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                                handleRowChange(i, "isExistingItem", true);
+                              } else {
+                                // ❌ Clear Item_Name in RHF to trigger error
+                                // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                                // handleRowChange(i, "isExistingItem", false);
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                                handleRowChange(i, "isExistingItem", false);
+                              }
+                              //handleRowChange(i, "isExistingItem", exists); // false if new item
+                            }}
+                                  onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
+                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                );
+
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: true,
+                                      itemOpen: false,
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
                             }}
                             onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
@@ -1358,7 +1436,7 @@ export default function PurchaseReturnAdd() {
                                               Item_HSN: it.Item_HSN || "",
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
-                                              isHSNLocked: true,      // lock HSN
+                                              isHSNLocked: false,      // lock HSN
                                               isUnitLocked: true,     // lock unit
                                             };
                                             return updated;
@@ -1445,10 +1523,13 @@ export default function PurchaseReturnAdd() {
                           maxLength={8}
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
                           onChange={(e) => {
-                            if (!rows[i]?.isHSNLocked) {
+                                  e.target.value = e.target.value.replace(/[^0-9]/g, "");
                               handleRowChange(i, "Item_HSN", e.target.value);
                               setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                            }
+                            // if (!rows[i]?.isHSNLocked) {
+                            //   handleRowChange(i, "Item_HSN", e.target.value);
+                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // }
                           }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"

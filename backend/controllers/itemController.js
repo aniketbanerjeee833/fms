@@ -10,11 +10,11 @@ const cleanValue = (value) => {
   }
   return value;  // ✅ returns the original value for valid data
 };
-{/* Add Item */}
+{/* Add Item */ }
 const addItem = async (req, res, next) => {
   let connection;
   try {
-        connection = await db.getConnection();
+    connection = await db.getConnection();
     await connection.beginTransaction(); // ✅ Start transaction
     // ✅ Validate request body with Zod
     const cleanData = sanitizeObject(req.body);
@@ -24,12 +24,17 @@ const addItem = async (req, res, next) => {
     }
     const { Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category } =
       validation.data;
-
     // ✅ Check duplicate
-    const [rows] = await db.query(
-      `SELECT * FROM add_item WHERE Item_Name = ?`,
-      [Item_Name]
+    const normalizedName = Item_Name.trim().toLowerCase();
+
+    const [rows] = await connection.query(
+      `SELECT Item_Id
+   FROM add_item
+   WHERE LOWER(TRIM(Item_Name)) = ?`,
+      [normalizedName]
     );
+
+
     if (rows.length > 0) {
       await connection.rollback();
       return res
@@ -68,53 +73,69 @@ const addItem = async (req, res, next) => {
     // if (err.code === "ER_DUP_ENTRY") {
     //   return res.status(400).json({ message: "Duplicate entry" });
     // }
-    if(connection) await connection.rollback();
+    if (connection) await connection.rollback();
     console.error("❌ Error adding item:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+  } finally {
     if (connection) connection.release();
   }
 };
 
 
 const editItem = async (req, res, next) => {
-    let connection;
+  let connection;
   try {
-        connection = await db.getConnection();
+    connection = await db.getConnection();
     await connection.beginTransaction(); // ✅ Start transaction
 
-        const { Item_Id } = req.params;
-        const cleanData = sanitizeObject(req.body);
-        const validation = itemFormSchema.safeParse(cleanData);
-        if (!validation.success) {
-          return res.status(400).json({ errors: validation.error.errors });
-        }
-        const { Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category } =validation.data;
+    const { Item_Id } = req.params;
+    const cleanData = sanitizeObject(req.body);
+    const validation = itemFormSchema.safeParse(cleanData);
+    if (!validation.success) {
+      return res.status(400).json({ errors: validation.error.errors });
+    }
+    const { Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category } = validation.data;
+    const normalizedName = Item_Name.trim().toLowerCase();
 
-        const [result] = await db.execute(
-          `UPDATE add_item SET Item_Name = ?, Item_HSN = ?, Item_Unit = ?, 
+    const [duplicate] = await connection.query(
+      `SELECT Item_Id
+   FROM add_item
+   WHERE LOWER(TRIM(Item_Name)) = ?
+     AND Item_Id <> ?`,
+      [normalizedName, Item_Id]
+    );
+
+    if (duplicate.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Another item with this name already exists.",
+      });
+    }
+    const [result] = await db.execute(
+      `UPDATE add_item SET Item_Name = ?, Item_HSN = ?, Item_Unit = ?, 
           Item_Image = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
-          [Item_Name, Item_HSN, Item_Unit, cleanValue(Item_Image), Item_Category, Item_Id]
-        );
+      [Item_Name, Item_HSN, Item_Unit, cleanValue(Item_Image), Item_Category, Item_Id]
+    );
 
-        if (result.affectedRows === 0) {
-          await connection.rollback();
-          return res.status(404).json({ message: "Item not found" });
-        }
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Item not found" });
+    }
 
-        if (result.affectedRows > 0) {
-          await connection.commit();
-          return res.status(200).json({ success: true, message: "Item updated successfully" });
-        }
+    if (result.affectedRows > 0) {
+      await connection.commit();
+      return res.status(200).json({ success: true, message: "Item updated successfully" });
+    }
 
 
   } catch (err) {
-    if(connection) await connection.rollback();
+    if (connection) await connection.rollback();
     console.error("❌ Error editing item:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+  } finally {
     if (connection) connection.release();
   }
 }
@@ -306,8 +327,8 @@ const getAllItems = async (req, res, next) => {
     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
     const fromDate = req.query.fromDate || null;
     const toDate = req.query.toDate || null;
-    console.log("🔍 Params =>", { page, search, fromDate, toDate }) ;
-    console.log(fromDate, toDate,search,page);
+    console.log("🔍 Params =>", { page, search, fromDate, toDate });
+    console.log(fromDate, toDate, search, page);
     const limit = 10;
     const offset = page ? (page - 1) * limit : 0;
 
@@ -339,19 +360,19 @@ const getAllItems = async (req, res, next) => {
     //   whereClauses.push("DATE(created_at) <= ?");
     //   params.push(toDate);
     // }
-  if (fromDate && toDate) {
-  whereClauses.push(`DATE(created_at) BETWEEN ? AND ?`);
-  params.push(
-    `${fromDate} 00:00:00`,
-    `${toDate} 23:59:59`
-  );
-} else if (fromDate) {
-  whereClauses.push(`DATE(created_at) >= ?`);
-  params.push(`${fromDate} 00:00:00`);
-} else if (toDate) {
-  whereClauses.push(`DATE(created_at) <= ?`);
-  params.push(`${toDate} 23:59:59`);
-}
+    if (fromDate && toDate) {
+      whereClauses.push(`DATE(created_at) BETWEEN ? AND ?`);
+      params.push(
+        `${fromDate} 00:00:00`,
+        `${toDate} 23:59:59`
+      );
+    } else if (fromDate) {
+      whereClauses.push(`DATE(created_at) >= ?`);
+      params.push(`${fromDate} 00:00:00`);
+    } else if (toDate) {
+      whereClauses.push(`DATE(created_at) <= ?`);
+      params.push(`${toDate} 23:59:59`);
+    }
     // Combine WHERE clauses
     const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
 
@@ -399,7 +420,7 @@ const getAllItems = async (req, res, next) => {
       }
     });
 
-    console.log(latestPurchasePrice, latestTaxType, latestSalePrice);
+    //console.log(latestPurchasePrice, latestTaxType, latestSalePrice);
     // ✅ Merge results
     const combined = items.map((item) => ({
       ...item,
@@ -408,7 +429,7 @@ const getAllItems = async (req, res, next) => {
       Sale_Price: latestSalePrice[item.Item_Id] || 0.0,
     }));
 
-      console.log(combined);
+    //console.log(combined);
     // ✅ Response
     return res.status(200).json({
       success: true,
@@ -418,92 +439,175 @@ const getAllItems = async (req, res, next) => {
       items: combined,
     });
   } catch (err) {
-    if(connection) connection.release();
+    if (connection) connection.release();
     console.error("❌ Error fetching items:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
-    if (connection)  connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 };
 
 
 
-{/* add category */}
+{/* add category */ }
+// const addCategory = async (req, res, next) => {
+//   let connection;
+//   try {
+//     const { Item_Category } = req.body;
+//     connection = await db.getConnection();
+
+//     if (!Item_Category) {
+//       await connection.rollback();
+//       return res.status(400).json({ success: false, message: "Item_Category is required" });
+//     }
+
+//     // Trim + collapse spaces
+//     const updatedCategory = Item_Category.trim().replace(/\s+/g, " ");
+
+//     // Check if already exists (case-insensitive)
+//     const [rows] = await db.query(
+//       `SELECT * FROM add_category WHERE LOWER(Item_Category) = LOWER(?)`,
+//       [updatedCategory]
+//     );
+
+//     if (rows.length > 0) {
+//       await connection.rollback();
+//       return res.status(400).json({ message: "Item_Category already exists" });
+//     }
+
+//     // Generate Category_Id
+//     let newId = "CAT001";
+//     const [last] = await db.query(
+//       "SELECT Category_Id FROM add_category ORDER BY id DESC LIMIT 1"
+//     );
+
+//     if (last.length > 0) {
+//       const lastId = last[0].Category_Id; // e.g. "CAT005"
+//       const num = parseInt(lastId.replace("CAT", "")) + 1;
+//       newId = "CAT" + num.toString().padStart(3, "0");
+//     }
+
+//     // ✅ Insert new category (2 placeholders for 2 values)
+//     const [result] = await db.execute(
+//       `INSERT INTO add_category (Category_Id, Item_Category, created_at, updated_at) 
+//        VALUES (?, ?, NOW(), NOW())`,
+//       [newId, updatedCategory]
+//     );
+//     await connection.commit();
+//     return res.status(201).json({
+//       message: "Item_Category added successfully",
+//       success: true,
+//       id: result.insertId, // auto-increment primary key
+//       Category_Id: newId,
+//       Item_Category: updatedCategory,
+//     });
+//   } catch (err) {
+//     if (connection) await connection.rollback();
+//     console.error("❌ Error adding Item_Category:", err);
+//     next(err);
+//     // return res.status(500).json({ message: "Internal Server Error" });
+//   } finally {
+//     if (connection) await connection.release()
+//   }
+// };
 const addCategory = async (req, res, next) => {
   let connection;
-  try {
-    const { Item_Category } = req.body;
-    connection = await db.getConnection();
 
-    if (!Item_Category) {
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { Item_Category } = req.body;
+
+    if (!Item_Category?.trim()) {
       await connection.rollback();
-      return res.status(400).json({success: false, message: "Item_Category is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Item Category is required",
+      });
     }
 
-    // Trim + collapse spaces
-    const updatedCategory = Item_Category.trim().replace(/\s+/g, " ");
+    // Normalize category name
+    const normalizedCategory = Item_Category.trim().replace(/\s+/g, " ");
 
-    // Check if already exists (case-insensitive)
-    const [rows] = await db.query(
-      `SELECT * FROM add_category WHERE LOWER(Item_Category) = LOWER(?)`,
-      [updatedCategory]
+    // Check duplicate (case-insensitive)
+    const [existing] = await connection.query(
+      `SELECT Category_Id
+       FROM add_category
+       WHERE LOWER(TRIM(Item_Category)) = ?`,
+      [normalizedCategory.toLowerCase()]
     );
 
-    if (rows.length > 0) {
+    if (existing.length > 0) {
       await connection.rollback();
-      return res.status(400).json({ message: "Item_Category already exists" });
+      return res.status(400).json({
+        success: false,
+        message: "Category already exists.",
+      });
     }
 
     // Generate Category_Id
-    let newId = "CAT001";
-    const [last] = await db.query(
-      "SELECT Category_Id FROM add_category ORDER BY id DESC LIMIT 1"
+    let categoryId = "CAT001";
+
+    const [last] = await connection.query(
+      `SELECT Category_Id
+       FROM add_category
+       ORDER BY id DESC
+       LIMIT 1`
     );
 
     if (last.length > 0) {
-      const lastId = last[0].Category_Id; // e.g. "CAT005"
-      const num = parseInt(lastId.replace("CAT", "")) + 1;
-      newId = "CAT" + num.toString().padStart(3, "0");
+      const lastId = last[0].Category_Id; // CAT001
+      const nextNumber = parseInt(lastId.replace("CAT", ""), 10) + 1;
+
+      categoryId = "CAT" + nextNumber.toString().padStart(3, "0");
     }
 
-    // ✅ Insert new category (2 placeholders for 2 values)
-    const [result] = await db.execute(
-      `INSERT INTO add_category (Category_Id, Item_Category, created_at, updated_at) 
-       VALUES (?, ?, NOW(), NOW())`,
-      [newId, updatedCategory]
+    // Insert category
+    const [result] = await connection.execute(
+      `INSERT INTO add_category
+        (
+          Category_Id,
+          Item_Category,
+          created_at,
+          updated_at
+        )
+       VALUES
+        (?, ?, NOW(), NOW())`,
+      [categoryId, normalizedCategory]
     );
-await connection.commit();
-   return res.status(201).json({
-  message: "Item_Category added successfully",
-  success: true,
-  id: result.insertId, // auto-increment primary key
-  Category_Id: newId,
-  Item_Category: updatedCategory,
-});
+
+    await connection.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Category added successfully.",
+      id: result.insertId,
+      Category_Id: categoryId,
+      Item_Category: normalizedCategory,
+    });
   } catch (err) {
-    if(connection) await connection.rollback();
-    console.error("❌ Error adding Item_Category:", err);
+    if (connection) await connection.rollback();
+    console.error("❌ Error adding category:", err);
     next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
-        if(connection) await connection.rollback()
+  } finally {
+    if (connection) connection.release();
   }
 };
-
 const getAllCategories = async (req, res, next) => {
   let connection;
-  try{
-      connection = await db.getConnection();
-      const [rows] = await db.query("SELECT * FROM add_category  ORDER BY created_at DESC");
-      return res.status(200).json(rows);
-  }catch(err){
-       if(connection) connection.release();
-      console.error("❌ Error getting all categories:", err);
-      next(err);
-      // return res.status(500).json({ message: "Internal Server Error" });
-  }finally{
-      if(connection) connection.release();
+  try {
+    connection = await db.getConnection();
+    const [rows] = await db.query("SELECT * FROM add_category  ORDER BY created_at DESC");
+    return res.status(200).json(rows);
+  } catch (err) {
+    if (connection) connection.release();
+    console.error("❌ Error getting all categories:", err);
+    next(err);
+    // return res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    if (connection) connection.release();
   }
 }
 
@@ -576,7 +680,7 @@ const getAllCategories = async (req, res, next) => {
 //       Type: "Purchase",
 //        Party_Name: partyDetails.find((p) => p.Party_Id === item.Party_Id)?.Party_Name,
 //       ...item,
-      
+
 //       // Purchase_Price_Unit: item.Purchase_Price,
 //       // Purchase_Id: item.Purchase_Id,
 //       // Quantity: item.Quantity,
@@ -823,14 +927,14 @@ const eachItemSalesPurchaseDetails = async (req, res, next) => {
 
     const [purchases] = purchaseIds.length
       ? await connection.query(
-          `
+        `
           SELECT ap.*, p.Party_Name, p.Phone_Number, p.GSTIN
           FROM add_purchase ap
           LEFT JOIN add_party p ON ap.Party_Id = p.Party_Id
           WHERE ap.Purchase_Id IN (?)
           `,
-          [purchaseIds]
-        )
+        [purchaseIds]
+      )
       : [[]];
 
     /* ---------------------------------------------------
@@ -839,14 +943,14 @@ const eachItemSalesPurchaseDetails = async (req, res, next) => {
 
     const [sales] = saleIds.length
       ? await connection.query(
-          `
+        `
           SELECT s.*, p.Party_Name, p.Phone_Number, p.GSTIN
           FROM add_sale s
           LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
           WHERE s.Sale_Id IN (?)
           `,
-          [saleIds]
-        )
+        [saleIds]
+      )
       : [[]];
 
     /* ---------------------------------------------------
@@ -855,39 +959,39 @@ const eachItemSalesPurchaseDetails = async (req, res, next) => {
 
     const [purchaseItems] = purchaseIds.length
       ? await connection.query(
-          `
+        `
           SELECT pi.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
           FROM add_purchase_items pi
           LEFT JOIN add_item i ON pi.Item_Id = i.Item_Id
           WHERE pi.Purchase_Id IN (?)
           `,
-          [purchaseIds]
-        )
+        [purchaseIds]
+      )
       : [[]];
 
     const [saleItems] = saleIds.length
       ? await connection.query(
-          `
+        `
           SELECT si.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
           FROM add_sale_items si
           LEFT JOIN add_item i ON si.Item_Id = i.Item_Id
           WHERE si.Sale_Id IN (?)
           `,
-          [saleIds]
-        )
+        [saleIds]
+      )
       : [[]];
 
     /* ---------------------------------------------------
        7️⃣ Build Final Objects
     --------------------------------------------------- */
-const purchaseMap = new Map();
+    const purchaseMap = new Map();
 
-purchaseItems.forEach(it => {
-  if(!purchaseMap.has(it.Purchase_Id)){
-    purchaseMap.set(it.Purchase_Id, []);
-  }
-  purchaseMap.get(it.Purchase_Id).push(it);
-});
+    purchaseItems.forEach(it => {
+      if (!purchaseMap.has(it.Purchase_Id)) {
+        purchaseMap.set(it.Purchase_Id, []);
+      }
+      purchaseMap.get(it.Purchase_Id).push(it);
+    });
     const purchaseBills = purchases.map((bill) => ({
       Type: "Purchase",
       ...bill,
@@ -900,13 +1004,13 @@ purchaseItems.forEach(it => {
       // ),
     }));
 
-    const saleMap=new Map()
+    const saleMap = new Map()
     saleItems.forEach(it => {
-  if(!saleMap.has(it.Sale_Id)){
-    saleMap.set(it.Sale_Id, []);
-  }
-  saleMap.get(it.Sale_Id).push(it);
-});
+      if (!saleMap.has(it.Sale_Id)) {
+        saleMap.set(it.Sale_Id, []);
+      }
+      saleMap.get(it.Sale_Id).push(it);
+    });
 
     const saleBills = sales.map((bill) => ({
       Type: "Sale",
@@ -1008,29 +1112,29 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
                   alignment: "right",
                   stack: [
                     {
-  text: type === "purchase" ? "Bill Number" : "Invoice Number",
-  style: "label"
-},
-{
-  text: safe(entry.Bill_Number || entry.Invoice_Number),
-  style: "value"
-},
+                      text: type === "purchase" ? "Bill Number" : "Invoice Number",
+                      style: "label"
+                    },
+                    {
+                      text: safe(entry.Bill_Number || entry.Invoice_Number),
+                      style: "value"
+                    },
 
-{
-  text: type === "purchase" ? "Bill Date" : "Invoice Date",
-  style: "label"
-},
-{
-  text: safe(
-    new Date(entry.Bill_Date || entry.Invoice_Date)
-      .toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "numeric",
-        year: "numeric",
-      })
-  ),
-  style: "value"
-},
+                    {
+                      text: type === "purchase" ? "Bill Date" : "Invoice Date",
+                      style: "label"
+                    },
+                    {
+                      text: safe(
+                        new Date(entry.Bill_Date || entry.Invoice_Date)
+                          .toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "numeric",
+                            year: "numeric",
+                          })
+                      ),
+                      style: "value"
+                    },
 
                   ],
                 },
@@ -1288,6 +1392,7 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
 // };
 
 
-export { addItem ,editItem,addCategory,getAllItems,getAllCategories,eachItemSalesPurchaseDetails,
-  printEachItemSalesPurchasesReport,eachItemBillAndInvoiceNumbers
+export {
+  addItem, editItem, addCategory, getAllItems, getAllCategories, eachItemSalesPurchaseDetails,
+  printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers
 };

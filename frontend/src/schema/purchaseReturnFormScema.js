@@ -160,8 +160,8 @@ export const purchaseReturnFormSchema = z
       .default(() => new Date().toISOString().slice(0, 10)), // today if not provided
 
     /* ── Supply ── */
-    State_Of_Supply: z.string().min(1, "State of Supply is required"),
-
+    // State_Of_Supply: z.string().min(1, "State of Supply is required"),
+State_Of_Supply: z.string().nullable().optional(),
     /* ── Amounts ──
        Total_Received and Balance_Due are DERIVED from splits[] at submit
        time (see onSubmit) — still validated here since they're still sent

@@ -21,7 +21,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
-import {Trash2} from "lucide-react";
+import { Trash2 } from "lucide-react";
 export default function PurchaseAdd() {
 
   const dispatch = useDispatch();
@@ -65,7 +65,7 @@ export default function PurchaseAdd() {
   const [newCategory, setNewCategory] = useState("");
 
   const [showPartyModal, setShowPartyModal] = useState(false);
-    const [showSplitBox, setShowSplitBox] = useState(false);
+  const [showSplitBox, setShowSplitBox] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
   const [originalTotal, setOriginalTotal] = useState(null);
   // const[chequeNumber,setChequeNumber]=useState(false);
@@ -74,7 +74,7 @@ export default function PurchaseAdd() {
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
-  
+
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   console.log(itemUnits, "itemUnits");
 
@@ -86,34 +86,50 @@ export default function PurchaseAdd() {
       return
     }
     else if (newCategory.trim() !== "") {
+      // try {
+      //   // ✅ Call backend
+      //   const res = await addCategory({
+      //     body: { Item_Category: newCategory.trim() },
+      //   });
+
+      //   // Some RTK Query wrappers put the response under `.data`
+      //   const data = res?.data || res;
+
+      //   if (data?.success) {
+      //     const addedCat = newCategory.trim();
+
+      //     // ✅ Auto-select the new category (single value)
+      //     //setSelected(addedCat);
+      //     setValue("Item_Category", addedCat); // directly set single category
+
+      //     // ✅ Refresh cache
+      //     dispatch(itemApi.util.invalidateTags(["Category"]));
+
+      //     // ✅ Reset modal & input
+      //     setShowModal(false);
+      //     // setNewCategory("");
+      //     // setOpen(true);
+      //   } else {
+      //     console.warn("⚠️ Category not added. Response:", data);
+      //   }
+      // } catch (err) {
+      //   console.error("❌ Error adding category:", err);
+      // }
       try {
-        // ✅ Call backend
-        const res = await addCategory({
+        const data = await addCategory({
           body: { Item_Category: newCategory.trim() },
-        });
+        }).unwrap();
+        toast.success(data.message || "Category added successfully.");
+        setValue("Item_Category", newCategory.trim());
 
-        // Some RTK Query wrappers put the response under `.data`
-        const data = res?.data || res;
+        dispatch(itemApi.util.invalidateTags(["Category"]));
 
-        if (data?.success) {
-          const addedCat = newCategory.trim();
-
-          // ✅ Auto-select the new category (single value)
-          //setSelected(addedCat);
-          setValue("Item_Category", addedCat); // directly set single category
-
-          // ✅ Refresh cache
-          dispatch(itemApi.util.invalidateTags(["Category"]));
-
-          // ✅ Reset modal & input
-          setShowModal(false);
-          // setNewCategory("");
-          // setOpen(true);
-        } else {
-          console.warn("⚠️ Category not added. Response:", data);
-        }
+        setShowModal(false);
+        setNewCategory("");
       } catch (err) {
-        console.error("❌ Error adding category:", err);
+        console.error(err);
+
+        toast.error(err?.data?.message || "Failed to add category.");
       }
     }
   };
@@ -181,8 +197,8 @@ export default function PurchaseAdd() {
     defaultValues: {
       Party_Name: "",
 
-       Bill_Number: "",
-      Bill_Date: "",
+      Bill_Number: "",
+      Bill_Date: new Date().toISOString().slice(0, 10),
       State_Of_Supply: "",
       Total_Amount: "",
       Balance_Due: "",
@@ -190,7 +206,7 @@ export default function PurchaseAdd() {
       //Payment_Type: "Cash",
       //Bank_Account_Id: null,   // 🔹 added
       //Reference_Number: "",
-       splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
+      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
       items: [{
 
 
@@ -215,7 +231,7 @@ export default function PurchaseAdd() {
     name: "items",
   });
 
-const {
+  const {
     fields: splitFields,
     append: appendSplit,
     remove: removeSplit,
@@ -260,26 +276,26 @@ const {
   };
 
   const handleDeleteRow = (i) => {
-  // 1. get current items BEFORE removal
-  const currentItems = watch("items");
- 
-  // 2. calculate new total excluding the deleted row
-  const newTotal = currentItems.reduce((sum, row, idx) => {
-    if (idx === i) return sum;                    // skip deleted row
-    return sum + parseFloat(row.Amount || 0);
-  }, 0);
- 
-  const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  const newBalanceDue = newTotal - currentTotalPaid;
- 
-  // 3. remove from UI state and form
-  setRows((prev) => prev.filter((_, idx) => idx !== i));
-  remove(i);
- 
-  // 4. update totals
-  setValue("Total_Amount", newTotal.toFixed(2),      { shouldValidate: true });
-  setValue("Balance_Due",  newBalanceDue.toFixed(2), { shouldValidate: true });
-};
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;                    // skip deleted row
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+    const newBalanceDue = newTotal - currentTotalPaid;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  };
 
   // const handleDeleteRow = (i) => {
   //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
@@ -331,7 +347,7 @@ const {
 
 
 
-  
+
 
 
   //const itemsValues = watch("items"); // watch all rows
@@ -352,7 +368,7 @@ const {
     setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
   };
 
-const sanitizeAmount = (value) => {
+  const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
     const parts = val.split(".");
     if (parts.length > 2) {
@@ -436,30 +452,40 @@ const sanitizeAmount = (value) => {
       // Total_Paid: totals.Total_Paid,           // blank -> 0.00
       // Balance_Due: totals.Balance_Due,
     };
-    const seenItems = new Set();
+    // const seenItems = new Set();
 
 
+    // for (const item of payload.items) {
+    //   const name = item.Item_Name?.trim().toLowerCase();
+    //   const category = item.Item_Category?.trim().toLowerCase();
+    //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
+    //   const Quantity = item.Quantity
+
+    //   if (!name || !category || !itemHSN || !Quantity) {
+    //     toast.error("Each item must have a valid name, category, HSN and quantity.");
+    //     return;
+    //   }
+
+    //   // ❌ Prevent duplicates
+    //   if (seenItems.has(name)) {
+    //     toast.error(
+    //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+    //     );
+    //     return;
+    //   }
+    //   seenItems.add(name);
+
+
+    // }
     for (const item of payload.items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      const category = item.Item_Category?.trim().toLowerCase();
-      const itemHSN = item.Item_HSN?.trim().toLowerCase();
-      const Quantity = item.Quantity
+      const name = item.Item_Name?.trim();
+      const category = item.Item_Category?.trim();
+      const itemHSN = item.Item_HSN?.trim();
 
-      if (!name || !category || !itemHSN || !Quantity) {
+      if (!name || !category || !itemHSN || !item.Quantity) {
         toast.error("Each item must have a valid name, category, HSN and quantity.");
         return;
       }
-
-      // ❌ Prevent duplicates
-      if (seenItems.has(name)) {
-        toast.error(
-          `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-        );
-        return;
-      }
-      seenItems.add(name);
-
-
     }
     console.log("payload:", payload);
     try {
@@ -470,10 +496,10 @@ const sanitizeAmount = (value) => {
       const resData = res?.data || res;
       dispatch(itemApi.util.invalidateTags(["Item"]));
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-        dispatch(bankAccountApi.util.invalidateTags([
-               { type: "BankAccount", id: payload.Bank_Account_Id },
-               "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-             ]));
+      dispatch(bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: payload.Bank_Account_Id },
+        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+      ]));
       if (!resData?.success) {
         toast.error("Failed to add new purchase");
         return;
@@ -549,7 +575,7 @@ const sanitizeAmount = (value) => {
   console.log("Form errors:", errors);
 
   // const paymentType = watch("Payment_Type", "");
- const paymentType = watch("splits.0.Payment_Type");
+  const paymentType = watch("splits.0.Payment_Type");
   // const formData = new FormData();
 
   const [file, setFile] = useState(null);
@@ -648,8 +674,8 @@ const sanitizeAmount = (value) => {
 
       setRows(
         formattedItems.map((item) => ({
-          itemSearch: item.Item_Name,   // 🔴 important
-          Item_HSN: item.Item_HSN || "",   // 🔴 important
+          itemSearch: item.Item_Name,
+          Item_HSN: item.Item_HSN || "",
           itemOpen: false,
           CategoryOpen: false,
           isHSNLocked: false,
@@ -1102,14 +1128,12 @@ const sanitizeAmount = (value) => {
 
 
 
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
-                                           state-of-supply-class">
+                <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
                   {/* <div className="row w-1/2"> */}
 
                   <span className=" whitespace-nowrap active">
                     State of Supply
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
                   <select
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -1128,11 +1152,11 @@ const sanitizeAmount = (value) => {
                           <option value="Karnataka">Karnataka</option>
                           <option value="Delhi">Delhi</option> */}
                   </select>
-                  {errors?.State_Of_Supply && (
+                  {/* {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
                       {errors?.State_Of_Supply?.message}
                     </p>
-                  )}
+                  )} */}
                 </div>
 
 
@@ -1345,10 +1369,79 @@ const sanitizeAmount = (value) => {
                               handleRowChange(i, "isExistingItem", false);
                               handleRowChange(i, "isUnitLocked", false);
                               // ✅ If typed value doesn’t match any existing item → unlock category
-                              const exists = items?.items?.some(
+                              // const exists = items?.items?.some(
+                              //   (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                              // );
+                                  const exists = items?.items?.find(
                                 (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                               );
-                              handleRowChange(i, "isExistingItem", exists); // false if new item
+                              if (exists) {
+                                // ✅ Only store if it's a valid item
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                                handleRowChange(i, "isExistingItem", true);
+                              } else {
+                                // ❌ Clear Item_Name in RHF to trigger error
+                                // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                                // handleRowChange(i, "isExistingItem", false);
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                                handleRowChange(i, "isExistingItem", false);
+                              }
+                              //handleRowChange(i, "isExistingItem", exists); // false if new item
+                            }}
+                            // Add onBlur to the item input — after the onChange:
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
+                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                );
+
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: true,
+                                      itemOpen: false,
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
                             }}
                             onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
@@ -1397,7 +1490,7 @@ const sanitizeAmount = (value) => {
                                               Item_HSN: it.Item_HSN || "",
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
-                                              isHSNLocked: true,      // lock HSN
+                                              isHSNLocked: false,      // lock HSN
                                               isUnitLocked: true,     // lock unit
                                             };
                                             return updated;
@@ -1485,16 +1578,22 @@ const sanitizeAmount = (value) => {
                           maxLength={8}              // limit to 8 digits
 
                           onChange={(e) => {
-                            if (!rows[i]?.isHSNLocked) {
-                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              handleRowChange(i, "Item_HSN", e.target.value);
-                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                              // setValue(`items.${i}.Item_HSN`, e.target.value);
-                            }
+                            // if (!rows[i]?.isHSNLocked) {
+                            //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            //   handleRowChange(i, "Item_HSN", e.target.value);
+                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            //   // setValue(`items.${i}.Item_HSN`, e.target.value);
+                            // }
+
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // setValue(`items.${i}.Item_HSN`, e.target.value);
+
                           }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
-                          readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
+                        //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
                         />
                         {errors?.items?.[i]?.Item_HSN && (
                           <p className="text-red-500 text-xs mt-1">
@@ -1936,7 +2035,7 @@ const sanitizeAmount = (value) => {
                               }
                             }}
                           >
-                            <option value="">Select Payment Type</option>
+                            {/* <option value="">Select Payment Type</option> */}
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Neft">Neft</option>
@@ -1952,18 +2051,18 @@ const sanitizeAmount = (value) => {
                           )}
                         </div>
 
-                     
+
                         {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                    <div className="mt-3 flex flex-col">
-                      <label className="text-sm">Reference Number</label>
-                      <input
-                        type="text"
-                        //readOnly={isView}
-                        style={{ marginBottom:"0px"}}
-                        {...register("splits.0.Reference_Number")}
-                      />
-                    </div>
-                  )}
+                          <div className="mt-3 flex flex-col">
+                            <label className="text-sm">Reference Number</label>
+                            <input
+                              type="text"
+                              //readOnly={isView}
+                              style={{ marginBottom: "0px" }}
+                              {...register("splits.0.Reference_Number")}
+                            />
+                          </div>
+                        )}
 
                         <button
                           type="button"
@@ -2026,7 +2125,7 @@ const sanitizeAmount = (value) => {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`); 
+                                      clearErrors(`splits.${index}.Amount`);
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -2050,7 +2149,7 @@ const sanitizeAmount = (value) => {
                                 <input
                                   type="text"
                                   placeholder="Reference Number"
-                                  style={{width:"80%"}}
+                                  style={{ width: "80%" }}
                                   // className="border rounded-md px-2 py-1.5 w-full"
                                   {...register(`splits.${index}.Reference_Number`)}
                                 />
@@ -2165,7 +2264,7 @@ const sanitizeAmount = (value) => {
 
                       <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                       <div className="flex items-center gap-2 relative">
+                        <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
