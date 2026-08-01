@@ -89,13 +89,15 @@ export const partyApi = createApi({
     getSinglePartyDetailsSalesPurchases: builder.query({
   query: ({
     Party_Id,
-    page = 1,
+    cursor = null,
     search = "",
     date = "",
   }) => {
     const params = new URLSearchParams();
 
-    params.set("page", page);
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
 
     if (search?.trim()) {
       params.set("search", search.trim());
@@ -108,8 +110,49 @@ export const partyApi = createApi({
     return `party/get-single-party-details-sales-purchases/${Party_Id}?${params.toString()}`;
   },
 
+  // merge pages for infinite scroll
+  serializeQueryArgs: ({ queryArgs }) => {
+    const { Party_Id, search, date } = queryArgs;
+    return { Party_Id, search, date }; // cursor excluded — same cache entry across pages
+  },
+  merge: (currentCache, newData, { arg }) => {
+    if (!arg.cursor) {
+      // first page / fresh filter — replace
+      return newData;
+    }
+    // subsequent pages — append
+    currentCache.transactions.push(...newData.transactions);
+    currentCache.nextCursor = newData.nextCursor;
+    currentCache.hasMore = newData.hasMore;
+  },
+  forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
+
   providesTags: ["Party"],
 }),
+//     getSinglePartyDetailsSalesPurchases: builder.query({
+//   query: ({
+//     Party_Id,
+//     page = 1,
+//     search = "",
+//     date = "",
+//   }) => {
+//     const params = new URLSearchParams();
+
+//     params.set("page", page);
+
+//     if (search?.trim()) {
+//       params.set("search", search.trim());
+//     }
+
+//     if (date) {
+//       params.set("date", date);
+//     }
+
+//     return `party/get-single-party-details-sales-purchases/${Party_Id}?${params.toString()}`;
+//   },
+
+//   providesTags: ["Party"],
+// }),
 
   printSinglePartyDetailsSalesPurchasesReport: builder.mutation({
   query: (payload) => ({

@@ -33,10 +33,11 @@ export default function SaleEdit() {
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
   const bankId = location.state?.bankId;
-  console.log("Edit page query:", bankId);
+  //console.log("Edit page query:", bankId);
   const { id: Sale_Id } = useParams();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
+  //const partyId = location.state?.partyId;
   const dispatch = useDispatch();
   const TAX_RATES = {
     "GST0": 0,
@@ -413,8 +414,8 @@ export default function SaleEdit() {
         ...it,
         itemSearch: it.Item_Name || "", // for UI display
         isExistingItem: true,           // lock category/HSN if needed
-        
-         isHSNLocked: false,
+
+        isHSNLocked: false,
         isUnitLocked: true,
         CategoryOpen: false,
         itemOpen: false,
@@ -670,51 +671,51 @@ export default function SaleEdit() {
   //     console.error("❌ Submission failed:", error);
   //   }
   // };
-const onSubmit = async (data) => {
-  console.log("🧾 Form Data (from RHF):", data);
+  const onSubmit = async (data) => {
+    console.log("🧾 Form Data (from RHF):", data);
 
-  // ✅ Validate that at least one item is present
-  if (!data.items || data.items.length === 0) {
-    toast.error("Please add at least one item before saving the sale.");
-    return;
-  }
+    // ✅ Validate that at least one item is present
+    if (!data.items || data.items.length === 0) {
+      toast.error("Please add at least one item before saving the sale.");
+      return;
+    }
 
-  // ✅ Remove blank rows
-  const cleanedItems = data.items.filter(
-    (it) => it.Item_Name && it.Item_Name.trim() !== ""
-  );
+    // ✅ Remove blank rows
+    const cleanedItems = data.items.filter(
+      (it) => it.Item_Name && it.Item_Name.trim() !== ""
+    );
 
-  if (cleanedItems.length === 0) {
-    toast.error("Please add at least one valid item with a name.");
-    return;
-  }
+    if (cleanedItems.length === 0) {
+      toast.error("Please add at least one valid item with a name.");
+      return;
+    }
 
-  // ✅ Ensure all items have tax & amount values
-  const itemsWithDefaults = cleanedItems.map((item) => ({
-    ...item,
-    Tax_Type: item.Tax_Type || "None",
-    Tax_Amount: item.Tax_Amount || "0.00",
-    Amount: item.Amount || "0.00",
-  }));
+    // ✅ Ensure all items have tax & amount values
+    const itemsWithDefaults = cleanedItems.map((item) => ({
+      ...item,
+      Tax_Type: item.Tax_Type || "None",
+      Tax_Amount: item.Tax_Amount || "0.00",
+      Amount: item.Amount || "0.00",
+    }));
 
-  // ✅ Build final payload
-  const payload = {
-    ...data,
-    items: itemsWithDefaults,
-    Total_Amount: data.Total_Amount || 0,
-    Total_Received: data.Total_Received || 0,
-    Balance_Due:
-      data.Balance_Due ||
-      ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-  };
+    // ✅ Build final payload
+    const payload = {
+      ...data,
+      items: itemsWithDefaults,
+      Total_Amount: data.Total_Amount || 0,
+      Total_Received: data.Total_Received || 0,
+      Balance_Due:
+        data.Balance_Due ||
+        ((data.Total_Amount || 0) - (data.Total_Received || 0)),
+    };
 
-  console.log(" Final Payload Sent:", payload);
+    console.log(" Final Payload Sent:", payload);
 
-  try {
-    const res = await editSale({
-      Sale_Id,
-      body: payload,
-    }).unwrap();
+    try {
+      const res = await editSale({
+        Sale_Id,
+        body: payload,
+      }).unwrap();
 
       if (!res?.success) {
         toast.error("Failed to update sale. Please try again.");
@@ -731,6 +732,7 @@ const onSubmit = async (data) => {
         { type: "BankAccount", id: payload.Bank_Account_Id },
         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
       ]));
+      dispatch(partyApi.util.invalidateTags(["Party"]));
 
       toast.success("Sale updated successfully!");
       //   navigate({
@@ -759,6 +761,14 @@ const onSubmit = async (data) => {
         //dispatch(itemApi.util.invalidateTags(["Item"]));
         // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
       }
+               else if (from === "party-details") {
+          // 🔹 new — return to Bank Accounts page with the same account selected
+          navigate({
+            pathname: `/party/parties`,
+             search: location.search,
+            // search: `?partyId=${partyId}`,
+          });
+        }
       else if (from === "bank-accounts") {
         // 🔹 new — return to Bank Accounts page with the same account selected
         navigate({
@@ -787,7 +797,7 @@ const onSubmit = async (data) => {
       toast.error(message);
       console.error("❌ Submission failed:", error);
     }
-};
+  };
   // const handleItemSelect = (it, i) => {
   //   console.log("Selected Item:", it, "at row", i);
   //   setRows((prev) => {
@@ -835,7 +845,7 @@ const onSubmit = async (data) => {
   //   setValue(`Total_Amount`, Total_Amount);
   //   setValue(`Balance_Due`, Balance_Due);
   // };
- 
+
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -914,6 +924,14 @@ const onSubmit = async (data) => {
                       search: `?bankId=${bankId}`,
                     });
                   }
+                          else if (from === "party-details") {
+          // 🔹 new — return to Bank Accounts page with the same account selected
+          navigate({
+            pathname: `/party/parties`,
+             search: location.search,
+            // search: `?partyId=${partyId}`,
+          });
+        }
                   else if (from === "cash-in-hand") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
@@ -1418,7 +1436,7 @@ const onSubmit = async (data) => {
                               // }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
-                                onBlur={() => {
+                            onBlur={() => {
                               setTimeout(() => {
                                 const typedValue = rows[i]?.itemSearch?.trim() || "";
                                 if (!typedValue) return;
@@ -1602,7 +1620,7 @@ const onSubmit = async (data) => {
                               </table>
                             </div>
                           )}
-                           {/* {confirmModal.open && (
+                          {/* {confirmModal.open && (
                             <div
                               className="fixed inset-0 flex items-center justify-center bg-white z-50 bg-opacity-50"
                             >

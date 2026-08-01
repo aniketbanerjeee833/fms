@@ -4,7 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
@@ -605,7 +605,7 @@ const onSubmit = async (data) => {
         "BankAccount",
       ])
     );
-
+     dispatch(partyApi.util.invalidateTags(["Party"]));
     if (!resData?.success) {
       toast.error("Failed to add new sale");
       return;

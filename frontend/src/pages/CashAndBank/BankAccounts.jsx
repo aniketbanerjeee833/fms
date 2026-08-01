@@ -398,7 +398,7 @@ export default function BankAccounts() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
           <li>
             <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
@@ -407,7 +407,7 @@ export default function BankAccounts() {
             </NavLink>
           </li>
         </ul>
-      </div>
+      </div> */}
 
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 

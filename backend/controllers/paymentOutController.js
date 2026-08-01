@@ -377,6 +377,7 @@
 import db from "../config/db.js";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction }  from "../utils/cashTransactionHelper.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 import { validateDateRange } from "../utils/validateDate.js";
 
@@ -397,10 +398,20 @@ const getAllPaymentOuts = async (req, res, next) => {
     const whereClauses = [];
     const params       = [];
 
+    // if (search) {
+    //   whereClauses.push(`(
+    //     LOWER(a.Party_Name)       LIKE ? OR
+    //     LOWER(po.Receipt_No)      LIKE ? OR
+    //     CAST(po.Paid AS CHAR)     LIKE ?
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like);
+    // }
+
     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)       LIKE ? OR
-        LOWER(po.Receipt_No)      LIKE ? OR
+       a.Party_Name       LIKE ? OR
+        po.Receipt_No      LIKE ? OR
         CAST(po.Paid AS CHAR)     LIKE ?
       )`);
       const like = `%${search}%`;
@@ -587,6 +598,17 @@ const createPaymentOut = async (req, res, next) => {
       splits,
     });
 
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Payment_Out",
+  referenceId: id,
+  amount: totalPaid,
+  txnDate: Payment_Date,
+  docNumber: Receipt_No,
+  balanceDue: null,
+})
+
     await connection.commit();
     return res.status(201).json({
       success: true,
@@ -667,6 +689,17 @@ const updatePaymentOut = async (req, res, next) => {
       txnDate:    Payment_Date,
       splits,
     });
+
+     await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Payment_Out",
+  referenceId: id,
+  amount: totalPaid,
+  txnDate: Payment_Date,
+  docNumber: Receipt_No,
+  balanceDue: null,
+});
 
     await connection.commit();
     return res.status(200).json({ success: true, message: "Payment Out updated", totalPaid });

@@ -9,6 +9,7 @@ import ExcelJS from "exceljs";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 
 
 
@@ -457,6 +458,17 @@ const addPurchase = async (req, res, next) => {
         splits,
       });
     }
+
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Purchase",
+  referenceId: purchaseIdNumber,
+  amount: totalAmount,
+  txnDate: Bill_Date,
+  docNumber: Bill_Number,     // 🔹 new
+  balanceDue: balanceDue,     // 🔹 new
+});
 
     // items loop — unchanged
     for (const item of items) {
@@ -932,14 +944,25 @@ const getAllPurchases = async (req, res, next) => {
     const params = [];
 
     /* ---------- SEARCH ---------- */
-    if (search) {
+    // if (search) {
+    //   whereClauses.push(`(
+    //     LOWER(a.Party_Name)           LIKE ? OR
+    //     CAST(p.Total_Amount AS CHAR)  LIKE ? OR
+    //     CAST(p.Balance_Due AS CHAR)   LIKE ?
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like);
+    // }
+     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)           LIKE ? OR
+      a.Party_Name          LIKE ? OR
         CAST(p.Total_Amount AS CHAR)  LIKE ? OR
-        CAST(p.Balance_Due AS CHAR)   LIKE ?
+        CAST(p.Balance_Due AS CHAR)   LIKE ? OR
+        p.Bill_Number LIKE ?
+
       )`);
       const like = `%${search}%`;
-      params.push(like, like, like);
+      params.push(like, like, like, like);
     }
 
     /* ---------- DATE FILTER ---------- */
@@ -1491,7 +1514,16 @@ const editPurchase = async (req, res, next) => {
         splits,
       });
     }
-
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Purchase",
+  referenceId: purchaseIdNumber,
+  amount: totalAmount,
+  txnDate: Bill_Date,
+  docNumber: Bill_Number,
+  balanceDue: balanceDue,
+});
     // items loop — unchanged from your original
     // const [oldItems] = await connection.query(
     //   "SELECT * FROM add_purchase_items WHERE Purchase_Id = ?",

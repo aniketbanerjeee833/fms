@@ -8,6 +8,7 @@ import ExcelJS from "exceljs";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 // import puppeteer from "puppeteer";
 //import pdf from "html-pdf-node";
     const TAX_TYPES = {
@@ -454,6 +455,16 @@ for (const item of items) {
         splits,
       });
     }
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Sale",
+  referenceId: saleIdNumber,
+  amount: totalAmount,
+  txnDate: Invoice_Date,
+  docNumber: Invoice_Number,
+  balanceDue: balanceDue,
+});
 
     // items loop — unchanged
     // for (const item of items) {
@@ -1310,16 +1321,25 @@ const getAllSales = async (req, res, next) => {
     const whereClauses = [];
     const params       = [];
 
-    if (search) {
+    // if (search) {
+    //   whereClauses.push(`(
+    //     LOWER(a.Party_Name)      LIKE ? OR
+    //     CAST(s.Total_Amount AS CHAR) LIKE ? OR
+    //     CAST(s.Balance_Due  AS CHAR) LIKE ?
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like);
+    // }
+ if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)      LIKE ? OR
+        a.Party_Name      LIKE ? OR
         CAST(s.Total_Amount AS CHAR) LIKE ? OR
-        CAST(s.Balance_Due  AS CHAR) LIKE ?
+        CAST(s.Balance_Due  AS CHAR) LIKE ? OR
+        s.Invoice_Number LIKE ?
       )`);
       const like = `%${search}%`;
-      params.push(like, like, like);
+      params.push(like, like, like, like);
     }
-
     if (fromDate && toDate) {
       whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
       params.push(`${fromDate} 00:00:00`, `${toDate} 23:59:59`);
@@ -2596,261 +2616,7 @@ const generateNextId = async (connection, table, column, prefix) => {
 /**
  * Edit Sale Controller
  */
-//OLD DUPLIACTE LOGIC
 
-// OLD
-// const editSale = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const { Sale_Id: saleId } = req.params;
-
-//     const [existingSale] = await connection.query(
-//       "SELECT * FROM add_sale WHERE Sale_Id = ?",
-//       [saleId]
-//     );
-//     if (existingSale.length === 0) {
-//       return res.status(404).json({ message: "No such Sale found." });
-//     }
-// const saleIdNumber = existingSale[0].id;  
-//     const cleanData = sanitizeObject(req.body);
-//     const validation = saleSchema.safeParse(cleanData);
-//     if (!validation.success) {
-//       return res.status(400).json({ errors: validation.error.errors });
-//     }
-
-//     const {
-//       Party_Name,
-//       Invoice_Number,
-//       Invoice_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       Total_Received,
-//       Balance_Due,
-//       Payment_Type,
-//        Bank_Account_Id, 
-//       Reference_Number,
-//       items,
-//     } = validation.data;
-
-//     await connection.beginTransaction();
-//     if (Payment_Type === "Bank" && !Bank_Account_Id) {
-//       await connection.rollback();
-//       return res.status(400).json({ message: "Bank account is required for Bank payment type." });
-//     }
-//     const totalReceived =
-//   Total_Received === "" || Total_Received === undefined
-//     ? 0
-//     : Number(Total_Received);
-//     // 🔹 Duplicate check
-//     const itemNameSet = new Set();
-//     for (const item of items) {
-//       const name = item.Item_Name?.trim().toLowerCase();
-//       if (!name) {
-//         await connection.rollback();
-//         return res.status(400).json({ message: "Item name missing." });
-//       }
-//       if (itemNameSet.has(name)) {
-//         await connection.rollback();
-//         return res.status(400).json({
-//           message: `Duplicate item '${item.Item_Name}'`,
-//         });
-//       }
-//       itemNameSet.add(name);
-//     }
-
-//     // 🔹 Party
-//     const [partyRows] = await connection.query(
-//       "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
-//       [Party_Name]
-//     );
-//     if (partyRows.length === 0) {
-//       await connection.rollback();
-//       return res.status(404).json({ message: "Party not found." });
-//     }
-
-//     const Party_Id = partyRows[0].Party_Id;
-
-//     // 🔥 FETCH OLD ITEMS
-//     const [oldItems] = await connection.query(
-//       "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
-//       [saleId]
-//     );
-
-//     const oldMap = new Map();
-//     oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
-
-//     const newItemIds = new Set();
-
-//     // 🔹 UPDATE SALE MASTER
-//     await connection.query(
-//       `UPDATE add_sale SET 
-//         Party_Id=?, Invoice_Number=?, Invoice_Date=?, State_Of_Supply=?,
-//         Total_Amount=?, Total_Received=?, Balance_Due=?,
-//         Payment_Type=?, Bank_Account_Id=?, Reference_Number=?, updated_at=NOW()
-//        WHERE Sale_Id=?`,
-//       [
-//         Party_Id,
-//         Invoice_Number,
-//         Invoice_Date,
-//         State_Of_Supply,
-//         Number(Total_Amount) || 0,
-//         Number(Total_Received) || 0,
-//         Number(Balance_Due) || 0,
-//         cleanValue(Payment_Type),
-//          Payment_Type === "Bank" ? Bank_Account_Id : null,
-//         cleanValue(Reference_Number),
-//         saleId,
-//       ]
-//     );
-   
-//   await recordBankTransaction({
-//     connection,
-//    bankAccountId: Payment_Type === "Bank" ? Bank_Account_Id : null,
-//     txnType: "Sale",
-//     referenceId: saleIdNumber,        // ✅ numeric, matches addSale's insertId
-//     partyName: Party_Name,
-//     amount: totalReceived,
-//     txnDate: Invoice_Date
-//   });
-//   await recordCashTransaction({
-//   connection,
-//   isCash:      Payment_Type === "Cash",   // new payment type
-//   txnType:     "Sale",
-//   referenceId: saleIdNumber,                   // existing sale's id
-//   partyName:   Party_Name,
-//   amount:      Total_Received || Total_Amount,
-//   txnDate:     Invoice_Date,
-// });
-
-//     // 🔥 LOOP ITEMS
-//     for (const item of items) {
-//       const [dbItem] = await connection.query(
-//         "SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1",
-//         [item.Item_Name]
-//       );
-
-//       const Item_Id = dbItem[0]?.Item_Id;
-//       if (!Item_Id) {
-//         await connection.rollback();
-//         return res.status(404).json({
-//           message: `Item '${item.Item_Name}' not found.`,
-//         });
-//       }
-
-//       newItemIds.add(Item_Id);
-
-//       const old = oldMap.get(Item_Id);
-
-//       const [purchaseTax] = await connection.query(
-//         `SELECT Tax_Type FROM add_purchase_items 
-//          WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-//         [Item_Id]
-//       );
-
-//       const safeTaxType = purchaseTax[0]?.Tax_Type || item.Tax_Type || "None";
-
-//       if (old) {
-//         // 🔥 UPDATE EXISTING ITEM
-//         await connection.query(
-//           `UPDATE add_sale_items SET 
-//            Quantity=?, Sale_Price=?, 
-//            Discount_On_Sale_Price=?, Discount_Type_On_Sale_Price=?,
-//            Tax_Type=?, Tax_Amount=?, Amount=?, updated_at=NOW()
-//            WHERE Sale_Items_Id=?`,
-//           [
-//             normalizeNumber(item.Quantity),
-//             normalizeNumber(item.Sale_Price),
-//             cleanDiscount(item.Discount_On_Sale_Price),
-//             cleanValue(item.Discount_Type_On_Sale_Price),
-//             cleanValue(safeTaxType),
-//             normalizeNumber(item.Tax_Amount),
-//             normalizeNumber(item.Amount),
-//             old.Sale_Items_Id,
-//           ]
-//         );
-
-//         // 🔥 STOCK DIFF
-//         const diff = normalizeNumber(item.Quantity) - old.Quantity;
-//         if (diff !== 0) {
-//           await connection.query(
-//             `UPDATE add_item 
-//              SET Stock_Quantity = Stock_Quantity - ?, updated_at=NOW()
-//              WHERE Item_Id=?`,
-//             [diff, Item_Id]
-//           );
-//         }
-//       } else {
-//         // 🔥 INSERT NEW ITEM (SAFE ID)
-//         const [res] = await connection.execute(
-//           `INSERT INTO add_sale_items
-//            (Sale_Id, Item_Id, Quantity, Sale_Price,
-//             Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-//             Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//           [
-//             saleId,
-//             Item_Id,
-//             normalizeNumber(item.Quantity),
-//             normalizeNumber(item.Sale_Price),
-//             cleanDiscount(item.Discount_On_Sale_Price),
-//             cleanValue(item.Discount_Type_On_Sale_Price),
-//             cleanValue(safeTaxType),
-//             normalizeNumber(item.Tax_Amount),
-//             normalizeNumber(item.Amount),
-//           ]
-//         );
-
-//         const id = res.insertId;
-//         const newId = "SIT" + id.toString().padStart(3, "0");
-
-//         await connection.execute(
-//           `UPDATE add_sale_items SET Sale_Items_Id=? WHERE id=?`,
-//           [newId, id]
-//         );
-
-//         // 🔥 STOCK DEDUCT
-//         await connection.query(
-//           `UPDATE add_item 
-//            SET Stock_Quantity = Stock_Quantity - ?, updated_at=NOW()
-//            WHERE Item_Id=?`,
-//           [normalizeNumber(item.Quantity), Item_Id]
-//         );
-//       }
-//     }
-
-//     // 🔥 DELETE REMOVED ITEMS
-//     for (const old of oldItems) {
-//       if (!newItemIds.has(old.Item_Id)) {
-//         await connection.query(
-//           `DELETE FROM add_sale_items WHERE Sale_Items_Id=?`,
-//           [old.Sale_Items_Id]
-//         );
-
-//         // restore stock
-//         await connection.query(
-//           `UPDATE add_item 
-//            SET Stock_Quantity = Stock_Quantity + ?, updated_at=NOW()
-//            WHERE Item_Id=?`,
-//           [old.Quantity, old.Item_Id]
-//         );
-//       }
-//     }
-
-//     await connection.commit();
-
-//     return res.json({
-//       success: true,
-//       message: "Sale updated successfully",
-//     });
-
-//   } catch (err) {
-//     if (connection) await connection.rollback();
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const editSale = async (req, res, next) => {
   let connection;
   try {
@@ -2992,6 +2758,16 @@ const editSale = async (req, res, next) => {
         splits,
       });
     }
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Sale",
+  referenceId: saleIdNumber,
+  amount: totalAmount,
+  txnDate: Invoice_Date,
+  docNumber: Invoice_Number,
+  balanceDue: balanceDue,
+});
 const [oldItems] = await connection.query(
   "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
   [saleId]

@@ -609,6 +609,7 @@
 
 
 import db from "../config/db.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 
 /* ── GET ALL ──────────────────────────────────────────────── */
@@ -627,11 +628,24 @@ const getAllSaleReturns = async (req, res, next) => {
     const whereClauses = [];
     const params       = [];
 
-    if (search) {
+    // if (search) {
+    //   whereClauses.push(`(
+    //     LOWER(p.Party_Name)      LIKE ? OR
+    //     LOWER(sr.Return_Number)  LIKE ? OR
+    //     LOWER(sr.Invoice_Number) LIKE ? OR
+    //     CAST(sr.Total_Amount AS CHAR) LIKE ? OR
+    //     CAST(sr.Balance_Due AS CHAR) LIKE ? OR
+    //     CAST(sr.Total_Paid AS CHAR) LIKE ?
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like, like, like, like);
+    // }
+
+     if (search) {
       whereClauses.push(`(
-        LOWER(p.Party_Name)      LIKE ? OR
-        LOWER(sr.Return_Number)  LIKE ? OR
-        LOWER(sr.Invoice_Number) LIKE ? OR
+        p.Party_Name     LIKE ? OR
+        sr.Return_Number  LIKE ? OR
+        sr.Invoice_Number LIKE ? OR
         CAST(sr.Total_Amount AS CHAR) LIKE ? OR
         CAST(sr.Balance_Due AS CHAR) LIKE ? OR
         CAST(sr.Total_Paid AS CHAR) LIKE ?
@@ -875,6 +889,18 @@ const createSaleReturn = async (req, res, next) => {
       });
     }
 
+    await recordPartyLedger({
+  connection,
+  partyId: party.Party_Id,
+  txnType: "Sale_Return",
+  referenceId: Sale_Return_Id,
+  amount: totalAmount,
+  txnDate: Return_Date,
+  docNumber: Return_Number,
+  balanceDue: balanceDue,
+});
+
+
     // items loop — unchanged, item name/hsn pulled from add_item via FK
     for (const item of items) {
       const {
@@ -1082,6 +1108,16 @@ const editSaleReturn = async (req, res, next) => {
         splits,
       });
     }
+    await recordPartyLedger({
+  connection,
+  partyId: party.Party_Id,
+  txnType: "Sale_Return",
+  referenceId: Number(Sale_Return_Id),
+  amount: totalAmount,
+  txnDate: Return_Date,
+  docNumber: Return_Number,
+  balanceDue: balanceDue,
+});
 
     // items loop — unchanged
     // const [oldItems] = await connection.query(

@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
@@ -37,7 +37,8 @@ export default function PurchaseReturndEdit() {
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
   const bankId = location.state?.bankId;
-  console.log("Sale return Edit page query:", location.search);
+  //console.log("Sale return Edit page query:", location.search);
+  //const partyId = location.state?.partyId;
   const { id: Purchase_Return_Id } = useParams();
   const dispatch = useDispatch();
   const TAX_RATES = {
@@ -605,17 +606,17 @@ export default function PurchaseReturndEdit() {
     //   seenItems.add(name);
     // }
     // ── validate items ──
-for (const item of payload.items) {
-  const name = item.Item_Name?.trim();
-  const category = item.Item_Category?.trim();
-  const itemHSN = item.Item_HSN?.trim();
-  const quantity = Number(item.Quantity);
+    for (const item of payload.items) {
+      const name = item.Item_Name?.trim();
+      const category = item.Item_Category?.trim();
+      const itemHSN = item.Item_HSN?.trim();
+      const quantity = Number(item.Quantity);
 
-  if (!name || !category || !itemHSN || quantity <= 0) {
-    toast.error("Each item must have a valid name, category, HSN and quantity.");
-    return;
-  }
-}
+      if (!name || !category || !itemHSN || quantity <= 0) {
+        toast.error("Each item must have a valid name, category, HSN and quantity.");
+        return;
+      }
+    }
 
     console.log("payload:", payload);
 
@@ -634,6 +635,7 @@ for (const item of payload.items) {
         { type: "BankAccount", id: payload.Bank_Account_Id },
         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
       ]));
+       dispatch(partyApi.util.invalidateTags(["Party"]));
       if (!res?.success) {
         toast.error("Failed to update debit note");
         return;
@@ -646,6 +648,14 @@ for (const item of payload.items) {
         navigate({
           pathname: "/purchase/return",
           search: location.search,
+        });
+      }
+      else if (from === "party-details") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
+        navigate({
+          pathname: `/party/parties`,
+          search: location.search,
+          // search: `?partyId=${partyId}`,
         });
       }
       else if (from === "bank-accounts") {
@@ -756,6 +766,15 @@ for (const item of payload.items) {
                     })
                     // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
                   }
+                  else if (from === "party-details") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/party/parties`,
+                      search: location.search,
+                      // search: `?partyId=${partyId}`,
+                    });
+                  }
+
                   else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
@@ -1287,7 +1306,7 @@ for (const item of payload.items) {
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
-                                   onBlur={() => {
+                            onBlur={() => {
                               setTimeout(() => {
                                 const typedValue = rows[i]?.itemSearch?.trim() || "";
                                 if (!typedValue) return;
@@ -1482,10 +1501,10 @@ for (const item of payload.items) {
                           //     setValue(`items.${i}.Item_HSN`, e.target.value);
                           //   }
                           // }}
-                           onChange={(e) => {
-                                  e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              handleRowChange(i, "Item_HSN", e.target.value);
-                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                          onChange={(e) => {
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
                             // if (!rows[i]?.isHSNLocked) {
                             //   handleRowChange(i, "Item_HSN", e.target.value);
                             //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
@@ -2092,7 +2111,7 @@ for (const item of payload.items) {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`); 
+                                      clearErrors(`splits.${index}.Amount`);
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -2229,9 +2248,9 @@ for (const item of payload.items) {
 
 
 
-                     <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                       <div className="flex items-center gap-2 relative">
+                        <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"

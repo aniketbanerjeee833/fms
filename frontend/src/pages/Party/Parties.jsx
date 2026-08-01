@@ -2,15 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 import { useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery } from "../../redux/api/partyAPi";
-import { MoreVertical, Users,SquarePen,Trash2, Eye } from "lucide-react";
+import { MoreVertical, Users, SquarePen, Trash2, Eye } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useDispatch } from "react-redux";
-import { useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
-import { useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import {toast} from "react-toastify";
+import { toast } from "react-toastify";
+import PaymentInModal from "../../components/Modal/PaymentInModal";
+import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 
 const TXN_TYPE_ROUTE_MAP = {
   Sale: "sale",
@@ -30,28 +32,26 @@ const PARTY_TYPE_META = {
   Payment_Out: { label: "Payment Out", color: "#dc2626" },
 };
 
-function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving,parties  }) {
+function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
   const { data: record, isLoading } = useGetPaymentInByIdQuery(id);
   if (isLoading || !record) return null;
 
   return (
     <PaymentInModal
-      mode="edit"          // or "edit" if you want it editable from here
+      mode="edit"
       initialData={record?.paymentIn}
       onClose={onClose}
       banks={banks}
       onSave={onSave}
       isSaving={isSaving}
       parties={parties}
-       PartyAddModal={PartyAddModal} 
-
+      PartyAddModal={PartyAddModal}
     />
   );
 }
 
-function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties}) {
+function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
   const { data: record, isLoading } = useGetPaymentOutByIdQuery(id);
-  console.log(record, "BankAccounts Payment Out");
   if (isLoading || !record) return null;
 
   return (
@@ -62,72 +62,72 @@ function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties})
       onClose={onClose}
       onSave={onSave}
       isSaving={isSaving}
-       parties={parties}
-        PartyAddModal={PartyAddModal}   // 🔹 add this
+      parties={parties}
+      PartyAddModal={PartyAddModal}
     />
   );
 }
 
 /* ════════════════════════════════════════════════════════════
    RIGHT PANEL — Party Detail (infinite scroll ledger)
+   Transaction search persists in the URL (?txnSearch=...) so it
+   survives refresh / back-navigation, same as the left party list.
+   Note: `cursor` (pagination position) intentionally stays local —
+   only the search TEXT needs to persist, not "which page you were on".
 ════════════════════════════════════════════════════════════ */
 function PartyDetailPanel({ partyId }) {
-    const dispatch=useDispatch();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [ledger, setLedger] = useState([]);
-  const [hasMore, setHasMore] = useState(true);
+  const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const search = searchParams.get("txnSearch") || "";
+  const [cursor, setCursor] = useState(null);
+
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
   const closeModal = () => setModalState({ open: false, type: null, id: null });
-   const { data: banks = []} = useGetAllBankAccountsQuery();
-    const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
-    const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
-  const { data, isLoading, isFetching } =  useGetSinglePartyDetailsSalesPurchasesQuery(
-    { Party_Id: partyId, page, search },
+  const { data: partiesList } = useGetAllPartiesQuery();
+  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
+  const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
+
+  const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
+    { Party_Id: partyId, cursor, search },
     { skip: !partyId }
   );
- 
-const fmt = (n) =>
-  Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  /* reset when party or search changes */
+
+  const fmt = (n) =>
+    Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleSearchChange = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set("txnSearch", value);
+    } else {
+      next.delete("txnSearch");
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  /* reset pagination when party or search changes */
   useEffect(() => {
-    setPage(1);
-    setLedger([]);
-    setHasMore(true);
+    setCursor(null);
   }, [partyId, search]);
 
-  /* merge all txn types into one flat, date-sorted ledger */
-  useEffect(() => {
-    if (!data) return;
-
-    const combined = [
-      ...(data.sales || []).map((r) => ({ ...r, _date: r.Invoice_Date, _no: r.Invoice_Number })),
-      ...(data.purchases || []).map((r) => ({ ...r, _date: r.Bill_Date, _no: r.Bill_Number })),
-      ...(data.saleReturns || []).map((r) => ({ ...r, _date: r.Return_Date, _no: r.Return_Number })),
-      ...(data.purchaseReturns || []).map((r) => ({ ...r, _date: r.Return_Date, _no: r.Return_Number })),
-      ...(data.paymentIns || []).map((r) => ({ ...r, _date: r.Payment_Date, _no: r.Receipt_No })),
-      ...(data.paymentOuts || []).map((r) => ({ ...r, _date: r.Payment_Date, _no: r.Receipt_No })),
-    ].sort((a, b) => new Date(b._date) - new Date(a._date));
-
-    setLedger((prev) => {
-      const existingKeys = new Set(prev.map((r) => `${r.Type}-${r._no}-${r._date}`));
-      const fresh = combined.filter((r) => !existingKeys.has(`${r.Type}-${r._no}-${r._date}`));
-      return [...prev, ...fresh];
-    });
-
-    if (page >= (data.totalPages ?? 1)) setHasMore(false);
-  }, [data]);
+  // RTK Query's merge() already accumulates every page into data.transactions
+  // for this cache key — no local ledger state or manual merge needed.
+  const ledger = data?.transactions || [];
+  const hasMore = data?.hasMore ?? false;
+  const nextCursor = data?.nextCursor ?? null;
 
   const handleObserver = useCallback(
     (entries) => {
-      if (entries[0].isIntersecting && hasMore && !isFetching && !isLoading) {
-        setPage((prev) => prev + 1);
+      if (entries[0].isIntersecting && hasMore && nextCursor && !isFetching && !isLoading) {
+        setCursor(nextCursor);
       }
     },
-    [hasMore, isFetching, isLoading]
+    [hasMore, nextCursor, isFetching, isLoading]
   );
 
   useEffect(() => {
@@ -142,7 +142,8 @@ const fmt = (n) =>
   }, [handleObserver]);
 
   const party = data?.partyDetails;
-const handleSavePaymentIn = async (formData) => {
+
+  const handleSavePaymentIn = async (formData) => {
     try {
       await updatePaymentIn({ id: modalState.id, ...formData }).unwrap();
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
@@ -150,10 +151,7 @@ const handleSavePaymentIn = async (formData) => {
         { type: "BankAccount", id: formData.Bank_Account_Id },
         "BankAccount",
       ]));
-      /* reset scroll so updated data reloads */
-      setPage(1);
-      setLedger([]);
-      setHasMore(true);
+      setCursor(null);
       closeModal();
       toast.success("Payment In updated");
     } catch (err) {
@@ -169,16 +167,14 @@ const handleSavePaymentIn = async (formData) => {
         { type: "BankAccount", id: formData.Bank_Account_Id },
         "BankAccount",
       ]));
-      setPage(1);
-      setLedger([]);
-      setHasMore(true);
+      setCursor(null);
       closeModal();
       toast.success("Payment Out updated");
     } catch (err) {
       toast.error(err?.data?.message || "Failed to save payment out.");
     }
   };
-console.log(ledger)
+
   if (!partyId) {
     return (
       <div
@@ -191,7 +187,7 @@ console.log(ledger)
     );
   }
 
-  if (isLoading && page === 1) {
+  if (isLoading && !cursor) {
     return (
       <div
         className="flex items-center justify-center h-full text-gray-400"
@@ -225,13 +221,13 @@ console.log(ledger)
           </div>
         </div>
 
-        {/* search bar — right side */}
+        {/* search bar — right side, persisted as ?txnSearch= */}
         <div className="flex items-center w-full sm:w-56">
           <input
             type="text"
             placeholder="Search transactions..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full sm:w-56"
           />
         </div>
@@ -244,7 +240,9 @@ console.log(ledger)
             <tr>
               <th className="text-left">Sl.No</th>
               <th className="text-left">Type</th>
+              <th className="text-left">Number</th>
               <th className="text-left">Date</th>
+              <th className="text-left">Total</th>
               <th className="text-left">Balance Due</th>
               <th>View/Edit</th>
             </tr>
@@ -253,58 +251,54 @@ console.log(ledger)
           <tbody>
             {ledger.length === 0 && !isLoading ? (
               <tr>
-                <td className="text-center" colSpan={5} style={{ padding: "40px 0", color: "#9ca3af" }}>
+                <td className="text-center" colSpan={6} style={{ padding: "40px 0", color: "#9ca3af" }}>
                   No transactions found
                 </td>
               </tr>
             ) : (
               ledger.map((row, idx) => {
-                const meta = PARTY_TYPE_META[row.Type] ?? { label: row.Type, color: "#6b7280" };
-                const routeInfo = TXN_TYPE_ROUTE_MAP[row.Type];
+                const meta = PARTY_TYPE_META[row.Txn_Type] ?? { label: row.Txn_Type, color: "#6b7280" };
                 const refId =
                   row.Sale_Id || row.Purchase_Id || row.Sale_Return_Id ||
                   row.Purchase_Return_Id || row.Payment_In_Id || row.Payment_Out_Id;
 
                 return (
-                  <tr key={`${row.Type}-${refId}-${idx}`}>
+                  <tr key={`${row.Txn_Type}-${refId}-${idx}`}>
                     <td>{idx + 1}.</td>
                     <td>{meta.label}</td>
+                    <td>{row.Doc_Number}</td>
                     <td>
-                      {row._date
-                        ? new Date(row._date).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "numeric",
-                            year: "numeric",
-                          })
+                      {row.Txn_Date
+                        ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "numeric",
+                          year: "numeric",
+                        })
                         : "N/A"}
                     </td>
-                    <td style={{ color: meta.color, fontWeight: 600 }}>
-                      ₹ {fmt(row.Balance_Due)}
-                    </td>
+                    <td>₹ {fmt(row.Amount)}</td>
+                    <td>₹ {fmt(row.Balance_Due)}</td>
                     <td>
-  {row.Formatted_Reference_Id && (
-    MODAL_TXN_TYPES.includes(row.Type) ? (
-      <Eye
-        style={{ cursor: "pointer", color: "#4CA1AF" }}
-        onClick={() => openModal(row.Type, row.Formatted_Reference_Id)}
-      />
-    ) : (
-      <NavLink
-        to={`/${TXN_TYPE_ROUTE_MAP[row.Type]}/edit/${row.Formatted_Reference_Id}`}
-        state={{ from: "party-details", partyId }}
-      >
-        <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
-      </NavLink>
-    )
-  )}
-</td>
-                    {/* <td>
-                      {routeInfo && refId && (
-                        <NavLink to={`/${routeInfo}/edit/${refId}`} state={{ from: "party-details", partyId }}>
-                          <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
-                        </NavLink>
+                      {row.Formatted_Reference_Id && (
+                        MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                          <Eye
+                            style={{ cursor: "pointer", color: "#4CA1AF" }}
+                            onClick={() => openModal(row.Txn_Type, row.Formatted_Reference_Id)}
+                          />
+                        ) : (
+                          <NavLink
+                            to={{
+                              pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                              search: searchParams.toString(),
+                            }}
+                            // to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
+                            state={{ from: "party-details", partyId }}
+                          >
+                            <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
+                          </NavLink>
+                        )
                       )}
-                    </td> */}
+                    </td>
                   </tr>
                 );
               })
@@ -326,7 +320,8 @@ console.log(ledger)
           </div>
         )}
       </div>
-           {/* ── MODALS ── */}
+
+      {/* ── MODALS ── */}
       {modalState.open && modalState.type === "Payment_In" && (
         <PaymentInModalLoader
           id={modalState.id}
@@ -344,7 +339,7 @@ console.log(ledger)
           onClose={closeModal}
           onSave={handleSavePaymentOut}
           isSaving={isUpdatingPaymentOut}
-           parties={partiesList}
+          parties={partiesList}
         />
       )}
     </div>
@@ -353,56 +348,48 @@ console.log(ledger)
 
 /* ════════════════════════════════════════════════════════════
    MAIN PAGE
+   Both `partyId` and the left party-list search (?q=) now live in
+   the URL. Every update MERGES into a copy of the current params
+   instead of replacing the whole query string — the old
+   setSearchParams({ partyId }) call was wiping out ?q=/?txnSearch=
+   whenever a party got auto-selected.
 ════════════════════════════════════════════════════════════ */
- 
-// const PARTY_TYPE_META = {
-//   Sale: { label: "Sale", color: "#059669" },
-//   Purchase: { label: "Purchase", color: "#dc2626" },
-//   Credit_Note: { label: "Credit Note", color: "#059669" },
-//   Debit_Note: { label: "Debit Note", color: "#dc2626" },
-//   Payment_In: { label: "Payment In", color: "#059669" },
-//   Payment_Out: { label: "Payment Out", color: "#dc2626" },
-// };
-
-// const PARTY_TYPE_ROUTE_MAP = {
-//   Sale: "sale",
-//   Purchase: "purchase",
-//   Credit_Note: "sale-return",
-//   Debit_Note: "purchase-return",
-//   Payment_In: "payment-in",
-//   Payment_Out: "payment-out",
-// };
-
 export default function Parties() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState(
-    searchParams.get("partyId") ? Number(searchParams.get("partyId")) : null
-  );
-  const [leftSearch, setLeftSearch] = useState("");
+
+  const selectedId = searchParams.get("partyId") || null;
+  const leftSearch = searchParams.get("q") || "";
+
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
-  //const [deleteTarget, setDeleteTarget] = useState(null);
 
   const { data: partiesData, isLoading } = useGetAllPartiesQuery({ search: leftSearch });
   const parties = partiesData?.parties || [];
-
-//   const [deleteParty] = useDeletePartyMutation();
-
+const menuRef = useRef(null);
+  // auto-select the first party only if nothing is selected yet
   useEffect(() => {
-    const urlPartyId = searchParams.get("partyId");
-    if (urlPartyId && Number(urlPartyId) !== selectedId) {
-      setSelectedId(Number(urlPartyId));
-    }
-    if (!urlPartyId && !isLoading && parties.length > 0) {
-      setSelectedId(parties[0].Party_Id);
-      setSearchParams({ partyId: parties[0].Party_Id }, { replace: true });
+    if (!searchParams.get("partyId") && !isLoading && parties.length > 0) {
+      const next = new URLSearchParams(searchParams);
+      next.set("partyId", parties[0].Party_Id);
+      setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, parties]);
 
   const handleSelectParty = (partyId) => {
-    setSelectedId(partyId);
-    setSearchParams({ partyId });
+    const next = new URLSearchParams(searchParams);
+    next.set("partyId", partyId);
+    setSearchParams(next);
+  };
+
+  const handleLeftSearchChange = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set("q", value);
+    } else {
+      next.delete("q");
+    }
+    setSearchParams(next, { replace: true });
   };
 
   const handleEdit = (party) => {
@@ -410,21 +397,20 @@ export default function Parties() {
     setOpenMenuId(null);
   };
 
-//   const handleDeleteConfirm = async () => {
-//     try {
-//       await deleteParty(deleteTarget.Party_Id).unwrap();
-//       toast.success("Party deleted");
-//       if (selectedId === deleteTarget.Party_Id) {
-//         setSelectedId(null);
-//         setSearchParams({}, { replace: true });
-//       }
-//     } catch (err) {
-//       toast.error(err?.data?.message || "Failed to delete party.");
-//     } finally {
-//       setDeleteTarget(null);
-//     }
-//   };
 
+useEffect(() => {
+  const handleOutsideClick = (event) => {
+    if (menuRef.current && !menuRef.current.contains(event.target)) {
+      setOpenMenuId(null);
+    }
+  };
+
+  document.addEventListener("mousedown", handleOutsideClick);
+
+  return () => {
+    document.removeEventListener("mousedown", handleOutsideClick);
+  };
+}, []);
   return (
     <>
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
@@ -471,7 +457,7 @@ export default function Parties() {
                 type="text"
                 placeholder="Search parties..."
                 value={leftSearch}
-                onChange={(e) => setLeftSearch(e.target.value)}
+                onChange={(e) => handleLeftSearchChange(e.target.value)}
                 className="w-full"
               />
             </div>
@@ -519,7 +505,10 @@ export default function Parties() {
                     </div>
 
                     {/* 3-dot menu */}
-                    <div className="flex items-center ml-2 flex-shrink-0 relative">
+                    <div ref={openMenuId === party.Party_Id ? menuRef : null} 
+                    className="flex items-center ml-2 flex-shrink-0 relative">
+
+                    {/* <div className="flex items-center ml-2 flex-shrink-0 relative"> */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -549,7 +538,6 @@ export default function Parties() {
                           <button
                             type="button"
                             onClick={() => {
-                              //setDeleteTarget(party);
                               setOpenMenuId(null);
                             }}
                             className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
@@ -580,31 +568,6 @@ export default function Parties() {
           onClose={() => setPartyModal({ open: false, mode: "add", data: null })}
         />
       )}
-
-      {/* {deleteTarget && (
-        <div className="fixed inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.4)", zIndex: 50 }}>
-          <div className="bg-white rounded-lg p-6" style={{ minWidth: 320 }}>
-            <p className="mb-4">Delete party "{deleteTarget.Party_Name}"?</p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-md bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 rounded-md text-white"
-                style={{ backgroundColor: "#dc2626" }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
     </>
   );
 }

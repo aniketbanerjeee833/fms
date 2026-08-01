@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
 import db from "../config/db.js";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import {
   insertPaymentSplits,
   deletePaymentSplits,
@@ -73,11 +74,25 @@ const getAllPurchaseReturns = async (req, res, next) => {
     const whereClauses = [];
     const params = [];
 
+    // if (search) {
+    //   whereClauses.push(`(
+    //     LOWER(a.Party_Name)           LIKE ? OR
+    //     LOWER(pr.Return_Number)       LIKE ? OR
+    //     LOWER(pr.Bill_Number)         LIKE ? OR
+    //     CAST(pr.Total_Amount AS CHAR) LIKE ? OR
+    //     CAST(pr.Balance_Due AS CHAR)  LIKE ? OR
+    //     CAST(pr.Total_Received AS CHAR)  LIKE ?
+
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like, like, like, like);
+    // }
+
     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)           LIKE ? OR
-        LOWER(pr.Return_Number)       LIKE ? OR
-        LOWER(pr.Bill_Number)         LIKE ? OR
+        a.Party_Name           LIKE ? OR
+      pr.Return_Number       LIKE ? OR
+      pr.Bill_Number         LIKE ? OR
         CAST(pr.Total_Amount AS CHAR) LIKE ? OR
         CAST(pr.Balance_Due AS CHAR)  LIKE ? OR
         CAST(pr.Total_Received AS CHAR)  LIKE ?
@@ -337,6 +352,16 @@ const createPurchaseReturn = async (req, res, next) => {
       txnDate: Return_Date,
       splits,
     });
+    await recordPartyLedger({
+  connection,
+  partyId: party.Party_Id,
+  txnType: "Purchase_Return",
+  referenceId: Purchase_Return_Id,
+  amount: totalAmount,
+  txnDate: Return_Date,
+  docNumber: Return_Number,
+  balanceDue: balanceDue,
+});
 
     // items
     for (const item of items) {
@@ -548,6 +573,17 @@ const editPurchaseReturn = async (req, res, next) => {
       txnDate: Return_Date,
       splits,
     });
+
+    await recordPartyLedger({
+  connection,
+  partyId: party.Party_Id,
+  txnType: "Purchase_Return",
+  referenceId: Purchase_Return_Id,
+  amount: totalAmount,
+  txnDate: Return_Date,
+  docNumber: Return_Number,
+  balanceDue: balanceDue,
+});
 
     
     

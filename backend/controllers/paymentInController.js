@@ -1,6 +1,7 @@
 import db from "../config/db.js"; // mysql2/promise connection
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 import { validateDateRange } from "../utils/validateDate.js";
 
@@ -79,6 +80,17 @@ const createPaymentIn = async (req, res, next) => {
       splits,
     });
 
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Payment_In",
+  referenceId: id,
+  amount: totalReceived,
+  txnDate: Payment_Date,
+  docNumber: Receipt_No,
+  balanceDue: null,
+});
+
     await connection.commit();
     return res.status(201).json({ success: true, message: "Payment In created", id, totalReceived });
   } catch (err) {
@@ -148,6 +160,16 @@ const updatePaymentIn = async (req, res, next) => {
       txnDate: Payment_Date,
       splits,
     });
+    await recordPartyLedger({
+  connection,
+  partyId: Party_Id,
+  txnType: "Payment_In",
+  referenceId: id,
+  amount: totalReceived,
+  txnDate: Payment_Date,
+  docNumber: Receipt_No,
+  balanceDue: null,
+});
 
     await connection.commit();
     return res.status(200).json({ success: true, message: "Payment In updated", totalReceived });
@@ -179,10 +201,20 @@ const getAllPaymentIns = async (req, res, next) => {
     const whereClauses = [];
     const params = [];
 
-    if (search) {
+    // if (search) {
+    //   whereClauses.push(`(
+    //     LOWER(a.Party_Name)       LIKE ? OR
+    //     LOWER(pi.Receipt_No)      LIKE ? OR
+    //     CAST(pi.Received AS CHAR) LIKE ?
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like);
+    // }
+
+     if (search) {
       whereClauses.push(`(
-        LOWER(a.Party_Name)       LIKE ? OR
-        LOWER(pi.Receipt_No)      LIKE ? OR
+        a.Party_Name       LIKE ? OR
+        pi.Receipt_No      LIKE ? OR
         CAST(pi.Received AS CHAR) LIKE ?
       )`);
       const like = `%${search}%`;
@@ -362,3 +394,6 @@ const getPaymentInById = async (req, res, next) => {
 };
 
 export { getAllPaymentIns, getPaymentInById, createPaymentIn, updatePaymentIn };
+
+
+

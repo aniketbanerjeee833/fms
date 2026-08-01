@@ -28,7 +28,8 @@ export default function PurchaseEdit() {
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
   const bankId = location.state?.bankId;
-  console.log("Edit page query:", location.search, from);
+  // const partyId=location.state?.partyId;
+  // //console.log("Edit page query:", location.search, from);
   const { id: Purchase_Id } = useParams();
   const dispatch = useDispatch();
   const TAX_RATES = {
@@ -605,6 +606,7 @@ export default function PurchaseEdit() {
         { type: "BankAccount", id: payload.Bank_Account_Id },
         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
       ]));
+      dispatch(partyApi.util.invalidateTags(["Party"]));
       // if(from === "party-payables"){
       //   dispatch(partyApi.util.invalidateTags(["Party"]));
       // }
@@ -639,7 +641,16 @@ export default function PurchaseEdit() {
             pathname: `/cash-bank/bank-accounts`,
             search: `?bankId=${bankId}`,
           });
-        } else if (from === "cash-in-hand") {
+        } 
+                    else if (from === "party-details") {
+          // 🔹 new — return to Bank Accounts page with the same account selected
+          navigate({
+            pathname: `/party/parties`,
+             search: location.search,
+            // search: `?partyId=${partyId}`,
+          });
+        }
+        else if (from === "cash-in-hand") {
           // 🔹 new — return to Bank Accounts page with the same account selected
           navigate({
             pathname: `/cash-bank/cash-in-hand`,
@@ -757,6 +768,14 @@ export default function PurchaseEdit() {
                       search: `?bankId=${bankId}`,
                     })
                   }
+                     else if (from === "party-details") {
+          // 🔹 new — return to Bank Accounts page with the same account selected
+          navigate({
+            pathname: `/party/parties`,
+             search: location.search,
+            // search: `?partyId=${partyId}`,
+          });
+        }
                   else if (from === "cash-in-hand") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
