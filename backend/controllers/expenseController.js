@@ -267,6 +267,7 @@ const getOrCreateExpenseCategory = async (connection, Category_Name, Category_Ty
 ═══════════════════════════════════════ */
 const createExpense = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -276,392 +277,936 @@ const createExpense = async (req, res, next) => {
       Expense_Date,
       Bill_Date,
       With_GST,
-      Category_Name,       // 🔹 typed directly — not Category_Id
-      Category_Type,       // optional, defaults to "Indirect"
-      Party_Name,
-      State_Of_Supply,
-      
-      Total_Amount,
-      Total_Paid,
-      splits,
-      items,               // [{ Item_Name, Item_HSN, Quantity, Price, Discount_On_Price,
-                           //    Discount_Type_On_Price, Tax_Type, Tax_Amount, Amount }]
-    } = req.body;
 
-    const withGST = !!With_GST;
-
-    if (!Category_Name?.trim() || !Expense_Date || !Array.isArray(items) || items.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Category Name, Expense Date and items are required.",
-      });
-    }
-
-    if (withGST && (!Party_Name || !Bill_Date)) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Party and Bill Date are required for GST expenses.",
-      });
-    }
-
-    const totalAmount = Number(Total_Amount) || 0;
-    const totalPaid   = Total_Paid === "" || Total_Paid === undefined ? 0 : Number(Total_Paid);
-    const balanceDue  = totalAmount - totalPaid;
-
-    // 🔹 without GST: must pay full amount — no credit allowed
-    if (!withGST && Math.round(totalPaid * 100) !== Math.round(totalAmount * 100)) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "For non-GST expenses, Total Paid must equal Total Amount.",
-      });
-    }
-
-    // 🔹 with GST: partial allowed but can't overpay
-    if (withGST && totalPaid > totalAmount) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Paid amount cannot exceed Total Amount.",
-      });
-    }
-
-    // 🔹 validate splits sum === totalPaid
-    if (totalPaid > 0) {
-      try {
-        validateSplits(splits, totalPaid);
-      } catch (err) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: err.message });
-      }
-    }
-
-    // 🔹 get or create category — default type Indirect
-    const Category_Id = await getOrCreateExpenseCategory(
-      connection,
       Category_Name,
-      Category_Type || "Indirect"
-    );
-
-    // 🔹 party lookup (GST only)
-    let Party_Id = null;
-    if (withGST) {
-      const [[party]] = await connection.query(
-        `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-        [Party_Name]
-      );
-      if (!party) {
-        await connection.rollback();
-        return res.status(404).json({ success: false, message: "Party not found." });
-      }
-      Party_Id = party.Party_Id;
-    }
-
-    const [fy] = await connection.query(
-      `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
-    );
-    const activeFY = fy.length ? fy[0].Financial_Year : null;
-
-    const [expenseResult] = await connection.query(
-      `INSERT INTO expenses
-       (Expense_Number, Expense_Date, Bill_Date, With_GST, Category_Id, Party_Id,
-        State_Of_Supply,  Total_Amount, Total_Paid, Balance_Due,
-        financial_year, created_at, updated_at)
-       VALUES (?, ?, ?, ?,  ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [
-        Expense_Number || null,
-        Expense_Date,
-        withGST ? Bill_Date : null,
-        withGST ? 1 : 0,
-        Category_Id,
-        Party_Id,
-        State_Of_Supply || null,
-       
-        totalAmount,
-        totalPaid,
-        balanceDue,
-        activeFY,
-      ]
-    );
-
-    const expenseId = expenseResult.insertId;
-    const txnDate   = withGST ? Bill_Date : Expense_Date;
-    const partyName = withGST ? Party_Name : null;
-
-    // 🔹 splits → bank/cash ledgers
-    if (totalPaid > 0 && Array.isArray(splits) && splits.length > 0) {
-      await insertPaymentSplits({
-        connection,
-        sourceType: "Expense",
-        sourceId:   expenseId,
-        partyName,
-        txnDate,
-        splits,
-      });
-    }
-
-    // 🔹 items — get or create master record, then insert child row
-    for (const item of items) {
-      const {
-        Item_Name,
-        Item_HSN,
-        Quantity,
-        Price,
-        Discount_On_Price,
-        Discount_Type_On_Price,
-        Tax_Type,
-        Tax_Amount,
-        Amount,
-      } = item;
-
-      if (!Item_Name?.trim()) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: "Item name is required." });
-      }
-
-      if (withGST && (!Quantity || !Price)) {
-        await connection.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Quantity and Price are required for GST expense items.",
-        });
-      }
-
-      // 🔹 look up or create master item — if HSN provided and item is new, store it
-      const masterItemId = await getOrCreateExpenseItemMaster(connection, Item_Name, Item_HSN);
-
-      await connection.query(
-        `INSERT INTO expense_items
-         (Expense_Id, Expense_Item_Master_Id, Quantity, Price,
-          Discount_On_Price, Discount_Type_On_Price, Tax_Type, Tax_Amount, Amount,
-          created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          expenseId,
-          masterItemId,
-          withGST ? Number(Quantity) : null,
-          withGST ? Number(Price)    : null,
-          Number(Discount_On_Price)  || 0,
-          Discount_Type_On_Price     || "Percentage",
-          Tax_Type  || "None",
-          Tax_Amount ? Number(Tax_Amount) : null,
-          Number(Amount) || 0,
-        ]
-      );
-    }
-
-    await connection.commit();
-    return res.status(201).json({
-      success: true,
-      message: "Expense created successfully",
-      expenseId,
-    });
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Create expense error:", err);
-    next(err);
-  } finally {
-    if (connection) connection.release();
-  }
-};
-
-/* ═══════════════════════════════════════
-   EDIT EXPENSE
-═══════════════════════════════════════ */
-const editExpense = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
-    const { id } = req.params;
-
-    const [[existing]] = await connection.query(`SELECT * FROM expenses WHERE id = ?`, [id]);
-    if (!existing) {
-      return res.status(404).json({ success: false, message: "Expense not found." });
-    }
-
-    const {
-      Expense_Number,
-      Expense_Date,
-      Bill_Date,
-      With_GST,
-      Category_Name,      // 🔹 typed directly
       Category_Type,
+
       Party_Name,
       State_Of_Supply,
-     
+
       Total_Amount,
-      Total_Paid,
+      // Total_Paid, // ❌ don't trust frontend
+
       splits,
       items,
     } = req.body;
 
     const withGST = !!With_GST;
 
-    if (!Category_Name?.trim() || !Expense_Date || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Category Name, Expense Date and items are required.",
-      });
+    
+
+  // 1. VALIDATION
+// =========================================================
+if (!Category_Name?.trim()) {
+  await connection.rollback();
+  return res.status(400).json({
+    success: false,
+    message: "Expense Category is required.",
+  });
+}
+
+if (withGST && !Party_Name?.trim()) {
+  await connection.rollback();
+  return res.status(400).json({
+    success: false,
+    message: "Party is required for GST expenses.",
+  });
+}
+
+    // =========================================================
+    // 2. FIND PARTY
+    //
+    // Party is now used regardless of GST / non-GST.
+    // =========================================================
+
+   let Party_Id = null;
+
+if (Party_Name?.trim()) {
+  const [[party]] = await connection.query(
+    `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
+    [Party_Name]
+  );
+
+  if (!party) {
+    await connection.rollback();
+    return res.status(404).json({
+      success: false,
+      message: "Party not found.",
+    });
+  }
+
+  Party_Id = party.Party_Id;
+}
+
+    // =========================================================
+    // 3. CATEGORY
+    //
+    // Category is OPTIONAL now.
+    //
+    // IMPORTANT:
+    // Don't call getOrCreateExpenseCategory() with blank/null
+    // because that helper uses Category_Name.trim().
+    // =========================================================
+
+    let Category_Id = null;
+
+    if (Category_Name?.trim()) {
+      Category_Id =
+        await getOrCreateExpenseCategory(
+          connection,
+          Category_Name,
+          Category_Type || "Indirect"
+        );
     }
 
-    if (withGST && (!Party_Name || !Bill_Date)) {
-      return res.status(400).json({
-        success: false,
-        message: "Party and Bill Date are required for GST expenses.",
-      });
-    }
+    // =========================================================
+    // 4. NORMALIZE PAYMENT SPLITS
+    //
+    // Rules:
+    //
+    // Payment_Type missing -> ignore
+    //
+    // Bank without Bank_Account_Id -> ignore
+    //
+    // "" / null / undefined Amount -> 0
+    // =========================================================
 
-    const totalAmount = Number(Total_Amount) || 0;
-    const totalPaid   = Total_Paid === "" || Total_Paid === undefined ? 0 : Number(Total_Paid);
-    const balanceDue  = totalAmount - totalPaid;
+    const normalizedSplits = (splits || [])
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
 
-    if (!withGST && Math.round(totalPaid * 100) !== Math.round(totalAmount * 100)) {
-      return res.status(400).json({
-        success: false,
-        message: "For non-GST expenses, Total Paid must equal Total Amount.",
-      });
-    }
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
 
-    if (withGST && totalPaid > totalAmount) {
-      return res.status(400).json({
-        success: false,
-        message: "Paid amount cannot exceed Total Amount.",
-      });
-    }
+        return true;
+      })
+      .map((split) => ({
+        ...split,
 
-    if (totalPaid > 0) {
-      try {
-        validateSplits(splits, totalPaid);
-      } catch (err) {
-        return res.status(400).json({ success: false, message: err.message });
-      }
-    }
+        Amount:
+          Number(split.Amount) || 0,
+      }));
 
-    await connection.beginTransaction();
+    // =========================================================
+    // 5. FIRST VALID PAYMENT SPLIT ALWAYS STAYS
+    //
+    // Cash  ₹0   -> KEEP if first
+    // HDFC  ₹0   -> DROP if later
+    // ANCO  ₹25  -> KEEP
+    //
+    // Example:
+    //
+    // frontend:
+    // Cash  0
+    // HDFC  0
+    // ANCO  25
+    //
+    // database:
+    // Cash  0
+    // ANCO  25
+    // =========================================================
 
-    // 🔹 get or create category
-    const Category_Id = await getOrCreateExpenseCategory(
-      connection,
-      Category_Name,
-      Category_Type || "Indirect"
-    );
+    const validSplits =
+      normalizedSplits.filter(
+        (split, index) => {
+          if (index === 0) {
+            return true;
+          }
 
-    let Party_Id = null;
-    if (withGST) {
-      const [[party]] = await connection.query(
-        `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-        [Party_Name]
+          return split.Amount > 0;
+        }
       );
-      if (!party) {
+
+    // =========================================================
+    // 6. TOTALS
+    //
+    // NEVER trust Total_Paid from frontend.
+    // Calculate it from surviving payment splits.
+    // =========================================================
+
+    const totalAmount =
+      Number(Total_Amount) || 0;
+
+    const totalPaid =
+      validSplits.reduce(
+        (sum, split) =>
+          sum + (Number(split.Amount) || 0),
+        0
+      );
+
+    const balanceDue =
+      totalAmount - totalPaid;
+
+    // =========================================================
+    // 7. VALIDATE SURVIVING SPLITS
+    //
+    // No:
+    //   validSplits.length === 0 error
+    //
+    // So empty/relaxed form remains possible.
+    // =========================================================
+
+    if (validSplits.length > 0) {
+      try {
+        validateSplits(
+          validSplits,
+          totalPaid
+        );
+      } catch (validationErr) {
         await connection.rollback();
-        return res.status(404).json({ success: false, message: "Party not found." });
+
+        return res.status(400).json({
+          success: false,
+          message: validationErr.message,
+        });
       }
-      Party_Id = party.Party_Id;
     }
 
-    await connection.query(
-      `UPDATE expenses SET
-         Expense_Number = ?, Expense_Date = ?, Bill_Date = ?, With_GST = ?,
-         Category_Id = ?, Party_Id = ?, State_Of_Supply = ?, 
-         Total_Amount = ?, Total_Paid = ?, Balance_Due = ?, updated_at = NOW()
-       WHERE id = ?`,
-      [
-        Expense_Number || null,
-        Expense_Date,
-        withGST ? Bill_Date : null,
-        withGST ? 1 : 0,
-        Category_Id,
-        Party_Id,
-        State_Of_Supply  || null,
-        
-        totalAmount,
-        totalPaid,
-        balanceDue,
-        id,
-      ]
+    // =========================================================
+    // 8. FINANCIAL YEAR
+    // =========================================================
+
+    const [fy] = await connection.query(
+      `SELECT Financial_Year
+       FROM financial_year
+       WHERE Current_Financial_Year = 1
+       LIMIT 1`
     );
 
-    const txnDate   = withGST ? Bill_Date : Expense_Date;
-    const partyName = withGST ? Party_Name : null;
+    const activeFY =
+      fy.length
+        ? fy[0].Financial_Year
+        : null;
 
-    // 🔹 wipe old splits + ledger rows, re-insert fresh
-    await deletePaymentSplits({ connection, sourceType: "Expense", sourceId: Number(id) });
+    // =========================================================
+    // 9. CREATE EXPENSE HEADER
+    //
+    // Everything except Party can be blank/null.
+    // =========================================================
 
-    if (totalPaid > 0 && Array.isArray(splits) && splits.length > 0) {
+    const [expenseResult] =
+      await connection.query(
+        `INSERT INTO expenses
+         (
+           Expense_Number,
+           Expense_Date,
+           Bill_Date,
+           With_GST,
+           Category_Id,
+           Party_Id,
+           State_Of_Supply,
+           Total_Amount,
+           Total_Paid,
+           Balance_Due,
+           financial_year,
+           created_at,
+           updated_at
+         )
+         VALUES (
+           ?, ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?,
+           NOW(), NOW()
+         )`,
+        [
+          Expense_Number || null,
+
+          Expense_Date || null,
+
+          Bill_Date || null,
+
+          withGST ? 1 : 0,
+
+          Category_Id,
+
+          Party_Id,
+
+          State_Of_Supply || null,
+
+          totalAmount,
+
+          totalPaid,
+
+          balanceDue,
+
+          activeFY,
+        ]
+      );
+
+    const expenseId =
+      expenseResult.insertId;
+
+    // =========================================================
+    // 10. TRANSACTION DATE
+    //
+    // Use Bill_Date first for GST.
+    // Otherwise Expense_Date.
+    //
+    // If both are blank -> null.
+    // =========================================================
+
+    const txnDate =
+      (withGST
+        ? Bill_Date || Expense_Date
+        : Expense_Date || Bill_Date) ||
+      null;
+
+    // =========================================================
+    // 11. PAYMENT SPLITS
+    //
+    // IMPORTANT:
+    //
+    // Do NOT check:
+    // totalPaid > 0
+    //
+    // because:
+    //
+    // Cash ₹0 as first split must still be stored in
+    // payment_splits.
+    //
+    // insertPaymentSplits should itself avoid creating a
+    // ₹0 cash/bank ledger transaction, as in your existing
+    // payment architecture.
+    // =========================================================
+
+    if (validSplits.length > 0) {
       await insertPaymentSplits({
         connection,
+
         sourceType: "Expense",
-        sourceId:   Number(id),
-        partyName,
+
+        sourceId: expenseId,
+
+        partyName: Party_Name,
+
         txnDate,
-        splits,
+
+        splits: validSplits,
       });
     }
 
-    // 🔹 replace items wholesale
-    await connection.query(`DELETE FROM expense_items WHERE Expense_Id = ?`, [id]);
+    // =========================================================
+    // 12. ITEMS
+    //
+    // Same relaxed Sale/Purchase rule:
+    //
+    // Name blank + Amount > 0
+    //      -> ERROR
+    //
+    // Name blank + Amount 0/blank
+    //      -> SKIP
+    //
+    // Name exists
+    //      -> SAVE
+    //
+    // items [] / undefined
+    //      -> allowed
+    // =========================================================
 
-    for (const item of items) {
+    for (const item of items || []) {
       const {
         Item_Name,
         Item_HSN,
+
         Quantity,
         Price,
+
         Discount_On_Price,
         Discount_Type_On_Price,
+
         Tax_Type,
         Tax_Amount,
+
         Amount,
       } = item;
 
+      // -------------------------------------------------------
+      // NAMELESS ROW
+      // -------------------------------------------------------
+
       if (!Item_Name?.trim()) {
-        await connection.rollback();
-        return res.status(400).json({ success: false, message: "Item name is required." });
+        const itemAmount =
+          Number(Amount) || 0;
+
+        // Amount entered -> name becomes required
+        if (itemAmount > 0) {
+          await connection.rollback();
+
+          return res.status(400).json({
+            success: false,
+            message:
+              "Please enter an item name for the row.",
+          });
+        }
+
+        // Blank placeholder row -> ignore
+        continue;
       }
 
-      if (withGST && (!Quantity || !Price)) {
-        await connection.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Quantity and Price required for GST expense items.",
-        });
-      }
+      // =======================================================
+      // 13. GET / CREATE EXPENSE ITEM MASTER
+      // =======================================================
 
-      const masterItemId = await getOrCreateExpenseItemMaster(connection, Item_Name, Item_HSN);
+      const masterItemId =
+        await getOrCreateExpenseItemMaster(
+          connection,
+          Item_Name,
+          Item_HSN
+        );
+
+      // =======================================================
+      // 14. INSERT EXPENSE ITEM
+      //
+      // Quantity / Price are no longer mandatory.
+      // =======================================================
 
       await connection.query(
         `INSERT INTO expense_items
-         (Expense_Id, Expense_Item_Master_Id, Quantity, Price,
-          Discount_On_Price, Discount_Type_On_Price, Tax_Type, Tax_Amount, Amount,
-          created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         (
+           Expense_Id,
+           Expense_Item_Master_Id,
+
+           Quantity,
+           Price,
+
+           Discount_On_Price,
+           Discount_Type_On_Price,
+
+           Tax_Type,
+           Tax_Amount,
+
+           Amount,
+
+           created_at,
+           updated_at
+         )
+         VALUES (
+           ?, ?, ?, ?, ?, ?, ?, ?, ?,
+           NOW(), NOW()
+         )`,
         [
-          id,
+          expenseId,
+
           masterItemId,
-          withGST ? Number(Quantity) : null,
-          withGST ? Number(Price)    : null,
-          Number(Discount_On_Price)  || 0,
-          Discount_Type_On_Price     || "Percentage",
-          Tax_Type  || "None",
-          Tax_Amount ? Number(Tax_Amount) : null,
+
+          Quantity === "" ||
+          Quantity === null ||
+          Quantity === undefined
+            ? null
+            : Number(Quantity),
+
+          Price === "" ||
+          Price === null ||
+          Price === undefined
+            ? null
+            : Number(Price),
+
+          Number(Discount_On_Price) || 0,
+
+          Discount_Type_On_Price ||
+            "Percentage",
+
+          Tax_Type || "None",
+
+          Number(Tax_Amount) || 0,
+
           Number(Amount) || 0,
         ]
       );
     }
 
+    // =========================================================
+    // 15. COMMIT
+    // =========================================================
+
     await connection.commit();
-    return res.status(200).json({ success: true, message: "Expense updated successfully", expenseId: id });
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Expense created successfully",
+      expenseId,
+    });
+
   } catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Edit expense error:", err);
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Create expense error:",
+      err
+    );
+
     next(err);
+
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
+/* ═══════════════════════════════════════
+   EDIT EXPENSE
+═══════════════════════════════════════ */
+const editExpense = async (req, res, next) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
+
+    const { id } = req.params;
+
+    const {
+      Expense_Number,
+      Expense_Date,
+      Bill_Date,
+      With_GST,
+
+      Category_Name,
+      Category_Type,
+
+      Party_Name,
+      State_Of_Supply,
+
+      Total_Amount,
+
+      splits,
+      items,
+    } = req.body;
+
+    const withGST = !!With_GST;
+
+    // =========================================================
+    // 1. CHECK EXPENSE EXISTS
+    // =========================================================
+
+    const [[existingExpense]] = await connection.query(
+      `SELECT *
+       FROM expenses
+       WHERE id = ?
+       LIMIT 1`,
+      [id]
+    );
+
+    if (!existingExpense) {
+      return res.status(404).json({
+        success: false,
+        message: "Expense not found.",
+      });
+    }
+
+    // =========================================================
+    // 2. REQUIRED FIELDS
+    //
+    // Expense requires:
+    // - Party
+    // - Category
+    // =========================================================
+
+    // =========================================================
+// 2. REQUIRED FIELDS
+// =========================================================
+if (!Category_Name?.trim()) {
+  return res.status(400).json({
+    success: false,
+    message: "Expense Category is required.",
+  });
+}
+
+if (withGST && !Party_Name?.trim()) {
+  return res.status(400).json({
+    success: false,
+    message: "Party is required for GST expenses.",
+  });
+}
+
+    // =========================================================
+    // 3. START TRANSACTION
+    // =========================================================
+
+    await connection.beginTransaction();
+// =========================================================
+// 4. FIND PARTY — only when provided
+// =========================================================
+let Party_Id = null;
+
+if (Party_Name?.trim()) {
+  const [[party]] = await connection.query(
+    `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
+    [Party_Name]
+  );
+  if (!party) {
+    await connection.rollback();
+    return res.status(404).json({
+      success: false,
+      message: "Party not found.",
+    });
+  }
+  Party_Id = party.Party_Id;
+}
+
+
+   
+
+    // =========================================================
+    // 5. GET / CREATE EXPENSE CATEGORY
+    //
+    // Category is REQUIRED.
+    // =========================================================
+
+    const Category_Id =
+      await getOrCreateExpenseCategory(
+        connection,
+        Category_Name,
+        Category_Type || "Indirect"
+      );
+
+    // =========================================================
+    // 6. NORMALIZE PAYMENT SPLITS
+    //
+    // No Payment_Type              -> remove
+    // Bank without account         -> remove
+    // blank amount                 -> 0
+    // =========================================================
+
+    const normalizedSplits = (splits || [])
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((split) => ({
+        ...split,
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    // =========================================================
+    // 7. FIRST VALID SPLIT ALWAYS STAYS
+    //
+    // Cash ₹0      first -> KEEP
+    // HDFC ₹0            -> DROP
+    // ANCO ₹50           -> KEEP
+    // =========================================================
+
+    const validSplits =
+      normalizedSplits.filter(
+        (split, index) => {
+          if (index === 0) {
+            return true;
+          }
+
+          return split.Amount > 0;
+        }
+      );
+
+    // =========================================================
+    // 8. TOTALS
+    //
+    // Do NOT trust Total_Paid from frontend.
+    // =========================================================
+
+    const totalAmount =
+      Number(Total_Amount) || 0;
+
+    const totalPaid =
+      validSplits.reduce(
+        (sum, split) =>
+          sum + (Number(split.Amount) || 0),
+        0
+      );
+
+    const balanceDue =
+      totalAmount - totalPaid;
+
+    // =========================================================
+    // 9. VALIDATE SURVIVING SPLITS
+    //
+    // We intentionally DON'T do:
+    //
+    // if (validSplits.length === 0) error
+    //
+    // because we're keeping the relaxed behavior.
+    // =========================================================
+
+    if (validSplits.length > 0) {
+      try {
+        validateSplits(
+          validSplits,
+          totalPaid
+        );
+      } catch (validationErr) {
+        await connection.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message: validationErr.message,
+        });
+      }
+    }
+
+    // =========================================================
+    // 10. UPDATE EXPENSE HEADER
+    // =========================================================
+
+    await connection.query(
+      `UPDATE expenses
+       SET
+         Expense_Number = ?,
+         Expense_Date = ?,
+         Bill_Date = ?,
+         With_GST = ?,
+         Category_Id = ?,
+         Party_Id = ?,
+         State_Of_Supply = ?,
+         Total_Amount = ?,
+         Total_Paid = ?,
+         Balance_Due = ?,
+         updated_at = NOW()
+       WHERE id = ?`,
+      [
+        Expense_Number || null,
+        Expense_Date || null,
+        Bill_Date || null,
+        withGST ? 1 : 0,
+
+        Category_Id,
+        Party_Id,
+
+        State_Of_Supply || null,
+
+        totalAmount,
+        totalPaid,
+        balanceDue,
+
+        id,
+      ]
+    );
+
+    // =========================================================
+    // 11. TRANSACTION DATE
+    // =========================================================
+
+    const txnDate =
+      (
+        withGST
+          ? Bill_Date || Expense_Date
+          : Expense_Date || Bill_Date
+      ) || null;
+
+    // =========================================================
+    // 12. DELETE OLD PAYMENT SPLITS
+    //
+    // This should also reverse old Cash/Bank transactions
+    // according to your existing helper.
+    // =========================================================
+
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Expense",
+      sourceId: Number(id),
+    });
+
+    // =========================================================
+    // 13. INSERT NEW PAYMENT SPLITS
+    //
+    // IMPORTANT:
+    // Do NOT check totalPaid > 0.
+    //
+    // First Cash ₹0 must still be preserved in payment_splits.
+    // =========================================================
+
+    if (validSplits.length > 0) {
+      await insertPaymentSplits({
+        connection,
+        sourceType: "Expense",
+        sourceId: Number(id),
+        partyName: Party_Name,
+        txnDate,
+        splits: validSplits,
+      });
+    }
+
+    // =========================================================
+    // 14. DELETE OLD EXPENSE ITEMS
+    //
+    // Expense items don't affect inventory stock here,
+    // so replacing them is straightforward.
+    // =========================================================
+
+    await connection.query(
+      `DELETE FROM expense_items
+       WHERE Expense_Id = ?`,
+      [id]
+    );
+
+    // =========================================================
+    // 15. INSERT NEW ITEMS
+    //
+    // Same relaxed rule:
+    //
+    // Item_Name blank + Amount > 0 -> ERROR
+    // Item_Name blank + Amount 0   -> SKIP
+    // Item_Name exists             -> SAVE
+    // All items blank              -> allowed
+    // =========================================================
+
+    for (const item of items || []) {
+      const {
+        Item_Name,
+        Item_HSN,
+
+        Quantity,
+        Price,
+
+        Discount_On_Price,
+        Discount_Type_On_Price,
+
+        Tax_Type,
+        Tax_Amount,
+
+        Amount,
+      } = item;
+
+      // =======================================================
+      // NAMELESS ROW
+      // =======================================================
+
+      if (!Item_Name?.trim()) {
+        const itemAmount =
+          Number(Amount) || 0;
+
+        if (itemAmount > 0) {
+          await connection.rollback();
+
+          return res.status(400).json({
+            success: false,
+            message:
+              "Please enter an item name for the row.",
+          });
+        }
+
+        // Empty placeholder row
+        continue;
+      }
+
+      // =======================================================
+      // 16. GET / CREATE EXPENSE ITEM MASTER
+      // =======================================================
+
+      const masterItemId =
+        await getOrCreateExpenseItemMaster(
+          connection,
+          Item_Name,
+          Item_HSN
+        );
+
+      // =======================================================
+      // 17. INSERT EXPENSE ITEM
+      // =======================================================
+
+      await connection.query(
+        `INSERT INTO expense_items
+         (
+           Expense_Id,
+           Expense_Item_Master_Id,
+
+           Quantity,
+           Price,
+
+           Discount_On_Price,
+           Discount_Type_On_Price,
+
+           Tax_Type,
+           Tax_Amount,
+
+           Amount,
+
+           created_at,
+           updated_at
+         )
+         VALUES (
+           ?, ?, ?, ?, ?, ?, ?, ?, ?,
+           NOW(), NOW()
+         )`,
+        [
+          id,
+
+          masterItemId,
+
+          Quantity === "" ||
+          Quantity === null ||
+          Quantity === undefined
+            ? null
+            : Number(Quantity),
+
+          Price === "" ||
+          Price === null ||
+          Price === undefined
+            ? null
+            : Number(Price),
+
+          Number(Discount_On_Price) || 0,
+
+          Discount_Type_On_Price ||
+            "Percentage",
+
+          Tax_Type || "None",
+
+          Number(Tax_Amount) || 0,
+
+          Number(Amount) || 0,
+        ]
+      );
+    }
+
+    // =========================================================
+    // 18. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Expense updated successfully",
+      expenseId: Number(id),
+      totalAmount,
+      totalPaid,
+      balanceDue,
+    });
+
+  } catch (err) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Update expense error:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 /* ═══════════════════════════════════════
    GET SINGLE EXPENSE FOR EDIT
 ═══════════════════════════════════════ */
@@ -758,148 +1303,31 @@ const deleteExpense = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════
-   GET ALL EXPENSES (paginated)
-═══════════════════════════════════════ */
-// const getAllExpenses = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
 
-//     const page       = parseInt(req.query.page, 10) || 1;
-//     const limit      = 10;
-//     const offset     = (page - 1) * limit;
-//     const search     = req.query.search?.trim().toLowerCase() || "";
-//     const fromDate   = req.query.fromDate || null;
-//     const toDate     = req.query.toDate   || null;
-//     const categoryId = req.query.categoryId || null;
-
-//     const whereClauses = [];
-//     const params       = [];
-
-//     if (search) {
-//       whereClauses.push(`(
-//         LOWER(e.Expense_Number) LIKE ? OR
-//         LOWER(a.Party_Name)     LIKE ? OR
-//         LOWER(ec.Category_Name) LIKE ? OR
-//         CAST(e.Total_Amount AS CHAR) LIKE ?
-//       )`);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like);
-//     }
-//     if (categoryId) {
-//       whereClauses.push(`e.Category_Id = ?`);
-//       params.push(categoryId);
-//     }
-//     if (fromDate && toDate) {
-//       whereClauses.push(`DATE(e.Expense_Date) BETWEEN ? AND ?`);
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(e.Expense_Date) >= ?`);
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(e.Expense_Date) <= ?`);
-//       params.push(toDate);
-//     }
-
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-//     const [rows] = await connection.query(
-//       `SELECT e.*, a.Party_Name, ec.Category_Name, ec.Category_Type
-//        FROM expenses e
-//        LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
-//        LEFT JOIN expense_categories ec ON e.Category_Id = ec.id
-//        ${whereSQL}
-//        ORDER BY e.created_at DESC
-//        LIMIT ? OFFSET ?`,
-//       [...params, limit, offset]
-//     );
-
-//     // 🔹 attach Payment_Type_Display per row
-//     for (const row of rows) {
-//       const [splits] = await connection.query(
-//         `SELECT ps.Payment_Type, ba.Account_Display_Name
-//          FROM payment_splits ps
-//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//          WHERE ps.Source_Type = 'Expense' AND ps.Source_Id = ?`,
-//         [row.id]
-//       );
-//       const labels = splits.map((s) =>
-//         s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-//       );
-//       const counts = {};
-//       labels.forEach((l) => (counts[l] = (counts[l] || 0) + 1));
-//       row.Payment_Type_Display = Object.entries(counts)
-//         .map(([label, count]) => (count > 1 ? `${label} (x${count})` : label))
-//         .join(" + ") || "—";
-//     }
-
-//     const [[{ total }]] = await connection.query(
-//       `SELECT COUNT(*) AS total
-//        FROM expenses e
-//        LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
-//        LEFT JOIN expense_categories ec ON e.Category_Id = ec.id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     const [[totals]] = await connection.query(
-//       `SELECT
-//          COALESCE(SUM(e.Total_Amount), 0) AS totalAmount,
-//          COALESCE(SUM(e.Total_Paid),   0) AS totalPaid,
-//          COALESCE(SUM(e.Balance_Due),  0) AS totalBalance
-//        FROM expenses e
-//        LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
-//        LEFT JOIN expense_categories ec ON e.Category_Id = ec.id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     return res.status(200).json({
-//       success: true,
-//       currentPage:    page,
-//       totalPages:     Math.ceil(total / limit),
-//       totalExpenses:  total,
-//       expenses:       rows,
-//       totals,
-//     });
-//   } catch (err) {
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-
-/* ═══════════════════════════════════════
-   BY-CATEGORY (infinite scroll)
-═══════════════════════════════════════ */
- const getExpensesByCategory = async (req, res, next) => {
+//Category
+const getExpensesByCategory = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
 
     const { categoryId } = req.params;
-    const lastId   = req.query.lastId ? Number(req.query.lastId) : null;
-    const search   = req.query.search?.trim().toLowerCase() || "";
-    const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
+    const lastId = req.query.lastId ? Number(req.query.lastId) : null;
+    const search = req.query.search?.trim().toLowerCase() || "";
+    const date   = req.query.date || null;   // 🔹 single date only
 
     const whereClauses = [`e.Category_Id = ?`];
     const params       = [categoryId];
 
     if (lastId) { whereClauses.push(`e.id < ?`); params.push(lastId); }
+
     if (search) {
       whereClauses.push(`(LOWER(e.Expense_Number) LIKE ? OR LOWER(a.Party_Name) LIKE ?)`);
-      const like = `%${search}%`;
-      params.push(like, like);
+      params.push(`%${search}%`, `%${search}%`);
     }
-    if (fromDate && toDate) {
-      whereClauses.push(`DATE(e.Expense_Date) BETWEEN ? AND ?`);
-      params.push(fromDate, toDate);
-    } else if (fromDate) {
-      whereClauses.push(`DATE(e.Expense_Date) >= ?`); params.push(fromDate);
-    } else if (toDate) {
-      whereClauses.push(`DATE(e.Expense_Date) <= ?`); params.push(toDate);
+
+    if (date) {
+      whereClauses.push(`DATE(e.Expense_Date) = ?`);   // 🔹 single date match
+      params.push(date);
     }
 
     const [rows] = await connection.query(
@@ -914,7 +1342,7 @@ const deleteExpense = async (req, res, next) => {
 
     const hasMore    = rows.length > PAGE_SIZE;
     const pageRows   = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-    const nextCursor = pageRows.length ? pageRows[pageRows.length - 1].id : null;
+    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
     return res.status(200).json({ success: true, expenses: pageRows, hasMore, nextCursor });
   } catch (err) {
@@ -923,11 +1351,8 @@ const deleteExpense = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-
-/* ═══════════════════════════════════════
-   BY ITEM USAGE (infinite scroll)
-═══════════════════════════════════════ */
- const getExpenseItemUsage = async (req, res, next) => {
+//by items
+const getExpenseItemUsage = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
@@ -938,10 +1363,17 @@ const deleteExpense = async (req, res, next) => {
     }
 
     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
+    const date   = req.query.date || null;   // 🔹 single date only
+
     const whereClauses = [`ei.Expense_Item_Master_Id = ?`];
     const params       = [masterItemId];
 
     if (lastId) { whereClauses.push(`ei.id < ?`); params.push(lastId); }
+
+    if (date) {
+      whereClauses.push(`DATE(e.Expense_Date) = ?`);   // 🔹 single date match
+      params.push(date);
+    }
 
     const [rows] = await connection.query(
       `SELECT ei.id, ei.Quantity, ei.Price, ei.Amount,
@@ -960,7 +1392,7 @@ const deleteExpense = async (req, res, next) => {
 
     const hasMore    = rows.length > PAGE_SIZE;
     const pageRows   = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-    const nextCursor = pageRows.length ? pageRows[pageRows.length - 1].id : null;
+    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
     return res.status(200).json({ success: true, usage: pageRows, hasMore, nextCursor });
   } catch (err) {
@@ -969,7 +1401,6 @@ const deleteExpense = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-
 export {
   getExpenseItemUsage,
   getExpenseById,

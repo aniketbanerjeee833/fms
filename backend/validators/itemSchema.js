@@ -14,7 +14,7 @@ const itemFormSchema = z.object({
       // 2. Enforce only digits (0-9)
       .regex(HSN_REGEX, "HSN Code must contain only digits (0-9)."),
   Item_Unit: z.string().min(1, "Unit is required"),
-  Item_Image: z.string().optional().nullable(),
+  //Item_Image: z.string().optional().nullable(),
   Item_Category: z.string().min(1, "At least one category is required"),
 });
 

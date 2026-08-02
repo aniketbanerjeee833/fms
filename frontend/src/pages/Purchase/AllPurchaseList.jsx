@@ -385,13 +385,13 @@ export default function AllPurchaseList() {
                 <thead>
                   <tr>
                     <th className="text-left">Sl.No</th>
-                    <th className="text-left ">Bill Date</th>
-                    <th className="text-left ">Bill Number</th>
+                    <th className="text-left ">Date</th>
+                    <th className="text-left ">Bill No.</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
 
-                    <th className="text-left">Balance Due</th>
+                    <th className="text-left">Balance</th>
                     {/* <th>View</th> */}
                     <th>View/Edit</th>
                     <th>Return</th>

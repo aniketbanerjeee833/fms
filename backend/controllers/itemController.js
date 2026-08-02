@@ -57,10 +57,10 @@ const addItem = async (req, res, next) => {
     // ✅ Insert into DB
     const [result] = await db.execute(
       `INSERT INTO add_item (
-        Item_Name, Item_Id, Item_HSN, Item_Unit, Item_Image, Item_Category,
+        Item_Name, Item_Id, Item_HSN, Item_Unit,  Item_Category,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [Item_Name, itemId, Item_HSN, Item_Unit, cleanValue(Item_Image), Item_Category]
+      ) VALUES (?, ?, ?, ?, ?,  NOW(), NOW())`,
+      [Item_Name, itemId, Item_HSN, Item_Unit, , Item_Category]
     );
     await connection.commit();
     return res.status(201).json({
@@ -95,7 +95,7 @@ const editItem = async (req, res, next) => {
     if (!validation.success) {
       return res.status(400).json({ errors: validation.error.errors });
     }
-    const { Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category } = validation.data;
+    const { Item_Name, Item_HSN, Item_Unit,  Item_Category } = validation.data;
     const normalizedName = Item_Name.trim().toLowerCase();
 
     const [duplicate] = await connection.query(
@@ -115,8 +115,8 @@ const editItem = async (req, res, next) => {
     }
     const [result] = await db.execute(
       `UPDATE add_item SET Item_Name = ?, Item_HSN = ?, Item_Unit = ?, 
-          Item_Image = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
-      [Item_Name, Item_HSN, Item_Unit, cleanValue(Item_Image), Item_Category, Item_Id]
+           Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
+      [Item_Name, Item_HSN, Item_Unit,  Item_Category, Item_Id]
     );
 
     if (result.affectedRows === 0) {

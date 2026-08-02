@@ -23,7 +23,7 @@ Item_HSN: z.string()
 //     .min(1, "HSN Code is required")
 //     .max(20, "HSN Code must be at most 20 characters"),
  Item_Unit: z.string().min(1, "Unit is required"),
-  Item_Image: z.string().optional().nullable(),
+  //Item_Image: z.string().optional().nullable(),
   Item_Category: z
     .string()
     .min(1, "At least one category is required"),

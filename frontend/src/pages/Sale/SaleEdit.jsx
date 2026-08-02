@@ -160,7 +160,7 @@ export default function SaleEdit() {
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 0,
+        Quantity: "",
         Item_Unit: "",
         Sale_Price: "",
 
@@ -268,7 +268,7 @@ export default function SaleEdit() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: 0,
+      Quantity: "",
       Item_Unit: "",
       Sale_Price: "",
       Discount_On_Sale_Price: "",
@@ -283,20 +283,20 @@ export default function SaleEdit() {
     setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
     remove(i); // remove from form
   };
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
   const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {
@@ -406,22 +406,52 @@ export default function SaleEdit() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
+  console.log(sale);
+   const emptyRow = () => ({
+  Item_Category: "",
+  Item_Name: "",
+  itemSearch: "",
+  Item_HSN: "",
+  Quantity: "",
+  Sale_Price: "",
+  Discount_On_Sale_Price: "",
+  Discount_Type_On_Sale_Price: "Percentage",
+  Tax_Type: "None",
+  Tax_Amount: "",
+  Amount: "",
+  itemOpen: false,
+  CategoryOpen: false,
+  isHSNLocked: false,
+  isUnitLocked: false,
+  isExistingItem: false,
+});
   useEffect(() => {
     if (sale) {
 
       setPartySearch(sale.invoicePartyDetails.Party_Name);
-      const prefilledRows = sale.items.map((it) => ({
-        ...it,
-        itemSearch: it.Item_Name || "", // for UI display
-        isExistingItem: true,           // lock category/HSN if needed
+      // const prefilledRows = sale.items.map((it) => ({
+      //   ...it,
+      //   itemSearch: it.Item_Name || "", // for UI display
+      //   isExistingItem: true,           // lock category/HSN if needed
 
-        isHSNLocked: false,
-        isUnitLocked: true,
-        CategoryOpen: false,
-        itemOpen: false,
-        itemQuantity: it.Quantity || 0,
-        itemTaxType: it.Tax_Type || "None",
-      }));
+      //   isHSNLocked: false,
+      //   isUnitLocked: true,
+      //   CategoryOpen: false,
+      //   itemOpen: false,
+      //   itemQuantity: it.Quantity || 0,
+      //   itemTaxType: it.Tax_Type || "None",
+      // }));
+        const prefilledRows = sale?.items?.length > 0
+      ? sale.items.map((item) => ({
+          ...item,
+          itemSearch: item.Item_Name,
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: true,
+          isExistingItem: true,
+        }))
+      : [emptyRow()];
 
       setRows(prefilledRows);
 
@@ -455,7 +485,7 @@ export default function SaleEdit() {
                 Amount: "",
               },
             ],
-        items: sale.items || [],
+        items:  prefilledRows
       })
       setShowSplitBox((sale?.splits?.length || 0) > 1);
     }
@@ -464,6 +494,7 @@ export default function SaleEdit() {
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
   const paymentType = watch("splits.0.Payment_Type");
+
   useEffect(() => {
     if (sale) {
 
@@ -540,264 +571,284 @@ export default function SaleEdit() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived])
-  // const onSubmit = async (data) => {
-  //   console.log("🧾 Form Data (from RHF):", data);
 
-  //   // ✅ Validate that at least one item is present
-  //   if (!data.items || data.items.length === 0) {
-  //     toast.error("Please add at least one item before saving the sale.");
-  //     return;
-  //   }
 
-  //   // ✅ Clean up items (optional safety — remove blank rows)
-  //   const cleanedItems = data.items.filter(
-  //     (it) => it.Item_Name && it.Item_Name.trim() !== ""
-  //   );
-
-  //   if (cleanedItems.length === 0) {
-  //     toast.error("Please add at least one valid item with a name.");
-  //     return;
-  //   }
-
-  //   // ✅ Validate no duplicates
-  //   const seenItems = new Set();
-  //   for (const item of cleanedItems) {
-  //     const name = item.Item_Name?.trim().toLowerCase();
-
-  //     if (seenItems.has(name)) {
-  //       toast.error(`Duplicate item '${item.Item_Name}' found.`);
-  //       return;
-  //     }
-  //     seenItems.add(name);
-  //   }
-
-  //   // ✅ Ensure all items have tax & amount values (since auto-calculated)
-  //   const itemsWithDefaults = cleanedItems.map((item) => ({
-  //     ...item,
-  //     Tax_Type: item.Tax_Type || "None",
-  //     Tax_Amount: item.Tax_Amount || "0.00",
-  //     Amount: item.Amount || "0.00",
-  //   }));
-
-  //   // ✅ Build final payload
-  //   const payload = {
-  //     ...data,
-  //     items: itemsWithDefaults,
-  //     Total_Amount: data.Total_Amount || 0,
-  //     Total_Received: data.Total_Received || 0,
-  //     Balance_Due:
-  //       data.Balance_Due ||
-  //       ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-  //   };
-
-  //   console.log("📦 Final Payload Sent:", payload);
-
-  //   // ✅ Submit to backend
-  //   try {
-  //     const res = await editSale({
-  //       Sale_Id,
-  //       body: payload,
-  //     }).unwrap();
-
-  //     if (!res?.success) {
-  //       toast.error("Failed to update sale. Please try again.");
-  //       return;
-  //     }
-
-  //     // ✅ Refresh & navigate
-
-  //     dispatch(saleApi.util.invalidateTags(["Sale"]));
-
-  //     dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
-  //     dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-  //     dispatch(bankAccountApi.util.invalidateTags([
-  //       { type: "BankAccount", id: payload.Bank_Account_Id },
-  //       "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-  //     ]));
-
-  //     toast.success("Sale updated successfully!");
-  //     //   navigate({
-  //     //   pathname: "/sale/all-sales",
-  //     //   search: location.search,
-  //     // });
-  //     if (from === "party-receivables") {
-  //       navigate({
-  //         pathname: `/party/receivables`,
-  //         search: location.search,
-  //       })
-  //     }
-  //     else if (from === "party-sales-purchases-details") {
-
-  //       navigate({
-  //         pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-  //         search: location.search,
-  //       })
-  //       dispatch(partyApi.util.invalidateTags(["Party"]));
-  //     }
-  //     else if (from === "item-sales-purchases-details") {
-  //       navigate({
-  //         pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-  //         search: location.search,
-  //       })
-  //       //dispatch(itemApi.util.invalidateTags(["Item"]));
-  //       // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-  //     }
-  //     else if (from === "bank-accounts") {
-  //       // 🔹 new — return to Bank Accounts page with the same account selected
-  //       navigate({
-  //         pathname: `/cash-bank/bank-accounts`,
-  //         search: `?bankId=${bankId}`,
-  //       });
-  //     }
-  //     else if (from === "cash-in-hand") {
-  //       // 🔹 new — return to Bank Accounts page with the same account selected
-  //       navigate({
-  //         pathname: `/cash-bank/cash-in-hand`,
-
-  //       });
-  //     }
-
-  //     else {
-  //       navigate({
-  //         pathname: "/sale/all-sales",
-  //         search: location.search,
-  //       });
-  //     }
-  //     // navigate("/sale/all-sales");
-  //   } catch (error) {
-  //     const message =
-  //       error?.data?.message || error?.message || "Failed to update sale.";
-  //     toast.error(message);
-  //     console.error("❌ Submission failed:", error);
-  //   }
-  // };
   const onSubmit = async (data) => {
-    console.log("🧾 Form Data (from RHF):", data);
+  console.log("🧾 Form Data (from RHF):", data);
 
-    // ✅ Validate that at least one item is present
-    if (!data.items || data.items.length === 0) {
-      toast.error("Please add at least one item before saving the sale.");
+  // =========================================================
+  // 1. ITEMS
+  //
+  // Send rows to backend AS-IS.
+  //
+  // Backend decides:
+  // No name + Amount > 0  -> ERROR
+  // No name + Amount 0    -> SKIP
+  // Valid item name       -> PROCESS
+  //
+  // Empty sale is allowed.
+  // =========================================================
+
+  const itemsWithDefaults = (data.items || []).map((item) => ({
+    ...item,
+
+    Tax_Type: item.Tax_Type || "None",
+
+    Tax_Amount:
+      item.Tax_Amount === "" ||
+      item.Tax_Amount === undefined ||
+      item.Tax_Amount === null
+        ? 0
+        : Number(item.Tax_Amount),
+
+    Amount:
+      item.Amount === "" ||
+      item.Amount === undefined ||
+      item.Amount === null
+        ? 0
+        : Number(item.Amount),
+  }));
+
+  // =========================================================
+  // 2. TOTAL AMOUNT
+  // =========================================================
+
+  const totalAmount = Number(data.Total_Amount) || 0;
+
+  // =========================================================
+  // 3. PAYMENT SPLITS
+  //
+  // SAME RULE AS ADD SALE:
+  //
+  // Total = 0
+  //   -> NO payment splits
+  //
+  // Total > 0
+  //   -> first VALID payment method always stays
+  //      even if blank / ₹0
+  //
+  //   -> later blank / ₹0 methods are dropped
+  //   -> later positive methods stay
+  //
+  // Example:
+  //
+  // Cash  0       -> KEEP (first)
+  // HDFC  40      -> KEEP
+  // ANCO  0       -> DROP
+  // SBI   5       -> KEEP
+  // =========================================================
+
+  let validSplits = [];
+
+  if (totalAmount > 0) {
+    const normalizedSplits = (data.splits || [])
+      .filter((split) => {
+        // No payment type
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        // Bank selected but no bank account
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((split) => ({
+        ...split,
+
+        // blank / undefined / null -> 0
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    validSplits = normalizedSplits.filter(
+      (split, index) => {
+        // First valid payment method ALWAYS survives
+        if (index === 0) {
+          return true;
+        }
+
+        // Every later payment needs positive amount
+        return split.Amount > 0;
+      }
+    );
+  }
+
+  // =========================================================
+  // 4. TOTAL RECEIVED
+  //
+  // Calculate from surviving splits.
+  // Don't trust data.Total_Received.
+  // =========================================================
+
+  const totalReceived = validSplits.reduce(
+    (sum, split) =>
+      sum + (Number(split.Amount) || 0),
+    0
+  );
+
+  // =========================================================
+  // 5. BALANCE DUE
+  // =========================================================
+
+  const balanceDue =
+    totalAmount - totalReceived;
+
+  // =========================================================
+  // 6. BUILD PAYLOAD
+  // =========================================================
+
+  const payload = {
+    ...data,
+
+    items: itemsWithDefaults,
+
+    Total_Amount: totalAmount,
+    Total_Received: totalReceived,
+    Balance_Due: balanceDue,
+
+    // IMPORTANT:
+    // Send filtered splits, not data.splits
+    splits: validSplits,
+  };
+
+  console.log("📦 Final Edit Sale Payload:", payload);
+
+  // =========================================================
+  // 7. SUBMIT
+  // =========================================================
+
+  try {
+    const res = await editSale({
+      Sale_Id,
+      body: payload,
+    }).unwrap();
+
+    console.log("✅ Edit Sale Response:", res);
+
+    if (!res?.success) {
+      toast.error(
+        "Failed to update sale. Please try again."
+      );
       return;
     }
 
-    // ✅ Remove blank rows
-    const cleanedItems = data.items.filter(
-      (it) => it.Item_Name && it.Item_Name.trim() !== ""
+    // =======================================================
+    // 8. INVALIDATE CACHE
+    // =======================================================
+
+    dispatch(
+      saleApi.util.invalidateTags(["Sale"])
     );
 
-    if (cleanedItems.length === 0) {
-      toast.error("Please add at least one valid item with a name.");
-      return;
+    dispatch(
+      itemApi.util.invalidateTags(["Item"])
+    );
+
+    dispatch(
+      dashboardApi.util.invalidateTags([
+        "Dashboard",
+      ])
+    );
+
+    dispatch(
+      cashInHandApi.util.invalidateTags([
+        "CashInHand",
+      ])
+    );
+
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        "BankAccount",
+      ])
+    );
+
+    dispatch(
+      partyApi.util.invalidateTags(["Party"])
+    );
+
+    toast.success("Sale updated successfully!");
+
+    // =======================================================
+    // 9. NAVIGATION
+    // =======================================================
+
+    if (from === "party-receivables") {
+      navigate({
+        pathname: "/party/receivables",
+        search: location.search,
+      });
     }
 
-    // ✅ Ensure all items have tax & amount values
-    const itemsWithDefaults = cleanedItems.map((item) => ({
-      ...item,
-      Tax_Type: item.Tax_Type || "None",
-      Tax_Amount: item.Tax_Amount || "0.00",
-      Amount: item.Amount || "0.00",
-    }));
+    else if (
+      from === "party-sales-purchases-details"
+    ) {
+      navigate({
+        pathname:
+          `/party/party-sales-purchases-details/${Party_Id}`,
+        search: location.search,
+      });
 
-    // ✅ Build final payload
-    const payload = {
-      ...data,
-      items: itemsWithDefaults,
-      Total_Amount: data.Total_Amount || 0,
-      Total_Received: data.Total_Received || 0,
-      Balance_Due:
-        data.Balance_Due ||
-        ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-    };
-
-    console.log(" Final Payload Sent:", payload);
-
-    try {
-      const res = await editSale({
-        Sale_Id,
-        body: payload,
-      }).unwrap();
-
-      if (!res?.success) {
-        toast.error("Failed to update sale. Please try again.");
-        return;
-      }
-
-      // ✅ Refresh & navigate
-
-      dispatch(saleApi.util.invalidateTags(["Sale"]));
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-      dispatch(partyApi.util.invalidateTags(["Party"]));
-
-      toast.success("Sale updated successfully!");
-      //   navigate({
-      //   pathname: "/sale/all-sales",
-      //   search: location.search,
-      // });
-      if (from === "party-receivables") {
-        navigate({
-          pathname: `/party/receivables`,
-          search: location.search,
-        })
-      }
-      else if (from === "party-sales-purchases-details") {
-
-        navigate({
-          pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-          search: location.search,
-        })
-        dispatch(partyApi.util.invalidateTags(["Party"]));
-      }
-      else if (from === "item-sales-purchases-details") {
-        navigate({
-          pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-          search: location.search,
-        })
-        //dispatch(itemApi.util.invalidateTags(["Item"]));
-        // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-      }
-               else if (from === "party-details") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/party/parties`,
-             search: location.search,
-            // search: `?partyId=${partyId}`,
-          });
-        }
-      else if (from === "bank-accounts") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
-        navigate({
-          pathname: `/cash-bank/bank-accounts`,
-          search: `?bankId=${bankId}`,
-        });
-      }
-      else if (from === "cash-in-hand") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
-        navigate({
-          pathname: `/cash-bank/cash-in-hand`,
-
-        });
-      }
-
-      else {
-        navigate({
-          pathname: "/sale/all-sales",
-          search: location.search,
-        });
-      }
-      // navigate("/sale/all-sales");
-    } catch (error) {
-      const message =
-        error?.data?.message || error?.message || "Failed to update sale.";
-      toast.error(message);
-      console.error("❌ Submission failed:", error);
+      dispatch(
+        partyApi.util.invalidateTags(["Party"])
+      );
     }
-  };
+
+    else if (
+      from === "item-sales-purchases-details"
+    ) {
+      navigate({
+        pathname:
+          `/item/item-sales-purchases-details/${Item_Id}`,
+        search: location.search,
+      });
+    }
+
+    else if (from === "party-details") {
+      navigate({
+        pathname: "/party/parties",
+        search: location.search,
+      });
+    }
+
+    else if (from === "bank-accounts") {
+      navigate({
+        pathname: "/cash-bank/bank-accounts",
+        search: `?bankId=${bankId}`,
+      });
+    }
+
+    else if (from === "cash-in-hand") {
+      navigate({
+        pathname: "/cash-bank/cash-in-hand",
+      });
+    }
+
+    else {
+      navigate({
+        pathname: "/sale/all-sales",
+        search: location.search,
+      });
+    }
+
+  } catch (error) {
+    const message =
+      error?.data?.message ||
+      error?.message ||
+      "Failed to update sale.";
+
+    toast.error(message);
+
+    console.error(
+      "❌ Submission failed:",
+      error
+    );
+  }
+};
   // const handleItemSelect = (it, i) => {
   //   console.log("Selected Item:", it, "at row", i);
   //   setRows((prev) => {
@@ -845,7 +896,7 @@ export default function SaleEdit() {
   //   setValue(`Total_Amount`, Total_Amount);
   //   setValue(`Balance_Due`, Balance_Due);
   // };
-
+  const showSalePayment = totalAmountWatch > 0;
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -924,14 +975,14 @@ export default function SaleEdit() {
                       search: `?bankId=${bankId}`,
                     });
                   }
-                          else if (from === "party-details") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/party/parties`,
-             search: location.search,
-            // search: `?partyId=${partyId}`,
-          });
-        }
+                  else if (from === "party-details") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/party/parties`,
+                      search: location.search,
+                      // search: `?partyId=${partyId}`,
+                    });
+                  }
                   else if (from === "cash-in-hand") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
@@ -1124,7 +1175,8 @@ export default function SaleEdit() {
                   {/* Invoice Number */}
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
-                    Invoice Number <span className="text-red-500">*</span>
+                    Invoice Number 
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1151,7 +1203,7 @@ export default function SaleEdit() {
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className=" whitespace-nowrap active">
                     Invoice Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1260,7 +1312,7 @@ export default function SaleEdit() {
                         </div>
                       </td>
 
-                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
                             type="text"
@@ -1389,6 +1441,84 @@ export default function SaleEdit() {
                                   onClick={handleAddCategory}
                                   style={{ backgroundColor: "#4CA1AF" }}
                                   className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        />
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
                                 >
                                   Add
                                 </button>
@@ -1692,8 +1822,8 @@ export default function SaleEdit() {
                           type="text"
                           className="form-control"
                           style={{ width: "100%" }}
-                          value={watch(`items.${i}.Quantity`)?.toString() || ""}
-                          {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
+                          //value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                          {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
                             let value = e.target.value.replace(/[^0-9]/g, "");
                             // let currentItemName = itemsValues[i]?.Item_Name?.trim();
@@ -2035,11 +2165,12 @@ export default function SaleEdit() {
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
 
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
-                    {!showSplitBox ? (
-                      <>
-                        <div className="flex flex-col w-full">
-                          <span className="active">Payment Type</span>
+                  {showSalePayment && (
+                    <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                      {!showSplitBox ? (
+                        <>
+                          <div className="flex flex-col w-full">
+                            <span className="active">Payment Type</span>
 
                           {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
             it's driven by setValue in the onChange below, not a native <select {...register}> */}
@@ -2202,7 +2333,7 @@ export default function SaleEdit() {
                         </button>
                       </div>
                     )}
-                  </div>
+                  </div>)}
                 </div>
                 {/* <div style={{ width: "100%" }}
                   className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"

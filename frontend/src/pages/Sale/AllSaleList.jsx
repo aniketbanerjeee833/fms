@@ -291,12 +291,12 @@ export default function AllSaleList() {
                 <thead>
                   <tr>
                     <th className="text-left">Sl.No</th>
-                    <th className="text-left ">Invoice Date</th>
-                     <th className="text-left ">Invoice Number</th>
+                    <th className="text-left ">Date</th>
+                     <th className="text-left ">Invoice No.</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
-                    <th className="text-left">Balance Due</th>
+                    <th className="text-left">Balance </th>
                     {/* <th>View</th> */}
                     <th>View/Edit</th>
                     <th>Return</th>
@@ -324,8 +324,8 @@ export default function AllSaleList() {
                                   ? sale?.Invoice_Number
                                   : "N/A"}
                               </td>
-                        <td>{sale?.Party_Name || "N/A"}</td>
-                         <td>{sale?.Payment_Type_Display || "N/A"}</td>
+                        <td >{sale?.Party_Name || "N/A"}</td>
+                      <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
                          {/* <td>
                           {sale?.Payment_Type
                             ? sale.Payment_Type === "Bank"

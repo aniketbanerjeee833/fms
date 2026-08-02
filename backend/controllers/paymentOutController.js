@@ -551,164 +551,530 @@ const getPaymentOutById = async (req, res, next) => {
 /* ── CREATE ───────────────────────────────────────────────── */
 const createPaymentOut = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
-    const { Party_Id, Party_Name, Receipt_No, Payment_Date, splits } = req.body;
+    const {
+      Party_Id,
+      Party_Name,
+      Receipt_No,
+      Payment_Date,
+      splits,
+    } = req.body;
+
+    // =====================================================
+    // 1. BASIC VALIDATION
+    // =====================================================
 
     if (!Party_Id || !Payment_Date) {
-      return res.status(400).json({ success: false, message: "Party and Date are required" });
+      return res.status(400).json({
+        success: false,
+        message: "Party and Date are required",
+      });
     }
 
     if (!Array.isArray(splits) || splits.length === 0) {
-      return res.status(400).json({ success: false, message: "At least one payment split is required" });
+      return res.status(400).json({
+        success: false,
+        message: "At least one payment split is required",
+      });
     }
 
-    /* totalPaid always derived from splits — never trusted from frontend */
-    const totalPaid = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
+    // =====================================================
+    // 2. NORMALIZE SPLITS
+    //
+    // ""       -> 0
+    // "0"      -> 0
+    // "0.00"   -> 0
+    // "500"    -> 500
+    //
+    // Invalid Bank without Bank_Account_Id is removed.
+    // =====================================================
 
-    if (isNaN(totalPaid) || totalPaid <= 0) {
-      return res.status(400).json({ success: false, message: "Paid amount must be greater than 0" });
+    const normalizedSplits = splits
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((split) => ({
+        ...split,
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    // =====================================================
+    // 3. FIRST VALID SPLIT STAYS
+    //
+    // First valid method:
+    //   ₹0 or blank -> KEEP
+    //
+    // Middle/last methods:
+    //   ₹0 or blank -> DROP
+    //   > ₹0        -> KEEP
+    // =====================================================
+
+    const validSplits = normalizedSplits.filter(
+      (split, index) => {
+        if (index === 0) {
+          return true;
+        }
+
+        return split.Amount > 0;
+      }
+    );
+
+    if (validSplits.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one valid payment method is required",
+      });
     }
 
-    /* validateSplits — null means no expected total check (same as payment in edit) */
+    // =====================================================
+    // 4. TOTAL PAID
+    //
+    // Calculate ONLY from surviving splits.
+    // =====================================================
+
+    const totalPaid = validSplits.reduce(
+      (sum, split) => sum + split.Amount,
+      0
+    );
+
+    // ₹0 is allowed because first payment method may be ₹0
+    if (isNaN(totalPaid) || totalPaid < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Paid amount must be a valid non-negative number",
+      });
+    }
+
+    // =====================================================
+    // 5. VALIDATE SURVIVING SPLITS
+    // =====================================================
+
     try {
-      validateSplits(splits, null);
+      validateSplits(
+        validSplits,
+        totalPaid
+      );
     } catch (validationErr) {
-      return res.status(400).json({ success: false, message: validationErr.message });
+      return res.status(400).json({
+        success: false,
+        message: validationErr.message,
+      });
     }
+
+    // =====================================================
+    // 6. START TRANSACTION
+    // =====================================================
 
     await connection.beginTransaction();
 
+    // =====================================================
+    // 7. INSERT PAYMENT OUT HEADER
+    // =====================================================
+
     const [result] = await connection.query(
-      `INSERT INTO payment_out (Party_Id, Receipt_No, Payment_Date, Paid)
+      `INSERT INTO payment_out
+       (
+         Party_Id,
+         Receipt_No,
+         Payment_Date,
+         Paid
+       )
        VALUES (?, ?, ?, ?)`,
-      [Party_Id, Receipt_No || null, Payment_Date, totalPaid]
+      [
+        Party_Id,
+        Receipt_No || null,
+        Payment_Date,
+        totalPaid,
+      ]
     );
 
-    const Payment_Out_Id = result.insertId;
+    const id = result.insertId;
 
-    /* insertPaymentSplits handles recordBankTransaction + recordCashTransaction internally */
+    // =====================================================
+    // 8. INSERT ONLY VALID SPLITS
+    // =====================================================
+
     await insertPaymentSplits({
       connection,
       sourceType: "Payment_Out",
-      sourceId:   Payment_Out_Id,
-      partyName:  Party_Name,
-      txnDate:    Payment_Date,
-      splits,
+      sourceId: id,
+      partyName: Party_Name,
+      txnDate: Payment_Date,
+      splits: validSplits,
     });
 
+    // =====================================================
+    // 9. PARTY LEDGER
+    // =====================================================
+
     await recordPartyLedger({
-  connection,
-  partyId: Party_Id,
-  txnType: "Payment_Out",
-  referenceId: id,
-  amount: totalPaid,
-  txnDate: Payment_Date,
-  docNumber: Receipt_No,
-  balanceDue: null,
-})
+      connection,
+      partyId: Party_Id,
+      txnType: "Payment_Out",
+
+      // FIXED:
+      // Your old code used referenceId: id
+      referenceId: id,
+
+      amount: totalPaid,
+      txnDate: Payment_Date,
+      docNumber: Receipt_No,
+      balanceDue: null,
+    });
+
+    // =====================================================
+    // 10. COMMIT
+    // =====================================================
 
     await connection.commit();
+
     return res.status(201).json({
       success: true,
       message: "Payment Out created",
-      Payment_Out_Id,
+      id,
       totalPaid,
     });
+
   } catch (err) {
-    if (connection) await connection.rollback();
+    if (connection) {
+      await connection.rollback();
+    }
+
     next(err);
+
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
 /* ── UPDATE ───────────────────────────────────────────────── */
+// const updatePaymentOut = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     const { id } = req.params;
+//     const { Party_Id, Party_Name, Receipt_No, Payment_Date, splits } = req.body;
+
+//     if (!Party_Id || !Payment_Date) {
+//       return res.status(400).json({ success: false, message: "Party and Date are required" });
+//     }
+
+//     if (!Array.isArray(splits) || splits.length === 0) {
+//       return res.status(400).json({ success: false, message: "At least one payment split is required" });
+//     }
+
+//     /* always recalculate from splits */
+//     const totalPaid = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
+
+//     if (isNaN(totalPaid) || totalPaid <= 0) {
+//       return res.status(400).json({ success: false, message: "Paid amount must be greater than 0" });
+//     }
+
+//     /* validateSplits with null — no expected total check */
+//     try {
+//       validateSplits(splits, null);
+//     } catch (validationErr) {
+//       return res.status(400).json({ success: false, message: validationErr.message });
+//     }
+
+//     /* check record exists */
+//     const [[existing]] = await connection.query(
+//       `SELECT id FROM payment_out WHERE id = ?`,
+//       [id]
+//     );
+//     if (!existing) {
+//       return res.status(404).json({ success: false, message: "Payment Out not found" });
+//     }
+
+//     await connection.beginTransaction();
+
+//     /* update header — Paid recalculated from splits */
+//     await connection.query(
+//       `UPDATE payment_out
+//        SET Party_Id = ?, Receipt_No = ?, Payment_Date = ?, Paid = ?, updated_at = NOW()
+//        WHERE id = ?`,
+//       [Party_Id, Receipt_No || null, Payment_Date, totalPaid, id]
+//     );
+
+//     /* wipe old splits + reverse their cash/bank ledger entries, then reinsert fresh */
+//     await deletePaymentSplits({
+//       connection,
+//       sourceType: "Payment_Out",
+//       sourceId:   id,
+//     });
+
+//     await insertPaymentSplits({
+//       connection,
+//       sourceType: "Payment_Out",
+//       sourceId:   id,
+//       partyName:  Party_Name,
+//       txnDate:    Payment_Date,
+//       splits,
+//     });
+
+//      await recordPartyLedger({
+//   connection,
+//   partyId: Party_Id,
+//   txnType: "Payment_Out",
+//   referenceId: id,
+//   amount: totalPaid,
+//   txnDate: Payment_Date,
+//   docNumber: Receipt_No,
+//   balanceDue: null,
+// });
+
+//     await connection.commit();
+//     return res.status(200).json({ success: true, message: "Payment Out updated", totalPaid });
+//   } catch (err) {
+//     if (connection) await connection.rollback();
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const updatePaymentOut = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
     const { id } = req.params;
-    const { Party_Id, Party_Name, Receipt_No, Payment_Date, splits } = req.body;
+
+    const {
+      Party_Id,
+      Party_Name,
+      Receipt_No,
+      Payment_Date,
+      splits,
+    } = req.body;
+
+    // =====================================================
+    // 1. BASIC VALIDATION
+    // =====================================================
 
     if (!Party_Id || !Payment_Date) {
-      return res.status(400).json({ success: false, message: "Party and Date are required" });
+      return res.status(400).json({
+        success: false,
+        message: "Party and Date are required",
+      });
     }
 
-    if (!Array.isArray(splits) || splits.length === 0) {
-      return res.status(400).json({ success: false, message: "At least one payment split is required" });
+    // if (!Array.isArray(splits) || splits.length === 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "At least one payment split is required",
+    //   });
+    // }
+
+    // =====================================================
+    // 2. NORMALIZE SPLITS
+    // =====================================================
+
+    const normalizedSplits = splits
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((split) => ({
+        ...split,
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    // =====================================================
+    // 3. FIRST VALID SPLIT STAYS
+    //
+    // Cash ₹0       -> KEEP if first
+    // HDFC ₹0       -> DROP if later
+    // ANCO ₹500     -> KEEP
+    // SBI blank     -> DROP
+    // =====================================================
+
+    const validSplits = normalizedSplits.filter(
+      (split, index) => {
+        if (index === 0) {
+          return true;
+        }
+
+        return split.Amount > 0;
+      }
+    );
+
+    // if (validSplits.length === 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "At least one valid payment method is required",
+    //   });
+    // }
+
+    // =====================================================
+    // 4. TOTAL PAID
+    // =====================================================
+
+    const totalPaid = validSplits.reduce(
+      (sum, split) => sum + split.Amount,
+      0
+    );
+
+    if (isNaN(totalPaid) || totalPaid < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Paid amount must be a valid non-negative number",
+      });
     }
 
-    /* always recalculate from splits */
-    const totalPaid = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
+    // =====================================================
+    // 5. VALIDATE SURVIVING SPLITS
+    // =====================================================
 
-    if (isNaN(totalPaid) || totalPaid <= 0) {
-      return res.status(400).json({ success: false, message: "Paid amount must be greater than 0" });
-    }
-
-    /* validateSplits with null — no expected total check */
     try {
-      validateSplits(splits, null);
+      validateSplits(
+        validSplits,
+        totalPaid
+      );
     } catch (validationErr) {
-      return res.status(400).json({ success: false, message: validationErr.message });
+      return res.status(400).json({
+        success: false,
+        message: validationErr.message,
+      });
     }
 
-    /* check record exists */
+    // =====================================================
+    // 6. CHECK PAYMENT OUT EXISTS
+    // =====================================================
+
     const [[existing]] = await connection.query(
-      `SELECT id FROM payment_out WHERE id = ?`,
+      `SELECT id
+       FROM payment_out
+       WHERE id = ?`,
       [id]
     );
+
     if (!existing) {
-      return res.status(404).json({ success: false, message: "Payment Out not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Payment Out not found",
+      });
     }
+
+    // =====================================================
+    // 7. START TRANSACTION
+    // =====================================================
 
     await connection.beginTransaction();
 
-    /* update header — Paid recalculated from splits */
+    // =====================================================
+    // 8. UPDATE HEADER
+    // =====================================================
+
     await connection.query(
       `UPDATE payment_out
-       SET Party_Id = ?, Receipt_No = ?, Payment_Date = ?, Paid = ?, updated_at = NOW()
+       SET
+         Party_Id = ?,
+         Receipt_No = ?,
+         Payment_Date = ?,
+         Paid = ?,
+         updated_at = NOW()
        WHERE id = ?`,
-      [Party_Id, Receipt_No || null, Payment_Date, totalPaid, id]
+      [
+        Party_Id,
+        Receipt_No || null,
+        Payment_Date,
+        totalPaid,
+        id,
+      ]
     );
 
-    /* wipe old splits + reverse their cash/bank ledger entries, then reinsert fresh */
+    // =====================================================
+    // 9. DELETE OLD SPLITS + OLD CASH/BANK LEDGER ROWS
+    // =====================================================
+
     await deletePaymentSplits({
       connection,
       sourceType: "Payment_Out",
-      sourceId:   id,
+      sourceId: id,
     });
+
+    // =====================================================
+    // 10. INSERT ONLY SURVIVING SPLITS
+    //
+    // IMPORTANT:
+    // splits: validSplits
+    // =====================================================
 
     await insertPaymentSplits({
       connection,
       sourceType: "Payment_Out",
-      sourceId:   id,
-      partyName:  Party_Name,
-      txnDate:    Payment_Date,
-      splits,
+      sourceId: id,
+      partyName: Party_Name,
+      txnDate: Payment_Date,
+      splits: validSplits,
     });
 
-     await recordPartyLedger({
-  connection,
-  partyId: Party_Id,
-  txnType: "Payment_Out",
-  referenceId: id,
-  amount: totalPaid,
-  txnDate: Payment_Date,
-  docNumber: Receipt_No,
-  balanceDue: null,
-});
+    // =====================================================
+    // 11. PARTY LEDGER
+    // =====================================================
+
+    await recordPartyLedger({
+      connection,
+      partyId: Party_Id,
+      txnType: "Payment_Out",
+      referenceId: id,
+      amount: totalPaid,
+      txnDate: Payment_Date,
+      docNumber: Receipt_No,
+      balanceDue: null,
+    });
+
+    // =====================================================
+    // 12. COMMIT
+    // =====================================================
 
     await connection.commit();
-    return res.status(200).json({ success: true, message: "Payment Out updated", totalPaid });
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment Out updated",
+      totalPaid,
+    });
+
   } catch (err) {
-    if (connection) await connection.rollback();
+    if (connection) {
+      await connection.rollback();
+    }
+
     next(err);
+
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
-
 export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut };

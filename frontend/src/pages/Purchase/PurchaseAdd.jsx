@@ -76,7 +76,7 @@ export default function PurchaseAdd() {
   const [activeUnitRow, setActiveUnitRow] = useState(null);
 
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
-  console.log(itemUnits, "itemUnits");
+
 
 
 
@@ -212,7 +212,7 @@ export default function PurchaseAdd() {
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 1,
+        Quantity: "",
         Item_Unit: "",
         Purchase_Price: "",
         Item_HSN: "",
@@ -264,7 +264,7 @@ export default function PurchaseAdd() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: "1",
+      Quantity: "",
       Item_Unit: "",
       Purchase_Price: "",
       Discount_On_Purchase_Price: "",
@@ -308,7 +308,7 @@ export default function PurchaseAdd() {
 
   const calculateRowAmount = (row, index, itemsValues) => {
     const price = num(row.Purchase_Price);
-    const qty = Math.max(1, num(row.Quantity)); // default 1
+    const qty = Math.max(0, num(row.Quantity)); // default 1
     const subtotal = price * qty;
 
     // discount
@@ -353,20 +353,20 @@ export default function PurchaseAdd() {
   //const itemsValues = watch("items"); // watch all rows
   const formValues = watch();
 
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
 
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
@@ -437,86 +437,197 @@ export default function PurchaseAdd() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
+const onSubmit = async (data) => {
+  console.log("Form Data (from RHF):", data);
 
-  const onSubmit = async (data) => {
-    console.log("Form Data (from RHF):", data);
+  // =========================================================
+  // 1. Get raw payment splits
+  // =========================================================
+  const rawSplits = data.splits || [];
 
-    // const { items, totals } = calcAll(data);
+  // =========================================================
+  // 2. Normalize split amounts
+  //
+  // ""        -> 0
+  // undefined -> 0
+  // "5"       -> 5
+  // "10.50"   -> 10.5
+  // =========================================================
+  const normalizedSplits = rawSplits.map((split) => ({
+    ...split,
+    Amount: Number(split.Amount) || 0,
+  }));
 
-    // 2) build payload
-    const payload = {
-      ...data,
-      Total_Paid: data.Total_Paid || 0,
-      // items,
-      // Total_Amount: totals.Total_Amount,
-      // Total_Paid: totals.Total_Paid,           // blank -> 0.00
-      // Balance_Due: totals.Balance_Due,
-    };
-    // const seenItems = new Set();
-
-
-    // for (const item of payload.items) {
-    //   const name = item.Item_Name?.trim().toLowerCase();
-    //   const category = item.Item_Category?.trim().toLowerCase();
-    //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
-    //   const Quantity = item.Quantity
-
-    //   if (!name || !category || !itemHSN || !Quantity) {
-    //     toast.error("Each item must have a valid name, category, HSN and quantity.");
-    //     return;
-    //   }
-
-    //   // ❌ Prevent duplicates
-    //   if (seenItems.has(name)) {
-    //     toast.error(
-    //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-    //     );
-    //     return;
-    //   }
-    //   seenItems.add(name);
-
-
-    // }
-    for (const item of payload.items) {
-      const name = item.Item_Name?.trim();
-      const category = item.Item_Category?.trim();
-      const itemHSN = item.Item_HSN?.trim();
-
-      if (!name || !category || !itemHSN || !item.Quantity) {
-        toast.error("Each item must have a valid name, category, HSN and quantity.");
-        return;
-      }
+  // =========================================================
+  // 3. Find FIRST valid payment method
+  //
+  // Cash -> valid
+  //
+  // Bank -> valid only when Bank_Account_Id exists
+  //
+  // Cheque / Neft -> valid
+  // =========================================================
+  const firstValidIndex = normalizedSplits.findIndex((split) => {
+    if (!split.Payment_Type) {
+      return false;
     }
-    console.log("payload:", payload);
-    try {
-      const res = await addPurchase({
-        body: payload,
-      }).unwrap();
-      console.log(" successfully:", res);
-      const resData = res?.data || res;
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-       dispatch(partyApi.util.invalidateTags(["Party"]));
-      if (!resData?.success) {
-        toast.error("Failed to add new purchase");
-        return;
-      } else {
-        toast.success("New Purchase added successfully!");
-        navigate("/purchase/all-purchases");
-      }
 
-    } catch (error) {
-      const errorMessage =
-        error?.data?.message || error?.message || "Failed to add new purchase";
-      toast.error(errorMessage);
-      // toast.error("Failed to add lead");
-      console.error("Submission failed", error);
+    // Bank must have an account selected
+    if (
+      split.Payment_Type === "Bank" &&
+      !split.Bank_Account_Id
+    ) {
+      return false;
     }
+
+    return true;
+  });
+
+  // =========================================================
+  // 4. Build valid splits
+  //
+  // RULE:
+  //
+  // 1. Positive amount -> ALWAYS KEEP
+  //
+  // 2. Blank / ₹0 -> KEEP only when it is the
+  //    FIRST valid payment method
+  //
+  // 3. Other blank / ₹0 rows -> DROP
+  // =========================================================
+  const validSplits = [];
+
+  normalizedSplits.forEach((split, index) => {
+    if (!split.Payment_Type) {
+      return;
+    }
+
+    // Invalid Bank row
+    if (
+      split.Payment_Type === "Bank" &&
+      !split.Bank_Account_Id
+    ) {
+      return;
+    }
+
+    // -------------------------------------------------------
+    // Positive payment
+    // Always keep it
+    // -------------------------------------------------------
+    if (split.Amount > 0) {
+      validSplits.push(split);
+      return;
+    }
+
+    // -------------------------------------------------------
+    // Blank / ₹0
+    //
+    // Only preserve the FIRST valid payment method
+    // -------------------------------------------------------
+    if (index === firstValidIndex) {
+      validSplits.push({
+        ...split,
+        Amount: 0,
+      });
+    }
+  });
+
+  // =========================================================
+  // 5. Calculate Total_Paid
+  //
+  // Calculate from the payment splits we're actually sending.
+  // ₹0 first split doesn't affect the total.
+  // =========================================================
+  const totalPaid = validSplits.reduce(
+    (sum, split) => sum + (Number(split.Amount) || 0),
+    0
+  );
+
+  // =========================================================
+  // 6. Build payload
+  // =========================================================
+  const payload = {
+    ...data,
+
+    Total_Paid: totalPaid,
+
+    splits: validSplits,
+  };
+
+  // console.log("Raw Splits:", rawSplits);
+  // console.log("Normalized Splits:", normalizedSplits);
+  // console.log("First Valid Index:", firstValidIndex);
+  // console.log("Valid Splits:", validSplits);
+  // console.log("Total Paid:", totalPaid);
+  // console.log("Final Payload:", payload);
+
+  // =========================================================
+  // 7. Submit purchase
+  // =========================================================
+  try {
+    const res = await addPurchase({
+      body: payload,
+    }).unwrap();
+
+    console.log("Purchase Response:", res);
+
+    const resData = res?.data || res;
+
+    // =======================================================
+    // 8. Invalidate RTK Query caches
+    // =======================================================
+    dispatch(
+      itemApi.util.invalidateTags([
+        "Item",
+      ])
+    );
+
+    dispatch(
+      cashInHandApi.util.invalidateTags([
+        "CashInHand",
+      ])
+    );
+
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        "BankAccount",
+      ])
+    );
+
+    dispatch(
+      partyApi.util.invalidateTags([
+        "Party",
+      ])
+    );
+
+    // =======================================================
+    // 9. Handle response
+    // =======================================================
+    if (!resData?.success) {
+      toast.error("Failed to add new purchase");
+      return;
+    }
+
+    toast.success(
+      "New Purchase added successfully!"
+    );
+
+    navigate("/purchase/all-purchases");
+  } catch (error) {
+    const errorMessage =
+      error?.data?.message ||
+      error?.message ||
+      "Failed to add new purchase";
+
+    toast.error(errorMessage);
+
+    console.error(
+      "Purchase submission failed:",
+      error
+    );
   }
+};
+
 
   const states = [
     "Andaman and Nicobar Islands",
@@ -577,6 +688,7 @@ export default function PurchaseAdd() {
 
   // const paymentType = watch("Payment_Type", "");
   const paymentType = watch("splits.0.Payment_Type");
+  console.log("Total Amount:", watch("Total_Amount"));
   // const formData = new FormData();
 
   const [file, setFile] = useState(null);
@@ -660,7 +772,7 @@ export default function PurchaseAdd() {
         Item_Category: "",
         Item_Name: item.Item_Name || "",
         Item_HSN: item.Item_HSN || "",
-        Quantity: Number(item.Quantity) || 1,
+        Quantity: Number(item.Quantity) || 0,
         Item_Unit: "",
         Purchase_Price: item.Purchase_Price || "",
         Discount_On_Purchase_Price: "",
@@ -1087,7 +1199,7 @@ export default function PurchaseAdd() {
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
                     Bill Number
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1108,7 +1220,7 @@ export default function PurchaseAdd() {
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
                     Bill Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1216,7 +1328,7 @@ export default function PurchaseAdd() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
                             type="text"
@@ -1352,6 +1464,84 @@ export default function PurchaseAdd() {
                             </div>
                           </div>
                         )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        />
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Item Dropdown */}
@@ -1373,7 +1563,7 @@ export default function PurchaseAdd() {
                               // const exists = items?.items?.some(
                               //   (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                               // );
-                                  const exists = items?.items?.find(
+                              const exists = items?.items?.find(
                                 (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                               );
                               if (exists) {
@@ -1428,7 +1618,7 @@ export default function PurchaseAdd() {
                                       ...itemsValues[i],
                                       Item_Name: matchedItem.Item_Name,
                                       Purchase_Price: matchedItem.Purchase_Price || 0,
-                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                      Quantity: itemsValues[i]?.Quantity || 0,
                                     },
                                     i,
                                     itemsValues
@@ -1504,7 +1694,7 @@ export default function PurchaseAdd() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                           handleRowChange(i, "itemOpen", false);
 
@@ -1514,7 +1704,7 @@ export default function PurchaseAdd() {
                                               ...itemsValues[i],
                                               Item_Name: it.Item_Name,
                                               Purchase_Price: it.Purchase_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 1,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
                                               Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
                                               Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
                                               Tax_Type: itemsValues[i]?.Tax_Type
@@ -1620,9 +1810,9 @@ export default function PurchaseAdd() {
                               shouldDirty: true,
                             });
 
-                            if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                              return;
-                            }
+                            // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                            //   return;
+                            // }
                             // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
                             //   ...itemsValues[i],
                             //   Quantity: e.target.value,
@@ -1707,7 +1897,8 @@ export default function PurchaseAdd() {
                                 setValue(`items.${i}.Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
                               }}
                             >
-                              <option value=""></option>
+                              {/* <option value=""></option> */}
+                              <option value="">NONE</option>   // ✅ matches Vyapar's default label
                               <option value="__ADD_UNIT__">➕ Add Unit</option>
                               {Array.isArray(itemUnits) &&
                                 itemUnits.map((unit) => (
@@ -1762,9 +1953,9 @@ export default function PurchaseAdd() {
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val,
                                 { shouldValidate: true, shouldDirty: true });
-                              if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                return;
-                              }
+                              // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                              //   return;
+                              // }
 
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(

@@ -1,5 +1,5 @@
 import { z } from "zod";
- 
+
 /* ─────────────────────────────────────────────────────────────
    SHARED HELPERS
 ───────────────────────────────────────────────────────────────*/
@@ -15,91 +15,86 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
- 
+
 /* ─────────────────────────────────────────────────────────────
-   PAYMENT SPLIT
+   PAYMENT SPLIT — relaxed, matches Purchase's paymentSplitSchema
 ───────────────────────────────────────────────────────────────*/
 const paymentSplitSchema = z
   .object({
     Payment_Type: z
       .enum(["Cash", "Cheque", "Neft", "Bank"])
       .or(z.literal(""))
-      .refine((val) => val !== "", { message: "Please select a payment type." }),
- 
+      .optional()
+      .default(""),   // 🔻 was: .refine(val => val !== "", ...) — no longer forces a selection
+
     Bank_Account_Id: z
       .union([z.number(), z.string(), z.null(), z.undefined()])
       .optional(),
- 
+
     Reference_Number: z
       .string()
       .trim()
       .nullable()
       .optional()
       .transform((val) => val ?? ""),
- 
-    Amount: digitsOnly("Amount", true).refine(
-      (val) => val > 0,
-      { message: "Split amount must be greater than 0" }
-    ),
+
+    Amount: digitsOnly("Amount", false),   // 🔻 was: required true + .refine(val > 0, ...)
   })
   .refine(
     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
     { message: "Please select a bank account.", path: ["Bank_Account_Id"] }
   );
- 
+
 /* ─────────────────────────────────────────────────────────────
-   EXPENSE ITEM  — with GST (all fields required)
+   EXPENSE ITEM — with GST (relaxed, matches Purchase item schema)
 ───────────────────────────────────────────────────────────────*/
 const expenseItemWithGSTSchema = z.object({
-  Item_Name: z.string().trim().min(1, "Item name is required"),
- 
+  Item_Name: z.string().optional().default(""),   // 🔻 was: min(1) required
+
   Item_HSN: z
-    .preprocess(
-      (val) => (val === undefined || val === null ? "" : String(val).trim()),
-      z.string().optional()
-    ),
- 
+    .union([z.string(), z.number(), z.undefined(), z.null()])
+    .transform((val) => (val === undefined || val === null ? "" : String(val).trim()))
+    .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
+      message: "HSN Code must be 4-8 digits if provided",
+    }),
+
   Quantity: z.preprocess(
     (val) => {
       if (val === "" || val === undefined || val === null) return 0;
       const n = Number(val);
       return isNaN(n) ? 0 : n;
     },
-    z.number().min(1, "Quantity must be at least 1")
+    z.number().min(0, "Quantity cannot be negative")   // 🔻 was: min(1) required
   ),
- 
-  Price: digitsOnly("Price", true).refine(
-    (val) => val > 0,
-    { message: "Price must be greater than 0" }
-  ),
- 
+
+  Price: z
+    .union([z.string(), z.number()])
+    .transform((val) => String(val ?? "").trim())
+    .refine((s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s), {
+      message: "Price must be a valid number with up to 2 decimals",
+    })
+    .transform((s) => (s === "" ? 0 : Number(s)))
+    .refine((num) => num >= 0, { message: "Price cannot be negative" }),   // 🔻 was: required, must be >0
+
   Discount_On_Price: digitsOnly("Discount_On_Price", false).optional(),
- 
-  Discount_Type_On_Price: z
-    .enum(["Percentage", "Amount"])
-    .optional()
-    .default("Percentage"),
- 
+  Discount_Type_On_Price: z.enum(["Percentage", "Amount"]).optional().default("Percentage"),
   Tax_Type: z.string().optional().default("None"),
- 
   Tax_Amount: digitsOnly("Tax_Amount", false),
- 
   Amount: digitsOnly("Amount", false),
 });
- 
+
 /* ─────────────────────────────────────────────────────────────
-   EXPENSE ITEM  — without GST (only Item_Name + Amount required)
+   EXPENSE ITEM — without GST (relaxed)
 ───────────────────────────────────────────────────────────────*/
 const expenseItemWithoutGSTSchema = z.object({
-  Item_Name: z.string().trim().min(1, "Item name is required"),
- 
+  Item_Name: z.string().optional().default(""),   // 🔻 was: min(1) required
+
   Item_HSN: z
     .preprocess(
       (val) => (val === undefined || val === null ? "" : String(val).trim()),
       z.string().optional()
     ),
- 
-  // Quantity + Price optional for non-GST
+
   Quantity: z.preprocess(
     (val) => {
       if (val === "" || val === undefined || val === null) return null;
@@ -108,70 +103,54 @@ const expenseItemWithoutGSTSchema = z.object({
     },
     z.number().nullable().optional()
   ),
- 
+
   Price: z
     .union([z.string(), z.number(), z.null(), z.undefined()])
     .optional()
     .transform((val) => (val === "" || val === undefined || val === null ? null : Number(val))),
- 
+
   Discount_On_Price: digitsOnly("Discount_On_Price", false).optional(),
- 
-  Discount_Type_On_Price: z
-    .enum(["Percentage", "Amount"])
-    .optional()
-    .default("Percentage"),
- 
+  Discount_Type_On_Price: z.enum(["Percentage", "Amount"]).optional().default("Percentage"),
   Tax_Type: z.string().optional().default("None"),
- 
   Tax_Amount: digitsOnly("Tax_Amount", false),
- 
-  Amount: digitsOnly("Amount", true).refine(
-    (val) => val > 0,
-    { message: "Amount must be greater than 0" }
-  ),
+
+  Amount: digitsOnly("Amount", false),   // 🔻 was: required true + must be >0
 });
- 
+
 /* ─────────────────────────────────────────────────────────────
-   BASE FIELDS  (common to both GST and non-GST)
+   BASE FIELDS — relaxed
 ───────────────────────────────────────────────────────────────*/
 const expenseBaseSchema = z.object({
-  Expense_Number: z.string().trim().optional(),
- 
+  Expense_Number: z.string().trim().optional().default(""),
+
   Expense_Date: z
     .string()
-    .min(1, "Expense Date is required")
+    .min(1, "Expense Date is required")   // 🔹 kept required — same role as Bill_Date in Purchase
     .refine((val) => !isNaN(Date.parse(val)), { message: "Expense Date must be a valid date" }),
- 
+
   With_GST: z.boolean().optional().default(false),
- 
-  Category_Name: z.string().trim().min(1, "Category is required"),
- 
-  Category_Type: z
-    .enum(["Direct", "Indirect"])
-    .optional()
-    .default("Indirect"),
- 
-  Total_Amount: digitsOnly("Total_Amount", true).refine(
-    (val) => val > 0,
-    { message: "Total Amount must be greater than 0" }
-  ),
- 
+
+  Category_Name: z.string().trim().optional().default(""),   // 🔻 was: min(1) required
+
+  Category_Type: z.enum(["Direct", "Indirect"]).optional().default("Indirect"),
+
+  Total_Amount: digitsOnly("Total_Amount", false).default(0),   // 🔻 was: required, must be >0
+
   Total_Paid: z
     .union([z.string(), z.number()])
     .optional()
-    .transform((val) => {
-      if (val === "" || val === undefined || val === null) return 0;
-      return Number(val);
-    })
+    .transform((val) => (val === "" || val === undefined || val === null ? 0 : Number(val)))
     .refine((val) => !isNaN(val) && val >= 0, { message: "Total Paid must be a valid number" }),
- 
+
+  // 🔹 splits optional — array itself can be empty, no forced minimum
   splits: z
     .array(paymentSplitSchema)
-    .min(1, "At least one payment split is required")
+    .optional()
+    .default([])
     .superRefine((splits, ctx) => {
       let cashSeen = false;
       const seenBankAccounts = new Set();
- 
+
       splits.forEach((split, index) => {
         if (split.Payment_Type === "Cash") {
           if (cashSeen) {
@@ -183,7 +162,7 @@ const expenseBaseSchema = z.object({
           }
           cashSeen = true;
         }
- 
+
         if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
           if (seenBankAccounts.has(split.Bank_Account_Id)) {
             ctx.addIssue({
@@ -197,142 +176,54 @@ const expenseBaseSchema = z.object({
       });
     }),
 });
- 
+
 /* ─────────────────────────────────────────────────────────────
-   WITH GST SCHEMA
+   WITH GST SCHEMA — relaxed
 ───────────────────────────────────────────────────────────────*/
 const expenseWithGSTSchema = expenseBaseSchema
   .extend({
     With_GST: z.literal(true),
- 
-    Bill_Date: z
-      .string()
-      .min(1, "Bill Date is required")
-      .refine((val) => !isNaN(Date.parse(val)), { message: "Bill Date must be a valid date" }),
- 
-    Party_Name: z.string().trim().min(1, "Party is required"),
- 
-  //  State_Of_Supply: z.string().optional(),
-   State_Of_Supply: z.string().nullable().optional(),
-    items: z
-      .array(expenseItemWithGSTSchema)
-      .nonempty("At least one item is required"),
+
+    Bill_Date: z.string().optional().default(""),   // 🔻 was: required
+
+    Party_Name: z.string().optional().default(""),   // 🔻 was: min(1) required
+
+    State_Of_Supply: z.string().nullable().optional(),
+
+    // 🔹 items array optional/empty-allowed — matches Purchase's approach
+    items: z.array(expenseItemWithGSTSchema).optional().default([]),   // 🔻 was: nonempty required
   })
   .refine(
     (data) => data.Total_Paid <= data.Total_Amount,
-    {
-      message: "Paid amount cannot exceed Total Amount",
-      path: ["Total_Paid"],
-    }
-  )
-  .refine(
-    (data) => {
-      if (data.Total_Paid === 0) return true; // no splits needed if nothing paid
-      const splitsSum = data.splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-      return Math.round(splitsSum * 100) === Math.round(data.Total_Paid * 100);
-    },
-    {
-      message: "Split amounts must add up to Total Paid",
-      path: ["splits"],
-    }
+    { message: "Paid amount cannot exceed Total Amount", path: ["Total_Paid"] }
   );
- 
+  // 🔻 REMOVED the splits-sum-must-equal-Total_Paid .refine() — this is now enforced
+  //    server-side against validSplits (the computed, filtered array), same as Purchase/Sale,
+  //    since the frontend's raw splits may still contain blank/zero placeholder rows.
+
 /* ─────────────────────────────────────────────────────────────
-   WITHOUT GST SCHEMA
+   WITHOUT GST SCHEMA — relaxed
 ───────────────────────────────────────────────────────────────*/
 const expenseWithoutGSTSchema = expenseBaseSchema
   .extend({
-    With_GST: z.literal(false).or(z.undefined()).or(z.literal(false)),
- 
-    // Party + Bill Date + State optional for non-GST
-    Bill_Date: z.string().optional(),
-    // Party_Name: z.string().optional(),
-    // State_Of_Supply: z.string().optional(),
- 
-    items: z
-      .array(expenseItemWithoutGSTSchema)
-      .nonempty("At least one item is required"),
-  })
-  .refine(
-    (data) => {
-      // non-GST: must pay full amount
-      return Math.round(data.Total_Paid * 100) === Math.round(data.Total_Amount * 100);
-    },
-    {
-      message: "Total Paid must equal Total Amount for non-GST expenses",
-      path: ["Total_Paid"],
-    }
-  )
-  .refine(
-    (data) => {
-      const splitsSum = data.splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-      return Math.round(splitsSum * 100) === Math.round(data.Total_Paid * 100);
-    },
-    {
-      message: "Split amounts must add up to Total Paid",
-      path: ["splits"],
-    }
-  );
- 
+    With_GST: z.literal(false).or(z.undefined()),
+
+    Bill_Date: z.string().optional().default(""),
+    Party_Name: z.string().optional().default(""),
+    State_Of_Supply: z.string().nullable().optional(),
+
+    items: z.array(expenseItemWithoutGSTSchema).optional().default([]),   // 🔻 was: nonempty required
+  });
+  // 🔻 REMOVED: "Total Paid must equal Total Amount for non-GST" refine
+  //    — an empty/draft non-GST expense should be saveable with Total_Paid: 0 too.
+  //    Keep this rule as a soft backend check if you want to still enforce it,
+  //    but only once Total_Amount > 0 (matches "empty form is exempt" pattern).
+  // 🔻 REMOVED the splits-sum-must-equal-Total_Paid .refine() — same reasoning as GST version.
+
 /* ─────────────────────────────────────────────────────────────
-   DISCRIMINATED UNION  — pick the right schema based on With_GST
-   Usage:
-     const result = expenseFormSchema.safeParse(formData);
-     if (!result.success) console.log(result.error.flatten());
+   DISCRIMINATED UNION
 ───────────────────────────────────────────────────────────────*/
 export const expenseFormSchema = z.discriminatedUnion("With_GST", [
-  expenseWithGSTSchema,     // With_GST: true
-  expenseWithoutGSTSchema,  // With_GST: false
+  expenseWithGSTSchema,
+  expenseWithoutGSTSchema,
 ]);
- 
-
-// const {
-//   control,
-//   register,
-//   handleSubmit,
-//   setValue,
-//   watch,
-//   clearErrors,
-//   formState: { errors },
-// } = useForm({
-//   resolver: zodResolver(expenseFormSchema),
-//   defaultValues: {
-//     Expense_Number: "",
-//     Expense_Date: "",
-//     With_GST: false,
-
-//     Category_Name: "",
-//     Category_Type: "Indirect",
-
-//     // GST fields
-//     Bill_Date: "",
-//     State_Of_Supply: "",
-//     Reference_Number: "",
-
-//     Total_Amount: "",
-//     Total_Paid: "",
-
-//     splits: [
-//       {
-//         Payment_Type: "Cash",
-//         Bank_Account_Id: null,
-//         Reference_Number: "",
-//         Amount: "",
-//       },
-//     ],
-
-//     items: [
-//       {
-//         Item_Name: "",
-//         Item_HSN: "",
-//         Quantity: "",
-//         Price: "",
-//         Discount_On_Price: "",
-//         Discount_Type_On_Price: "Percentage",
-//         Tax_Type: "None",
-//         Tax_Amount: "",
-//         Amount: "",
-//       },
-//     ],
-//   },
-// });

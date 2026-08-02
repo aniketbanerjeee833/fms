@@ -49,13 +49,13 @@ const normalizeNumber = (val) =>
 
 
 //OLD
+
 // const addSale = async (req, res, next) => {
 //   let connection;
 //   try {
 //     connection = await db.getConnection();
 //     await connection.beginTransaction();
 
-//     // 1️⃣ Sanitize + validate
 //     const cleanData = sanitizeObject(req.body);
 //     const validation = saleSchema.safeParse(cleanData);
 //     if (!validation.success) {
@@ -72,54 +72,122 @@ const normalizeNumber = (val) =>
 //       Total_Amount,
 //       Total_Received,
 //       Balance_Due,
-//       Payment_Type,
-//       Bank_Account_Id,  
-//       Reference_Number,
+//       //Reference_Number,
+//       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
 //       items,
 //     } = validation.data;
 
-//     if (
-//       !Party_Name ||
-//       !Invoice_Number ||
-//       !Invoice_Date ||
-//       !State_Of_Supply ||
-//       !Array.isArray(items) ||
-//       items.length === 0
-//     ) {
+//     // if (
+//     //   !Party_Name ||
+//     //   !Invoice_Number ||
+//     //   !Invoice_Date ||
+//     //   // !State_Of_Supply ||
+//     //   !Array.isArray(items) ||
+//     //   items.length === 0
+//     // ) {
+//     //   await connection.rollback();
+//     //   return res.status(400).json({ message: "Star marked fields missing or items empty" });
+//     // }
+
+//     // const totalAmount   = Number(Total_Amount) || 0;
+//     // const totalReceived = Total_Received === "" || Total_Received === undefined
+//     //   ? 0
+//     //   : Number(Total_Received);
+//     // const balanceDue    = Balance_Due === "" || Balance_Due === undefined
+//     //   ? totalAmount - totalReceived
+//     //   : Number(Balance_Due);
+//        // =========================================================
+//     // SALE PAYMENT LOGIC
+//     //
+//     // Unlike Purchase:
+//     // - Bank ₹0 / blank -> DROP
+//     // - Cash ₹0 / blank -> DROP
+//     // - Any positive payment -> KEEP
+//     // - No sale amount -> no payment splits
+//     // =========================================================
+
+//     const totalAmount = Number(Total_Amount) || 0;
+
+//     const validSplits =
+//       totalAmount > 0
+//         ? (splits || [])
+//             .filter((split) => {
+//               if (!split.Payment_Type) return false;
+
+//               const amount = Number(split.Amount) || 0;
+
+//               // Sale never keeps ₹0 / blank payment rows
+//               if (amount <= 0) return false;
+
+//               // Bank requires an account
+//               if (split.Payment_Type === "Bank" && !split.Bank_Account_Id) {
+//                 return false;
+//               }
+
+//               return true;
+//             })
+//             .map((split) => ({
+//               ...split,
+//               Amount: Number(split.Amount) || 0,
+//             }))
+//         : [];
+
+//     // Backend calculates Total_Paid from actual surviving payment rows.
+//     const totalReceived = validSplits.reduce(
+//       (sum, split) => sum + (Number(split.Amount) || 0),
+//       0
+//     );
+
+//     const balanceDue = totalAmount - totalReceived;
+
+//     // 🔹 received cannot exceed total
+//     if (totalReceived > totalAmount) {
 //       await connection.rollback();
 //       return res.status(400).json({
-//         message: "Star marked fields missing or items empty",
+//         success: false,
+//         message: "Received amount should be less than or equal to Total Amount",
 //       });
 //     }
-//     if (Payment_Type === "Bank" && !Bank_Account_Id) {
-//       await connection.rollback();
-//       return res.status(400).json({ message: "Bank account is required for Bank payment type." });
-//     }
-//     // 2️⃣ Check duplicate items
-//     const itemCountMap = new Map();
-//     for (const item of items) {
-//       const itemName = item.Item_Name?.trim().toLowerCase();
-//       if (!itemName) {
+
+//     // 🔹 validate splits sum === totalReceived
+//     if (totalReceived > 0) {
+//       try {
+//         validateSplits(validSplits, totalReceived);
+//       } catch (validationErr) {
 //         await connection.rollback();
-//         return res.status(400).json({ message: "Item name missing." });
+//         return res.status(400).json({ success: false, message: validationErr.message });
 //       }
+//     }
 
-//       const qty = Number(item.Quantity) || 0;
-//       itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + qty);
+//     // duplicate item check
+//     // const itemCountMap = new Map();
+//     // for (const item of items) {
+//     //   const itemName = item.Item_Name?.trim().toLowerCase();
+//     //   if (!itemName) {
+//     //     await connection.rollback();
+//     //     return res.status(400).json({ message: "Item name missing." });
+//     //   }
+//     //   itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + 1);
+//     //   if (itemCountMap.get(itemName) > 1) {
+//     //     await connection.rollback();
+//     //     return res.status(400).json({
+//     //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+//     //     });
+//     //   }
+//     // }
+//    for (const item of items || []) {
+//       const itemName = item.Item_Name?.trim();
+//       const itemAmount = normalizeNumber(item.Amount) ?? 0;
 
-//       const duplicates = [...itemCountMap.entries()].filter(([name]) =>
-//         items.filter((it) => it.Item_Name?.trim().toLowerCase() === name).length > 1
-//       );
-//       if (duplicates.length > 0) {
-//         const names = duplicates.map(([n]) => `'${n}'`).join(", ");
+//       if (!itemName && itemAmount > 0) {
 //         await connection.rollback();
+
 //         return res.status(400).json({
-//           message: `Duplicate items detected: ${names}. Please ensure each item appears only once.`,
+//           success: false,
+//           message: "Please enter an item name for the row.",
 //         });
 //       }
 //     }
-
-//     // 4️⃣ Fetch Party_Id
 //     const [partyRows] = await connection.query(
 //       "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
 //       [Party_Name]
@@ -128,199 +196,259 @@ const normalizeNumber = (val) =>
 //       await connection.rollback();
 //       return res.status(404).json({ message: "Party not found." });
 //     }
-
 //     const Party_Id = partyRows[0].Party_Id;
 
-//     // ⚡ 6️⃣ FETCH ACTIVE FINANCIAL YEAR
 //     const [fy] = await connection.query(
-//       `SELECT Financial_Year 
-//        FROM financial_year 
-//        WHERE Current_Financial_Year = 1
-//        LIMIT 1`
+//       `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
 //     );
-
 //     if (fy.length === 0) {
 //       await connection.rollback();
-//       return res.status(400).json({
-//         message: "No active financial year found. Please set one in settings.",
-//       });
+//       return res.status(400).json({ message: "No active financial year found. Please set one in settings." });
 //     }
-
 //     const activeFY = fy[0].Financial_Year;
 
-//     const totalAmount = Number(Total_Amount) || 0;
-
-//     const totalReceived =
-//       Total_Received === "" || Total_Received === undefined
-//         ? 0
-//         : Number(Total_Received);
-
-//     const balanceDue =
-//       Balance_Due === "" || Balance_Due === undefined
-//         ? totalAmount - totalReceived
-//         : Number(Balance_Due);
-
-//     // 7️⃣ Insert into add_sale
 //     const [saleResult] = await connection.execute(
-//       `INSERT INTO add_sale 
+//       `INSERT INTO add_sale
 //        (Party_Id, Invoice_Number, Invoice_Date, State_Of_Supply,
-//         Total_Amount, Total_Received, Balance_Due, Payment_Type,Bank_Account_Id, Reference_Number,
+//         Total_Amount, Total_Received, Balance_Due, 
 //         Financial_Year, created_at, updated_at)
-//        VALUES (?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, NOW(), NOW())`,
+//        VALUES (?, ?, ?, ?, ?, ?, ?,  ?, NOW(), NOW())`,
 //       [
 //         Party_Id,
 //         Invoice_Number,
 //         Invoice_Date,
-//         State_Of_Supply,
+//         cleanValue(State_Of_Supply),
 //         totalAmount,
 //         totalReceived,
 //         balanceDue,
-//         cleanValue(Payment_Type),
-//          Payment_Type === "Bank" ? Bank_Account_Id : null,
-//         cleanValue(Reference_Number),
+//         //cleanValue(Reference_Number),
 //         activeFY,
 //       ]
 //     );
 
-//     // ✅ generate Sale_Id using insertId
 //     const saleIdNumber = saleResult.insertId;
-//     const newSaleId = "SAL" + saleIdNumber.toString().padStart(3, "0");
+//     const newSaleId    = "SAL" + saleIdNumber.toString().padStart(3, "0");
 
 //     await connection.execute(
 //       `UPDATE add_sale SET Sale_Id = ? WHERE id = ?`,
 //       [newSaleId, saleIdNumber]
 //     );
 
-//     if (Payment_Type === "Bank" && Bank_Account_Id && totalReceived > 0) {
-//   await recordBankTransaction({
+//     // 🔹 insert splits + fan out to bank/cash ledgers
+//     // if (totalReceived > 0 && Array.isArray(splits) && splits.length > 0) {
+//     //   await insertPaymentSplits({
+//     //     connection,
+//     //     sourceType: "Sale",
+//     //     sourceId:   saleIdNumber,
+//     //     partyName:  Party_Name,
+//     //     txnDate:    Invoice_Date,
+//     //     splits,
+//     //   });
+//     // }
+//     if (validSplits.length > 0) {
+//   await insertPaymentSplits({
 //     connection,
-//     bankAccountId: Bank_Account_Id,
-//     txnType: "Sale",
-//     referenceId: saleIdNumber,        // ✅ numeric id, not "SAL001"
+//     sourceType: "Sale",
+//     sourceId: saleIdNumber,
 //     partyName: Party_Name,
-//     amount: totalReceived,
-//     txnDate: Invoice_Date
+//     txnDate: Invoice_Date,
+//     splits: validSplits, // ✅ filtered splits
 //   });
 // }
-//  if (Payment_Type === "Cash" && totalPaid > 0){
-// await recordCashTransaction({
+//     await recordPartyLedger({
 //   connection,
-//   isCash:      Payment_Type === "Cash",
-//   txnType:     "Sale",
-//   referenceId: result.insertId,           // sale's id
-//   partyName:   Party_Name,
-//   amount:      Total_Received || Total_Amount,
-//   txnDate:     Invoice_Date,
-// })
-//  }
+//   partyId: Party_Id,
+//   txnType: "Sale",
+//   referenceId: saleIdNumber,
+//   amount: totalAmount,
+//   txnDate: Invoice_Date,
+//   docNumber: Invoice_Number,
+//   balanceDue: balanceDue,
+// });
+
+   
+//   for (const item of items) {
+//   const {
+//     Item_Name,
+//     Item_HSN,
+//     Item_Category,
+//     Quantity,
+//     Item_Unit,
+//     Sale_Price,
+//     Discount_On_Sale_Price,
+//     Discount_Type_On_Sale_Price,
+//     Tax_Type,
+//     Tax_Amount,
+//     Amount,
+//   } = item;
 
 
-//     // 9️⃣ Insert sale items
-//     for (const item of items) {
-//       const {
-//         Item_Name,
-//         Item_HSN,
-//         Item_Category,
-//         Quantity,
-//         Item_Unit,
-//         Sale_Price,
-//         Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price,
-//         Tax_Type,
-//         Tax_Amount,
-//         Amount,
-//       } = item;
-
-//       // Check item exists
-//       const [itemRows] = await connection.query(
-//         "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
+//   // Check if item already exists
+//     const [itemRows] = await connection.execute(
+//         "SELECT * FROM add_item WHERE TRIM(Item_Name) = TRIM(?)) LIMIT 1",
 //         [Item_Name]
 //       );
-//       if (itemRows.length === 0) {
-//         await connection.rollback();
-//         return res.status(404).json({
-//           message: `Item '${Item_Name}' not found in inventory.`,
-//         });
-//       }
 
-//       const Item_Id = itemRows[0].Item_Id;
+//   let Item_Id;
 
-//       // Fetch safe tax type
-//       const [purchaseTax] = await connection.query(
-//         `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ?
-//          ORDER BY id DESC LIMIT 1`,
-//         [Item_Id]
-//       );
+//   if (itemRows.length === 0) {
+//     // ===============================
+//     // Create new item
+//     // ===============================
+//     const [newItemResult] = await connection.execute(
+//       `INSERT INTO add_item
+//       (
+//         Item_Name,
+//         Item_Category,
+//         Item_HSN,
+//         Item_Unit,
+//         Stock_Quantity,
+//         created_at,
+//         updated_at
+//       )
+//       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+//       [
+//         Item_Name,
+//         Item_Category || "",
+//         cleanValue(Item_HSN),
+//         Item_Unit || "",
+//         -normalizeNumber(Quantity), // Allow negative stock
+//       ]
+//     );
 
-//       const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+//     const autoId = newItemResult.insertId;
 
-//       // Update stock
-//       await connection.query(
-//         `UPDATE add_item 
-//          SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
-//          WHERE Item_Id = ?`,
-//         [normalizeNumber(Quantity), Item_Id]
-//       );
+//     // Generate ITM001, ITM002...
+//     Item_Id = "ITM" + autoId.toString().padStart(3, "0");
 
-//       // ✅ INSERT FIRST (no Sale_Items_Id)
-//       const [saleItemResult] = await connection.execute(
-//         `INSERT INTO add_sale_items 
-//          (Sale_Id, Item_Id, Quantity, Sale_Price,
-//           Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-//           Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//         [
-//           newSaleId,
-//           Item_Id,
-//           normalizeNumber(Quantity),
-//           normalizeNumber(Sale_Price),
-//           cleanDiscount(Discount_On_Sale_Price),
-//           cleanValue(Discount_Type_On_Sale_Price),
-//           cleanValue(safeTaxType),
-//           normalizeNumber(Tax_Amount),
-//           normalizeNumber(Amount),
-//         ]
-//       );
+//     // Update Item_Id
+//     await connection.execute(
+//       `UPDATE add_item
+//        SET Item_Id = ?
+//        WHERE id = ?`,
+//       [Item_Id, autoId]
+//     );
+//   } else {
+//     // ===============================
+//     // Existing item
+//     // ===============================
+//     Item_Id = itemRows[0].Item_Id;
 
-//       // ✅ generate ID safely
-//       const id = saleItemResult.insertId;
-//       const newSaleItemId = "SIT" + id.toString().padStart(3, "0");
+//     await connection.execute(
+//       `UPDATE add_item
+//        SET Stock_Quantity = Stock_Quantity - ?,
+//            Item_HSN = ?,
+//            updated_at = NOW()
+//        WHERE Item_Id = ?`,
+//       [
+//         normalizeNumber(Quantity),
+//         cleanValue(Item_HSN) || itemRows[0].Item_HSN,
+//         Item_Id,
+//       ]
+//     );
+//   }
 
-//       await connection.execute(
-//         `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
-//         [newSaleItemId, id]
-//       );
-//     }
+//   // Verify Item_Id exists
+//   const [checkItem] = await connection.query(
+//     `SELECT Item_Id FROM add_item WHERE Item_Id = ?`,
+//     [Item_Id]
+//   );
+
+//   if (checkItem.length === 0) {
+//     throw new Error(`Item_Id ${Item_Id} not found in add_item`);
+//   }
+
+//   // Get latest purchase tax
+//   const [purchaseTax] = await connection.query(
+//     `SELECT Tax_Type
+//      FROM add_purchase_items
+//      WHERE Item_Id = ?
+//      ORDER BY id DESC
+//      LIMIT 1`,
+//     [Item_Id]
+//   );
+
+//   const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+
+//   // Insert Sale Item
+//   const [saleItemResult] = await connection.execute(
+//     `INSERT INTO add_sale_items
+//     (
+//       Sale_Id,
+//       Item_Id,
+//       Quantity,
+//       Sale_Price,
+//       Discount_On_Sale_Price,
+//       Discount_Type_On_Sale_Price,
+//       Tax_Type,
+//       Tax_Amount,
+//       Amount,
+//       created_at,
+//       updated_at
+//     )
+//     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//     [
+//       newSaleId,
+//       Item_Id,
+//       normalizeNumber(Quantity),
+//       normalizeNumber(Sale_Price),
+//       cleanDiscount(Discount_On_Sale_Price),
+//       cleanValue(Discount_Type_On_Sale_Price),
+//       cleanValue(safeTaxType),
+//       normalizeNumber(Tax_Amount),
+//       normalizeNumber(Amount),
+//     ]
+//   );
+
+//   // Generate Sale_Items_Id
+//   const saleItemAutoId = saleItemResult.insertId;
+//   const newSaleItemId = "SIT" + saleItemAutoId.toString().padStart(3, "0");
+
+//   await connection.execute(
+//     `UPDATE add_sale_items
+//      SET Sale_Items_Id = ?
+//      WHERE id = ?`,
+//     [newSaleItemId, saleItemAutoId]
+//   );
+// }
 
 //     await connection.commit();
 
 //     return res.status(201).json({
 //       success: true,
 //       message: "Sale and items added successfully",
-//       saleId: newSaleId,
+//       saleId:  newSaleId,
 //     });
-//   } catch (err) {
+//   } 
+//   catch (err) {
 //     if (connection) await connection.rollback();
 //     console.error("❌ Error adding sale:", err);
-//     return res.status(500).json({
-//       success: false,
-//       message: err.message || "Something went wrong",
-//     });
+//     next(err);
 //   } finally {
 //     if (connection) connection.release();
 //   }
 // };
 const addSale = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+    // =========================================================
+    // 1. SANITIZE + ZOD VALIDATION
+    // =========================================================
+
     const cleanData = sanitizeObject(req.body);
+
     const validation = saleSchema.safeParse(cleanData);
+
     if (!validation.success) {
       await connection.rollback();
-      return res.status(400).json({ errors: validation.error.errors });
+
+      return res.status(400).json({
+        errors: validation.error.errors,
+      });
     }
 
     const {
@@ -332,363 +460,506 @@ const addSale = async (req, res, next) => {
       Total_Amount,
       Total_Received,
       Balance_Due,
-      //Reference_Number,
-      splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
+      splits,
       items,
     } = validation.data;
 
-    if (
-      !Party_Name ||
-      !Invoice_Number ||
-      !Invoice_Date ||
-      // !State_Of_Supply ||
-      !Array.isArray(items) ||
-      items.length === 0
-    ) {
-      await connection.rollback();
-      return res.status(400).json({ message: "Star marked fields missing or items empty" });
+    // =========================================================
+    // 2. TOTAL AMOUNT
+    // =========================================================
+
+    const totalAmount = Number(Total_Amount) || 0;
+
+    // =========================================================
+    // 3. SALE PAYMENT SPLITS
+    //
+    // SALE BEHAVIOUR:
+    //
+    // Cash blank   -> DROP
+    // Cash 0       -> DROP
+    // Cash 500     -> KEEP
+    //
+    // Bank blank   -> DROP
+    // Bank 0       -> DROP
+    // Bank 500     -> KEEP
+    //
+    // Empty sale -> no payment_splits
+    //
+    // This is intentionally different from Purchase.
+    // =========================================================
+let validSplits = [];
+
+if (totalAmount > 0) {
+  const normalizedSplits = (splits || [])
+    .filter((split) => {
+      // Must have payment type
+      if (!split.Payment_Type) {
+        return false;
+      }
+
+      // Bank must have selected bank account
+      if (
+        split.Payment_Type === "Bank" &&
+        !split.Bank_Account_Id
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map((split) => ({
+      ...split,
+      Amount: Number(split.Amount) || 0,
+    }));
+
+
+  validSplits = normalizedSplits.filter(
+    (split, index) => {
+
+      // FIRST valid payment method:
+      // always preserve, even ₹0
+      if (index === 0) {
+        return true;
+      }
+
+      // Every payment after first:
+      // only preserve positive amount
+      return split.Amount > 0;
     }
+  );
+}
 
-    const totalAmount   = Number(Total_Amount) || 0;
-    const totalReceived = Total_Received === "" || Total_Received === undefined
-      ? 0
-      : Number(Total_Received);
-    const balanceDue    = Balance_Due === "" || Balance_Due === undefined
-      ? totalAmount - totalReceived
-      : Number(Balance_Due);
+    // =========================================================
+    // 4. TOTAL RECEIVED
+    //
+    // Backend calculates this.
+    // Don't trust Total_Received coming from frontend.
+    // =========================================================
 
-    // 🔹 received cannot exceed total
+    const totalReceived = validSplits.reduce(
+      (sum, split) => sum + (Number(split.Amount) || 0),
+      0
+    );
+
+    // =========================================================
+    // 5. BALANCE DUE
+    // =========================================================
+
+    const balanceDue = totalAmount - totalReceived;
+
+    // =========================================================
+    // 6. PAYMENT VALIDATION
+    // =========================================================
+
     if (totalReceived > totalAmount) {
       await connection.rollback();
+
       return res.status(400).json({
         success: false,
-        message: "Received amount should be less than or equal to Total Amount",
+        message:
+          "Received amount should be less than or equal to Total Amount",
       });
     }
 
-    // 🔹 validate splits sum === totalReceived
+    // Only validate when an actual payment exists
     if (totalReceived > 0) {
       try {
-        validateSplits(splits, totalReceived);
+        validateSplits(validSplits, totalReceived);
       } catch (validationErr) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: validationErr.message });
+
+        return res.status(400).json({
+          success: false,
+          message: validationErr.message,
+        });
       }
     }
 
-    // duplicate item check
-    // const itemCountMap = new Map();
-    // for (const item of items) {
-    //   const itemName = item.Item_Name?.trim().toLowerCase();
-    //   if (!itemName) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ message: "Item name missing." });
-    //   }
-    //   itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + 1);
-    //   if (itemCountMap.get(itemName) > 1) {
-    //     await connection.rollback();
-    //     return res.status(400).json({
-    //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-    //     });
-    //   }
-    // }
-for (const item of items) {
-  if (!item.Item_Name?.trim()) {
-    await connection.rollback();
-    return res.status(400).json({ message: "Item name missing." });
-  }
-}
-    const [partyRows] = await connection.query(
-      "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
+    // =========================================================
+    // 7. FIND PARTY
+    // =========================================================
+
+    const [partyRows] = await connection.execute(
+      `SELECT Party_Id, GSTIN
+       FROM add_party
+       WHERE Party_Name = ?
+       LIMIT 1`,
       [Party_Name]
     );
+
     if (partyRows.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ message: "Party not found." });
+
+      return res.status(404).json({
+        success: false,
+        message: "Party not found.",
+      });
     }
+
     const Party_Id = partyRows[0].Party_Id;
 
+    // =========================================================
+    // 8. ACTIVE FINANCIAL YEAR
+    // =========================================================
+
     const [fy] = await connection.query(
-      `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
+      `SELECT Financial_Year
+       FROM financial_year
+       WHERE Current_Financial_Year = 1
+       LIMIT 1`
     );
+
     if (fy.length === 0) {
       await connection.rollback();
-      return res.status(400).json({ message: "No active financial year found. Please set one in settings." });
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "No active financial year found. Please set one in settings.",
+      });
     }
+
     const activeFY = fy[0].Financial_Year;
+
+    // =========================================================
+    // 9. CREATE SALE HEADER
+    // =========================================================
 
     const [saleResult] = await connection.execute(
       `INSERT INTO add_sale
-       (Party_Id, Invoice_Number, Invoice_Date, State_Of_Supply,
-        Total_Amount, Total_Received, Balance_Due, 
-        Financial_Year, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?,  ?, NOW(), NOW())`,
+       (
+         Party_Id,
+         Invoice_Number,
+         Invoice_Date,
+         Financial_Year,
+         State_Of_Supply,
+         Total_Amount,
+         Total_Received,
+         Balance_Due,
+         created_at,
+         updated_at
+       )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         Party_Id,
         Invoice_Number,
         Invoice_Date,
+        activeFY,
         cleanValue(State_Of_Supply),
         totalAmount,
         totalReceived,
         balanceDue,
-        //cleanValue(Reference_Number),
-        activeFY,
       ]
     );
 
     const saleIdNumber = saleResult.insertId;
-    const newSaleId    = "SAL" + saleIdNumber.toString().padStart(3, "0");
+
+    const newSaleId =
+      "SAL" + saleIdNumber.toString().padStart(3, "0");
 
     await connection.execute(
-      `UPDATE add_sale SET Sale_Id = ? WHERE id = ?`,
+      `UPDATE add_sale
+       SET Sale_Id = ?
+       WHERE id = ?`,
       [newSaleId, saleIdNumber]
     );
 
-    // 🔹 insert splits + fan out to bank/cash ledgers
-    if (totalReceived > 0 && Array.isArray(splits) && splits.length > 0) {
+    // =========================================================
+    // 10. PAYMENT SPLITS
+    //
+    // IMPORTANT:
+    // Use validSplits, NOT original splits.
+    //
+    // Empty sale:
+    // validSplits = []
+    //
+    // Therefore:
+    // payment_splits    -> none
+    // bank_transactions -> none
+    // cash_transactions -> none
+    // =========================================================
+
+    if (validSplits.length > 0) {
       await insertPaymentSplits({
         connection,
         sourceType: "Sale",
-        sourceId:   saleIdNumber,
-        partyName:  Party_Name,
-        txnDate:    Invoice_Date,
-        splits,
+        sourceId: saleIdNumber,
+        partyName: Party_Name,
+        txnDate: Invoice_Date,
+        splits: validSplits,
       });
     }
+
+    // =========================================================
+    // 11. PARTY LEDGER
+    // =========================================================
+
     await recordPartyLedger({
-  connection,
-  partyId: Party_Id,
-  txnType: "Sale",
-  referenceId: saleIdNumber,
-  amount: totalAmount,
-  txnDate: Invoice_Date,
-  docNumber: Invoice_Number,
-  balanceDue: balanceDue,
-});
+      connection,
+      partyId: Party_Id,
+      txnType: "Sale",
+      referenceId: saleIdNumber,
+      amount: totalAmount,
+      txnDate: Invoice_Date,
+      docNumber: Invoice_Number,
+      balanceDue,
+    });
 
-    // items loop — unchanged
-    // for (const item of items) {
-    //   const {
-    //     Item_Name,
-    //     Item_HSN,
-    //     Item_Category,
-    //     Quantity,
-    //     Item_Unit,
-    //     Sale_Price,
-    //     Discount_On_Sale_Price,
-    //     Discount_Type_On_Sale_Price,
-    //     Tax_Type,
-    //     Tax_Amount,
-    //     Amount,
-    //   } = item;
+    // =========================================================
+    // 12. ITEMS
+    //
+    // SAME SINGLE-LOOP STYLE AS YOUR ADD PURCHASE.
+    //
+    // RULE:
+    //
+    // Name blank + Amount blank -> SKIP
+    // Name blank + Amount 0     -> SKIP
+    // Name blank + Amount > 0   -> ERROR
+    //
+    // Name exists -> process item
+    // =========================================================
 
-    //   const [itemRows] = await connection.query(
-    //     "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
-    //     [Item_Name]
-    //   );
-    //   if (itemRows.length === 0) {
-    //     await connection.rollback();
-    //     return res.status(404).json({ message: `Item '${Item_Name}' not found in inventory.` });
-    //   }
+    for (const item of items || []) {
 
-    //   const Item_Id = itemRows[0].Item_Id;
+      // =======================================================
+      // NO ITEM NAME
+      // =======================================================
 
-    //   const [purchaseTax] = await connection.query(
-    //     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-    //     [Item_Id]
-    //   );
-    //   const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+      if (!item.Item_Name?.trim()) {
 
-    //   await connection.query(
-    //     `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-    //     [normalizeNumber(Quantity), Item_Id]
-    //   );
+        // Amount exists without item name
+        if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+          await connection.rollback();
 
-    //   const [saleItemResult] = await connection.execute(
-    //     `INSERT INTO add_sale_items
-    //      (Sale_Id, Item_Id, Quantity, Sale_Price,
-    //       Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-    //       Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-    //      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    //     [
-    //       newSaleId,
-    //       Item_Id,
-    //       normalizeNumber(Quantity),
-    //       normalizeNumber(Sale_Price),
-    //       cleanDiscount(Discount_On_Sale_Price),
-    //       cleanValue(Discount_Type_On_Sale_Price),
-    //       cleanValue(safeTaxType),
-    //       normalizeNumber(Tax_Amount),
-    //       normalizeNumber(Amount),
-    //     ]
-    //   );
+          return res.status(400).json({
+            success: false,
+            message: "Please enter an item name for the row.",
+          });
+        }
 
-    //   const id           = saleItemResult.insertId;
-    //   const newSaleItemId = "SIT" + id.toString().padStart(3, "0");
+        // Blank placeholder row.
+        // Do NOT create add_item.
+        // Do NOT create add_sale_items.
+        continue;
+      }
 
-    //   await connection.execute(
-    //     `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
-    //     [newSaleItemId, id]
-    //   );
-    // }
+      // =======================================================
+      // REAL ITEM
+      // =======================================================
 
-  for (const item of items) {
-  const {
-    Item_Name,
-    Item_HSN,
-    Item_Category,
-    Quantity,
-    Item_Unit,
-    Sale_Price,
-    Discount_On_Sale_Price,
-    Discount_Type_On_Sale_Price,
-    Tax_Type,
-    Tax_Amount,
-    Amount,
-  } = item;
+      const {
+        Item_Name,
+        Item_HSN,
+        Item_Category,
+        Quantity,
+        Item_Unit,
+        Sale_Price,
+        Discount_On_Sale_Price,
+        Discount_Type_On_Sale_Price,
+        Tax_Type,
+        Tax_Amount,
+        Amount,
+      } = item;
 
-  // Check if item already exists
-    const [itemRows] = await connection.execute(
-        "SELECT * FROM add_item WHERE LOWER(TRIM(Item_Name)) = LOWER(TRIM(?)) LIMIT 1",
+      // =======================================================
+      // 13. FIND EXISTING ITEM
+      // =======================================================
+
+      const [itemRows] = await connection.execute(
+        `SELECT *
+         FROM add_item
+         WHERE TRIM(Item_Name) = TRIM(?))
+         LIMIT 1`,
         [Item_Name]
       );
 
-  let Item_Id;
+      let Item_Id;
 
-  if (itemRows.length === 0) {
-    // ===============================
-    // Create new item
-    // ===============================
-    const [newItemResult] = await connection.execute(
-      `INSERT INTO add_item
-      (
-        Item_Name,
-        Item_Category,
-        Item_HSN,
-        Item_Unit,
-        Stock_Quantity,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      [
-        Item_Name,
-        cleanValue(Item_Category),
-        cleanValue(Item_HSN),
-        cleanValue(Item_Unit),
-        -normalizeNumber(Quantity), // Allow negative stock
-      ]
-    );
+      // =======================================================
+      // 14. NEW ITEM
+      // =======================================================
 
-    const autoId = newItemResult.insertId;
+      if (itemRows.length === 0) {
+        const [itemResult] = await connection.execute(
+          `INSERT INTO add_item
+           (
+             Item_Name,
+             Item_HSN,
+             Item_Unit,
+             Item_Category,
+             Stock_Quantity,
+             created_at,
+             updated_at
+           )
+           VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+          [
+            Item_Name.trim(),
+            cleanValue(Item_HSN),
+            Item_Unit || "",
+            Item_Category || "",
 
-    // Generate ITM001, ITM002...
-    Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+            // Sale decreases stock.
+            // If item doesn't exist yet,
+            // starting stock can become negative.
+            -(normalizeNumber(Quantity) ?? 0),
+          ]
+        );
 
-    // Update Item_Id
-    await connection.execute(
-      `UPDATE add_item
-       SET Item_Id = ?
-       WHERE id = ?`,
-      [Item_Id, autoId]
-    );
-  } else {
-    // ===============================
-    // Existing item
-    // ===============================
-    Item_Id = itemRows[0].Item_Id;
+        const itemIdNum = itemResult.insertId;
 
-    await connection.execute(
-      `UPDATE add_item
-       SET Stock_Quantity = Stock_Quantity - ?,
-           Item_HSN = ?,
-           updated_at = NOW()
-       WHERE Item_Id = ?`,
-      [
-        normalizeNumber(Quantity),
-        cleanValue(Item_HSN) || itemRows[0].Item_HSN,
-        Item_Id,
-      ]
-    );
-  }
+        Item_Id =
+          "ITM" +
+          itemIdNum
+            .toString()
+            .padStart(3, "0");
 
-  // Verify Item_Id exists
-  const [checkItem] = await connection.query(
-    `SELECT Item_Id FROM add_item WHERE Item_Id = ?`,
-    [Item_Id]
-  );
+        await connection.execute(
+          `UPDATE add_item
+           SET Item_Id = ?
+           WHERE id = ?`,
+          [Item_Id, itemIdNum]
+        );
+      }
 
-  if (checkItem.length === 0) {
-    throw new Error(`Item_Id ${Item_Id} not found in add_item`);
-  }
+      // =======================================================
+      // 15. EXISTING ITEM
+      // =======================================================
 
-  // Get latest purchase tax
-  const [purchaseTax] = await connection.query(
-    `SELECT Tax_Type
-     FROM add_purchase_items
-     WHERE Item_Id = ?
-     ORDER BY id DESC
-     LIMIT 1`,
-    [Item_Id]
-  );
+      else {
+        Item_Id = itemRows[0].Item_Id;
 
-  const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+        await connection.execute(
+          `UPDATE add_item
+           SET
+             Stock_Quantity = Stock_Quantity - ?,
+             Item_HSN = ?,
+             Item_Category = ?,
+             updated_at = NOW()
+           WHERE Item_Id = ?`,
+          [
+            normalizeNumber(Quantity) ?? 0,
 
-  // Insert Sale Item
-  const [saleItemResult] = await connection.execute(
-    `INSERT INTO add_sale_items
-    (
-      Sale_Id,
-      Item_Id,
-      Quantity,
-      Sale_Price,
-      Discount_On_Sale_Price,
-      Discount_Type_On_Sale_Price,
-      Tax_Type,
-      Tax_Amount,
-      Amount,
-      created_at,
-      updated_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    [
-      newSaleId,
-      Item_Id,
-      normalizeNumber(Quantity),
-      normalizeNumber(Sale_Price),
-      cleanDiscount(Discount_On_Sale_Price),
-      cleanValue(Discount_Type_On_Sale_Price),
-      cleanValue(safeTaxType),
-      normalizeNumber(Tax_Amount),
-      normalizeNumber(Amount),
-    ]
-  );
+            cleanValue(Item_HSN) ||
+              itemRows[0].Item_HSN,
 
-  // Generate Sale_Items_Id
-  const saleItemAutoId = saleItemResult.insertId;
-  const newSaleItemId = "SIT" + saleItemAutoId.toString().padStart(3, "0");
+            Item_Category ||itemRows[0].Item_Category ||
+              "",
 
-  await connection.execute(
-    `UPDATE add_sale_items
-     SET Sale_Items_Id = ?
-     WHERE id = ?`,
-    [newSaleItemId, saleItemAutoId]
-  );
-}
+            Item_Id,
+          ]
+        );
+      }
+
+      // =======================================================
+      // 16. GET LATEST PURCHASE TAX
+      // =======================================================
+
+      const [purchaseTax] = await connection.query(
+        `SELECT Tax_Type
+         FROM add_purchase_items
+         WHERE Item_Id = ?
+         ORDER BY id DESC
+         LIMIT 1`,
+        [Item_Id]
+      );
+
+      const safeTaxType =
+        purchaseTax[0]?.Tax_Type ||
+        Tax_Type ||
+        "None";
+
+      // =======================================================
+      // 17. INSERT SALE ITEM
+      // =======================================================
+
+      const [saleItemResult] =
+        await connection.execute(
+          `INSERT INTO add_sale_items
+           (
+             Sale_Id,
+             Item_Id,
+             Quantity,
+             Sale_Price,
+             Discount_On_Sale_Price,
+             Discount_Type_On_Sale_Price,
+             Tax_Type,
+             Tax_Amount,
+             Amount,
+             created_at,
+             updated_at
+           )
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          [
+            newSaleId,
+            Item_Id,
+
+            normalizeNumber(Quantity) ?? 0,
+
+            normalizeNumber(Sale_Price) ?? 0,
+
+            cleanDiscount(
+              Discount_On_Sale_Price
+            ),
+
+            cleanValue(
+              Discount_Type_On_Sale_Price
+            ),
+
+            cleanValue(safeTaxType),
+
+            normalizeNumber(Tax_Amount) ?? 0,
+
+            normalizeNumber(Amount) ?? 0,
+          ]
+        );
+
+      // =======================================================
+      // 18. GENERATE SALE ITEM ID
+      // =======================================================
+
+      const saleItemIdNum =
+        saleItemResult.insertId;
+
+      const newSaleItemId =
+        "SIT" +
+        saleItemIdNum
+          .toString()
+          .padStart(3, "0");
+
+      await connection.execute(
+        `UPDATE add_sale_items
+         SET Sale_Items_Id = ?
+         WHERE id = ?`,
+        [newSaleItemId, saleItemIdNum]
+      );
+    }
+
+    // =========================================================
+    // 19. COMMIT
+    // =========================================================
 
     await connection.commit();
 
     return res.status(201).json({
       success: true,
       message: "Sale and items added successfully",
-      saleId:  newSaleId,
+      saleId: newSaleId,
     });
+
   } catch (err) {
-    if (connection) await connection.rollback();
+
+    if (connection) {
+      await connection.rollback();
+    }
+
     console.error("❌ Error adding sale:", err);
+
     next(err);
+
   } finally {
-    if (connection) connection.release();
+
+    if (connection) {connection.release();
+    }
   }
 };
 const addNewSale = async (req, res, next) => {
@@ -1755,164 +2026,6 @@ if (fromDate && toDate) {
     if(connection)  connection.release();
   }
 };
-
-// const getSingleSale = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     connection = await db.getConnection();
-
-//     const { Sale_Id: saleId } = req.params;
-
-//     if (!saleId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Sale ID is required."
-//       });
-//     }
-
-//     // Detect table type
-//     const isSaleForItemSale = saleId.startsWith("SALS");
-
-//     const itemTable = isSaleForItemSale ? "add_item_sale" : "add_item";
-//     const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
-//     const salesTable = isSaleForItemSale ? "add_new_sale" : "add_sale";
-
-//     /* ---------------------------------------------------
-//        1️⃣ Fetch Sale Header
-//     --------------------------------------------------- */
-
-//     const [saleData] = await connection.query(
-//       `
-//       SELECT 
-//         s.Sale_Id,
-//         s.Invoice_Number,
-//         s.Invoice_Date,
-//         s.Reference_Number,
-//         s.State_Of_Supply,
-//         s.Payment_Type,
-//         s.Bank_Account_Id,
-//         s.Total_Amount,
-//         s.Total_Received,
-//         s.Balance_Due,
-//         s.Party_Id,
-//         p.Party_Name,
-//         p.GSTIN,
-//         p.Billing_Address,
-//         p.Shipping_Address,
-//         ba.Account_Display_Name AS Bank_Display_Name,
-//         CASE
-//           WHEN s.Payment_Type = 'Bank'
-//           THEN ba.Account_Display_Name
-//           ELSE s.Payment_Type
-//         END AS Payment_Type_Display
-//       FROM ${salesTable} s
-//       LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
-//       LEFT JOIN bank_accounts ba ON s.Bank_Account_Id = ba.id
-//       WHERE s.Sale_Id = ?
-//       `,
-//       [saleId]
-//     );
-
-//     if (!saleData.length) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Sale not found."
-//       });
-//     }
-
-//     const saleHeader = saleData[0];
-
-//     /* ---------------------------------------------------
-//        2️⃣ Fetch Sale Items
-//     --------------------------------------------------- */
-
-//     const [items] = await connection.query(
-//       `
-//       SELECT 
-//         si.Sale_Items_Id,
-//         si.Item_Id,
-//         i.Item_Name,
-//         i.Item_HSN,
-//         i.Item_Unit,
-//         i.Item_Category,
-//         si.Quantity,
-//         si.Sale_Price,
-//         si.Discount_On_Sale_Price,
-//         si.Discount_Type_On_Sale_Price,
-//         si.Tax_Amount,
-//         si.Tax_Type,
-//         si.Amount,
-//         si.created_at
-//       FROM ${saleItemTable} si
-//       LEFT JOIN ${itemTable} i 
-//         ON si.Item_Id = i.Item_Id
-//       WHERE si.Sale_Id = ?
-//       ORDER BY si.created_at DESC
-//       `,
-//       [saleId]
-//     );
-
-//     if (!items.length) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "No sale items found for this invoice."
-//       });
-//     }
-
-//     /* ---------------------------------------------------
-//        3️⃣ Format Response
-//     --------------------------------------------------- */
-
-//     const response = {
-//       success: true,
-
-//       invoicePartyDetails: {
-//         Sale_Id: saleHeader.Sale_Id,
-//         Party_Name: saleHeader.Party_Name,
-//         GSTIN: saleHeader.GSTIN,
-//         State_Of_Supply: saleHeader.State_Of_Supply,
-//         Reference_Number: saleHeader.Reference_Number,
-//         Payment_Type: saleHeader.Payment_Type,
-//         Payment_Type_Display: saleHeader.Payment_Type_Display,
-//         Bank_Account_Id: saleHeader.Bank_Account_Id,
-//         Bank_Display_Name: saleHeader.Bank_Display_Name,
-//         Invoice_Number: saleHeader.Invoice_Number,
-//         Invoice_Date: saleHeader.Invoice_Date,
-//         Total_Amount: saleHeader.Total_Amount,
-//         Total_Received: saleHeader.Total_Received,
-//         Balance_Due: saleHeader.Balance_Due,
-//         Billing_Address: saleHeader.Billing_Address,
-//         Shipping_Address: saleHeader.Shipping_Address,
-//       },
-
-//       items: items.map((it) => ({
-//         Sale_Items_Id: it.Sale_Items_Id,
-//         Item_Id: it.Item_Id,
-//         Item_Name: it.Item_Name,
-//         Item_HSN: it.Item_HSN,
-//         Item_Unit: it.Item_Unit,
-//         Item_Category: it.Item_Category,
-//         Quantity: it.Quantity,
-//         Sale_Price: it.Sale_Price,
-//         Discount_On_Sale_Price: it.Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price,
-//         Tax_Amount: it.Tax_Amount,
-//         Tax_Type: it.Tax_Type || "None",
-//         Amount: it.Amount,
-//         created_at: it.created_at
-//       }))
-//     };
-
-//     return res.status(200).json(response);
-
-//   } catch (err) {
-//     console.error("❌ Error getting single sale:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const getSingleSale = async (req, res, next) => {
   let connection;
   try {
@@ -1959,9 +2072,9 @@ const getSingleSale = async (req, res, next) => {
       [saleId]
     );
 
-    if (!items.length) {
-      return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
-    }
+    // if (!items.length) {
+    //   return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
+    // }
 
     // 🔹 fetch splits with bank display name
     const [splits] = await connection.query(
@@ -2654,10 +2767,55 @@ const editSale = async (req, res, next) => {
     await connection.beginTransaction();
 
     const totalAmount   = Number(Total_Amount)   || 0;
-    const totalReceived = Total_Received === "" || Total_Received === undefined
-      ? 0
-      : Number(Total_Received);
-    const balanceDue    = Number(Balance_Due) || totalAmount - totalReceived;
+    let validSplits = [];
+
+if (totalAmount > 0) {
+  const normalizedSplits = (splits || [])
+    .filter((split) => {
+      // Must have payment type
+      if (!split.Payment_Type) {
+        return false;
+      }
+
+      // Bank must have selected bank account
+      if (
+        split.Payment_Type === "Bank" &&
+        !split.Bank_Account_Id
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .map((split) => ({
+      ...split,
+      Amount: Number(split.Amount) || 0,
+    }));
+
+
+  validSplits = normalizedSplits.filter(
+    (split, index) => {
+
+      // FIRST valid payment method:
+      // always preserve, even ₹0
+      if (index === 0) {
+        return true;
+      }
+
+      // Every payment after first:
+      // only preserve positive amount
+      return split.Amount > 0;
+    }
+  );
+}
+    // const totalReceived = Total_Received === "" || Total_Received === undefined
+    //   ? 0
+    //   : Number(Total_Received);
+     const totalReceived = validSplits.reduce(
+      (sum, split) => sum + (Number(split.Amount) || 0),
+      0
+    );
+    const balanceDue    =  totalAmount - totalReceived;
 
     // 🔹 received cannot exceed total
     if (totalReceived > totalAmount) {
@@ -2671,33 +2829,20 @@ const editSale = async (req, res, next) => {
     // 🔹 validate splits
     if (totalReceived > 0) {
       try {
-        validateSplits(splits, totalReceived);
+        validateSplits(validSplits, totalReceived);
       } catch (validationErr) {
         await connection.rollback();
         return res.status(400).json({ success: false, message: validationErr.message });
       }
     }
 
-    // duplicate item check
-    // const itemNameSet = new Set();
-    // for (const item of items) {
-    //   const name = item.Item_Name?.trim().toLowerCase();
-    //   if (!name) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ message: "Item name missing." });
-    //   }
-    //   if (itemNameSet.has(name)) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ message: `Duplicate item '${item.Item_Name}'` });
-    //   }
-    //   itemNameSet.add(name);
-    // }
-    for (const item of items) {
-  if (!item.Item_Name?.trim()) {
-    await connection.rollback();
-    return res.status(400).json({ message: "Item name missing." });
-  }
-}
+   
+//     for (const item of items) {
+//   if (!item.Item_Name?.trim()) {
+//     await connection.rollback();
+//     return res.status(400).json({ message: "Item name missing." });
+//   }
+// }
 
     const [partyRows] = await connection.query(
       "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
@@ -2748,14 +2893,14 @@ const editSale = async (req, res, next) => {
       sourceId:   saleIdNumber,
     });
 
-    if (totalReceived > 0 && Array.isArray(splits) && splits.length > 0) {
+    if (validSplits.length > 0) {
       await insertPaymentSplits({
         connection,
         sourceType: "Sale",
         sourceId:   saleIdNumber,
         partyName:  Party_Name,
         txnDate:    Invoice_Date,
-        splits,
+          splits: validSplits, 
       });
     }
     await recordPartyLedger({
@@ -2778,6 +2923,22 @@ const [oldItems] = await connection.query(
 // 🔹 Step 1: resolve every line to its real Item_Id first (create new items if needed)
 const resolvedLines = [];
 for (const item of items) {
+    if (!item.Item_Name?.trim()) {
+
+    // Only Amount > 0 makes Item_Name mandatory
+    if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Please enter an item name for the row.",
+      });
+    }
+
+    // Amount blank / 0 + no Item_Name
+    // Treat as empty placeholder row
+    continue;
+  }
   let Item_Id = item.Item_Id || null;
   let dbItemRow = null;
 
@@ -2785,7 +2946,7 @@ for (const item of items) {
     const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
     dbItemRow = rows[0] || null;
   } else {
-    const [rows] = await connection.query("SELECT * FROM add_item WHERE LOWER(TRIM(Item_Name))= LOWER(TRIM(?)) LIMIT 1", [item.Item_Name]);
+    const [rows] = await connection.query("SELECT * FROM add_item WHERE TRIM(Item_Name)= TRIM(?) LIMIT 1", [item.Item_Name]);
     //const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [item.Item_Name]);
     dbItemRow = rows[0] || null;
     Item_Id = dbItemRow?.Item_Id || null;
@@ -2806,19 +2967,41 @@ for (const item of items) {
       [
         Item_Id,
         item.Item_Name,
-        cleanValue(item.Item_Category),
+      item.Item_Category || "",
         cleanValue(item.Item_HSN),
-        cleanValue(item.Item_Unit),
+       item.Item_Unit || "",
         0, // stock adjusted in step 2 below, based on net quantity
       ]
     );
     dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
-  } else if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+  } 
+  else {
+  const updates = [];
+  const params = [];
+
+  if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+    updates.push("Item_HSN = ?");
+    params.push(item.Item_HSN);
+  }
+  if (item.Item_Category !== undefined && item.Item_Category !== dbItemRow.Item_Category) {
+    updates.push("Item_Category = ?");
+    params.push(item.Item_Category || "");
+  }
+
+  if (updates.length > 0) {
+    params.push(Item_Id);
     await connection.query(
-      `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
-      [item.Item_HSN, Item_Id]
+      `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
+      params
     );
   }
+}
+  // else if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+  //   await connection.query(
+  //     `UPDATE add_item SET Item_HSN = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
+  //     [item.Item_HSN, Item_Id]
+  //   );
+  // }
 
   resolvedLines.push({ ...item, Item_Id });
 }
@@ -2868,13 +3051,13 @@ for (const line of resolvedLines) {
     [
       saleId,
       line.Item_Id,
-      normalizeNumber(line.Quantity),
-      normalizeNumber(line.Sale_Price),
+      normalizeNumber(line.Quantity) ?? 0,
+      normalizeNumber(line.Sale_Price) ?? 0,
       cleanDiscount(line.Discount_On_Sale_Price),
       cleanValue(line.Discount_Type_On_Sale_Price),
       cleanValue(safeTaxType),
-      normalizeNumber(line.Tax_Amount),
-      normalizeNumber(line.Amount),
+      normalizeNumber(line.Tax_Amount) ?? 0,
+      normalizeNumber(line.Amount) ?? 0,
     ]
   );
   const id    = insertRes.insertId;
@@ -2882,151 +3065,7 @@ for (const line of resolvedLines) {
   await connection.execute(`UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`, [newId, id]);
 }
    
-//     const [oldItems] = await connection.query(
-//   "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
-//   [saleId]
-// );
 
-// const oldMap     = new Map();
-// oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
-// const newItemIds = new Set();
-
-// for (const item of items) {
-//   let Item_Id = item.Item_Id || null;
-//   let dbItemRow = null;
-
-//   if (Item_Id) {
-//     // 🔹 Trust the Item_Id if the frontend sent one (existing item, editing this row)
-//     const [rows] = await connection.query(
-//       "SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1",
-//       [Item_Id]
-//     );
-//     dbItemRow = rows[0] || null;
-//   } else {
-//     // 🔹 No Item_Id — try resolve by name (existing item picked fresh / typed matching name)
-//     const [rows] = await connection.query(
-//       "SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1",
-//       [item.Item_Name]
-//     );
-//     dbItemRow = rows[0] || null;
-//     Item_Id = dbItemRow?.Item_Id || null;
-//   }
-
-//   if (!dbItemRow) {
-//     // 🔹 Brand-new item — create it, stock can go negative
-//     const [maxRow] = await connection.query(
-//       `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
-//     );
-//     const autoId = (maxRow[0]?.maxId || 0) + 1;
-//     Item_Id = "ITM" + autoId.toString().padStart(3, "0");
-
-//     await connection.execute(
-//       `INSERT INTO add_item
-//        (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit, 
-//         Stock_Quantity, created_at, updated_at)
-//        VALUES (?, ?, ?, ?,  ?, ?, NOW(), NOW())`,
-//       [
-//         Item_Id,
-//         item.Item_Name,
-//         cleanValue(item.Item_Category),
-//         cleanValue(item.Item_HSN),
-//         cleanValue(item.Item_Unit),
-       
-//         -normalizeNumber(item.Quantity),
-//       ]
-//     );
-//   } else {
-//     // 🔹 Existing item — sync HSN to master if changed (propagates everywhere, since master is the single source of truth)
-//     if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
-//       await connection.query(
-//         `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
-//         [item.Item_HSN, Item_Id]
-//       );
-//     }
-//   }
-
-//   newItemIds.add(Item_Id);
-
-//   const old = oldMap.get(Item_Id);
-
-//   const [purchaseTax] = await connection.query(
-//     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-//     [Item_Id]
-//   );
-//   // 🔹 Tax_Type on the sale row itself is user-editable per line — no longer forced from purchase history
-//   const safeTaxType = item.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
-
-//   if (old) {
-//     await connection.query(
-//       `UPDATE add_sale_items SET
-//          Quantity = ?, Sale_Price = ?,
-//          Discount_On_Sale_Price = ?, Discount_Type_On_Sale_Price = ?,
-//          Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
-//        WHERE Sale_Items_Id = ?`,
-//       [
-//         normalizeNumber(item.Quantity),
-//         normalizeNumber(item.Sale_Price),
-//         cleanDiscount(item.Discount_On_Sale_Price),
-//         cleanValue(item.Discount_Type_On_Sale_Price),
-//         cleanValue(safeTaxType),
-//         normalizeNumber(item.Tax_Amount),
-//         normalizeNumber(item.Amount),
-//         old.Sale_Items_Id,
-//       ]
-//     );
-
-//     const diff = normalizeNumber(item.Quantity) - old.Quantity;
-//     if (diff !== 0) {
-//       await connection.query(
-//         `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-//         [diff, Item_Id]
-//       );
-//     }
-//   } else {
-//     const [insertRes] = await connection.execute(
-//       `INSERT INTO add_sale_items
-//        (Sale_Id, Item_Id, Quantity, Sale_Price,
-//         Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-//         Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//       [
-//         saleId,
-//         Item_Id,
-//         normalizeNumber(item.Quantity),
-//         normalizeNumber(item.Sale_Price),
-//         cleanDiscount(item.Discount_On_Sale_Price),
-//         cleanValue(item.Discount_Type_On_Sale_Price),
-//         cleanValue(safeTaxType),
-//         normalizeNumber(item.Tax_Amount),
-//         normalizeNumber(item.Amount),
-//       ]
-//     );
-//     const id    = insertRes.insertId;
-//     const newId = "SIT" + id.toString().padStart(3, "0");
-//     await connection.execute(
-//       `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
-//       [newId, id]
-//     );
-//     await connection.query(
-//       `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-//       [normalizeNumber(item.Quantity), Item_Id]
-//     );
-//   }
-// }
-
-// delete removed items + restore stock — unchanged
-// for (const old of oldItems) {
-//   if (!newItemIds.has(old.Item_Id)) {
-//     await connection.query(
-//       `DELETE FROM add_sale_items WHERE Sale_Items_Id = ?`,
-//       [old.Sale_Items_Id]
-//     );
-//     await connection.query(
-//       `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-//       [old.Quantity, old.Item_Id]
-//     );
-//   }
-// }
 
     await connection.commit();
 

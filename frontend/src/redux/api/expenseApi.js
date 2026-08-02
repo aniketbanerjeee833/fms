@@ -106,29 +106,56 @@ export const expenseApi = createApi({
       providesTags: (result, error, id) => [{ type: "Expense", id }],
     }),
 
-    getExpensesByCategory: builder.query({
-      query: ({ categoryId, lastId, search = "", fromDate = "", toDate = "" }) => {
-        const params = new URLSearchParams();
-        if (lastId) params.append("lastId", lastId);
-        if (search) params.append("search", search);
-        if (fromDate) params.append("fromDate", fromDate);
-        if (toDate) params.append("toDate", toDate);
-        const queryString = params.toString();
-        return `expense/by-category/${categoryId}${queryString ? `?${queryString}` : ""}`;
-      },
-      providesTags: [{ type: "Expense", id: "LIST" }],
-    }),
+getExpensesByCategory: builder.query({
+  query: ({ categoryId, cursor = null, search = "", date = "" }) => {
+    const params = new URLSearchParams();
+    if (cursor) params.append("lastId", cursor);
+    if (search) params.append("search", search);
+    if (date)   params.append("date", date);       // 🔹 single date
+    const qs = params.toString();
+    return `expense/by-category/${categoryId}${qs ? `?${qs}` : ""}`;
+  },
+  serializeQueryArgs: ({ queryArgs }) => ({
+    categoryId: queryArgs.categoryId,
+    search:     queryArgs.search,
+    date:       queryArgs.date,
+  }),
+  merge: (currentCache, newData) => {
+    currentCache.expenses.push(...newData.expenses);
+    currentCache.hasMore    = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+  },
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor,
+  providesTags: (result, error, { categoryId }) => [
+    { type: "Expense", id: `CATEGORY_${categoryId}` },
+  ],
+}),
 
-    getExpenseItemUsage: builder.query({
-      query: ({ masterItemId, lastId }) => {
-        const params = new URLSearchParams();
-        if (masterItemId) params.append("masterItemId", masterItemId);
-        if (lastId) params.append("lastId", lastId);
-        const queryString = params.toString();
-        return `expense/item-usage${queryString ? `?${queryString}` : ""}`;
-      },
-      providesTags: [{ type: "Expense", id: "USAGE" }],
-    }),
+getExpenseItemUsage: builder.query({
+  query: ({ masterItemId, cursor = null, date = "" }) => {
+    const params = new URLSearchParams();
+    if (masterItemId) params.append("masterItemId", masterItemId);
+    if (cursor)       params.append("lastId", cursor);
+    if (date)         params.append("date", date);   // 🔹 single date
+    const qs = params.toString();
+    return `expense/item-usage${qs ? `?${qs}` : ""}`;
+  },
+  serializeQueryArgs: ({ queryArgs }) => ({
+    masterItemId: queryArgs.masterItemId,
+    date:         queryArgs.date,
+  }),
+  merge: (currentCache, newData) => {
+    currentCache.usage.push(...newData.usage);
+    currentCache.hasMore    = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+  },
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor,
+  providesTags: (result, error, { masterItemId }) => [
+    { type: "Expense", id: `ITEM_${masterItemId}` },
+  ],
+}),
   }),
 });
 

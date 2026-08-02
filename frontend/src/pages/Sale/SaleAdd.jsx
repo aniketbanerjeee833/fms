@@ -165,20 +165,20 @@ export default function SaleAdd() {
       return updated;
     });
   };
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
   const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {
@@ -278,7 +278,7 @@ export default function SaleAdd() {
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 0,
+        Quantity: "",
         Item_Unit: "",
         Sale_Price: "",
 
@@ -330,7 +330,7 @@ export default function SaleAdd() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: 0,
+      Quantity: "",
       Item_Unit: "",
       Sale_Price: "",
       Discount_On_Sale_Price: "",
@@ -467,125 +467,128 @@ export default function SaleAdd() {
   }, [totalAmountWatch, computedTotalReceived]);
 
 
-  // const onSubmit = async (data) => {
-  //   console.log("Form Data (from RHF):", data);
 
-
-  //   if (!data.items || data.items.length === 0) {
-  //     toast.error("Please add at least one item before saving the sale.");
-  //     return;
-  //   }
-
-  //   // ✅ Clean up items (optional safety — remove blank rows)
-  //   const cleanedItems = data.items.filter(
-  //     (it) => it.Item_Name && it.Item_Name.trim() !== ""
-  //   );
-
-  //   if (cleanedItems.length === 0) {
-  //     toast.error("Please add at least one valid item with a name.");
-  //     return;
-  //   }
-
-  //   // ✅ Validate no duplicates
-  //   const seenItems = new Set();
-  //   for (const item of cleanedItems) {
-  //     const name = item.Item_Name?.trim().toLowerCase();
-
-  //     if (seenItems.has(name)) {
-  //       toast.error(`Duplicate item '${item.Item_Name}' found.`);
-  //       return;
-  //     }
-  //     seenItems.add(name);
-  //   }
-
-  //   // ✅ Ensure all items have tax & amount values (since auto-calculated)
-  //   const itemsWithDefaults = cleanedItems.map((item) => ({
-  //     ...item,
-  //     Tax_Type: item.Tax_Type || "None",
-  //     Tax_Amount: item.Tax_Amount || "0.00",
-  //     Amount: item.Amount || "0.00",
-  //   }));
-
-  //   // ✅ Build final payload
-  //   const payload = {
-  //     ...data,
-  //     items: itemsWithDefaults,
-  //     Total_Amount: data.Total_Amount || 0,
-  //     Total_Received: data.Total_Received || 0,
-  //     Balance_Due:
-  //       data.Balance_Due ||
-  //       ((data.Total_Amount || 0) - (data.Total_Received || 0)),
-  //   };
-
-  //   console.log("📦 Final Payload Sent:", payload);
-
-  //   try {
-  //     const res = await addSale({
-  //       body: payload,
-  //     }).unwrap();
-  //     console.log(" successfully:", res);
-  //     const resData = res?.data || res;
-  //     dispatch(itemApi.util.invalidateTags(["Item"]));
-  //     dispatch(saleApi.util.invalidateTags(["Sale"]));
-  //     dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-  //     dispatch(bankAccountApi.util.invalidateTags([
-  //       { type: "BankAccount", id: payload.Bank_Account_Id },
-  //       "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-  //     ]));
-  //     if (!resData?.success) {
-  //       toast.error("Failed to add new sale");
-  //       return;
-  //     } else {
-  //       toast.success("New Sale added successfully!");
-  //       navigate("/sale/all-sales");
-  //     }
-
-  //   } catch (error) {
-  //     const errorMessage =
-  //       error?.data?.message || error?.message || "Failed to add new sale";
-  //     toast.error(errorMessage);
-  //     // toast.error("Failed to add lead");
-  //     console.error("Submission failed", error);
-  //   }
-  // }
 const onSubmit = async (data) => {
   console.log("Form Data (from RHF):", data);
 
-  if (!data.items || data.items.length === 0) {
-    toast.error("Please add at least one item before saving the sale.");
-    return;
-  }
+  // =========================================================
+  // 1. ITEMS
+  // =========================================================
 
-  // ✅ Clean up items (remove blank rows)
-  const cleanedItems = data.items.filter(
-    (it) => it.Item_Name && it.Item_Name.trim() !== ""
-  );
-
-  if (cleanedItems.length === 0) {
-    toast.error("Please add at least one valid item with a name.");
-    return;
-  }
-
-  // ✅ Ensure all items have tax & amount values
-  const itemsWithDefaults = cleanedItems.map((item) => ({
+  const itemsWithDefaults = (data.items || []).map((item) => ({
     ...item,
+
     Tax_Type: item.Tax_Type || "None",
-    Tax_Amount: item.Tax_Amount || "0.00",
-    Amount: item.Amount || "0.00",
+
+    Tax_Amount:
+      item.Tax_Amount === "" ||
+      item.Tax_Amount === undefined ||
+      item.Tax_Amount === null
+        ? 0
+        : Number(item.Tax_Amount),
+
+    Amount:
+      item.Amount === "" ||
+      item.Amount === undefined ||
+      item.Amount === null
+        ? 0
+        : Number(item.Amount),
   }));
 
-  // ✅ Build final payload
+  // =========================================================
+  // 2. SALE TOTAL
+  // =========================================================
+
+  const totalAmount = Number(data.Total_Amount) || 0;
+
+  // =========================================================
+  // 3. PAYMENT SPLITS
+  //
+  // Sale:
+  //
+  // Total = 0
+  // -> no splits
+  //
+  // Total > 0
+  // -> first valid payment method stays even at ₹0
+  // -> later ₹0 methods are dropped
+  // -> later positive methods stay
+  // =========================================================
+
+  let validSplits = [];
+
+  if (totalAmount > 0) {
+    const normalizedSplits = (data.splits || [])
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((split) => ({
+        ...split,
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    validSplits = normalizedSplits.filter(
+      (split, index) => {
+        // First valid payment type ALWAYS stays
+        if (index === 0) {
+          return true;
+        }
+
+        // Later payment types only stay with positive amount
+        return split.Amount > 0;
+      }
+    );
+  }
+
+  // =========================================================
+  // 4. TOTAL RECEIVED
+  // =========================================================
+
+  const totalReceived = validSplits.reduce(
+    (sum, split) =>
+      sum + (Number(split.Amount) || 0),
+    0
+  );
+
+  // =========================================================
+  // 5. BALANCE DUE
+  // =========================================================
+
+  const balanceDue =
+    totalAmount - totalReceived;
+
+  // =========================================================
+  // 6. BUILD PAYLOAD
+  // =========================================================
+
   const payload = {
     ...data,
+
     items: itemsWithDefaults,
-    Total_Amount: data.Total_Amount || 0,
-    Total_Received: data.Total_Received || 0,
-    Balance_Due:
-      data.Balance_Due ||
-      ((data.Total_Amount || 0) - (data.Total_Received || 0)),
+
+    Total_Amount: totalAmount,
+    Total_Received: totalReceived,
+    Balance_Due: balanceDue,
+
+    splits: validSplits,
   };
 
-  console.log("📦 Final Payload Sent:", payload);
+  console.log("Final Sale Payload:", payload);
+
+  // =========================================================
+  // 7. SUBMIT
+  // =========================================================
 
   try {
     const res = await addSale({
@@ -596,32 +599,236 @@ const onSubmit = async (data) => {
 
     const resData = res?.data || res;
 
-    dispatch(itemApi.util.invalidateTags(["Item"]));
-    dispatch(saleApi.util.invalidateTags(["Sale"]));
-    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",
-      ])
-    );
-     dispatch(partyApi.util.invalidateTags(["Party"]));
     if (!resData?.success) {
       toast.error("Failed to add new sale");
       return;
     }
 
-    toast.success("New Sale added successfully!");
+    // =======================================================
+    // CACHE INVALIDATION
+    // =======================================================
+
+    dispatch(
+      itemApi.util.invalidateTags(["Item"])
+    );
+
+    dispatch(
+      saleApi.util.invalidateTags(["Sale"])
+    );
+
+    dispatch(
+      cashInHandApi.util.invalidateTags([
+        "CashInHand",
+      ])
+    );
+
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        "BankAccount",
+      ])
+    );
+
+    dispatch(
+      partyApi.util.invalidateTags(["Party"])
+    );
+
+    toast.success(
+      "New Sale added successfully!"
+    );
+
     navigate("/sale/all-sales");
+
   } catch (error) {
     const errorMessage =
-      error?.data?.message || error?.message || "Failed to add new sale";
+      error?.data?.message ||
+      error?.message ||
+      "Failed to add new sale";
 
     toast.error(errorMessage);
-    console.error("Submission failed", error);
+
+    console.error(
+      "Submission failed",
+      error
+    );
   }
 };
+// const onSubmit = async (data) => {
+//   console.log("Form Data (from RHF):", data);
 
+//   // =========================================================
+//   // 1. ITEMS
+//   //
+//   // Your rule:
+//   // - No Item_Name + Amount > 0 => ERROR
+//   // - No Item_Name + Amount blank/0 => ignore the row
+//   // - Empty Sale is allowed
+//   // =========================================================
+
+//   // for (const item of data.items || []) {
+//   //   const itemName = item.Item_Name?.trim();
+//   //   const amount = Number(item.Amount) || 0;
+
+//   //   if (!itemName && amount > 0) {
+//   //     toast.error("Please enter an item name for the row.");
+//   //     return;
+//   //   }
+//   // }
+
+//   // Remove blank placeholder rows.
+//   // If all rows are blank, cleanedItems becomes [].
+
+//   const itemsWithDefaults = cleanedItems.map((item) => ({
+//     ...item,
+//     Tax_Type: item.Tax_Type || "None",
+//     Tax_Amount:
+//       item.Tax_Amount === "" ||
+//       item.Tax_Amount === undefined ||
+//       item.Tax_Amount === null
+//         ? 0
+//         : Number(item.Tax_Amount),
+
+//     Amount:
+//       item.Amount === "" ||
+//       item.Amount === undefined ||
+//       item.Amount === null
+//         ? 0
+//         : Number(item.Amount),
+//   }));
+
+//   // =========================================================
+//   // 2. SALE TOTAL
+//   // =========================================================
+
+//   const totalAmount = Number(data.Total_Amount) || 0;
+
+//   // =========================================================
+//   // 3. PAYMENT SPLITS
+//   //
+//   // Vyapar-like SALE behavior:
+//   //
+//   // HDFC blank  -> DROP
+//   // HDFC ₹0     -> DROP
+//   // HDFC ₹500   -> KEEP
+//   //
+//   // Cash blank  -> DROP
+//   // Cash ₹0     -> DROP
+//   // Cash ₹200   -> KEEP
+//   //
+//   // Unlike Purchase, there is NO "keep first ₹0 split" rule.
+//   // =========================================================
+
+//   const validSplits =
+//     totalAmount > 0
+//       ? (data.splits || [])
+//           .filter((split) => {
+//             if (!split.Payment_Type) return false;
+
+//             const amount = Number(split.Amount) || 0;
+
+//             // Sale doesn't save zero/blank payments
+//             if (amount <= 0) return false;
+
+//             // Bank must have an account selected
+//             if (
+//               split.Payment_Type === "Bank" &&
+//               !split.Bank_Account_Id
+//             ) {
+//               return false;
+//             }
+
+//             return true;
+//           })
+//           .map((split) => ({
+//             ...split,
+//             Amount: Number(split.Amount) || 0,
+//           }))
+//       : [];
+
+//   // =========================================================
+//   // 4. TOTAL RECEIVED
+//   //
+//   // Calculate from the payment splits that actually survived.
+//   // Don't trust the form's Total_Received.
+//   // =========================================================
+
+//   const totalReceived = validSplits.reduce(
+//     (sum, split) => sum + (Number(split.Amount) || 0),
+//     0
+//   );
+
+//   // =========================================================
+//   // 5. BALANCE DUE
+//   // =========================================================
+
+//   const balanceDue = totalAmount - totalReceived;
+
+//   // if (totalReceived > totalAmount) {
+//   //   toast.error(
+//   //     "Received amount should be less than or equal to Total Amount"
+//   //   );
+//   //   return;
+//   // }
+
+//   // =========================================================
+//   // 6. BUILD PAYLOAD
+//   // =========================================================
+
+//   const payload = {
+//     ...data,
+
+//     items: itemsWithDefaults,
+
+//     Total_Amount: totalAmount,
+//     Total_Received: totalReceived,
+//     Balance_Due: balanceDue,
+
+//     splits: validSplits,
+//   };
+
+//   console.log("Final Sale Payload:", payload);
+
+//   // =========================================================
+//   // 7. SUBMIT
+//   // =========================================================
+
+//   try {
+//     const res = await addSale({
+//       body: payload,
+//     }).unwrap();
+
+//     console.log("Successfully:", res);
+
+//     const resData = res?.data || res;
+
+//     if (!resData?.success) {
+//       toast.error("Failed to add new sale");
+//       return;
+//     }
+
+//     // =======================================================
+//     // 8. INVALIDATE CACHE
+//     // =======================================================
+
+//     dispatch(itemApi.util.invalidateTags(["Item"]));
+//     dispatch(saleApi.util.invalidateTags(["Sale"]));
+//     dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+//     dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+//     dispatch(partyApi.util.invalidateTags(["Party"]));
+
+//     toast.success("New Sale added successfully!");
+
+//     navigate("/sale/all-sales");
+//   } catch (error) {
+//     const errorMessage =
+//       error?.data?.message ||
+//       error?.message ||
+//       "Failed to add new sale";
+
+//     toast.error(errorMessage);
+
+//     console.error("Submission failed", error);
+//   }
+// };
   useEffect(() => {
     const gstin = parties?.parties?.find(
       (party) => party.Party_Name === watch("Party_Name")
@@ -682,7 +889,11 @@ const onSubmit = async (data) => {
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
   const paymentType = watch("splits.0.Payment_Type");
-  console.log(itemsValues, "itemsValues");
+
+  //console.log("Total Amount Watch:", totalAmountWatch);
+
+const showSalePayment = totalAmountWatch > 0;
+//console.log("Show Sale Payment Section:", showSalePayment);
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -918,7 +1129,8 @@ const onSubmit = async (data) => {
 
                   {/* Label */}
                   <span className="whitespace-nowrap ">
-                    Invoice Number <span className="text-red-500">*</span>
+                    Invoice Number 
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   {/* Input */}
@@ -958,7 +1170,7 @@ const onSubmit = async (data) => {
                   {/* <div className="input-field  "> */}
                   <span className=" whitespace-nowrap active">
                     Invoice Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1094,7 +1306,7 @@ const onSubmit = async (data) => {
                         </div>
 
                       </td> */}
-                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
                             type="text"
@@ -1230,7 +1442,85 @@ const onSubmit = async (data) => {
                             </div>
                           </div>
                         )}
-                      </td>
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                                              <Controller
+                                                control={control}
+                                                name={`items.${i}.Item_Category`}
+                                                defaultValue="All"
+                                                render={({ field }) => (
+                                                  <select
+                                                    {...field}
+                                                    className="form-select"
+                                                    style={{ width: "100%", fontSize: "12px" }}
+                                                    onChange={(e) => {
+                                                      const value = e.target.value;
+                                                      if (value === "__ADD_CATEGORY__") {
+                                                        setShowModal(true);
+                                                        return; // don't commit this as the selected value
+                                                      }
+                                                      field.onChange(value);
+                                                    }}
+                                                  >
+                                                    <option value="All">All</option>
+                                                    <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                                                    {categories?.map((cat) => (
+                                                      <option key={cat.Category_Id} value={cat.Item_Category}>
+                                                        {cat.Item_Category}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                )}
+                                              />
+                      
+                                              {showModal && (
+                                                <div
+                                                  style={{
+                                                    position: "fixed", inset: 0, display: "flex",
+                                                    alignItems: "center", justifyContent: "center",
+                                                    backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                                                  }}
+                                                >
+                                                  <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setShowModal(false)}
+                                                      style={{ backgroundColor: "transparent" }}
+                                                      className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                                                    >
+                                                      ✕
+                                                    </button>
+                                                    <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                                                    <input
+                                                      type="text"
+                                                      value={newCategory}
+                                                      onChange={(e) => setNewCategory(e.target.value)}
+                                                      className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                                      placeholder="Enter category name"
+                                                    />
+                                                    <div className="flex justify-end gap-3">
+                                                      <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                                        Cancel
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                          const created = await handleAddCategory(); // should return the created category object
+                                                          if (created?.Item_Category) {
+                                                            setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                                          }
+                                                          setShowModal(false);
+                                                        }}
+                                                        style={{ backgroundColor: "#4CA1AF" }}
+                                                        className="px-4 py-2 rounded-md text-white"
+                                                      >
+                                                        Add
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </td>
 
 
 
@@ -1485,14 +1775,14 @@ const onSubmit = async (data) => {
                           type="text"
                           className="form-control"
                           style={{ width: "100%" }}
-                          value={watch(`items.${i}.Quantity`)?.toString() || ""}
-                          {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
+                          //value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                          {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
                             let value = e.target.value.replace(/[^0-9]/g, "");
                             //let stockQty = items?.items?.find((item) => item.Item_Name === itemsValues[i]?.Item_Name)?.Stock_Quantity || 0;
                             //console.log(stockQty);
 
-                            if (!itemsValues[i]?.Item_Name?.trim()) return;
+                            // if (!itemsValues[i]?.Item_Name?.trim()) return;
 
                             // ✅ Clamp value
                             let num = parseInt(value, 10);
@@ -1854,11 +2144,12 @@ const onSubmit = async (data) => {
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
-                <div className="flex flex-col px-2">
-                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+                
+                  <div className="flex flex-col px-2">
+                    {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
 
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                  {showSalePayment && (<div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
                     {!showSplitBox ? (
                       <>
                         <div className="flex flex-col w-full">
@@ -2025,7 +2316,7 @@ const onSubmit = async (data) => {
                         </button>
                       </div>
                     )}
-                  </div>
+                  </div>)}
                 </div>
                 {/* <div style={{ width: "100%" }}
                   className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"

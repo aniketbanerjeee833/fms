@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {  useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import {  partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import {  itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
@@ -177,7 +177,7 @@ export default function SaleReturnAdd() {
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 0,
+        Quantity: "",
         Item_Unit: "",
         Sale_Price: "",
 
@@ -260,20 +260,20 @@ const {
       return updated;
     });
   };
-    const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  //   const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
   useEffect(() => {
     const handleClickOutside = (event) => {
       setRows((prev) =>
@@ -335,7 +335,7 @@ const {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: 0,
+      Quantity: "",
       Item_Unit: "",
       Sale_Price: "",
       Discount_On_Sale_Price: "",
@@ -445,21 +445,39 @@ const {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
+   const emptyRow = () => ({
+  Item_Category: "",
+  Item_Name: "",
+  itemSearch: "",
+  Item_HSN: "",
+  Quantity: "",
+  Sale_Price: "",
+  Discount_On_Sale_Price: "",
+  Discount_Type_On_Sale_Price: "Percentage",
+  Tax_Type: "None",
+  Tax_Amount: "",
+  Amount: "",
+  itemOpen: false,
+  CategoryOpen: false,
+  isHSNLocked: false,
+  isUnitLocked: false,
+  isExistingItem: false,
+});
   useEffect(() => {
     if (sale) {
 
       setPartySearch(sale.invoicePartyDetails.Party_Name);
-      const prefilledRows = sale.items.map((it) => ({
-        ...it,
-        itemSearch: it.Item_Name || "", // for UI display
-        isExistingItem: true,           // lock category/HSN if needed
-        isHSNLocked: false,
-        isUnitLocked: true,
-        CategoryOpen: false,
-        itemOpen: false,
-        itemQuantity: it.Quantity || 0,
-        itemTaxType: it.Tax_Type || "None",
-      }));
+       const prefilledRows = sale?.items?.length > 0
+      ? sale.items.map((item) => ({
+          ...item,
+          itemSearch: item.Item_Name,
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: true,
+          isExistingItem: true,
+        }))
+      : [emptyRow()];
 
       setRows(prefilledRows);
 
@@ -496,7 +514,7 @@ const {
               },
             ],
 
-        items: sale.items || [],
+        items: prefilledRows,
       })
       setShowSplitBox((sale?.splits?.length || 0) > 1);
     }
@@ -587,68 +605,161 @@ const {
  
 const onSubmit = async (data) => {
   console.log("Form Data (from RHF):", data);
- 
-  const payload = { ...data };
- 
-  // ── validate items ──
-  // const seenItems = new Set();
-  // for (const item of payload.items) {
-  //   const name     = item.Item_Name?.trim().toLowerCase();
-  //   const category = item.Item_Category?.trim().toLowerCase();
-  //   const itemHSN  = item.Item_HSN?.trim().toLowerCase();
-  //   const Quantity = item.Quantity;
- 
-  //   if (!name || !category || !itemHSN || !Quantity) {
-  //     toast.error("Each item must have a valid name, category, HSN and quantity.");
-  //     return;
-  //   }
- 
-  //   if (seenItems.has(name)) {
-  //     toast.error(
-  //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-  //     );
-  //     return;
-  //   }
-  //   seenItems.add(name);
-  // }
-  // ── validate items ──
-for (const item of payload.items) {
-  const name = item.Item_Name?.trim();
-  const category = item.Item_Category?.trim();
-  const itemHSN = item.Item_HSN?.trim();
-  const quantity = Number(item.Quantity);
 
-  if (!name || !category || !itemHSN || quantity <= 0) {
-    toast.error("Each item must have a valid name, category, HSN and quantity.");
-    return;
-  }
-}
- 
-  // console.log("payload:", payload);
- 
+  // =========================================================
+  // 1. ITEMS
+  //
+  // Do NOT filter blank rows here.
+  //
+  // Backend handles:
+  //   No Item_Name + Amount > 0  -> error
+  //   No Item_Name + Amount 0    -> skip
+  //   Completely empty items     -> allowed
+  // =========================================================
+
+  const itemsWithDefaults = (data.items || []).map((item) => ({
+    ...item,
+
+    Tax_Type: item.Tax_Type || "None",
+
+    Tax_Amount:
+      item.Tax_Amount === "" ||
+      item.Tax_Amount === null ||
+      item.Tax_Amount === undefined
+        ? 0
+        : Number(item.Tax_Amount),
+
+    Amount:
+      item.Amount === "" ||
+      item.Amount === null ||
+      item.Amount === undefined
+        ? 0
+        : Number(item.Amount),
+  }));
+
+  // =========================================================
+  // 2. TOTAL AMOUNT
+  // =========================================================
+
+  const totalAmount = Number(data.Total_Amount) || 0;
+
+  // =========================================================
+  // 3. PAYMENT SPLITS
+  //
+  // IMPORTANT:
+  // Don't filter them here.
+  //
+  // Backend handles:
+  //   First valid split ₹0 -> KEEP
+  //   Middle/last ₹0       -> DROP
+  //   Positive splits      -> KEEP
+  //
+  // Example:
+  // Cash  ₹0   -> sent
+  // HDFC  ₹25  -> sent
+  // ANCO  ₹0   -> sent
+  //
+  // Backend converts this to:
+  // Cash  ₹0
+  // HDFC  ₹25
+  // =========================================================
+
+  const splits = (data.splits || []).map((split) => ({
+    ...split,
+
+    Amount:
+      split.Amount === "" ||
+      split.Amount === null ||
+      split.Amount === undefined
+        ? 0
+        : Number(split.Amount),
+
+    Bank_Account_Id:
+      split.Payment_Type === "Bank"
+        ? split.Bank_Account_Id || null
+        : null,
+
+    Reference_Number:
+      split.Reference_Number || "",
+  }));
+
+  // =========================================================
+  // 4. BUILD PAYLOAD
+  //
+  // Total_Paid and Balance_Due do NOT need to be trusted
+  // because backend recalculates them from validSplits.
+  // =========================================================
+
+  const payload = {
+    ...data,
+
+    items: itemsWithDefaults,
+    splits,
+
+    Total_Amount: totalAmount,
+  };
+
+  console.log("Final Sale Return Payload:", payload);
+
+  // =========================================================
+  // 5. SUBMIT
+  // =========================================================
+
   try {
-   const res = await createSaleReturn({
-     Sale_Id: Sale_Id,   // ← from useParams() or props
-     ...payload,                 // ← everything else (Party_Name, items, etc.)
-   }).unwrap();
-    //console.log("Created successfully:", res);
- 
-    // invalidate so list refetches
-    dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
-   dispatch(itemApi.util.invalidateTags(["Item"]));
-   dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-     dispatch(bankAccountApi.util.invalidateTags([
-            { type: "BankAccount", id: payload.Bank_Account_Id },
-            "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-          ]));
+    const res = await createSaleReturn({
+      Sale_Id,
+      ...payload,
+    }).unwrap();
+
+    console.log("Sale Return Created:", res);
+
     if (!res?.success) {
       toast.error("Failed to add credit note");
       return;
     }
- 
-    toast.success("Credit note added  successfull!");
- 
-    // ── navigate back based on where user came from ──
+
+    // =======================================================
+    // 6. INVALIDATE
+    // =======================================================
+
+    dispatch(
+      saleReturnApi.util.invalidateTags([
+        "SaleReturn",
+      ])
+    );
+
+    dispatch(
+      itemApi.util.invalidateTags([
+        "Item",
+      ])
+    );
+
+    dispatch(
+      cashInHandApi.util.invalidateTags([
+        "CashInHand",
+      ])
+    );
+
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        "BankAccount",
+      ])
+    );
+
+    dispatch(
+      partyApi.util.invalidateTags([
+        "Party",
+      ])
+    );
+
+    toast.success(
+      "Credit note added successfully!"
+    );
+
+    // =======================================================
+    // 7. NAVIGATION
+    // =======================================================
+
     if (from === "all-sale-return-list") {
       navigate({
         pathname: "/sale/return",
@@ -660,12 +771,19 @@ for (const item of payload.items) {
         search: location.search,
       });
     }
- 
+
   } catch (error) {
     const errorMessage =
-      error?.data?.message || error?.message || "Failed to add credit note.";
+      error?.data?.message ||
+      error?.message ||
+      "Failed to add credit note.";
+
     toast.error(errorMessage);
-    //console.error("Submission failed", error);
+
+    console.error(
+      "Sale Return submission failed:",
+      error
+    );
   }
 };
  const paymentType = watch("splits.0.Payment_Type");
@@ -972,7 +1090,7 @@ for (const item of payload.items) {
                         {/* <div className="input-field col s6 mt-4"> */}
                         <span className=" whitespace-nowrap active">
                           Invoice Date
-                          <span className="text-red-500">*</span>
+                          {/* <span className="text-red-500">*</span> */}
                         </span>
 
                         <input
@@ -998,7 +1116,7 @@ for (const item of payload.items) {
                          <div className="flex items-center w-full gap-3  justify-end">
                         <span className="whitespace-nowrap ">
                            Date
-                          <span className="text-red-500">*</span>
+                          {/* <span className="text-red-500">*</span> */}
                         </span>
 
                         <input
@@ -1100,37 +1218,7 @@ for (const item of payload.items) {
                               </div>
                             </td>
 
-                            {/* <td
-                              style={{ padding: "0px", position: "relative" }}>
-
-                              <div ref={(el) => (categoryRefs.current[i] = el)}>
-
-
-
-                                <input
-                                  type="text"
-                                  value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
-                                  style={{ marginBottom: "0px" }}
-                                  readOnly
-
-                                  placeholder="Category"
-                                  className="w-full outline-none border-b-2 text-gray-900"
-                                // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
-                                />
-
-                                {errors?.items?.[i]?.Item_Category && (
-                                  <p className="text-red-500 text-xs mt-1">
-                                    {errors.items[i].Item_Category.message}
-                                  </p>
-                                )}
-
-
-
-                              </div>
-                              {/* Modal 
-
-                            </td> */}
-                            <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                            {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
                             type="text"
@@ -1262,7 +1350,85 @@ for (const item of payload.items) {
                           </div>
                         )}
 
-                      </td>
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                                              <Controller
+                                                control={control}
+                                                name={`items.${i}.Item_Category`}
+                                                defaultValue="All"
+                                                render={({ field }) => (
+                                                  <select
+                                                    {...field}
+                                                    className="form-select"
+                                                    style={{ width: "100%", fontSize: "12px" }}
+                                                    onChange={(e) => {
+                                                      const value = e.target.value;
+                                                      if (value === "__ADD_CATEGORY__") {
+                                                        setShowModal(true);
+                                                        return; // don't commit this as the selected value
+                                                      }
+                                                      field.onChange(value);
+                                                    }}
+                                                  >
+                                                    <option value="All">All</option>
+                                                    <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                                                    {categories?.map((cat) => (
+                                                      <option key={cat.Category_Id} value={cat.Item_Category}>
+                                                        {cat.Item_Category}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                )}
+                                              />
+                      
+                                              {showModal && (
+                                                <div
+                                                  style={{
+                                                    position: "fixed", inset: 0, display: "flex",
+                                                    alignItems: "center", justifyContent: "center",
+                                                    backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                                                  }}
+                                                >
+                                                  <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setShowModal(false)}
+                                                      style={{ backgroundColor: "transparent" }}
+                                                      className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                                                    >
+                                                      ✕
+                                                    </button>
+                                                    <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                                                    <input
+                                                      type="text"
+                                                      value={newCategory}
+                                                      onChange={(e) => setNewCategory(e.target.value)}
+                                                      className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                                      placeholder="Enter category name"
+                                                    />
+                                                    <div className="flex justify-end gap-3">
+                                                      <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                                        Cancel
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                          const created = await handleAddCategory(); // should return the created category object
+                                                          if (created?.Item_Category) {
+                                                            setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                                          }
+                                                          setShowModal(false);
+                                                        }}
+                                                        style={{ backgroundColor: "#4CA1AF" }}
+                                                        className="px-4 py-2 rounded-md text-white"
+                                                      >
+                                                        Add
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </td>
 
 
                             {/* Item Dropdown */}
@@ -1332,7 +1498,7 @@ for (const item of payload.items) {
                                       ...itemsValues[i],
                                       Item_Name: matchedItem.Item_Name,
                                       Purchase_Price: matchedItem.Purchase_Price || 0,
-                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                      Quantity: itemsValues[i]?.Quantity || 0,
                                     },
                                     i,
                                     itemsValues
@@ -1510,8 +1676,8 @@ for (const item of payload.items) {
                                 type="text"
                                 className="form-control"
                                 style={{ width: "100%" }}
-                                value={watch(`items.${i}.Quantity`)?.toString() || ""}
-                                {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
+                                //value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                                {...register(`items.${i}.Quantity`)}
                                 onChange={(e) => {
                                   let value = e.target.value.replace(/[^0-9]/g, "");
                                   // let currentItemName = itemsValues[i]?.Item_Name?.trim();

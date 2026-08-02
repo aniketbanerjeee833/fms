@@ -178,7 +178,7 @@ export default function SaleReturndEdit() {
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 0,
+        Quantity: "",
         Item_Unit: "",
         Sale_Price: "",
 
@@ -323,7 +323,7 @@ export default function SaleReturndEdit() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: 0,
+      Quantity: "",
       Item_Unit: "",
       Sale_Price: "",
       Discount_On_Sale_Price: "",
@@ -415,20 +415,20 @@ export default function SaleReturndEdit() {
 
 
 
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
 
   useEffect(() => {
     const gstin = parties?.parties?.find(
@@ -446,21 +446,50 @@ export default function SaleReturndEdit() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
+   const emptyRow = () => ({
+  Item_Category: "",
+  Item_Name: "",
+  itemSearch: "",
+  Item_HSN: "",
+  Quantity: "",
+  Sale_Price: "",
+  Discount_On_Sale_Price: "",
+  Discount_Type_On_Sale_Price: "Percentage",
+  Tax_Type: "None",
+  Tax_Amount: "",
+  Amount: "",
+  itemOpen: false,
+  CategoryOpen: false,
+  isHSNLocked: false,
+  isUnitLocked: false,
+  isExistingItem: false,
+});
   useEffect(() => {
     if (sale) {
 
       setPartySearch(sale.saleReturn.Party_Name);
-      const prefilledRows = sale.saleReturn.items.map((it) => ({
-        ...it,
-        itemSearch: it.Item_Name || "", // for UI display
-        isExistingItem: true,           // lock category/HSN if needed
-        isHSNLocked: false,
-        isUnitLocked: true,
-        CategoryOpen: false,
-        itemOpen: false,
-        itemQuantity: it.Quantity || 0,
-        itemTaxType: it.Tax_Type || "None",
-      }));
+      // const prefilledRows = sale.saleReturn.items.map((it) => ({
+      //   ...it,
+      //   itemSearch: it.Item_Name || "", // for UI display
+      //   isExistingItem: true,           // lock category/HSN if needed
+      //   isHSNLocked: false,
+      //   isUnitLocked: true,
+      //   CategoryOpen: false,
+      //   itemOpen: false,
+      //   itemQuantity: it.Quantity || "",
+      //   itemTaxType: it.Tax_Type || "None",
+      // }));
+         const prefilledRows = sale?.saleReturn?.items?.length > 0
+      ? sale.saleReturn.items.map((item) => ({
+          ...item,
+          itemSearch: item.Item_Name,
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: true,
+          isExistingItem: true,
+        }))
+      : [emptyRow()];
 
       setRows(prefilledRows);
 
@@ -498,7 +527,7 @@ export default function SaleReturndEdit() {
               },
             ],
 
-        items: sale.saleReturn.items || [],
+        items: prefilledRows,
       })
       setShowSplitBox((sale?.saleReturn?.splits?.length || 0) > 1);
     }
@@ -587,93 +616,225 @@ export default function SaleReturndEdit() {
   }, [totalAmountWatch, computedTotalPaid]);
 
 
-  const onSubmit = async (data) => {
-    console.log("Form Data (from RHF):", data);
+ const onSubmit = async (data) => {
+  console.log("Form Data (from RHF):", data);
 
-    const payload = { ...data };
+  // =========================================================
+  // 1. ITEMS
+  //
+  // Do NOT filter blank rows here.
+  //
+  // Backend handles:
+  // No Item_Name + Amount > 0 -> ERROR
+  // No Item_Name + Amount 0   -> SKIP
+  // Empty items               -> allowed
+  // =========================================================
 
-    // ── validate items ──
-    for (const item of payload.items) {
-      const name = item.Item_Name?.trim();
-      const category = item.Item_Category?.trim();
-      const itemHSN = item.Item_HSN?.trim();
-      const quantity = Number(item.Quantity);
+  const itemsWithDefaults = (data.items || []).map((item) => ({
+    ...item,
 
-      if (!name || !category || !itemHSN || quantity <= 0) {
-        toast.error("Each item must have a valid name, category, HSN and quantity.");
-        return;
-      }
-    }
+    Tax_Type: item.Tax_Type || "None",
 
-    console.log("payload:", payload);
+    Tax_Amount:
+      item.Tax_Amount === "" ||
+      item.Tax_Amount === null ||
+      item.Tax_Amount === undefined
+        ? 0
+        : Number(item.Tax_Amount),
 
-    try {
-      const res = await updateSaleReturn({
-        Sale_Return_Id: Sale_Return_Id,   // ← from useParams() or props
-        ...payload,                 // ← everything else (Party_Name, items, etc.)
-      }).unwrap();
-      //console.log("Created successfully:", res);
+    Amount:
+      item.Amount === "" ||
+      item.Amount === null ||
+      item.Amount === undefined
+        ? 0
+        : Number(item.Amount),
+  }));
 
-      // invalidate so list refetches
-      dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-       dispatch(partyApi.util.invalidateTags(["Party"]));
-      if (!res?.success) {
-        toast.error("Failed to update credit note");
-        return;
-      }
+  // =========================================================
+  // 2. TOTAL AMOUNT
+  // =========================================================
 
-      toast.success("Credit note updated  successfull!");
+  const totalAmount = Number(data.Total_Amount) || 0;
 
-      // ── navigate back based on where user came from ──
-      if (from === "all-sale-return-list") {
-        navigate({
-          pathname: "/sale/return",
-          search: location.search,
-        });
-      }
-      else if (from === "party-details") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
-        navigate({
-          pathname: `/party/parties`,
-          search: location.search,
-          // search: `?partyId=${partyId}`,
-        });
-      }
-      else if (from === "bank-accounts") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
-        navigate({
-          pathname: `/cash-bank/bank-accounts`,
-          search: `?bankId=${bankId}`,
-        });
-      }
-      else if (from === "cash-in-hand") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
-        navigate({
-          pathname: `/cash-bank/cash-in-hand`,
+  // =========================================================
+  // 3. PAYMENT SPLITS
+  //
+  // Send splits to backend.
+  //
+  // Backend decides:
+  //
+  // First valid:
+  // Cash ₹0 -> KEEP
+  //
+  // Later:
+  // HDFC ₹0 -> DROP
+  // ANCO ₹25 -> KEEP
+  //
+  // Don't remove zero splits here because backend needs to
+  // know which payment method was FIRST.
+  // =========================================================
 
-        });
-      }
-      else {
-        navigate({
-          pathname: "/sale/return",
-          search: location.search,
-        });
-      }
+  const splits = (data.splits || []).map((split) => ({
+    ...split,
 
-    } catch (error) {
-      const errorMessage =
-        error?.data?.message || error?.message || "Failed to updae credit note.";
-      toast.error(errorMessage);
-      //console.error("Submission failed", error);
-    }
+    Amount:
+      split.Amount === "" ||
+      split.Amount === null ||
+      split.Amount === undefined
+        ? 0
+        : Number(split.Amount),
+
+    Bank_Account_Id:
+      split.Payment_Type === "Bank"
+        ? split.Bank_Account_Id || null
+        : null,
+
+    Reference_Number:
+      split.Reference_Number || "",
+  }));
+
+  // =========================================================
+  // 4. PAYLOAD
+  //
+  // Backend recalculates:
+  // Total_Paid
+  // Balance_Due
+  //
+  // from validSplits.
+  // =========================================================
+
+  const payload = {
+    ...data,
+
+    items: itemsWithDefaults,
+    splits,
+
+    Total_Amount: totalAmount,
   };
 
+  console.log(
+    "Final Edit Sale Return Payload:",
+    payload
+  );
+
+  // =========================================================
+  // 5. UPDATE
+  // =========================================================
+
+  try {
+    const res = await updateSaleReturn({
+      Sale_Return_Id,
+      ...payload,
+    }).unwrap();
+
+    console.log(
+      "Sale Return Updated:",
+      res
+    );
+
+    if (!res?.success) {
+      toast.error(
+        "Failed to update credit note"
+      );
+      return;
+    }
+
+    // =======================================================
+    // 6. INVALIDATE CACHE
+    // =======================================================
+
+    dispatch(
+      saleReturnApi.util.invalidateTags([
+        "SaleReturn",
+      ])
+    );
+
+    dispatch(
+      itemApi.util.invalidateTags([
+        "Item",
+      ])
+    );
+
+    dispatch(
+      cashInHandApi.util.invalidateTags([
+        "CashInHand",
+      ])
+    );
+
+    // Bank IDs are inside splits now.
+    // No payload.Bank_Account_Id required.
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        "BankAccount",
+      ])
+    );
+
+    dispatch(
+      partyApi.util.invalidateTags([
+        "Party",
+      ])
+    );
+
+    // =======================================================
+    // 7. SUCCESS
+    // =======================================================
+
+    toast.success(
+      "Credit note updated successfully!"
+    );
+
+    // =======================================================
+    // 8. NAVIGATION
+    // =======================================================
+
+    if (from === "all-sale-return-list") {
+      navigate({
+        pathname: "/sale/return",
+        search: location.search,
+      });
+    }
+
+    else if (from === "party-details") {
+      navigate({
+        pathname: "/party/parties",
+        search: location.search,
+      });
+    }
+
+    else if (from === "bank-accounts") {
+      navigate({
+        pathname: "/cash-bank/bank-accounts",
+        search: `?bankId=${bankId}`,
+      });
+    }
+
+    else if (from === "cash-in-hand") {
+      navigate({
+        pathname: "/cash-bank/cash-in-hand",
+      });
+    }
+
+    else {
+      navigate({
+        pathname: "/sale/return",
+        search: location.search,
+      });
+    }
+
+  } catch (error) {
+    const errorMessage =
+      error?.data?.message ||
+      error?.message ||
+      "Failed to update credit note.";
+
+    toast.error(errorMessage);
+
+    console.error(
+      "Sale Return update failed:",
+      error
+    );
+  }
+};
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -999,7 +1160,7 @@ export default function SaleReturndEdit() {
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className=" whitespace-nowrap active">
                     Invoice Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1025,7 +1186,7 @@ export default function SaleReturndEdit() {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1128,92 +1289,41 @@ export default function SaleReturndEdit() {
                       </td>
 
                       <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                        <div ref={(el) => (categoryRefs.current[i] = el)}>
-                          <input
-                            type="text"
-                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
-                            style={{ marginBottom: "0px" }}
-                            readOnly={rows[i]?.isExistingItem}
-                            placeholder="Category"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                            onClick={() => {
-                              if (!rows[i]?.isExistingItem) {
-                                setRows((prev) =>
-                                  prev.map((row, idx) => ({
-                                    ...row,
-                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
-                                  }))
-                                );
-                              }
-                            }}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              handleRowChange(i, "categorySearch", value);
-                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
-                              handleRowChange(i, "isExistingItem", false);
-                            }}
-                          />
-
-
-                          {errors?.items?.[i]?.Item_Category && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Category.message}
-                            </p>
-                          )}
-
-                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
                                   setShowModal(true);
-                                  handleRowChange(i, "CategoryOpen", false);
-                                }}>
-                                + Add Category
-                              </span>
-
-                              {categories
-                                ?.filter((cat) =>
-                                  cat.Item_Category.toLowerCase().startsWith(
-                                    (rows[i]?.categorySearch || "").toLowerCase()
-                                  )
-                                )
-                                .map((cat, idx) => (
-                                  <div
-                                    key={idx}
-                                    onClick={() => {
-                                      handleSelect(i, cat.Item_Category);
-                                      handleRowChange(i, "categorySearch", cat.Item_Category);
-                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
-                                      handleRowChange(i, "CategoryOpen", false);
-                                    }}
-
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {cat.Item_Category}
-                                  </div>
-                                ))}
-
-                              {categories?.filter((cat) =>
-                                cat.Item_Category.toLowerCase().startsWith(
-                                  (rows[i]?.categorySearch || "").toLowerCase()
-                                )
-                              ).length === 0 && (
-                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
-                                )}
-                            </div>
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
                           )}
-                        </div>
+                        />
+
                         {showModal && (
                           <div
                             style={{
-                              position: "fixed",
-                              inset: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "rgba(0,0,0,0.4)",
-                              backdropFilter: "blur(4px)",
-                              zIndex: 30,
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
                             }}
                           >
                             <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
@@ -1225,7 +1335,6 @@ export default function SaleReturndEdit() {
                               >
                                 ✕
                               </button>
-
                               <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
                               <input
                                 type="text"
@@ -1234,23 +1343,21 @@ export default function SaleReturndEdit() {
                                 className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
                                 placeholder="Enter category name"
                               />
-
                               <div className="flex justify-end gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setShowModal(false)}
-
-                                  style={{ backgroundColor: "lightgray" }}
-                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-                                >
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
                                   Cancel
                                 </button>
-
                                 <button
                                   type="button"
-                                  onClick={handleAddCategory}
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
                                   style={{ backgroundColor: "#4CA1AF" }}
-                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                  className="px-4 py-2 rounded-md text-white"
                                 >
                                   Add
                                 </button>
@@ -1258,7 +1365,6 @@ export default function SaleReturndEdit() {
                             </div>
                           </div>
                         )}
-
                       </td>
 
                       {/* Item Dropdown */}
@@ -1328,7 +1434,7 @@ export default function SaleReturndEdit() {
                                       ...itemsValues[i],
                                       Item_Name: matchedItem.Item_Name,
                                       Purchase_Price: matchedItem.Purchase_Price || 0,
-                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                      Quantity: itemsValues[i]?.Quantity || 0,
                                     },
                                     i,
                                     itemsValues
@@ -1506,8 +1612,8 @@ export default function SaleReturndEdit() {
                           type="text"
                           className="form-control"
                           style={{ width: "100%" }}
-                          value={watch(`items.${i}.Quantity`)?.toString() || ""}
-                          {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
+                          //value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                          {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
                             let value = e.target.value.replace(/[^0-9]/g, "");
                             // let currentItemName = itemsValues[i]?.Item_Name?.trim();

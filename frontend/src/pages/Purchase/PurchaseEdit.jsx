@@ -242,7 +242,7 @@ export default function PurchaseEdit() {
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 1,
+        Quantity: "",
         Item_Unit: "",
         Purchase_Price: "",
 
@@ -294,7 +294,7 @@ export default function PurchaseEdit() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: "1",
+      Quantity: "",
       Item_Unit: "",
       Purchase_Price: "",
       Discount_On_Purchase_Price: "",
@@ -338,7 +338,7 @@ export default function PurchaseEdit() {
 
   const calculateRowAmount = (row, index, itemsValues) => {
     const price = num(row.Purchase_Price);
-    const qty = Math.max(1, num(row.Quantity)); // default 1
+    const qty = Math.max(0, num(row.Quantity)); // default 1
     const subtotal = price * qty;
 
     // discount
@@ -382,20 +382,20 @@ export default function PurchaseEdit() {
   //const itemsValues = watch("items"); // watch all rows
   const formValues = watch();
 
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
 
 
 
@@ -487,19 +487,50 @@ export default function PurchaseEdit() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
+  console.log("purchase", purchase);
+  const emptyRow = () => ({
+  Item_Category: "",
+  Item_Name: "",
+  itemSearch: "",
+  Item_HSN: "",
+  Quantity: "",
+  Item_Unit: "",
+  Purchase_Price: "",
+  Discount_On_Purchase_Price: "",
+  Discount_Type_On_Purchase_Price: "Percentage",
+  Tax_Type: "None",
+  Tax_Amount: "",
+  Amount: "",
+  itemOpen: false,
+  CategoryOpen: false,
+  isHSNLocked: false,
+  isUnitLocked: false,
+  isExistingItem: false,
+});
   useEffect(() => {
     if (purchase) {
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
-      const prefilledRows = purchase?.items?.map((item) => ({
-        ...item,
-        itemSearch: item.Item_Name,
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: false,
-        isUnitLocked: true,
-        isExistingItem: true,
+      // const prefilledRows = purchase?.items?.map((item) => ({
+      //   ...item,
+      //   itemSearch: item.Item_Name,
+      //   itemOpen: false,
+      //   CategoryOpen: false,
+      //   isHSNLocked: false,
+      //   isUnitLocked: true,
+      //   isExistingItem: true,
 
-      }))
+      // }))
+        const prefilledRows = purchase?.items?.length > 0
+      ? purchase.items.map((item) => ({
+          ...item,
+          itemSearch: item.Item_Name,
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: true,
+          isExistingItem: true,
+        }))
+      : [emptyRow()];
       setRows(prefilledRows)
       reset({
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
@@ -529,7 +560,8 @@ export default function PurchaseEdit() {
                 Amount: "",
               },
             ],
-        items: purchase?.items
+        //items: purchase?.items
+        items:  prefilledRows
       })
       setShowSplitBox((purchase?.splits?.length || 0) > 1);
     }
@@ -540,141 +572,261 @@ export default function PurchaseEdit() {
     }
   }, [purchase]);
 
-  const onSubmit = async (data) => {
-    console.log("Form Data (from RHF):", data);
-
-    //const { items, totals } = calcAll(data);
-
-    // 2) build payload
-    const payload = {
-      ...data,
-      // items,
-      // Total_Amount: totals.Total_Amount,
-      // Total_Paid: totals.Total_Paid,           // blank -> 0.00
-      // Balance_Due: totals.Balance_Due,
-    };
-    // const seenItems = new Set();
 
 
-    // for (const item of payload.items) {
-    //   const name = item.Item_Name?.trim().toLowerCase();
-    //   const category = item.Item_Category?.trim().toLowerCase();
-    //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
-    //   const Quantity = item.Quantity
+const onSubmit = async (data) => {
+  console.log("Form Data (from RHF):", data);
 
-    //   if (!name || !category || !itemHSN || !Quantity) {
-    //     toast.error("Each item must have a valid name, category, HSN and quantity.");
-    //     return;
-    //   }
+  // =========================================================
+  // 1. NORMALIZE PAYMENT SPLITS
+  // =========================================================
 
-    //   // ❌ Prevent duplicates
-    //   if (seenItems.has(name)) {
-    //     toast.error(
-    //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-    //     );
-    //     return;
-    //   }
-    //   seenItems.add(name);
+  const rawSplits = data.splits || [];
 
+  const normalizedSplits = rawSplits.map((split) => ({
+    ...split,
+    Amount: Number(split.Amount) || 0,
+  }));
 
-    // }
-    for (const item of payload.items) {
-  const name = item.Item_Name?.trim();
-  const category = item.Item_Category?.trim();
-  const itemHSN = item.Item_HSN?.trim();
-  const quantity = Number(item.Quantity);
+  // =========================================================
+  // 2. FIND FIRST VALID PAYMENT METHOD
+  //
+  // Bank is valid only when account is selected.
+  // Cash / Cheque / Neft are valid when Payment_Type exists.
+  // =========================================================
 
-  if (!name || !category || !itemHSN || quantity <= 0) {
-    toast.error("Each item must have a valid name, category, HSN and quantity.");
-    return;
-  }
-}
-    console.log("payload:", payload);
-    try {
-      const res = await editPurchase({
-        body: payload,
-        Purchase_Id
-      }).unwrap();
-      console.log(" successfully:", res);
-      const resData = res?.data || res;
-
-      dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(dashboardApi.util.invalidateTags(["Dashboard"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
-      dispatch(partyApi.util.invalidateTags(["Party"]));
-      // if(from === "party-payables"){
-      //   dispatch(partyApi.util.invalidateTags(["Party"]));
-      // }
-      if (!resData?.success) {
-        toast.error("Failed to update purchase");
-        return;
-      } else {
-        toast.success(" Purchase updated successfully!");
-        if (from === "party-payables") {
-          navigate({
-            pathname: `/party/payables`,
-            search: location.search,
-          })
-        }
-        else if (from === "party-sales-purchases-details") {
-
-          navigate({
-            pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-            search: location.search,
-          })
-          dispatch(partyApi.util.invalidateTags(["Party"]));
-        }
-        else if (from === "item-sales-purchases-details") {
-          navigate({
-            pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-            search: location.search,
-          })
-          dispatch(itemApi.util.invalidateTags(["Item"]));
-        } else if (from === "bank-accounts") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/cash-bank/bank-accounts`,
-            search: `?bankId=${bankId}`,
-          });
-        } 
-                    else if (from === "party-details") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/party/parties`,
-             search: location.search,
-            // search: `?partyId=${partyId}`,
-          });
-        }
-        else if (from === "cash-in-hand") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/cash-bank/cash-in-hand`,
-
-          });
-        }
-        else {
-          navigate({
-            pathname: "/purchase/all-purchases",
-            search: location.search,
-          });
-        }     // navigate("/purchase/all-purchases");
-      }
-
-    } catch (error) {
-      const errorMessage =
-        error?.data?.message || error?.message || "Failed to update purchase.";
-      toast.error(errorMessage);
-      // toast.error("Failed to add lead");
-      console.error("Submission failed", error);
+  const firstValidIndex = normalizedSplits.findIndex((split) => {
+    if (!split.Payment_Type) {
+      return false;
     }
+
+    if (
+      split.Payment_Type === "Bank" &&
+      !split.Bank_Account_Id
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // =========================================================
+  // 3. BUILD VALID SPLITS
+  //
+  // RULE:
+  //
+  // Positive amount -> ALWAYS KEEP
+  //
+  // Blank / ₹0 -> ONLY keep if it is the FIRST
+  //               valid payment method
+  //
+  // Other ₹0 rows -> DROP
+  // =========================================================
+
+  const validSplits = [];
+
+  normalizedSplits.forEach((split, index) => {
+    // No payment type
+    if (!split.Payment_Type) {
+      return;
+    }
+
+    // Bank without account
+    if (
+      split.Payment_Type === "Bank" &&
+      !split.Bank_Account_Id
+    ) {
+      return;
+    }
+
+    // ---------------------------------------------
+    // Positive amount -> always keep
+    // ---------------------------------------------
+    if (split.Amount > 0) {
+      validSplits.push(split);
+      return;
+    }
+
+    // ---------------------------------------------
+    // ₹0 / blank -> only FIRST valid payment method
+    // ---------------------------------------------
+    if (index === firstValidIndex) {
+      validSplits.push({
+        ...split,
+        Amount: 0,
+      });
+    }
+  });
+
+  // =========================================================
+  // 4. CALCULATE TOTAL PAID FROM SURVIVING SPLITS
+  // =========================================================
+
+  const totalPaid = validSplits.reduce(
+    (sum, split) => {
+      return sum + (Number(split.Amount) || 0);
+    },
+    0
+  );
+
+  // =========================================================
+  // 5. BUILD PAYLOAD
+  // =========================================================
+
+  const payload = {
+    ...data,
+
+    // Don't trust old Total_Paid from form.
+    // Recalculate from valid payment splits.
+    Total_Paid: totalPaid,
+
+    splits: validSplits,
+  };
+
+  // console.log("Raw Splits:", rawSplits);
+  // console.log("Normalized Splits:", normalizedSplits);
+  // console.log("First Valid Index:", firstValidIndex);
+  // console.log("Valid Splits:", validSplits);
+  // console.log("Total Paid:", totalPaid);
+  // console.log("Final Edit Payload:", payload);
+
+  // =========================================================
+  // 6. SUBMIT EDIT
+  // =========================================================
+
+  try {
+    const res = await editPurchase({
+      body: payload,
+      Purchase_Id,
+    }).unwrap();
+
+    console.log("Purchase updated successfully:", res);
+
+    const resData = res?.data || res;
+
+    // =======================================================
+    // 7. INVALIDATE CACHE
+    // =======================================================
+
+    dispatch(
+      purchaseApi.util.invalidateTags(["Purchase"])
+    );
+
+    dispatch(
+      itemApi.util.invalidateTags(["Item"])
+    );
+
+    dispatch(
+      dashboardApi.util.invalidateTags(["Dashboard"])
+    );
+
+    dispatch(
+      cashInHandApi.util.invalidateTags(["CashInHand"])
+    );
+
+    // Since purchase can contain MULTIPLE banks,
+    // invalidate the general BankAccount tag.
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        "BankAccount",
+      ])
+    );
+
+    dispatch(
+      partyApi.util.invalidateTags(["Party"])
+    );
+
+    // =======================================================
+    // 8. RESPONSE CHECK
+    // =======================================================
+
+    if (!resData?.success) {
+      toast.error("Failed to update purchase");
+      return;
+    }
+
+    toast.success("Purchase updated successfully!");
+
+    // =======================================================
+    // 9. NAVIGATION
+    // =======================================================
+
+    if (from === "party-payables") {
+      navigate({
+        pathname: "/party/payables",
+        search: location.search,
+      });
+    }
+
+    else if (
+      from === "party-sales-purchases-details"
+    ) {
+      navigate({
+        pathname:
+          `/party/party-sales-purchases-details/${Party_Id}`,
+        search: location.search,
+      });
+
+      dispatch(
+        partyApi.util.invalidateTags(["Party"])
+      );
+    }
+
+    else if (
+      from === "item-sales-purchases-details"
+    ) {
+      navigate({
+        pathname:
+          `/item/item-sales-purchases-details/${Item_Id}`,
+        search: location.search,
+      });
+
+      dispatch(
+        itemApi.util.invalidateTags(["Item"])
+      );
+    }
+
+    else if (from === "bank-accounts") {
+      navigate({
+        pathname: "/cash-bank/bank-accounts",
+        search: `?bankId=${bankId}`,
+      });
+    }
+
+    else if (from === "party-details") {
+      navigate({
+        pathname: "/party/parties",
+        search: location.search,
+      });
+    }
+
+    else if (from === "cash-in-hand") {
+      navigate({
+        pathname: "/cash-bank/cash-in-hand",
+      });
+    }
+
+    else {
+      navigate({
+        pathname: "/purchase/all-purchases",
+        search: location.search,
+      });
+    }
+
+  } catch (error) {
+    const errorMessage =
+      error?.data?.message ||
+      error?.message ||
+      "Failed to update purchase.";
+
+    toast.error(errorMessage);
+
+    console.error(
+      "Purchase update failed:",
+      error
+    );
   }
-
-
+};
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
@@ -967,7 +1119,7 @@ export default function PurchaseEdit() {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Bill Number
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -988,7 +1140,7 @@ export default function PurchaseEdit() {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Bill Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1097,260 +1249,85 @@ export default function PurchaseEdit() {
                       </td>
 
 
+
                       <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                        <div ref={(el) => (categoryRefs.current[i] = el)}>
-                          <input
-                            type="text"
-                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
-                            style={{ marginBottom: "0px" }}
-                            readOnly={rows[i]?.isExistingItem}
-                            placeholder="Category"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                            onClick={() => {
-                              if (!rows[i]?.isExistingItem) {
-                                setRows((prev) =>
-                                  prev.map((row, idx) => ({
-                                    ...row,
-                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
-                                  }))
-                                );
-                              }
-                            }}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              handleRowChange(i, "categorySearch", value);
-                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
-                              handleRowChange(i, "isExistingItem", false);
-                            }}
-                          />
-
-
-                          {errors?.items?.[i]?.Item_Category && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Category.message}
-                            </p>
-                          )}
-
-                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setShowModal(true);
-                                  handleRowChange(i, "CategoryOpen", false);
-                                }}>
-                                + Add Category
-                              </span>
-
-                              {categories
-                                ?.filter((cat) =>
-                                  cat.Item_Category.toLowerCase().startsWith(
-                                    (rows[i]?.categorySearch || "").toLowerCase()
-                                  )
-                                )
-                                .map((cat, idx) => (
-                                  <div
-                                    key={idx}
-                                    onClick={() => {
-                                      handleSelect(i, cat.Item_Category);
-                                      handleRowChange(i, "categorySearch", cat.Item_Category);
-                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
-                                      handleRowChange(i, "CategoryOpen", false);
-                                    }}
-
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {cat.Item_Category}
-                                  </div>
-                                ))}
-
-                              {categories?.filter((cat) =>
-                                cat.Item_Category.toLowerCase().startsWith(
-                                  (rows[i]?.categorySearch || "").toLowerCase()
-                                )
-                              ).length === 0 && (
-                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
-                                )}
-                            </div>
-                          )}
-                        </div>
-                        {showModal && (
-                          <div
-                            style={{
-                              position: "fixed",
-                              inset: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "rgba(0,0,0,0.4)",
-                              backdropFilter: "blur(4px)",
-                              zIndex: 30,
-                            }}
-                          >
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowModal(false)}
-                                style={{ backgroundColor: "transparent" }}
-                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                              >
-                                ✕
-                              </button>
-
-                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                              <input
-                                type="text"
-                                value={newCategory}
-                                onChange={(e) => setNewCategory(e.target.value)}
-                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                placeholder="Enter category name"
-                              />
-
-                              <div className="flex justify-end gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setShowModal(false)}
-
-                                  style={{ backgroundColor: "lightgray" }}
-                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-                                >
-                                  Cancel
-                                </button>
-                                {/* <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (from === "party-sales-purchases-details") {
-
-                                            navigate({
-                                              pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                                              search: location.search,
-                                            })
-                                          }
-                                            //  navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                          // } else if (from === "item-sales-purchases-details") {
-                                          //   navigate({
-                                          //     pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                                          //     search: location.search,
-                                          //   })
-                                          //   // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                          // } 
-                                          else {
-                                            navigate({
-                                              pathname: "/purchase/all-purchases",
-                                              search: location.search,
-                                            })
-
-                                            // navigate("/sale/all-sales");
-                                          }
-                                        }}
-                                        //       onClick={() => {
-                                        //     if (from === "party-sales-purchases-details") {
-                                        //       navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                        // //        navigate({
-                                        // //   pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                                        // //   search: location.search,
-                                        // // })
-                                        //       //  navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                        //     } else if (from === "item-sales-purchases-details") {
-                                        //      navigate({
-                                        //   pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                                        //   search: location.search,
-                                        // })
-                                        //       // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                        //     } else {
-                                        //                                     navigate({
-                                        //   pathname: "/purchase/all-purchases",
-                                        //   search: location.search,
-                                        // })
-
-                                        //       // navigate("/sale/all-sales");
-                                        //     }
-                                        //   }}
-                                        //   onClick={() => {
-                                        //     if (from === "party-sales-purchases-details") {
-                                        //       navigate(`/party/party-sales-purchases-details/${Party_Id}`);
-                                        //     } 
-
-                                        //     else if (from === "item-sales-purchases-details") {
-                                        //       navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-                                        //     }else {
-                                        //                                         navigate({
-                                        //   pathname: "/purchase/all-purchases",
-                                        //   search: location.search,
-                                        // })
-                                        //       // navigate(`/purchase/all-purchases`);
-                                        //     }
-                                        //   }}
-                                        className="text-white font-bold py-2 px-4 rounded"
-                                        style={{ backgroundColor: "#4CA1AF" }}
-                                      >
-                                        Cancel
-                                      </button> */}
-                                <button
-                                  type="button"
-                                  onClick={handleAddCategory}
-                                  style={{ backgroundColor: "#4CA1AF" }}
-                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
-                                >
-                                  Add
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {/* {showModal && (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.4)",
-        backdropFilter: "blur(4px)",
-        zIndex: 30,
-      }}
-    >
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-        <button
-          type="button"
-          onClick={() => setShowModal(false)}
-          style={{ backgroundColor: "transparent" }}
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        >
-          ✕
-        </button>
-
-        <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-        <input
-          type="text"
-          value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-          placeholder="Enter category name"
-        />
-
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => setShowModal(false)}
-            style={{ backgroundColor: "lightgray" }}
-            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleAddCategory}
-            style={{ backgroundColor: "#4CA1AF" }}
-            className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
-          >
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  )} */}
-                      </td>
+                                              <Controller
+                                                control={control}
+                                                name={`items.${i}.Item_Category`}
+                                                defaultValue="All"
+                                                render={({ field }) => (
+                                                  <select
+                                                    {...field}
+                                                    className="form-select"
+                                                    style={{ width: "100%", fontSize: "12px" }}
+                                                    onChange={(e) => {
+                                                      const value = e.target.value;
+                                                      if (value === "__ADD_CATEGORY__") {
+                                                        setShowModal(true);
+                                                        return; // don't commit this as the selected value
+                                                      }
+                                                      field.onChange(value);
+                                                    }}
+                                                  >
+                                                    <option value="All">All</option>
+                                                    <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                                                    {categories?.map((cat) => (
+                                                      <option key={cat.Category_Id} value={cat.Item_Category}>
+                                                        {cat.Item_Category}
+                                                      </option>
+                                                    ))}
+                                                  </select>
+                                                )}
+                                              />
+                      
+                                              {showModal && (
+                                                <div
+                                                  style={{
+                                                    position: "fixed", inset: 0, display: "flex",
+                                                    alignItems: "center", justifyContent: "center",
+                                                    backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                                                  }}
+                                                >
+                                                  <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setShowModal(false)}
+                                                      style={{ backgroundColor: "transparent" }}
+                                                      className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                                                    >
+                                                      ✕
+                                                    </button>
+                                                    <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                                                    <input
+                                                      type="text"
+                                                      value={newCategory}
+                                                      onChange={(e) => setNewCategory(e.target.value)}
+                                                      className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                                      placeholder="Enter category name"
+                                                    />
+                                                    <div className="flex justify-end gap-3">
+                                                      <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                                        Cancel
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                          const created = await handleAddCategory(); // should return the created category object
+                                                          if (created?.Item_Category) {
+                                                            setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                                          }
+                                                          setShowModal(false);
+                                                        }}
+                                                        style={{ backgroundColor: "#4CA1AF" }}
+                                                        className="px-4 py-2 rounded-md text-white"
+                                                      >
+                                                        Add
+                                                      </button>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </td>
                       {/* Item Dropdown */}
                       <td style={{ padding: "0px", width: "18%", position: "relative" }}>
                         <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
@@ -1409,7 +1386,7 @@ export default function PurchaseEdit() {
                                       ...itemsValues[i],
                                       Item_Name: matchedItem.Item_Name,
                                       Purchase_Price: matchedItem.Purchase_Price || 0,
-                                      Quantity: itemsValues[i]?.Quantity || 1,
+                                      Quantity: itemsValues[i]?.Quantity || 0,
                                     },
                                     i,
                                     itemsValues
@@ -1485,7 +1462,7 @@ export default function PurchaseEdit() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                           handleRowChange(i, "itemOpen", false);
 
@@ -1495,7 +1472,7 @@ export default function PurchaseEdit() {
                                               ...itemsValues[i],
                                               Item_Name: it.Item_Name,
                                               Purchase_Price: it.Purchase_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 1,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
                                               Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
                                               Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
                                               Tax_Type: itemsValues[i]?.Tax_Type
@@ -1596,9 +1573,9 @@ export default function PurchaseEdit() {
                               shouldDirty: true,
                             });
 
-                            if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                              return;
-                            }
+                            // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                            //   return;
+                            // }
                             // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
                             //   ...itemsValues[i],
                             //   Quantity: e.target.value,
@@ -1707,9 +1684,9 @@ export default function PurchaseEdit() {
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
                               //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
-                              if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                return;
-                              }
+                              // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                              //   return;
+                              // }
 
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
@@ -2507,3 +2484,259 @@ export default function PurchaseEdit() {
     </>
   );
 }
+
+
+                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <div ref={(el) => (categoryRefs.current[i] = el)}>
+                          <input
+                            type="text"
+                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
+                            style={{ marginBottom: "0px" }}
+                            readOnly={rows[i]?.isExistingItem}
+                            placeholder="Category"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                            onClick={() => {
+                              if (!rows[i]?.isExistingItem) {
+                                setRows((prev) =>
+                                  prev.map((row, idx) => ({
+                                    ...row,
+                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
+                                  }))
+                                );
+                              }
+                            }}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              handleRowChange(i, "categorySearch", value);
+                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
+                              handleRowChange(i, "isExistingItem", false);
+                            }}
+                          />
+
+
+                          {errors?.items?.[i]?.Item_Category && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_Category.message}
+                            </p>
+                          )}
+
+                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
+                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                  setShowModal(true);
+                                  handleRowChange(i, "CategoryOpen", false);
+                                }}>
+                                + Add Category
+                              </span>
+
+                              {categories
+                                ?.filter((cat) =>
+                                  cat.Item_Category.toLowerCase().startsWith(
+                                    (rows[i]?.categorySearch || "").toLowerCase()
+                                  )
+                                )
+                                .map((cat, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => {
+                                      handleSelect(i, cat.Item_Category);
+                                      handleRowChange(i, "categorySearch", cat.Item_Category);
+                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
+                                      handleRowChange(i, "CategoryOpen", false);
+                                    }}
+
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    {cat.Item_Category}
+                                  </div>
+                                ))}
+
+                              {categories?.filter((cat) =>
+                                cat.Item_Category.toLowerCase().startsWith(
+                                  (rows[i]?.categorySearch || "").toLowerCase()
+                                )
+                              ).length === 0 && (
+                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
+                                )}
+                            </div>
+                          )}
+                        </div>
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed",
+                              inset: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)",
+                              backdropFilter: "blur(4px)",
+                              zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+
+                              <div className="flex justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowModal(false)}
+
+                                  style={{ backgroundColor: "lightgray" }}
+                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                >
+                                  Cancel
+                                </button>
+                                {/* <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (from === "party-sales-purchases-details") {
+
+                                            navigate({
+                                              pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                                              search: location.search,
+                                            })
+                                          }
+                                            //  navigate(`/party/party-sales-purchases-details/${Party_Id}`);
+                                          // } else if (from === "item-sales-purchases-details") {
+                                          //   navigate({
+                                          //     pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                                          //     search: location.search,
+                                          //   })
+                                          //   // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                                          // } 
+                                          else {
+                                            navigate({
+                                              pathname: "/purchase/all-purchases",
+                                              search: location.search,
+                                            })
+
+                                            // navigate("/sale/all-sales");
+                                          }
+                                        }}
+                                        //       onClick={() => {
+                                        //     if (from === "party-sales-purchases-details") {
+                                        //       navigate(`/party/party-sales-purchases-details/${Party_Id}`);
+                                        // //        navigate({
+                                        // //   pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                                        // //   search: location.search,
+                                        // // })
+                                        //       //  navigate(`/party/party-sales-purchases-details/${Party_Id}`);
+                                        //     } else if (from === "item-sales-purchases-details") {
+                                        //      navigate({
+                                        //   pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                                        //   search: location.search,
+                                        // })
+                                        //       // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                                        //     } else {
+                                        //                                     navigate({
+                                        //   pathname: "/purchase/all-purchases",
+                                        //   search: location.search,
+                                        // })
+
+                                        //       // navigate("/sale/all-sales");
+                                        //     }
+                                        //   }}
+                                        //   onClick={() => {
+                                        //     if (from === "party-sales-purchases-details") {
+                                        //       navigate(`/party/party-sales-purchases-details/${Party_Id}`);
+                                        //     } 
+
+                                        //     else if (from === "item-sales-purchases-details") {
+                                        //       navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                                        //     }else {
+                                        //                                         navigate({
+                                        //   pathname: "/purchase/all-purchases",
+                                        //   search: location.search,
+                                        // })
+                                        //       // navigate(`/purchase/all-purchases`);
+                                        //     }
+                                        //   }}
+                                        className="text-white font-bold py-2 px-4 rounded"
+                                        style={{ backgroundColor: "#4CA1AF" }}
+                                      >
+                                        Cancel
+                                      </button> 
+                                <button
+                                  type="button"
+                                  onClick={handleAddCategory}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {/* {showModal && (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0,0,0,0.4)",
+        backdropFilter: "blur(4px)",
+        zIndex: 30,
+      }}
+    >
+      <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+        <button
+          type="button"
+          onClick={() => setShowModal(false)}
+          style={{ backgroundColor: "transparent" }}
+          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+        >
+          ✕
+        </button>
+
+        <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+        <input
+          type="text"
+          value={newCategory}
+          onChange={(e) => setNewCategory(e.target.value)}
+          className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+          placeholder="Enter category name"
+        />
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowModal(false)}
+            style={{ backgroundColor: "lightgray" }}
+            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleAddCategory}
+            style={{ backgroundColor: "#4CA1AF" }}
+            className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+    </div>
+  )} 
+                      </td> */}

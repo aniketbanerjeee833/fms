@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
@@ -228,49 +228,7 @@ export default function PurchaseReturnAdd() {
 
 
 
-  // const {
-  //   control,
-  //   register,
-  //   handleSubmit,
-  //   setValue,
-  //   watch,
-  //   reset,
 
-  //   formState: { errors },
-  // } = useForm({
-  //   resolver: zodResolver(purchaseReturnFormSchema),
-  //   defaultValues: {
-  //     Party_Name: "",
-  //     Return_Number: "",
-  //     Bill_Number: "",
-  //     Bill_Date: "",
-  //     Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
-  //     State_Of_Supply: "",
-  //     Total_Amount: "",
-  //     Balance_Due: "",
-  //     Total_Received: "",
-  //     Payment_Type: "Cash",
-  //     Bank_Account_Id: null,   // 🔹 added
-  //     Reference_Number: "",
-  //     items: [{
-
-
-  //       Item_Category: "",
-  //       Item_Name: "",
-  //       Quantity: 1,
-  //       Item_Unit: "",
-  //       Purchase_Price: "",
-
-  //       Discount_On_Purchase_Price: "",
-  //       Discount_Type_On_Purchase_Price: "Percentage",
-  //       Tax_Type: "None",
-  //       Tax_Amount: "",
-  //       Amount: "",
-  //     }
-  //     ]
-  //   }
-
-  // })
   const {
     control,
     register,
@@ -297,7 +255,7 @@ export default function PurchaseReturnAdd() {
         {
           Item_Category: "",
           Item_Name: "",
-          Quantity: 1,
+          Quantity: "",
           Item_Unit: "",
           Purchase_Price: "",
           Discount_On_Purchase_Price: "",
@@ -347,7 +305,7 @@ export default function PurchaseReturnAdd() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: "1",
+      Quantity: "",
       Item_Unit: "",
       Purchase_Price: "",
       Discount_On_Purchase_Price: "",
@@ -435,20 +393,20 @@ export default function PurchaseReturnAdd() {
   //const itemsValues = watch("items"); // watch all rows
   const formValues = watch();
 
-  const handleSelect = (rowIndex, categoryName) => {
-    setRows((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        Item_Category: categoryName,
-        CategoryOpen: false,
-        isExistingItem: false,   // user-typed, so still editable
-      };
-      return updated;
-    });
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
-    setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  };
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
 
 
 
@@ -470,60 +428,48 @@ export default function PurchaseReturnAdd() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
-  // useEffect(() => {
-  //   if (purchase) {
-  //     setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
-  //     const prefilledRows = purchase?.items?.map((item) => ({
-  //       ...item,
-  //       itemSearch: item.Item_Name,
-  //       itemOpen: false,
-  //       CategoryOpen: false,
-  //       isHSNLocked: true,
-  //       isUnitLocked: true,
-  //       isExistingItem: true,
-
-  //     }))
-  //     setRows(prefilledRows)
-  //     reset({
-  //       Return_Date: new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
-  //       Return_Number: "",                                        // ✅ blank, user fills manually
-  //       Party_Name: purchase?.billPurchaseDetails?.Party_Name,
-  //       GSTIN: purchase?.billPurchaseDetails?.GSTIN,
-  //       Bill_Number: purchase?.billPurchaseDetails?.Bill_Number,
-  //       Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
-  //       State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
-  //       Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
-  //       Total_Received: "",
-  //       // Total_Received: purchase?.billPurchaseDetails?.Total_Received,
-  //       Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
-  //       Payment_Type: purchase?.billPurchaseDetails?.Payment_Type,
-  //       Reference_Number: purchase?.billPurchaseDetails?.Reference_Number,
-  //       splits: [
-  //       {
-  //         Payment_Type: purchase?.billPurchaseDetails?.Payment_Type || "Cash",
-  //         Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id || null,
-  //         Reference_Number: purchase?.billPurchaseDetails?.Reference_Number || "",
-  //         Amount: "",
-  //       },
-  //     ],
-  //       items: purchase?.items
-  //     })
-  //      setShowSplitBox(false);
-  //   }
-  // }, [purchase])
-
+  const emptyRow = () => ({
+    Item_Category: "",
+    Item_Name: "",
+    itemSearch: "",
+    Item_HSN: "",
+    Quantity: "",
+    Item_Unit: "",
+    Purchase_Price: "",
+    Discount_On_Purchase_Price: "",
+    Discount_Type_On_Purchase_Price: "Percentage",
+    Tax_Type: "None",
+    Tax_Amount: "",
+    Amount: "",
+    itemOpen: false,
+    CategoryOpen: false,
+    isHSNLocked: false,
+    isUnitLocked: false,
+    isExistingItem: false,
+  });
   useEffect(() => {
     if (purchase) {
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name);
-      const prefilledRows = purchase?.items?.map((item) => ({
-        ...item,
-        itemSearch: item.Item_Name,
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: false,
-        isUnitLocked: true,
-        isExistingItem: true,
-      }));
+      // const prefilledRows = purchase?.items?.map((item) => ({
+      //   ...item,
+      //   itemSearch: item.Item_Name,
+      //   itemOpen: false,
+      //   CategoryOpen: false,
+      //   isHSNLocked: false,
+      //   isUnitLocked: true,
+      //   isExistingItem: true,
+      // }));
+      const prefilledRows = purchase?.items?.length > 0
+        ? purchase.items.map((item) => ({
+          ...item,
+          itemSearch: item.Item_Name,
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: true,
+          isExistingItem: true,
+        }))
+        : [emptyRow()];
       setRows(prefilledRows);
 
       reset({
@@ -564,7 +510,7 @@ export default function PurchaseReturnAdd() {
                 Amount: "",
               },
             ],
-        items: purchase?.items,
+        items: prefilledRows,
       });
 
       // always start single-payment for a brand new return — there's no prior
@@ -647,71 +593,322 @@ export default function PurchaseReturnAdd() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
+  //   const onSubmit = async (data) => {
+  //     console.log("Form Data (from RHF):", data);
+
+  //     const payload = { ...data };
+
+  //     // ── validate items ──
+  //     // const seenItems = new Set();
+  //     // for (const item of payload.items) {
+  //     //   const name = item.Item_Name?.trim().toLowerCase();
+  //     //   const category = item.Item_Category?.trim().toLowerCase();
+  //     //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
+  //     //   const Quantity = item.Quantity;
+
+  //     //   if (!name || !category || !itemHSN || !Quantity) {
+  //     //     toast.error("Each item must have a valid name, category, HSN and quantity.");
+  //     //     return;
+  //     //   }
+
+  //     //   if (seenItems.has(name)) {
+  //     //     toast.error(
+  //     //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
+  //     //     );
+  //     //     return;
+  //     //   }
+  //     //   seenItems.add(name);
+  //     // }
+
+  //     // ── validate items ──
+  // for (const item of payload.items) {
+  //   const name = item.Item_Name?.trim();
+  //   const category = item.Item_Category?.trim();
+  //   const itemHSN = item.Item_HSN?.trim();
+  //   const quantity = Number(item.Quantity);
+
+  //   if (!name || !category || !itemHSN || quantity <= 0) {
+  //     toast.error("Each item must have a valid name, category, HSN and quantity.");
+  //     return;
+  //   }
+  // }
+
+  //     console.log("payload:", payload);
+
+  //     try {
+  //       const res = await createPurchaseReturn({
+  //         Purchase_Id: Purchase_Id,   // ← from useParams() or props
+  //         ...payload,                 // ← everything else (Party_Name, items, etc.)
+  //       }).unwrap();
+  //       //console.log("Created successfully:", res);
+
+  //       // invalidate so list refetches
+  //       dispatch(purchaseReturnApi.util.invalidateTags(["PurchaseReturn"]));
+  //       dispatch(itemApi.util.invalidateTags(["Item"]));
+  //       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+  //       dispatch(bankAccountApi.util.invalidateTags([
+  //         { type: "BankAccount", id: payload.Bank_Account_Id },
+  //         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
+  //       ]));
+  //       if (!res?.success) {
+  //         toast.error("Failed to add debit note");
+  //         return;
+  //       }
+
+  //       toast.success("Debit Note added  successfull!");
+
+  //       // ── navigate back based on where user came from ──
+  //       if (from === "purchase-return-list") {
+  //         navigate({
+  //           pathname: "/purchase/return",
+  //           search: location.search,
+  //         });
+  //       } else {
+  //         navigate({
+  //           pathname: "/purchase/return",
+  //           search: location.search,
+  //         });
+  //       }
+
+  //     } catch (error) {
+  //       const errorMessage =
+  //         error?.data?.message || error?.message || "Failed to add new debit note.";
+  //       toast.error(errorMessage);
+  //       //console.error("Submission failed", error);
+  //     }
+  //   };
+
+
+  // console.log("showGSTIN:", showGSTIN, purchase);
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
-    const payload = { ...data };
+    // =========================================================
+    // 1. ITEMS
+    //
+    // Do NOT remove blank item rows here.
+    //
+    // Backend decides:
+    //
+    // No Item_Name + Amount > 0
+    //     -> ERROR
+    //
+    // No Item_Name + Amount blank/0
+    //     -> SKIP
+    //
+    // Empty purchase return is allowed.
+    // =========================================================
 
-    // ── validate items ──
-    // const seenItems = new Set();
-    // for (const item of payload.items) {
-    //   const name = item.Item_Name?.trim().toLowerCase();
-    //   const category = item.Item_Category?.trim().toLowerCase();
-    //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
-    //   const Quantity = item.Quantity;
+    const itemsWithDefaults = (data.items || []).map((item) => ({
+      ...item,
 
-    //   if (!name || !category || !itemHSN || !Quantity) {
-    //     toast.error("Each item must have a valid name, category, HSN and quantity.");
-    //     return;
-    //   }
+      Tax_Type: item.Tax_Type || "None",
 
-    //   if (seenItems.has(name)) {
-    //     toast.error(
-    //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-    //     );
-    //     return;
-    //   }
-    //   seenItems.add(name);
+      Tax_Amount:
+        item.Tax_Amount === "" ||
+          item.Tax_Amount === null ||
+          item.Tax_Amount === undefined
+          ? 0
+          : Number(item.Tax_Amount),
+
+      Amount:
+        item.Amount === "" ||
+          item.Amount === null ||
+          item.Amount === undefined
+          ? 0
+          : Number(item.Amount),
+    }));
+
+    // =========================================================
+    // 2. TOTAL AMOUNT
+    // =========================================================
+
+    const totalAmount = Number(data.Total_Amount) || 0;
+
+    // =========================================================
+    // 3. NORMALIZE PAYMENT SPLITS
+    //
+    // Remove rows that don't have a valid payment method.
+    //
+    // Bank also needs Bank_Account_Id.
+    // =========================================================
+
+    const normalizedSplits = (data.splits || [])
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((split) => ({
+        ...split,
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    // =========================================================
+    // 4. FIRST VALID PAYMENT METHOD STAYS
+    //
+    // Cash  ₹0     -> KEEP if first
+    // HDFC  ₹0     -> DROP if second/middle/last
+    // SBI   ₹500   -> KEEP
+    //
+    // Example:
+    //
+    // Cash   ₹0      KEEP
+    // HDFC   ₹0      DROP
+    // SBI    ₹500    KEEP
+    //
+    // Result:
+    //
+    // Cash ₹0
+    // SBI  ₹500
+    // =========================================================
+
+    const validSplits = normalizedSplits.filter(
+      (split, index) => {
+        // First valid payment method always stays
+        if (index === 0) {
+          return true;
+        }
+
+        // Remaining methods need positive amount
+        return split.Amount > 0;
+      }
+    );
+
+    // =========================================================
+    // 5. TOTAL RECEIVED
+    //
+    // Never trust Total_Received from the form.
+    // Calculate it from surviving splits.
+    // =========================================================
+
+    const totalReceived = validSplits.reduce(
+      (sum, split) =>
+        sum + (Number(split.Amount) || 0),
+      0
+    );
+
+    // =========================================================
+    // 6. BALANCE DUE
+    // =========================================================
+
+    const balanceDue = totalAmount - totalReceived;
+
+    // =========================================================
+    // 7. OPTIONAL FRONTEND SAFETY CHECK
+    //
+    // Backend checks this again.
+    // =========================================================
+
+    // if (totalReceived > totalAmount) {
+    //   toast.error(
+    //     "Received amount should be less than or equal to Total Amount"
+    //   );
+
+    //   return;
     // }
 
-    // ── validate items ──
-for (const item of payload.items) {
-  const name = item.Item_Name?.trim();
-  const category = item.Item_Category?.trim();
-  const itemHSN = item.Item_HSN?.trim();
-  const quantity = Number(item.Quantity);
+    // =========================================================
+    // 8. BUILD PAYLOAD
+    // =========================================================
 
-  if (!name || !category || !itemHSN || quantity <= 0) {
-    toast.error("Each item must have a valid name, category, HSN and quantity.");
-    return;
-  }
-}
+    const payload = {
+      ...data,
 
-    console.log("payload:", payload);
+      items: itemsWithDefaults,
+
+      Total_Amount: totalAmount,
+
+      Total_Received: totalReceived,
+
+      Balance_Due: balanceDue,
+
+      splits: validSplits,
+    };
+
+    console.log(
+      "Final Purchase Return Payload:",
+      payload
+    );
+
+    // =========================================================
+    // 9. SUBMIT
+    // =========================================================
 
     try {
       const res = await createPurchaseReturn({
-        Purchase_Id: Purchase_Id,   // ← from useParams() or props
-        ...payload,                 // ← everything else (Party_Name, items, etc.)
+        Purchase_Id,
+        ...payload,
       }).unwrap();
-      //console.log("Created successfully:", res);
 
-      // invalidate so list refetches
-      dispatch(purchaseReturnApi.util.invalidateTags(["PurchaseReturn"]));
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
+      console.log(
+        "Purchase Return created:",
+        res
+      );
+
       if (!res?.success) {
-        toast.error("Failed to add debit note");
+        toast.error(
+          "Failed to add debit note"
+        );
+
         return;
       }
 
-      toast.success("Debit Note added  successfull!");
+      // =======================================================
+      // 10. INVALIDATE CACHE
+      // =======================================================
 
-      // ── navigate back based on where user came from ──
+      dispatch(
+        purchaseReturnApi.util.invalidateTags([
+          "PurchaseReturn",
+        ])
+      );
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+        ])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
+
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
+
+      dispatch(
+        partyApi.util.invalidateTags([
+          "Party",
+        ])
+      );
+
+      // =======================================================
+      // 11. SUCCESS
+      // =======================================================
+
+      toast.success(
+        "Debit Note added successfully!"
+      );
+
+      // =======================================================
+      // 12. NAVIGATION
+      // =======================================================
+
       if (from === "purchase-return-list") {
         navigate({
           pathname: "/purchase/return",
@@ -726,19 +923,22 @@ for (const item of payload.items) {
 
     } catch (error) {
       const errorMessage =
-        error?.data?.message || error?.message || "Failed to add new debit note.";
+        error?.data?.message ||
+        error?.message ||
+        "Failed to add new debit note.";
+
       toast.error(errorMessage);
-      //console.error("Submission failed", error);
+
+      console.error(
+        "Purchase Return submission failed:",
+        error
+      );
     }
   };
-
-
-  // console.log("showGSTIN:", showGSTIN, purchase);
-
   console.log("Current form values:", formValues);
-   
+
   console.log("Form errors:", errors);
-    const paymentType = watch("splits.0.Payment_Type");
+  const paymentType = watch("splits.0.Payment_Type");
   // const paymentType = watch("Payment_Type", "");
   return (
     <>
@@ -1000,7 +1200,7 @@ for (const item of payload.items) {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Return Number
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1021,7 +1221,7 @@ for (const item of payload.items) {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Bill Number
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1042,7 +1242,7 @@ for (const item of payload.items) {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Bill Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1062,7 +1262,7 @@ for (const item of payload.items) {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -1170,7 +1370,7 @@ for (const item of payload.items) {
                         </div>
                       </td>
 
-
+                      {/* 
                       <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
@@ -1303,6 +1503,84 @@ for (const item of payload.items) {
                           </div>
                         )}
 
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        />
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </td>
                       {/* Item Dropdown */}
                       <td style={{ padding: "0px", width: "18%", position: "relative" }}>
@@ -1335,7 +1613,7 @@ for (const item of payload.items) {
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
-                                  onBlur={() => {
+                            onBlur={() => {
                               setTimeout(() => {
                                 const typedValue = rows[i]?.itemSearch?.trim() || "";
                                 if (!typedValue) return;
@@ -1404,7 +1682,7 @@ for (const item of payload.items) {
                             <div
                               style={{ width: "40rem" }}
                               className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                           border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
@@ -1449,7 +1727,7 @@ for (const item of payload.items) {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                           handleRowChange(i, "itemOpen", false);
 
@@ -1459,7 +1737,7 @@ for (const item of payload.items) {
                                               ...itemsValues[i],
                                               Item_Name: it.Item_Name,
                                               Purchase_Price: it.Purchase_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 1,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
                                               Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
                                               Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
                                               Tax_Type: itemsValues[i]?.Tax_Type
@@ -1523,9 +1801,9 @@ for (const item of payload.items) {
                           maxLength={8}
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
                           onChange={(e) => {
-                                  e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              handleRowChange(i, "Item_HSN", e.target.value);
-                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
                             // if (!rows[i]?.isHSNLocked) {
                             //   handleRowChange(i, "Item_HSN", e.target.value);
                             //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
@@ -1554,9 +1832,9 @@ for (const item of payload.items) {
                           onChange={(e) => {
 
                             e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                            if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                              return;
-                            }
+                            // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                            //   return;
+                            // }
                             // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
                             //   ...itemsValues[i],
                             //   Quantity: e.target.value,
@@ -1585,38 +1863,7 @@ for (const item of payload.items) {
                         )}
                       </td>
 
-                      {/* Unit */}
-                      {/* <td style={{ padding: "0px" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Item_Unit`}
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select "
-                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      handleRowChange(i, "Item_Unit", value);
-                                      setValue(`items.${i}.Item_Unit`, value);
-                                    }}
-                                  >
-                                    <option value="">Select</option>
-                                    {Object.entries(itemUnits).map(([key, value]) => (
-                                      <option key={key} value={key}>
-                                        {`${value} (${key})`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              />
-                              {errors?.items?.[i]?.Item_Unit && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_Unit.message}
-                                </p>
-                              )}
-                            </td> */}
+                    
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
@@ -1666,60 +1913,7 @@ for (const item of payload.items) {
                       </td>
 
 
-                      {/* Price/Unit */}
-                      {/* <td style={{ padding: "0px",width: "6%" }}>
-                              <div className="d-flex align-items-center">
-                                <input
-                                  type="text"
-                                  className="form-control"
-                                  style={{ width: "100%", marginBottom: "0px" }}
-                                  {...register(`items.${i}.Purchase_Price`)}
-                                  onChange={(e) => {
-                                    let val = e.target.value;
-
-                                    // ✅ allow digits and one dot
-                                    val = val.replace(/[^0-9.]/g, "");
-
-                                    // ✅ if more than one dot, keep only the first
-                                    const parts = val.split(".");
-                                    if (parts.length > 2) {
-                                      val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                                    }
-
-                                    // ✅ limit to 2 decimal places
-                                    if (val.includes(".")) {
-                                      const [int, dec] = val.split(".");
-                                      val = int + "." + dec.slice(0, 2);
-                                    }
-
-                                    e.target.value = val;
-                                       setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
-                                    if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                      return;
-                                    }
-
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Purchase_Price: val },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
-                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                                  }}
-
-                                  placeholder="Price"
-                                />
-
-                              </div>
-                                                     {errors?.items?.[i]?.Purchase_Price && (
-          <p className="text-red-500 text-xs mt-1">
-            {errors.items[i].Purchase_Price.message}
-          </p>
-        )}
-                            </td> */}
+                     
                       {/* Price/Unit */}
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
@@ -1749,9 +1943,9 @@ for (const item of payload.items) {
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
                               //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
-                              if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                return;
-                              }
+                              // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                              //   return;
+                              // }
 
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
@@ -2079,16 +2273,16 @@ for (const item of payload.items) {
                           </div>
                         )} */}
                         {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                    <div className="mt-3 flex flex-col">
-                      <label className="text-sm">Reference Number</label>
-                      <input
-                        type="text"
-                        //readOnly={isView}
-                        style={{ width: "80%" ,marginBottom:"0px"}}
-                        {...register("splits.0.Reference_Number")}
-                      />
-                    </div>
-                  )}
+                          <div className="mt-3 flex flex-col">
+                            <label className="text-sm">Reference Number</label>
+                            <input
+                              type="text"
+                              //readOnly={isView}
+                              style={{ width: "80%", marginBottom: "0px" }}
+                              {...register("splits.0.Reference_Number")}
+                            />
+                          </div>
+                        )}
 
                         <button
                           type="button"
@@ -2151,7 +2345,7 @@ for (const item of payload.items) {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`); 
+                                      clearErrors(`splits.${index}.Amount`);
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -2175,7 +2369,7 @@ for (const item of payload.items) {
                                 <input
                                   type="text"
                                   placeholder="Reference Number"
-                                  style={{width:"80%"}}
+                                  style={{ width: "80%" }}
                                   // className="border rounded-md px-2 py-1.5 w-full"
                                   {...register(`splits.${index}.Reference_Number`)}
                                 />
@@ -2288,9 +2482,9 @@ for (const item of payload.items) {
 
 
 
-                   <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                       <div className="flex items-center gap-2 relative">
+                        <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
