@@ -51,11 +51,16 @@ const priceStringDigits = z
   .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
  const saleSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"),
-  Phone_Number: z
+ Phone_Number: z
   .string()
   .trim()
-  .optional()
-  .or(z.literal("")),
+  .refine(
+    (value) => value === "" || /^\d{10}$/.test(value),
+    {
+      message: "Phone number must be exactly 10 digits",
+    }
+  )
+  .optional(),
   Billing_Address: z
   .string()
   .trim()

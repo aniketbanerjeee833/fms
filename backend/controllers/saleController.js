@@ -8,27 +8,27 @@ import ExcelJS from "exceljs";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
-import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
+import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 // import puppeteer from "puppeteer";
 //import pdf from "html-pdf-node";
-    const TAX_TYPES = {
-        "GST0": "GST 0%",
-        "GST0.25": "GST 0.25%",
-        "GST3": "GST 3%",
-        GST5: "GST 5%",
-        GST12: "GST 12%",
-        GST18: "GST 18%",
-        GST28: "GST 28%",
-        GST40: "GST 40%",
-        "IGST0": "IGST 0%",
-        "IGST0.25": "IGST 0.25%",
-        "IGST3": "IGST 3%",
-        IGST5: "IGST 5%",
-        IGST12: "IGST 12%",
-        IGST18: "IGST 18%",
-        IGST28: "IGST 28%",
-        IGST40: "IGST 40%"
-    }
+const TAX_TYPES = {
+  "GST0": "GST 0%",
+  "GST0.25": "GST 0.25%",
+  "GST3": "GST 3%",
+  GST5: "GST 5%",
+  GST12: "GST 12%",
+  GST18: "GST 18%",
+  GST28: "GST 28%",
+  GST40: "GST 40%",
+  "IGST0": "IGST 0%",
+  "IGST0.25": "IGST 0.25%",
+  "IGST3": "IGST 3%",
+  IGST5: "IGST 5%",
+  IGST12: "IGST 12%",
+  IGST18: "IGST 18%",
+  IGST28: "IGST 28%",
+  IGST40: "IGST 40%"
+}
 const cleanValue = (value) => {
   if (value === undefined || value === null || value === "" || value === " ") {
     return null; // store as NULL in DB
@@ -266,7 +266,7 @@ const normalizeNumber = (val) =>
 //   balanceDue: balanceDue,
 // });
 
-   
+
 //   for (const item of items) {
 //   const {
 //     Item_Name,
@@ -453,7 +453,8 @@ const addSale = async (req, res, next) => {
 
     const {
       Party_Name,
-       Phone_Number,
+      Phone_Number,
+      Billing_Address,
       GSTIN,
       Invoice_Number,
       Invoice_Date,
@@ -488,47 +489,47 @@ const addSale = async (req, res, next) => {
     //
     // This is intentionally different from Purchase.
     // =========================================================
-let validSplits = [];
+    let validSplits = [];
 
-if (totalAmount > 0) {
-  const normalizedSplits = (splits || [])
-    .filter((split) => {
-      // Must have payment type
-      if (!split.Payment_Type) {
-        return false;
-      }
+    if (totalAmount > 0) {
+      const normalizedSplits = (splits || [])
+        .filter((split) => {
+          // Must have payment type
+          if (!split.Payment_Type) {
+            return false;
+          }
 
-      // Bank must have selected bank account
-      if (
-        split.Payment_Type === "Bank" &&
-        !split.Bank_Account_Id
-      ) {
-        return false;
-      }
+          // Bank must have selected bank account
+          if (
+            split.Payment_Type === "Bank" &&
+            !split.Bank_Account_Id
+          ) {
+            return false;
+          }
 
-      return true;
-    })
-    .map((split) => ({
-      ...split,
-      Amount: Number(split.Amount) || 0,
-    }));
+          return true;
+        })
+        .map((split) => ({
+          ...split,
+          Amount: Number(split.Amount) || 0,
+        }));
 
 
-  validSplits = normalizedSplits.filter(
-    (split, index) => {
+      validSplits = normalizedSplits.filter(
+        (split, index) => {
 
-      // FIRST valid payment method:
-      // always preserve, even ₹0
-      if (index === 0) {
-        return true;
-      }
+          // FIRST valid payment method:
+          // always preserve, even ₹0
+          if (index === 0) {
+            return true;
+          }
 
-      // Every payment after first:
-      // only preserve positive amount
-      return split.Amount > 0;
+          // Every payment after first:
+          // only preserve positive amount
+          return split.Amount > 0;
+        }
+      );
     }
-  );
-}
 
     // =========================================================
     // 4. TOTAL RECEIVED
@@ -580,24 +581,101 @@ if (totalAmount > 0) {
     // 7. FIND PARTY
     // =========================================================
 
+    // const [partyRows] = await connection.execute(
+    //   `SELECT Party_Id, GSTIN
+    //    FROM add_party
+    //    WHERE Party_Name = ?
+    //    LIMIT 1`,
+    //   [Party_Name]
+    // );
+
+    // if (partyRows.length === 0) {
+    //   await connection.rollback();
+
+    //   return res.status(404).json({
+    //     success: false,
+    //     message: "Party not found.",
+    //   });
+    // }
+
+    // const Party_Id = partyRows[0].Party_Id;
+    // =========================================================
+    // 7. FIND PARTY / AUTO-CREATE NEW PARTY
+    // =========================================================
+
+    // =========================================================
+    // 7. FIND PARTY / AUTO-CREATE NEW PARTY
+    // =========================================================
+
     const [partyRows] = await connection.execute(
-      `SELECT Party_Id, GSTIN
-       FROM add_party
-       WHERE Party_Name = ?
-       LIMIT 1`,
+      `SELECT * FROM add_party WHERE TRIM(Party_Name) = TRIM(?) LIMIT 1`,
       [Party_Name]
     );
 
+    let Party_Id;
+
     if (partyRows.length === 0) {
-      await connection.rollback();
+      // ── A. CREATE NEW PARTY ──
+      const [partyResult] = await connection.execute(
+        `INSERT INTO add_party
+     (Party_Name, Phone_Number, GSTIN, created_at, updated_at)
+     VALUES (?, ?, ?, NOW(), NOW())`,
+        [Party_Name.trim(), cleanValue(Phone_Number), cleanValue(GSTIN)]
+      );
 
-      return res.status(404).json({
-        success: false,
-        message: "Party not found.",
-      });
+      const partyIdNumber = partyResult.insertId;
+      Party_Id = "PTY" + partyIdNumber.toString().padStart(3, "0");
+
+      await connection.execute(
+        `UPDATE add_party SET Party_Id = ? WHERE id = ?`,
+        [Party_Id, partyIdNumber]
+      );
+
+      // ── B. DEFAULT BILLING ADDRESS (only if provided) ──
+      if (Billing_Address?.trim()) {
+        await connection.execute(
+          `INSERT INTO add_party_addresses
+       (Party_Id, Address_Type, Address_Text, Is_Default, created_at, updated_at)
+       VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+          [Party_Id, Billing_Address.trim()]
+        );
+      }
+
+    } else {
+      // ── EXISTING PARTY ──
+      Party_Id = partyRows[0].Party_Id;
+      const existingParty = partyRows[0];
+
+      // 🔹 update phone if it was blank and user provided one now
+      if (!existingParty.Phone_Number && Phone_Number?.trim()) {
+        await connection.execute(
+          `UPDATE add_party
+       SET Phone_Number = ?, updated_at = NOW()
+       WHERE Party_Id = ?`,
+          [Phone_Number.trim(), Party_Id]
+        );
+      }
+
+      // 🔹 if no billing address exists at all for this party, add the one from this sale
+      if (Billing_Address?.trim()) {
+        const [[{ addrCount }]] = await connection.query(
+          `SELECT COUNT(*) AS addrCount
+       FROM add_party_addresses
+       WHERE Party_Id = ? AND Address_Type = 'Billing'`,
+          [Party_Id]
+        );
+        if (addrCount === 0) {
+          await connection.execute(
+            `INSERT INTO add_party_addresses
+         (Party_Id, Address_Type, Address_Text, Is_Default, created_at, updated_at)
+         VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+            [Party_Id, Billing_Address.trim()]
+          );
+        }
+        // if addresses already exist, don't touch them —
+        // user manages addresses explicitly through the party edit screen
+      }
     }
-
-    const Party_Id = partyRows[0].Party_Id;
 
     // =========================================================
     // 8. ACTIVE FINANCIAL YEAR
@@ -843,10 +921,10 @@ if (totalAmount > 0) {
             normalizeNumber(Quantity) ?? 0,
 
             cleanValue(Item_HSN) ||
-              itemRows[0].Item_HSN,
+            itemRows[0].Item_HSN,
 
-            Item_Category ||itemRows[0].Item_Category ||
-              "",
+            Item_Category || itemRows[0].Item_Category ||
+            "",
 
             Item_Id,
           ]
@@ -961,7 +1039,8 @@ if (totalAmount > 0) {
 
   } finally {
 
-    if (connection) {connection.release();
+    if (connection) {
+      connection.release();
     }
   }
 };
@@ -1006,7 +1085,7 @@ const addNewSale = async (req, res, next) => {
     //   Reference_Number,
     //   items,
     // } = req.body;
-    
+
     if (
       !Party_Name ||
       !Invoice_Number ||
@@ -1020,44 +1099,44 @@ const addNewSale = async (req, res, next) => {
         message: "Star marked fields missing or items empty",
       });
     }
-//     const itemNameSet = new Set();
-//     for (const item of items) {
-//   const itemName = item.Item_Name?.trim().toLowerCase();
+    //     const itemNameSet = new Set();
+    //     for (const item of items) {
+    //   const itemName = item.Item_Name?.trim().toLowerCase();
 
-//   if (!itemName) {
-//     await connection.rollback();
-//     return res.status(400).json({ message: "Item name missing." });
-//   }
+    //   if (!itemName) {
+    //     await connection.rollback();
+    //     return res.status(400).json({ message: "Item name missing." });
+    //   }
 
-//   if (itemNameSet.has(itemName)) {
-//     await connection.rollback();
-//     return res.status(400).json({
-//       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-//     });
-//   }
+    //   if (itemNameSet.has(itemName)) {
+    //     await connection.rollback();
+    //     return res.status(400).json({
+    //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
+    //     });
+    //   }
 
-//   itemNameSet.add(itemName);
-// }
-const itemNameSet = new Set();
+    //   itemNameSet.add(itemName);
+    // }
+    const itemNameSet = new Set();
 
-for (const item of items) {
-  const itemName = item.Item_Name?.trim().toLowerCase();
+    for (const item of items) {
+      const itemName = item.Item_Name?.trim().toLowerCase();
 
-  if (!itemName) {
-    await connection.rollback();
-    return res.status(400).json({ message: "Item name missing." });
-  }
+      if (!itemName) {
+        await connection.rollback();
+        return res.status(400).json({ message: "Item name missing." });
+      }
 
-  if (itemNameSet.has(itemName)) {
-    await connection.rollback();
-    return res.status(400).json({
-      message: `Duplicate item detected: '${item.Item_Name}'`,
-    });
-  }
+      if (itemNameSet.has(itemName)) {
+        await connection.rollback();
+        return res.status(400).json({
+          message: `Duplicate item detected: '${item.Item_Name}'`,
+        });
+      }
 
-  itemNameSet.add(itemName);
-}
-   
+      itemNameSet.add(itemName);
+    }
+
     // 2️⃣ Validate unique invoice number
     const [existingInvoice] = await connection.query(
       "SELECT Invoice_Number FROM add_new_sale WHERE Invoice_Number = ? LIMIT 1",
@@ -1085,24 +1164,24 @@ for (const item of items) {
     const [lastSale] = await connection.query(
       "SELECT Sale_Id FROM  add_new_sale ORDER BY id DESC LIMIT 1"
     );
-      // let newSaleId = "SAL001";
-      // if (lastSale.length > 0) {
-      //   const num = parseInt(lastSale[0].Sale_Id.replace("SAL", "")) + 1;
-      //   newSaleId = "SAL" + num.toString().padStart(3, "0");
-      // }
+    // let newSaleId = "SAL001";
+    // if (lastSale.length > 0) {
+    //   const num = parseInt(lastSale[0].Sale_Id.replace("SAL", "")) + 1;
+    //   newSaleId = "SAL" + num.toString().padStart(3, "0");
+    // }
 
-  let nextSaleNum = 1;
+    let nextSaleNum = 1;
     // if (lastHotel.length > 0) {
     //   nextHotelNum = Number(lastHotel[0].hotel_id.replace(/\D/g, "")) + 1;
     // }
-     if (lastSale.length > 0) {
-        // const num = parseInt(lastSale[0].Sale_Id.replace("SAL", "")) + 1;
-        // newSaleId = "SAL" + num.toString().padStart(3, "0");
-        nextSaleNum = parseInt(lastSale[0].Sale_Id.replace(/\D/g, "")) + 1;
-      }
+    if (lastSale.length > 0) {
+      // const num = parseInt(lastSale[0].Sale_Id.replace("SAL", "")) + 1;
+      // newSaleId = "SAL" + num.toString().padStart(3, "0");
+      nextSaleNum = parseInt(lastSale[0].Sale_Id.replace(/\D/g, "")) + 1;
+    }
     const newSaleId = "SALS" + nextSaleNum.toString().padStart(4, "0");
 
-     const [fy] = await connection.query(
+    const [fy] = await connection.query(
       `SELECT Financial_Year 
        FROM financial_year 
        WHERE Current_Financial_Year = 1
@@ -1119,15 +1198,15 @@ for (const item of items) {
     const activeFY = fy[0].Financial_Year; // Example: "2025-2026"
     // 5️⃣ Insert into add_sale
     const totalAmount = Number(Total_Amount) || 0;
-const totalReceived =
-  Total_Received === "" || Total_Received === undefined
-    ? 0
-    : Number(Total_Received);
+    const totalReceived =
+      Total_Received === "" || Total_Received === undefined
+        ? 0
+        : Number(Total_Received);
 
-const balanceDue =
-  Balance_Due === "" || Balance_Due === undefined
-    ? totalAmount - totalReceived
-    : Number(Balance_Due);
+    const balanceDue =
+      Balance_Due === "" || Balance_Due === undefined
+        ? totalAmount - totalReceived
+        : Number(Balance_Due);
     await connection.query(
       `INSERT INTO add_new_sale
        (Party_Id, Sale_Id, Invoice_Number, Invoice_Date,financial_year, State_Of_Supply,
@@ -1150,10 +1229,10 @@ const balanceDue =
     );
 
 
-const [maxRow] = await connection.query(
-  "SELECT MAX(CAST(SUBSTRING(Sale_Items_Id, 5) AS UNSIGNED)) AS maxNum FROM add_new_sale_items"
-);
-let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
+    const [maxRow] = await connection.query(
+      "SELECT MAX(CAST(SUBSTRING(Sale_Items_Id, 5) AS UNSIGNED)) AS maxNum FROM add_new_sale_items"
+    );
+    let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
 
     // 7️⃣ Insert each sale item
     for (const item of items) {
@@ -1171,7 +1250,7 @@ let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
         Tax_Amount,
         Amount,
       } = item;
-   
+
       let Item_Id;
       // Ensure item exists
       const [itemRows] = await connection.query(
@@ -1179,7 +1258,7 @@ let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
         [Item_Name]
       );
       if (itemRows.length === 0) {
-       const [lastItem] = await connection.query(
+        const [lastItem] = await connection.query(
           "SELECT Item_Id FROM add_item_sale ORDER BY id DESC LIMIT 1"
         );
 
@@ -1201,7 +1280,7 @@ let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
             Item_Unit || "",
             cleanValue(Item_Image),
             Item_Category || ""
-            
+
           ]
         );
 
@@ -1226,12 +1305,12 @@ let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
           `UPDATE add_item_sale
            SET  updated_at = NOW()
            WHERE Item_Id = ?`,
-          [ Item_Id]
+          [Item_Id]
         );
       }
 
-   
- 
+
+
       // // Generate new sale item id safely
       const newSaleItemId = "SITS" + nextSaleItemNum.toString().padStart(4, "0");
       nextSaleItemNum++;
@@ -1270,9 +1349,9 @@ let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
     if (connection) await connection.rollback();
     console.error("❌ Error adding sale:", err);
     return res.status(500).json({
-  success: false,
-  message: err.message || "Something went wrong",
-});
+      success: false,
+      message: err.message || "Something went wrong",
+    });
     // return res.status(500).json({
     //   success: false,
     //   message: "Duplicate entry detected. Please use unique values.",
@@ -1283,12 +1362,12 @@ let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
   }
 };
 const addInvoice = async (req, res, next) => {
- 
-let connection;
+
+  let connection;
   try {
- const { Invoice_Name } = req.body;
- connection = await db.getConnection();
- await connection.beginTransaction();
+    const { Invoice_Name } = req.body;
+    connection = await db.getConnection();
+    await connection.beginTransaction();
     const newInvoice = await db.execute(
       `INSERT INTO add_invoice (Invoice_Name, created_at, updated_at) VALUES (?, NOW(), NOW())`,
       [Invoice_Name]
@@ -1304,12 +1383,12 @@ let connection;
     )
   }
   catch (err) {
-    if(connection) await connection.rollback();
+    if (connection) await connection.rollback();
     console.error("❌ Error adding invoice:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
-   if (connection) connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 }
 const updateInvoice = async (req, res, next) => {
@@ -1317,7 +1396,7 @@ const updateInvoice = async (req, res, next) => {
 
 
   try {
-      const { Invoice_Name, id } = req.body;
+    const { Invoice_Name, id } = req.body;
     connection = await db.getConnection();
     await connection.beginTransaction();
     const newInvoice = await db.execute(
@@ -1325,7 +1404,7 @@ const updateInvoice = async (req, res, next) => {
       [Invoice_Name, id]
     );
 
-      await connection.commit();
+    await connection.commit();
     return res.status(201).json(
       {
         success: true,
@@ -1334,12 +1413,12 @@ const updateInvoice = async (req, res, next) => {
       }
     )
   } catch (err) {
-    if(connection) await connection.rollback();
+    if (connection) await connection.rollback();
     console.error("❌ Error updating invoice:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
- if (connection) connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 }
 const getSingleInvoice = async (req, res, next) => {
@@ -1363,26 +1442,26 @@ const getSingleInvoice = async (req, res, next) => {
       invoice: rows[0],
     });
   } catch (err) {
-    if(connection)  connection.release();
+    if (connection) connection.release();
     console.error("❌ Error getting invoice:", err);
     next(err);
     //return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
-    if(connection)  connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 };
 const addNewSaleInvoice = async (req, res, next) => {
-  
-let connection;
+
+  let connection;
   try {
-const { Invoice_Name } = req.body;
-connection = await db.getConnection();
-await connection.beginTransaction();
+    const { Invoice_Name } = req.body;
+    connection = await db.getConnection();
+    await connection.beginTransaction();
     const newInvoice = await db.execute(
       `INSERT INTO add_new_sale_invoice (Invoice_Name, created_at, updated_at) VALUES (?, NOW(), NOW())`,
       [Invoice_Name]
     );
-await connection.commit();
+    await connection.commit();
     return res.status(201).json(
       {
         success: true,
@@ -1392,26 +1471,26 @@ await connection.commit();
     )
   }
   catch (err) {
-    if(connection) await connection.rollback();
+    if (connection) await connection.rollback();
     console.error("❌ Error adding invoice:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+  } finally {
     if (connection) connection.release();
   }
 }
 const updateNewSaleInvoice = async (req, res, next) => {
-  
-let connection;
+
+  let connection;
   try {
-const { Invoice_Name, id } = req.body;
-connection = await db.getConnection();
-await connection.beginTransaction();
+    const { Invoice_Name, id } = req.body;
+    connection = await db.getConnection();
+    await connection.beginTransaction();
     const newInvoice = await db.execute(
       `UPDATE add_new_sale_invoice SET Invoice_Name=? WHERE id=?`,
       [Invoice_Name, id]
     );
-await connection.commit();
+    await connection.commit();
     return res.status(201).json(
       {
         success: true,
@@ -1420,11 +1499,11 @@ await connection.commit();
       }
     )
   } catch (err) {
-    if(connection) await connection.rollback();
+    if (connection) await connection.rollback();
     console.error("❌ Error updating invoice:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+  } finally {
     if (connection) connection.release();
   }
 }
@@ -1449,12 +1528,12 @@ const getSingleNewSaleInvoice = async (req, res, next) => {
       invoice: rows[0],
     });
   } catch (err) {
-    if(connection)  connection.release();
+    if (connection) connection.release();
     console.error("❌ Error getting invoice:", err);
     next(err);
     //return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
-    if(connection)  connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 };
 // const getAllSales = async (req, res, next) => {
@@ -1487,7 +1566,7 @@ const getSingleNewSaleInvoice = async (req, res, next) => {
 //       params.push(like, like, like, like, like);
 //     }
 
- 
+
 // if (fromDate && toDate) {
 //   whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
 //   params.push(
@@ -1520,7 +1599,7 @@ const getSingleNewSaleInvoice = async (req, res, next) => {
 //     `;
 //     // const query = `
 //     //   SELECT s.*, a.Party_Name
-      
+
 //     //   FROM add_sale s
 //     //   LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
 //     //   ${whereSQL}
@@ -1531,7 +1610,7 @@ const getSingleNewSaleInvoice = async (req, res, next) => {
 
 //     const [rows] = await db.query(query, params);
 
-    
+
 //     const [count] = await db.query(
 //       `
 //       SELECT COUNT(*) AS total
@@ -1584,16 +1663,16 @@ const getAllSales = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
-    const page   = parseInt(req.query.page, 10) || 1;
-    const limit  = 10;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = 10;
     const offset = (page - 1) * limit;
 
-    const search   = req.query.search?.trim().toLowerCase() || "";
+    const search = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
+    const toDate = req.query.toDate || null;
 
     const whereClauses = [];
-    const params       = [];
+    const params = [];
 
     // if (search) {
     //   whereClauses.push(`(
@@ -1604,7 +1683,7 @@ const getAllSales = async (req, res, next) => {
     //   const like = `%${search}%`;
     //   params.push(like, like, like);
     // }
- if (search) {
+    if (search) {
       whereClauses.push(`(
         a.Party_Name      LIKE ? OR
         CAST(s.Total_Amount AS CHAR) LIKE ? OR
@@ -1678,9 +1757,9 @@ const getAllSales = async (req, res, next) => {
 
     return res.status(200).json({
       currentPage: page,
-      totalPages:  Math.ceil(total / limit),
-      totalSales:  total,
-      sales:       rows,
+      totalPages: Math.ceil(total / limit),
+      totalSales: total,
+      sales: rows,
       totals,
     });
   } catch (err) {
@@ -1696,12 +1775,12 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
-    const search   = req.query.search   ? req.query.search.trim().toLowerCase() : "";
+    const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
     const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
+    const toDate = req.query.toDate || null;
 
     const whereClauses = [];
-    const params       = [];
+    const params = [];
 
     if (search) {
       whereClauses.push(`
@@ -1750,47 +1829,47 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
     /* ════════════════════════════════════════════════════════
        BUILD WORKBOOK
     ════════════════════════════════════════════════════════ */
-    const workbook  = new ExcelJS.Workbook();
-    const sheet     = workbook.addWorksheet("Sale Report");
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Sale Report");
     const itemSheet = workbook.addWorksheet("Item Details");
 
     /* ── palette — pure black & white, no color fills ── */
-    const WHITE     = "FFFFFFFF";
-    const BLACK     = "FF000000";
+    const WHITE = "FFFFFFFF";
+    const BLACK = "FF000000";
     const STAMP_CLR = "FF595959";
 
     /* ── 8 columns ── */
     sheet.columns = [
-      { key: "date",       width: 14 },   // A
-      { key: "invoice",    width: 18 },   // B
-      { key: "party",      width: 34 },   // C
-      { key: "gstin",      width: 22 },   // D
-      { key: "amount",     width: 16 },   // E  Total Amount
-      { key: "payment",    width: 14 },   // F  Payment Type
-      { key: "received",   width: 20 },   // G  Received/Paid
-      { key: "balance",    width: 16 },   // H  Balance Due
+      { key: "date", width: 14 },   // A
+      { key: "invoice", width: 18 },   // B
+      { key: "party", width: 34 },   // C
+      { key: "gstin", width: 22 },   // D
+      { key: "amount", width: 16 },   // E  Total Amount
+      { key: "payment", width: 14 },   // F  Payment Type
+      { key: "received", width: 20 },   // G  Received/Paid
+      { key: "balance", width: 16 },   // H  Balance Due
     ];
 
-    const LAST_COL   = "H";
+    const LAST_COL = "H";
     const TOTAL_COLS = 8;
 
     /* ─── ROW 1 : report title ─── */
     sheet.mergeCells(`A1:${LAST_COL}1`);
-    const titleCell     = sheet.getCell("A1");
-    titleCell.value     = "SALES REPORT";
-    titleCell.font      = { name: "Calibri", bold: true, size: 14, color: { argb: BLACK } };
+    const titleCell = sheet.getCell("A1");
+    titleCell.value = "SALES REPORT";
+    titleCell.font = { name: "Calibri", bold: true, size: 14, color: { argb: BLACK } };
     titleCell.alignment = { horizontal: "center", vertical: "middle" };
     sheet.getRow(1).height = 28;
 
     /* ─── ROW 2 : generated-on stamp ─── */
     sheet.mergeCells(`A2:${LAST_COL}2`);
-    const generatedOn   = new Date().toLocaleString("en-IN", {
+    const generatedOn = new Date().toLocaleString("en-IN", {
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: true,
     });
-    const stampCell     = sheet.getCell("A2");
-    stampCell.value     = `Generated on ${generatedOn}`;
-    stampCell.font      = { name: "Calibri", size: 10, italic: true, color: { argb: STAMP_CLR } };
+    const stampCell = sheet.getCell("A2");
+    stampCell.value = `Generated on ${generatedOn}`;
+    stampCell.font = { name: "Calibri", size: 10, italic: true, color: { argb: STAMP_CLR } };
     stampCell.alignment = { horizontal: "left", vertical: "middle" };
     sheet.getRow(2).height = 18;
 
@@ -1806,13 +1885,13 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
 
     const headerRow = sheet.addRow(HEADERS);
     headerRow.eachCell((cell) => {
-      cell.font      = { name: "Calibri", bold: true, size: 10, color: { argb: BLACK } };
+      cell.font = { name: "Calibri", bold: true, size: 10, color: { argb: BLACK } };
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-      cell.border    = {
-        top:    { style: "thin", color: { argb: BLACK } },
-        left:   { style: "thin", color: { argb: BLACK } },
+      cell.border = {
+        top: { style: "thin", color: { argb: BLACK } },
+        left: { style: "thin", color: { argb: BLACK } },
         bottom: { style: "thin", color: { argb: BLACK } },
-        right:  { style: "thin", color: { argb: BLACK } },
+        right: { style: "thin", color: { argb: BLACK } },
       };
     });
     sheet.getRow(headerRow.number).height = 22;
@@ -1823,31 +1902,31 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
       const dataRow = sheet.addRow([
         sale.Invoice_Date
           ? new Date(sale.Invoice_Date).toLocaleDateString("en-IN", {
-              day: "2-digit", month: "2-digit", year: "numeric",
-            })
+            day: "2-digit", month: "2-digit", year: "numeric",
+          })
           : "N/A",
-        sale.Invoice_Number      || "N/A",
-        sale.Party_Name   || "N/A",
-        sale.GSTIN        || "",
-        Number(sale.Total_Amount   || 0),
+        sale.Invoice_Number || "N/A",
+        sale.Party_Name || "N/A",
+        sale.GSTIN || "",
+        Number(sale.Total_Amount || 0),
         sale.Payment_Type || "N/A",
         Number(sale.Total_Received || 0),
-        Number(sale.Balance_Due    || 0),
+        Number(sale.Balance_Due || 0),
       ]);
 
       dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        cell.font      = { name: "Calibri", size: 10, color: { argb: BLACK } };
+        cell.font = { name: "Calibri", size: 10, color: { argb: BLACK } };
         cell.alignment = { vertical: "middle" };
-        cell.border    = {
-          top:    { style: "hair", color: { argb: BLACK } },
-          left:   { style: "hair", color: { argb: BLACK } },
+        cell.border = {
+          top: { style: "hair", color: { argb: BLACK } },
+          left: { style: "hair", color: { argb: BLACK } },
           bottom: { style: "hair", color: { argb: BLACK } },
-          right:  { style: "hair", color: { argb: BLACK } },
+          right: { style: "hair", color: { argb: BLACK } },
         };
 
         /* numeric columns: E(5) G(7) H(8) */
         if (colNumber === 5 || colNumber === 7 || colNumber === 8) {
-          cell.numFmt    = "₹#,##0.00";
+          cell.numFmt = "₹#,##0.00";
           cell.alignment = { horizontal: "right", vertical: "middle" };
         }
 
@@ -1872,13 +1951,13 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
     ]);
 
     totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      cell.font      = { name: "Calibri", bold: true, size: 11, color: { argb: BLACK } };
+      cell.font = { name: "Calibri", bold: true, size: 11, color: { argb: BLACK } };
       cell.alignment = { horizontal: "right", vertical: "middle" };
-      cell.border    = {
-        top:    { style: "medium", color: { argb: BLACK } },
-        left:   { style: "thin",   color: { argb: BLACK } },
+      cell.border = {
+        top: { style: "medium", color: { argb: BLACK } },
+        left: { style: "thin", color: { argb: BLACK } },
         bottom: { style: "medium", color: { argb: BLACK } },
-        right:  { style: "thin",   color: { argb: BLACK } },
+        right: { style: "thin", color: { argb: BLACK } },
       };
       if (colNumber === 5 || colNumber === 7 || colNumber === 8) {
         cell.numFmt = "₹#,##0.00";
@@ -1960,19 +2039,19 @@ const getAllNewSales = async (req, res, next) => {
     //   whereClauses.push("DATE(s.created_at) <= ?");
     //   params.push(toDate);
     // }
-if (fromDate && toDate) {
-  whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
-  params.push(
-    `${fromDate} 00:00:00`,
-    `${toDate} 23:59:59`
-  );
-} else if (fromDate) {
-  whereClauses.push(`s.Invoice_Date >= ?`);
-  params.push(`${fromDate} 00:00:00`);
-} else if (toDate) {
-  whereClauses.push(`s.Invoice_Date <= ?`);
-  params.push(`${toDate} 23:59:59`);
-}
+    if (fromDate && toDate) {
+      whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
+      params.push(
+        `${fromDate} 00:00:00`,
+        `${toDate} 23:59:59`
+      );
+    } else if (fromDate) {
+      whereClauses.push(`s.Invoice_Date >= ?`);
+      params.push(`${fromDate} 00:00:00`);
+    } else if (toDate) {
+      whereClauses.push(`s.Invoice_Date <= ?`);
+      params.push(`${toDate} 23:59:59`);
+    }
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     // 🧠 Main Paginated Query
@@ -2021,12 +2100,12 @@ if (fromDate && toDate) {
 
     //return res.status(200).json(rows);
   } catch (err) {
-    if(connection)  connection.release();
+    if (connection) connection.release();
     console.error("❌ Error fetching purchases:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
-    if(connection)  connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 };
 const getSingleSale = async (req, res, next) => {
@@ -2044,13 +2123,13 @@ const getSingleSale = async (req, res, next) => {
     // const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
     // const itemTable     = isSaleForItemSale ? "add_item_sale"      : "add_item";
 
-      const salesTable    = isSaleForItemSale ? "add_sale"       : "add_sale";
+    const salesTable = isSaleForItemSale ? "add_sale" : "add_sale";
     const saleItemTable = isSaleForItemSale ? "add_sale_items" : "add_sale_items";
-    const itemTable     = isSaleForItemSale ? "add_item"      : "add_item";
+    const itemTable = isSaleForItemSale ? "add_item" : "add_item";
 
     const [saleData] = await connection.query(
       `SELECT s.id,
-         s.Sale_Id,  s.Phone_Number, s.Invoice_Number, s.Invoice_Date, 
+         s.Sale_Id,  s.Phone_Number, s.Billing_Address, s.Invoice_Number, s.Invoice_Date, 
          s.State_Of_Supply, s.Total_Amount, s.Total_Received, s.Balance_Due, s.Party_Id,
          p.Party_Name, p.GSTIN
        FROM ${salesTable} s
@@ -2104,48 +2183,50 @@ const getSingleSale = async (req, res, next) => {
       .join(" + ");
 
     return res.status(200).json({
-  success: true,
+      success: true,
 
-  invoicePartyDetails: {
-    Sale_Id: saleHeader.Sale_Id,
-    Party_Name: saleHeader.Party_Name,
-    GSTIN: saleHeader.GSTIN,
-    State_Of_Supply: saleHeader.State_Of_Supply,
-    //Reference_Number: saleHeader.Reference_Number,
-    Payment_Type_Display,
-    Invoice_Number: saleHeader.Invoice_Number,
-    Invoice_Date: saleHeader.Invoice_Date,
-    Total_Amount: saleHeader.Total_Amount,
-    Total_Received: saleHeader.Total_Received,
-    Balance_Due: saleHeader.Balance_Due
-  },
+      invoicePartyDetails: {
+        Sale_Id: saleHeader.Sale_Id,
+        Party_Name: saleHeader.Party_Name,
+        Phone_Number: saleHeader.Phone_Number,
+        Billing_Address: saleHeader.Billing_Address,
+        GSTIN: saleHeader.GSTIN,
+        State_Of_Supply: saleHeader.State_Of_Supply,
+        //Reference_Number: saleHeader.Reference_Number,
+        Payment_Type_Display,
+        Invoice_Number: saleHeader.Invoice_Number,
+        Invoice_Date: saleHeader.Invoice_Date,
+        Total_Amount: saleHeader.Total_Amount,
+        Total_Received: saleHeader.Total_Received,
+        Balance_Due: saleHeader.Balance_Due
+      },
 
-  splits: splits.map((split) => ({
-    Id: split.id,
-    Payment_Type: split.Payment_Type,
-    Bank_Account_Id: split.Bank_Account_Id,
-    Account_Display_Name: split.Account_Display_Name,
-    Reference_Number: split.Reference_Number,
-    Amount: split.Amount,
-  })),
+      splits: splits.map((split) => ({
+        Id: split.id,
+        Payment_Type: split.Payment_Type,
+        Bank_Account_Id: split.Bank_Account_Id,
+        Account_Display_Name: split.Account_Display_Name,
+        Reference_Number: split.Reference_Number,
+        Amount: split.Amount,
+      })),
 
-  items: items.map((it) => ({
-    Sale_Items_Id: it.Sale_Items_Id,
-    Item_Id: it.Item_Id,
-    Item_Name: it.Item_Name,
-    Item_HSN: it.Item_HSN,
-    Item_Unit: it.Item_Unit,
-    Item_Category: it.Item_Category,
-    Quantity: it.Quantity,
-    Sale_Price: it.Sale_Price,
-    Discount_On_Sale_Price: it.Discount_On_Sale_Price,
-    Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price,
-    Tax_Amount: it.Tax_Amount,
-    Tax_Type: it.Tax_Type || "None",
-    Amount: it.Amount,
-    created_at: it.created_at,
-  })),
-});
+      items: items.map((it) => ({
+        Sale_Items_Id: it.Sale_Items_Id,
+        Item_Id: it.Item_Id,
+        Item_Name: it.Item_Name,
+        Item_HSN: it.Item_HSN,
+        Item_Unit: it.Item_Unit,
+        Item_Category: it.Item_Category,
+        Quantity: it.Quantity,
+        Sale_Price: it.Sale_Price,
+        Discount_On_Sale_Price: it.Discount_On_Sale_Price,
+        Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price,
+        Tax_Amount: it.Tax_Amount,
+        Tax_Type: it.Tax_Type || "None",
+        Amount: it.Amount,
+        created_at: it.created_at,
+      })),
+    });
   } catch (err) {
     console.error("❌ Error getting single sale:", err);
     next(err);
@@ -2294,37 +2375,34 @@ const generateInvoiceHtml = (sale) => {
             <span>${invoicePartyDetails?.Payment_Type || "N/A"}</span>
           </div>
 
-          ${
-            invoicePartyDetails?.Reference_Number
-              ? `<div class="meta-item" style="flex: 1 1 100%;">
+          ${invoicePartyDetails?.Reference_Number
+      ? `<div class="meta-item" style="flex: 1 1 100%;">
                   <strong>Reference Number</strong>
                   <span>${invoicePartyDetails.Reference_Number}</span>
                 </div>`
-              : ""
-          }
+      : ""
+    }
         </div>
 
         
         
           
               <div class="address-section">
-                ${
-                  invoicePartyDetails?.Billing_Address
-                    ? `<div class="address-box">
+                ${invoicePartyDetails?.Billing_Address
+      ? `<div class="address-box">
                         <h4>Billed To</h4>
                         <p>${invoicePartyDetails.Billing_Address}</p>
                       </div>`
-                    : ""
-                }
-                ${
-                  invoicePartyDetails?.Shipping_Address
-                    ? `<div class="divider"></div>
+      : ""
+    }
+                ${invoicePartyDetails?.Shipping_Address
+      ? `<div class="divider"></div>
                       <div class="address-box">
                         <h4>Shipped To</h4>
                         <p>${invoicePartyDetails.Shipping_Address}</p>
                       </div>`
-                    : ""
-                }
+      : ""
+    }
               </div>
             
         
@@ -2346,10 +2424,9 @@ const generateInvoiceHtml = (sale) => {
             </tr>
           </thead>
           <tbody>
-            ${
-              items
-                ?.map(
-                  (it, idx) => `
+            ${items
+      ?.map(
+        (it, idx) => `
                     <tr>
                       <td>${idx + 1}</td>
                       <td>${it?.Item_Category || ""}</td>
@@ -2357,23 +2434,21 @@ const generateInvoiceHtml = (sale) => {
                       <td>${it?.Item_HSN || ""}</td>
                       <td>${it?.Quantity || 0} ${it?.Item_Unit || ""}</td>
                       <td>${Number(it?.Sale_Price || 0).toFixed(2)}</td>
-                      <td>${
-                        it?.Discount_Type_On_Sale_Price === "Percentage"
-                          ? it?.Discount_On_Sale_Price==0.00 ? "0%" : it?.Discount_On_Sale_Price + "%"
-                          : "₹" + it?.Discount_On_Sale_Price
-                      }</td>
-                      <td>${
-                        Object.keys(TAX_TYPES).includes(it?.Tax_Type)
-                          ? TAX_TYPES[it?.Tax_Type]
-                          : it?.Tax_Type
-                      }</td>
+                      <td>${it?.Discount_Type_On_Sale_Price === "Percentage"
+            ? it?.Discount_On_Sale_Price == 0.00 ? "0%" : it?.Discount_On_Sale_Price + "%"
+            : "₹" + it?.Discount_On_Sale_Price
+          }</td>
+                      <td>${Object.keys(TAX_TYPES).includes(it?.Tax_Type)
+            ? TAX_TYPES[it?.Tax_Type]
+            : it?.Tax_Type
+          }</td>
                       <td>${Number(it?.Tax_Amount || 0).toFixed(2)}</td>
                       <td>${Number(it?.Amount || 0).toFixed(2)}</td>
                     </tr>
                   `
-                )
-                .join("") || ""
-            }
+      )
+      .join("") || ""
+    }
           </tbody>
         </table>
 
@@ -2536,63 +2611,63 @@ const printSaleBill = async (req, res) => {
           margin: [0, 0, 0, 15],
         },
 
-      
-{
-  style: "section",
-  table: {
-    widths: ["50%", "50%"],
-    body: [
-      [
+
         {
-          stack: [
-            { text: "Party Name", style: "label", margin: [0, 2, 0, 1] },
-            { text: safe(invoicePartyDetails?.Party_Name), style: "value", margin: [0, 0, 0, 4] },
-            { text: "GSTIN", style: "label", margin: [0, 2, 0, 1] },
-            { text: safe(invoicePartyDetails?.GSTIN), style: "value", margin: [0, 0, 0, 4] },
-          ],
-          border: [false, false, true, false],
+          style: "section",
+          table: {
+            widths: ["50%", "50%"],
+            body: [
+              [
+                {
+                  stack: [
+                    { text: "Party Name", style: "label", margin: [0, 2, 0, 1] },
+                    { text: safe(invoicePartyDetails?.Party_Name), style: "value", margin: [0, 0, 0, 4] },
+                    { text: "GSTIN", style: "label", margin: [0, 2, 0, 1] },
+                    { text: safe(invoicePartyDetails?.GSTIN), style: "value", margin: [0, 0, 0, 4] },
+                  ],
+                  border: [false, false, true, false],
+                },
+                {
+                  stack: [
+                    { text: "State of Supply", style: "label", margin: [0, 2, 0, 1] },
+                    { text: safe(invoicePartyDetails?.State_Of_Supply), style: "value", margin: [0, 0, 0, 4] },
+                    { text: "Payment Type", style: "label", margin: [0, 2, 0, 1] },
+                    { text: safe(invoicePartyDetails?.Payment_Type), style: "value", margin: [0, 0, 0, 4] },
+                    ...(invoicePartyDetails?.Reference_Number
+                      ? [
+                        { text: "Reference Number", style: "label", margin: [0, 2, 0, 1] },
+                        { text: invoicePartyDetails.Reference_Number, style: "value", margin: [0, 0, 0, 4] },
+                      ]
+                      : []),
+                  ],
+                },
+              ],
+            ],
+          },
+          layout: "lightHorizontalLines",
+          margin: [0, 5, 0, 5], // Adds spacing around the table itself
         },
-        {
-          stack: [
-            { text: "State of Supply", style: "label", margin: [0, 2, 0, 1] },
-            { text: safe(invoicePartyDetails?.State_Of_Supply), style: "value", margin: [0, 0, 0, 4] },
-            { text: "Payment Type", style: "label", margin: [0, 2, 0, 1] },
-            { text: safe(invoicePartyDetails?.Payment_Type), style: "value", margin: [0, 0, 0, 4] },
-            ...(invoicePartyDetails?.Reference_Number
-              ? [
-                  { text: "Reference Number", style: "label", margin: [0, 2, 0, 1] },
-                  { text: invoicePartyDetails.Reference_Number, style: "value", margin: [0, 0, 0, 4] },
-                ]
-              : []),
-          ],
-        },
-      ],
-    ],
-  },
-  layout: "lightHorizontalLines",
-  margin: [0, 5, 0, 5], // Adds spacing around the table itself
-},
 
         // 🏠 Addresses
         {
           columns: [
             invoicePartyDetails?.Billing_Address
               ? {
-                  width: "50%",
-                  stack: [
-                    { text: "Billed To", style: "labelBold" },
-                    { text: invoicePartyDetails.Billing_Address, style: "value" },
-                  ],
-                }
+                width: "50%",
+                stack: [
+                  { text: "Billed To", style: "labelBold" },
+                  { text: invoicePartyDetails.Billing_Address, style: "value" },
+                ],
+              }
               : {},
             invoicePartyDetails?.Shipping_Address
               ? {
-                  width: "50%",
-                  stack: [
-                    { text: "Shipped To", style: "labelBold" },
-                    { text: invoicePartyDetails.Shipping_Address, style: "value" },
-                  ],
-                }
+                width: "50%",
+                stack: [
+                  { text: "Shipped To", style: "labelBold" },
+                  { text: invoicePartyDetails.Shipping_Address, style: "value" },
+                ],
+              }
               : {},
           ],
           columnGap: 20,
@@ -2634,9 +2709,9 @@ const printSaleBill = async (req, res) => {
                       : "₹" + (it.Discount_On_Sale_Price || 0),
                   style: "numeric",
                 },
-                 Object.keys(TAX_TYPES).includes(it?.Tax_Type)
-                          ? TAX_TYPES[it?.Tax_Type]
-                          : it?.Tax_Type,
+                Object.keys(TAX_TYPES).includes(it?.Tax_Type)
+                  ? TAX_TYPES[it?.Tax_Type]
+                  : it?.Tax_Type,
                 // safe(it.Tax_Type),
                 { text: Number(it?.Tax_Amount || 0).toFixed(2), style: "numeric" },
                 { text: Number(it?.Amount || 0).toFixed(2), style: "numeric" },
@@ -2664,7 +2739,7 @@ const printSaleBill = async (req, res) => {
                   [{ text: "Received", style: "labelBold" }, { text: `${invoicePartyDetails?.Total_Received || 0}`, style: "numeric" }],
                   [
                     { text: "Balance Due", style: "labelBoldRed" },
-                     //{ text: `${invoicePartyDetails?.Balance_Due || 0}` },
+                    //{ text: `${invoicePartyDetails?.Balance_Due || 0}` },
                     { text: `${invoicePartyDetails?.Balance_Due || 0}`, style: "numericRed" },
                   ],
                 ],
@@ -2690,7 +2765,7 @@ const printSaleBill = async (req, res) => {
         labelBoldRed: { bold: true, color: "black", fontSize: 11 },
         value: { fontSize: 11 },
         numeric: { alignment: "right", fontSize: 11 },
-        numericRed: { alignment: "right", fontSize: 11, color: "black"},
+        numericRed: { alignment: "right", fontSize: 11, color: "black" },
         tableExample: { fontSize: 11 },
       },
       defaultStyle: { font: "Helvetica" },
@@ -2739,18 +2814,27 @@ const editSale = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
+    await connection.beginTransaction();
     const { Sale_Id: saleId } = req.params;
 
     const [existingSale] = await connection.query(
       "SELECT * FROM add_sale WHERE Sale_Id = ?",
       [saleId]
     );
-    if (existingSale.length === 0) {
-      return res.status(404).json({ message: "No such Sale found." });
+      if (existingSale.length === 0) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "No such Sale found.",
+      });
     }
+    // IMPORTANT:
+// Save old party before changing the sale
+const oldPartyId = existingSale[0].Party_Id;
     const saleIdNumber = existingSale[0].id;
 
-    const cleanData  = sanitizeObject(req.body);
+    const cleanData = sanitizeObject(req.body);
     const validation = saleSchema.safeParse(cleanData);
     if (!validation.success) {
       return res.status(400).json({ errors: validation.error.errors });
@@ -2759,6 +2843,8 @@ const editSale = async (req, res, next) => {
     const {
       Party_Name,
       Invoice_Number,
+      Phone_Number,        // ← add
+      Billing_Address,     // ← add
       Invoice_Date,
       State_Of_Supply,
       Total_Amount,
@@ -2769,58 +2855,58 @@ const editSale = async (req, res, next) => {
       items,
     } = validation.data;
 
-    await connection.beginTransaction();
+    //await connection.beginTransaction();
 
-    const totalAmount   = Number(Total_Amount)   || 0;
+    const totalAmount = Number(Total_Amount) || 0;
     let validSplits = [];
 
-if (totalAmount > 0) {
-  const normalizedSplits = (splits || [])
-    .filter((split) => {
-      // Must have payment type
-      if (!split.Payment_Type) {
-        return false;
-      }
+    if (totalAmount > 0) {
+      const normalizedSplits = (splits || [])
+        .filter((split) => {
+          // Must have payment type
+          if (!split.Payment_Type) {
+            return false;
+          }
 
-      // Bank must have selected bank account
-      if (
-        split.Payment_Type === "Bank" &&
-        !split.Bank_Account_Id
-      ) {
-        return false;
-      }
+          // Bank must have selected bank account
+          if (
+            split.Payment_Type === "Bank" &&
+            !split.Bank_Account_Id
+          ) {
+            return false;
+          }
 
-      return true;
-    })
-    .map((split) => ({
-      ...split,
-      Amount: Number(split.Amount) || 0,
-    }));
+          return true;
+        })
+        .map((split) => ({
+          ...split,
+          Amount: Number(split.Amount) || 0,
+        }));
 
 
-  validSplits = normalizedSplits.filter(
-    (split, index) => {
+      validSplits = normalizedSplits.filter(
+        (split, index) => {
 
-      // FIRST valid payment method:
-      // always preserve, even ₹0
-      if (index === 0) {
-        return true;
-      }
+          // FIRST valid payment method:
+          // always preserve, even ₹0
+          if (index === 0) {
+            return true;
+          }
 
-      // Every payment after first:
-      // only preserve positive amount
-      return split.Amount > 0;
+          // Every payment after first:
+          // only preserve positive amount
+          return split.Amount > 0;
+        }
+      );
     }
-  );
-}
     // const totalReceived = Total_Received === "" || Total_Received === undefined
     //   ? 0
     //   : Number(Total_Received);
-     const totalReceived = validSplits.reduce(
+    const totalReceived = validSplits.reduce(
       (sum, split) => sum + (Number(split.Amount) || 0),
       0
     );
-    const balanceDue    =  totalAmount - totalReceived;
+    const balanceDue = totalAmount - totalReceived;
 
     // 🔹 received cannot exceed total
     if (totalReceived > totalAmount) {
@@ -2841,235 +2927,432 @@ if (totalAmount > 0) {
       }
     }
 
-   
-//     for (const item of items) {
-//   if (!item.Item_Name?.trim()) {
-//     await connection.rollback();
-//     return res.status(400).json({ message: "Item name missing." });
-//   }
-// }
 
-    const [partyRows] = await connection.query(
-      "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
-      [Party_Name]
+  
+   
+// ─────────────────────────────────────────────
+// RESOLVE PARTY
+// Existing party -> use it
+// Brand-new party -> create it
+// ─────────────────────────────────────────────
+
+const [partyRows] = await connection.query(
+  `SELECT *
+   FROM add_party
+   WHERE TRIM(Party_Name) = TRIM(?)
+   LIMIT 1`,
+  [Party_Name]
+);
+
+let Party_Id;
+
+if (partyRows.length === 0) {
+  // ═══════════════════════════════════════════
+  // NEW PARTY
+  // ═══════════════════════════════════════════
+
+  const [last] = await connection.query(
+    `SELECT Party_Id
+     FROM add_party
+     ORDER BY id DESC
+     LIMIT 1`
+  );
+
+  const lastId = last[0]?.Party_Id || "PTY000";
+
+  const num =
+    parseInt(lastId.replace("PTY", ""), 10) + 1;
+
+  Party_Id =
+    "PTY" + num.toString().padStart(3, "0");
+
+  await connection.execute(
+    `INSERT INTO add_party
+     (
+       Party_Id,
+       Party_Name,
+       Phone_Number,
+      
+       created_at,
+       updated_at
+     )
+     VALUES (?, ?,  ?, NOW(), NOW())`,
+    [
+      Party_Id,
+      Party_Name.trim(),
+      cleanValue(Phone_Number)
+      
+    ]
+  );
+
+  // Add billing address as default
+  if (Billing_Address?.trim()) {
+    await connection.execute(
+      `INSERT INTO add_party_addresses
+       (
+         Party_Id,
+         Address_Type,
+         Address_Text,
+         Is_Default,
+         created_at,
+         updated_at
+       )
+       VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+      [
+        Party_Id,
+        Billing_Address.trim(),
+      ]
     );
-    if (partyRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ message: "Party not found." });
+  }
+
+} else {
+  // ═══════════════════════════════════════════
+  // EXISTING PARTY
+  // ═══════════════════════════════════════════
+
+  const existingParty = partyRows[0];
+
+  Party_Id = existingParty.Party_Id;
+
+  // ─────────────────────────────────────────
+  // PHONE
+  // Only fill master phone when currently blank.
+  // Don't overwrite an existing master phone
+  // just because this sale contains another phone.
+  // ─────────────────────────────────────────
+
+  if (
+    !existingParty.Phone_Number &&
+    Phone_Number?.trim()
+  ) {
+    await connection.execute(
+      `UPDATE add_party
+       SET
+         Phone_Number = ?,
+         updated_at = NOW()
+       WHERE Party_Id = ?`,
+      [
+        Phone_Number.trim(),
+        Party_Id,
+      ]
+    );
+  }
+
+ 
+
+ 
+
+  // ─────────────────────────────────────────
+  // BILLING ADDRESS
+  //
+  // If party has NO billing address yet,
+  // add this sale address as default.
+  //
+  // If addresses already exist, don't change
+  // party master addresses from sale editing.
+  // ─────────────────────────────────────────
+
+  if (Billing_Address?.trim()) {
+    const [[addressCount]] =
+      await connection.query(
+        `SELECT COUNT(*) AS total
+         FROM add_party_addresses
+         WHERE Party_Id = ?
+           AND Address_Type = 'Billing'`,
+        [Party_Id]
+      );
+
+    if (Number(addressCount.total) === 0) {
+      await connection.execute(
+        `INSERT INTO add_party_addresses
+         (
+           Party_Id,
+           Address_Type,
+           Address_Text,
+           Is_Default,
+           created_at,
+           updated_at
+         )
+         VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+        [
+          Party_Id,
+          Billing_Address.trim(),
+        ]
+      );
     }
-    const Party_Id = partyRows[0].Party_Id;
+  }
+}
 
     // update parent — no Payment_Type / Bank_Account_Id columns
     await connection.query(
-      `UPDATE add_sale SET
-         Party_Id = ?, Invoice_Number = ?, Invoice_Date = ?, State_Of_Supply = ?,
-         Total_Amount = ?, Total_Received = ?, Balance_Due = ?,
-          updated_at = NOW()
-       WHERE Sale_Id = ?`,
-      [
-        Party_Id,
-        Invoice_Number,
-        Invoice_Date,
-        cleanValue(State_Of_Supply),
-        totalAmount,
-        totalReceived,
-        balanceDue,
-        saleId
-      ]
-    );
+  `UPDATE add_sale
+   SET
+     Party_Id = ?,
+     Phone_Number = ?,
+     Billing_Address = ?,
+     Invoice_Number = ?,
+     Invoice_Date = ?,
+     State_Of_Supply = ?,
+     Total_Amount = ?,
+     Total_Received = ?,
+     Balance_Due = ?,
+     updated_at = NOW()
+   WHERE Sale_Id = ?`,
+  [
+    Party_Id,
+
+    // Snapshot values belonging specifically to THIS sale
+    cleanValue(Phone_Number),
+    cleanValue(Billing_Address),
+
+    Invoice_Number,
+    Invoice_Date,
+    cleanValue(State_Of_Supply),
+    totalAmount,
+    totalReceived,
+    balanceDue,
+    saleId,
+  ]
+);
     await connection.query(
-  `UPDATE sale_return
+      `UPDATE sale_return
    SET
       Invoice_Number = ?,
       Invoice_Date = ?,
       updated_at = NOW()
    WHERE Sale_Id = ?`,
-  [
-    Invoice_Number,
-    Invoice_Date,
-    saleId,
-  ]
-);
+      [
+        Invoice_Number,
+        Invoice_Date,
+        saleId,
+      ]
+    );
 
     // 🔹 wipe old splits + ledger rows, re-insert fresh ones
     await deletePaymentSplits({
       connection,
       sourceType: "Sale",
-      sourceId:   saleIdNumber,
+      sourceId: saleIdNumber,
     });
 
     if (validSplits.length > 0) {
       await insertPaymentSplits({
         connection,
         sourceType: "Sale",
-        sourceId:   saleIdNumber,
-        partyName:  Party_Name,
-        txnDate:    Invoice_Date,
-          splits: validSplits, 
+        sourceId: saleIdNumber,
+        partyName: Party_Name,
+        txnDate: Invoice_Date,
+        splits: validSplits,
       });
     }
-    await recordPartyLedger({
+    const partyChanged =
+  oldPartyId &&
+  Party_Id &&
+  oldPartyId !== Party_Id;
+
+
+// ─────────────────────────────────────────────
+// 1. REMOVE SALE FROM OLD PARTY
+// ─────────────────────────────────────────────
+if (partyChanged) {
+  await reversePartyLedger({
+    connection,
+
+    // OLD PARTY
+    partyId: oldPartyId,
+
+    txnType: "Sale",
+
+    // Same numeric Source_Id used when
+    // original ledger row was created
+    referenceId: saleIdNumber,
+  });
+}
+
+
+// ─────────────────────────────────────────────
+// 2. ADD / UPDATE SALE FOR CURRENT PARTY
+// ─────────────────────────────────────────────
+await recordPartyLedger({
   connection,
+
+  // NEW/CURRENT PARTY
   partyId: Party_Id,
+
   txnType: "Sale",
+
   referenceId: saleIdNumber,
+
   amount: totalAmount,
+
   txnDate: Invoice_Date,
+
   docNumber: Invoice_Number,
+
   balanceDue: balanceDue,
 });
-const [oldItems] = await connection.query(
-  "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
-  [saleId]
-);
-// const oldMap = new Map();
-// oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
-
-// 🔹 Step 1: resolve every line to its real Item_Id first (create new items if needed)
-const resolvedLines = [];
-for (const item of items) {
-    if (!item.Item_Name?.trim()) {
-
-    // Only Amount > 0 makes Item_Name mandatory
-    if ((normalizeNumber(item.Amount) ?? 0) > 0) {
-      await connection.rollback();
-
-      return res.status(400).json({
-        success: false,
-        message: "Please enter an item name for the row.",
-      });
-    }
-
-    // Amount blank / 0 + no Item_Name
-    // Treat as empty placeholder row
-    continue;
-  }
-  let Item_Id = item.Item_Id || null;
-  let dbItemRow = null;
-
-  if (Item_Id) {
-    const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
-    dbItemRow = rows[0] || null;
-  } else {
-    const [rows] = await connection.query("SELECT * FROM add_item WHERE TRIM(Item_Name)= TRIM(?) LIMIT 1", [item.Item_Name]);
-    //const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [item.Item_Name]);
-    dbItemRow = rows[0] || null;
-    Item_Id = dbItemRow?.Item_Id || null;
-  }
-
-  if (!dbItemRow) {
-    const [maxRow] = await connection.query(
-      `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
+    // await recordPartyLedger({
+    //   connection,
+    //   partyId: Party_Id,
+    //   txnType: "Sale",
+    //   referenceId: saleIdNumber,
+    //   amount: totalAmount,
+    //   txnDate: Invoice_Date,
+    //   docNumber: Invoice_Number,
+    //   balanceDue: balanceDue,
+    // });
+    const [oldItems] = await connection.query(
+      "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
+      [saleId]
     );
-    const autoId = (maxRow[0]?.maxId || 0) + 1;
-    Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+    // const oldMap = new Map();
+    // oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
 
-    await connection.execute(
-      `INSERT INTO add_item
+    // 🔹 Step 1: resolve every line to its real Item_Id first (create new items if needed)
+    const resolvedLines = [];
+    for (const item of items) {
+      if (!item.Item_Name?.trim()) {
+
+        // Only Amount > 0 makes Item_Name mandatory
+        if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+          await connection.rollback();
+
+          return res.status(400).json({
+            success: false,
+            message: "Please enter an item name for the row.",
+          });
+        }
+
+        // Amount blank / 0 + no Item_Name
+        // Treat as empty placeholder row
+        continue;
+      }
+      let Item_Id = item.Item_Id || null;
+      let dbItemRow = null;
+
+      if (Item_Id) {
+        const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
+        dbItemRow = rows[0] || null;
+      } else {
+        const [rows] = await connection.query("SELECT * FROM add_item WHERE TRIM(Item_Name)= TRIM(?) LIMIT 1", [item.Item_Name]);
+        //const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [item.Item_Name]);
+        dbItemRow = rows[0] || null;
+        Item_Id = dbItemRow?.Item_Id || null;
+      }
+
+      if (!dbItemRow) {
+        const [maxRow] = await connection.query(
+          `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
+        );
+        const autoId = (maxRow[0]?.maxId || 0) + 1;
+        Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+
+        await connection.execute(
+          `INSERT INTO add_item
        (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit,
         Stock_Quantity, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [
-        Item_Id,
-        item.Item_Name,
-      item.Item_Category || "",
-        cleanValue(item.Item_HSN),
-       item.Item_Unit || "",
-        0, // stock adjusted in step 2 below, based on net quantity
-      ]
-    );
-    dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
-  } 
-  else {
-  const updates = [];
-  const params = [];
+          [
+            Item_Id,
+            item.Item_Name,
+            item.Item_Category || "",
+            cleanValue(item.Item_HSN),
+            item.Item_Unit || "",
+            0, // stock adjusted in step 2 below, based on net quantity
+          ]
+        );
+        dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
+      }
+      else {
+        const updates = [];
+        const params = [];
 
-  if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
-    updates.push("Item_HSN = ?");
-    params.push(item.Item_HSN);
-  }
-  if (item.Item_Category !== undefined && item.Item_Category !== dbItemRow.Item_Category) {
-    updates.push("Item_Category = ?");
-    params.push(item.Item_Category || "");
-  }
+        if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+          updates.push("Item_HSN = ?");
+          params.push(item.Item_HSN);
+        }
+        if (item.Item_Category !== undefined && item.Item_Category !== dbItemRow.Item_Category) {
+          updates.push("Item_Category = ?");
+          params.push(item.Item_Category || "");
+        }
 
-  if (updates.length > 0) {
-    params.push(Item_Id);
-    await connection.query(
-      `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
-      params
-    );
-  }
-}
-  // else if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
-  //   await connection.query(
-  //     `UPDATE add_item SET Item_HSN = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
-  //     [item.Item_HSN, Item_Id]
-  //   );
-  // }
+        if (updates.length > 0) {
+          params.push(Item_Id);
+          await connection.query(
+            `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
+            params
+          );
+        }
+      }
+      // else if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+      //   await connection.query(
+      //     `UPDATE add_item SET Item_HSN = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
+      //     [item.Item_HSN, Item_Id]
+      //   );
+      // }
 
-  resolvedLines.push({ ...item, Item_Id });
-}
+      resolvedLines.push({ ...item, Item_Id });
+    }
 
-// 🔹 Step 2: net stock delta per Item_Id across ALL new lines vs ALL old lines for that item
-const newQtyByItem = new Map();
-for (const line of resolvedLines) {
-  newQtyByItem.set(
-    line.Item_Id,
-    (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity)
-  );
-}
-const oldQtyByItem = new Map();
-oldItems.forEach((o) => {
-  oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
-});
+    // 🔹 Step 2: net stock delta per Item_Id across ALL new lines vs ALL old lines for that item
+    const newQtyByItem = new Map();
+    for (const line of resolvedLines) {
+      newQtyByItem.set(
+        line.Item_Id,
+        (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity)
+      );
+    }
+    const oldQtyByItem = new Map();
+    oldItems.forEach((o) => {
+      oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
+    });
 
-const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
-for (const itemId of allItemIds) {
-  const newQty = newQtyByItem.get(itemId) || 0;
-  const oldQty = oldQtyByItem.get(itemId) || 0;
-  const diff = newQty - oldQty; // positive → more sold → deduct more stock
-  if (diff !== 0) {
-    await connection.query(
-      `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-      [diff, itemId]
-    );
-  }
-}
+    const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
+    for (const itemId of allItemIds) {
+      const newQty = newQtyByItem.get(itemId) || 0;
+      const oldQty = oldQtyByItem.get(itemId) || 0;
+      const diff = newQty - oldQty; // positive → more sold → deduct more stock
+      if (diff !== 0) {
+        await connection.query(
+          `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+          [diff, itemId]
+        );
+      }
+    }
 
-// 🔹 Step 3: delete all old sale_items rows for this sale, re-insert fresh (simplest correct approach for repeats)
-await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
+    // 🔹 Step 3: delete all old sale_items rows for this sale, re-insert fresh (simplest correct approach for repeats)
+    await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
 
-for (const line of resolvedLines) {
-  const [purchaseTax] = await connection.query(
-    `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-    [line.Item_Id]
-  );
-  const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+    for (const line of resolvedLines) {
+      const [purchaseTax] = await connection.query(
+        `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+        [line.Item_Id]
+      );
+      const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
 
-  const [insertRes] = await connection.execute(
-    `INSERT INTO add_sale_items
+      const [insertRes] = await connection.execute(
+        `INSERT INTO add_sale_items
      (Sale_Id, Item_Id, Quantity, Sale_Price,
       Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
       Tax_Type, Tax_Amount, Amount, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    [
-      saleId,
-      line.Item_Id,
-      normalizeNumber(line.Quantity) ?? 0,
-      normalizeNumber(line.Sale_Price) ?? 0,
-      cleanDiscount(line.Discount_On_Sale_Price),
-      cleanValue(line.Discount_Type_On_Sale_Price),
-      cleanValue(safeTaxType),
-      normalizeNumber(line.Tax_Amount) ?? 0,
-      normalizeNumber(line.Amount) ?? 0,
-    ]
-  );
-  const id    = insertRes.insertId;
-  const newId = "SIT" + id.toString().padStart(3, "0");
-  await connection.execute(`UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`, [newId, id]);
-}
-   
+        [
+          saleId,
+          line.Item_Id,
+          normalizeNumber(line.Quantity) ?? 0,
+          normalizeNumber(line.Sale_Price) ?? 0,
+          cleanDiscount(line.Discount_On_Sale_Price),
+          cleanValue(line.Discount_Type_On_Sale_Price),
+          cleanValue(safeTaxType),
+          normalizeNumber(line.Tax_Amount) ?? 0,
+          normalizeNumber(line.Amount) ?? 0,
+        ]
+      );
+      const id = insertRes.insertId;
+      const newId = "SIT" + id.toString().padStart(3, "0");
+      await connection.execute(`UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`, [newId, id]);
+    }
+
 
 
     await connection.commit();
@@ -3099,7 +3382,7 @@ const editNewSale = async (req, res, next) => {
 
     // 2️⃣ Validate & sanitize request
     const cleanData = sanitizeObject(req.body);
-     const validation = saleNewItemFormSchema.safeParse(cleanData);
+    const validation = saleNewItemFormSchema.safeParse(cleanData);
     if (!validation.success) {
       return res.status(400).json({ errors: validation.error.errors });
     }
@@ -3148,30 +3431,30 @@ const editNewSale = async (req, res, next) => {
 
 
     for (const old of oldItems) {
-      if(old.Item_Id===null || old.Item_Id===undefined) {
+      if (old.Item_Id === null || old.Item_Id === undefined) {
         await connection.rollback();
         return res.status(400).json({ message: "Invalid Item_Id in old sale items." });
       }
-      
-    await connection.query(
+
+      await connection.query(
         `UPDATE add_item_sale 
          SET updated_at = NOW() 
          WHERE Item_Id = ?`,
         [old.Item_Id]
       );
-    
-    
-    }
-const totalAmount = Number(Total_Amount) || 0;
-const totalReceived =
-  Total_Received === "" || Total_Received === undefined
-    ? 0
-    : Number(Total_Received);
 
-const balanceDue =
-  Balance_Due === "" || Balance_Due === undefined
-    ? totalAmount - totalReceived
-    : Number(Balance_Due);
+
+    }
+    const totalAmount = Number(Total_Amount) || 0;
+    const totalReceived =
+      Total_Received === "" || Total_Received === undefined
+        ? 0
+        : Number(Total_Received);
+
+    const balanceDue =
+      Balance_Due === "" || Balance_Due === undefined
+        ? totalAmount - totalReceived
+        : Number(Balance_Due);
     // 5️⃣ Update sale master record
     await connection.query(
       `UPDATE add_new_sale SET 
@@ -3209,27 +3492,27 @@ const balanceDue =
     for (const old of oldSaleItems) {
       oldSaleItemMap.set(old.Item_Id, old);
     }
-const [maxIdRow] = await connection.query(
- "SELECT MAX(CAST(SUBSTRING(Sale_Items_Id, 5) AS UNSIGNED)) AS maxNum FROM add_new_sale_items"
-);
-let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
-   console.log(nextSaleItemNum);
+    const [maxIdRow] = await connection.query(
+      "SELECT MAX(CAST(SUBSTRING(Sale_Items_Id, 5) AS UNSIGNED)) AS maxNum FROM add_new_sale_items"
+    );
+    let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
+    console.log(nextSaleItemNum);
     // Delete all old sale items (we’ll reinsert)
     await connection.query("DELETE FROM add_new_sale_items WHERE Sale_Id = ?", [saleId]);
 
 
- 
+
     // 8️⃣ Reinsert sale items & adjust stock
     for (const item of items) {
       const [dbItem] = await connection.query(
         "SELECT Item_Id FROM add_item_sale WHERE Item_Name = ? LIMIT 1",
         [item.Item_Name]
       );
- 
+
       const Item_Id = dbItem[0]?.Item_Id;
 
-      console.log("Item_Id:",Item_Id);
-   
+      console.log("Item_Id:", Item_Id);
+
 
       if (!Item_Id) {
         await connection.rollback();
@@ -3237,18 +3520,18 @@ let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
           .status(404)
           .json({ message: `Item '${item.Item_Name}' not found.` });
       }
-  const [purchaseTax] = await connection.query(
-    `SELECT Tax_Type 
+      const [purchaseTax] = await connection.query(
+        `SELECT Tax_Type 
      FROM add_purchase_items 
      WHERE Item_Id = ? 
      ORDER BY id DESC 
      LIMIT 1`,
-    [Item_Id]
-  );
+        [Item_Id]
+      );
 
-  // 3️⃣ Use trusted tax type or fallback to frontend value
-  const taxTypeFromDB = purchaseTax[0]?.Tax_Type;
-  const safeTaxType = taxTypeFromDB || item.Tax_Type || "None";
+      // 3️⃣ Use trusted tax type or fallback to frontend value
+      const taxTypeFromDB = purchaseTax[0]?.Tax_Type;
+      const safeTaxType = taxTypeFromDB || item.Tax_Type || "None";
       // Reuse old Sale_Items_Id if exists, else generate new one
       const oldData = oldSaleItemMap.get(Item_Id);
       let Sale_Items_Id;
@@ -3263,7 +3546,7 @@ let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
         createdAt = new Date().toISOString().slice(0, 19).replace("T", " ");
       }
       console.log(Sale_Items_Id);
-      const taxType = item.Tax_Type ||  "None";
+      const taxType = item.Tax_Type || "None";
       // Insert the updated/new sale item
       await connection.query(
         `INSERT INTO add_new_sale_items 
@@ -3279,7 +3562,7 @@ let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
           normalizeNumber(item.Sale_Price),
           cleanDiscount(item.Discount_On_Sale_Price),
           cleanValue(item.Discount_Type_On_Sale_Price),
-        cleanValue(safeTaxType),
+          cleanValue(safeTaxType),
           normalizeNumber(item.Tax_Amount),
           normalizeNumber(item.Amount),
           createdAt,
@@ -3287,15 +3570,15 @@ let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
       );
 
       // Update stock (deduct sold quantity)
-      
-          await connection.query(
+
+      await connection.query(
         `UPDATE add_item_sale 
          SET updated_at = NOW()
          WHERE Item_Id = ?`,
-        [ Item_Id]
+        [Item_Id]
       );
-      
-    
+
+
     }
 
     await connection.commit();
@@ -3395,9 +3678,9 @@ const getNewSaleLatestInvoiceNumber = async (req, res, next) => {
     const [invoiceSettings] = await db.query(`SELECT Invoice_Name FROM add_new_sale_invoice LIMIT 1`);
 
     if (!invoiceSettings || invoiceSettings.length === 0 || !invoiceSettings[0].Invoice_Name) {
-      
+
       return res.status(400).json({
-        
+
         success: false,
         message:
           "Invoice prefix not set. Please configure an invoice prefix in settings before generating invoices.",
@@ -3446,11 +3729,11 @@ const getNewSaleLatestInvoiceNumber = async (req, res, next) => {
       latestInvoiceInfo,
     });
   } catch (err) {
-    if(connection ) connection.release();
+    if (connection) connection.release();
     console.error("❌ Error getting latest invoice number:", err);
     next(err);
-  }finally {
-    if(connection) connection.release();
+  } finally {
+    if (connection) connection.release();
   }
 };
 
@@ -3482,7 +3765,7 @@ const getTotalNewSalesEachDay = async (req, res, next) => {
       data: result,
     });
   } catch (err) {
-    if(connection) connection.release();
+    if (connection) connection.release();
     console.error("❌ Error getting total new sales by day:", err);
     next(err);
   } finally {
@@ -3528,10 +3811,10 @@ const getTotalSalesEachDay = async (req, res, next) => {
 
 
 export {
-  addSale,addNewSale, getAllSales, exportAllSalesReportToExcel, getAllNewSales,getSingleSale, getLatestInvoiceNumber,
+  addSale, addNewSale, getAllSales, exportAllSalesReportToExcel, getAllNewSales, getSingleSale, getLatestInvoiceNumber,
   addInvoice, updateInvoice, getSingleInvoice,
-  addNewSaleInvoice, updateNewSaleInvoice, getSingleNewSaleInvoice,getNewSaleLatestInvoiceNumber,
-  printSaleBill,editSale,editNewSale,getTotalNewSalesEachDay,getTotalSalesEachDay
+  addNewSaleInvoice, updateNewSaleInvoice, getSingleNewSaleInvoice, getNewSaleLatestInvoiceNumber,
+  printSaleBill, editSale, editNewSale, getTotalNewSalesEachDay, getTotalSalesEachDay
 };
 
 // const getTotalSalesEachDay = async (req, res, next) => {
@@ -3541,8 +3824,8 @@ export {
 
 //     // 1️⃣ Get active financial year
 //     const [fy] = await connection.query(
-//       `SELECT Financial_Year 
-//        FROM financial_year 
+//       `SELECT Financial_Year
+//        FROM financial_year
 //        WHERE Current_Financial_Year = 1
 //        LIMIT 1`
 //     );
@@ -3559,7 +3842,7 @@ export {
 //     // 2️⃣ Get sales count per day inside financial year
 //     const [rows] = await connection.query(
 //       `
-//       SELECT 
+//       SELECT
 //         DATE_FORMAT(Invoice_Date, '%Y-%m-%d') AS sale_date,
 //         COUNT(*) AS total_sales
 //       FROM add_sale

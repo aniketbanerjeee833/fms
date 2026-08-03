@@ -115,6 +115,8 @@ export default function SaleEdit() {
   const [partySearch, setPartySearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showEditPartyModal, setShowEditPartyModal] = useState(false);
+  const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
   // const [confirmModal, setConfirmModal] = useState({
@@ -144,6 +146,8 @@ export default function SaleEdit() {
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       Party_Name: "",
+      Phone_Number: "",
+      Billing_Address: "",
       GSTIN: "",
       Invoice_Number: "",
       Invoice_Date: "",
@@ -407,24 +411,24 @@ export default function SaleEdit() {
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
   console.log(sale);
-   const emptyRow = () => ({
-  Item_Category: "",
-  Item_Name: "",
-  itemSearch: "",
-  Item_HSN: "",
-  Quantity: "",
-  Sale_Price: "",
-  Discount_On_Sale_Price: "",
-  Discount_Type_On_Sale_Price: "Percentage",
-  Tax_Type: "None",
-  Tax_Amount: "",
-  Amount: "",
-  itemOpen: false,
-  CategoryOpen: false,
-  isHSNLocked: false,
-  isUnitLocked: false,
-  isExistingItem: false,
-});
+  const emptyRow = () => ({
+    Item_Category: "",
+    Item_Name: "",
+    itemSearch: "",
+    Item_HSN: "",
+    Quantity: "",
+    Sale_Price: "",
+    Discount_On_Sale_Price: "",
+    Discount_Type_On_Sale_Price: "Percentage",
+    Tax_Type: "None",
+    Tax_Amount: "",
+    Amount: "",
+    itemOpen: false,
+    CategoryOpen: false,
+    isHSNLocked: false,
+    isUnitLocked: false,
+    isExistingItem: false,
+  });
   useEffect(() => {
     if (sale) {
 
@@ -441,8 +445,9 @@ export default function SaleEdit() {
       //   itemQuantity: it.Quantity || 0,
       //   itemTaxType: it.Tax_Type || "None",
       // }));
-        const prefilledRows = sale?.items?.length > 0
-      ? sale.items.map((item) => ({
+
+      const prefilledRows = sale?.items?.length > 0
+        ? sale.items.map((item) => ({
           ...item,
           itemSearch: item.Item_Name,
           itemOpen: false,
@@ -451,12 +456,14 @@ export default function SaleEdit() {
           isUnitLocked: true,
           isExistingItem: true,
         }))
-      : [emptyRow()];
+        : [emptyRow()];
 
       setRows(prefilledRows);
 
       reset({
         Party_Name: sale.invoicePartyDetails?.Party_Name || "",
+        Phone_Number: sale.invoicePartyDetails?.Phone_Number || "",
+        Billing_Address: sale.invoicePartyDetails?.Billing_Address || "",
         GSTIN: sale.invoicePartyDetails?.GSTIN || "",
         Invoice_Number: sale.invoicePartyDetails?.Invoice_Number || "",
 
@@ -485,7 +492,7 @@ export default function SaleEdit() {
                 Amount: "",
               },
             ],
-        items:  prefilledRows
+        items: prefilledRows
       })
       setShowSplitBox((sale?.splits?.length || 0) > 1);
     }
@@ -502,6 +509,25 @@ export default function SaleEdit() {
       setShowGSTIN(sale.GSTIN ? String(sale.GSTIN) : "");
     }
   }, [sale]);
+
+
+  const salePartyName = sale?.invoicePartyDetails?.Party_Name;
+
+  useEffect(() => {
+    if (!salePartyName) return;
+    if (!parties?.parties?.length) return;
+
+    const matchedParty = parties.parties.find(
+      (party) =>
+        party.Party_Name?.trim().toLowerCase() ===
+        salePartyName.trim().toLowerCase()
+    );
+
+    console.log("MATCHED EDIT PARTY:", matchedParty);
+
+    setCurrentPartyDetails(matchedParty || null);
+
+  }, [salePartyName, parties?.parties]);
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
     const parts = val.split(".");
@@ -574,281 +600,281 @@ export default function SaleEdit() {
 
 
   const onSubmit = async (data) => {
-  console.log("🧾 Form Data (from RHF):", data);
+    console.log("🧾 Form Data (from RHF):", data);
 
-  // =========================================================
-  // 1. ITEMS
-  //
-  // Send rows to backend AS-IS.
-  //
-  // Backend decides:
-  // No name + Amount > 0  -> ERROR
-  // No name + Amount 0    -> SKIP
-  // Valid item name       -> PROCESS
-  //
-  // Empty sale is allowed.
-  // =========================================================
+    // =========================================================
+    // 1. ITEMS
+    //
+    // Send rows to backend AS-IS.
+    //
+    // Backend decides:
+    // No name + Amount > 0  -> ERROR
+    // No name + Amount 0    -> SKIP
+    // Valid item name       -> PROCESS
+    //
+    // Empty sale is allowed.
+    // =========================================================
 
-  const itemsWithDefaults = (data.items || []).map((item) => ({
-    ...item,
+    const itemsWithDefaults = (data.items || []).map((item) => ({
+      ...item,
 
-    Tax_Type: item.Tax_Type || "None",
+      Tax_Type: item.Tax_Type || "None",
 
-    Tax_Amount:
-      item.Tax_Amount === "" ||
-      item.Tax_Amount === undefined ||
-      item.Tax_Amount === null
-        ? 0
-        : Number(item.Tax_Amount),
+      Tax_Amount:
+        item.Tax_Amount === "" ||
+          item.Tax_Amount === undefined ||
+          item.Tax_Amount === null
+          ? 0
+          : Number(item.Tax_Amount),
 
-    Amount:
-      item.Amount === "" ||
-      item.Amount === undefined ||
-      item.Amount === null
-        ? 0
-        : Number(item.Amount),
-  }));
+      Amount:
+        item.Amount === "" ||
+          item.Amount === undefined ||
+          item.Amount === null
+          ? 0
+          : Number(item.Amount),
+    }));
 
-  // =========================================================
-  // 2. TOTAL AMOUNT
-  // =========================================================
+    // =========================================================
+    // 2. TOTAL AMOUNT
+    // =========================================================
 
-  const totalAmount = Number(data.Total_Amount) || 0;
+    const totalAmount = Number(data.Total_Amount) || 0;
 
-  // =========================================================
-  // 3. PAYMENT SPLITS
-  //
-  // SAME RULE AS ADD SALE:
-  //
-  // Total = 0
-  //   -> NO payment splits
-  //
-  // Total > 0
-  //   -> first VALID payment method always stays
-  //      even if blank / ₹0
-  //
-  //   -> later blank / ₹0 methods are dropped
-  //   -> later positive methods stay
-  //
-  // Example:
-  //
-  // Cash  0       -> KEEP (first)
-  // HDFC  40      -> KEEP
-  // ANCO  0       -> DROP
-  // SBI   5       -> KEEP
-  // =========================================================
+    // =========================================================
+    // 3. PAYMENT SPLITS
+    //
+    // SAME RULE AS ADD SALE:
+    //
+    // Total = 0
+    //   -> NO payment splits
+    //
+    // Total > 0
+    //   -> first VALID payment method always stays
+    //      even if blank / ₹0
+    //
+    //   -> later blank / ₹0 methods are dropped
+    //   -> later positive methods stay
+    //
+    // Example:
+    //
+    // Cash  0       -> KEEP (first)
+    // HDFC  40      -> KEEP
+    // ANCO  0       -> DROP
+    // SBI   5       -> KEEP
+    // =========================================================
 
-  let validSplits = [];
+    let validSplits = [];
 
-  if (totalAmount > 0) {
-    const normalizedSplits = (data.splits || [])
-      .filter((split) => {
-        // No payment type
-        if (!split.Payment_Type) {
-          return false;
-        }
+    if (totalAmount > 0) {
+      const normalizedSplits = (data.splits || [])
+        .filter((split) => {
+          // No payment type
+          if (!split.Payment_Type) {
+            return false;
+          }
 
-        // Bank selected but no bank account
-        if (
-          split.Payment_Type === "Bank" &&
-          !split.Bank_Account_Id
-        ) {
-          return false;
-        }
+          // Bank selected but no bank account
+          if (
+            split.Payment_Type === "Bank" &&
+            !split.Bank_Account_Id
+          ) {
+            return false;
+          }
 
-        return true;
-      })
-      .map((split) => ({
-        ...split,
-
-        // blank / undefined / null -> 0
-        Amount: Number(split.Amount) || 0,
-      }));
-
-    validSplits = normalizedSplits.filter(
-      (split, index) => {
-        // First valid payment method ALWAYS survives
-        if (index === 0) {
           return true;
+        })
+        .map((split) => ({
+          ...split,
+
+          // blank / undefined / null -> 0
+          Amount: Number(split.Amount) || 0,
+        }));
+
+      validSplits = normalizedSplits.filter(
+        (split, index) => {
+          // First valid payment method ALWAYS survives
+          if (index === 0) {
+            return true;
+          }
+
+          // Every later payment needs positive amount
+          return split.Amount > 0;
         }
-
-        // Every later payment needs positive amount
-        return split.Amount > 0;
-      }
-    );
-  }
-
-  // =========================================================
-  // 4. TOTAL RECEIVED
-  //
-  // Calculate from surviving splits.
-  // Don't trust data.Total_Received.
-  // =========================================================
-
-  const totalReceived = validSplits.reduce(
-    (sum, split) =>
-      sum + (Number(split.Amount) || 0),
-    0
-  );
-
-  // =========================================================
-  // 5. BALANCE DUE
-  // =========================================================
-
-  const balanceDue =
-    totalAmount - totalReceived;
-
-  // =========================================================
-  // 6. BUILD PAYLOAD
-  // =========================================================
-
-  const payload = {
-    ...data,
-
-    items: itemsWithDefaults,
-
-    Total_Amount: totalAmount,
-    Total_Received: totalReceived,
-    Balance_Due: balanceDue,
-
-    // IMPORTANT:
-    // Send filtered splits, not data.splits
-    splits: validSplits,
-  };
-
-  console.log("📦 Final Edit Sale Payload:", payload);
-
-  // =========================================================
-  // 7. SUBMIT
-  // =========================================================
-
-  try {
-    const res = await editSale({
-      Sale_Id,
-      body: payload,
-    }).unwrap();
-
-    console.log("✅ Edit Sale Response:", res);
-
-    if (!res?.success) {
-      toast.error(
-        "Failed to update sale. Please try again."
       );
-      return;
     }
 
-    // =======================================================
-    // 8. INVALIDATE CACHE
-    // =======================================================
+    // =========================================================
+    // 4. TOTAL RECEIVED
+    //
+    // Calculate from surviving splits.
+    // Don't trust data.Total_Received.
+    // =========================================================
 
-    dispatch(
-      saleApi.util.invalidateTags(["Sale"])
+    const totalReceived = validSplits.reduce(
+      (sum, split) =>
+        sum + (Number(split.Amount) || 0),
+      0
     );
 
-    dispatch(
-      itemApi.util.invalidateTags(["Item"])
-    );
+    // =========================================================
+    // 5. BALANCE DUE
+    // =========================================================
 
-    dispatch(
-      dashboardApi.util.invalidateTags([
-        "Dashboard",
-      ])
-    );
+    const balanceDue =
+      totalAmount - totalReceived;
 
-    dispatch(
-      cashInHandApi.util.invalidateTags([
-        "CashInHand",
-      ])
-    );
+    // =========================================================
+    // 6. BUILD PAYLOAD
+    // =========================================================
 
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        "BankAccount",
-      ])
-    );
+    const payload = {
+      ...data,
 
-    dispatch(
-      partyApi.util.invalidateTags(["Party"])
-    );
+      items: itemsWithDefaults,
 
-    toast.success("Sale updated successfully!");
+      Total_Amount: totalAmount,
+      Total_Received: totalReceived,
+      Balance_Due: balanceDue,
 
-    // =======================================================
-    // 9. NAVIGATION
-    // =======================================================
+      // IMPORTANT:
+      // Send filtered splits, not data.splits
+      splits: validSplits,
+    };
 
-    if (from === "party-receivables") {
-      navigate({
-        pathname: "/party/receivables",
-        search: location.search,
-      });
-    }
+    console.log("📦 Final Edit Sale Payload:", payload);
 
-    else if (
-      from === "party-sales-purchases-details"
-    ) {
-      navigate({
-        pathname:
-          `/party/party-sales-purchases-details/${Party_Id}`,
-        search: location.search,
-      });
+    // =========================================================
+    // 7. SUBMIT
+    // =========================================================
+
+    try {
+      const res = await editSale({
+        Sale_Id,
+        body: payload,
+      }).unwrap();
+
+      console.log("✅ Edit Sale Response:", res);
+
+      if (!res?.success) {
+        toast.error(
+          "Failed to update sale. Please try again."
+        );
+        return;
+      }
+
+      // =======================================================
+      // 8. INVALIDATE CACHE
+      // =======================================================
+
+      dispatch(
+        saleApi.util.invalidateTags(["Sale"])
+      );
+
+      dispatch(
+        itemApi.util.invalidateTags(["Item"])
+      );
+
+      dispatch(
+        dashboardApi.util.invalidateTags([
+          "Dashboard",
+        ])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
+
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
 
       dispatch(
         partyApi.util.invalidateTags(["Party"])
       );
+
+      toast.success("Sale updated successfully!");
+
+      // =======================================================
+      // 9. NAVIGATION
+      // =======================================================
+
+      if (from === "party-receivables") {
+        navigate({
+          pathname: "/party/receivables",
+          search: location.search,
+        });
+      }
+
+      else if (
+        from === "party-sales-purchases-details"
+      ) {
+        navigate({
+          pathname:
+            `/party/party-sales-purchases-details/${Party_Id}`,
+          search: location.search,
+        });
+
+        dispatch(
+          partyApi.util.invalidateTags(["Party"])
+        );
+      }
+
+      else if (
+        from === "item-sales-purchases-details"
+      ) {
+        navigate({
+          pathname:
+            `/item/item-sales-purchases-details/${Item_Id}`,
+          search: location.search,
+        });
+      }
+
+      else if (from === "party-details") {
+        navigate({
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }
+
+      else if (from === "bank-accounts") {
+        navigate({
+          pathname: "/cash-bank/bank-accounts",
+          search: `?bankId=${bankId}`,
+        });
+      }
+
+      else if (from === "cash-in-hand") {
+        navigate({
+          pathname: "/cash-bank/cash-in-hand",
+        });
+      }
+
+      else {
+        navigate({
+          pathname: "/sale/all-sales",
+          search: location.search,
+        });
+      }
+
+    } catch (error) {
+      const message =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to update sale.";
+
+      toast.error(message);
+
+      console.error(
+        "❌ Submission failed:",
+        error
+      );
     }
-
-    else if (
-      from === "item-sales-purchases-details"
-    ) {
-      navigate({
-        pathname:
-          `/item/item-sales-purchases-details/${Item_Id}`,
-        search: location.search,
-      });
-    }
-
-    else if (from === "party-details") {
-      navigate({
-        pathname: "/party/parties",
-        search: location.search,
-      });
-    }
-
-    else if (from === "bank-accounts") {
-      navigate({
-        pathname: "/cash-bank/bank-accounts",
-        search: `?bankId=${bankId}`,
-      });
-    }
-
-    else if (from === "cash-in-hand") {
-      navigate({
-        pathname: "/cash-bank/cash-in-hand",
-      });
-    }
-
-    else {
-      navigate({
-        pathname: "/sale/all-sales",
-        search: location.search,
-      });
-    }
-
-  } catch (error) {
-    const message =
-      error?.data?.message ||
-      error?.message ||
-      "Failed to update sale.";
-
-    toast.error(message);
-
-    console.error(
-      "❌ Submission failed:",
-      error
-    );
-  }
-};
+  };
   // const handleItemSelect = (it, i) => {
   //   console.log("Selected Item:", it, "at row", i);
   //   setRows((prev) => {
@@ -897,6 +923,9 @@ export default function SaleEdit() {
   //   setValue(`Balance_Due`, Balance_Due);
   // };
   const showSalePayment = totalAmountWatch > 0;
+
+  console.log(currentPartyDetails, "currentPartyDetails");
+  //console.log(sale)
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -1034,12 +1063,12 @@ export default function SaleEdit() {
         </div>
         <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
-              {/* <div className="row"> */}
+            {/* <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+             
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
                 <div className=" flex flex-col relative mt-2 gap-2 party-class"
                   style={{ marginBottom: "0px", marginTop: "0px" }}>
-                  {/* <div className="input-field col s6 mt-4 relative"> */}
+                  {/* <div className="input-field col s6 mt-4 relative"> 
 
                   <span className="active">
                     Party
@@ -1132,9 +1161,9 @@ export default function SaleEdit() {
                   {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
-                      onSave={(newParty) => {
-                        setPartySearch(newParty);
-                        setValue("Party_Name", newParty, { shouldValidate: true });
+                      onSave={(updatedParty) => {
+                        setPartySearch(updatedParty);
+                        setValue("Party_Name", updatedParty, { shouldValidate: true });
                         setShowPartyModal(false);
                       }}
                     />
@@ -1143,7 +1172,7 @@ export default function SaleEdit() {
                 </div>
                 <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
-                  {/* <div className="input-field col s6 mt-4"> */}
+                  {/* <div className="input-field col s6 mt-4"> 
                   <span className="whitespace-nowrap active">
                     GSTIN
 
@@ -1172,11 +1201,11 @@ export default function SaleEdit() {
                 <div className="flex items-center w-full gap-3  justify-end">
                   {/* <div className="row  "> */}
 
-                  {/* Invoice Number */}
-                  {/* <div className="input-field col s6 mt-4"> */}
+            {/* Invoice Number */}
+            {/* <div className="input-field col s6 mt-4"> 
                   <span className="whitespace-nowrap ">
                     Invoice Number 
-                    {/* <span className="text-red-500">*</span> */}
+                    {/* <span className="text-red-500">*</span> 
                   </span>
 
                   <input
@@ -1198,12 +1227,12 @@ export default function SaleEdit() {
 
 
 
-                {/* Invoice Date */}
+                {/* Invoice Date 
                 <div className="flex items-center w-full  gap-3 justify-end">
-                  {/* <div className="input-field col s6 mt-4"> */}
+                  {/* <div className="input-field col s6 mt-4"> 
                   <span className=" whitespace-nowrap active">
                     Invoice Date
-                    {/* <span className="text-red-500">*</span> */}
+                    {/* <span className="text-red-500">*</span> 
                   </span>
 
                   <input
@@ -1231,11 +1260,11 @@ export default function SaleEdit() {
                 <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
                   {/* <div className="row w-1/2"> */}
 
-                  {/* State of Supply */}
-                  {/* <div className="input-field col s6"> */}
+            {/* State of Supply */}
+            {/* <div className="input-field col s6"> 
                   <span className=" whitespace-nowrap active">
                     State of Supply
-                    {/* <span className="text-red-500">*</span> */}
+                    {/* <span className="text-red-500">*</span> 
                   </span>
                   <select
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -1255,14 +1284,365 @@ export default function SaleEdit() {
                     <p className="text-red-500 text-xs mt-1">
                       {errors?.State_Of_Supply?.message}
                     </p>
-                  )} */}
+                  )} 
                 </div>
 
 
               </div>
 
-            </div>
+            </div> */}
+            <div className="flex flex-col justify-between gap-6 w-full lg:flex-row heading-wrapper">
 
+              {/* ══════════════════ LEFT SIDE ══════════════════ */}
+              <div className="flex flex-col gap-4 w-full lg:w-2/3">
+
+                {/* ── ROW: Party + GSTIN ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+                  {/* Party */}
+                  <div className="flex flex-col gap-2 relative party-class">
+                    <span className="active">
+                      Party
+                      <span className="text-red-500">*</span>
+                    </span>
+
+                    <div className="relative w-full">
+                      <div
+                        className="flex flex-row border rounded-md bg-white cursor-pointer"
+                        onClick={() => setOpen((prev) => !prev)}
+                      >
+                        <input
+                          type="text"
+                          id="Party_Name"
+                          value={partySearch}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPartySearch(value);
+                            setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                            setOpen(true);
+
+                            const matchedParty = parties?.parties?.find(
+                              (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
+                            );
+
+                            if (matchedParty) {
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              const defaultBilling = matchedParty.addresses?.find(
+                                (a) => a.Address_Type === "Billing" && a.Is_Default
+                              );
+                              setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                              setCurrentPartyDetails(matchedParty);
+                              setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                            } else {
+                              // typed value doesn't match any known party — treat as new, clear stale data
+                              setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
+                              setValue("Billing_Address", "", { shouldValidate: true, shouldDirty: true });
+                              setCurrentPartyDetails(null);
+                              setValue("Phone_Number", "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const typedValue = partySearch?.trim()?.toLowerCase();
+                              const matchedParty = parties?.parties?.find(
+                                (p) => p.Party_Name.toLowerCase() === typedValue
+                              );
+
+                              if (matchedParty) {
+                                setPartySearch(matchedParty.Party_Name);
+                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                const defaultBilling = matchedParty.addresses?.find(
+                                  (a) => a.Address_Type === "Billing" && a.Is_Default
+                                );
+                                setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                setCurrentPartyDetails(matchedParty);
+                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                              }
+
+                              setOpen(false);
+                            }, 150);
+                          }}
+                          placeholder="Search By Name/Phone"
+                          className="w-full outline-none py-1 px-2 text-gray-900"
+                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                        />
+                        <div className="w-10"></div>
+                        <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                      </div>
+
+                      {open && (
+                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          <span
+                            onClick={() => setShowPartyModal(true)}
+                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                          >
+                            + Add Party
+                          </span>
+
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  setPartySearch(party.Party_Name);
+                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true });
+                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
+                                  setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
+                                  const defaultBilling = party.addresses?.find(
+                                    (a) => a.Address_Type === "Billing" && a.Is_Default
+                                  );
+                                  setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+
+                                  setCurrentPartyDetails(party);
+                                  setOpen(false);
+                                }}
+                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              >
+                                {party.Party_Name} ({party.Phone_Number})
+                              </div>
+                            ))}
+
+                          {parties?.parties?.filter((party) =>
+                            party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+                          ).length === 0 && (
+                              <p className="px-3 py-2 text-gray-500">No Party found</p>
+                            )}
+                        </div>
+                      )}
+                    </div>
+
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartySearch(newParty);
+                          setValue("Party_Name", newParty, { shouldValidate: true, shouldDirty: true });
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )}
+                  </div>
+
+
+                  {/* Phone Number — compact inline label+input */}
+                  <div className="flex flex-col gap-2">
+
+                    <span className="whitespace-nowrap active">Phone Number</span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      id="Phone_Number"
+                      {...register("Phone_Number")}
+                      placeholder="Phone Number"
+                      className="w-full outline-none border-b-2 text-gray-900"
+                      style={{ marginBottom: 0 }}
+                    />
+
+                    {errors?.Phone_Number && (
+                      <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
+                    )}
+                  </div>
+                </div>
+                {/* ── ROW 2: Billing Address + GSTIN ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+                  {/* Billing Address */}
+                  <div className="flex flex-col gap-2">
+                    <span className="active">Billing Address</span>
+                    <textarea
+                      {...register("Billing_Address")}
+                      rows={5}
+                      placeholder="Billing Address"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                      style={{ minHeight: "80px" }}
+                    />
+
+                    {/* Only existing parties have address management */}
+                    {/* Existing party only */}
+                    {currentPartyDetails && (
+                      <>
+                        {watch("Billing_Address") ? (
+                          // ─────────────────────────────
+                          // ADDRESS EXISTS
+                          // ─────────────────────────────
+                          <div className="flex justify-end gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setValue("Billing_Address", "", {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                              }
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#ef4444",
+                                cursor: "pointer",
+                                fontSize: 13,
+                              }}
+                            >
+                              Remove
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
+                        ) : (
+                          // ─────────────────────────────
+                          // ADDRESS REMOVED / NOT SET
+                          // ─────────────────────────────
+                          <div className="flex justify-end mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              + Set Billing Address
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* {errors?.Billing_Address && (
+                      <p className="text-red-500 text-xs mt-1">{errors.Billing_Address.message}</p>
+                    )} */}
+                  </div>
+
+                  {/* GSTIN — compact inline label+input, pinned to top */}
+                  <div className="flex flex-col gap-2 self-start">
+
+                    <span className="whitespace-nowrap active">GSTIN</span>
+                    <input
+                      type="text"
+                      id="GSTIN"
+                      value={showGSTIN || ""}
+                      {...register("GSTIN")}
+                      placeholder="GSTIN"
+                      className="w-full outline-none border-b-2 text-gray-900"
+                      style={{ marginBottom: 0 }}
+                      readOnly
+                    />
+                  </div>
+                  {/* {errors?.GSTIN && (
+                    <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
+                  )} */}
+
+                </div>
+                {showEditPartyModal && (
+                  <PartyAddModal
+                    editingParty={true}
+                    partyDetails={currentPartyDetails}
+                    restrictedMode={true}
+                    onClose={() => setShowEditPartyModal(false)}
+                    onSave={(updatedParty) => {
+                      const defaultBilling = updatedParty.addresses?.find(
+                        (a) => a.Address_Type === "Billing" && a.Is_Default
+                      );
+                      setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldDirty: true, shouldValidate: true });
+                      setShowEditPartyModal(false);
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* ══════════════════ RIGHT SIDE ══════════════════ */}
+              <div className="flex flex-col gap-4 w-full lg:w-1/3">
+
+                {/* Invoice Number */}
+                <div className="grid grid-cols-[150px_1fr] items-center gap-3">
+                  <span className="whitespace-nowrap">Invoice Number</span>
+                  <input
+                    type="text"
+                    id="Invoice_Number"
+                    {...register("Invoice_Number")}
+                    placeholder="Invoice Number"
+                    readOnly
+                    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 w-full"
+                    style={{ marginBottom: 0 }}
+                  />
+                </div>
+                {errors?.Invoice_Number && (
+                  <p className="text-red-500 text-xs pl-[162px]">{errors?.Invoice_Number?.message}</p>
+                )}
+
+                {/* Invoice Date */}
+                <div className="grid grid-cols-[150px_1fr] items-center gap-3">
+                  <span className="whitespace-nowrap active">Invoice Date</span>
+                  <input
+                    type="date"
+                    id="Invoice_Date"
+                    {...register("Invoice_Date")}
+                    className="invoice-date-class w-full outline-none text-gray-900 border-b-2"
+                    style={{ marginBottom: 0 }}
+                  />
+                </div>
+                {errors?.Invoice_Date && (
+                  <p className="text-red-500 text-xs pl-[162px]">{errors?.Invoice_Date?.message}</p>
+                )}
+
+                {/* State of Supply */}
+                <div className="grid grid-cols-[150px_1fr] items-center gap-3 state-of-supply-class">
+                  <span className="whitespace-nowrap active">State of Supply</span>
+                  <select
+                    id="stateOfSupply"
+                    className="validate w-full border-b-2"
+                    style={{ marginBottom: 0 }}
+                    {...register("State_Of_Supply")}
+                  >
+                    <option value="">Select State</option>
+                    {states.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+              </div>
+
+            </div>
 
 
 
@@ -2172,168 +2552,168 @@ export default function SaleEdit() {
                           <div className="flex flex-col w-full">
                             <span className="active">Payment Type</span>
 
-                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
+                            {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
             it's driven by setValue in the onChange below, not a native <select {...register}> */}
-                          <input
-                            type="hidden"
-                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
-                          />
-
-                          <select
-                            id="Payment_Type"
-                            value={
-                              paymentType === "Bank"
-                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                                : paymentType || ""
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val.startsWith("bank_")) {
-                                const bankId = val.replace("bank_", "");
-                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                              } else {
-                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                              }
-                            }}
-                          >
-                            {/* <option value="">Select Payment Type</option> */}
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Neft">Neft</option>
-                            {banks?.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </select>
-
-                          {errors?.splits?.[0]?.Payment_Type && (
-                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
-                          )}
-                        </div>
-
-
-                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                          <div className="mt-3 flex flex-col">
-                            <label className="text-sm">Reference Number</label>
                             <input
-                              type="text"
-                              //readOnly={isView}
-                              style={{ marginBottom: "0px" }}
-                              {...register("splits.0.Reference_Number")}
+                              type="hidden"
+                              {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                             />
+
+                            <select
+                              id="Payment_Type"
+                              value={
+                                paymentType === "Bank"
+                                  ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                  : paymentType || ""
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val.startsWith("bank_")) {
+                                  const bankId = val.replace("bank_", "");
+                                  setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                  setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                  setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                                }
+                              }}
+                            >
+                              {/* <option value="">Select Payment Type</option> */}
+                              <option value="Cash">Cash</option>
+                              <option value="Cheque">Cheque</option>
+                              <option value="Neft">Neft</option>
+                              {banks?.map((bank) => (
+                                <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
+                                  {bank.Account_Display_Name}
+                                </option>
+                              ))}
+                            </select>
+
+                            {errors?.splits?.[0]?.Payment_Type && (
+                              <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
+                            )}
                           </div>
-                        )}
 
-                        <button
-                          type="button"
-                          onClick={handleAddPaymentType}
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none", padding: 0 }}
-                        >
-                          + Add Payment Type
-                        </button>
-                      </>
-                    ) : (
-                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
-                        {splitFields.map((field, index) => {
-                          const rowType = watch(`splits.${index}.Payment_Type`);
-                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
-                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
-                          const amountField = register(`splits.${index}.Amount`, {
-                            required: "Required",
-                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
-                          });
 
-                          return (
-                            <div key={field.id} className="flex flex-col gap-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
-                                    value={currentIdentifier || ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val.startsWith("bank_")) {
-                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                      } else {
-                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                      }
-                                    }}
-                                    className="border rounded-md px-2 py-1.5"
-                                  >
-                                    <option value="">Select Type</option>
-                                    {rowOptions.map((opt) => (
-                                      <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
+                          {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                            <div className="mt-3 flex flex-col">
+                              <label className="text-sm">Reference Number</label>
+                              <input
+                                type="text"
+                                //readOnly={isView}
+                                style={{ marginBottom: "0px" }}
+                                {...register("splits.0.Reference_Number")}
+                              />
+                            </div>
+                          )}
 
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Amount"
-                                    style={{ marginBottom: "0px", width: "80%" }}
-                                    className="border rounded-md px-2 py-1.5"
-                                    {...amountField}
-                                    onChange={(e) => {
-                                      e.target.value = sanitizeAmount(e.target.value);
-                                      amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`);
-                                    }}
-                                  />
-                                  {errors?.splits?.[index]?.Amount && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                          <button
+                            type="button"
+                            onClick={handleAddPaymentType}
+                            className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                            style={{ background: "transparent", border: "none", padding: 0 }}
+                          >
+                            + Add Payment Type
+                          </button>
+                        </>
+                      ) : (
+                        <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
+                          {splitFields.map((field, index) => {
+                            const rowType = watch(`splits.${index}.Payment_Type`);
+                            const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
+                            const rowOptions = getAvailableOptions(index);
+                            const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
+                            const amountField = register(`splits.${index}.Amount`, {
+                              required: "Required",
+                              validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                            });
+
+                            return (
+                              <div key={field.id} className="flex flex-col gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                  <div className="flex flex-col flex-1">
+                                    <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                    <select
+                                      value={currentIdentifier || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val.startsWith("bank_")) {
+                                          setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                          setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                        } else {
+                                          setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                          setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                        }
+                                      }}
+                                      className="border rounded-md px-2 py-1.5"
+                                    >
+                                      <option value="">Select Type</option>
+                                      {rowOptions.map((opt) => (
+                                        <option key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="flex flex-col flex-1">
+                                    <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder="Amount"
+                                      style={{ marginBottom: "0px", width: "80%" }}
+                                      className="border rounded-md px-2 py-1.5"
+                                      {...amountField}
+                                      onChange={(e) => {
+                                        e.target.value = sanitizeAmount(e.target.value);
+                                        amountField.onChange(e);
+                                        clearErrors(`splits.${index}.Amount`);
+                                      }}
+                                    />
+                                    {errors?.splits?.[index]?.Amount && (
+                                      <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                    )}
+                                  </div>
+
+                                  {splitFields.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSplit(index)}
+                                      className="text-gray-500 mb-2 mt-4"
+                                      style={{ background: "transparent", border: "none" }}
+                                    >
+                                      <Trash2 size={18} />
+                                    </button>
                                   )}
                                 </div>
 
-                                {splitFields.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSplit(index)}
-                                    className="text-gray-500 mb-2 mt-4"
-                                    style={{ background: "transparent", border: "none" }}
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
+                                {needsRef && (
+                                  <input
+                                    type="text"
+                                    placeholder="Reference Number"
+                                    style={{ width: "80%" }}
+                                    // className="border rounded-md px-2 py-1.5 w-full"
+                                    {...register(`splits.${index}.Reference_Number`)}
+                                  />
                                 )}
                               </div>
+                            );
+                          })}
 
-                              {needsRef && (
-                                <input
-                                  type="text"
-                                  placeholder="Reference Number"
-                                  style={{ width: "80%" }}
-                                  // className="border rounded-md px-2 py-1.5 w-full"
-                                  {...register(`splits.${index}.Reference_Number`)}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                          }
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none" }}
-                        >
-                          + Add Another Payment
-                        </button>
-                      </div>
-                    )}
-                  </div>)}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                            }
+                            className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                            style={{ background: "transparent", border: "none" }}
+                          >
+                            + Add Another Payment
+                          </button>
+                        </div>
+                      )}
+                    </div>)}
                 </div>
                 {/* <div style={{ width: "100%" }}
                   className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"

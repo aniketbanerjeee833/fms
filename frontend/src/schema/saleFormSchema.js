@@ -47,8 +47,13 @@ export const saleFormSchema = z.object({
  Phone_Number: z
   .string()
   .trim()
-  .optional()
-  .or(z.literal("")),
+  .refine(
+    (value) => value === "" || /^\d{10}$/.test(value),
+    {
+      message: "Phone number must be exactly 10 digits",
+    }
+  )
+  .optional(),
   Billing_Address: z
   .string()
   .trim()

@@ -425,15 +425,103 @@ const addPurchase = async (req, res, next) => {
     //      than accept them, filter items below instead of validating/rejecting here:
     //      const itemsToInsert = items.filter((item) => item.Item_Name?.trim());
 
-    const [partyRows] = await connection.execute(
-      "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
-      [Party_Name]
-    );
-    if (partyRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ message: "Party not found." });
-    }
-    const Party_Id = partyRows[0].Party_Id;
+    // const [partyRows] = await connection.execute(
+    //   "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
+    //   [Party_Name]
+    // );
+    // if (partyRows.length === 0) {
+    //   await connection.rollback();
+    //   return res.status(404).json({ message: "Party not found." });
+    // }
+    // const Party_Id = partyRows[0].Party_Id;
+    // =========================================================
+// 7. FIND PARTY / AUTO-CREATE NEW PARTY
+// =========================================================
+
+const [partyRows] = await connection.execute(
+  `SELECT *
+   FROM add_party
+   WHERE TRIM(Party_Name) = TRIM(?)
+   LIMIT 1`,
+  [Party_Name]
+);
+
+let Party_Id;
+
+if (partyRows.length === 0) {
+  // =======================================================
+  // A. CREATE PARTY MASTER
+  // =======================================================
+
+  const [partyResult] = await connection.execute(
+    `INSERT INTO add_party
+     (
+       Party_Name,
+       
+       
+       created_at,
+       updated_at
+     )
+     VALUES (?, NOW(), NOW())`,
+    [
+      Party_Name.trim(),
+     
+    
+    ]
+  );
+
+  const partyIdNumber = partyResult.insertId;
+
+  Party_Id =
+    "PTY" +
+    partyIdNumber
+      .toString()
+      .padStart(3, "0");
+
+  await connection.execute(
+    `UPDATE add_party
+     SET Party_Id = ?
+     WHERE id = ?`,
+    [Party_Id, partyIdNumber]
+  );
+
+  // =======================================================
+  // B. CREATE DEFAULT BILLING ADDRESS
+  // =======================================================
+
+  // Only create address row if user actually entered address
+  // if (Billing_Address?.trim()) {
+  //   await connection.execute(
+  //     `INSERT INTO add_party_address
+  //      (
+  //        Party_Id,
+  //        Billing_Address,
+  //        Is_Default,
+  //        created_at,
+  //        updated_at
+  //      )
+  //      VALUES (?, ?, 1, NOW(), NOW())`,
+  //     [
+  //       Party_Id,
+  //       Billing_Address.trim(),
+  //     ]
+  //   );
+  // }
+}
+
+// =========================================================
+// EXISTING PARTY
+// =========================================================
+else {
+  Party_Id = partyRows[0].Party_Id;
+
+  // IMPORTANT:
+  // Don't update party phone here.
+  // Don't update default billing address here.
+  //
+  // Phone_Number and Billing_Address entered in this sale
+  // belong to this invoice only.
+}
 
     const [fy] = await connection.query(
       `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`

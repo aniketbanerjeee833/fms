@@ -2247,3 +2247,319 @@
 //                                               )}
 //                                             </div>
 //                                           )} */}
+
+
+            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+
+             <div className="flex flex-col gap-4 w-full">
+
+  {/* ── ROW 1: Party + Phone Number ── */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+    {/* Party */}
+    <div className="flex flex-col gap-2 relative party-class">
+      <span className="whitespace-nowrap active">
+        Party
+        <span className="text-red-500">*</span>
+      </span>
+
+      <div className="relative w-full">
+        <div
+          className="flex flex-row border rounded-md bg-white cursor-pointer"
+          onClick={() => setOpen((prev) => !prev)}
+        >
+          <input
+            type="text"
+            id="Party_Name"
+            value={partySearch}
+            onChange={(e) => {
+              const value = e.target.value;
+              setPartySearch(value);
+              setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+              setOpen(true);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(true);
+            }}
+            onBlur={() => {
+              setTimeout(() => {
+                const typedValue = partySearch?.trim()?.toLowerCase();
+                const matchedParty = parties?.parties?.find(
+                  (p) => p.Party_Name.toLowerCase() === typedValue
+                );
+
+                if (matchedParty) {
+                  setPartySearch(matchedParty.Party_Name);
+                  setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                  setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                }
+
+                setOpen(false);
+              }, 150);
+            }}
+            placeholder="Search By Name/Phone"
+            className="w-full outline-none py-1 px-2 text-gray-900"
+            style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+          />
+          <div className="w-10"></div>
+          <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+        </div>
+
+        {open && (
+          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+            <span
+              onClick={() => setShowPartyModal(true)}
+              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+            >
+              + Add Party
+            </span>
+
+            {parties?.parties
+              ?.filter(
+                (party) =>
+                  party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                  party?.Phone_Number?.includes(partySearch)
+              )
+              .map((party, i) => (
+                <div
+                  key={i}
+                  onClick={() => {
+                    setPartySearch(party.Party_Name);
+                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                    const defaultBilling = party.addresses?.find(
+                      (a) => a.Address_Type === "Billing" && a.Is_Default
+                    );
+                    setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+
+                    setCurrentPartyDetails(party);
+                    setOpen(false);
+                  }}
+                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                >
+                  {party.Party_Name} ({party.Phone_Number})
+                </div>
+              ))}
+
+            {parties?.parties?.filter((party) =>
+              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+            ).length === 0 && (
+              <p className="px-3 py-2 text-gray-500">No Party found</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showPartyModal && (
+        <PartyAddModal
+          onClose={() => setShowPartyModal(false)}
+          onSave={(newParty) => {
+            setPartySearch(newParty);
+            setValue("Party_Name", newParty, { shouldValidate: true, shouldDirty: true });
+            setShowPartyModal(false);
+          }}
+        />
+      )}
+
+      {errors?.Party_Name && (
+        <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
+      )}
+    </div>
+
+    {/* Phone Number */}
+    <div className="flex flex-col gap-2">
+      <span className="whitespace-nowrap active">Phone Number</span>
+      <input
+        type="tel"
+        maxLength={10}
+        id="Phone_Number"
+        {...register("Phone_Number")}
+        placeholder="Phone Number"
+        className="w-full outline-none border-b-2 text-gray-900"
+      />
+      {errors?.Phone_Number && (
+        <p className="text-red-500 text-xs mt-1">{errors?.Phone_Number?.message}</p>
+      )}
+    </div>
+  </div>
+
+  {/* ── ROW 2: Billing Address + GSTIN — 2x2 grid ── */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+    {/* Billing Address */}
+    <div className="flex flex-col gap-2">
+      <span className="active">Billing Address</span>
+      <textarea
+        {...register("Billing_Address")}
+        rows={5}
+        placeholder="Billing Address"
+        className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+        style={{ minHeight: "110px" }}
+      />
+
+      {watch("Billing_Address") && (
+        <div className="flex justify-end gap-3 mt-1">
+          <button
+            type="button"
+            onClick={() => setValue("Billing_Address", "", { shouldDirty: true, shouldValidate: true })}
+            style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 13 }}
+          >
+            Remove
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowEditPartyModal(true)}
+            style={{ background: "transparent", border: "none", color: "#4CA1AF", cursor: "pointer", fontSize: 13, fontWeight: 500 }}
+          >
+            Change
+          </button>
+        </div>
+      )}
+
+      {errors?.Billing_Address && (
+        <p className="text-red-500 text-xs mt-1">{errors.Billing_Address.message}</p>
+      )}
+    </div>
+
+    {/* GSTIN */}
+    <div className="flex flex-col gap-2">
+      <span className="whitespace-nowrap active">GSTIN</span>
+      <input
+        type="text"
+        id="GSTIN"
+        value={showGSTIN || ""}
+        {...register("GSTIN")}
+        placeholder="GSTIN"
+        className="w-full outline-none border-b-2 text-gray-900"
+        readOnly
+      />
+      {errors?.GSTIN && (
+        <p className="text-red-500 text-xs mt-1">{errors?.GSTIN?.message}</p>
+      )}
+    </div>
+  </div>
+
+  {showEditPartyModal && (
+    <PartyAddModal
+      editingParty={true}
+      partyDetails={currentPartyDetails}
+      restrictedMode={true}
+      onClose={() => setShowEditPartyModal(false)}
+      onSave={(updatedParty) => {
+        const defaultBilling = updatedParty.addresses?.find(
+          (a) => a.Address_Type === "Billing" && a.Is_Default
+        );
+        setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldDirty: true, shouldValidate: true });
+        setShowEditPartyModal(false);
+      }}
+    />
+  )}
+
+</div>
+              <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
+           gap-0  mr-2">
+
+                <div className="flex items-center w-full gap-3  justify-end">
+
+                  {/* Label */}
+                  <span className="whitespace-nowrap ">
+                    Invoice Number
+                    {/* <span className="text-red-500">*</span> */}
+                  </span>
+
+                  {/* Input */}
+                  <input
+                    type="text"
+                    id="Invoice_Number"
+                    {...register("Invoice_Number")}
+                    placeholder="Invoice Number"
+                    readOnly
+
+                    // className="  outline-none text-gray-900 py-1 bg-transparent"
+                    className="
+       invoice-number-class
+      outline-none 
+      text-gray-900 
+      py-1 
+      bg-transparent "
+
+
+
+                    style={{ marginBottom: 0, border: "none", width: "50%" }}
+                  />
+
+                </div>
+
+                {/* Error message */}
+                {errors?.Invoice_Number && (
+                  <p className="text-red-500 text-xs mt-1">{errors.Invoice_Number.message}</p>
+                )}
+
+
+
+
+                {/* Invoice Date */}
+                <div className="flex items-center w-full gap-3 justify-end">
+                  {/* <div className="grid grid-cols-[140px_0.9fr] items-center gap-2"> */}
+                  {/* <div className="input-field  "> */}
+                  <span className=" whitespace-nowrap active">
+                    Invoice Date
+                    {/* <span className="text-red-500">*</span> */}
+                  </span>
+
+                  <input
+                    style={{ marginBottom: 0, width: "50%", border: "none" }}
+                    type="date"
+                    id=" Invoice_Date"
+                    {...register("Invoice_Date")}
+                    placeholder=" Invoice_Date"
+                    className="w-full outline-none text-gray-900 invoice-date-class"
+                    min={
+                      latestInvoiceNumber?.latestInvoiceInfo?.createdAt
+                        ? new Date(latestInvoiceNumber?.latestInvoiceInfo?.createdAt).toISOString().split("T")[0]
+                        : ""
+                    } // ✅ Prevent earlier dates
+                  />
+                  {errors?.Invoice_Date && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.Invoice_Date?.message}
+                    </p>
+                  )}
+                </div>
+
+
+
+
+
+
+                {/* State of Supply */}
+                <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
+                  {/* <div className="grid grid-cols-[140px_0.9fr] items-center gap-2"> */}
+                  {/* <div className="input-field  "> */}
+                  <span className=" whitespace-nowrap active">
+                    State of Supply
+                    {/* <span className="text-red-500">*</span> */}
+                  </span>
+                  <select
+                    style={{ marginBottom: "0px", width: "50%", border: "none" }}
+                    id="stateOfSupply"
+                    className="validate mt-2"
+                    {...register("State_Of_Supply")}
+                  >
+                    <option value="">Select State</option>
+                    {states.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
+                  {/* {errors?.State_Of_Supply && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.State_Of_Supply?.message}
+                    </p>
+                  )} */}
+                </div>
+              </div>
+
+            </div>

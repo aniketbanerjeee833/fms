@@ -9,34 +9,35 @@ import { partyApi } from "../../redux/api/partyAPi";
 
 const ACCENT = "#4CA1AF";
 
-const TABS = ["GST & Address", "Credit & Balance"];
+
+
 
 const STATES = [
-  "Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar",
-  "Chandigarh","Chhattisgarh","Dadra and Nagar Haveli and Daman and Diu","Delhi","Goa",
-  "Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka",
-  "Kerala","Ladakh","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya",
-  "Mizoram","Nagaland","Odisha","Puducherry","Punjab","Rajasthan","Sikkim","Tamil Nadu",
-  "Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
+  "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar",
+  "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka",
+  "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
+  "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
 ];
 
-export default function PartyAddModal({ onClose, onSave, partyDetails, editingParty }) {
-  const dispatch    = useDispatch();
+export default function PartyAddModal({ onClose, onSave, partyDetails, editingParty, restrictedMode = false }) {
+  const dispatch = useDispatch();
   const dropdownRef = useRef(null);
-
-  const [activeTab,         setActiveTab]         = useState("GST & Address");
-  const [stateOpen,         setStateOpen]         = useState(false);
-  const [stateSearch,       setStateSearch]       = useState("");
-  const [showBalanceType,   setShowBalanceType]   = useState(false);
-  const [customLimit,       setCustomLimit]       = useState(false);
+  const TABS = restrictedMode ? ["GST & Address"] : ["GST & Address", "Credit & Balance"];
+  const [activeTab, setActiveTab] = useState("GST & Address");
+  const [stateOpen, setStateOpen] = useState(false);
+  const [stateSearch, setStateSearch] = useState("");
+  const [showBalanceType, setShowBalanceType] = useState(false);
+  const [customLimit, setCustomLimit] = useState(false);
   const [defaultBillingIdx, setDefaultBillingIdx] = useState(null);
-  const [defaultShippingIdx,setDefaultShippingIdx]= useState(null);
-  const [confirmModal,      setConfirmModal]      = useState(false);
+  const [defaultShippingIdx, setDefaultShippingIdx] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(false);
 
-  const [addParty,    { isLoading: isAdding   }] = useAddPartyMutation();
+  const [addParty, { isLoading: isAdding }] = useAddPartyMutation();
   const [updateParty, { isLoading: isUpdating }] = useEditPartyMutation();
   const isLoading = isAdding || isUpdating;
-
+  //console.log(partyDetails, "partyDetails");
   /* ── form ── */
   const {
     register,
@@ -49,20 +50,20 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
   } = useForm({
     resolver: zodResolver(partyFormSchema),
     defaultValues: {
-      Party_Name:            "",
-      GSTIN:                 "",
-      Phone_Number:          "",
-      State:                 "",
-      Email_Id:              "",
+      Party_Name: "",
+      GSTIN: "",
+      Phone_Number: "",
+      State: "",
+      Email_Id: "",
       addresses: [
-        { Address_Type: "Billing",  Address_Text: "", Is_Default: false },
+        { Address_Type: "Billing", Address_Text: "", Is_Default: false },
         { Address_Type: "Shipping", Address_Text: "", Is_Default: false },
       ],
-      Opening_Balance:      "",
+      Opening_Balance: "",
       Opening_Balance_Type: null,
       Opening_Balance_Date: new Date().toISOString().split("T")[0],
-      Credit_Limit_Type:    "No_Limit",
-      Credit_Limit:         "",
+      Credit_Limit_Type: "No_Limit",
+      Credit_Limit: "",
     },
   });
 
@@ -72,7 +73,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
   });
 
   const openingBalanceWatch = watch("Opening_Balance");
-  const openingBalanceType  = watch("Opening_Balance_Type");
+  const openingBalanceType = watch("Opening_Balance_Type");
 
   /* show balance type toggle when OB has a value */
   useEffect(() => {
@@ -90,7 +91,11 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
+  useEffect(() => {
+    if (restrictedMode && activeTab !== "GST & Address") {
+      setActiveTab("GST & Address");
+    }
+  }, [restrictedMode, activeTab]);
   /* prefill for edit */
   useEffect(() => {
     if (!editingParty || !partyDetails) return;
@@ -99,29 +104,29 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
 
     /* figure out default address indices */
     const addresses = partyDetails.addresses ?? [];
-    const defBilling  = addresses.findIndex((a) => a.Address_Type === "Billing"  && a.Is_Default);
+    const defBilling = addresses.findIndex((a) => a.Address_Type === "Billing" && a.Is_Default);
     const defShipping = addresses.findIndex((a) => a.Address_Type === "Shipping" && a.Is_Default);
-    if (defBilling  >= 0) setDefaultBillingIdx(defBilling);
+    if (defBilling >= 0) setDefaultBillingIdx(defBilling);
     if (defShipping >= 0) setDefaultShippingIdx(defShipping);
 
     /* custom limit toggle */
     if (partyDetails.Credit_Limit_Type === "Custom") setCustomLimit(true);
 
     reset({
-      Party_Name:            partyDetails.Party_Name            ?? "",
-      GSTIN:                 partyDetails.GSTIN                 ?? "",
-      Phone_Number:          partyDetails.Phone_Number          ?? "",
-      State:                 partyDetails.State                 ?? "",
-      Email_Id:              partyDetails.Email_Id              ?? "",
-      Opening_Balance:       partyDetails.Opening_Balance       ?? "",
-      Opening_Balance_Type:  partyDetails.Opening_Balance_Type  ?? null,
-      Opening_Balance_Date:  partyDetails.Opening_Balance_Date
+      Party_Name: partyDetails.Party_Name ?? "",
+      GSTIN: partyDetails.GSTIN ?? "",
+      Phone_Number: partyDetails.Phone_Number ?? "",
+      State: partyDetails.State ?? "",
+      Email_Id: partyDetails.Email_Id ?? "",
+      Opening_Balance: partyDetails.Opening_Balance ?? "",
+      Opening_Balance_Type: partyDetails.Opening_Balance_Type ?? null,
+      Opening_Balance_Date: partyDetails.Opening_Balance_Date
         ? new Date(partyDetails.Opening_Balance_Date).toISOString().split("T")[0]
         : new Date().toISOString().split("T")[0],
-      Credit_Limit_Type:     partyDetails.Credit_Limit_Type     ?? "No_Limit",
-      Credit_Limit:          partyDetails.Credit_Limit          ?? "",
+      Credit_Limit_Type: partyDetails.Credit_Limit_Type ?? "No_Limit",
+      Credit_Limit: partyDetails.Credit_Limit ?? "",
       addresses: addresses.length > 0 ? addresses : [
-        { Address_Type: "Billing",  Address_Text: "", Is_Default: false },
+        { Address_Type: "Billing", Address_Text: "", Is_Default: false },
         { Address_Type: "Shipping", Address_Text: "", Is_Default: false },
       ],
     });
@@ -156,13 +161,17 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
         if (!res?.success) { toast.error("Failed to update party"); return; }
         toast.success("Party updated successfully!");
         dispatch(partyApi.util.invalidateTags(["Party"]));
+        onSave?.(res);      // ⭐ ADD THIS
         onClose();
+
       } else {
         const res = await addParty({ body: data }).unwrap();
+        console.log("addParty res", res);
         if (!res?.success) { toast.error("Failed to add party"); return; }
         toast.success("Party added successfully!");
         dispatch(partyApi.util.invalidateTags(["Party"]));
-        onSave(res?.Party_Name);
+        //onSave(res?.Party_Name);
+        onSave(res);
       }
     } catch (err) {
       toast.error(err?.data?.message || err?.message || "Something went wrong");
@@ -172,21 +181,21 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
   /* ── shared styles ── */
   const inputCls = "w-full outline-none border-b-2 border-gray-300 focus:border-[#4CA1AF] text-gray-900 py-1 bg-transparent transition-colors";
   const labelCls = "text-xs font-medium text-gray-500 mb-0.5";
-const formValues=watch();
-console.log("formValues",formValues);
+  const formValues = watch();
+  console.log("formValues", formValues);
   return (
     <div
       style={{
-        marginTop:       "50px",
-        position:        "fixed",
-        inset:           0,
-        display:         "flex",
-        alignItems:      "center",
-        justifyContent:  "center",
+        marginTop: "50px",
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         backgroundColor: "rgba(0,0,0,0.3)",
-        backdropFilter:  "blur(4px)",
-        zIndex:          100,
-        padding:         "1rem",
+        backdropFilter: "blur(4px)",
+        zIndex: 100,
+        padding: "1rem",
       }}
     >
       <div
@@ -228,7 +237,7 @@ console.log("formValues",formValues);
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
             <div className="flex flex-col">
               <span className={labelCls}>Party Name <span className="text-red-500">*</span></span>
-              <input type="text" placeholder="Party Name" className={inputCls} {...register("Party_Name")} />
+              <input type="text" placeholder="Party Name" className={inputCls} disabled={restrictedMode} {...register("Party_Name")} />
               {errors?.Party_Name && <p className="text-red-500 text-xs mt-1">{errors.Party_Name.message}</p>}
             </div>
 
@@ -243,7 +252,7 @@ console.log("formValues",formValues);
 
             <div className="flex flex-col">
               <span className={labelCls}>Phone Number</span>
-              <input type="text" placeholder="Phone Number" className={inputCls}
+              <input type="tel" maxLength={10} placeholder="Phone Number" disabled={restrictedMode} className={inputCls}
                 {...register("Phone_Number")}
                 onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 10); }}
               />
@@ -300,7 +309,7 @@ console.log("formValues",formValues);
                   {/* Email */}
                   <div className="flex flex-col">
                     <span className={labelCls}>Email</span>
-                    <input type="text" placeholder="example@email.com" className={inputCls} {...register("Email_Id")} />
+                    <input type="text" placeholder="example@email.com" className={inputCls} disabled={restrictedMode} {...register("Email_Id")} />
                     {errors?.Email_Id && <p className="text-red-500 text-xs mt-1">{errors.Email_Id.message}</p>}
                   </div>
                 </div>
@@ -326,10 +335,29 @@ console.log("formValues",formValues);
                         style={{ borderColor: isDefault ? ACCENT : "#e5e7eb", backgroundColor: isDefault ? "#eaf6f7" : "white" }}>
                         <div className="flex-shrink-0 rounded-full"
                           style={{ width: 10, height: 10, backgroundColor: isDefault ? ACCENT : "#d1d5db", marginTop: 6 }} />
-                        <textarea rows={2} placeholder="Billing Address"
-                          style={{ resize: "none", flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13 }}
+                        <textarea
+                          rows={3}
+                          placeholder="Billing Address"
+                          className="flex-1 min-h-[70px] resize-y"
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            outline: "none",
+                            fontSize: 13,
+                          }}
                           {...register(`addresses.${i}.Address_Text`)}
-                          onClick={(e) => e.stopPropagation()} />
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        {/* <textarea rows={2} placeholder="Billing Address"
+                          style={{  flex: 1, border: "none", background: "transparent", outline: "none",
+                             fontSize: 13,minHeight: "44px" }}
+                          {...register(`addresses.${i}.Address_Text`)}
+                          onClick={(e) => e.stopPropagation()}
+                          onInput={(e) => {
+                            e.currentTarget.style.height = "auto";
+                            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
+                          }}
+                        /> */}
                         {addressFields.filter((f) => f.Address_Type === "Billing").length > 1 && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); removeAddress(i); }}
                             style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}>✕</button>

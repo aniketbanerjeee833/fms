@@ -68,7 +68,16 @@ const partySchema = z.object({
     })
     .optional(),
 
-  Phone_Number: z.string().optional().or(z.literal("")),
+ Phone_Number: z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || /^\d{10}$/.test(value),
+    {
+      message: "Phone number must be exactly 10 digits",
+    }
+  )
+  .optional(),
 
   State: z.string().min(1, "State is required minimum 1 character")
     .optional().or(z.literal("")),

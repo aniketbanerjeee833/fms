@@ -760,7 +760,7 @@ export default function PartyAdd() {
                         <div className="flex flex-col">
                             <span className={labelCls}>Phone Number</span>
                             <input
-                                type="text"
+                                type="tel"
                                 placeholder="Phone Number"
                                 className={inputCls}
                                 {...register("Phone_Number")}
