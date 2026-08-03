@@ -1903,9 +1903,7 @@ const getSinglePurchase = async (req, res, next) => {
          pu.Balance_Due,
          pu.Party_Id,
          p.Party_Name,
-         p.GSTIN,
-         p.Billing_Address,
-         p.Shipping_Address
+         p.GSTIN
        FROM add_purchase pu
        LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
        WHERE pu.Purchase_Id = ?`,

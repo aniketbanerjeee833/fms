@@ -1,635 +1,503 @@
-import { useRef, useState } from "react";
-import { useDispatch } from "react-redux";
-
-import { partyApi, useAddPartyMutation, useEditPartyMutation } from "../../redux/api/partyAPi";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useRef } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { partyFormSchema } from "../../schema/partyFormSchema";
-import { useEffect } from "react";
+import { useAddPartyMutation, useEditPartyMutation } from "../../redux/api/partyAPi";
+import { partyApi } from "../../redux/api/partyAPi";
 
-export default function PartyAddModal({ onClose,onSave,partyDetails,editingParty }) {
-        // const navigate = useNavigate();
+const ACCENT = "#4CA1AF";
 
-const states = [
-  "Andaman and Nicobar Islands",
-  "Andhra Pradesh",
-  "Arunachal Pradesh",
-  "Assam",
-  "Bihar",
-  "Chandigarh",
-  "Chhattisgarh",
-  "Dadra and Nagar Haveli and Daman and Diu",
-  "Delhi",
-  "Goa",
-  "Gujarat",
-  "Haryana",
-  "Himachal Pradesh",
-  "Jammu and Kashmir",
-  "Jharkhand",
-  "Karnataka",
-  "Kerala",
-  "Ladakh",
-  "Lakshadweep",
-  "Madhya Pradesh",
-  "Maharashtra",
-  "Manipur",
-  "Meghalaya",
-  "Mizoram",
-  "Nagaland",
-  "Odisha",
-  "Puducherry",
-  "Punjab",
-  "Rajasthan",
-  "Sikkim",
-  "Tamil Nadu",
-  "Telangana",
-  "Tripura",
-  "Uttar Pradesh",
-  "Uttarakhand",
-  "West Bengal"
+const TABS = ["GST & Address", "Credit & Balance"];
+
+const STATES = [
+  "Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar",
+  "Chandigarh","Chhattisgarh","Dadra and Nagar Haveli and Daman and Diu","Delhi","Goa",
+  "Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka",
+  "Kerala","Ladakh","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya",
+  "Mizoram","Nagaland","Odisha","Puducherry","Punjab","Rajasthan","Sikkim","Tamil Nadu",
+  "Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
 ];
- const dispatch = useDispatch();
- const dropdownRef = useRef(null);
-        const [activeTab, setActiveTab] = useState("GST & Address");
-       const[shippingAdress, setShippingAddress] = useState(false);
-    const [confirmModal, setConfirmModal] = useState(false);
- const [open, setOpen] = useState(false);
-     const [search, setSearch] = useState("");
-     const[selected, setSelected] = useState(null);
-        const[addParty, { isLoading }] = useAddPartyMutation();
-        const[updateParty, { isLoading: isUpdating }] = useEditPartyMutation();
-      
-        console.log("partyDetails",partyDetails);
-        console.log("editingParty",editingParty);
 
-        const {
-            register,
-            
-          reset,
-            watch,
-                 setValue,
-            formState: { errors },
-        } = useForm({
-            resolver: zodResolver(partyFormSchema),
-            defaultValues: {
-                Party_Name: "",
-                Phone_Number: "",
-                GSTIN: "",
-                Email_Id: "",
-                Shipping_Address: "",
-                Billing_Address: "",
-                State: "",
-            },
-    
-        })
-        const formValues = watch();
-        console.log("Current form values:", formValues);
-        console.log("Form errors:", errors);
-    
-        useEffect(() => {
-        const handleClickOutside = (e) => {
-          if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-            setOpen(false);
-          }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-      }, []);
-      const handleSelect = (state) => {
-    setSelected(state);
-    setValue("State", state); // update react-hook-form
-    setOpen(false);
-  };
-       useEffect(() => {
-  if (!editingParty) return;     // Not in edit mode → do nothing
-  if (!partyDetails) return;     // No data yet → do nothing
-  if (Object.keys(partyDetails).length === 0) return; // empty object
-if(partyDetails.State) setSearch(partyDetails.State??"");
-  reset({
-    Party_Name: partyDetails.Party_Name ?? "",
-    Phone_Number: partyDetails.Phone_Number ?? "",
-    GSTIN: partyDetails.GSTIN ?? "",
-    Email_Id: partyDetails.Email_Id ?? "",
-    Shipping_Address: partyDetails.Shipping_Address ?? "",
-    Billing_Address: partyDetails.Billing_Address ?? "",
-    State: partyDetails.State ?? "",
+export default function PartyAddModal({ onClose, onSave, partyDetails, editingParty }) {
+  const dispatch    = useDispatch();
+  const dropdownRef = useRef(null);
+
+  const [activeTab,         setActiveTab]         = useState("GST & Address");
+  const [stateOpen,         setStateOpen]         = useState(false);
+  const [stateSearch,       setStateSearch]       = useState("");
+  const [showBalanceType,   setShowBalanceType]   = useState(false);
+  const [customLimit,       setCustomLimit]       = useState(false);
+  const [defaultBillingIdx, setDefaultBillingIdx] = useState(null);
+  const [defaultShippingIdx,setDefaultShippingIdx]= useState(null);
+  const [confirmModal,      setConfirmModal]      = useState(false);
+
+  const [addParty,    { isLoading: isAdding   }] = useAddPartyMutation();
+  const [updateParty, { isLoading: isUpdating }] = useEditPartyMutation();
+  const isLoading = isAdding || isUpdating;
+
+  /* ── form ── */
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(partyFormSchema),
+    defaultValues: {
+      Party_Name:            "",
+      GSTIN:                 "",
+      Phone_Number:          "",
+      State:                 "",
+      Email_Id:              "",
+      addresses: [
+        { Address_Type: "Billing",  Address_Text: "", Is_Default: false },
+        { Address_Type: "Shipping", Address_Text: "", Is_Default: false },
+      ],
+      Opening_Balance:      "",
+      Opening_Balance_Type: null,
+      Opening_Balance_Date: new Date().toISOString().split("T")[0],
+      Credit_Limit_Type:    "No_Limit",
+      Credit_Limit:         "",
+    },
   });
 
-}, [editingParty, partyDetails, reset]);
+  const { fields: addressFields, append: appendAddress, remove: removeAddress } = useFieldArray({
+    control,
+    name: "addresses",
+  });
 
-    
-        const handleSubmit = async () => {
-            console.log("Form Data (from RHF):", formValues);
-            if(formValues.Party_Name === ""){
-                toast.error("Party Name is required");
-                return;
-            }
-            try {
-                const res = await addParty({
-                    body: formValues,
-                }).unwrap();
-    
-                console.log(" successfully:", res);
-                const resData=  res;
-                if(!resData?.success){
-                    toast.error("Failed to add new party ");
-                    return;
-                }else{
-                    toast.success("New Party added successfully!");
-                   
-                    
-                     onSave(resData?.Party_Name);
-                     dispatch(partyApi.util.invalidateTags(["Party"]));
-               
-                }
-               
-                
-               
-            
-               
-            } catch (error) {
-                const errorMessage =
-                    error?.data?.message ?? error?.message ?? "Failed to add new party";
-          
-                toast.error(errorMessage);
-                // toast.error("Failed to add lead");
-                console.error("Submission failed", error);
-            }
-    
-        }
-const handleEdit = async () => {
-  console.log("EDIT Party Data:", formValues);
+  const openingBalanceWatch = watch("Opening_Balance");
+  const openingBalanceType  = watch("Opening_Balance_Type");
 
-  try {
-    const res = await updateParty({
-      Party_Id: partyDetails.Party_Id,   // ID required for update
-      body: formValues,
-    }).unwrap();
+  /* show balance type toggle when OB has a value */
+  useEffect(() => {
+    const val = openingBalanceWatch;
+    setShowBalanceType(val !== "" && val !== undefined && val !== null);
+  }, [openingBalanceWatch]);
 
-    if (!res?.success) {
-      toast.error("Failed to update party");
-      return;
+  /* close state dropdown on outside click */
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setStateOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  /* prefill for edit */
+  useEffect(() => {
+    if (!editingParty || !partyDetails) return;
+
+    setStateSearch(partyDetails.State ?? "");
+
+    /* figure out default address indices */
+    const addresses = partyDetails.addresses ?? [];
+    const defBilling  = addresses.findIndex((a) => a.Address_Type === "Billing"  && a.Is_Default);
+    const defShipping = addresses.findIndex((a) => a.Address_Type === "Shipping" && a.Is_Default);
+    if (defBilling  >= 0) setDefaultBillingIdx(defBilling);
+    if (defShipping >= 0) setDefaultShippingIdx(defShipping);
+
+    /* custom limit toggle */
+    if (partyDetails.Credit_Limit_Type === "Custom") setCustomLimit(true);
+
+    reset({
+      Party_Name:            partyDetails.Party_Name            ?? "",
+      GSTIN:                 partyDetails.GSTIN                 ?? "",
+      Phone_Number:          partyDetails.Phone_Number          ?? "",
+      State:                 partyDetails.State                 ?? "",
+      Email_Id:              partyDetails.Email_Id              ?? "",
+      Opening_Balance:       partyDetails.Opening_Balance       ?? "",
+      Opening_Balance_Type:  partyDetails.Opening_Balance_Type  ?? null,
+      Opening_Balance_Date:  partyDetails.Opening_Balance_Date
+        ? new Date(partyDetails.Opening_Balance_Date).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
+      Credit_Limit_Type:     partyDetails.Credit_Limit_Type     ?? "No_Limit",
+      Credit_Limit:          partyDetails.Credit_Limit          ?? "",
+      addresses: addresses.length > 0 ? addresses : [
+        { Address_Type: "Billing",  Address_Text: "", Is_Default: false },
+        { Address_Type: "Shipping", Address_Text: "", Is_Default: false },
+      ],
+    });
+  }, [editingParty, partyDetails, reset]);
+
+  /* ── default address helpers ── */
+  const handleDefaultBilling = (selectedIndex) => {
+    setDefaultBillingIdx(selectedIndex);
+    const addresses = watch("addresses") || [];
+    addresses.forEach((address, index) => {
+      if (address.Address_Type === "Billing") {
+        setValue(`addresses.${index}.Is_Default`, index === selectedIndex, { shouldDirty: true });
+      }
+    });
+  };
+
+  const handleDefaultShipping = (selectedIndex) => {
+    setDefaultShippingIdx(selectedIndex);
+    const addresses = watch("addresses") || [];
+    addresses.forEach((address, index) => {
+      if (address.Address_Type === "Shipping") {
+        setValue(`addresses.${index}.Is_Default`, index === selectedIndex, { shouldDirty: true });
+      }
+    });
+  };
+
+  /* ── submit ── */
+  const onSubmit = async (data) => {
+    try {
+      if (editingParty) {
+        const res = await updateParty({ Party_Id: partyDetails.Party_Id, body: data }).unwrap();
+        if (!res?.success) { toast.error("Failed to update party"); return; }
+        toast.success("Party updated successfully!");
+        dispatch(partyApi.util.invalidateTags(["Party"]));
+        onClose();
+      } else {
+        const res = await addParty({ body: data }).unwrap();
+        if (!res?.success) { toast.error("Failed to add party"); return; }
+        toast.success("Party added successfully!");
+        dispatch(partyApi.util.invalidateTags(["Party"]));
+        onSave(res?.Party_Name);
+      }
+    } catch (err) {
+      toast.error(err?.data?.message || err?.message || "Something went wrong");
     }
+  };
 
-    toast.success("Party updated successfully!");
-
-    onClose();
-    dispatch(partyApi.util.invalidateTags(["Party"]));
-
-  } catch (error) {
-    toast.error(error?.data?.message ?? "Failed to update party");
-    console.error(error);
-  }
-};
-
+  /* ── shared styles ── */
+  const inputCls = "w-full outline-none border-b-2 border-gray-300 focus:border-[#4CA1AF] text-gray-900 py-1 bg-transparent transition-colors";
+  const labelCls = "text-xs font-medium text-gray-500 mb-0.5";
+const formValues=watch();
+console.log("formValues",formValues);
   return (
- <div
-  style={{
-    marginTop: "50px",
-    position: "fixed",
-    inset: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.3)", // dim background
-    backdropFilter: "blur(4px)", // blur effect
-    zIndex: 100,
-    padding: "1rem", // ensures spacing on small screens
-  }}
->
     <div
-      className="bg-white 
-      w-full max-w-4xl rounded-lg 
-      shadow-lg p-6 
-      overflow-y-auto max-h-[90vh]"
+      style={{
+        marginTop:       "50px",
+        position:        "fixed",
+        inset:           0,
+        display:         "flex",
+        alignItems:      "center",
+        justifyContent:  "center",
+        backgroundColor: "rgba(0,0,0,0.3)",
+        backdropFilter:  "blur(4px)",
+        zIndex:          100,
+        padding:         "1rem",
+      }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6"
-      style={{marginBottom:"20px",paddingBottom:"10px"}}>
-        <h4 className="text-xl font-semibold text-gray-900">
-          {editingParty ? "Edit Party" : "Add New Party"}
-        </h4>
-        <button
-          type="button"
-          style={{ backgroundColor: "transparent" }}
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 text-2xl"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Form Content */}
-      <div>
-        <div className="grid grid-cols-3 gap-6">
-          {/* Party Name */}
-          <div className="flex flex-col mt-0 relative">
-            <label
-      htmlFor="Party_Name"
-      className="active"
-    >
-              Party Name
-              <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
-            </label>
-            <input
-              type="text"
-              id="Party_Name"
-              {...register("Party_Name")}
-              style={{marginLeft:"10px"}}
-              placeholder="Party Name"
-              className="w-full outline-none border-b-2 text-gray-900"
-            />
-            {errors?.Party_Name && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors?.Party_Name?.message}
-              </p>
-            )}
-          </div>
-
-          {/* GSTIN */}
-          <div className="flex flex-col mt-2 relative">
-                   <label
-      htmlFor="GSTIN"
-      className="active"
-    
-    > GSTIN</label>
-            <input
-              type="text"
-              id="GSTIN"
-               style={{marginLeft:"10px"}}
-                  maxLength={15}
-              {...register("GSTIN")}
-                onChange={(e) => {
-                                                // Only allow uppercase letters and digits
-                                                const filtered = e.target.value
-                                                    .toUpperCase()
-                                                    .replace(/[^A-Z0-9]/g, "");
-                                                e.target.value = filtered;
-                                            }}
-              placeholder="GSTIN"
-              className="w-full outline-none border-b-2 text-gray-900"
-            />
-            {errors?.GSTIN && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors?.GSTIN?.message}
-              </p>
-            )}
-          </div>
-
-          {/* Phone Number */}
-          <div className="flex flex-col mt-2 relative" >
-                <label
-      htmlFor="Phone_Number"
-      className="active"
-    
-    >Phone Number</label>
-            <input
-              type="text"
-              id="Phone_Number"
-               style={{marginLeft:"10px"}}
-              {...register("Phone_Number")}
-              onInput={(e) => {
-                e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 10);
-              }}
-              placeholder="Phone Number"
-              className="w-full outline-none border-b-2 text-gray-900 "
-            />
-            {errors?.Phone_Number && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors?.Phone_Number?.message}
-              </p>
-            )}
-          </div>
+      <div
+        className="bg-white w-full rounded-lg shadow-lg p-6 overflow-y-auto"
+        style={{ maxWidth: "56rem", maxHeight: "90vh" }}
+      >
+        {/* ── HEADER ── */}
+        <div className="flex justify-between items-center"
+          style={{ marginBottom: "20px", paddingBottom: "10px", borderBottom: "1px solid #e5e7eb" }}>
+          <h4 className="text-xl font-semibold text-gray-900">
+            {editingParty ? "Edit Party" : "Add New Party"}
+          </h4>
+          <button type="button" onClick={onClose}
+            style={{ backgroundColor: "transparent", fontSize: "20px" }}
+            className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
 
-        {/* Tabs */}
-        <div className="mt-6">
-          <div className="border-b border-gray-300 flex space-x-8">
-            {["GST & Address"].map((tab) => (
-              <button
-                type="button"
-                key={tab}
+        <style>{`
+          .pty-tab-active   { color: red; border-bottom: 2px solid red; font-weight: 600; background: white; }
+          .pty-tab-inactive { color: #6b7280; border-bottom: 2px solid transparent; font-weight: 500; }
+          .pty-tab-inactive:hover { color: #374151; }
+          .pty-toggle {
+            position: relative; width: 44px; height: 24px;
+            background: #d1d5db; border-radius: 999px;
+            cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+          }
+          .pty-toggle.on { background: red; }
+          .pty-toggle::after {
+            content: ""; position: absolute; top: 3px; left: 3px;
+            width: 18px; height: 18px; background: white; border-radius: 50%;
+            transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+          }
+          .pty-toggle.on::after { transform: translateX(20px); }
+        `}</style>
+
+        <form onSubmit={handleSubmit(onSubmit)}>
+
+          {/* ── TOP ROW: Party Name / GSTIN / Phone ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+            <div className="flex flex-col">
+              <span className={labelCls}>Party Name <span className="text-red-500">*</span></span>
+              <input type="text" placeholder="Party Name" className={inputCls} {...register("Party_Name")} />
+              {errors?.Party_Name && <p className="text-red-500 text-xs mt-1">{errors.Party_Name.message}</p>}
+            </div>
+
+            <div className="flex flex-col">
+              <span className={labelCls}>GSTIN</span>
+              <input type="text" maxLength={15} placeholder="GSTIN" className={inputCls}
+                {...register("GSTIN")}
+                onChange={(e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); }}
+              />
+              {errors?.GSTIN && <p className="text-red-500 text-xs mt-1">{errors.GSTIN.message}</p>}
+            </div>
+
+            <div className="flex flex-col">
+              <span className={labelCls}>Phone Number</span>
+              <input type="text" placeholder="Phone Number" className={inputCls}
+                {...register("Phone_Number")}
+                onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 10); }}
+              />
+              {errors?.Phone_Number && <p className="text-red-500 text-xs mt-1">{errors.Phone_Number.message}</p>}
+            </div>
+          </div>
+
+          {/* ── TABS ── */}
+          <div className="border-b border-gray-200 flex gap-0 mb-0">
+            {TABS.map((tab) => (
+              <button key={tab} type="button"
+                style={{ background: "none", cursor: "pointer" }}
                 onClick={() => setActiveTab(tab)}
-                style={{
-                  cursor: "pointer",
-                  backgroundColor: "transparent",
-                  border: "none",
-                  outline: "none",
-                  padding: "0.5rem 1rem",
-                  borderBottom: activeTab === tab ? "1px solid red" : "none",
-                  color: activeTab === tab ? "red" : "gray",
-                  fontWeight: activeTab === tab ? "600" : "500",
-                }}
-              >
+                className={`px-5 py-2.5 text-sm transition-colors ${activeTab === tab ? "pty-tab-active" : "pty-tab-inactive"}`}>
                 {tab}
               </button>
             ))}
           </div>
 
-          
-          <div className="bg-gray-100 p-4 sm:p-6 mt-4 rounded-lg">
-  {activeTab === "GST & Address" && (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="flex flex-col gap-6 mt-2">
-          {/* State */}
-          {/* <div className="flex flex-col">
-            <label
-              htmlFor="State"
-              className="mb-2 text-sm font-semibold text-gray-700"
-            >
-              State
-            </label>
-            <select
-              id="State"
-              {...register("State")}
-              className=" border border-gray-300 rounded-md px-3 py-2 
-              bg-white text-gray-900  outline-none transition-all"
-            >
-              <option value="">Select State</option>
-              <option value="West Bengal">West Bengal</option>
-              <option value="Maharashtra">Maharashtra</option>
-            </select>
-            {errors?.State && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors?.State?.message}
-              </p>
+          {/* ── TAB PANELS ── */}
+          <div className="bg-gray-50 rounded-b-lg p-6">
+
+            {/* ══ GST & ADDRESS ══ */}
+            {activeTab === "GST & Address" && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+
+                {/* col 1 — State + Email */}
+                <div className="flex flex-col gap-6">
+                  {/* State searchable dropdown */}
+                  <div className="flex flex-col relative" ref={dropdownRef}>
+                    <span className={labelCls}>State</span>
+                    <input type="text" value={stateSearch}
+                      onClick={() => setStateOpen((p) => !p)}
+                      onChange={(e) => { setStateSearch(e.target.value); setStateOpen(true); }}
+                      placeholder="Search state"
+                      className={inputCls}
+                    />
+                    {stateOpen && (
+                      <div className="absolute top-full left-0 z-20 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {STATES.filter((s) => s.toLowerCase().includes(stateSearch.toLowerCase()))
+                          .map((s, i) => (
+                            <div key={i} onClick={() => { setStateSearch(s); setValue("State", s); setStateOpen(false); }}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm">{s}</div>
+                          ))}
+                        {STATES.filter((s) => s.toLowerCase().includes(stateSearch.toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-gray-400 text-sm">No state found</p>
+                        )}
+                      </div>
+                    )}
+                    <input type="hidden" {...register("State")} />
+                    {errors?.State && <p className="text-red-500 text-xs mt-1">{errors.State.message}</p>}
+                  </div>
+
+                  {/* Email */}
+                  <div className="flex flex-col">
+                    <span className={labelCls}>Email</span>
+                    <input type="text" placeholder="example@email.com" className={inputCls} {...register("Email_Id")} />
+                    {errors?.Email_Id && <p className="text-red-500 text-xs mt-1">{errors.Email_Id.message}</p>}
+                  </div>
+                </div>
+
+                {/* col 2 — Billing Addresses */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className={labelCls}>Billing Addresses</span>
+                    <button type="button"
+                      style={{ color: ACCENT, background: "none", border: "none", cursor: "pointer", fontSize: 13 }}
+                      onClick={() => appendAddress({ Address_Type: "Billing", Address_Text: "", Is_Default: false })}>
+                      + Add Billing
+                    </button>
+                  </div>
+
+                  {addressFields.map((field, i) => {
+                    if (field.Address_Type !== "Billing") return null;
+                    const isDefault = defaultBillingIdx === i;
+                    return (
+                      <div key={field.id}
+                        onClick={() => handleDefaultBilling(i)}
+                        className="flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all"
+                        style={{ borderColor: isDefault ? ACCENT : "#e5e7eb", backgroundColor: isDefault ? "#eaf6f7" : "white" }}>
+                        <div className="flex-shrink-0 rounded-full"
+                          style={{ width: 10, height: 10, backgroundColor: isDefault ? ACCENT : "#d1d5db", marginTop: 6 }} />
+                        <textarea rows={2} placeholder="Billing Address"
+                          style={{ resize: "none", flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13 }}
+                          {...register(`addresses.${i}.Address_Text`)}
+                          onClick={(e) => e.stopPropagation()} />
+                        {addressFields.filter((f) => f.Address_Type === "Billing").length > 1 && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); removeAddress(i); }}
+                            style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}>✕</button>
+                        )}
+                        {isDefault && (
+                          <span className="text-xs font-medium flex-shrink-0" style={{ color: ACCENT, marginTop: 4 }}>Default</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* col 3 — Shipping Addresses */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className={labelCls}>Shipping Addresses</span>
+                    <button type="button"
+                      style={{ color: ACCENT, background: "none", border: "none", cursor: "pointer", fontSize: 13 }}
+                      onClick={() => appendAddress({ Address_Type: "Shipping", Address_Text: "", Is_Default: false })}>
+                      + Add Shipping
+                    </button>
+                  </div>
+
+                  {addressFields.map((field, i) => {
+                    if (field.Address_Type !== "Shipping") return null;
+                    const isDefault = defaultShippingIdx === i;
+                    return (
+                      <div key={field.id}
+                        onClick={() => handleDefaultShipping(i)}
+                        className="flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all"
+                        style={{ borderColor: isDefault ? ACCENT : "#e5e7eb", backgroundColor: isDefault ? "#eaf6f7" : "white" }}>
+                        <div className="flex-shrink-0 rounded-full"
+                          style={{ width: 10, height: 10, backgroundColor: isDefault ? ACCENT : "#d1d5db", marginTop: 6 }} />
+                        <textarea rows={2} placeholder="Shipping Address"
+                          style={{ resize: "none", flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13 }}
+                          {...register(`addresses.${i}.Address_Text`)}
+                          onClick={(e) => e.stopPropagation()} />
+                        <button type="button"
+                          onClick={(e) => { e.stopPropagation(); removeAddress(i); }}
+                          style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "2px 4px", flexShrink: 0 }}>✕</button>
+                        {isDefault && (
+                          <span className="text-xs font-medium flex-shrink-0" style={{ color: ACCENT, marginTop: 4 }}>Default</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
-          </div> */}
-           <div 
-                                                        
-  className=" relative "
-  ref={dropdownRef} >
 
+            {/* ══ CREDIT & BALANCE ══ */}
+            {activeTab === "Credit & Balance" && (
+              <div className="flex flex-col gap-6 max-w-lg">
 
-    
-                                                            <span className="active">
-                                                                State
+                {/* Opening Balance + As Of Date */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col">
+                    <span className={labelCls}>Opening Balance</span>
+                    <input type="text" placeholder="0.00" className={inputCls}
+                      {...register("Opening_Balance")}
+                      onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={labelCls}>As Of Date</span>
+                    <input type="date" className={inputCls} {...register("Opening_Balance_Date")} />
+                  </div>
+                </div>
 
-                                                            </span>
+                {/* To Pay / To Receive */}
+                {showBalanceType && (
+                  <div className="flex flex-col gap-2">
+                    <span className={labelCls}>Balance Type</span>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                        <input type="checkbox"
+                          checked={openingBalanceType === "To_Pay"}
+                          onChange={(e) => setValue("Opening_Balance_Type", e.target.checked ? "To_Pay" : null, { shouldDirty: true, shouldValidate: true })}
+                        />
+                        To Pay
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                        <input type="checkbox"
+                          checked={openingBalanceType === "To_Receive"}
+                          onChange={(e) => setValue("Opening_Balance_Type", e.target.checked ? "To_Receive" : null, { shouldDirty: true, shouldValidate: true })}
+                        />
+                        To Receive
+                      </label>
+                    </div>
+                    {errors?.Opening_Balance_Type && (
+                      <p className="text-red-500 text-xs">{errors.Opening_Balance_Type.message}</p>
+                    )}
+                  </div>
+                )}
 
-    
+                {/* Credit Limit toggle */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-700">Credit Limit</span>
+                    <span className={`text-sm ${!customLimit ? "font-medium text-gray-700" : "text-gray-400"}`}>No Limit</span>
+                    <div className={`pty-toggle ${customLimit ? "on" : ""}`}
+                      onClick={() => {
+                        const next = !customLimit;
+                        setCustomLimit(next);
+                        setValue("Credit_Limit_Type", next ? "Custom" : "No_Limit", { shouldDirty: true, shouldValidate: true });
+                        if (!next) setValue("Credit_Limit", "", { shouldDirty: true, shouldValidate: true });
+                      }} />
+                    <span className={`text-sm ${customLimit ? "font-medium text-gray-700" : "text-gray-400"}`}>Custom Limit</span>
+                  </div>
 
-  <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
+                  {customLimit && (
+                    <div className="flex flex-col max-w-xs">
+                      <span className={labelCls}>Credit Limit Amount</span>
+                      <input type="text" placeholder="Enter credit limit" className={inputCls}
+                        {...register("Credit_Limit")}
+                        onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }}
+                      />
+                      {errors?.Credit_Limit && <p className="text-red-500 text-xs mt-1">{errors.Credit_Limit.message}</p>}
+                    </div>
+                  )}
+                </div>
 
-  {/* Search + Dropdown Trigger */}
-  <input
-    type="text"
-    value={search}
-    onClick={() => setOpen((prev) => !prev)}
-    onChange={(e) => setSearch(e.target.value)}
-    placeholder="Search state"
-     className="w-full outline-none border-b-2 text-gray-900 "
-  />
-
-  {/* Dropdown List */}
-  {open && (
-    <div className="absolute z-20 flex flex-col
-      w-full bg-white border border-gray-300 
-     rounded-md shadow-lg max-h-48 overflow-y-auto">
-      
-
-      {/* Category List */}
-      {states
-        ?.filter((state) =>
-          state.toLowerCase().includes(search.toLowerCase())
-        )
-        .map((state, i) => (
-          <div
-            key={i}
-            onClick={() => {
-              handleSelect(state);
-              setSearch(state);
-              setOpen(false);
-            }}
-            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-          >
-            {state}
-            {/* {cat.Item_Category} */}
+              </div>
+            )}
           </div>
-        ))}
 
-      {/* No match case */}
-      {states?.filter((state) =>
-        state.toLowerCase().includes(search.toLowerCase())
-      ).length === 0 && (
-        <p className="px-3 py-2 text-gray-500">No categories found</p>
+          {/* ── FOOTER ── */}
+          <div className="flex justify-end gap-3 mt-4">
+            <button type="button" onClick={onClose}
+              className="px-5 py-2 rounded-md text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-700">
+              Cancel
+            </button>
+            <button type="button" disabled={isLoading}
+              onClick={() => editingParty ? setConfirmModal(true) : handleSubmit(onSubmit)()}
+              className="px-5 py-2 rounded-md text-sm font-medium text-white"
+              style={{ backgroundColor: ACCENT }}>
+              {isLoading ? "Saving..." : editingParty ? "Update" : "Save"}
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      {/* ── CONFIRM EDIT MODAL ── */}
+      {confirmModal && (
+        <div style={{
+          position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", zIndex: 200,
+        }}>
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h3 className="text-lg font-semibold text-center text-red-600 mb-4">
+              Are you sure you want to update this Party?
+            </h3>
+            <div className="flex justify-center gap-4">
+              <button type="button"
+                onClick={() => { setConfirmModal(false); handleSubmit(onSubmit)(); }}
+                className="px-4 py-2 rounded-md text-white"
+                style={{ backgroundColor: ACCENT }}>
+                {isUpdating ? "Updating..." : "Yes"}
+              </button>
+              <button type="button" onClick={() => setConfirmModal(false)}
+                className="px-4 py-2 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-700">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
-  )}
-
-  {/* Hidden input for react-hook-form */}
-  {/* <input type="hidden" {...register("Item_Category")} value={selected ?? ""} /> */}
-
-  {/* Modal */}
-
-{/* </div> */}
-                                                            {/* <select
-                                                                id=" State"
-                                                                {...register("State")}
-                                                                className="w-full outline-none border-b-2 text-gray-900 bg-white"
-                                                            >
-                                                                <option value="">Select State</option>
-                                                                <option value="West Bengal"> West Bengal </option>
-
-                                                                <option value="Maharashtra"> Maharashtra </option>
-
-                                                            </select> */}
-                                                            {errors?.State && (
-                                                                <p className="text-red-500 text-xs mt-1">
-                                                                    {errors?.State?.message}
-                                                                </p>
-                                                            )}
-                                                        </div>
-
-          {/* Email */}
-          <div className="flex flex-col ">
-            <label
-              htmlFor="Email_Id"
-              className="mb-2 text-sm font-semibold text-gray-700"
-            >
-              Email ID
-            </label>
-            {/* <input
-              type="email"
-              id="Email_Id"
-              {...register("Email_Id")}
-              placeholder="example@email.com"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-[#4CA1AF] outline-none transition-all"
-            /> */}
-               <input
-                     
-                        type="email"
-                        id="Email_Id"
-                        {...register("Email_Id")}
-                        placeholder="example@email.com"
-                        className=" outline-none border-b-2  text-gray-900 bg-white"
-                      />
-            {errors?.Email_Id && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors?.Email_Id?.message}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column */}
-        <div className="flex flex-col gap-2 mt-2">
-          {/* Billing Address */}
-          <div className="flex flex-col">
-            <label
-              htmlFor="Billing_Address"
-              className="mb-2 text-sm font-semibold text-gray-700"
-            >
-              Billing Address
-            </label>
-            <textarea
-            style={{resize:"none"}}
-              id="Billing_Address"
-              {...register("Billing_Address")}
-              className="w-full border border-gray-300 resize-none
-              rounded-md px-3 py-2 bg-white text-gray-900 h-32 sm:h-40 resize-none  outline-none"
-              placeholder="Enter Billing Address"
-            ></textarea>
-            {errors?.Billing_Address && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors?.Billing_Address?.message}
-              </p>
-            )}
-          </div>
-
-          {/* Shipping Address Toggle */}
-          <p
-            className="text-[#4CA1AF] cursor-pointer font-medium hover:underline mt-2"
-            onClick={() => setShippingAddress(!shippingAdress)}
-          >
-            {shippingAdress
-              ? "Hide Shipping Address"
-              : "Add Shipping Address"}
-          </p>
-
-          {shippingAdress && (
-            <div className="flex flex-col">
-              <label
-                htmlFor="Shipping_Address"
-                className="mb-2 text-sm font-semibold text-gray-700"
-              >
-                Shipping Address
-              </label>
-                 <textarea
-                           
-                          id="Shipping_Address"
-                          {...register("Shipping_Address")}
-                          className="w-full outline-none text-gray-900 bg-white border border-gray-300 rounded-md p-2 h-40 resize-none"
-                          placeholder="Enter Shipping Address"
-                        ></textarea>
-              {errors?.Shipping_Address && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors?.Shipping_Address?.message}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 mt-6">
-        <button
-          type="button"
-          onClick={() => onClose()}
-          className="text-white
-           font-semibold py-2 px-4
-            rounded-md w-full sm:w-auto"
-          style={{ backgroundColor: "#4CA1AF" }}
-        >
-          Cancel
-        </button>
-        <button
-  type="button"
-  onClick={() => {
-    if (editingParty) {
-      setConfirmModal(true);   // Open confirmation for editing
-    } else {
-      handleSubmit();          // No confirmation needed for Add
-    }
-  }}
-  disabled={ isLoading}
-  className="text-white font-semibold py-2 px-4 rounded-md w-full sm:w-auto"
-  style={{ backgroundColor: "#4CA1AF" }}
->
-  Save
-  {/* {isLoading ? (editingParty ? "Updating..." : "Saving...") 
-             : (editingParty ? "Update" : "Save")} */}
-</button>
-
-        {/* <button
-  type="button"
-  onClick={editingParty ? handleEdit : handleSubmit}
-  disabled={isLoading}
-  className="text-white font-semibold py-2 px-4 rounded-md w-full sm:w-auto"
-  style={{ backgroundColor: "#4CA1AF" }}
->
-  {isLoading ??isUpdating ? "Saving..." :  "Save"}
-</button> */}
-
-        {/* <button
-          type="button"
-          onClick={() => handleSubmit()}
-          disabled={formValues.errorCount > 0?? isLoading}
-          className="text-white font-semibold py-2 px-4 rounded-md w-full sm:w-auto"
-          style={{ backgroundColor: "#4CA1AF" }}
-        >
-          {isLoading ? "Saving..." : "Save"}
-        </button> */}
-      </div>
-    </>
-  )}
-</div>
-{confirmModal && (
-  <div
-    className="fixed inset-0 
-    flex items-center justify-center 
-    bg-white z-50 bg-opacity-50"
-  >
-    <div className="bg-white p-6 rounded-lg shadow-lg w-96">
-      <h3 className="text-lg font-semibold text-center text-red-600 mb-4">
-        Are you sure you want to update this Party?
-      </h3>
-
-      <div className="flex justify-center gap-4">
-        <button
-          type="button"
-          onClick={() => {
-            setConfirmModal(false);
-            handleEdit();         // ✔ Trigger update API ONLY ON YES
-          }}
-          className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#3b8c98]"
-        >
-        {isUpdating?"Saving...":"Yes"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setConfirmModal(false)}
-          className="px-4 py-2 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-700"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
+  );
 }
-       
-           

@@ -453,6 +453,7 @@ const addSale = async (req, res, next) => {
 
     const {
       Party_Name,
+       Phone_Number,
       GSTIN,
       Invoice_Number,
       Invoice_Date,
@@ -629,6 +630,7 @@ if (totalAmount > 0) {
       `INSERT INTO add_sale
        (
          Party_Id,
+          Phone_Number,
          Invoice_Number,
          Invoice_Date,
          Financial_Year,
@@ -639,9 +641,10 @@ if (totalAmount > 0) {
          created_at,
          updated_at
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         Party_Id,
+        cleanValue(Phone_Number),
         Invoice_Number,
         Invoice_Date,
         activeFY,
@@ -2037,15 +2040,19 @@ const getSingleSale = async (req, res, next) => {
     }
 
     const isSaleForItemSale = saleId.startsWith("SALS");
-    const salesTable    = isSaleForItemSale ? "add_new_sale"       : "add_sale";
-    const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
-    const itemTable     = isSaleForItemSale ? "add_item_sale"      : "add_item";
+    // const salesTable    = isSaleForItemSale ? "add_new_sale"       : "add_sale";
+    // const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
+    // const itemTable     = isSaleForItemSale ? "add_item_sale"      : "add_item";
+
+      const salesTable    = isSaleForItemSale ? "add_sale"       : "add_sale";
+    const saleItemTable = isSaleForItemSale ? "add_sale_items" : "add_sale_items";
+    const itemTable     = isSaleForItemSale ? "add_item"      : "add_item";
 
     const [saleData] = await connection.query(
       `SELECT s.id,
-         s.Sale_Id, s.Invoice_Number, s.Invoice_Date, 
+         s.Sale_Id,  s.Phone_Number, s.Invoice_Number, s.Invoice_Date, 
          s.State_Of_Supply, s.Total_Amount, s.Total_Received, s.Balance_Due, s.Party_Id,
-         p.Party_Name, p.GSTIN, p.Billing_Address, p.Shipping_Address
+         p.Party_Name, p.GSTIN
        FROM ${salesTable} s
        LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
        WHERE s.Sale_Id = ?`,
@@ -2110,9 +2117,7 @@ const getSingleSale = async (req, res, next) => {
     Invoice_Date: saleHeader.Invoice_Date,
     Total_Amount: saleHeader.Total_Amount,
     Total_Received: saleHeader.Total_Received,
-    Balance_Due: saleHeader.Balance_Due,
-    Billing_Address: saleHeader.Billing_Address,
-    Shipping_Address: saleHeader.Shipping_Address,
+    Balance_Due: saleHeader.Balance_Due
   },
 
   splits: splits.map((split) => ({

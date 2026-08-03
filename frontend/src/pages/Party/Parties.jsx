@@ -75,7 +75,7 @@ function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties }
    Note: `cursor` (pagination position) intentionally stays local —
    only the search TEXT needs to persist, not "which page you were on".
 ════════════════════════════════════════════════════════════ */
-function PartyDetailPanel({ partyId }) {
+function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -96,7 +96,12 @@ function PartyDetailPanel({ partyId }) {
     { Party_Id: partyId, cursor, search },
     { skip: !partyId }
   );
-
+  useEffect(() => {
+    if (data?.partyDetails) {
+      setSelectedPartyDetails(data.partyDetails);
+    }
+  }, [data, setSelectedPartyDetails]);
+  console.log("data", data);
   const fmt = (n) =>
     Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -265,7 +270,14 @@ function PartyDetailPanel({ partyId }) {
                 return (
                   <tr key={`${row.Txn_Type}-${refId}-${idx}`}>
                     <td>{idx + 1}.</td>
-                    <td>{meta.label}</td>
+                    <td>
+                      {row.Txn_Type === "Opening_Balance"
+                        ? row.Direction === "Credit"
+                          ? "Receivable Opening Balance"
+                          : "Payable Opening Balance"
+                        : meta.label}
+                    </td>
+                    {/* <td>{meta.label}</td> */}
                     <td>{row.Doc_Number}</td>
                     <td>
                       {row.Txn_Date
@@ -279,8 +291,9 @@ function PartyDetailPanel({ partyId }) {
                     <td>₹ {fmt(row.Amount)}</td>
                     <td>₹ {fmt(row.Balance_Due)}</td>
                     <td>
-                      {row.Formatted_Reference_Id && (
-                        MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                      {row.Txn_Type !== "Opening_Balance" &&
+                        row.Formatted_Reference_Id &&
+                        (MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
                           <Eye
                             style={{ cursor: "pointer", color: "#4CA1AF" }}
                             onClick={() => openModal(row.Txn_Type, row.Formatted_Reference_Id)}
@@ -291,13 +304,11 @@ function PartyDetailPanel({ partyId }) {
                               pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
                               search: searchParams.toString(),
                             }}
-                            // to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
                             state={{ from: "party-details", partyId }}
                           >
                             <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
                           </NavLink>
-                        )
-                      )}
+                        ))}
                     </td>
                   </tr>
                 );
@@ -329,6 +340,7 @@ function PartyDetailPanel({ partyId }) {
           onClose={closeModal}
           onSave={handleSavePaymentIn}
           isSaving={isUpdatingPaymentIn}
+          //parties={partiesList}
           parties={partiesList}
         />
       )}
@@ -359,13 +371,14 @@ export default function Parties() {
 
   const selectedId = searchParams.get("partyId") || null;
   const leftSearch = searchParams.get("q") || "";
-
+  const [selectedPartyDetails, setSelectedPartyDetails] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
 
   const { data: partiesData, isLoading } = useGetAllPartiesQuery({ search: leftSearch });
   const parties = partiesData?.parties || [];
-const menuRef = useRef(null);
+  console.log("parties", parties);
+  const menuRef = useRef(null);
   // auto-select the first party only if nothing is selected yet
   useEffect(() => {
     if (!searchParams.get("partyId") && !isLoading && parties.length > 0) {
@@ -393,24 +406,25 @@ const menuRef = useRef(null);
   };
 
   const handleEdit = (party) => {
-    setPartyModal({ open: true, mode: "edit", data: party });
+    console.log("Editing party:", party,);
+    setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
     setOpenMenuId(null);
   };
 
 
-useEffect(() => {
-  const handleOutsideClick = (event) => {
-    if (menuRef.current && !menuRef.current.contains(event.target)) {
-      setOpenMenuId(null);
-    }
-  };
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
 
-  document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("mousedown", handleOutsideClick);
 
-  return () => {
-    document.removeEventListener("mousedown", handleOutsideClick);
-  };
-}, []);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
   return (
     <>
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
@@ -505,15 +519,33 @@ useEffect(() => {
                     </div>
 
                     {/* 3-dot menu */}
-                    <div ref={openMenuId === party.Party_Id ? menuRef : null} 
-                    className="flex items-center ml-2 flex-shrink-0 relative">
+                    <div ref={openMenuId === party.Party_Id ? menuRef : null}
+                      className="flex items-center ml-2 flex-shrink-0 relative">
 
-                    {/* <div className="flex items-center ml-2 flex-shrink-0 relative"> */}
-                      <button
+                      {/* <div className="flex items-center ml-2 flex-shrink-0 relative"> */}
+                      {/* <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenMenuId(openMenuId === party.Party_Id ? null : party.Party_Id);
+                        }}
+                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                        style={{ backgroundColor: "transparent" }}
+                      >
+                        <MoreVertical size={16} style={{ color: "#94a3b8" }} />
+                      </button> */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          // Select this party
+                          handleSelectParty(party.Party_Id);
+
+                          // Open/close menu
+                          setOpenMenuId(
+                            openMenuId === party.Party_Id ? null : party.Party_Id
+                          );
                         }}
                         className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                         style={{ backgroundColor: "transparent" }}
@@ -529,7 +561,8 @@ useEffect(() => {
                         >
                           <button
                             type="button"
-                            onClick={() => handleEdit(party)}
+                            onClick={handleEdit}
+                            // onClick={() => handleEdit(party)}
                             className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
                             style={{ backgroundColor: "transparent" }}
                           >
@@ -556,7 +589,7 @@ useEffect(() => {
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
-            <PartyDetailPanel partyId={selectedId} />
+            <PartyDetailPanel partyId={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div>
         </div>
       </div>

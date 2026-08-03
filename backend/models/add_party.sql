@@ -15,3 +15,11 @@ CREATE TABLE IF NOT EXISTS add_party(
 )
 -- ALTER TABLE add_party 
 -- ADD CONSTRAINT uq_party UNIQUE (Party_Id);
+
+
+ALTER TABLE add_party
+  ADD COLUMN Opening_Balance DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN Opening_Balance_Type ENUM('To_Receive','To_Pay') NULL, 
+  ADD COLUMN Opening_Balance_Date DATE NULL,
+  ADD COLUMN Credit_Limit_Type ENUM('No_Limit','Custom') NOT NULL DEFAULT 'No_Limit',
+  ADD COLUMN Credit_Limit DECIMAL(10,2) NULL;  

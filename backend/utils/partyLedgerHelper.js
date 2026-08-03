@@ -156,12 +156,31 @@ export const recordPartyLedger = async ({
     const oldAmount  = Number(existingRow.Amount);
     const amountDiff = Number(amount) - oldAmount;
 
+    // await connection.query(
+    //   `UPDATE party_ledger
+    //    SET Amount = ?, Txn_Date = ?, Doc_Number = ?, Balance_Due = ? , updated_at = NOW()
+    //    WHERE id = ?`,
+    //   [amount, txnDate, docNumber, balanceDue,  existingRow.id]
+    // );
     await connection.query(
-      `UPDATE party_ledger
-       SET Amount = ?, Txn_Date = ?, Doc_Number = ?, Balance_Due = ? , updated_at = NOW()
-       WHERE id = ?`,
-      [amount, txnDate, docNumber, balanceDue,  existingRow.id]
-    );
+  `UPDATE party_ledger
+   SET
+      Direction = ?,
+      Amount = ?,
+      Txn_Date = ?,
+      Doc_Number = ?,
+      Balance_Due = ?,
+      updated_at = NOW()
+   WHERE id = ?`,
+  [
+    direction,
+    amount,
+    txnDate,
+    docNumber,
+    balanceDue,
+    existingRow.id,
+  ]
+);
 
     if (amountDiff !== 0) {
       const shift = direction === "Credit" ? amountDiff : -amountDiff;

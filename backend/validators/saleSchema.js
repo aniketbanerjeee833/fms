@@ -51,7 +51,16 @@ const priceStringDigits = z
   .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
  const saleSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"),
-
+  Phone_Number: z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal("")),
+  Billing_Address: z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal("")),
     GSTIN: z.preprocess(
      (val) => (val === null || val === undefined ? "" : String(val)),
      z.string().refine((val) => val === "" || val.length === 15, {

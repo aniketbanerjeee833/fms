@@ -1,5 +1,6 @@
 
 import db from "../config/db.js";
+import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import { sanitizeObject } from "../utils/sanitizeInput.js";
 import partySchema from "../validators/partySchema.js";
 
@@ -11,119 +12,160 @@ const cleanValue = (value) => {
   return value;  // ✅ returns the original value for valid data
 };
 
+
 const addParty = async (req, res, next) => {
   let connection;
   try {
-  
-
     connection = await db.getConnection();
     await connection.beginTransaction();
+
     const cleanData = sanitizeObject(req.body);
     const validation = partySchema.safeParse(cleanData);
     if (!validation.success) {
+      await connection.rollback();
       return res.status(400).json({ errors: validation.error.errors });
     }
+
     const {
       Party_Name,
       GSTIN,
       Phone_Number,
-     
       State,
       Email_Id,
-      Billing_Address,
-      Shipping_Address,
-      
+      addresses,
+      Opening_Balance,
+      Opening_Balance_Type,
+      Opening_Balance_Date,
+      Credit_Limit_Type,
+      Credit_Limit,
     } = validation.data;
 
     if (!Party_Name) {
       await connection.rollback();
       return res.status(400).json({ message: "Party name is required" });
     }
-// 🔥 Correct duplicate check
-const [existingParty] = await db.query(
-  `SELECT Party_Id FROM add_party 
-   WHERE GSTIN = ? OR Phone_Number = ?
-   LIMIT 1`,
-  [GSTIN, Phone_Number]
-);
 
-if (existingParty.length > 0) {
-  await connection.rollback();
-  return res.status(400).json({
-    message: "GSTIN or Phone Number already exists for another party",
-  });
-}
-// 🔥 Duplicate party name check (case-insensitive, trimmed)
-const [existingName] = await db.query(
-  `SELECT Party_Id FROM add_party 
-   WHERE LOWER(TRIM(Party_Name)) = LOWER(TRIM(?))
-   LIMIT 1`,
-  [Party_Name]
-);
+    // 🔥 Duplicate GSTIN/Phone check
+    const [existingParty] = await connection.query(
+      `SELECT Party_Id FROM add_party 
+       WHERE GSTIN = ? OR Phone_Number = ?
+       LIMIT 1`,
+      [GSTIN, Phone_Number]
+    );
 
-if (existingName.length > 0) {
-  await connection.rollback();
-  return res.status(400).json({
-    message: "Party name already exists",
-  });
-}
+    if (existingParty.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: "GSTIN or Phone Number already exists for another party",
+      });
+    }
 
-  // const [existingParty] = await db.query(
-  //     "SELECT Party_Id, GSTIN, Phone_Number FROM add_party "
-  //   );
+    // 🔥 Duplicate party name check
+    const [existingName] = await connection.query(
+      `SELECT Party_Id FROM add_party 
+       WHERE TRIM(Party_Name) = TRIM(?)
+       LIMIT 1`,
+      [Party_Name]
+    );
 
-  //    if(existingParty[0].GSTIN === GSTIN || existingParty[0].Phone_Number === Phone_Number){
-  //     await connection.rollback();
-  //     return res.status(400).json({ message: "GSTIN or Phone Number for another party already exists" });
-  //   }
-    // Get last party code
-    const [last] = await db.query(
+    if (existingName.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        message: "Party name already exists",
+      });
+    }
+
+    // Generate Party_Id
+    const [last] = await connection.query(
       "SELECT Party_Id FROM add_party ORDER BY id DESC LIMIT 1"
     );
 
-   
     let newId = "PTY001";
     if (last.length > 0) {
-      const lastId = last[0].Party_Id; // e.g. "PTY005"
+      const lastId = last[0].Party_Id;
       const num = parseInt(lastId.replace("PTY", "")) + 1;
       newId = "PTY" + num.toString().padStart(3, "0");
     }
-  const cleanValue = (val) =>
-    val !== undefined && val !== null && String(val).trim() !== "" ? val : null;
-    // Insert into DB
-    const [result] = await db.execute(
+
+    const cleanValue = (val) =>
+      val !== undefined && val !== null && String(val).trim() !== "" ? val : null;
+
+    const hasOpeningBalance = Opening_Balance !== null;
+    const todayDate = new Date().toISOString().slice(0, 10);
+
+    const [result] = await connection.execute(
       `INSERT INTO add_party 
-       (Party_Id, Party_Name, GSTIN, Phone_Number,  State, Email_Id, Billing_Address, Shipping_Address)
-       VALUES (?, ?, ?, ?, ?, ?, ?,?)`,
+       (Party_Id, Party_Name, GSTIN, Phone_Number, State, Email_Id,
+        Opening_Balance, Opening_Balance_Type, Opening_Balance_Date,
+        Credit_Limit_Type, Credit_Limit)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newId,
         Party_Name,
         cleanValue(GSTIN),
         cleanValue(Phone_Number),
-      
         cleanValue(State),
         cleanValue(Email_Id),
-        cleanValue(Billing_Address),
-        cleanValue(Shipping_Address),
-        
+
+        hasOpeningBalance ? Opening_Balance : null,
+        hasOpeningBalance ? Opening_Balance_Type : null,
+        hasOpeningBalance ? (Opening_Balance_Date || todayDate) : null,
+
+        Credit_Limit_Type || "No_Limit",
+        Credit_Limit_Type === "Custom" ? Credit_Limit : null,
       ]
     );
 
-      await connection.commit();
+    // 🔹 ADDRESSES — skip blank ones; last one of each type wins as default
+    const realAddresses = (addresses || []).filter((a) => a.Address_Text?.trim());
+
+    // find the LAST index for each type, among real addresses
+    const lastIndexByType = {};
+    realAddresses.forEach((a, i) => {
+      lastIndexByType[a.Address_Type] = i;
+    });
+
+    for (let i = 0; i < realAddresses.length; i++) {
+      const addr = realAddresses[i];
+      const isDefault = i === lastIndexByType[addr.Address_Type];
+
+      await connection.query(
+        `INSERT INTO add_party_addresses (Party_Id, Address_Type, Address_Text, Is_Default)
+         VALUES (?, ?, ?, ?)`,
+        [newId, addr.Address_Type, addr.Address_Text.trim(), isDefault ? 1 : 0]
+      );
+    }
+
+    // 🔹 seed the ledger only if Opening Balance was touched
+    if (hasOpeningBalance) {
+      await recordPartyLedger({
+        connection,
+        partyId: newId,
+        txnType: "Opening_Balance",
+        referenceId: result.insertId,
+        amount: Opening_Balance,
+        txnDate: Opening_Balance_Date || todayDate,
+        directionOverride: Opening_Balance_Type === "To_Receive" ? "Credit" : "Debit",
+      });
+    }
+
+    await connection.commit();
     return res.status(201).json({
       message: "Party added successfully",
       success: true,
-      id: result.insertId, // auto-increment primary key
-      Party_Id: newId,     // custom party code
+      id: result.insertId,
+      Party_Id: newId,
       Party_Name,
       GSTIN,
       Phone_Number,
-     
       State,
       Email_Id,
-      Billing_Address,
-      Shipping_Address,
-     
+      addresses: realAddresses,
+      Opening_Balance,
+      Opening_Balance_Type,
+      Opening_Balance_Date,
+      Credit_Limit_Type,
+      Credit_Limit,
     });
   } catch (err) {
     if (connection) {
@@ -131,102 +173,612 @@ if (existingName.length > 0) {
     }
     console.error("❌ Error adding party:", err);
     next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+  } finally {
     if (connection) {
       connection.release();
     }
   }
 };
+// const addParty = async (req, res, next) => {
+//   let connection;
+//   try {
+  
 
-const editParty= async (req, res, next) => {
+//     connection = await db.getConnection();
+//     await connection.beginTransaction();
+//     const cleanData = sanitizeObject(req.body);
+//     const validation = partySchema.safeParse(cleanData);
+//     if (!validation.success) {
+//       return res.status(400).json({ errors: validation.error.errors });
+//     }
+//     // const {
+//     //   Party_Name,
+//     //   GSTIN,
+//     //   Phone_Number,
+     
+//     //   State,
+//     //   Email_Id,
+//     //   Billing_Address,
+//     //   Shipping_Address,
+      
+//     // } = validation.data;
+//     const {
+//   Party_Name, GSTIN, Phone_Number, State, Email_Id,
+//   Billing_Address, Shipping_Address,
+//   Opening_Balance, Opening_Balance_Type, Opening_Balance_Date,
+//   Credit_Limit_Type, Credit_Limit,
+// } = validation.data;
+
+//     if (!Party_Name) {
+//       await connection.rollback();
+//       return res.status(400).json({ message: "Party name is required" });
+//     }
+// // 🔥 Correct duplicate check
+// const [existingParty] = await db.query(
+//   `SELECT Party_Id FROM add_party 
+//    WHERE GSTIN = ? OR Phone_Number = ?
+//    LIMIT 1`,
+//   [GSTIN, Phone_Number]
+// );
+
+// if (existingParty.length > 0) {
+//   await connection.rollback();
+//   return res.status(400).json({
+//     message: "GSTIN or Phone Number already exists for another party",
+//   });
+// }
+// // 🔥 Duplicate party name check (case-insensitive, trimmed)
+// const [existingName] = await db.query(
+//   `SELECT Party_Id FROM add_party 
+//    WHERE LOWER(TRIM(Party_Name)) = LOWER(TRIM(?))
+//    LIMIT 1`,
+//   [Party_Name]
+// );
+
+// if (existingName.length > 0) {
+//   await connection.rollback();
+//   return res.status(400).json({
+//     message: "Party name already exists",
+//   });
+// }
+
+//   // const [existingParty] = await db.query(
+//   //     "SELECT Party_Id, GSTIN, Phone_Number FROM add_party "
+//   //   );
+
+//   //    if(existingParty[0].GSTIN === GSTIN || existingParty[0].Phone_Number === Phone_Number){
+//   //     await connection.rollback();
+//   //     return res.status(400).json({ message: "GSTIN or Phone Number for another party already exists" });
+//   //   }
+//     // Get last party code
+//     const [last] = await db.query(
+//       "SELECT Party_Id FROM add_party ORDER BY id DESC LIMIT 1"
+//     );
+
+   
+//     let newId = "PTY001";
+//     if (last.length > 0) {
+//       const lastId = last[0].Party_Id; // e.g. "PTY005"
+//       const num = parseInt(lastId.replace("PTY", "")) + 1;
+//       newId = "PTY" + num.toString().padStart(3, "0");
+//     }
+//   const cleanValue = (val) =>
+//     val !== undefined && val !== null && String(val).trim() !== "" ? val : null;
+//     // Insert into DB
+//     const [result] = await db.execute(
+//       `INSERT INTO add_party 
+//        (Party_Id, Party_Name, GSTIN, Phone_Number,  State, Email_Id, Billing_Address, Shipping_Address)
+//        VALUES (?, ?, ?, ?, ?, ?, ?,?)`,
+//       [
+//         newId,
+//         Party_Name,
+//         cleanValue(GSTIN),
+//         cleanValue(Phone_Number),
+      
+//         cleanValue(State),
+//         cleanValue(Email_Id),
+//         cleanValue(Billing_Address),
+//         cleanValue(Shipping_Address),
+        
+//       ]
+//     );
+
+//       await connection.commit();
+//     return res.status(201).json({
+//       message: "Party added successfully",
+//       success: true,
+//       id: result.insertId, // auto-increment primary key
+//       Party_Id: newId,     // custom party code
+//       Party_Name,
+//       GSTIN,
+//       Phone_Number,
+     
+//       State,
+//       Email_Id,
+//       Billing_Address,
+//       Shipping_Address,
+     
+//     });
+//   } catch (err) {
+//     if (connection) {
+//       await connection.rollback();
+//     }
+//     console.error("❌ Error adding party:", err);
+//     next(err);
+//     // return res.status(500).json({ message: "Internal Server Error" });
+//   }finally {
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// };
+
+const editParty = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
+
+    // ─────────────────────────────────────
+    // VALIDATION
+    // ─────────────────────────────────────
     const cleanData = sanitizeObject(req.body);
     const validation = partySchema.safeParse(cleanData);
+
     if (!validation.success) {
-      return res.status(400).json({ errors: validation.error.errors });
+      await connection.rollback();
+
+      return res.status(400).json({
+        errors: validation.error.errors,
+      });
     }
+
     const {
       Party_Name,
       GSTIN,
       Phone_Number,
       State,
       Email_Id,
-      Billing_Address,
-      Shipping_Address,
-      
+
+      addresses,
+
+      Opening_Balance,
+      Opening_Balance_Type,
+      Opening_Balance_Date,
+
+      Credit_Limit_Type,
+      Credit_Limit,
     } = validation.data;
+
+    const { Party_Id: partyId } = req.params;
 
     if (!Party_Name) {
       await connection.rollback();
-      return res.status(400).json({ message: "Party name is required" });
+
+      return res.status(400).json({
+        message: "Party name is required",
+      });
     }
-    const { Party_Id: partyId } = req.params;
 
- 
+    // ─────────────────────────────────────
+    // CHECK PARTY EXISTS
+    // ─────────────────────────────────────
+    const [[partyRow]] = await connection.query(
+      `SELECT id
+       FROM add_party
+       WHERE Party_Id = ?
+       LIMIT 1`,
+      [partyId]
+    );
 
-// 🔥 Duplicate party name check (excluding this party itself)
-const [existingName] = await db.query(
-  `SELECT Party_Id FROM add_party 
-   WHERE LOWER(TRIM(Party_Name)) = LOWER(TRIM(?)) AND Party_Id != ?
-   LIMIT 1`,
-  [Party_Name, partyId]
-);
+    if (!partyRow) {
+      await connection.rollback();
 
-if (existingName.length > 0) {
-  await connection.rollback();
-  return res.status(400).json({
-    message: "Party name already exists",
-  });
-}
-    const [result] = await db.execute(
-      `UPDATE add_party 
-       SET Party_Name = ?, GSTIN = ?, Phone_Number = ?, State = ?, Email_Id = ?, Billing_Address = ?, Shipping_Address = ?
+      return res.status(404).json({
+        message: "Party not found",
+      });
+    }
+
+    // ─────────────────────────────────────
+    // DUPLICATE PARTY NAME
+    // ─────────────────────────────────────
+    const [existingName] = await connection.query(
+      `SELECT Party_Id
+       FROM add_party
+       WHERE TRIM(Party_Name) = TRIM(?)
+         AND Party_Id != ?
+       LIMIT 1`,
+      [Party_Name, partyId]
+    );
+
+    if (existingName.length > 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        message: "Party name already exists",
+      });
+    }
+
+    // ─────────────────────────────────────
+    // DUPLICATE GSTIN / PHONE
+    // ─────────────────────────────────────
+    // if (GSTIN || Phone_Number) {
+    //   const conditions = [];
+    //   const params = [];
+
+    //   if (GSTIN) {
+    //     conditions.push("GSTIN = ?");
+    //     params.push(GSTIN);
+    //   }
+
+    //   if (Phone_Number) {
+    //     conditions.push("Phone_Number = ?");
+    //     params.push(Phone_Number);
+    //   }
+
+    //   params.push(partyId);
+
+    //   const [existingParty] = await connection.query(
+    //     `SELECT Party_Id
+    //      FROM add_party
+    //      WHERE (${conditions.join(" OR ")})
+    //        AND Party_Id != ?
+    //      LIMIT 1`,
+    //     params
+    //   );
+
+    //   if (existingParty.length > 0) {
+    //     await connection.rollback();
+
+    //     return res.status(400).json({
+    //       message:
+    //         "GSTIN or Phone Number already exists for another party",
+    //     });
+    //   }
+    // }
+
+    const cleanValue = (val) =>
+      val !== undefined &&
+      val !== null &&
+      String(val).trim() !== ""
+        ? val
+        : null;
+
+    const hasOpeningBalance = Opening_Balance !== null;
+
+    const todayDate = new Date()
+      .toISOString()
+      .slice(0, 10);
+
+    // ─────────────────────────────────────
+    // UPDATE PARTY MASTER
+    // ─────────────────────────────────────
+    await connection.execute(
+      `UPDATE add_party
+       SET
+         Party_Name = ?,
+         GSTIN = ?,
+         Phone_Number = ?,
+         State = ?,
+         Email_Id = ?,
+
+         Opening_Balance = ?,
+         Opening_Balance_Type = ?,
+         Opening_Balance_Date = ?,
+
+         Credit_Limit_Type = ?,
+         Credit_Limit = ?,
+
+         updated_at = NOW()
+
        WHERE Party_Id = ?`,
       [
         Party_Name,
         cleanValue(GSTIN),
         cleanValue(Phone_Number),
-       
         cleanValue(State),
         cleanValue(Email_Id),
-        cleanValue(Billing_Address),
-        cleanValue(Shipping_Address),
+
+        hasOpeningBalance
+          ? Opening_Balance
+          : null,
+
+        hasOpeningBalance
+          ? Opening_Balance_Type
+          : null,
+
+        hasOpeningBalance
+          ? Opening_Balance_Date || todayDate
+          : null,
+
+        Credit_Limit_Type || "No_Limit",
+
+        Credit_Limit_Type === "Custom"
+          ? Credit_Limit
+          : null,
+
         partyId,
       ]
     );
 
+    // ─────────────────────────────────────
+    // ADDRESSES
+    // ─────────────────────────────────────
+
+    // Ignore opened-but-empty address boxes
+    const realAddresses = (addresses || []).filter(
+      (address) => address.Address_Text?.trim()
+    );
+
+    
+    // Remove existing addresses
+    await connection.execute(
+      `DELETE FROM add_party_addresses
+       WHERE Party_Id = ?`,
+      [partyId]
+    );
+
+    // Reinsert exactly according to user's selection
+    for (const address of realAddresses) {
+      await connection.execute(
+        `INSERT INTO add_party_addresses
+         (
+           Party_Id,
+           Address_Type,
+           Address_Text,
+           Is_Default
+         )
+         VALUES (?, ?, ?, ?)`,
+        [
+          partyId,
+          address.Address_Type,
+          address.Address_Text.trim(),
+
+          //  USER CONTROLS DEFAULT
+          address.Is_Default === true ? 1 : 0,
+        ]
+      );
+    }
+
+    // ─────────────────────────────────────
+    // OPENING BALANCE LEDGER
+    // ─────────────────────────────────────
+    if (hasOpeningBalance) {
+      await recordPartyLedger({
+        connection,
+
+        partyId,
+
+        txnType: "Opening_Balance",
+
+        referenceId: partyRow.id,
+
+        amount: Opening_Balance,
+
+        txnDate:Opening_Balance_Date || todayDate,
+
+        directionOverride:Opening_Balance_Type === "To_Receive"
+            ? "Credit"
+            : "Debit",
+      });
+
+    } else {
+      // Opening balance completely removed
+      await reversePartyLedger({
+        connection,
+
+        partyId,
+
+        txnType: "Opening_Balance",
+
+        referenceId: partyRow.id,
+      });
+    }
+
+    // ─────────────────────────────────────
+    // COMMIT
+    // ─────────────────────────────────────
     await connection.commit();
+
     return res.status(200).json({
-      message: "Party updated successfully",
       success: true,
-      id: partyId,
+      message: "Party updated successfully",
+
+      Party_Id: partyId,
+
       Party_Name,
       GSTIN,
       Phone_Number,
-     
       State,
       Email_Id,
-      Billing_Address,
-      Shipping_Address,
-     
+
+      addresses: realAddresses,
+
+      Opening_Balance:
+        hasOpeningBalance
+          ? Opening_Balance
+          : null,
+
+      Opening_Balance_Type:
+        hasOpeningBalance
+          ? Opening_Balance_Type
+          : null,
+
+      Opening_Balance_Date:
+        hasOpeningBalance
+          ? Opening_Balance_Date || todayDate
+          : null,
+
+      Credit_Limit_Type:
+        Credit_Limit_Type || "No_Limit",
+
+      Credit_Limit:
+        Credit_Limit_Type === "Custom"
+          ? Credit_Limit
+          : null,
     });
+
   } catch (err) {
     if (connection) {
       await connection.rollback();
     }
+
     console.error("❌ Error updating party:", err);
+
     next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+
+  } finally {
     if (connection) {
       connection.release();
     }
   }
-}
+};
+// const editParty = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+//     await connection.beginTransaction();
+
+//     const cleanData = sanitizeObject(req.body);
+//     const validation = partySchema.safeParse(cleanData);
+//     if (!validation.success) {
+//       await connection.rollback();
+//       return res.status(400).json({ errors: validation.error.errors });
+//     }
+
+//     const {
+//       Party_Name,
+//       GSTIN,
+//       Phone_Number,
+//       State,
+//       Email_Id,
+//       Billing_Address,
+//       Shipping_Address,
+//       Opening_Balance,
+//       Opening_Balance_Type,
+//       Opening_Balance_Date,
+//       Credit_Limit_Type,
+//       Credit_Limit,
+//     } = validation.data;
+
+//     if (!Party_Name) {
+//       await connection.rollback();
+//       return res.status(400).json({ message: "Party name is required" });
+//     }
+
+//     const { Party_Id: partyId } = req.params;
+
+//     // 🔥 fetch the party's numeric PK — needed as referenceId for the ledger
+//     const [[partyRow]] = await connection.query(
+//       `SELECT id FROM add_party WHERE Party_Id = ?`,
+//       [partyId]
+//     );
+
+//     if (!partyRow) {
+//       await connection.rollback();
+//       return res.status(404).json({ message: "Party not found" });
+//     }
+
+//     // 🔥 Duplicate party name check (excluding this party itself)
+//     const [existingName] = await connection.query(
+//       `SELECT Party_Id FROM add_party 
+//        WHERE TRIM(Party_Name) = TRIM(?) AND Party_Id != ?
+//        LIMIT 1`,
+//       [Party_Name, partyId]
+//     );
+
+//     if (existingName.length > 0) {
+//       await connection.rollback();
+//       return res.status(400).json({
+//         message: "Party name already exists",
+//       });
+//     }
+
+//     const cleanValue = (val) =>
+//       val !== undefined && val !== null && String(val).trim() !== "" ? val : null;
+
+//     const hasOpeningBalance = Opening_Balance !== null;
+//     const todayDate = new Date().toISOString().slice(0, 10);
+
+//     await connection.execute(
+//       `UPDATE add_party 
+//        SET Party_Name = ?, GSTIN = ?, Phone_Number = ?, State = ?, Email_Id = ?,
+//            Billing_Address = ?, Shipping_Address = ?,
+//            Opening_Balance = ?, Opening_Balance_Type = ?, Opening_Balance_Date = ?,
+//            Credit_Limit_Type = ?, Credit_Limit = ?
+//        WHERE Party_Id = ?`,
+//       [
+//         Party_Name,
+//         cleanValue(GSTIN),
+//         cleanValue(Phone_Number),
+//         cleanValue(State),
+//         cleanValue(Email_Id),
+//         cleanValue(Billing_Address),
+//         cleanValue(Shipping_Address),
+
+//         hasOpeningBalance ? Opening_Balance : null,
+//         hasOpeningBalance ? Opening_Balance_Type : null,
+//         hasOpeningBalance ? (Opening_Balance_Date || todayDate) : null,
+
+//         Credit_Limit_Type || "No_Limit",
+//         Credit_Limit_Type === "Custom" ? Credit_Limit : null,
+
+//         partyId,
+//       ]
+//     );
+
+//     // 🔹 sync the ledger to match the new state
+//     if (hasOpeningBalance) {
+//       await recordPartyLedger({
+//         connection,
+//         partyId,
+//         txnType: "Opening_Balance",
+//         referenceId: partyRow.id,
+//         amount: Opening_Balance,
+//         txnDate: Opening_Balance_Date || todayDate,
+//         directionOverride: Opening_Balance_Type === "To_Receive" ? "Credit" : "Debit",
+//       });
+//     } else {
+//       // 🔹 user cleared the opening balance entirely — remove the ledger row if one existed
+//       await reversePartyLedger({
+//         connection,
+//         partyId,
+//         txnType: "Opening_Balance",
+//         referenceId: partyRow.id,
+//       });
+//     }
+
+//     await connection.commit();
+//     return res.status(200).json({
+//       message: "Party updated successfully",
+//       success: true,
+//       id: partyId,
+//       Party_Name,
+//       GSTIN,
+//       Phone_Number,
+//       State,
+//       Email_Id,
+//       Billing_Address,
+//       Shipping_Address,
+//       Opening_Balance,
+//       Opening_Balance_Type,
+//       Opening_Balance_Date,
+//       Credit_Limit_Type,
+//       Credit_Limit,
+//     });
+//   } catch (err) {
+//     if (connection) {
+//       await connection.rollback();
+//     }
+//     console.error("❌ Error updating party:", err);
+//     next(err);
+//   } finally {
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// };
 const getAllParties = async (req, res, next) => {
   let connection;
   try {
@@ -913,13 +1465,54 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Party Id is required" });
     }
 
-    const [partyDetails] = await connection.query(
-      `SELECT * FROM add_party WHERE Party_Id = ?`,
-      [Party_Id]
-    );
-    if (!partyDetails.length) {
-      return res.status(404).json({ success: false, message: "Party not found" });
-    }
+    // const [partyDetails] = await connection.query(
+    //   `SELECT * FROM add_party WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
+    // if (!partyDetails.length) {
+    //   return res.status(404).json({ success: false, message: "Party not found" });
+    // }
+    // ─────────────────────────────────────────────
+// PARTY DETAILS
+// ─────────────────────────────────────────────
+const [[party]] = await connection.query(
+  `SELECT *
+   FROM add_party
+   WHERE Party_Id = ?
+   LIMIT 1`,
+  [Party_Id]
+);
+
+if (!party) {
+  return res.status(404).json({
+    success: false,
+    message: "Party not found",
+  });
+}
+
+// ─────────────────────────────────────────────
+// PARTY ADDRESSES
+// ─────────────────────────────────────────────
+const [addresses] = await connection.query(
+  `SELECT
+      id,
+      Address_Type,
+      Address_Text,
+      Is_Default
+   FROM add_party_addresses
+   WHERE Party_Id = ?
+   ORDER BY Address_Type, Is_Default DESC, id ASC`,
+  [Party_Id]
+);
+
+// Combine them
+const partyDetails = {
+  ...party,
+  addresses: addresses.map((address) => ({
+    ...address,
+    Is_Default: Boolean(address.Is_Default),
+  })),
+};
 
     // 🔹 Build ledger query — cursor + search + date
     const params = [Party_Id];
@@ -1067,7 +1660,7 @@ const [ledgerRows] = await connection.query(
     return res.status(200).json({
       success: true,
       partyId: Party_Id,
-      partyDetails: partyDetails[0],
+      partyDetails: partyDetails,
       transactions: pageRows,
       nextCursor,
       hasMore,

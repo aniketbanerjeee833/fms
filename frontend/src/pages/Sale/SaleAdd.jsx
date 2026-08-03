@@ -133,7 +133,7 @@ export default function SaleAdd() {
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  
+
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   console.log(itemUnits, "itemUnits");
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
@@ -262,7 +262,10 @@ export default function SaleAdd() {
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
       Party_Name: "",
+
       GSTIN: "",
+      Phone_Number: "",
+      Billing_Address: "",
       Invoice_Number: "",
       Invoice_Date: today,
       State_Of_Supply: "",
@@ -468,367 +471,367 @@ export default function SaleAdd() {
 
 
 
-const onSubmit = async (data) => {
-  console.log("Form Data (from RHF):", data);
+  const onSubmit = async (data) => {
+    console.log("Form Data (from RHF):", data);
 
-  // =========================================================
-  // 1. ITEMS
-  // =========================================================
+    // =========================================================
+    // 1. ITEMS
+    // =========================================================
 
-  const itemsWithDefaults = (data.items || []).map((item) => ({
-    ...item,
+    const itemsWithDefaults = (data.items || []).map((item) => ({
+      ...item,
 
-    Tax_Type: item.Tax_Type || "None",
+      Tax_Type: item.Tax_Type || "None",
 
-    Tax_Amount:
-      item.Tax_Amount === "" ||
-      item.Tax_Amount === undefined ||
-      item.Tax_Amount === null
-        ? 0
-        : Number(item.Tax_Amount),
+      Tax_Amount:
+        item.Tax_Amount === "" ||
+          item.Tax_Amount === undefined ||
+          item.Tax_Amount === null
+          ? 0
+          : Number(item.Tax_Amount),
 
-    Amount:
-      item.Amount === "" ||
-      item.Amount === undefined ||
-      item.Amount === null
-        ? 0
-        : Number(item.Amount),
-  }));
+      Amount:
+        item.Amount === "" ||
+          item.Amount === undefined ||
+          item.Amount === null
+          ? 0
+          : Number(item.Amount),
+    }));
 
-  // =========================================================
-  // 2. SALE TOTAL
-  // =========================================================
+    // =========================================================
+    // 2. SALE TOTAL
+    // =========================================================
 
-  const totalAmount = Number(data.Total_Amount) || 0;
+    const totalAmount = Number(data.Total_Amount) || 0;
 
-  // =========================================================
-  // 3. PAYMENT SPLITS
-  //
-  // Sale:
-  //
-  // Total = 0
-  // -> no splits
-  //
-  // Total > 0
-  // -> first valid payment method stays even at ₹0
-  // -> later ₹0 methods are dropped
-  // -> later positive methods stay
-  // =========================================================
+    // =========================================================
+    // 3. PAYMENT SPLITS
+    //
+    // Sale:
+    //
+    // Total = 0
+    // -> no splits
+    //
+    // Total > 0
+    // -> first valid payment method stays even at ₹0
+    // -> later ₹0 methods are dropped
+    // -> later positive methods stay
+    // =========================================================
 
-  let validSplits = [];
+    let validSplits = [];
 
-  if (totalAmount > 0) {
-    const normalizedSplits = (data.splits || [])
-      .filter((split) => {
-        if (!split.Payment_Type) {
-          return false;
-        }
+    if (totalAmount > 0) {
+      const normalizedSplits = (data.splits || [])
+        .filter((split) => {
+          if (!split.Payment_Type) {
+            return false;
+          }
 
-        if (
-          split.Payment_Type === "Bank" &&
-          !split.Bank_Account_Id
-        ) {
-          return false;
-        }
+          if (
+            split.Payment_Type === "Bank" &&
+            !split.Bank_Account_Id
+          ) {
+            return false;
+          }
 
-        return true;
-      })
-      .map((split) => ({
-        ...split,
-        Amount: Number(split.Amount) || 0,
-      }));
-
-    validSplits = normalizedSplits.filter(
-      (split, index) => {
-        // First valid payment type ALWAYS stays
-        if (index === 0) {
           return true;
+        })
+        .map((split) => ({
+          ...split,
+          Amount: Number(split.Amount) || 0,
+        }));
+
+      validSplits = normalizedSplits.filter(
+        (split, index) => {
+          // First valid payment type ALWAYS stays
+          if (index === 0) {
+            return true;
+          }
+
+          // Later payment types only stay with positive amount
+          return split.Amount > 0;
         }
-
-        // Later payment types only stay with positive amount
-        return split.Amount > 0;
-      }
-    );
-  }
-
-  // =========================================================
-  // 4. TOTAL RECEIVED
-  // =========================================================
-
-  const totalReceived = validSplits.reduce(
-    (sum, split) =>
-      sum + (Number(split.Amount) || 0),
-    0
-  );
-
-  // =========================================================
-  // 5. BALANCE DUE
-  // =========================================================
-
-  const balanceDue =
-    totalAmount - totalReceived;
-
-  // =========================================================
-  // 6. BUILD PAYLOAD
-  // =========================================================
-
-  const payload = {
-    ...data,
-
-    items: itemsWithDefaults,
-
-    Total_Amount: totalAmount,
-    Total_Received: totalReceived,
-    Balance_Due: balanceDue,
-
-    splits: validSplits,
-  };
-
-  console.log("Final Sale Payload:", payload);
-
-  // =========================================================
-  // 7. SUBMIT
-  // =========================================================
-
-  try {
-    const res = await addSale({
-      body: payload,
-    }).unwrap();
-
-    console.log("Successfully:", res);
-
-    const resData = res?.data || res;
-
-    if (!resData?.success) {
-      toast.error("Failed to add new sale");
-      return;
+      );
     }
 
-    // =======================================================
-    // CACHE INVALIDATION
-    // =======================================================
+    // =========================================================
+    // 4. TOTAL RECEIVED
+    // =========================================================
 
-    dispatch(
-      itemApi.util.invalidateTags(["Item"])
+    const totalReceived = validSplits.reduce(
+      (sum, split) =>
+        sum + (Number(split.Amount) || 0),
+      0
     );
 
-    dispatch(
-      saleApi.util.invalidateTags(["Sale"])
-    );
+    // =========================================================
+    // 5. BALANCE DUE
+    // =========================================================
 
-    dispatch(
-      cashInHandApi.util.invalidateTags([
-        "CashInHand",
-      ])
-    );
+    const balanceDue =
+      totalAmount - totalReceived;
 
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        "BankAccount",
-      ])
-    );
+    // =========================================================
+    // 6. BUILD PAYLOAD
+    // =========================================================
 
-    dispatch(
-      partyApi.util.invalidateTags(["Party"])
-    );
+    const payload = {
+      ...data,
 
-    toast.success(
-      "New Sale added successfully!"
-    );
+      items: itemsWithDefaults,
 
-    navigate("/sale/all-sales");
+      Total_Amount: totalAmount,
+      Total_Received: totalReceived,
+      Balance_Due: balanceDue,
 
-  } catch (error) {
-    const errorMessage =
-      error?.data?.message ||
-      error?.message ||
-      "Failed to add new sale";
+      splits: validSplits,
+    };
 
-    toast.error(errorMessage);
+    console.log("Final Sale Payload:", payload);
 
-    console.error(
-      "Submission failed",
-      error
-    );
-  }
-};
-// const onSubmit = async (data) => {
-//   console.log("Form Data (from RHF):", data);
+    // =========================================================
+    // 7. SUBMIT
+    // =========================================================
 
-//   // =========================================================
-//   // 1. ITEMS
-//   //
-//   // Your rule:
-//   // - No Item_Name + Amount > 0 => ERROR
-//   // - No Item_Name + Amount blank/0 => ignore the row
-//   // - Empty Sale is allowed
-//   // =========================================================
+    try {
+      const res = await addSale({
+        body: payload,
+      }).unwrap();
 
-//   // for (const item of data.items || []) {
-//   //   const itemName = item.Item_Name?.trim();
-//   //   const amount = Number(item.Amount) || 0;
+      console.log("Successfully:", res);
 
-//   //   if (!itemName && amount > 0) {
-//   //     toast.error("Please enter an item name for the row.");
-//   //     return;
-//   //   }
-//   // }
+      const resData = res?.data || res;
 
-//   // Remove blank placeholder rows.
-//   // If all rows are blank, cleanedItems becomes [].
+      if (!resData?.success) {
+        toast.error("Failed to add new sale");
+        return;
+      }
 
-//   const itemsWithDefaults = cleanedItems.map((item) => ({
-//     ...item,
-//     Tax_Type: item.Tax_Type || "None",
-//     Tax_Amount:
-//       item.Tax_Amount === "" ||
-//       item.Tax_Amount === undefined ||
-//       item.Tax_Amount === null
-//         ? 0
-//         : Number(item.Tax_Amount),
+      // =======================================================
+      // CACHE INVALIDATION
+      // =======================================================
 
-//     Amount:
-//       item.Amount === "" ||
-//       item.Amount === undefined ||
-//       item.Amount === null
-//         ? 0
-//         : Number(item.Amount),
-//   }));
+      dispatch(
+        itemApi.util.invalidateTags(["Item"])
+      );
 
-//   // =========================================================
-//   // 2. SALE TOTAL
-//   // =========================================================
+      dispatch(
+        saleApi.util.invalidateTags(["Sale"])
+      );
 
-//   const totalAmount = Number(data.Total_Amount) || 0;
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
 
-//   // =========================================================
-//   // 3. PAYMENT SPLITS
-//   //
-//   // Vyapar-like SALE behavior:
-//   //
-//   // HDFC blank  -> DROP
-//   // HDFC ₹0     -> DROP
-//   // HDFC ₹500   -> KEEP
-//   //
-//   // Cash blank  -> DROP
-//   // Cash ₹0     -> DROP
-//   // Cash ₹200   -> KEEP
-//   //
-//   // Unlike Purchase, there is NO "keep first ₹0 split" rule.
-//   // =========================================================
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
 
-//   const validSplits =
-//     totalAmount > 0
-//       ? (data.splits || [])
-//           .filter((split) => {
-//             if (!split.Payment_Type) return false;
+      dispatch(
+        partyApi.util.invalidateTags(["Party"])
+      );
 
-//             const amount = Number(split.Amount) || 0;
+      toast.success(
+        "New Sale added successfully!"
+      );
 
-//             // Sale doesn't save zero/blank payments
-//             if (amount <= 0) return false;
+      navigate("/sale/all-sales");
 
-//             // Bank must have an account selected
-//             if (
-//               split.Payment_Type === "Bank" &&
-//               !split.Bank_Account_Id
-//             ) {
-//               return false;
-//             }
+    } catch (error) {
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to add new sale";
 
-//             return true;
-//           })
-//           .map((split) => ({
-//             ...split,
-//             Amount: Number(split.Amount) || 0,
-//           }))
-//       : [];
+      toast.error(errorMessage);
 
-//   // =========================================================
-//   // 4. TOTAL RECEIVED
-//   //
-//   // Calculate from the payment splits that actually survived.
-//   // Don't trust the form's Total_Received.
-//   // =========================================================
+      console.error(
+        "Submission failed",
+        error
+      );
+    }
+  };
+  // const onSubmit = async (data) => {
+  //   console.log("Form Data (from RHF):", data);
 
-//   const totalReceived = validSplits.reduce(
-//     (sum, split) => sum + (Number(split.Amount) || 0),
-//     0
-//   );
+  //   // =========================================================
+  //   // 1. ITEMS
+  //   //
+  //   // Your rule:
+  //   // - No Item_Name + Amount > 0 => ERROR
+  //   // - No Item_Name + Amount blank/0 => ignore the row
+  //   // - Empty Sale is allowed
+  //   // =========================================================
 
-//   // =========================================================
-//   // 5. BALANCE DUE
-//   // =========================================================
+  //   // for (const item of data.items || []) {
+  //   //   const itemName = item.Item_Name?.trim();
+  //   //   const amount = Number(item.Amount) || 0;
 
-//   const balanceDue = totalAmount - totalReceived;
+  //   //   if (!itemName && amount > 0) {
+  //   //     toast.error("Please enter an item name for the row.");
+  //   //     return;
+  //   //   }
+  //   // }
 
-//   // if (totalReceived > totalAmount) {
-//   //   toast.error(
-//   //     "Received amount should be less than or equal to Total Amount"
-//   //   );
-//   //   return;
-//   // }
+  //   // Remove blank placeholder rows.
+  //   // If all rows are blank, cleanedItems becomes [].
 
-//   // =========================================================
-//   // 6. BUILD PAYLOAD
-//   // =========================================================
+  //   const itemsWithDefaults = cleanedItems.map((item) => ({
+  //     ...item,
+  //     Tax_Type: item.Tax_Type || "None",
+  //     Tax_Amount:
+  //       item.Tax_Amount === "" ||
+  //       item.Tax_Amount === undefined ||
+  //       item.Tax_Amount === null
+  //         ? 0
+  //         : Number(item.Tax_Amount),
 
-//   const payload = {
-//     ...data,
+  //     Amount:
+  //       item.Amount === "" ||
+  //       item.Amount === undefined ||
+  //       item.Amount === null
+  //         ? 0
+  //         : Number(item.Amount),
+  //   }));
 
-//     items: itemsWithDefaults,
+  //   // =========================================================
+  //   // 2. SALE TOTAL
+  //   // =========================================================
 
-//     Total_Amount: totalAmount,
-//     Total_Received: totalReceived,
-//     Balance_Due: balanceDue,
+  //   const totalAmount = Number(data.Total_Amount) || 0;
 
-//     splits: validSplits,
-//   };
+  //   // =========================================================
+  //   // 3. PAYMENT SPLITS
+  //   //
+  //   // Vyapar-like SALE behavior:
+  //   //
+  //   // HDFC blank  -> DROP
+  //   // HDFC ₹0     -> DROP
+  //   // HDFC ₹500   -> KEEP
+  //   //
+  //   // Cash blank  -> DROP
+  //   // Cash ₹0     -> DROP
+  //   // Cash ₹200   -> KEEP
+  //   //
+  //   // Unlike Purchase, there is NO "keep first ₹0 split" rule.
+  //   // =========================================================
 
-//   console.log("Final Sale Payload:", payload);
+  //   const validSplits =
+  //     totalAmount > 0
+  //       ? (data.splits || [])
+  //           .filter((split) => {
+  //             if (!split.Payment_Type) return false;
 
-//   // =========================================================
-//   // 7. SUBMIT
-//   // =========================================================
+  //             const amount = Number(split.Amount) || 0;
 
-//   try {
-//     const res = await addSale({
-//       body: payload,
-//     }).unwrap();
+  //             // Sale doesn't save zero/blank payments
+  //             if (amount <= 0) return false;
 
-//     console.log("Successfully:", res);
+  //             // Bank must have an account selected
+  //             if (
+  //               split.Payment_Type === "Bank" &&
+  //               !split.Bank_Account_Id
+  //             ) {
+  //               return false;
+  //             }
 
-//     const resData = res?.data || res;
+  //             return true;
+  //           })
+  //           .map((split) => ({
+  //             ...split,
+  //             Amount: Number(split.Amount) || 0,
+  //           }))
+  //       : [];
 
-//     if (!resData?.success) {
-//       toast.error("Failed to add new sale");
-//       return;
-//     }
+  //   // =========================================================
+  //   // 4. TOTAL RECEIVED
+  //   //
+  //   // Calculate from the payment splits that actually survived.
+  //   // Don't trust the form's Total_Received.
+  //   // =========================================================
 
-//     // =======================================================
-//     // 8. INVALIDATE CACHE
-//     // =======================================================
+  //   const totalReceived = validSplits.reduce(
+  //     (sum, split) => sum + (Number(split.Amount) || 0),
+  //     0
+  //   );
 
-//     dispatch(itemApi.util.invalidateTags(["Item"]));
-//     dispatch(saleApi.util.invalidateTags(["Sale"]));
-//     dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-//     dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
-//     dispatch(partyApi.util.invalidateTags(["Party"]));
+  //   // =========================================================
+  //   // 5. BALANCE DUE
+  //   // =========================================================
 
-//     toast.success("New Sale added successfully!");
+  //   const balanceDue = totalAmount - totalReceived;
 
-//     navigate("/sale/all-sales");
-//   } catch (error) {
-//     const errorMessage =
-//       error?.data?.message ||
-//       error?.message ||
-//       "Failed to add new sale";
+  //   // if (totalReceived > totalAmount) {
+  //   //   toast.error(
+  //   //     "Received amount should be less than or equal to Total Amount"
+  //   //   );
+  //   //   return;
+  //   // }
 
-//     toast.error(errorMessage);
+  //   // =========================================================
+  //   // 6. BUILD PAYLOAD
+  //   // =========================================================
 
-//     console.error("Submission failed", error);
-//   }
-// };
+  //   const payload = {
+  //     ...data,
+
+  //     items: itemsWithDefaults,
+
+  //     Total_Amount: totalAmount,
+  //     Total_Received: totalReceived,
+  //     Balance_Due: balanceDue,
+
+  //     splits: validSplits,
+  //   };
+
+  //   console.log("Final Sale Payload:", payload);
+
+  //   // =========================================================
+  //   // 7. SUBMIT
+  //   // =========================================================
+
+  //   try {
+  //     const res = await addSale({
+  //       body: payload,
+  //     }).unwrap();
+
+  //     console.log("Successfully:", res);
+
+  //     const resData = res?.data || res;
+
+  //     if (!resData?.success) {
+  //       toast.error("Failed to add new sale");
+  //       return;
+  //     }
+
+  //     // =======================================================
+  //     // 8. INVALIDATE CACHE
+  //     // =======================================================
+
+  //     dispatch(itemApi.util.invalidateTags(["Item"]));
+  //     dispatch(saleApi.util.invalidateTags(["Sale"]));
+  //     dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+  //     dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+  //     dispatch(partyApi.util.invalidateTags(["Party"]));
+
+  //     toast.success("New Sale added successfully!");
+
+  //     navigate("/sale/all-sales");
+  //   } catch (error) {
+  //     const errorMessage =
+  //       error?.data?.message ||
+  //       error?.message ||
+  //       "Failed to add new sale";
+
+  //     toast.error(errorMessage);
+
+  //     console.error("Submission failed", error);
+  //   }
+  // };
   useEffect(() => {
     const gstin = parties?.parties?.find(
       (party) => party.Party_Name === watch("Party_Name")
@@ -892,8 +895,8 @@ const onSubmit = async (data) => {
 
   //console.log("Total Amount Watch:", totalAmountWatch);
 
-const showSalePayment = totalAmountWatch > 0;
-//console.log("Show Sale Payment Section:", showSalePayment);
+  const showSalePayment = totalAmountWatch > 0;
+  //console.log("Show Sale Payment Section:", showSalePayment);
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -978,8 +981,8 @@ const showSalePayment = totalAmountWatch > 0;
               {/* <div className="flex flex-wrap justify-between gap-6 w-full "> */}
 
               {/* <div className="flex justify-between"> */}
-              <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-
+              {/* <div className="grid grid-rows-2 grid-cols-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "> */}
+              <div className="grid grid-rows-2 grid-cols-2 ml-2 w-full gap-4 ">
                 {/* <div className="input-field  relative"> */}
                 <div className="flex flex-col relative mt-2 gap-2 party-class"
                   style={{ marginBottom: "0px", marginTop: "0px" }}>
@@ -1095,9 +1098,12 @@ const showSalePayment = totalAmountWatch > 0;
 
                 {/* <div className="input-field   "> */}
 
-
+                {/* 
                 <div className="input-field  flex gap-4
-                              justify-center items-center  gstin-class">
+                              justify-center items-center  gstin-class"> */}
+
+                <div className=" flex flex-col gap-2
+                              w-1/2">
                   <span className=" whitespace-nowrap active ">
                     GSTIN
 
@@ -1120,6 +1126,49 @@ const showSalePayment = totalAmountWatch > 0;
                   )}
                 </div>
 
+                {/* <div className="input-field  flex gap-4
+                              justify-center items-center  gstin-class"> */}
+                <div className=" flex flex-col gap-2
+                               w-1/2">
+                  <span className=" whitespace-nowrap active ">
+                    Phone Number
+
+                  </span>
+
+                  <input
+                    type="text"
+                    style={{ marginBottom: "0px" }}
+                    id=" Phone_Number"
+                    //value={showPhone_Number || ""}
+                    {...register("Phone_Number")}
+                    placeholder="Phone Number"
+                    className="w-full outline-none border-b-2 text-gray-900"
+                  //readOnly
+                  />
+                  {errors?.Phone_Number && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors?.Phone_Number?.message}
+                    </p>
+                  )}
+                </div>
+                {/* <div className="input-field  flex gap-4
+                              justify-center items-center  gstin-class"> */}
+                <div className="flex flex-col gap-2 w-1/2">
+                  <span className="active">Billing Address</span>
+
+                  <textarea
+                    {...register("Billing_Address")}
+                    rows={3}
+                    placeholder="Billing Address"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                  />
+
+                  {errors?.Billing_Address && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.Billing_Address.message}
+                    </p>
+                  )}
+                </div>
 
               </div>
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
@@ -1129,7 +1178,7 @@ const showSalePayment = totalAmountWatch > 0;
 
                   {/* Label */}
                   <span className="whitespace-nowrap ">
-                    Invoice Number 
+                    Invoice Number
                     {/* <span className="text-red-500">*</span> */}
                   </span>
 
@@ -1444,83 +1493,83 @@ const showSalePayment = totalAmountWatch > 0;
                         )}
                       </td> */}
                       <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                                              <Controller
-                                                control={control}
-                                                name={`items.${i}.Item_Category`}
-                                                defaultValue="All"
-                                                render={({ field }) => (
-                                                  <select
-                                                    {...field}
-                                                    className="form-select"
-                                                    style={{ width: "100%", fontSize: "12px" }}
-                                                    onChange={(e) => {
-                                                      const value = e.target.value;
-                                                      if (value === "__ADD_CATEGORY__") {
-                                                        setShowModal(true);
-                                                        return; // don't commit this as the selected value
-                                                      }
-                                                      field.onChange(value);
-                                                    }}
-                                                  >
-                                                    <option value="All">All</option>
-                                                    <option value="__ADD_CATEGORY__">➕ Add Category</option>
-                                                    {categories?.map((cat) => (
-                                                      <option key={cat.Category_Id} value={cat.Item_Category}>
-                                                        {cat.Item_Category}
-                                                      </option>
-                                                    ))}
-                                                  </select>
-                                                )}
-                                              />
-                      
-                                              {showModal && (
-                                                <div
-                                                  style={{
-                                                    position: "fixed", inset: 0, display: "flex",
-                                                    alignItems: "center", justifyContent: "center",
-                                                    backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
-                                                  }}
-                                                >
-                                                  <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setShowModal(false)}
-                                                      style={{ backgroundColor: "transparent" }}
-                                                      className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                                                    >
-                                                      ✕
-                                                    </button>
-                                                    <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                                                    <input
-                                                      type="text"
-                                                      value={newCategory}
-                                                      onChange={(e) => setNewCategory(e.target.value)}
-                                                      className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                                      placeholder="Enter category name"
-                                                    />
-                                                    <div className="flex justify-end gap-3">
-                                                      <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
-                                                        Cancel
-                                                      </button>
-                                                      <button
-                                                        type="button"
-                                                        onClick={async () => {
-                                                          const created = await handleAddCategory(); // should return the created category object
-                                                          if (created?.Item_Category) {
-                                                            setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
-                                                          }
-                                                          setShowModal(false);
-                                                        }}
-                                                        style={{ backgroundColor: "#4CA1AF" }}
-                                                        className="px-4 py-2 rounded-md text-white"
-                                                      >
-                                                        Add
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </td>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        />
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </td>
 
 
 
@@ -1554,7 +1603,7 @@ const showSalePayment = totalAmountWatch > 0;
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
-                              onBlur={() => {
+                            onBlur={() => {
                               setTimeout(() => {
                                 const typedValue = rows[i]?.itemSearch?.trim() || "";
                                 if (!typedValue) return;
@@ -1757,7 +1806,7 @@ const showSalePayment = totalAmountWatch > 0;
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
                           onChange={(e) => {
-                             e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
                             handleRowChange(i, "Item_HSN", e.target.value);
                             setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
                           }}
@@ -1984,7 +2033,7 @@ const showSalePayment = totalAmountWatch > 0;
                             className="form-control"
                             style={{ width: "50%", marginBottom: "0px" }}
                             {...register(`items.${i}.Discount_On_Sale_Price`)}
-                           
+
                             onInput={(e) => {
                               let val = e.target.value;
 
@@ -2144,9 +2193,9 @@ const showSalePayment = totalAmountWatch > 0;
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
-                
-                  <div className="flex flex-col px-2">
-                    {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+
+                <div className="flex flex-col px-2">
+                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
 
                   {showSalePayment && (<div className="flex flex-col mt-3 gap-2 w-full sm:w-128">

@@ -1313,20 +1313,18 @@ const getExpensesByCategory = async (req, res, next) => {
     const { categoryId } = req.params;
     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
     const search = req.query.search?.trim().toLowerCase() || "";
-    const date   = req.query.date || null;   // 🔹 single date only
+    const date   = req.query.date || null;
 
     const whereClauses = [`e.Category_Id = ?`];
     const params       = [categoryId];
 
     if (lastId) { whereClauses.push(`e.id < ?`); params.push(lastId); }
-
     if (search) {
       whereClauses.push(`(LOWER(e.Expense_Number) LIKE ? OR LOWER(a.Party_Name) LIKE ?)`);
       params.push(`%${search}%`, `%${search}%`);
     }
-
     if (date) {
-      whereClauses.push(`DATE(e.Expense_Date) = ?`);   // 🔹 single date match
+      whereClauses.push(`DATE(e.Expense_Date) = ?`);
       params.push(date);
     }
 
@@ -1340,8 +1338,39 @@ const getExpensesByCategory = async (req, res, next) => {
       [...params, PAGE_SIZE + 1]
     );
 
-    const hasMore    = rows.length > PAGE_SIZE;
-    const pageRows   = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+    const hasMore  = rows.length > PAGE_SIZE;
+    const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+    // 🔹 attach Payment_Type_Display from payment_splits
+    const expenseIds = pageRows.map((r) => r.id);
+    if (expenseIds.length > 0) {
+      const [splits] = await connection.query(
+        `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
+         FROM payment_splits ps
+         LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+         WHERE ps.Source_Type = 'Expense'
+           AND ps.Source_Id IN (${expenseIds.map(() => "?").join(",")})`,
+        expenseIds
+      );
+
+      const splitMap = {};
+      for (const s of splits) {
+        if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
+        splitMap[s.Source_Id].push(
+          s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+        );
+      }
+
+      for (const row of pageRows) {
+        const labels = splitMap[row.id] || [];
+        const counts = {};
+        labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
+        row.Payment_Type_Display = Object.entries(counts)
+          .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
+          .join(" , ") || "—";
+      }
+    }
+
     const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
     return res.status(200).json({ success: true, expenses: pageRows, hasMore, nextCursor });
@@ -1363,15 +1392,14 @@ const getExpenseItemUsage = async (req, res, next) => {
     }
 
     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
-    const date   = req.query.date || null;   // 🔹 single date only
+    const date   = req.query.date || null;
 
     const whereClauses = [`ei.Expense_Item_Master_Id = ?`];
     const params       = [masterItemId];
 
     if (lastId) { whereClauses.push(`ei.id < ?`); params.push(lastId); }
-
     if (date) {
-      whereClauses.push(`DATE(e.Expense_Date) = ?`);   // 🔹 single date match
+      whereClauses.push(`DATE(e.Expense_Date) = ?`);
       params.push(date);
     }
 
@@ -1390,8 +1418,39 @@ const getExpenseItemUsage = async (req, res, next) => {
       [...params, PAGE_SIZE + 1]
     );
 
-    const hasMore    = rows.length > PAGE_SIZE;
-    const pageRows   = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+    const hasMore  = rows.length > PAGE_SIZE;
+    const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+    // 🔹 attach Payment_Type_Display — key off e.Expense_Id (parent expense)
+    const expenseIds = [...new Set(pageRows.map((r) => r.Expense_Id))];
+    if (expenseIds.length > 0) {
+      const [splits] = await connection.query(
+        `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
+         FROM payment_splits ps
+         LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+         WHERE ps.Source_Type = 'Expense'
+           AND ps.Source_Id IN (${expenseIds.map(() => "?").join(",")})`,
+        expenseIds
+      );
+
+      const splitMap = {};
+      for (const s of splits) {
+        if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
+        splitMap[s.Source_Id].push(
+          s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+        );
+      }
+
+      for (const row of pageRows) {
+        const labels = splitMap[row.Expense_Id] || [];
+        const counts = {};
+        labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
+        row.Payment_Type_Display = Object.entries(counts)
+          .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
+          .join(" , ") || "—";
+      }
+    }
+
     const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
     return res.status(200).json({ success: true, usage: pageRows, hasMore, nextCursor });
