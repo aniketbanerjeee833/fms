@@ -21,6 +21,7 @@ import { saleReturnApi } from "./api/saleReturnApi";
 import { cashInHandApi } from "./api/cashInHandApi";
 import { bankAccountApi } from "./api/bankAccountApi";
 import { expenseApi } from "./api/expenseApi";
+import { termsConditionsApi } from "./api/termsConditionsApi";
 
 
 // ✅ Combine reducers
@@ -43,7 +44,8 @@ const rootReducer = combineReducers({
   [bankAccountApi.reducerPath]: bankAccountApi.reducer,
   [expenseApi.reducerPath]: expenseApi.reducer,
   [reportApi.reducerPath]: reportApi.reducer,
-  [settingsApi.reducerPath]: settingsApi.reducer
+  [settingsApi.reducerPath]: settingsApi.reducer,
+  [termsConditionsApi.reducerPath]: termsConditionsApi.reducer
 
  
 });
@@ -79,7 +81,8 @@ const store = configureStore({
       bankAccountApi.middleware,
       expenseApi.middleware,
       reportApi.middleware,
-      settingsApi.middleware
+      settingsApi.middleware,
+      termsConditionsApi.middleware
      
     ),
 });

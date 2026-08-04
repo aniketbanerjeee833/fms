@@ -22,6 +22,10 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 import { Trash2 } from "lucide-react";
+
+import TermsConditionsModal from "../../components/Modal/TermsConditionsModal";
+import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
+import { useGetAllTermsQuery, useGetTermsByIdQuery } from "../../redux/api/termsConditionsApi";
 export default function PurchaseAdd() {
 
   const dispatch = useDispatch();
@@ -61,6 +65,10 @@ export default function PurchaseAdd() {
   //const[categoryOpen,setCategoryOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
+  //const [showTermsSection, setShowTermsSection] = useState(false);
+  //const [showTermsConditionsModal, setShowTermsConditionsModal] = useState(false);
+  //const [showTermsConditionsModal, setShowTermsConditionsModal]    = useState({ open: false, mode: "add", data: null });
+  //const [isSaving, setIsSaving] = useState(false);
   const [partySearch, setPartySearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
 
@@ -74,7 +82,12 @@ export default function PurchaseAdd() {
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
+  //const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  ///const [originalTemplateDescription, setOriginalTemplateDescription] = useState("");
 
+
+  const { data: termsTemplates } = useGetAllTermsQuery();
+  console.log(termsTemplates, "termsTemplates");
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
 
 
@@ -105,7 +118,7 @@ export default function PurchaseAdd() {
       //     // ✅ Refresh cache
       //     dispatch(itemApi.util.invalidateTags(["Category"]));
 
-      //     // ✅ Reset modal & input
+      //     // ✅ Reset showTermsConditionsModal & input
       //     setShowModal(false);
       //     // setNewCategory("");
       //     // setOpen(true);
@@ -196,7 +209,7 @@ export default function PurchaseAdd() {
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       Party_Name: "",
-   
+
 
       Bill_Number: "",
       Bill_Date: new Date().toISOString().slice(0, 10),
@@ -204,6 +217,8 @@ export default function PurchaseAdd() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
+      Terms_Condition_Id: null,
+      Terms_Condition_Description: "",
       //Payment_Type: "Cash",
       //Bank_Account_Id: null,   // 🔹 added
       //Reference_Number: "",
@@ -427,7 +442,7 @@ export default function PurchaseAdd() {
   // one-directional: recompute Balance_Due whenever the total-amount or splits change.
   // (One-directional only — do NOT also sync splits from Balance_Due, that
   // two-way sync is exactly what caused the "value shown but still required"
-  // bug in the Payment-Out modal.)
+  // bug in the Payment-Out showTermsConditionsModal.)
   const totalAmountWatch = watch("Total_Amount");
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
@@ -438,196 +453,200 @@ export default function PurchaseAdd() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
-const onSubmit = async (data) => {
-  console.log("Form Data (from RHF):", data);
 
-  // =========================================================
-  // 1. Get raw payment splits
-  // =========================================================
-  const rawSplits = data.splits || [];
 
-  // =========================================================
-  // 2. Normalize split amounts
-  //
-  // ""        -> 0
-  // undefined -> 0
-  // "5"       -> 5
-  // "10.50"   -> 10.5
-  // =========================================================
-  const normalizedSplits = rawSplits.map((split) => ({
-    ...split,
-    Amount: Number(split.Amount) || 0,
-  }));
 
-  // =========================================================
-  // 3. Find FIRST valid payment method
-  //
-  // Cash -> valid
-  //
-  // Bank -> valid only when Bank_Account_Id exists
-  //
-  // Cheque / Neft -> valid
-  // =========================================================
-  const firstValidIndex = normalizedSplits.findIndex((split) => {
-    if (!split.Payment_Type) {
-      return false;
-    }
+ 
+  const onSubmit = async (data) => {
+    console.log("Form Data (from RHF):", data);
 
-    // Bank must have an account selected
-    if (
-      split.Payment_Type === "Bank" &&
-      !split.Bank_Account_Id
-    ) {
-      return false;
-    }
+    // =========================================================
+    // 1. Get raw payment splits
+    // =========================================================
+    const rawSplits = data.splits || [];
 
-    return true;
-  });
-
-  // =========================================================
-  // 4. Build valid splits
-  //
-  // RULE:
-  //
-  // 1. Positive amount -> ALWAYS KEEP
-  //
-  // 2. Blank / ₹0 -> KEEP only when it is the
-  //    FIRST valid payment method
-  //
-  // 3. Other blank / ₹0 rows -> DROP
-  // =========================================================
-  const validSplits = [];
-
-  normalizedSplits.forEach((split, index) => {
-    if (!split.Payment_Type) {
-      return;
-    }
-
-    // Invalid Bank row
-    if (
-      split.Payment_Type === "Bank" &&
-      !split.Bank_Account_Id
-    ) {
-      return;
-    }
-
-    // -------------------------------------------------------
-    // Positive payment
-    // Always keep it
-    // -------------------------------------------------------
-    if (split.Amount > 0) {
-      validSplits.push(split);
-      return;
-    }
-
-    // -------------------------------------------------------
-    // Blank / ₹0
+    // =========================================================
+    // 2. Normalize split amounts
     //
-    // Only preserve the FIRST valid payment method
-    // -------------------------------------------------------
-    if (index === firstValidIndex) {
-      validSplits.push({
-        ...split,
-        Amount: 0,
-      });
+    // ""        -> 0
+    // undefined -> 0
+    // "5"       -> 5
+    // "10.50"   -> 10.5
+    // =========================================================
+    const normalizedSplits = rawSplits.map((split) => ({
+      ...split,
+      Amount: Number(split.Amount) || 0,
+    }));
+
+    // =========================================================
+    // 3. Find FIRST valid payment method
+    //
+    // Cash -> valid
+    //
+    // Bank -> valid only when Bank_Account_Id exists
+    //
+    // Cheque / Neft -> valid
+    // =========================================================
+    const firstValidIndex = normalizedSplits.findIndex((split) => {
+      if (!split.Payment_Type) {
+        return false;
+      }
+
+      // Bank must have an account selected
+      if (
+        split.Payment_Type === "Bank" &&
+        !split.Bank_Account_Id
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // =========================================================
+    // 4. Build valid splits
+    //
+    // RULE:
+    //
+    // 1. Positive amount -> ALWAYS KEEP
+    //
+    // 2. Blank / ₹0 -> KEEP only when it is the
+    //    FIRST valid payment method
+    //
+    // 3. Other blank / ₹0 rows -> DROP
+    // =========================================================
+    const validSplits = [];
+
+    normalizedSplits.forEach((split, index) => {
+      if (!split.Payment_Type) {
+        return;
+      }
+
+      // Invalid Bank row
+      if (
+        split.Payment_Type === "Bank" &&
+        !split.Bank_Account_Id
+      ) {
+        return;
+      }
+
+      // -------------------------------------------------------
+      // Positive payment
+      // Always keep it
+      // -------------------------------------------------------
+      if (split.Amount > 0) {
+        validSplits.push(split);
+        return;
+      }
+
+      // -------------------------------------------------------
+      // Blank / ₹0
+      //
+      // Only preserve the FIRST valid payment method
+      // -------------------------------------------------------
+      if (index === firstValidIndex) {
+        validSplits.push({
+          ...split,
+          Amount: 0,
+        });
+      }
+    });
+
+    // =========================================================
+    // 5. Calculate Total_Paid
+    //
+    // Calculate from the payment splits we're actually sending.
+    // ₹0 first split doesn't affect the total.
+    // =========================================================
+    const totalPaid = validSplits.reduce(
+      (sum, split) => sum + (Number(split.Amount) || 0),
+      0
+    );
+
+    // =========================================================
+    // 6. Build payload
+    // =========================================================
+    const payload = {
+      ...data,
+
+      Total_Paid: totalPaid,
+
+      splits: validSplits,
+    };
+
+    // console.log("Raw Splits:", rawSplits);
+    // console.log("Normalized Splits:", normalizedSplits);
+    // console.log("First Valid Index:", firstValidIndex);
+    // console.log("Valid Splits:", validSplits);
+    // console.log("Total Paid:", totalPaid);
+    // console.log("Final Payload:", payload);
+
+    // =========================================================
+    // 7. Submit purchase
+    // =========================================================
+    try {
+      const res = await addPurchase({
+        body: payload,
+      }).unwrap();
+
+      console.log("Purchase Response:", res);
+
+      const resData = res?.data || res;
+
+      // =======================================================
+      // 8. Invalidate RTK Query caches
+      // =======================================================
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+        ])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
+
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
+
+      dispatch(
+        partyApi.util.invalidateTags([
+          "Party",
+        ])
+      );
+
+      // =======================================================
+      // 9. Handle response
+      // =======================================================
+      if (!resData?.success) {
+        toast.error("Failed to add new purchase");
+        return;
+      }
+
+      toast.success(
+        "New Purchase added successfully!"
+      );
+
+      navigate("/purchase/all-purchases");
+    } catch (error) {
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to add new purchase";
+
+      toast.error(errorMessage);
+
+      console.error(
+        "Purchase submission failed:",
+        error
+      );
     }
-  });
-
-  // =========================================================
-  // 5. Calculate Total_Paid
-  //
-  // Calculate from the payment splits we're actually sending.
-  // ₹0 first split doesn't affect the total.
-  // =========================================================
-  const totalPaid = validSplits.reduce(
-    (sum, split) => sum + (Number(split.Amount) || 0),
-    0
-  );
-
-  // =========================================================
-  // 6. Build payload
-  // =========================================================
-  const payload = {
-    ...data,
-
-    Total_Paid: totalPaid,
-
-    splits: validSplits,
   };
-
-  // console.log("Raw Splits:", rawSplits);
-  // console.log("Normalized Splits:", normalizedSplits);
-  // console.log("First Valid Index:", firstValidIndex);
-  // console.log("Valid Splits:", validSplits);
-  // console.log("Total Paid:", totalPaid);
-  // console.log("Final Payload:", payload);
-
-  // =========================================================
-  // 7. Submit purchase
-  // =========================================================
-  try {
-    const res = await addPurchase({
-      body: payload,
-    }).unwrap();
-
-    console.log("Purchase Response:", res);
-
-    const resData = res?.data || res;
-
-    // =======================================================
-    // 8. Invalidate RTK Query caches
-    // =======================================================
-    dispatch(
-      itemApi.util.invalidateTags([
-        "Item",
-      ])
-    );
-
-    dispatch(
-      cashInHandApi.util.invalidateTags([
-        "CashInHand",
-      ])
-    );
-
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        "BankAccount",
-      ])
-    );
-
-    dispatch(
-      partyApi.util.invalidateTags([
-        "Party",
-      ])
-    );
-
-    // =======================================================
-    // 9. Handle response
-    // =======================================================
-    if (!resData?.success) {
-      toast.error("Failed to add new purchase");
-      return;
-    }
-
-    toast.success(
-      "New Purchase added successfully!"
-    );
-
-    navigate("/purchase/all-purchases");
-  } catch (error) {
-    const errorMessage =
-      error?.data?.message ||
-      error?.message ||
-      "Failed to add new purchase";
-
-    toast.error(errorMessage);
-
-    console.error(
-      "Purchase submission failed:",
-      error
-    );
-  }
-};
 
 
   const states = [
@@ -1055,143 +1074,143 @@ const onSubmit = async (data) => {
               {/* <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "> */}
               <div className="flex flex-col gap-4 w-full lg:w-2/3">
 
-  {/* ROW 1: Party + Billing Name (if applicable) */}
-  <div className={`grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4`}>
+                {/* ROW 1: Party + Billing Name (if applicable) */}
+                <div className={`grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4`}>
 
-    {/* Party */}
-    <div className="flex flex-col gap-2 relative party-class">
-      <span className="whitespace-nowrap active">
-        Party
-        <span className="text-red-500">*</span>
-      </span>
+                  {/* Party */}
+                  <div className="flex flex-col gap-2 relative party-class">
+                    <span className="whitespace-nowrap active">
+                      Party
+                      <span className="text-red-500">*</span>
+                    </span>
 
-      <div className="relative w-full">
-        <div
-          className="flex flex-row border rounded-md bg-white cursor-pointer"
-          onClick={() => setOpen((prev) => !prev)}
-        >
-          <input
-            type="text"
-            id="Party_Name"
-            value={partySearch}
-            onChange={(e) => {
-              const value = e.target.value;
-              setPartySearch(value);
-              setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
-              setOpen(true);
+                    <div className="relative w-full">
+                      <div
+                        className="flex flex-row border rounded-md bg-white cursor-pointer"
+                        onClick={() => setOpen((prev) => !prev)}
+                      >
+                        <input
+                          type="text"
+                          id="Party_Name"
+                          value={partySearch}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPartySearch(value);
+                            setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                            setOpen(true);
 
-              const matchedParty = parties?.parties?.find(
-                (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
-              );
+                            const matchedParty = parties?.parties?.find(
+                              (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
+                            );
 
-              if (matchedParty) {
-                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                setCurrentPartyDetails(matchedParty);
-               
-                setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
-              } else {
-                // setValue("Phone_Number", "", { shouldValidate: true, shouldDirty: true });
-                setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                setCurrentPartyDetails(null);
-              }
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(true);
-            }}
-            onBlur={() => {
-              setTimeout(() => {
-                const typedValue = partySearch?.trim()?.toLowerCase();
-                const matchedParty = parties?.parties?.find(
-                  (p) => p.Party_Name.toLowerCase() === typedValue
-                );
+                            if (matchedParty) {
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              setCurrentPartyDetails(matchedParty);
 
-                if (matchedParty) {
-                  setPartySearch(matchedParty.Party_Name);
-                
-                  setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                  setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                 
-                  //setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
-                  setCurrentPartyDetails(matchedParty);
-                  setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
-                } else {
-                  setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
-                }
+                              setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                            } else {
+                              // setValue("Phone_Number", "", { shouldValidate: true, shouldDirty: true });
+                              setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
+                              setCurrentPartyDetails(null);
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const typedValue = partySearch?.trim()?.toLowerCase();
+                              const matchedParty = parties?.parties?.find(
+                                (p) => p.Party_Name.toLowerCase() === typedValue
+                              );
 
-                setOpen(false);
-              }, 150);
-            }}
-            placeholder="Search By Name/Phone"
-            className="w-full outline-none py-1 px-2 text-gray-900"
-            style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-          />
-          <div className="w-10"></div>
-          <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
-        </div>
+                              if (matchedParty) {
+                                setPartySearch(matchedParty.Party_Name);
 
-        {open && (
-          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-            <span
-              onClick={() => setShowPartyModal(true)}
-              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-            >
-              + Add Party
-            </span>
+                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
 
-            {parties?.parties
-              ?.filter(
-                (party) =>
-                  party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                  party?.Phone_Number?.includes(partySearch)
-              )
-              .map((party, i) => (
-                <div
-                  key={i}
-                  onClick={() => {
-                    setPartySearch(party.Party_Name);
-                    //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
-                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                   
-                    ///setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
-                    setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
-                    setCurrentPartyDetails(party);
-                    setOpen(false);
-                  }}
-                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                >
-                  {party.Party_Name} ({party.Phone_Number})
-                </div>
-              ))}
+                                //setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                setCurrentPartyDetails(matchedParty);
+                                setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
+                              }
 
-            {parties?.parties?.filter((party) =>
-              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
-            ).length === 0 && (
-                <p className="px-3 py-2 text-gray-500">No Party found</p>
-              )}
-          </div>
-        )}
-      </div>
+                              setOpen(false);
+                            }, 150);
+                          }}
+                          placeholder="Search By Name/Phone"
+                          className="w-full outline-none py-1 px-2 text-gray-900"
+                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                        />
+                        <div className="w-10"></div>
+                        <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                      </div>
 
-      {showPartyModal && (
-        <PartyAddModal
-          onClose={() => setShowPartyModal(false)}
-          onSave={(newParty) => {
-            setPartySearch(newParty);
-            setValue("Party_Name", newParty, { shouldValidate: true, shouldDirty: true });
-            setShowPartyModal(false);
-          }}
-        />
-      )}
+                      {open && (
+                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          <span
+                            onClick={() => setShowPartyModal(true)}
+                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                          >
+                            + Add Party
+                          </span>
 
-      {errors?.Party_Name && (
-        <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
-      )}
-    </div>
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  setPartySearch(party.Party_Name);
+                                  //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
+                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
 
-    {/* Billing Name — only rendered when applicable, sits beside Party */}
-    {/* {showBillingName && (
+                                  ///setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                  setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                  setCurrentPartyDetails(party);
+                                  setOpen(false);
+                                }}
+                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              >
+                                {party.Party_Name} ({party.Phone_Number})
+                              </div>
+                            ))}
+
+                          {parties?.parties?.filter((party) =>
+                            party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+                          ).length === 0 && (
+                              <p className="px-3 py-2 text-gray-500">No Party found</p>
+                            )}
+                        </div>
+                      )}
+                    </div>
+
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartySearch(newParty);
+                          setValue("Party_Name", newParty, { shouldValidate: true, shouldDirty: true });
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )}
+
+                    {errors?.Party_Name && (
+                      <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
+                    )}
+                  </div>
+
+                  {/* Billing Name — only rendered when applicable, sits beside Party */}
+                  {/* {showBillingName && (
       <div className="flex flex-col gap-2">
         <span className="whitespace-nowrap active">
          "Billing Name (Optional)
@@ -1209,33 +1228,33 @@ const onSubmit = async (data) => {
         )}
       </div>
     )} */}
-  </div>
+                </div>
 
-  {/* ROW 2: Phone Number + GSTIN */}
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                {/* ROW 2: Phone Number + GSTIN */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
-  
 
-    {/* GSTIN — readonly */}
-    <div className="flex flex-col gap-2">
-      <span className="whitespace-nowrap active">GSTIN</span>
-      <input
-        type="text"
-        id="GSTIN"
-        value={showGSTIN || ""}
-        placeholder="GSTIN"
-        className="w-full outline-none border-b-2 text-gray-900"
-        style={{ marginBottom: 0 }}
-        readOnly
-      />
-      {errors?.GSTIN && (
-        <p className="text-red-500 text-xs mt-1">{errors?.GSTIN?.message}</p>
-      )}
-    </div>
 
-  </div>
+                  {/* GSTIN — readonly */}
+                  <div className="flex flex-col gap-2">
+                    <span className="whitespace-nowrap active">GSTIN</span>
+                    <input
+                      type="text"
+                      id="GSTIN"
+                      value={showGSTIN || ""}
+                      placeholder="GSTIN"
+                      className="w-full outline-none border-b-2 text-gray-900"
+                      style={{ marginBottom: 0 }}
+                      readOnly
+                    />
+                    {errors?.GSTIN && (
+                      <p className="text-red-500 text-xs mt-1">{errors?.GSTIN?.message}</p>
+                    )}
+                  </div>
 
-</div>
+                </div>
+
+              </div>
               {/* <div className="row  "> */}
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
@@ -2239,7 +2258,30 @@ const onSubmit = async (data) => {
                   + Add Row
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
+              <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
+
+
+                <TermsAndConditionsSelector
+                  termsList={termsTemplates}
+                  value={watch("Terms_Condition_Id")}
+                  onChange={({ Terms_Condition_Id, Terms_Condition_Description }) => {
+                    setValue("Terms_Condition_Id", Terms_Condition_Id, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+
+                    setValue(
+                      "Terms_Condition_Description",
+                      Terms_Condition_Description,
+                      {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      }
+                    );
+                  }}
+                />
+
+
                 <div className="flex flex-col px-2">
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
@@ -2645,23 +2687,6 @@ const onSubmit = async (data) => {
           </form>
 
         </div>
-        {/* // : 
-              // (
-              //   <div className="flex flex-col justify-center items-center h-screen gap-4">
-
-              //     <div className="relative">
-              //       <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              //       <div className="absolute inset-0 flex items-center justify-center text-blue-500 text-xl">
-              //         📄
-              //       </div>
-              //     </div>
-
-              //     <p className="text-gray-700 font-medium">
-              //       AI is scanning the invoice...
-              //     </p>
-
-              //   </div>
-              // ) */}
 
 
 
@@ -2689,52 +2714,57 @@ const onSubmit = async (data) => {
             setShowAddUnitModal(false);
             setActiveUnitRow(null);
           }}
-        // onSave={(newUnit) => {
-        //   // 1️⃣ Add new unit to dropdown list
-        //   setItemUnits((prev) => [...prev, newUnit]);
 
-        //   // 2️⃣ Auto select newly added unit
-        //   setValue(
-        //     `items.${activeUnitRow}.Item_Unit`,
-        //     newUnit.Unit_Shorthand,
-        //     { shouldValidate: true, shouldDirty: true }
-        //   );
-
-        //   handleRowChange(
-        //     activeUnitRow,
-        //     "Item_Unit",
-        //     newUnit.Unit_Shorthand
-        //   );
-
-        //   // 3️⃣ Close modal
-        //   setShowAddUnitModal(false);
-        //   setActiveUnitRow(null);
-        // }}
         />
       )}
-      {/* {showAddUnitModal && (
-  <AddUnitModal
-    onClose={() => {
-      setShowAddUnitModal(false);
-      setActiveUnitRow(null);
-    }}
-    // onSave={({  unitKey }) => {
-    //   // 1️⃣ Add unit to dropdown list
-    //   // setItemUnits((prev) => ({
-    //   //   ...prev,
-    //   //   [unitKey]: unitName,
-    //   // }));
+      {/* {showTermsConditionsModal.open && (
+        <TermsConditionsModal
+          mode={showTermsConditionsModal.mode}
+          initialData={showTermsConditionsModal.data}
+          onClose={() => setShowTermsConditionsModal({ open: false, mode: "add", data: null })}
+          onSave={handleSave}
+          isSaving={isSaving}
+        />
+      )} */}
+      {/* {showTermsConditionsModal && (
+                  <TermsConditionsModal
+                    onClose={() => setShowTermsConditionsModal(false)}
+                    onSave={(newTemplate) => {
+                      setValue(
+                        "Terms_Condition_Id",
+                        newTemplate.Terms_Condition_Id,
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        }
+                      );
 
-    //   // 2️⃣ Auto-select newly added unit
-    //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
-    //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
+                      setOriginalTemplateDescription(newTemplate.Terms || "");
 
-    //   // 3️⃣ Close modal
-    //   setShowAddUnitModal(false);
-    //   setActiveUnitRow(null);
-    // }}
-  />
-)} */}
+                      setValue(
+                        "Terms_Condition_Description",
+                        newTemplate.Terms || "",
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        }
+                      );
+
+                      setShowTermsConditionsModal(false);
+                    }}
+                  />
+                  // <TermsConditionsModal
+                  //   onClose={() => setShowTermsConditionsModal(false)}
+                  //   onSave={(newTemplate) => {
+                  //     // refresh templates list via RTK invalidation, then auto-select the new one
+                  //     //setSelectedTemplateId(newTemplate.Terms_Condition_Id);
+                  //     //setOriginalTemplateDescription(newTemplate.Description || "");
+                  //     setValue("Terms_Condition_Id", newTemplate.Terms_Condition_Id, { shouldValidate: true, shouldDirty: true });
+                  //     setValue("Terms_Condition_Description", newTemplate.Description || "", { shouldValidate: true, shouldDirty: true });
+                  //     setShowTermsConditionsModal(false);
+                  //   }}
+                  // />
+                )} */}
       <style>
         {`
   /*  screens between 1000px and 640px */
@@ -2868,7 +2898,7 @@ const onSubmit = async (data) => {
   );
 }
 
- {/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
+{/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
                   style={{ marginBottom: "0px", marginTop: "0px" }}>
                   <span className="whitespace-nowrap active ">
                     Party

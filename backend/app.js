@@ -18,6 +18,7 @@ import dailyExpenseRoutes from "./routes/dailyExpense.js";
 import financialYearRoutes from "./routes/financialYearRoutes.js";
 import miscellaneousRoutes from "./routes/miscellaneousRoutes.js";
 import { expenseCategoryRouter, expenseRouter,expenseItemRouter } from "./routes/expenseRoutes.js";
+import termsConditionRoutes from "./routes/termsConditionsRoutes.js";
 
 import "dotenv/config";
 import express from "express";
@@ -149,6 +150,7 @@ app.use("/api/misc",miscellaneousRoutes)
 app.use("/api/expense-category", expenseCategoryRouter);
 app.use("/api/expense-item", expenseItemRouter);
 app.use("/api/expense", expenseRouter);
+app.use("/api/terms-conditions", termsConditionRoutes);
 app.use(errorHandler)
 // const PORT = process.env.PORT || 5000;
 const PORT = 4000;

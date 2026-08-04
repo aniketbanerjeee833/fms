@@ -165,7 +165,19 @@ export const saleFormSchema = z.object({
       })
     )
     .optional()
-    .default([]),   
+    .default([]),
+    
+    Terms_Conditions_Id: z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .optional()
+  .transform((val) => {
+    if (val === "" || val === null || val === undefined) {
+      return null;
+    }
+
+    const id = Number(val);
+    return Number.isInteger(id) ? id : null;
+  }),
 })
 .superRefine((data, ctx) => {
   // =====================================================
