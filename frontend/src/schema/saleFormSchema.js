@@ -43,7 +43,18 @@ const paymentSplitSchema = z
   });
 
 export const saleFormSchema = z.object({
-  Party_Name: z.string().min(1, "Party_Name is required"),
+    Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
+  // Party_Name: z.string().min(1, "Party_Name is required"),
+      Party_Name: z
+      .string()
+      .trim()
+      .optional()
+      .or(z.literal("")),
+   Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
  Phone_Number: z
   .string()
   .trim()
@@ -117,52 +128,7 @@ export const saleFormSchema = z.object({
         }
       });
     }),
-//   items: z
-//     .array(
-//       z.object({
-//            Item_Category: z.string().min(1, "Item category is required"),
-//         Item_Name: z.string().min(1, "Item name is required"),
-  
-            
-// Item_HSN: z
-//   .union([
-//     z.string(),
-//     z.number(),
-//     z.undefined(),
-//     z.null(),
-//   ])
-//   .transform((val) => (val === undefined || val === null ? "" : String(val))) // ✅ Always a string
-//   .refine((val) => val.trim() !== "", { message: "HSN Code is required." })
-//   .refine((val) => /^\d+$/.test(val), { message: "HSN Code must contain only digits (0-9)." })
-//   .refine((val) => val.length >= 4, { message: "HSN Code must be at least 4 digits." })
-//   .refine((val) => val.length <= 8, { message: "HSN Code must be at most 8 digits." }),
 
-//   Quantity: z.preprocess(
-//   (val) => {
-//     if (val === "" || val === undefined || val === null) return 0;
-//     const n = Number(val);
-//     return isNaN(n) ? 0 : n;
-//   },
-//   z.number().min(1, "Quantity must be greater than zero")
-// ),
-  
-//         Item_Unit: z.string().min(1, "Unit is required"),
-     
-//         Sale_Price: digitsOnly("Sale_Price", true).refine(
-//   (num) => num === undefined || num > 0,
-//   { message: "Sale Price must be greater than 0" }
-// ),
-
-
-//         // Purchase_Price_Type: z.enum(["With Tax", "Without Tax"]),
-//         Discount_On_Sale_Price: digitsOnly("Discount_On_Sale_Price", false).optional(),
-//         Discount_Type_On_Sale_Price: z.enum(["Percentage", "Amount"]).optional(),
-//         Tax_Type: z.string().min(1, "Tax_Type is required").optional().default("None"), // ✅ no need to validate enum, UI ensures correctness
-//         Tax_Amount: digitsOnly("Tax_Amount", false),
-//         Amount: digitsOnly("Amount", false),
-//       })
-//     )
-//     .nonempty("At least one item must be added"),
  items: z
     .array(
       z.object({
@@ -201,10 +167,28 @@ export const saleFormSchema = z.object({
     .optional()
     .default([]),   
 })
-// .refine(
-//     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
-//     {
-//       message: "Please select a bank account.",
-//       path: ["Bank_Account_Id"],
-//     }
-//   );
+.superRefine((data, ctx) => {
+  // =====================================================
+  // CREDIT SALE → PARTY IS MANDATORY
+  // =====================================================
+
+  if (
+    data.Sale_Mode === "Credit" &&
+    !data.Party_Name?.trim()
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["Party_Name"],
+      message: "Party name is required for credit sale",
+    });
+  }
+
+  // =====================================================
+  // CASH SALE → PARTY CAN BE BLANK
+  // =====================================================
+  //
+  // No validation needed.
+  //
+  // Cash + blank party
+  // → backend will use "Cash Sale" party
+});

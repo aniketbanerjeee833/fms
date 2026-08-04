@@ -50,21 +50,34 @@ const normalizeNumber = (val) =>
 
 //OLD
 
+
 // const addSale = async (req, res, next) => {
 //   let connection;
+
 //   try {
 //     connection = await db.getConnection();
 //     await connection.beginTransaction();
 
+//     // =========================================================
+//     // 1. SANITIZE + ZOD VALIDATION
+//     // =========================================================
+
 //     const cleanData = sanitizeObject(req.body);
+
 //     const validation = saleSchema.safeParse(cleanData);
+
 //     if (!validation.success) {
 //       await connection.rollback();
-//       return res.status(400).json({ errors: validation.error.errors });
+
+//       return res.status(400).json({
+//         errors: validation.error.errors,
+//       });
 //     }
 
 //     const {
 //       Party_Name,
+//       Phone_Number,
+//       Billing_Address,
 //       GSTIN,
 //       Invoice_Number,
 //       Invoice_Date,
@@ -72,362 +85,589 @@ const normalizeNumber = (val) =>
 //       Total_Amount,
 //       Total_Received,
 //       Balance_Due,
-//       //Reference_Number,
-//       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
+//       splits,
 //       items,
 //     } = validation.data;
 
-//     // if (
-//     //   !Party_Name ||
-//     //   !Invoice_Number ||
-//     //   !Invoice_Date ||
-//     //   // !State_Of_Supply ||
-//     //   !Array.isArray(items) ||
-//     //   items.length === 0
-//     // ) {
-//     //   await connection.rollback();
-//     //   return res.status(400).json({ message: "Star marked fields missing or items empty" });
-//     // }
-
-//     // const totalAmount   = Number(Total_Amount) || 0;
-//     // const totalReceived = Total_Received === "" || Total_Received === undefined
-//     //   ? 0
-//     //   : Number(Total_Received);
-//     // const balanceDue    = Balance_Due === "" || Balance_Due === undefined
-//     //   ? totalAmount - totalReceived
-//     //   : Number(Balance_Due);
-//        // =========================================================
-//     // SALE PAYMENT LOGIC
-//     //
-//     // Unlike Purchase:
-//     // - Bank ₹0 / blank -> DROP
-//     // - Cash ₹0 / blank -> DROP
-//     // - Any positive payment -> KEEP
-//     // - No sale amount -> no payment splits
+//     // =========================================================
+//     // 2. TOTAL AMOUNT
 //     // =========================================================
 
 //     const totalAmount = Number(Total_Amount) || 0;
 
-//     const validSplits =
-//       totalAmount > 0
-//         ? (splits || [])
-//             .filter((split) => {
-//               if (!split.Payment_Type) return false;
+//     // =========================================================
+//     // 3. SALE PAYMENT SPLITS
+//     //
+//     // SALE BEHAVIOUR:
+//     //
+//     // Cash blank   -> DROP
+//     // Cash 0       -> DROP
+//     // Cash 500     -> KEEP
+//     //
+//     // Bank blank   -> DROP
+//     // Bank 0       -> DROP
+//     // Bank 500     -> KEEP
+//     //
+//     // Empty sale -> no payment_splits
+//     //
+//     // This is intentionally different from Purchase.
+//     // =========================================================
+//     let validSplits = [];
 
-//               const amount = Number(split.Amount) || 0;
+//     if (totalAmount > 0) {
+//       const normalizedSplits = (splits || [])
+//         .filter((split) => {
+//           // Must have payment type
+//           if (!split.Payment_Type) {
+//             return false;
+//           }
 
-//               // Sale never keeps ₹0 / blank payment rows
-//               if (amount <= 0) return false;
+//           // Bank must have selected bank account
+//           if (
+//             split.Payment_Type === "Bank" &&
+//             !split.Bank_Account_Id
+//           ) {
+//             return false;
+//           }
 
-//               // Bank requires an account
-//               if (split.Payment_Type === "Bank" && !split.Bank_Account_Id) {
-//                 return false;
-//               }
+//           return true;
+//         })
+//         .map((split) => ({
+//           ...split,
+//           Amount: Number(split.Amount) || 0,
+//         }));
 
-//               return true;
-//             })
-//             .map((split) => ({
-//               ...split,
-//               Amount: Number(split.Amount) || 0,
-//             }))
-//         : [];
 
-//     // Backend calculates Total_Paid from actual surviving payment rows.
+//       validSplits = normalizedSplits.filter(
+//         (split, index) => {
+
+//           // FIRST valid payment method:
+//           // always preserve, even ₹0
+//           if (index === 0) {
+//             return true;
+//           }
+
+//           // Every payment after first:
+//           // only preserve positive amount
+//           return split.Amount > 0;
+//         }
+//       );
+//     }
+
+//     // =========================================================
+//     // 4. TOTAL RECEIVED
+//     //
+//     // Backend calculates this.
+//     // Don't trust Total_Received coming from frontend.
+//     // =========================================================
+
 //     const totalReceived = validSplits.reduce(
 //       (sum, split) => sum + (Number(split.Amount) || 0),
 //       0
 //     );
 
+//     // =========================================================
+//     // 5. BALANCE DUE
+//     // =========================================================
+
 //     const balanceDue = totalAmount - totalReceived;
 
-//     // 🔹 received cannot exceed total
+//     // =========================================================
+//     // 6. PAYMENT VALIDATION
+//     // =========================================================
+
 //     if (totalReceived > totalAmount) {
 //       await connection.rollback();
+
 //       return res.status(400).json({
 //         success: false,
-//         message: "Received amount should be less than or equal to Total Amount",
+//         message:
+//           "Received amount should be less than or equal to Total Amount",
 //       });
 //     }
 
-//     // 🔹 validate splits sum === totalReceived
+//     // Only validate when an actual payment exists
 //     if (totalReceived > 0) {
 //       try {
 //         validateSplits(validSplits, totalReceived);
 //       } catch (validationErr) {
 //         await connection.rollback();
-//         return res.status(400).json({ success: false, message: validationErr.message });
-//       }
-//     }
-
-//     // duplicate item check
-//     // const itemCountMap = new Map();
-//     // for (const item of items) {
-//     //   const itemName = item.Item_Name?.trim().toLowerCase();
-//     //   if (!itemName) {
-//     //     await connection.rollback();
-//     //     return res.status(400).json({ message: "Item name missing." });
-//     //   }
-//     //   itemCountMap.set(itemName, (itemCountMap.get(itemName) || 0) + 1);
-//     //   if (itemCountMap.get(itemName) > 1) {
-//     //     await connection.rollback();
-//     //     return res.status(400).json({
-//     //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-//     //     });
-//     //   }
-//     // }
-//    for (const item of items || []) {
-//       const itemName = item.Item_Name?.trim();
-//       const itemAmount = normalizeNumber(item.Amount) ?? 0;
-
-//       if (!itemName && itemAmount > 0) {
-//         await connection.rollback();
 
 //         return res.status(400).json({
 //           success: false,
-//           message: "Please enter an item name for the row.",
+//           message: validationErr.message,
 //         });
 //       }
 //     }
-//     const [partyRows] = await connection.query(
-//       "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
+
+//     // =========================================================
+//     // 7. FIND PARTY
+//     // =========================================================
+
+//     // const [partyRows] = await connection.execute(
+//     //   `SELECT Party_Id, GSTIN
+//     //    FROM add_party
+//     //    WHERE Party_Name = ?
+//     //    LIMIT 1`,
+//     //   [Party_Name]
+//     // );
+
+//     // if (partyRows.length === 0) {
+//     //   await connection.rollback();
+
+//     //   return res.status(404).json({
+//     //     success: false,
+//     //     message: "Party not found.",
+//     //   });
+//     // }
+
+//     // const Party_Id = partyRows[0].Party_Id;
+//     // =========================================================
+//     // 7. FIND PARTY / AUTO-CREATE NEW PARTY
+//     // =========================================================
+
+//     // =========================================================
+//     // 7. FIND PARTY / AUTO-CREATE NEW PARTY
+//     // =========================================================
+
+//     const [partyRows] = await connection.execute(
+//       `SELECT * FROM add_party WHERE TRIM(Party_Name) = TRIM(?) LIMIT 1`,
 //       [Party_Name]
 //     );
+
+//     let Party_Id;
+
 //     if (partyRows.length === 0) {
-//       await connection.rollback();
-//       return res.status(404).json({ message: "Party not found." });
+//       // ── A. CREATE NEW PARTY ──
+//       const [partyResult] = await connection.execute(
+//         `INSERT INTO add_party
+//      (Party_Name, Phone_Number, GSTIN, created_at, updated_at)
+//      VALUES (?, ?, ?, NOW(), NOW())`,
+//         [Party_Name.trim(), cleanValue(Phone_Number), cleanValue(GSTIN)]
+//       );
+
+//       const partyIdNumber = partyResult.insertId;
+//       Party_Id = "PTY" + partyIdNumber.toString().padStart(3, "0");
+
+//       await connection.execute(
+//         `UPDATE add_party SET Party_Id = ? WHERE id = ?`,
+//         [Party_Id, partyIdNumber]
+//       );
+
+//       // ── B. DEFAULT BILLING ADDRESS (only if provided) ──
+//       if (Billing_Address?.trim()) {
+//         await connection.execute(
+//           `INSERT INTO add_party_addresses
+//        (Party_Id, Address_Type, Address_Text, Is_Default, created_at, updated_at)
+//        VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+//           [Party_Id, Billing_Address.trim()]
+//         );
+//       }
+
+//     } else {
+//       // ── EXISTING PARTY ──
+//       Party_Id = partyRows[0].Party_Id;
+//       const existingParty = partyRows[0];
+
+//       // 🔹 update phone if it was blank and user provided one now
+//       if (!existingParty.Phone_Number && Phone_Number?.trim()) {
+//         await connection.execute(
+//           `UPDATE add_party
+//        SET Phone_Number = ?, updated_at = NOW()
+//        WHERE Party_Id = ?`,
+//           [Phone_Number.trim(), Party_Id]
+//         );
+//       }
+
+//       // 🔹 if no billing address exists at all for this party, add the one from this sale
+//       if (Billing_Address?.trim()) {
+//         const [[{ addrCount }]] = await connection.query(
+//           `SELECT COUNT(*) AS addrCount
+//        FROM add_party_addresses
+//        WHERE Party_Id = ? AND Address_Type = 'Billing'`,
+//           [Party_Id]
+//         );
+//         if (addrCount === 0) {
+//           await connection.execute(
+//             `INSERT INTO add_party_addresses
+//          (Party_Id, Address_Type, Address_Text, Is_Default, created_at, updated_at)
+//          VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+//             [Party_Id, Billing_Address.trim()]
+//           );
+//         }
+//         // if addresses already exist, don't touch them —
+//         // user manages addresses explicitly through the party edit screen
+//       }
 //     }
-//     const Party_Id = partyRows[0].Party_Id;
+
+//     // =========================================================
+//     // 8. ACTIVE FINANCIAL YEAR
+//     // =========================================================
 
 //     const [fy] = await connection.query(
-//       `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
+//       `SELECT Financial_Year
+//        FROM financial_year
+//        WHERE Current_Financial_Year = 1
+//        LIMIT 1`
 //     );
+
 //     if (fy.length === 0) {
 //       await connection.rollback();
-//       return res.status(400).json({ message: "No active financial year found. Please set one in settings." });
+
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "No active financial year found. Please set one in settings.",
+//       });
 //     }
+
 //     const activeFY = fy[0].Financial_Year;
+
+//     // =========================================================
+//     // 9. CREATE SALE HEADER
+//     // =========================================================
 
 //     const [saleResult] = await connection.execute(
 //       `INSERT INTO add_sale
-//        (Party_Id, Invoice_Number, Invoice_Date, State_Of_Supply,
-//         Total_Amount, Total_Received, Balance_Due, 
-//         Financial_Year, created_at, updated_at)
-//        VALUES (?, ?, ?, ?, ?, ?, ?,  ?, NOW(), NOW())`,
+//        (
+//          Party_Id,
+//           Phone_Number,
+//          Invoice_Number,
+//          Invoice_Date,
+//          Financial_Year,
+//          State_Of_Supply,
+//          Total_Amount,
+//          Total_Received,
+//          Balance_Due,
+//          created_at,
+//          updated_at
+//        )
+//        VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 //       [
 //         Party_Id,
+//         cleanValue(Phone_Number),
 //         Invoice_Number,
 //         Invoice_Date,
+//         activeFY,
 //         cleanValue(State_Of_Supply),
 //         totalAmount,
 //         totalReceived,
 //         balanceDue,
-//         //cleanValue(Reference_Number),
-//         activeFY,
 //       ]
 //     );
 
 //     const saleIdNumber = saleResult.insertId;
-//     const newSaleId    = "SAL" + saleIdNumber.toString().padStart(3, "0");
+
+//     const newSaleId =
+//       "SAL" + saleIdNumber.toString().padStart(3, "0");
 
 //     await connection.execute(
-//       `UPDATE add_sale SET Sale_Id = ? WHERE id = ?`,
+//       `UPDATE add_sale
+//        SET Sale_Id = ?
+//        WHERE id = ?`,
 //       [newSaleId, saleIdNumber]
 //     );
 
-//     // 🔹 insert splits + fan out to bank/cash ledgers
-//     // if (totalReceived > 0 && Array.isArray(splits) && splits.length > 0) {
-//     //   await insertPaymentSplits({
-//     //     connection,
-//     //     sourceType: "Sale",
-//     //     sourceId:   saleIdNumber,
-//     //     partyName:  Party_Name,
-//     //     txnDate:    Invoice_Date,
-//     //     splits,
-//     //   });
-//     // }
+//     // =========================================================
+//     // 10. PAYMENT SPLITS
+//     //
+//     // IMPORTANT:
+//     // Use validSplits, NOT original splits.
+//     //
+//     // Empty sale:
+//     // validSplits = []
+//     //
+//     // Therefore:
+//     // payment_splits    -> none
+//     // bank_transactions -> none
+//     // cash_transactions -> none
+//     // =========================================================
+
 //     if (validSplits.length > 0) {
-//   await insertPaymentSplits({
-//     connection,
-//     sourceType: "Sale",
-//     sourceId: saleIdNumber,
-//     partyName: Party_Name,
-//     txnDate: Invoice_Date,
-//     splits: validSplits, // ✅ filtered splits
-//   });
-// }
+//       await insertPaymentSplits({
+//         connection,
+//         sourceType: "Sale",
+//         sourceId: saleIdNumber,
+//         partyName: Party_Name,
+//         txnDate: Invoice_Date,
+//         splits: validSplits,
+//       });
+//     }
+
+//     // =========================================================
+//     // 11. PARTY LEDGER
+//     // =========================================================
+
 //     await recordPartyLedger({
-//   connection,
-//   partyId: Party_Id,
-//   txnType: "Sale",
-//   referenceId: saleIdNumber,
-//   amount: totalAmount,
-//   txnDate: Invoice_Date,
-//   docNumber: Invoice_Number,
-//   balanceDue: balanceDue,
-// });
+//       connection,
+//       partyId: Party_Id,
+//       txnType: "Sale",
+//       referenceId: saleIdNumber,
+//       amount: totalAmount,
+//       txnDate: Invoice_Date,
+//       docNumber: Invoice_Number,
+//       balanceDue,
+//     });
 
+//     // =========================================================
+//     // 12. ITEMS
+//     //
+//     // SAME SINGLE-LOOP STYLE AS YOUR ADD PURCHASE.
+//     //
+//     // RULE:
+//     //
+//     // Name blank + Amount blank -> SKIP
+//     // Name blank + Amount 0     -> SKIP
+//     // Name blank + Amount > 0   -> ERROR
+//     //
+//     // Name exists -> process item
+//     // =========================================================
 
-//   for (const item of items) {
-//   const {
-//     Item_Name,
-//     Item_HSN,
-//     Item_Category,
-//     Quantity,
-//     Item_Unit,
-//     Sale_Price,
-//     Discount_On_Sale_Price,
-//     Discount_Type_On_Sale_Price,
-//     Tax_Type,
-//     Tax_Amount,
-//     Amount,
-//   } = item;
+//     for (const item of items || []) {
 
+//       // =======================================================
+//       // NO ITEM NAME
+//       // =======================================================
 
-//   // Check if item already exists
-//     const [itemRows] = await connection.execute(
-//         "SELECT * FROM add_item WHERE TRIM(Item_Name) = TRIM(?)) LIMIT 1",
+//       if (!item.Item_Name?.trim()) {
+
+//         // Amount exists without item name
+//         if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+//           await connection.rollback();
+
+//           return res.status(400).json({
+//             success: false,
+//             message: "Please enter an item name for the row.",
+//           });
+//         }
+
+//         // Blank placeholder row.
+//         // Do NOT create add_item.
+//         // Do NOT create add_sale_items.
+//         continue;
+//       }
+
+//       // =======================================================
+//       // REAL ITEM
+//       // =======================================================
+
+//       const {
+//         Item_Name,
+//         Item_HSN,
+//         Item_Category,
+//         Quantity,
+//         Item_Unit,
+//         Sale_Price,
+//         Discount_On_Sale_Price,
+//         Discount_Type_On_Sale_Price,
+//         Tax_Type,
+//         Tax_Amount,
+//         Amount,
+//       } = item;
+
+//       // =======================================================
+//       // 13. FIND EXISTING ITEM
+//       // =======================================================
+
+//       const [itemRows] = await connection.execute(
+//         `SELECT *
+//          FROM add_item
+//          WHERE TRIM(Item_Name) = TRIM(?))
+//          LIMIT 1`,
 //         [Item_Name]
 //       );
 
-//   let Item_Id;
+//       let Item_Id;
 
-//   if (itemRows.length === 0) {
-//     // ===============================
-//     // Create new item
-//     // ===============================
-//     const [newItemResult] = await connection.execute(
-//       `INSERT INTO add_item
-//       (
-//         Item_Name,
-//         Item_Category,
-//         Item_HSN,
-//         Item_Unit,
-//         Stock_Quantity,
-//         created_at,
-//         updated_at
-//       )
-//       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-//       [
-//         Item_Name,
-//         Item_Category || "",
-//         cleanValue(Item_HSN),
-//         Item_Unit || "",
-//         -normalizeNumber(Quantity), // Allow negative stock
-//       ]
-//     );
+//       // =======================================================
+//       // 14. NEW ITEM
+//       // =======================================================
 
-//     const autoId = newItemResult.insertId;
+//       if (itemRows.length === 0) {
+//         const [itemResult] = await connection.execute(
+//           `INSERT INTO add_item
+//            (
+//              Item_Name,
+//              Item_HSN,
+//              Item_Unit,
+//              Item_Category,
+//              Stock_Quantity,
+//              created_at,
+//              updated_at
+//            )
+//            VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+//           [
+//             Item_Name.trim(),
+//             cleanValue(Item_HSN),
+//             Item_Unit || "",
+//             Item_Category || "",
 
-//     // Generate ITM001, ITM002...
-//     Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+//             // Sale decreases stock.
+//             // If item doesn't exist yet,
+//             // starting stock can become negative.
+//             -(normalizeNumber(Quantity) ?? 0),
+//           ]
+//         );
 
-//     // Update Item_Id
-//     await connection.execute(
-//       `UPDATE add_item
-//        SET Item_Id = ?
-//        WHERE id = ?`,
-//       [Item_Id, autoId]
-//     );
-//   } else {
-//     // ===============================
-//     // Existing item
-//     // ===============================
-//     Item_Id = itemRows[0].Item_Id;
+//         const itemIdNum = itemResult.insertId;
 
-//     await connection.execute(
-//       `UPDATE add_item
-//        SET Stock_Quantity = Stock_Quantity - ?,
-//            Item_HSN = ?,
-//            updated_at = NOW()
-//        WHERE Item_Id = ?`,
-//       [
-//         normalizeNumber(Quantity),
-//         cleanValue(Item_HSN) || itemRows[0].Item_HSN,
-//         Item_Id,
-//       ]
-//     );
-//   }
+//         Item_Id =
+//           "ITM" +
+//           itemIdNum
+//             .toString()
+//             .padStart(3, "0");
 
-//   // Verify Item_Id exists
-//   const [checkItem] = await connection.query(
-//     `SELECT Item_Id FROM add_item WHERE Item_Id = ?`,
-//     [Item_Id]
-//   );
+//         await connection.execute(
+//           `UPDATE add_item
+//            SET Item_Id = ?
+//            WHERE id = ?`,
+//           [Item_Id, itemIdNum]
+//         );
+//       }
 
-//   if (checkItem.length === 0) {
-//     throw new Error(`Item_Id ${Item_Id} not found in add_item`);
-//   }
+//       // =======================================================
+//       // 15. EXISTING ITEM
+//       // =======================================================
 
-//   // Get latest purchase tax
-//   const [purchaseTax] = await connection.query(
-//     `SELECT Tax_Type
-//      FROM add_purchase_items
-//      WHERE Item_Id = ?
-//      ORDER BY id DESC
-//      LIMIT 1`,
-//     [Item_Id]
-//   );
+//       else {
+//         Item_Id = itemRows[0].Item_Id;
 
-//   const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+//         await connection.execute(
+//           `UPDATE add_item
+//            SET
+//              Stock_Quantity = Stock_Quantity - ?,
+//              Item_HSN = ?,
+//              Item_Category = ?,
+//              updated_at = NOW()
+//            WHERE Item_Id = ?`,
+//           [
+//             normalizeNumber(Quantity) ?? 0,
 
-//   // Insert Sale Item
-//   const [saleItemResult] = await connection.execute(
-//     `INSERT INTO add_sale_items
-//     (
-//       Sale_Id,
-//       Item_Id,
-//       Quantity,
-//       Sale_Price,
-//       Discount_On_Sale_Price,
-//       Discount_Type_On_Sale_Price,
-//       Tax_Type,
-//       Tax_Amount,
-//       Amount,
-//       created_at,
-//       updated_at
-//     )
-//     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//     [
-//       newSaleId,
-//       Item_Id,
-//       normalizeNumber(Quantity),
-//       normalizeNumber(Sale_Price),
-//       cleanDiscount(Discount_On_Sale_Price),
-//       cleanValue(Discount_Type_On_Sale_Price),
-//       cleanValue(safeTaxType),
-//       normalizeNumber(Tax_Amount),
-//       normalizeNumber(Amount),
-//     ]
-//   );
+//             cleanValue(Item_HSN) ||
+//             itemRows[0].Item_HSN,
 
-//   // Generate Sale_Items_Id
-//   const saleItemAutoId = saleItemResult.insertId;
-//   const newSaleItemId = "SIT" + saleItemAutoId.toString().padStart(3, "0");
+//             Item_Category || itemRows[0].Item_Category ||
+//             "",
 
-//   await connection.execute(
-//     `UPDATE add_sale_items
-//      SET Sale_Items_Id = ?
-//      WHERE id = ?`,
-//     [newSaleItemId, saleItemAutoId]
-//   );
-// }
+//             Item_Id,
+//           ]
+//         );
+//       }
+
+//       // =======================================================
+//       // 16. GET LATEST PURCHASE TAX
+//       // =======================================================
+
+//       const [purchaseTax] = await connection.query(
+//         `SELECT Tax_Type
+//          FROM add_purchase_items
+//          WHERE Item_Id = ?
+//          ORDER BY id DESC
+//          LIMIT 1`,
+//         [Item_Id]
+//       );
+
+//       const safeTaxType =
+//         purchaseTax[0]?.Tax_Type ||
+//         Tax_Type ||
+//         "None";
+
+//       // =======================================================
+//       // 17. INSERT SALE ITEM
+//       // =======================================================
+
+//       const [saleItemResult] =
+//         await connection.execute(
+//           `INSERT INTO add_sale_items
+//            (
+//              Sale_Id,
+//              Item_Id,
+//              Quantity,
+//              Sale_Price,
+//              Discount_On_Sale_Price,
+//              Discount_Type_On_Sale_Price,
+//              Tax_Type,
+//              Tax_Amount,
+//              Amount,
+//              created_at,
+//              updated_at
+//            )
+//            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//           [
+//             newSaleId,
+//             Item_Id,
+
+//             normalizeNumber(Quantity) ?? 0,
+
+//             normalizeNumber(Sale_Price) ?? 0,
+
+//             cleanDiscount(
+//               Discount_On_Sale_Price
+//             ),
+
+//             cleanValue(
+//               Discount_Type_On_Sale_Price
+//             ),
+
+//             cleanValue(safeTaxType),
+
+//             normalizeNumber(Tax_Amount) ?? 0,
+
+//             normalizeNumber(Amount) ?? 0,
+//           ]
+//         );
+
+//       // =======================================================
+//       // 18. GENERATE SALE ITEM ID
+//       // =======================================================
+
+//       const saleItemIdNum =
+//         saleItemResult.insertId;
+
+//       const newSaleItemId =
+//         "SIT" +
+//         saleItemIdNum
+//           .toString()
+//           .padStart(3, "0");
+
+//       await connection.execute(
+//         `UPDATE add_sale_items
+//          SET Sale_Items_Id = ?
+//          WHERE id = ?`,
+//         [newSaleItemId, saleItemIdNum]
+//       );
+//     }
+
+//     // =========================================================
+//     // 19. COMMIT
+//     // =========================================================
 
 //     await connection.commit();
 
 //     return res.status(201).json({
 //       success: true,
 //       message: "Sale and items added successfully",
-//       saleId:  newSaleId,
+//       saleId: newSaleId,
 //     });
-//   } 
-//   catch (err) {
-//     if (connection) await connection.rollback();
+
+//   } catch (err) {
+
+//     if (connection) {
+//       await connection.rollback();
+//     }
+
 //     console.error("❌ Error adding sale:", err);
+
 //     next(err);
+
 //   } finally {
-//     if (connection) connection.release();
+
+//     if (connection) {
+//       connection.release();
+//     }
 //   }
 // };
+
 const addSale = async (req, res, next) => {
   let connection;
 
@@ -452,7 +692,9 @@ const addSale = async (req, res, next) => {
     }
 
     const {
+      Sale_Mode,          // 🔹 "Credit" | "Cash" — request/controller logic only, never stored
       Party_Name,
+      Billing_Name,        // 🔹 invoice snapshot field
       Phone_Number,
       Billing_Address,
       GSTIN,
@@ -466,6 +708,8 @@ const addSale = async (req, res, next) => {
       items,
     } = validation.data;
 
+    const saleMode = Sale_Mode === "Cash" ? "Cash" : "Credit"; // default Credit if missing/unexpected
+    console.log("Sale mode:", saleMode);
     // =========================================================
     // 2. TOTAL AMOUNT
     // =========================================================
@@ -475,19 +719,12 @@ const addSale = async (req, res, next) => {
     // =========================================================
     // 3. SALE PAYMENT SPLITS
     //
-    // SALE BEHAVIOUR:
+    // CREDIT: existing behavior — first split kept even at ₹0,
+    //         later ₹0 splits dropped, positive splits kept.
     //
-    // Cash blank   -> DROP
-    // Cash 0       -> DROP
-    // Cash 500     -> KEEP
-    //
-    // Bank blank   -> DROP
-    // Bank 0       -> DROP
-    // Bank 500     -> KEEP
-    //
-    // Empty sale -> no payment_splits
-    //
-    // This is intentionally different from Purchase.
+    // CASH: sum of splits MUST equal totalAmount exactly.
+    //       Always fully paid — Total_Received/Balance_Due are
+    //       computed here, never trusted from frontend.
     // =========================================================
     let validSplits = [];
 
@@ -514,40 +751,65 @@ const addSale = async (req, res, next) => {
           Amount: Number(split.Amount) || 0,
         }));
 
-
-      validSplits = normalizedSplits.filter(
-        (split, index) => {
-
-          // FIRST valid payment method:
-          // always preserve, even ₹0
-          if (index === 0) {
-            return true;
+      if (saleMode === "Cash") {
+        // 🔹 Cash mode: keep every split with a real amount (no first-at-₹0 exception —
+        //    a cash sale must be exactly and fully paid, so a ₹0 placeholder split is meaningless)
+        validSplits = normalizedSplits.filter((split) => split.Amount > 0);
+      } else {
+        // 🔹 Credit mode — unchanged existing logic
+        validSplits = normalizedSplits.filter(
+          (split, index) => {
+            // FIRST valid payment method: always preserve, even ₹0
+            if (index === 0) {
+              return true;
+            }
+            // Every payment after first: only preserve positive amount
+            return split.Amount > 0;
           }
-
-          // Every payment after first:
-          // only preserve positive amount
-          return split.Amount > 0;
-        }
-      );
+        );
+      }
     }
 
     // =========================================================
-    // 4. TOTAL RECEIVED
+    // 4. TOTAL RECEIVED / BALANCE DUE
     //
-    // Backend calculates this.
-    // Don't trust Total_Received coming from frontend.
+    // Backend calculates this. Don't trust Total_Received/Balance_Due
+    // coming from frontend, especially for Cash mode.
     // =========================================================
 
-    const totalReceived = validSplits.reduce(
-      (sum, split) => sum + (Number(split.Amount) || 0),
-      0
-    );
+    let totalReceived;
+    let balanceDue;
 
-    // =========================================================
-    // 5. BALANCE DUE
-    // =========================================================
+    if (saleMode === "Cash") {
+      // 🔹 Cash sale must be fully paid — enforced here, not trusted from frontend
+      totalReceived = totalAmount;
+      balanceDue = 0;
 
-    const balanceDue = totalAmount - totalReceived;
+      if (totalAmount > 0) {
+        const splitsSum = validSplits.reduce(
+          (sum, split) => sum + (Number(split.Amount) || 0),
+          0
+        );
+
+        if (Math.round(splitsSum * 100) !== Math.round(totalAmount * 100)) {
+          await connection.rollback();
+          return res.status(400).json({
+            success: false,
+            message:
+              splitsSum < totalAmount
+                ? "Cash sale must be fully paid."
+                : "Payment exceeds the total amount.",
+          });
+        }
+      }
+    } else {
+      // 🔹 Credit mode — unchanged existing logic
+      totalReceived = validSplits.reduce(
+        (sum, split) => sum + (Number(split.Amount) || 0),
+        0
+      );
+      balanceDue = totalAmount - totalReceived;
+    }
 
     // =========================================================
     // 6. PAYMENT VALIDATION
@@ -577,105 +839,471 @@ const addSale = async (req, res, next) => {
       }
     }
 
-    // =========================================================
-    // 7. FIND PARTY
-    // =========================================================
+   
 
-    // const [partyRows] = await connection.execute(
-    //   `SELECT Party_Id, GSTIN
-    //    FROM add_party
-    //    WHERE Party_Name = ?
-    //    LIMIT 1`,
-    //   [Party_Name]
-    // );
+//     let Party_Id;
+//     let resolvedPartyName;
 
-    // if (partyRows.length === 0) {
-    //   await connection.rollback();
+//     if (saleMode === "Credit") {
+//       if (!Party_Name?.trim()) {
+//         await connection.rollback();
+//         return res.status(400).json({
+//           success: false,
+//           message: "Party is required for a Credit sale.",
+//         });
+//       }
+//       resolvedPartyName = Party_Name.trim();
+//     } else {
+//       // Cash mode
+//       resolvedPartyName = Party_Name?.trim() || "Cash Sale";
+//     }
 
-    //   return res.status(404).json({
-    //     success: false,
-    //     message: "Party not found.",
-    //   });
-    // }
+//     const [partyRows] = await connection.execute(
+//       `SELECT * FROM add_party WHERE TRIM(Party_Name) = TRIM(?) LIMIT 1`,
+//       [resolvedPartyName]
+//     );
 
-    // const Party_Id = partyRows[0].Party_Id;
-    // =========================================================
-    // 7. FIND PARTY / AUTO-CREATE NEW PARTY
-    // =========================================================
+//   if (partyRows.length === 0) {
+//   // =====================================================
+//   // NEW PARTY
+//   // =====================================================
 
-    // =========================================================
-    // 7. FIND PARTY / AUTO-CREATE NEW PARTY
-    // =========================================================
+//   const [partyResult] = await connection.execute(
+//     `INSERT INTO add_party
+//      (
+//        Party_Name,
+//        Billing_Name,
+//        Phone_Number,
+//        GSTIN,
+//        created_at,
+//        updated_at
+//      )
+//      VALUES (?, ?, ?, ?, NOW(), NOW())`,
+//     [
+//       resolvedPartyName,
+//       cleanValue(Billing_Name),
+//       cleanValue(Phone_Number),
+//       cleanValue(GSTIN),
+//     ]
+//   );
 
-    const [partyRows] = await connection.execute(
-      `SELECT * FROM add_party WHERE TRIM(Party_Name) = TRIM(?) LIMIT 1`,
-      [Party_Name]
+//   const partyIdNumber = partyResult.insertId;
+
+//   Party_Id =
+//     "PTY" + partyIdNumber.toString().padStart(3, "0");
+
+//   await connection.execute(
+//     `UPDATE add_party
+//      SET Party_Id = ?
+//      WHERE id = ?`,
+//     [Party_Id, partyIdNumber]
+//   );
+
+//   // =====================================================
+//   // FIRST BILLING ADDRESS → DEFAULT ADDRESS
+//   // =====================================================
+
+//   if (Billing_Address?.trim()) {
+//     await connection.execute(
+//       `INSERT INTO add_party_addresses
+//        (
+//          Party_Id,
+//          Address_Type,
+//          Address_Text,
+//          Is_Default,
+//          created_at,
+//          updated_at
+//        )
+//        VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+//       [
+//         Party_Id,
+//         Billing_Address.trim(),
+//       ]
+//     );
+//   }
+
+// } else {
+
+
+//   Party_Id = partyRows[0].Party_Id;
+
+//   const existingParty = partyRows[0];
+
+
+
+
+//   if (
+//     !existingParty.Billing_Name?.trim() &&
+//     Billing_Name?.trim()
+//   ) {
+//     await connection.execute(
+//       `UPDATE add_party
+//        SET Billing_Name = ?,
+//            updated_at = NOW()
+//        WHERE Party_Id = ?`,
+//       [
+//         Billing_Name.trim(),
+//         Party_Id,
+//       ]
+//     );
+//   }
+
+
+
+
+//   if (
+//     !existingParty.Phone_Number?.trim() &&
+//     Phone_Number?.trim()
+//   ) {
+//     await connection.execute(
+//       `UPDATE add_party
+//        SET Phone_Number = ?,
+//            updated_at = NOW()
+//        WHERE Party_Id = ?`,
+//       [
+//         Phone_Number.trim(),
+//         Party_Id,
+//       ]
+//     );
+//   }
+
+
+ 
+
+//   if (Billing_Address?.trim()) {
+
+//     const [[{ addrCount }]] = await connection.query(
+//       `SELECT COUNT(*) AS addrCount
+//        FROM add_party_addresses
+//        WHERE Party_Id = ?
+//          AND Address_Type = 'Billing'`,
+//       [Party_Id]
+//     );
+
+//     if (addrCount === 0) {
+
+//       await connection.execute(
+//         `INSERT INTO add_party_addresses
+//          (
+//            Party_Id,
+//            Address_Type,
+//            Address_Text,
+//            Is_Default,
+//            created_at,
+//            updated_at
+//          )
+//          VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+//         [
+//           Party_Id,
+//           Billing_Address.trim(),
+//         ]
+//       );
+//     }
+//   }
+// =========================================================
+// RESOLVE PARTY
+// =========================================================
+
+let Party_Id;
+let resolvedPartyName;
+
+if (saleMode === "Credit") {
+  // Credit sale MUST have a party
+  if (!Party_Name?.trim()) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Party is required for a Credit sale.",
+    });
+  }
+
+  resolvedPartyName = Party_Name.trim();
+
+} else {
+  // Cash mode:
+  // blank party -> special system "Cash Sale" party
+  // selected party -> normal party
+  resolvedPartyName =Party_Name?.trim() || "Cash Sale";
+}
+
+
+// =========================================================
+// IS THIS THE SPECIAL CASH SALE PARTY?
+// =========================================================
+
+const isCashSaleParty =resolvedPartyName.toLowerCase() === "cash sale";
+
+
+// =========================================================
+// FIND PARTY
+// =========================================================
+
+const [partyRows] = await connection.execute(
+  `SELECT *
+   FROM add_party
+   WHERE TRIM(Party_Name) = TRIM(?)
+   LIMIT 1`,
+  [resolvedPartyName]
+);
+
+
+// =========================================================
+// CASE 1: PARTY DOES NOT EXIST
+// =========================================================
+
+if (partyRows.length === 0) {
+
+  // =======================================================
+  // A. CREATE SPECIAL "CASH SALE" PARTY
+  // =======================================================
+  //
+  // Cash Sale is only an accounting/system party.
+  //
+  // DON'T put invoice customer details into its master:
+  // - Billing_Name
+  // - Phone_Number
+  // - GSTIN
+  // - Billing_Address
+  //
+  // Those belong to add_sale.
+  // =======================================================
+
+  if (isCashSaleParty) {
+
+    const [partyResult] = await connection.execute(
+      `INSERT INTO add_party
+       (
+         Party_Name,
+         created_at,
+         updated_at
+       )
+       VALUES (?, NOW(), NOW())`,
+      [resolvedPartyName]
     );
 
-    let Party_Id;
+    const partyIdNumber = partyResult.insertId;
 
-    if (partyRows.length === 0) {
-      // ── A. CREATE NEW PARTY ──
-      const [partyResult] = await connection.execute(
-        `INSERT INTO add_party
-     (Party_Name, Phone_Number, GSTIN, created_at, updated_at)
-     VALUES (?, ?, ?, NOW(), NOW())`,
-        [Party_Name.trim(), cleanValue(Phone_Number), cleanValue(GSTIN)]
-      );
+    Party_Id =
+      "PTY" +
+      partyIdNumber.toString().padStart(3, "0");
 
-      const partyIdNumber = partyResult.insertId;
-      Party_Id = "PTY" + partyIdNumber.toString().padStart(3, "0");
+    await connection.execute(
+      `UPDATE add_party
+       SET Party_Id = ?
+       WHERE id = ?`,
+      [
+        Party_Id,
+        partyIdNumber,
+      ]
+    );
+
+  }
+
+  // =======================================================
+  // B. CREATE NEW NORMAL PARTY
+  // =======================================================
+
+  else {
+
+    const [partyResult] = await connection.execute(
+      `INSERT INTO add_party
+       (
+         Party_Name,
+         Billing_Name,
+         Phone_Number,
+         GSTIN,
+         created_at,
+         updated_at
+       )
+       VALUES (?, ?, ?, ?, NOW(), NOW())`,
+      [
+        resolvedPartyName,
+        cleanValue(Billing_Name),
+        cleanValue(Phone_Number),
+        cleanValue(GSTIN),
+      ]
+    );
+
+    const partyIdNumber = partyResult.insertId;
+
+    Party_Id =
+      "PTY" +
+      partyIdNumber.toString().padStart(3, "0");
+
+    await connection.execute(
+      `UPDATE add_party
+       SET Party_Id = ?
+       WHERE id = ?`,
+      [
+        Party_Id,
+        partyIdNumber,
+      ]
+    );
+
+
+    // =====================================================
+    // FIRST BILLING ADDRESS -> DEFAULT ADDRESS
+    // =====================================================
+
+    if (Billing_Address?.trim()) {
 
       await connection.execute(
-        `UPDATE add_party SET Party_Id = ? WHERE id = ?`,
-        [Party_Id, partyIdNumber]
+        `INSERT INTO add_party_addresses
+         (
+           Party_Id,
+           Address_Type,
+           Address_Text,
+           Is_Default,
+           created_at,
+           updated_at
+         )
+         VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+        [
+          Party_Id,
+          Billing_Address.trim(),
+        ]
       );
+    }
+  }
 
-      // ── B. DEFAULT BILLING ADDRESS (only if provided) ──
-      if (Billing_Address?.trim()) {
-        await connection.execute(
-          `INSERT INTO add_party_addresses
-       (Party_Id, Address_Type, Address_Text, Is_Default, created_at, updated_at)
-       VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
-          [Party_Id, Billing_Address.trim()]
-        );
-      }
+}
 
-    } else {
-      // ── EXISTING PARTY ──
-      Party_Id = partyRows[0].Party_Id;
-      const existingParty = partyRows[0];
 
-      // 🔹 update phone if it was blank and user provided one now
-      if (!existingParty.Phone_Number && Phone_Number?.trim()) {
-        await connection.execute(
-          `UPDATE add_party
-       SET Phone_Number = ?, updated_at = NOW()
-       WHERE Party_Id = ?`,
-          [Phone_Number.trim(), Party_Id]
-        );
-      }
+// =========================================================
+// CASE 2: PARTY ALREADY EXISTS
+// =========================================================
 
-      // 🔹 if no billing address exists at all for this party, add the one from this sale
-      if (Billing_Address?.trim()) {
-        const [[{ addrCount }]] = await connection.query(
+else {
+
+  const existingParty = partyRows[0];
+
+  Party_Id = existingParty.Party_Id;
+
+
+  // =======================================================
+  // SPECIAL "CASH SALE"
+  // =======================================================
+  //
+  // DO NOTHING TO MASTER.
+  //
+  // Every invoice may belong to a different walk-in
+  // customer, so invoice details must NOT modify Cash Sale.
+  // =======================================================
+
+  if (isCashSaleParty) {
+
+    // Intentionally empty.
+    //
+    // DON'T update:
+    // add_party.Billing_Name
+    // add_party.Phone_Number
+    // add_party.GSTIN
+    // add_party_addresses
+  }
+
+
+  // =======================================================
+  // NORMAL EXISTING PARTY
+  // =======================================================
+
+  else {
+
+    // =====================================================
+    // 1. BILLING NAME
+    //
+    // Initialize master only if currently blank.
+    // =====================================================
+
+    if (
+      !existingParty.Billing_Name?.trim() &&
+      Billing_Name?.trim()
+    ) {
+
+      await connection.execute(
+        `UPDATE add_party
+         SET
+           Billing_Name = ?,
+           updated_at = NOW()
+         WHERE Party_Id = ?`,
+        [
+          Billing_Name.trim(),
+          Party_Id,
+        ]
+      );
+    }
+
+
+    // =====================================================
+    // 2. PHONE NUMBER
+    //
+    // Initialize master only if currently blank.
+    // =====================================================
+
+    if (
+      !existingParty.Phone_Number?.trim() &&
+      Phone_Number?.trim()
+    ) {
+
+      await connection.execute(
+        `UPDATE add_party
+         SET
+           Phone_Number = ?,
+           updated_at = NOW()
+         WHERE Party_Id = ?`,
+        [
+          Phone_Number.trim(),
+          Party_Id,
+        ]
+      );
+    }
+
+
+    // =====================================================
+    // 3. BILLING ADDRESS
+    //
+    // Initialize only if NO billing address exists.
+    // =====================================================
+
+    if (Billing_Address?.trim()) {
+
+      const [[{ addrCount }]] =
+        await connection.query(
           `SELECT COUNT(*) AS addrCount
-       FROM add_party_addresses
-       WHERE Party_Id = ? AND Address_Type = 'Billing'`,
+           FROM add_party_addresses
+           WHERE Party_Id = ?
+             AND Address_Type = 'Billing'`,
           [Party_Id]
         );
-        if (addrCount === 0) {
-          await connection.execute(
-            `INSERT INTO add_party_addresses
-         (Party_Id, Address_Type, Address_Text, Is_Default, created_at, updated_at)
-         VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
-            [Party_Id, Billing_Address.trim()]
-          );
-        }
-        // if addresses already exist, don't touch them —
-        // user manages addresses explicitly through the party edit screen
+
+      if (Number(addrCount) === 0) {
+
+        await connection.execute(
+          `INSERT INTO add_party_addresses
+           (
+             Party_Id,
+             Address_Type,
+             Address_Text,
+             Is_Default,
+             created_at,
+             updated_at
+           )
+           VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+          [
+            Party_Id,
+            Billing_Address.trim(),
+          ]
+        );
       }
     }
+
+    // GSTIN:
+    // readonly in Sale UI.
+    // Don't update an existing party's GSTIN from sale.
+  }
+}
+
+
 
     // =========================================================
     // 8. ACTIVE FINANCIAL YEAR
@@ -702,13 +1330,18 @@ const addSale = async (req, res, next) => {
 
     // =========================================================
     // 9. CREATE SALE HEADER
+    //
+    // Billing_Name / Phone_Number / Billing_Address stored here
+    // as this invoice's own snapshot — independent of party master.
     // =========================================================
 
     const [saleResult] = await connection.execute(
       `INSERT INTO add_sale
        (
          Party_Id,
-          Phone_Number,
+         Billing_Name,
+         Phone_Number,
+         Billing_Address,
          Invoice_Number,
          Invoice_Date,
          Financial_Year,
@@ -719,10 +1352,12 @@ const addSale = async (req, res, next) => {
          created_at,
          updated_at
        )
-       VALUES (?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         Party_Id,
+        cleanValue(Billing_Name),
         cleanValue(Phone_Number),
+        cleanValue(Billing_Address),
         Invoice_Number,
         Invoice_Date,
         activeFY,
@@ -748,16 +1383,10 @@ const addSale = async (req, res, next) => {
     // =========================================================
     // 10. PAYMENT SPLITS
     //
-    // IMPORTANT:
-    // Use validSplits, NOT original splits.
-    //
-    // Empty sale:
-    // validSplits = []
-    //
-    // Therefore:
-    // payment_splits    -> none
-    // bank_transactions -> none
-    // cash_transactions -> none
+    // Use validSplits, NOT original splits, for BOTH modes.
+    // Cash mode: validSplits sums exactly to totalAmount (enforced above),
+    // so payment_splits/bank_transactions/cash_transactions stay
+    // consistent with add_sale.Total_Received.
     // =========================================================
 
     if (validSplits.length > 0) {
@@ -765,7 +1394,7 @@ const addSale = async (req, res, next) => {
         connection,
         sourceType: "Sale",
         sourceId: saleIdNumber,
-        partyName: Party_Name,
+        partyName: resolvedPartyName,
         txnDate: Invoice_Date,
         splits: validSplits,
       });
@@ -787,28 +1416,13 @@ const addSale = async (req, res, next) => {
     });
 
     // =========================================================
-    // 12. ITEMS
-    //
-    // SAME SINGLE-LOOP STYLE AS YOUR ADD PURCHASE.
-    //
-    // RULE:
-    //
-    // Name blank + Amount blank -> SKIP
-    // Name blank + Amount 0     -> SKIP
-    // Name blank + Amount > 0   -> ERROR
-    //
-    // Name exists -> process item
+    // 12. ITEMS — unchanged
     // =========================================================
 
     for (const item of items || []) {
 
-      // =======================================================
-      // NO ITEM NAME
-      // =======================================================
-
       if (!item.Item_Name?.trim()) {
 
-        // Amount exists without item name
         if ((normalizeNumber(item.Amount) ?? 0) > 0) {
           await connection.rollback();
 
@@ -818,15 +1432,8 @@ const addSale = async (req, res, next) => {
           });
         }
 
-        // Blank placeholder row.
-        // Do NOT create add_item.
-        // Do NOT create add_sale_items.
         continue;
       }
-
-      // =======================================================
-      // REAL ITEM
-      // =======================================================
 
       const {
         Item_Name,
@@ -842,23 +1449,15 @@ const addSale = async (req, res, next) => {
         Amount,
       } = item;
 
-      // =======================================================
-      // 13. FIND EXISTING ITEM
-      // =======================================================
-
       const [itemRows] = await connection.execute(
         `SELECT *
          FROM add_item
-         WHERE TRIM(Item_Name) = TRIM(?))
+         WHERE TRIM(Item_Name) = TRIM(?)
          LIMIT 1`,
         [Item_Name]
       );
 
       let Item_Id;
-
-      // =======================================================
-      // 14. NEW ITEM
-      // =======================================================
 
       if (itemRows.length === 0) {
         const [itemResult] = await connection.execute(
@@ -878,10 +1477,6 @@ const addSale = async (req, res, next) => {
             cleanValue(Item_HSN),
             Item_Unit || "",
             Item_Category || "",
-
-            // Sale decreases stock.
-            // If item doesn't exist yet,
-            // starting stock can become negative.
             -(normalizeNumber(Quantity) ?? 0),
           ]
         );
@@ -901,10 +1496,6 @@ const addSale = async (req, res, next) => {
           [Item_Id, itemIdNum]
         );
       }
-
-      // =======================================================
-      // 15. EXISTING ITEM
-      // =======================================================
 
       else {
         Item_Id = itemRows[0].Item_Id;
@@ -931,10 +1522,6 @@ const addSale = async (req, res, next) => {
         );
       }
 
-      // =======================================================
-      // 16. GET LATEST PURCHASE TAX
-      // =======================================================
-
       const [purchaseTax] = await connection.query(
         `SELECT Tax_Type
          FROM add_purchase_items
@@ -948,10 +1535,6 @@ const addSale = async (req, res, next) => {
         purchaseTax[0]?.Tax_Type ||
         Tax_Type ||
         "None";
-
-      // =======================================================
-      // 17. INSERT SALE ITEM
-      // =======================================================
 
       const [saleItemResult] =
         await connection.execute(
@@ -993,10 +1576,6 @@ const addSale = async (req, res, next) => {
             normalizeNumber(Amount) ?? 0,
           ]
         );
-
-      // =======================================================
-      // 18. GENERATE SALE ITEM ID
-      // =======================================================
 
       const saleItemIdNum =
         saleItemResult.insertId;
@@ -2129,7 +2708,7 @@ const getSingleSale = async (req, res, next) => {
 
     const [saleData] = await connection.query(
       `SELECT s.id,
-         s.Sale_Id,  s.Phone_Number, s.Billing_Address, s.Invoice_Number, s.Invoice_Date, 
+         s.Sale_Id,  s.Phone_Number, s.Billing_Name,s.Billing_Address, s.Invoice_Number, s.Invoice_Date, 
          s.State_Of_Supply, s.Total_Amount, s.Total_Received, s.Balance_Due, s.Party_Id,
          p.Party_Name, p.GSTIN
        FROM ${salesTable} s
@@ -2188,6 +2767,7 @@ const getSingleSale = async (req, res, next) => {
       invoicePartyDetails: {
         Sale_Id: saleHeader.Sale_Id,
         Party_Name: saleHeader.Party_Name,
+        Billing_Name: saleHeader.Billing_Name,
         Phone_Number: saleHeader.Phone_Number,
         Billing_Address: saleHeader.Billing_Address,
         GSTIN: saleHeader.GSTIN,
@@ -2821,7 +3401,7 @@ const editSale = async (req, res, next) => {
       "SELECT * FROM add_sale WHERE Sale_Id = ?",
       [saleId]
     );
-      if (existingSale.length === 0) {
+    if (existingSale.length === 0) {
       await connection.rollback();
 
       return res.status(404).json({
@@ -2830,8 +3410,8 @@ const editSale = async (req, res, next) => {
       });
     }
     // IMPORTANT:
-// Save old party before changing the sale
-const oldPartyId = existingSale[0].Party_Id;
+    // Save old party before changing the sale
+    const oldPartyId = existingSale[0].Party_Id;
     const saleIdNumber = existingSale[0].id;
 
     const cleanData = sanitizeObject(req.body);
@@ -2842,6 +3422,7 @@ const oldPartyId = existingSale[0].Party_Id;
 
     const {
       Party_Name,
+      Billing_Name,
       Invoice_Number,
       Phone_Number,        // ← add
       Billing_Address,     // ← add
@@ -2928,141 +3509,182 @@ const oldPartyId = existingSale[0].Party_Id;
     }
 
 
-  
-   
-// ─────────────────────────────────────────────
-// RESOLVE PARTY
-// Existing party -> use it
-// Brand-new party -> create it
-// ─────────────────────────────────────────────
+
+// =========================================================
+// RESOLVE PARTY — EDIT SALE
+// =========================================================
+//
+// EDIT SALE RULE:
+//
+// Party_Name is always mandatory because even an anonymous
+// cash invoice already comes back as:
+//
+// Party_Name = "Cash Sale"
+//
+// ---------------------------------------------------------
+//
+// SPECIAL "Cash Sale" PARTY:
+//
+// add_party:
+//   ❌ NEVER update Billing_Name
+//   ❌ NEVER update Phone_Number
+//   ❌ NEVER update GSTIN
+//   ❌ NEVER create/update Billing_Address
+//
+// add_sale:
+//   ✅ Billing_Name is invoice-specific
+//   ✅ Phone_Number is invoice-specific
+//   ✅ Billing_Address is invoice-specific
+//
+// ---------------------------------------------------------
+//
+// NORMAL PARTY:
+//
+// If party doesn't exist:
+//   → create master
+//   → initialize Billing_Name
+//   → initialize Phone_Number
+//   → initialize first Billing_Address
+//
+// If party exists:
+//   → initialize Billing_Name only if master blank
+//   → initialize Phone_Number only if master blank
+//   → initialize Billing_Address only if none exists
+//
+// But add_sale ALWAYS receives the current invoice values.
+//
+// GSTIN is readonly in Sale Edit and is NEVER updated here.
+// =========================================================
+
+
+const partyName = Party_Name?.trim();
+
+if (!partyName) {
+  await connection.rollback();
+
+  return res.status(400).json({
+    success: false,
+    message: "Party name is required.",
+  });
+}
+
+
+// =========================================================
+// IDENTIFY SPECIAL CASH SALE PARTY
+// =========================================================
+
+const isCashSaleParty =
+  partyName.toLowerCase() === "cash sale";
+
+
+// =========================================================
+// FIND PARTY
+// =========================================================
 
 const [partyRows] = await connection.query(
   `SELECT *
    FROM add_party
    WHERE TRIM(Party_Name) = TRIM(?)
    LIMIT 1`,
-  [Party_Name]
+  [partyName]
 );
 
 let Party_Id;
 
+
+// =========================================================
+// CASE 1: PARTY DOES NOT EXIST
+// =========================================================
+
 if (partyRows.length === 0) {
-  // ═══════════════════════════════════════════
-  // NEW PARTY
-  // ═══════════════════════════════════════════
 
-  const [last] = await connection.query(
-    `SELECT Party_Id
-     FROM add_party
-     ORDER BY id DESC
-     LIMIT 1`
-  );
+  // =======================================================
+  // A. SPECIAL CASH SALE PARTY DOESN'T EXIST
+  // =======================================================
+  //
+  // Normally Cash Sale should already exist.
+  //
+  // If somehow missing, recreate ONLY the system party.
+  // Customer details still do NOT belong in its master.
+  // =======================================================
 
-  const lastId = last[0]?.Party_Id || "PTY000";
+  if (isCashSaleParty) {
 
-  const num =
-    parseInt(lastId.replace("PTY", ""), 10) + 1;
-
-  Party_Id =
-    "PTY" + num.toString().padStart(3, "0");
-
-  await connection.execute(
-    `INSERT INTO add_party
-     (
-       Party_Id,
-       Party_Name,
-       Phone_Number,
-      
-       created_at,
-       updated_at
-     )
-     VALUES (?, ?,  ?, NOW(), NOW())`,
-    [
-      Party_Id,
-      Party_Name.trim(),
-      cleanValue(Phone_Number)
-      
-    ]
-  );
-
-  // Add billing address as default
-  if (Billing_Address?.trim()) {
-    await connection.execute(
-      `INSERT INTO add_party_addresses
+    const [partyResult] = await connection.execute(
+      `INSERT INTO add_party
        (
-         Party_Id,
-         Address_Type,
-         Address_Text,
-         Is_Default,
+         Party_Name,
          created_at,
          updated_at
        )
-       VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
-      [
-        Party_Id,
-        Billing_Address.trim(),
-      ]
+       VALUES (?, NOW(), NOW())`,
+      [partyName]
     );
-  }
 
-} else {
-  // ═══════════════════════════════════════════
-  // EXISTING PARTY
-  // ═══════════════════════════════════════════
+    const partyIdNumber = partyResult.insertId;
 
-  const existingParty = partyRows[0];
+    Party_Id =
+      "PTY" +
+      partyIdNumber.toString().padStart(3, "0");
 
-  Party_Id = existingParty.Party_Id;
-
-  // ─────────────────────────────────────────
-  // PHONE
-  // Only fill master phone when currently blank.
-  // Don't overwrite an existing master phone
-  // just because this sale contains another phone.
-  // ─────────────────────────────────────────
-
-  if (
-    !existingParty.Phone_Number &&
-    Phone_Number?.trim()
-  ) {
     await connection.execute(
       `UPDATE add_party
-       SET
-         Phone_Number = ?,
-         updated_at = NOW()
-       WHERE Party_Id = ?`,
+       SET Party_Id = ?
+       WHERE id = ?`,
       [
-        Phone_Number.trim(),
         Party_Id,
+        partyIdNumber,
       ]
     );
   }
 
- 
 
- 
+  // =======================================================
+  // B. BRAND-NEW NORMAL PARTY
+  // =======================================================
 
-  // ─────────────────────────────────────────
-  // BILLING ADDRESS
-  //
-  // If party has NO billing address yet,
-  // add this sale address as default.
-  //
-  // If addresses already exist, don't change
-  // party master addresses from sale editing.
-  // ─────────────────────────────────────────
+  else {
 
-  if (Billing_Address?.trim()) {
-    const [[addressCount]] =
-      await connection.query(
-        `SELECT COUNT(*) AS total
-         FROM add_party_addresses
-         WHERE Party_Id = ?
-           AND Address_Type = 'Billing'`,
-        [Party_Id]
-      );
+    const [partyResult] = await connection.execute(
+      `INSERT INTO add_party
+       (
+         Party_Name,
+         Billing_Name,
+         Phone_Number,
+         created_at,
+         updated_at
+       )
+       VALUES (?, ?, ?, NOW(), NOW())`,
+      [
+        partyName,
+        cleanValue(Billing_Name),
+        cleanValue(Phone_Number),
+      ]
+    );
 
-    if (Number(addressCount.total) === 0) {
+    const partyIdNumber = partyResult.insertId;
+
+    Party_Id =
+      "PTY" +
+      partyIdNumber.toString().padStart(3, "0");
+
+    await connection.execute(
+      `UPDATE add_party
+       SET Party_Id = ?
+       WHERE id = ?`,
+      [
+        Party_Id,
+        partyIdNumber,
+      ]
+    );
+
+
+    // =====================================================
+    // FIRST BILLING ADDRESS -> DEFAULT
+    // =====================================================
+
+    if (Billing_Address?.trim()) {
+
       await connection.execute(
         `INSERT INTO add_party_addresses
          (
@@ -3083,37 +3705,244 @@ if (partyRows.length === 0) {
   }
 }
 
-    // update parent — no Payment_Type / Bank_Account_Id columns
-    await connection.query(
+
+// =========================================================
+// CASE 2: PARTY ALREADY EXISTS
+// =========================================================
+
+else {
+
+  const existingParty = partyRows[0];
+
+  Party_Id = existingParty.Party_Id;
+
+
+  // =======================================================
+  // A. SPECIAL CASH SALE PARTY
+  // =======================================================
+  //
+  // DO ABSOLUTELY NOTHING TO MASTER.
+  //
+  // Cash Sale represents many different walk-in customers.
+  //
+  // Billing_Name / Phone / Address entered on this invoice
+  // belong ONLY to add_sale.
+  // =======================================================
+
+  if (isCashSaleParty) {
+
+    // Intentionally empty.
+  }
+
+
+  // =======================================================
+  // B. NORMAL EXISTING PARTY
+  // =======================================================
+
+  else {
+
+    // =====================================================
+    // 1. BILLING NAME
+    //
+    // Initialize master only when blank.
+    // =====================================================
+
+    if (
+      !existingParty.Billing_Name?.trim() &&
+      Billing_Name?.trim()
+    ) {
+
+      await connection.execute(
+        `UPDATE add_party
+         SET
+           Billing_Name = ?,
+           updated_at = NOW()
+         WHERE Party_Id = ?`,
+        [
+          Billing_Name.trim(),
+          Party_Id,
+        ]
+      );
+    }
+
+
+    // =====================================================
+    // 2. PHONE NUMBER
+    //
+    // Initialize master only when blank.
+    // =====================================================
+
+    if (
+      !existingParty.Phone_Number?.trim() &&
+      Phone_Number?.trim()
+    ) {
+
+      await connection.execute(
+        `UPDATE add_party
+         SET
+           Phone_Number = ?,
+           updated_at = NOW()
+         WHERE Party_Id = ?`,
+        [
+          Phone_Number.trim(),
+          Party_Id,
+        ]
+      );
+    }
+
+
+    // =====================================================
+    // 3. BILLING ADDRESS
+    //
+    // Add first address only if no Billing address exists.
+    // =====================================================
+
+    if (Billing_Address?.trim()) {
+
+      const [[addressCount]] =
+        await connection.query(
+          `SELECT COUNT(*) AS total
+           FROM add_party_addresses
+           WHERE Party_Id = ?
+             AND Address_Type = 'Billing'`,
+          [Party_Id]
+        );
+
+      if (Number(addressCount.total) === 0) {
+
+        await connection.execute(
+          `INSERT INTO add_party_addresses
+           (
+             Party_Id,
+             Address_Type,
+             Address_Text,
+             Is_Default,
+             created_at,
+             updated_at
+           )
+           VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
+          [
+            Party_Id,
+            Billing_Address.trim(),
+          ]
+        );
+      }
+    }
+
+
+    // =====================================================
+    // GSTIN
+    // =====================================================
+    //
+    // GSTIN is readonly in Sale Edit.
+    // NEVER update add_party.GSTIN from here.
+  }
+}
+
+
+// =========================================================
+// UPDATE INVOICE SNAPSHOT
+// =========================================================
+//
+// IMPORTANT:
+//
+// These values describe THIS invoice.
+//
+// NORMAL PARTY:
+//   → current UI values overwrite this bill.
+//
+// CASH SALE:
+//   → current UI values also belong only to this bill.
+//
+// Therefore we DON'T need finalBillingName /
+// finalPhoneNumber / finalBillingAddress anymore.
+//
+// Whatever Edit Sale UI sends is saved on THIS invoice.
+// =========================================================
+
+await connection.query(
   `UPDATE add_sale
    SET
-     Party_Id = ?,
-     Phone_Number = ?,
-     Billing_Address = ?,
-     Invoice_Number = ?,
-     Invoice_Date = ?,
-     State_Of_Supply = ?,
-     Total_Amount = ?,
-     Total_Received = ?,
-     Balance_Due = ?,
-     updated_at = NOW()
+      Party_Id = ?,
+
+      Billing_Name = ?,
+      Phone_Number = ?,
+      Billing_Address = ?,
+
+      Invoice_Number = ?,
+      Invoice_Date = ?,
+      State_Of_Supply = ?,
+
+      Total_Amount = ?,
+      Total_Received = ?,
+      Balance_Due = ?,
+
+      updated_at = NOW()
+
    WHERE Sale_Id = ?`,
   [
     Party_Id,
 
-    // Snapshot values belonging specifically to THIS sale
+    // Invoice-specific snapshots
+    cleanValue(Billing_Name),
     cleanValue(Phone_Number),
     cleanValue(Billing_Address),
 
     Invoice_Number,
     Invoice_Date,
     cleanValue(State_Of_Supply),
+
     totalAmount,
     totalReceived,
     balanceDue,
+
     saleId,
   ]
 );
+// await connection.query(
+//   `UPDATE add_sale
+//    SET
+//       Party_Id = ?,
+
+//       Billing_Name = ?,
+//       Phone_Number = ?,
+//       Billing_Address = ?,
+
+//       Invoice_Number = ?,
+//       Invoice_Date = ?,
+//       State_Of_Supply = ?,
+
+//       Total_Amount = ?,
+//       Total_Received = ?,
+//       Balance_Due = ?,
+
+//       updated_at = NOW()
+
+//    WHERE Sale_Id = ?`,
+//   [
+//     Party_Id,
+
+//     // Invoice snapshots
+//     finalBillingName,
+//     finalPhoneNumber,
+//     finalBillingAddress,
+
+//     Invoice_Number,
+//     Invoice_Date,
+//     cleanValue(State_Of_Supply),
+
+//     totalAmount,
+//     totalReceived,
+//     balanceDue,
+
+//     saleId,
+//   ]
+// );
+ 
+
+
+
+
     await connection.query(
       `UPDATE sale_return
    SET
@@ -3146,51 +3975,51 @@ if (partyRows.length === 0) {
       });
     }
     const partyChanged =
-  oldPartyId &&
-  Party_Id &&
-  oldPartyId !== Party_Id;
+      oldPartyId &&
+      Party_Id &&
+      oldPartyId !== Party_Id;
 
 
-// ─────────────────────────────────────────────
-// 1. REMOVE SALE FROM OLD PARTY
-// ─────────────────────────────────────────────
-if (partyChanged) {
-  await reversePartyLedger({
-    connection,
+    // ─────────────────────────────────────────────
+    // 1. REMOVE SALE FROM OLD PARTY
+    // ─────────────────────────────────────────────
+    if (partyChanged) {
+      await reversePartyLedger({
+        connection,
 
-    // OLD PARTY
-    partyId: oldPartyId,
+        // OLD PARTY
+        partyId: oldPartyId,
 
-    txnType: "Sale",
+        txnType: "Sale",
 
-    // Same numeric Source_Id used when
-    // original ledger row was created
-    referenceId: saleIdNumber,
-  });
-}
+        // Same numeric Source_Id used when
+        // original ledger row was created
+        referenceId: saleIdNumber,
+      });
+    }
 
 
-// ─────────────────────────────────────────────
-// 2. ADD / UPDATE SALE FOR CURRENT PARTY
-// ─────────────────────────────────────────────
-await recordPartyLedger({
-  connection,
+    // ─────────────────────────────────────────────
+    // 2. ADD / UPDATE SALE FOR CURRENT PARTY
+    // ─────────────────────────────────────────────
+    await recordPartyLedger({
+      connection,
 
-  // NEW/CURRENT PARTY
-  partyId: Party_Id,
+      // NEW/CURRENT PARTY
+      partyId: Party_Id,
 
-  txnType: "Sale",
+      txnType: "Sale",
 
-  referenceId: saleIdNumber,
+      referenceId: saleIdNumber,
 
-  amount: totalAmount,
+      amount: totalAmount,
 
-  txnDate: Invoice_Date,
+      txnDate: Invoice_Date,
 
-  docNumber: Invoice_Number,
+      docNumber: Invoice_Number,
 
-  balanceDue: balanceDue,
-});
+      balanceDue: balanceDue,
+    });
     // await recordPartyLedger({
     //   connection,
     //   partyId: Party_Id,

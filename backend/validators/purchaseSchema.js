@@ -280,6 +280,7 @@ const paymentSplitSchema = z
 
 const purchaseSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"), // 🔹 only real requirement
+ 
  GSTIN: z.preprocess(
   (val) => (val === null || val === undefined ? "" : String(val)),
   z.string().refine((val) => val === "" || val.length === 15, {

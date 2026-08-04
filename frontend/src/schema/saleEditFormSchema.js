@@ -1,4 +1,8 @@
 import { z } from "zod";
+
+
+
+
 const digitsOnly = (fieldName, required = true) =>
   z.union([z.string(), z.number()])
     .transform((val) => String(val ?? "").trim())
@@ -11,31 +15,7 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
-// ✅ Schema
 
-// const paymentSplitSchema = z
-//   .object({
-//     Payment_Type: z
-//       .enum(["Cash", "Cheque", "Neft", "Bank"])
-//       .or(z.literal("")) // allow blank select
-//       .refine((val) => val !== "", {
-//         message: "Please select a payment type.",
-//       }),
-
-//     // Required only when Payment_Type === "Bank"
-//     Bank_Account_Id: z
-//       .union([z.number(), z.string(), z.null(), z.undefined()])
-//       .optional(),
-
-//     Reference_Number: z
-//       .string()
-//       .trim()
-//       .nullable()
-//       .optional()
-//       .transform((val) => val ?? ""),
-
-//     Amount: digitsOnly("Amount", true),
-//   })
 const paymentSplitSchema = z
   .object({
     Payment_Type: z
@@ -61,34 +41,62 @@ const paymentSplitSchema = z
     message: "Please select a bank account.",
     path: ["Bank_Account_Id"],
   });
- 
 
-export const purchaseFormSchema = z.object({
-  Party_Name: z.string().min(1, "Party_Name is required"), // 🔹 only real requirement
-  
-
- GSTIN: z.preprocess(
+export const saleEditFormSchema = z.object({
+    Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
+  // Party_Name: z.string().min(1, "Party_Name is required"),
+    Party_Name: z
+    .string()
+    .trim()
+    .min(1, "Party name is required"),
+   Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+ Phone_Number: z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || /^\d{10}$/.test(value),
+    {
+      message: "Phone number must be exactly 10 digits",
+    }
+  )
+  .optional(),
+  Billing_Address: z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal("")),
+    GSTIN: z.preprocess(
   (val) => (val === null || val === undefined ? "" : String(val)),
   z.string().refine((val) => val === "" || val.length === 15, {
     message: "GSTIN must be exactly 15 characters or left empty",
   })
 ),
 
-  // 🔹 Bill Number optional now — Vyapar shows it blank and still saves
-  Bill_Number: z.string().optional().default(""),
+     
 
-  Bill_Date: z
+   Invoice_Number: z.string().optional().default(""),
+
+  Invoice_Date: z
     .string()
-    .refine((val) => !isNaN(Date.parse(val)), { message: "Bill_Date must be a valid date" }),
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: "Invoice_Date must be a valid date",
+    }),
 
+  // State_Of_Supply: z.string().min(1, "State_Of_Supply is required"),
   State_Of_Supply: z.string().nullable().optional(),
+  // 🔹 Auto-calculated but cannot be empty
+   Total_Amount: digitsOnly("Total_Amount", false).default(0),
+    Balance_Due: digitsOnly("Balance_Due", false).default(0),
 
-  // 🔹 Totals can legitimately be 0 for an empty bill
-  Total_Amount: digitsOnly("Total_Amount", false).default(0),
-  Balance_Due: digitsOnly("Balance_Due", false).default(0),
-  Total_Paid: z.string().optional().or(digitsOnly("Total_Paid", false)),
+  // 🔹 Optional but digits if provided
+  Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
+  
 
-  // 🔹 splits optional — Vyapar defaults Payment Type to "Cash" but doesn't force a split entry to exist server-side if amount is 0
+  // Stock_Quantity: digitsOnly("Stock_Quantity"),
   splits: z
     .array(paymentSplitSchema)
     .optional()
@@ -119,41 +127,8 @@ export const purchaseFormSchema = z.object({
         }
       });
     }),
-  //  splits: z
-  //       .array(paymentSplitSchema)
-  //       .min(1, "At least one payment split is required")
-  //       .superRefine((splits, ctx) => {
-  //         let cashSeen = false;
-  //         const seenBankAccounts = new Set();
-  
-  //         splits.forEach((split, index) => {
-  //           if (split.Payment_Type === "Cash") {
-  //             if (cashSeen) {
-  //               ctx.addIssue({
-  //                 code: z.ZodIssueCode.custom,
-  //                 message: "Only one Cash split is allowed.",
-  //                 path: [index, "Payment_Type"],
-  //               });
-  //             }
-  //             cashSeen = true;
-  //           }
-  
-  //           if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
-  //             if (seenBankAccounts.has(split.Bank_Account_Id)) {
-  //               ctx.addIssue({
-  //                 code: z.ZodIssueCode.custom,
-  //                 message:
-  //                   "Each bank account can only be used once. Edit the existing split instead of adding a duplicate.",
-  //                 path: [index, "Bank_Account_Id"],
-  //               });
-  //             }
-  //             seenBankAccounts.add(split.Bank_Account_Id);
-  //           }
-  //         });
-  //       }),
 
-  // 🔹 items — allowed to be empty array entirely (Vyapar's 2 blank rows never get submitted as "items")
-  items: z
+ items: z
     .array(
       z.object({
         Item_Category: z.string().optional().default(""),
@@ -173,22 +148,21 @@ export const purchaseFormSchema = z.object({
           z.number().min(0, "Quantity cannot be negative")
         ),
         Item_Unit: z.string().optional().default(""),
-        Purchase_Price: z
+        Sale_Price: z
           .union([z.string(), z.number()])
           .transform((val) => String(val ?? "").trim())
           .refine((s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s), {
-            message: "Purchase Price must be a valid number with up to 2 decimals",
+            message: "Sale Price must be a valid number with up to 2 decimals",
           })
           .transform((s) => (s === "" ? 0 : Number(s)))
-          .refine((num) => num >= 0, { message: "Purchase Price cannot be negative" }),
-        Discount_On_Purchase_Price: digitsOnly("Discount_On_Purchase_Price", false).optional(),
-        Discount_Type_On_Purchase_Price: z.enum(["Percentage", "Amount"]).optional(),
+          .refine((num) => num >= 0, { message: "Sale Price cannot be negative" }),
+        Discount_On_Sale_Price: digitsOnly("Discount_On_Sale_Price", false).optional(),
+        Discount_Type_On_Sale_Price: z.enum(["Percentage", "Amount"]).optional(),
         Tax_Type: z.string().optional().default("None"),
         Tax_Amount: digitsOnly("Tax_Amount", false),
         Amount: digitsOnly("Amount", false),
       })
     )
     .optional()
-    .default([]),   // 🔹 array itself optional — no .nonempty() anymore
-});
-
+    .default([]),   
+})

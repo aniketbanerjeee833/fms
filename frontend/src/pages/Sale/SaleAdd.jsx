@@ -107,6 +107,8 @@ export default function SaleAdd() {
   const [newCategory, setNewCategory] = useState("");
   const [originalTotal, setOriginalTotal] = useState(null);
   const today = new Date().toISOString().split("T")[0];
+  // add this state
+
   // const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
   const [showSplitBox, setShowSplitBox] = useState(false);
@@ -263,8 +265,9 @@ export default function SaleAdd() {
   } = useForm({
     resolver: zodResolver(saleFormSchema),
     defaultValues: {
+      Sale_Mode: "Credit",
       Party_Name: "",
-
+      Billing_Name: "",
       GSTIN: "",
       Phone_Number: "",
       Billing_Address: "",
@@ -311,7 +314,7 @@ export default function SaleAdd() {
     name: "splits",
   });
 
-
+  const saleMode = watch("Sale_Mode");
   const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
@@ -353,6 +356,8 @@ export default function SaleAdd() {
 
   const itemsValues = watch("items");   // watch all item rows
   const totalReceived = watch("Total_Received"); // watch Total_Received
+
+
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
 
   // helper to calculate amount in a specific row
@@ -471,7 +476,20 @@ export default function SaleAdd() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
 
+  useEffect(() => {
+    if (saleMode === "Cash") {
+      const total = Number(totalAmountWatch) || 0;
 
+      setValue(
+        "splits.0.Amount",
+        total > 0 ? total.toFixed(2) : "",
+        {
+          shouldDirty: true,
+          shouldValidate: true,
+        }
+      );
+    }
+  }, [saleMode, totalAmountWatch, setValue]);
 
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
@@ -565,13 +583,21 @@ export default function SaleAdd() {
         sum + (Number(split.Amount) || 0),
       0
     );
-
+    //console.log("Total Received (computed from splits):", totalReceived);
+    //console.log("Total Amount (from form):", totalAmount);
+    //  if (data.Sale_Mode === "Cash" && totalAmount > 0 && totalReceived !== totalAmount) {
+    //     toast.error(
+    //       totalReceived < totalAmount
+    //         ? `Payment cannot exceed the total amount .`
+    //         : `Payment cannot exceed the total amount.`
+    //     );
+    //     return;
+    //   }
     // =========================================================
     // 5. BALANCE DUE
     // =========================================================
 
-    const balanceDue =
-      totalAmount - totalReceived;
+    const balanceDue = totalAmount - totalReceived;
 
     // =========================================================
     // 6. BUILD PAYLOAD
@@ -723,7 +749,8 @@ export default function SaleAdd() {
   //console.log("Total Amount Watch:", totalAmountWatch);
 
   const showSalePayment = totalAmountWatch > 0;
-  //console.log("Show Sale Payment Section:", showSalePayment);
+  console.log(currentPartyDetails)
+  //const showBillingName = saleMode === "Cash" || (saleMode === "Credit" && currentPartyDetails?.Billing_Name);
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -765,6 +792,37 @@ export default function SaleAdd() {
             {/* LEFT HEADER */}
             <div className="w-full sm:w-auto">
               <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Add New Sale</h4>
+              <div className="flex items-center gap-3 mb-4">
+                {/* <span className="text-sm font-medium text-gray-700">Sale Mode:</span> */}
+                <div className="flex rounded-md border border-gray-300 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setValue("Sale_Mode", "Credit", { shouldDirty: true })}
+                    style={{
+                      background: saleMode === "Credit" ? "#4CA1AF" : "white",
+                      color: saleMode === "Credit" ? "white" : "#374151",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    className="px-4 py-1.5 text-sm font-medium"
+                  >
+                    Credit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setValue("Sale_Mode", "Cash", { shouldDirty: true })}
+                    style={{
+                      background: saleMode === "Cash" ? "#4CA1AF" : "white",
+                      color: saleMode === "Cash" ? "white" : "#374151",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    className="px-4 py-1.5 text-sm font-medium"
+                  >
+                    Cash
+                  </button>
+                </div>
+              </div>
               {/* <p className="text-gray-500 mb-2 sm:mb-4">
         Add new sale details
       </p> */}
@@ -809,14 +867,20 @@ export default function SaleAdd() {
               {/* ══════════════════ LEFT SIDE ══════════════════ */}
               <div className="flex flex-col gap-4 w-full lg:w-2/3">
 
-                {/* ── ROW 1: Party + Phone Number ── */}
+                {/* ── ROW 1: Party */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
+
+                  {/* <div className={`grid grid-cols-1 ${showBillingName ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-x-6 gap-y-4`}> */}
                   {/* Party */}
                   <div className="flex flex-col gap-2 relative party-class">
-                    <span className="whitespace-nowrap active">
+                    {/* <span className="whitespace-nowrap active">
                       Party
                       <span className="text-red-500">*</span>
+                    </span> */}
+                    <span className="whitespace-nowrap active">
+                      {saleMode === "Cash" ? "Party (Optional)" : "Party"}
+                      {saleMode === "Credit" && <span className="text-red-500">*</span>}
                     </span>
 
                     <div className="relative w-full">
@@ -849,6 +913,7 @@ export default function SaleAdd() {
                                 shouldValidate: true,
                                 shouldDirty: true,
                               });
+                              setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
                             } else {
                               // typed value doesn't match any known party — treat as new, clear stale data
@@ -860,6 +925,7 @@ export default function SaleAdd() {
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
                               setValue("Billing_Address", "", { shouldValidate: true, shouldDirty: true });
                               setCurrentPartyDetails(null);
+                              setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
                             }
                           }}
                           onClick={(e) => {
@@ -887,6 +953,9 @@ export default function SaleAdd() {
                                 );
                                 setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
                                 setCurrentPartyDetails(matchedParty);
+                                setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
                               }
 
                               setOpen(false);
@@ -927,8 +996,10 @@ export default function SaleAdd() {
                                     (a) => a.Address_Type === "Billing" && a.Is_Default
                                   );
                                   setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                  setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
                                   setCurrentPartyDetails(party);
+
                                   setOpen(false);
                                 }}
                                 className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
@@ -945,7 +1016,7 @@ export default function SaleAdd() {
                         </div>
                       )}
                     </div>
-                    
+
                     {showPartyModal && (
                       <PartyAddModal
                         onClose={() => setShowPartyModal(false)}
@@ -955,15 +1026,52 @@ export default function SaleAdd() {
                           setShowPartyModal(false);
                         }}
                       />
-                    )} 
-                    
+                    )}
 
-                    {errors?.Party_Name && (
+
+                    {saleMode === "Credit" && errors?.Party_Name && (
                       <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
                     )}
                   </div>
+                  {/* {(saleMode === "Cash" || (saleMode === "Credit" && currentPartyDetails?.Billing_Name)) && (
+                    <div className="flex flex-col gap-2">
+                      <span className="whitespace-nowrap active">
+                        {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name"}
+                      </span>
+                      <input
+                        type="text"
+                        id="Billing_Name"
+                        {...register("Billing_Name")}
+                        placeholder="Billing Name"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+                      {errors?.Billing_Name && (
+                        <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
+                      )}
+                    </div>
+                  )} */}
 
+                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (<div className="flex flex-col gap-2">
+                    <span className="whitespace-nowrap active">
+                      {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name"}
+                    </span>
+                    <input
+                      type="text"
+                      id="Billing_Name"
+                      {...register("Billing_Name")}
+                      placeholder="Billing Name"
+                      className="w-full outline-none border-b-2 text-gray-900"
+                      style={{ marginBottom: 0 }}
+                    />
+                    {errors?.Billing_Name && (
+                      <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
+                    )}
+                  </div>)}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                   {/* Phone Number — compact inline label+input */}
+
                   <div className="flex flex-col gap-2">
 
                     <span className="whitespace-nowrap active">Phone Number</span>
@@ -982,68 +1090,8 @@ export default function SaleAdd() {
                     )}
                   </div>
 
-                </div>
-
-                {/* ── ROW 2: Billing Address + GSTIN ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-
-                  {/* Billing Address */}
-                  <div className="flex flex-col gap-2">
-                    <span className="active">Billing Address</span>
-                    <textarea
-                      {...register("Billing_Address")}
-                      rows={5}
-                      placeholder="Billing Address"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
-                      style={{ minHeight: "80px" }}
-                    />
-
-                    {/* Only existing parties have address management */}
-                    {watch("Billing_Address") && currentPartyDetails && (
-                      <div className="flex justify-end gap-3 mt-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setValue("Billing_Address", "", {
-                              shouldDirty: true,
-                              shouldValidate: true,
-                            })
-                          }
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            color: "#ef4444",
-                            cursor: "pointer",
-                            fontSize: 13,
-                          }}
-                        >
-                          Remove
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setShowEditPartyModal(true)}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            color: "#4CA1AF",
-                            cursor: "pointer",
-                            fontSize: 13,
-                            fontWeight: 500,
-                          }}
-                        >
-                          Change
-                        </button>
-                      </div>
-                    )}
-
-                    {/* {errors?.Billing_Address && (
-                      <p className="text-red-500 text-xs mt-1">{errors.Billing_Address.message}</p>
-                    )} */}
-                  </div>
-
                   {/* GSTIN — compact inline label+input, pinned to top */}
-                  <div className="flex flex-col gap-2 self-start">
+                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (<div className="flex flex-col gap-2 self-start">
 
                     <span className="whitespace-nowrap active">GSTIN</span>
                     <input
@@ -1056,12 +1104,91 @@ export default function SaleAdd() {
                       style={{ marginBottom: 0 }}
                       readOnly
                     />
-                  </div>
+                  </div>)}
                   {/* {errors?.GSTIN && (
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}
-
                 </div>
+
+                {/* ── ROW 2: Billing Address + GSTIN ── */}
+                {currentPartyDetails?.Party_Name !== "Cash Sale" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+                    {/* Billing Address */}
+                    <div className="flex flex-col gap-2">
+                      <span className="active">Billing Address</span>
+                      <textarea
+                        {...register("Billing_Address")}
+                        rows={5}
+                        placeholder="Billing Address"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                        style={{ minHeight: "80px" }}
+                      />
+
+                      {/* Address has content — show Remove / Change */}
+                      {watch("Billing_Address") && currentPartyDetails && (
+                        <div className="flex justify-end gap-3 mt-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setValue("Billing_Address", "", {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              })
+                            }
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#ef4444",
+                              cursor: "pointer",
+                              fontSize: 13,
+                            }}
+                          >
+                            Remove
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowEditPartyModal(true)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#4CA1AF",
+                              cursor: "pointer",
+                              fontSize: 13,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Address was just removed — offer to pick one from the party instead */}
+                      {!watch("Billing_Address") && currentPartyDetails && (
+                        <div className="flex justify-end mt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowEditPartyModal(true)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#4CA1AF",
+                              cursor: "pointer",
+                              fontSize: 13,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Select Billing Address
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                )}
+
+              
 
                 {showEditPartyModal && (
                   <PartyAddModal
@@ -1190,172 +1317,7 @@ export default function SaleAdd() {
                         </div>
                       </td>
 
-                      {/* <td
-                        style={{ padding: "0px", position: "relative" }}>
 
-                        <div ref={(el) => (categoryRefs.current[i] = el)}>
-
-
-
-                          <input
-                            type="text"
-                            value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
-                            style={{ marginBottom: "0px" }}
-                            // readOnly
-                            readOnly={rows[i]?.isExistingItem}
-
-                            placeholder="Category"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                          // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
-                          />
-
-                          {errors?.items?.[i]?.Item_Category && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Category.message}
-                            </p>
-                          )}
-
-
-                        </div>
-
-                      </td> */}
-                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                        <div ref={(el) => (categoryRefs.current[i] = el)}>
-                          <input
-                            type="text"
-                            value={watch(`items.${i}.Item_Category`) || rows[i]?.categorySearch || ""}
-                            style={{ marginBottom: "0px" }}
-                            readOnly={rows[i]?.isExistingItem}
-                            placeholder="Category"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                            onClick={() => {
-                              setShowModal(false);
-                              if (!rows[i]?.isExistingItem) {
-                                setRows((prev) =>
-                                  prev.map((row, idx) => ({
-                                    ...row,
-                                    CategoryOpen: idx === i ? !row.CategoryOpen : false,
-                                  }))
-                                );
-                              }
-                            }}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              handleRowChange(i, "categorySearch", value);
-                              setValue(`items.${i}.Item_Category`, value, { shouldValidate: true });
-                              handleRowChange(i, "isExistingItem", false);
-                            }}
-                          />
-
-
-                          {errors?.items?.[i]?.Item_Category && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Category.message}
-                            </p>
-                          )}
-
-                          {rows[i]?.CategoryOpen && !rows[i]?.isExistingItem && (
-                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                              <span className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                onClick={() => {
-                                  setShowModal(true);
-                                  handleRowChange(i, "CategoryOpen", false);
-                                }}>
-                                + Add Category
-                              </span>
-
-                              {categories
-                                ?.filter((cat) =>
-                                  cat.Item_Category.toLowerCase().startsWith(
-                                    (rows[i]?.categorySearch || "").toLowerCase()
-                                  )
-                                )
-                                .map((cat, idx) => (
-                                  <div
-                                    key={idx}
-                                    onClick={() => {
-                                      handleSelect(i, cat.Item_Category);
-                                      handleRowChange(i, "categorySearch", cat.Item_Category);
-                                      setValue(`items.${i}.Item_Category`, cat.Item_Category, { shouldValidate: true });
-                                      handleRowChange(i, "CategoryOpen", false);
-                                    }}
-                                    // onClick={() => {
-                                    //   handleSelect(i, cat.Item_Category);
-                                    //   handleRowChange(i, "categorySearch", cat.Item_Category);
-                                    //   handleRowChange(i, "CategoryOpen", false);
-                                    // }}
-                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                  >
-                                    {cat.Item_Category}
-                                  </div>
-                                ))}
-
-                              {categories?.filter((cat) =>
-                                cat.Item_Category.toLowerCase().startsWith(
-                                  (rows[i]?.categorySearch || "").toLowerCase()
-                                )
-                              ).length === 0 && (
-                                  <p className="px-3 py-2 text-gray-500">No categories found</p>
-                                )}
-                            </div>
-                          )}
-                        </div>
-
-                        {showModal && (
-                          <div
-                            style={{
-                              position: "fixed",
-                              inset: 0,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              backgroundColor: "rgba(0,0,0,0.4)",
-                              backdropFilter: "blur(4px)",
-                              zIndex: 30,
-                            }}
-                          >
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-128 relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowModal(false)}
-                                style={{ backgroundColor: "transparent" }}
-                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                              >
-                                ✕
-                              </button>
-
-                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                              <input
-                                type="text"
-                                value={newCategory}
-                                onChange={(e) => setNewCategory(e.target.value)}
-                                className="w-full border border-gray-300 rounded-md
-           p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                placeholder="Enter category name"
-                              />
-
-                              <div className="flex justify-end gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setShowModal(false)}
-                                  style={{ backgroundColor: "lightgray" }}
-                                  className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleAddCategory}
-                                  style={{ backgroundColor: "#4CA1AF" }}
-                                  className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
-                                >
-                                  Add
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </td> */}
                       <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <Controller
                           control={control}
@@ -2321,119 +2283,123 @@ export default function SaleAdd() {
 
 
 
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                      {saleMode === "Credit" && (
+                        <>
+                          <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                        <div className="flex items-center gap-2 relative">
+                            <div className="flex items-center gap-2 relative">
 
-                          <input
-                            type="checkbox"
-
-
-                            id="totalReceivedCheck"
-                            className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
-                            onChange={(e) => {
-
-                              const isChecked = e.target.checked;
-                              const totalAmount = parseFloat(watch("Total_Amount"));
-
-                              // 🧠 If no total amount entered, do nothing
-                              if (!totalAmount || isNaN(totalAmount)) {
-                                // Optional: visually reset the checkbox
+                              <input
+                                type="checkbox"
 
 
-                                // Clear both fields to stay consistent
-                                setValue("Total_Received", "");
-                                setValue("Balance_Due", "");
-                                if (splitsWatch.length === 1) {
-                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                id="totalReceivedCheck"
+                                className="w-4 h-4 cursor-pointer"
+                                disabled={splitsWatch.length > 1}   // 🔹 add this
+
+                                onChange={(e) => {
+
+                                  const isChecked = e.target.checked;
+                                  const totalAmount = parseFloat(watch("Total_Amount"));
+
+                                  // 🧠 If no total amount entered, do nothing
+                                  if (!totalAmount || isNaN(totalAmount)) {
+                                    // Optional: visually reset the checkbox
+
+
+                                    // Clear both fields to stay consistent
+                                    setValue("Total_Received", "");
+                                    setValue("Balance_Due", "");
+                                    if (splitsWatch.length === 1) {
+                                      setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                    }
+                                    return;
+                                  }
+
+                                  if (isChecked) {
+                                    // ✅ Set Total_Received = Total_Amount, Balance_Due = 0
+                                    setValue("Total_Received", totalAmount.toFixed(2));
+                                    setValue("Balance_Due", 0);
+                                  } else {
+                                    // ✅ When unchecked, restore Balance_Due = Total_Amount
+                                    setValue("Total_Received", "");
+                                    setValue("Balance_Due", totalAmount.toFixed(2));
+                                  }
+                                  if (splitsWatch.length === 1) {
+                                    setValue(
+                                      "splits.0.Amount",
+                                      isChecked ? totalAmount.toFixed(2) : "",
+                                      { shouldValidate: true, shouldDirty: true }
+                                    );
+                                  }
+                                }}
+                              />
+                              <span
+                                htmlFor="totalReceivedCheck"
+                                className="font-medium whitespace-nowrap"
+                              >
+                                Total Received
+                              </span>
+
+                            </div>
+
+
+                            <input
+                              type="text"
+                              {...register("Total_Received")}
+                              style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                              readOnly={splitsWatch.length > 1}
+                              onChange={(e) => {
+                                if (splitsWatch.length > 1) return;
+                                let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                                // Allow only one dot
+                                const parts = val.split(".");
+                                if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+
+                                // Limit to 2 decimals
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 2);
                                 }
-                                return;
-                              }
 
-                              if (isChecked) {
-                                // ✅ Set Total_Received = Total_Amount, Balance_Due = 0
-                                setValue("Total_Received", totalAmount.toFixed(2));
-                                setValue("Balance_Due", 0);
-                              } else {
-                                // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                setValue("Total_Received", "");
-                                setValue("Balance_Due", totalAmount.toFixed(2));
-                              }
-                              if (splitsWatch.length === 1) {
-                                setValue(
-                                  "splits.0.Amount",
-                                  isChecked ? totalAmount.toFixed(2) : "",
-                                  { shouldValidate: true, shouldDirty: true }
-                                );
-                              }
-                            }}
-                          />
-                          <span
-                            htmlFor="totalReceivedCheck"
-                            className="font-medium whitespace-nowrap"
-                          >
-                            Total Received
-                          </span>
+                                e.target.value = val;
+                                setValue("Total_Received", val);
 
-                        </div>
-
-
-                        <input
-                          type="text"
-                          {...register("Total_Received")}
-                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
-                          onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
-                            let val = e.target.value.replace(/[^0-9.]/g, "");
-
-                            // Allow only one dot
-                            const parts = val.split(".");
-                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-                            // Limit to 2 decimals
-                            if (val.includes(".")) {
-                              const [int, dec] = val.split(".");
-                              val = int + "." + dec.slice(0, 2);
-                            }
-
-                            e.target.value = val;
-                            setValue("Total_Received", val);
-
-                            const totalReceived = parseFloat(val || 0);
-                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
-                            clearErrors("splits.0.Amount"); // already there ✅
-                          }}
-                          className="form-control"
-                        />
-                      </div>
+                                const totalReceived = parseFloat(val || 0);
+                                const totalAmount = parseFloat(watch("Total_Amount") || 0);
+                                setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                                if (splitsWatch.length === 1) {
+                                  const val = e.target.value;
+                                  setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                                }
+                                clearErrors("splits.0.Amount"); // already there ✅
+                              }}
+                              className="form-control"
+                            />
+                          </div>
 
 
 
 
-                      <div style={{ width: "100%" }}
-                        className="flex  gap-2 items-center ">
+                          <div style={{ width: "100%" }}
+                            className="flex  gap-2 items-center ">
 
-                        <span className="font-medium whitespace-nowrap">Balance Due</span>
-                        <input
-                          style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
-                          }}
-                          type="text"
-                          className="form-control  "
-                          {...register("Balance_Due")}
+                            <span className="font-medium whitespace-nowrap">Balance Due</span>
+                            <input
+                              style={{
+                                backgroundColor: "transparent", marginBottom: "0px",
+                                height: "1rem", width: "100%"
+                              }}
+                              type="text"
+                              className="form-control  "
+                              {...register("Balance_Due")}
 
-                          readOnly
-                        />
-                      </div>
+                              readOnly
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 

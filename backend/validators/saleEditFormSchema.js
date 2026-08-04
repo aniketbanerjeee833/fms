@@ -51,12 +51,8 @@ const priceStringDigits = z
   .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
  const saleSchema = z.object({
    Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
-    Party_Name: z
-    .string()
-    .trim()
-    .optional()
-    .or(z.literal("")),
-  // Party_Name: z.string().min(1, "Party_Name is required"),
+   
+  Party_Name: z.string().min(1, "Party_Name is required"),
  Phone_Number: z
   .string()
   .trim()
@@ -185,31 +181,7 @@ splits: z
     .optional()
     .default([]), // 🔹 array itself optional — no .nonempty() anymore
 })
-.superRefine((data, ctx) => {
-  // =====================================================
-  // CREDIT SALE → PARTY IS MANDATORY
-  // =====================================================
 
-  if (
-    data.Sale_Mode === "Credit" &&
-    !data.Party_Name?.trim()
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["Party_Name"],
-      message: "Party name is required for credit sale",
-    });
-  }
-
-  // =====================================================
-  // CASH SALE → PARTY CAN BE BLANK
-  // =====================================================
-  //
-  // No validation needed.
-  //
-  // Cash + blank party
-  // → backend will use "Cash Sale" party
-});
 // .refine(
 //     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
 //     {
