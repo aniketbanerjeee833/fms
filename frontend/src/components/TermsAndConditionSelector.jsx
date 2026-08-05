@@ -8,12 +8,16 @@ export function TermsAndConditionsSelector({
   onChange,
   onRefresh,
 }) {
-  const [dropOpen, setDropOpen] = useState(false);
+ const [dropOpen, setDropOpen] = useState(false);
   const [modal, setModal] = useState({ open: false, data: null });
   const dropRef = useRef(null);
-
+ 
+  // 🔹 holds the exact record just created/updated so the dropdown label + preview
+  //    reflect it INSTANTLY — not dependent on termsList's refetch timing/race.
+  const [justSaved, setJustSaved] = useState(null);
+ 
   const [addTerms, { isLoading }] = useCreateTermsMutation();
-
+ 
   useEffect(() => {
     const handler = (e) => {
       if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
@@ -21,24 +25,34 @@ export function TermsAndConditionsSelector({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  const selected = termsList.find((t) => String(t.id) === String(value)) || null;
-  console.log(selected);
-
+ 
+  // 🔹 prefer the local override if it matches the currently selected value —
+  //    guarantees the newest data shows even before termsList has refetched.
+  const selected =
+    justSaved && String(justSaved.id) === String(value)
+      ? justSaved
+      : termsList.find((t) => String(t.id) === String(value)) || null;
+ 
   const handleSave = async (formData) => {
     try {
       const res = await addTerms(formData).unwrap();
-
-      // ✅ your backend response — confirm exact shape, adjust key if needed
-      const template = res.template;
-
-      onRefresh?.();
-
+ 
+      if (!res?.success || !res?.term) {
+        console.error("Unexpected response from addTerms:", res);
+        return;
+      }
+ 
+      const savedTerm = res.term; // 🔹 full row, echoed straight from the backend
+ 
+      onRefresh?.(); // still trigger a cache refresh so the dropdown list itself grows
+ 
+      setJustSaved(savedTerm); // 🔹 instant local reflection, no race with the refetch
+ 
       onChange?.({
-        Terms_Condition_Id: template.id,
-        Terms_Condition_Description: template.Terms,
+        Terms_Condition_Id: savedTerm.id,
+        Terms_Condition_Description: savedTerm.Terms,
       });
-
+ 
       setModal({ open: false, data: null });
     } catch (err) {
       console.error("Failed to save terms:", err);
@@ -46,16 +60,16 @@ export function TermsAndConditionsSelector({
   };
 
   const ACCENT = "#4CA1AF";
-  return (
+return (
     <>
       <style>{`
         .tnc-drop-item { transition: background 0.12s; }
         .tnc-drop-item:hover { background: #f4f9fa; }
       `}</style>
-
+ 
       <div className="flex flex-col gap-2 w-full">
         <span className="text-sm font-semibold text-gray-800">Terms &amp; Conditions</span>
-
+ 
         <div className="relative" ref={dropRef}>
           <div
             onClick={() => setDropOpen((p) => !p)}
@@ -66,7 +80,7 @@ export function TermsAndConditionsSelector({
             </span>
             <span className="text-gray-500" style={{ fontSize: 12 }}>▼</span>
           </div>
-
+ 
           {dropOpen && (
             <div className="absolute top-full left-0 z-30 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 overflow-hidden">
               <div
@@ -81,6 +95,7 @@ export function TermsAndConditionsSelector({
               </div>
               <div
                 onClick={() => {
+                  setJustSaved(null);
                   onChange?.({
                     Terms_Condition_Id: null,
                     Terms_Condition_Description: "",
@@ -91,88 +106,71 @@ export function TermsAndConditionsSelector({
               >
                 None
               </div>
-
-              {termsList.length === 0 && (
-                <p className="px-3 py-2 text-xs text-gray-400">No terms saved yet</p>
-              )}
-
-              {termsList.map((t) => {
-                const isSelected = value === t.id;
-                return (
-                  <div
-                    key={t.id}
-                    className="tnc-drop-item flex items-center justify-between px-3 py-2 text-sm cursor-pointer"
-                    style={{
-                      background: isSelected ? "#eaf6f7" : undefined,
-                      color: isSelected ? ACCENT : "#374151",
-                      fontWeight: isSelected ? 500 : 400,
-                    }}
-                  >
-                    <span
-                      className="flex-1"
-                      onClick={() => {
-                        onChange?.({
-                          Terms_Condition_Id: t.id,
-                          Terms_Condition_Description: t.Terms,
-                        });
-                        setDropOpen(false);
+ 
+              {/* 🔹 merge in justSaved if it's not in termsList yet (e.g. refetch hasn't landed) */}
+              {(() => {
+                const listToShow =
+                  justSaved && !termsList.some((t) => String(t.id) === String(justSaved.id))
+                    ? [justSaved, ...termsList]
+                    : termsList;
+ 
+                if (listToShow.length === 0) {
+                  return <p className="px-3 py-2 text-xs text-gray-400">No terms saved yet</p>;
+                }
+ 
+                return listToShow.map((t) => {
+                  const isSelected = String(value) === String(t.id);
+                  return (
+                    <div
+                      key={t.id}
+                      className="tnc-drop-item flex items-center justify-between px-3 py-2 text-sm cursor-pointer"
+                      style={{
+                        background: isSelected ? "#eaf6f7" : undefined,
+                        color: isSelected ? ACCENT : "#374151",
+                        fontWeight: isSelected ? 500 : 400,
                       }}
                     >
-                      {t.Title}
-                    </span>
-                  </div>
-                );
-              })}
+                      <span
+                        className="flex-1"
+                        onClick={() => {
+                          onChange?.({
+                            Terms_Condition_Id: t.id,
+                            Terms_Condition_Description: t.Terms,
+                          });
+                          setDropOpen(false);
+                        }}
+                      >
+                        {t.Title}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
-
-        {/* ── Preview box ── */}
+ 
+        {/* ── Preview box — instantly reflects the latest save via `selected` above ── */}
         <div
           className="w-full border border-gray-200 rounded-lg px-3 py-3 bg-white text-sm"
           style={{ minHeight: 72 }}
         >
-          {selected?.Terms ? ( // ✅ was Description
-            <p className="text-gray-700 whitespace-pre-wrap text-xs leading-5">
-              {selected.Terms}
-            </p>
+          {selected?.Terms ? (
+            <p className="text-gray-700 whitespace-pre-wrap text-xs leading-5">{selected.Terms}</p>
           ) : (
-            <p className="text-gray-400 italic text-xs">
-              Selected terms and conditions appear here
-            </p>
+            <p className="text-gray-400 italic text-xs">Selected terms and conditions appear here</p>
           )}
         </div>
-
-        {/* {selected && (
-          <button
-            type="button"
-            onClick={() =>
-              onChange?.({
-                Terms_Condition_Id: null,
-                Terms_Condition_Description: "",
-              })
-            }
-            style={{
-              background: "none", border: "none",
-              cursor: "pointer", color: "#ef4444",
-              fontSize: 12, alignSelf: "flex-end", padding: 0,
-            }}
-          >
-            Clear
-          </button>
-        )} */}
-      </div >
-
-      {
-        modal.open && (
-          <TermsConditionsModal
-            initialData={modal.data}
-            onClose={() => setModal({ open: false, data: null })}
-            onSave={handleSave}
-            isSaving={isLoading}
-          />
-        )
-      }
+      </div>
+ 
+      {modal.open && (
+        <TermsConditionsModal
+          initialData={modal.data}
+          onClose={() => setModal({ open: false, data: null })}
+          onSave={handleSave}
+          isSaving={isLoading}
+        />
+      )}
     </>
   );
 }

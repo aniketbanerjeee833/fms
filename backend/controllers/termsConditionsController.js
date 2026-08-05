@@ -3,55 +3,106 @@ import db from "../config/db.js";
 /* ═══════════════════════════════════════
    CREATE
 ═══════════════════════════════════════ */
+// const createTerms = async (req, res, next) => {
+//   try {
+//     const {
+//       Title,
+//       Terms,
+//       Sale_Invoice       = 0,
+//       //Sale_Order         = 0,
+//       //Delivery_Challan   = 0,
+//       //Estimation_Quotation = 0,
+//       Purchase_Bill      = 0,
+//       //Purchase_Order     = 0,
+//       //Proforma_Invoice   = 0,
+//     } = req.body;
+
+//     if (!Title?.trim() || !Terms?.trim()) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Title and Terms are required.",
+//       });
+//     }
+
+//     const [result] = await db.query(
+//       `INSERT INTO terms_conditions
+//        (Title, Terms, Sale_Invoice, 
+//         Purchase_Bill)
+//        VALUES (?, ?, ?, ?)`,
+//       [
+//         Title.trim(),
+//         Terms.trim(),
+//         Sale_Invoice       ? 1 : 0,
+        
+       
+      
+//         Purchase_Bill      ? 1 : 0,
+       
+//       ]
+//     );
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Terms & Conditions created",
+//       id: result.insertId,
+//     });
+//   } catch (err) {
+//     console.error("❌ createTerms:", err);
+//     next(err);
+//   }
+// };
 const createTerms = async (req, res, next) => {
   try {
     const {
       Title,
       Terms,
-      Sale_Invoice       = 0,
+      Sale_Invoice = 0,
       //Sale_Order         = 0,
       //Delivery_Challan   = 0,
       //Estimation_Quotation = 0,
-      Purchase_Bill      = 0,
+      Purchase_Bill = 0,
       //Purchase_Order     = 0,
       //Proforma_Invoice   = 0,
     } = req.body;
-
+ 
     if (!Title?.trim() || !Terms?.trim()) {
       return res.status(400).json({
         success: false,
         message: "Title and Terms are required.",
       });
     }
-
+ 
     const [result] = await db.query(
       `INSERT INTO terms_conditions
-       (Title, Terms, Sale_Invoice, 
-        Purchase_Bill)
+       (Title, Terms, Sale_Invoice, Purchase_Bill)
        VALUES (?, ?, ?, ?)`,
       [
         Title.trim(),
         Terms.trim(),
-        Sale_Invoice       ? 1 : 0,
-        
-       
-      
-        Purchase_Bill      ? 1 : 0,
-       
+        Sale_Invoice ? 1 : 0,
+        Purchase_Bill ? 1 : 0,
       ]
     );
-
+ 
+    // 🔹 echo back the full row exactly as stored — frontend uses this directly,
+    //    no need to reconstruct it from req.body or refetch before showing it
+    const [[savedTerm]] = await db.query(
+      `SELECT id, Title, Terms, Sale_Invoice, Purchase_Bill, created_at, updated_at
+       FROM terms_conditions WHERE id = ?`,
+      [result.insertId]
+    );
+ 
     res.status(201).json({
       success: true,
       message: "Terms & Conditions created",
       id: result.insertId,
+      term: savedTerm, // 🔹 the full record
     });
   } catch (err) {
     console.error("❌ createTerms:", err);
     next(err);
   }
 };
-
 // /* ═══════════════════════════════════════
 //    EDIT
 // ═══════════════════════════════════════ */
