@@ -1,312 +1,155 @@
-import { useState } from "react";
-//import { useAddItemUnitMutation } from "../../redux/api/miscellaneousApi";
-//import { toast } from "react-toastify";
 
 
-// export default function AddUnitModal({onClose,onSave}) {
-//        const[itemUnitName, setItemUnitName] = useState("");
-//        const[itemUnitShortHand, setItemUnitShortHand] = useState("");
-
-//         //    console.log(dailyExpense, editingDailyExpense,"editingDailyExpense");
-               
-//            const [addItemUnit, { isLoading:isAddingItemUnitLoading }]=useAddItemUnitMutation();
-           
-//            //const[editSingleDailyExpense, { isLoading }] = useEditSingleDailyExpenseMutation();
-//        const handleSave = async () => {
-//          if (isAddingItemUnitLoading) return; // 🔥 STOP DOUBLE CALL
-//   try {
-//     if (!itemUnitName) {
-//       toast.error("Unit Name cannot be empty!");
-//       return;
-//     }
-
-//     const payload = {
-//       Unit_Name: itemUnitName,
-//       Unit_Shorthand: itemUnitShortHand,
-//     };
-
-//     const res = await addItemUnit(payload).unwrap();
-
-//     toast.success(res.message);
-
-//     onClose();
-//                    onSave({
-//       Unit_Name: payload.Unit_Name,
-//       Unit_Shorthand: payload.Unit_Shorthand
-//     });
-
-//   } catch (err) {
-//     toast.error(err?.data?.message || "Adding Item Unit Failed!");
-//   }
-// };
-//     //          const handleSave = async () => {
-//     //        try {
-//     //         const payload={
-//     //           Unit_Name:itemUnitName,
-//     //           Unit_Shorthand:itemUnitShortHand
-//     //         }
-//     //         console.log(payload);
-//     //         if(!payload.Unit_Name){
-//     //           toast.error("Unit Name cannot be empty!");
-//     //           return;
-//     //         }
-//     //          const res = await addItemUnit(payload).unwrap();
-//     //        console.log(" successfully:", res);
-//     //         //  const resData = res?.data || res;
-//     //           const resData = res;
-//     //          console.log(resData);
-//     //          if(!resData?.success) {
-//     //            toast.error("Adding Item Unit Failed!");
-//     //            return;
-//     //          }else{
-//     //            toast.success("Item Unit added Successfully!");
-//     //              onClose();  // close modal
-//     //                onSave({
-//     //   Unit_Name: payload.Unit_Name,
-//     //   Unit_Shorthand: payload.Unit_Shorthand
-//     // });
-//     //          }
-           
-//     //        } catch (err) {
-//     //          toast.error(err?.data?.message || "Adding Item Unit Failed!");
-//     //          console.error("Add Item Unit error:", err);
-//     //        }
-//     //      };
-//   return (
-//  <div
-//   style={{
-//     position: "fixed",
-//     marginTop: "4rem",
-//     inset: 0,
-//     display: "flex",
-//     alignItems: "center",
-//     justifyContent: "center",
-//     backgroundColor: "rgba(0,0,0,0.3)", // dim background
-//     backdropFilter: "blur(4px)", // blur effect
-//     zIndex: 50,
-//     padding: "1rem", // ensures spacing on small screens
-//   }}
-// >
-//     <div
-//       className="bg-white 
-//       w-full
-//        max-w-xl rounded-lg 
-//       shadow-lg p-6 
-//     overflow-hidden max-h-[90vh]
-//       "
-//     >
-     
-//        <div className="flex justify-between items-center mb-6"
-//       style={{marginBottom:"20px",paddingBottom:"10px"}}>
-//         <h4 className="text-xl font-semibold text-gray-900">
-//             Add Unit
-//           {/* {editingDailyExpense ? "Edit Daily Expense" : "View Daily Expense"} */}
-//         </h4>
-//         <button
-//           type="button"
-//           style={{ backgroundColor: "transparent" ,height:"30px",width:"30px",
-//             fontSize:"20px"
-//           }}
-//           onClick={onClose}
-//           className="text-gray-500 hover:text-gray-700 "
-//         >
-//           ✕
-//         </button>
-//       </div>
-
-      
-//     <div >
-//       <div className="row flex flex-col gap-2">
-  
-
-// <div style={{width:"100%"}}
-// className=" flex flex-col ">
-//   <span className="active">
-//     Item Name
-//     <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
-//   </span>
-
-//   <input
-//   type="text"
-//     // type={editingDailyExpense ? "date" : "text"}
-//     id="Date"
-//     value={itemUnitName}
-//     // value={
-//     //   editingDailyExpense
-//     //     ? dailyExpense?.Date     // must be yyyy-mm-dd
-//     //     : new Date(dailyExpense?.Date).toLocaleDateString("en-IN", {
-//     //         day: "numeric",
-//     //         month: "numeric",
-//     //         year: "numeric",
-//     //       })
-//     // }
-//     //readOnly={!editingDailyExpense}
-//     // onChange={(e) =>
-//     //   editingDailyExpense &&
-//     //   setDailyExpense({ ...dailyExpense, Date: e.target.value })
-//     // }
-//     onChange={(e) => {
-//         setItemUnitName(e.target.value);
-//     }}
-//     className="w-full outline-none border-b-2 text-gray-900"
-//   />
-// </div>
+import { useEffect, useState } from "react";
+import { useAddItemConversionMutation, useGetItemConversionsQuery } from "../../redux/api/itemApi";
 
 
-  
-//                  <div style={{width:"100%"}}
-//                   className="flex flex-col ">
-//                       <span className="active">
-//                         Short Hand
-//                         <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
-//                       </span>
-                     
-//                       <input
-//   type="text"
-//     // type={editingDailyExpense ? "date" : "text"}
-//     id="Date"
-//     value={itemUnitShortHand}
-//     // value={
-//     //   editingDailyExpense
-//     //     ? dailyExpense?.Date     // must be yyyy-mm-dd
-//     //     : new Date(dailyExpense?.Date).toLocaleDateString("en-IN", {
-//     //         day: "numeric",
-//     //         month: "numeric",
-//     //         year: "numeric",
-//     //       })
-//     // }
-//     //readOnly={!editingDailyExpense}
-//     // onChange={(e) =>
-//     //   editingDailyExpense &&
-//     //   setDailyExpense({ ...dailyExpense, Date: e.target.value })
-//     // }
-//     onChange={(e) => {
-//         setItemUnitShortHand(e.target.value);
-//     }}
-//     className="w-full outline-none border-b-2 text-gray-900"
-//   />
-//                     </div>
 
 
-  
-  
-//                   </div>
 
-//                     <div className="flex justify-end mt-4 gap-4">
-//                        <button
-//                       type="button"
-//                   onClick={handleSave}
-//       disabled={isAddingItemUnitLoading}
-//                       className="px-5 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#3b8c98]"
-//                       style={{ backgroundColor: "#4CA1AF" }}
-//                     >
-//                            {isAddingItemUnitLoading ? "Saving..." : "Save"}
-//                     </button>
-//                          <button
-//                       type="button"
-//                   onClick={()=>onClose()}
-   
-//                            className="px-5 py-2 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-700"
-                     
-//                     >
-//                         Cancel
-//                            {/* {isAddingItemUnitLoading ? "Saving..." : "Save"} */}
-//                     </button>
-//                     {/* {editingDailyExpense===false && <button
-//                       type="button"
-                      
-//                       className=" text-white font-bold py-2 px-4 rounded"
-//                       style={{ backgroundColor: "#4CA1AF" }}
-//                     >
-//                       Print
-//                     </button>} */}
-//                   </div>
-                  
- 
-//                   {/* Paid via*/}
-    
-//   </div>
-  
-  
-  
-                 
-  
-//                   {/* <div className="flex justify-end mt-4 gap-4">
-//                       {editingDailyExpense && <button
-//                       type="button"
-//                   onClick={handleSave}
-//       disabled={isLoading}
-//                       className=" text-white font-bold py-2 px-4 rounded"
-//                       style={{ backgroundColor: "#4CA1AF" }}
-//                     >
-//                            {isLoading ? "Saving..." : "Save"}
-//                     </button>}
-              
-//                   </div> */}
-//     </div>
-//   </div>
-// );
-// }
+export default function SelectUnitModal({
+  units = [],
+  onClose,
+  onSave,
+  Item_Id,               // 🔹 NEW — needed to fetch/save conversions
+  initialBase = "",
+  initialSecondary = "",
+  //initialConversionRate = "",
+}) {
+  const [baseUnit, setBaseUnit] = useState(initialBase || "");
+  const [secondaryUnit, setSecondaryUnit] = useState(initialSecondary || "");
+  const [customRate, setCustomRate] = useState("");
+  const [selectedRate, setSelectedRate] = useState(null);
+  const [conversionError, setConversionError] = useState("");
+  console.log(Item_Id);
+  // 🔹 fetch all conversions for this item (runs on modal mount / whenever Item_Id changes)
+  // const { data: conversionsData } = useGetItemConversionsQuery(Item_Id, {
+  //   skip: !Item_Id,
+  // });
+  // const allConversions = conversionsData?.conversions || [];
+  const {
+    data: allConversions = [],
 
-import {  useEffect } from "react";
+  } = useGetItemConversionsQuery(Item_Id, {
+    skip: !Item_Id,
+  });
 
-/**
- * SelectUnitModal
- *
- * Props:
- *   units        — array of { Unit_Shorthand, Unit_Name } from useGetAllItemUnitsQuery
- *   onClose      — () => void
- *   onSave       — ({ baseUnit, secondaryUnit, conversionRate }) => void
- *   initialBase  — pre-selected base unit shorthand (optional)
- */
-export default function SelectUnitModal({ units = [], onClose, onSave, initialBase = "" }) {
-  const [baseUnit, setBaseUnit]           = useState(initialBase || "");
-  const [secondaryUnit, setSecondaryUnit] = useState("");
-  const [selectedRate, setSelectedRate]   = useState(null); // index of selected radio
-  const [customRate, setCustomRate]       = useState("0");
+  console.log(allConversions);
+  const [addItemConversion, { isLoading: isSavingConversion }] =
+    useAddItemConversionMutation();
 
-  // Suggested conversion rates between the two selected units
-  // In a real app these would come from a lookup table.
-  // Here we generate one standard suggestion if units differ, otherwise just custom.
   const suggestions = (() => {
     if (!baseUnit || !secondaryUnit || baseUnit === secondaryUnit) return [];
 
-    // Well-known pairs — extend as needed
     const knownRates = {
       "Gm-Kg": 0.001,
       "Kg-Gm": 1000,
-      "ml-l":  0.001,
-      "l-ml":  1000,
-      "cm-m":  0.01,
-      "m-cm":  100,
+      "ml-l": 0.001,
+      "l-ml": 1000,
+      "cm-m": 0.01,
+      "m-cm": 100,
     };
     const key = `${baseUnit}-${secondaryUnit}`;
     const rate = knownRates[key];
     return rate !== undefined ? [rate] : [];
   })();
 
-  const baseLabel      = units.find((u) => u.Unit_Shorthand === baseUnit)?.Unit_Name      || baseUnit;
+  // 🔹 saved conversions — filtered to the CURRENT base/secondary pair only
+  //    (e.g. Kg→Box shows only Kg→Box history, Kg→Gm shows only Kg→Gm history)
+  const savedConversions = allConversions.filter(
+    (c) =>
+      String(c.Primary_Unit) === String(baseUnit) &&
+      String(c.Secondary_Unit) === String(secondaryUnit)
+  );
+
+  const baseLabel = units.find((u) => u.Unit_Shorthand === baseUnit)?.Unit_Name || baseUnit;
   const secondaryLabel = units.find((u) => u.Unit_Shorthand === secondaryUnit)?.Unit_Name || secondaryUnit;
 
-  // When suggestions change, reset radio selection
   useEffect(() => {
     setSelectedRate(null);
-    setCustomRate("0");
+    setCustomRate("");
+    setConversionError("");
   }, [baseUnit, secondaryUnit]);
 
-  const handleSave = () => {
-    const rate =
-      selectedRate !== null && suggestions[selectedRate] !== undefined
-        ? suggestions[selectedRate]
-        : parseFloat(customRate) || 0;
+  const handleSave = async () => {
+    setConversionError("");
 
-    onSave({
-      baseUnit,
-      secondaryUnit: secondaryUnit || null,
-      conversionRate: secondaryUnit ? rate : null,
-    });
+    // 1. NEITHER SELECTED
+    if (!baseUnit && !secondaryUnit) {
+      onSave({ baseUnit: null, secondaryUnit: null, conversionRate: null });
+      return;
+    }
+
+    // 2. NO SECONDARY UNIT — conversion not required
+    if (!secondaryUnit) {
+      onSave({ baseUnit, secondaryUnit: null, conversionRate: null });
+      return;
+    }
+
+    // 3. SECONDARY EXISTS BUT NOTHING SELECTED
+    if (!selectedRate) {
+      setConversionError("Please select a conversion rate");
+      return;
+    }
+
+    let rate = null;
+
+    // 4. CUSTOM RATE
+    if (selectedRate === "custom") {
+      rate = Number(customRate);
+      if (customRate.trim() === "" || !Number.isFinite(rate) || rate <= 0) {
+        setConversionError("Please enter conversion rate");
+        return;
+      }
+    }
+    // 5. STANDARD SUGGESTION
+    else if (selectedRate.startsWith("suggestion-")) {
+      const index = Number(selectedRate.replace("suggestion-", ""));
+      rate = Number(suggestions[index]);
+    }
+    // 6. SAVED CONVERSION
+    else if (selectedRate.startsWith("saved-")) {
+      const id = selectedRate.replace("saved-", "");
+      const saved = savedConversions.find((c) => String(c.id) === String(id));
+      rate = saved ? Number(saved.Conversion_Rate) : null;
+    }
+
+    // 7. FINAL SAFETY CHECK
+    if (!rate || rate <= 0) {
+      setConversionError("Please enter conversion rate");
+      return;
+    }
+
+    // 8. PERSIST to item_unit_conversions (so it shows up next time as "saved")
+    //    Only worth calling if this exact pair+rate isn't already saved (INSERT IGNORE handles dupes anyway)
+    const alreadyExists = savedConversions.some(
+  c =>
+    Number(c.Conversion_Rate) === Number(rate)
+);
+
+
+    if (Item_Id && !alreadyExists) {
+      try {
+        await addItemConversion({
+          Item_Id,
+          Primary_Unit: baseUnit,
+          Secondary_Unit: secondaryUnit,
+          Conversion_Rate: rate,
+        }).unwrap();
+      } catch (err) {
+        console.error("Failed to save conversion history:", err);
+        // don't block the form save on this — conversion history is a nice-to-have
+      }
+    }
+
+    // 9. UPDATE PARENT FORM STATE
+    onSave({ baseUnit, secondaryUnit, conversionRate: rate });
   };
 
+  console.log("baseUnit", baseUnit);
+  console.log("secondaryUnit", secondaryUnit);
+  console.log("allConversions", allConversions);
+  console.log("savedConversions", savedConversions);
   return (
     <div
       style={{
@@ -347,7 +190,15 @@ export default function SelectUnitModal({ units = [], onClose, onSave, initialBa
             </span>
             <select
               value={baseUnit}
-              onChange={(e) => setBaseUnit(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setBaseUnit(value);
+                if (!value) {
+                  setSelectedRate(null);
+                  setCustomRate("");
+                  setConversionError("");
+                }
+              }}
               style={{
                 border: "2px solid #4CA1AF",
                 borderRadius: 6,
@@ -358,7 +209,7 @@ export default function SelectUnitModal({ units = [], onClose, onSave, initialBa
                 backgroundColor: "white",
               }}
             >
-              <option value="">Select unit</option>
+              <option value="">None</option>
               {units.map((u) => (
                 <option key={u.Unit_Shorthand} value={u.Unit_Shorthand}>
                   {u.Unit_Name.toUpperCase()} ({u.Unit_Shorthand})
@@ -374,7 +225,13 @@ export default function SelectUnitModal({ units = [], onClose, onSave, initialBa
             </span>
             <select
               value={secondaryUnit}
-              onChange={(e) => setSecondaryUnit(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSecondaryUnit(value);
+                setConversionError("");
+                setSelectedRate(null);
+                setCustomRate("");
+              }}
               style={{
                 border: "1px solid #d1d5db",
                 borderRadius: 6,
@@ -397,7 +254,7 @@ export default function SelectUnitModal({ units = [], onClose, onSave, initialBa
           </div>
         </div>
 
-        {/* ── Conversion Rates — only when secondary is selected ── */}
+        {/* ── Conversion Rates — only when both selected ── */}
         {secondaryUnit && baseUnit && (
           <div className="mb-6">
             <p className="font-semibold text-gray-700 mb-3" style={{ fontSize: 14 }}>
@@ -405,101 +262,201 @@ export default function SelectUnitModal({ units = [], onClose, onSave, initialBa
             </p>
 
             <div className="flex flex-col gap-3">
-              {/* Suggested rates (e.g. 1 Gm = 0.001 Kg) */}
-              {suggestions.map((rate, i) => (
-                <label
-                  key={i}
-                  className="flex items-center gap-3 cursor-pointer"
-                  onClick={() => setSelectedRate(i)}
-                >
-                  <div
-                    style={{
-                      width: 18, height: 18,
-                      borderRadius: "50%",
-                      border: `2px solid ${selectedRate === i ? "#4CA1AF" : "#9ca3af"}`,
-                      backgroundColor: selectedRate === i ? "#4CA1AF" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {selectedRate === i && (
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "white" }} />
-                    )}
-                  </div>
-                  <span style={{ fontSize: 14, color: "#6b7280" }}>
-                    1&nbsp;<strong style={{ color: "#1f2937" }}>{baseLabel.toUpperCase()}</strong>
-                    &nbsp;=&nbsp;
-                    <strong style={{ color: "#1f2937" }}>{rate}</strong>
-                    &nbsp;{secondaryLabel.toUpperCase()}
-                  </span>
-                </label>
-              ))}
 
-              {/* Custom rate row */}
+              {/* CUSTOM RATE */}
               <div
-                className="flex items-center gap-3 cursor-pointer"
-                onClick={() => setSelectedRate(null)}
+                className="flex items-center gap-2 flex-nowrap cursor-pointer"
+                onClick={() => setSelectedRate("custom")}
               >
                 <div
                   style={{
-                    width: 18, height: 18,
+                    width: 18,
+                    height: 18,
                     borderRadius: "50%",
-                    border: `2px solid ${selectedRate === null ? "#4CA1AF" : "#9ca3af"}`,
-                    backgroundColor: selectedRate === null ? "#4CA1AF" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    border: `2px solid ${selectedRate === "custom" ? "#4CA1AF" : "#9ca3af"}`,
+                    backgroundColor: selectedRate === "custom" ? "#4CA1AF" : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     flexShrink: 0,
                   }}
                 >
-                  {selectedRate === null && (
+                  {selectedRate === "custom" && (
                     <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "white" }} />
                   )}
                 </div>
-                <span style={{ fontSize: 14, color: "#6b7280" }}>
-                  1&nbsp;<strong style={{ color: "#1f2937" }}>{baseLabel.toUpperCase()}</strong>
-                  &nbsp;=
+
+                <span className="whitespace-nowrap text-sm">
+                  1 <strong>{baseLabel.toUpperCase()}</strong>
                 </span>
+                <span className="text-sm">=</span>
+
                 <input
                   type="text"
                   value={customRate}
-                  onClick={(e) => { e.stopPropagation(); setSelectedRate(null); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRate("custom");
+                  }}
                   onChange={(e) => {
-                    setSelectedRate(null);
+                    setSelectedRate("custom");
                     setCustomRate(e.target.value.replace(/[^0-9.]/g, ""));
                   }}
-                  className="w-1/2"
                   style={{
-                    
+                    width: "100px",
+                    height: "30px",
                     border: "1px solid #d1d5db",
                     borderRadius: 4,
                     padding: "3px 8px",
                     fontSize: 14,
                     outline: "none",
-                    marginBottom: 0,
+                    margin: 0,
+                    flexShrink: 0,
                   }}
                 />
-                <span style={{ fontSize: 14, color: "#6b7280" }}>
+
+                <span className="whitespace-nowrap text-sm">
                   {secondaryLabel.toUpperCase()}
                 </span>
               </div>
+
+              {/* STANDARD SUGGESTIONS */}
+              {suggestions.map((rate, i) => (
+                <label
+                  key={`suggestion-${i}`}
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={() => setSelectedRate(`suggestion-${i}`)}
+                >
+                  <input
+                    type="radio"
+                    checked={selectedRate === `suggestion-${i}`}
+                    onChange={() => setSelectedRate(`suggestion-${i}`)}
+                  />
+                  <span>
+                    1 <strong>{baseLabel.toUpperCase()}</strong> = <strong>{rate}</strong>{" "}
+                    {secondaryLabel.toUpperCase()}
+                  </span>
+                </label>
+              ))}
+
+              {/* SAVED CONVERSION HISTORY — filtered to this exact base/secondary pair */}
+              {/* {savedConversions.map((conversion) => {
+                const rate = Number(conversion.Conversion_Rate);
+                return (
+                  <label
+                    key={`saved-${conversion.id}`}
+                    className="flex items-center gap-3 cursor-pointer"
+                    onClick={() => setSelectedRate(`saved-${conversion.id}`)}
+                  >
+                    <input
+                      type="radio"
+                      checked={selectedRate === `saved-${conversion.id}`}
+                      onChange={() => setSelectedRate(`saved-${conversion.id}`)}
+                    />
+                    <span style={{ fontSize: 14 }}>
+                      1 <strong>{baseLabel.toUpperCase()}</strong> = <strong>{rate}</strong>{" "}
+                      {secondaryLabel.toUpperCase()}
+                    </span>
+                  </label>
+                );
+              })} */}
+              {/* SAVED CONVERSION HISTORY */}
+              {/* SAVED CONVERSION HISTORY */}
+              {savedConversions.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-gray-500 mt-2">
+                    Previously Used
+                  </p>
+
+                  {savedConversions.map((conversion) => {
+                    const rate = Number(conversion.Conversion_Rate);
+
+                    return (
+                      <div
+                        key={`saved-${conversion.id}`}
+                        className="flex items-center gap-3 cursor-pointer"
+                        onClick={() => {
+                          setSelectedRate(`saved-${conversion.id}`);
+                          //setCustomRate(String(rate));
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%",
+                            border: `2px solid ${selectedRate === `saved-${conversion.id}`
+                                ? "#4CA1AF"
+                                : "#9ca3af"
+                              }`,
+                            background:
+                              selectedRate === `saved-${conversion.id}`
+                                ? "#4CA1AF"
+                                : "white",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {selectedRate === `saved-${conversion.id}` && (
+                            <div
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: "#fff",
+                              }}
+                            />
+                          )}
+                        </div>
+                        {/* <input
+                          type="radio"
+                          checked={selectedRate === `saved-${conversion.id}`}
+                          onChange={() => {
+                            setSelectedRate(`saved-${conversion.id}`);
+                            setCustomRate(String(rate));
+                          }}
+                        /> */}
+
+                        <span className="text-sm">
+                          1 <strong>{baseLabel.toUpperCase()}</strong>
+                          {" = "}
+                          <strong>{rate}</strong>{" "}
+                          {secondaryLabel.toUpperCase()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
             </div>
           </div>
         )}
 
-        {/* ── Divider + Footer ── */}
+        {conversionError && (
+          <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 8 }}>
+            {conversionError}
+          </p>
+        )}
+
+        {/* ── Footer ── */}
         <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 16, display: "flex", justifyContent: "flex-end" }}>
           <button
             type="button"
             onClick={handleSave}
-            disabled={!baseUnit}
+            disabled={isSavingConversion}
             className="text-white font-semibold px-6 py-2 rounded-md"
             style={{
-              backgroundColor: baseUnit ? "#4CA1AF" : "#9ca3af",
+              backgroundColor: "#4CA1AF",
               border: "none",
-              cursor: baseUnit ? "pointer" : "not-allowed",
+              cursor: isSavingConversion ? "not-allowed" : "pointer",
+              opacity: isSavingConversion ? 0.6 : 1,
               fontSize: 14,
             }}
           >
-            SAVE
+            {isSavingConversion ? "Saving..." : "SAVE"}
           </button>
         </div>
       </div>

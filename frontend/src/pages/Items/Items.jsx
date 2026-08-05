@@ -417,7 +417,7 @@ const selectedUnit=watch("Item_Unit")
               Secondary: <strong>{secondaryUnit}</strong>
             </span>
 
-            <div className="mt-1 text-xs text-gray-500">
+            <div className="mt-1 text-[#4CA1AF]">
               1 {primaryUnit} = {conversionRate} {secondaryUnit}
             </div>
           </>
@@ -509,6 +509,7 @@ const selectedUnit=watch("Item_Unit")
     onClose={() => {
       setShowSelectUnitModal(false);
     }}
+    
 
     onSave={(newUnit) => {
       console.log("Selected unit configuration:", newUnit);

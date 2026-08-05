@@ -431,83 +431,97 @@ const addItem = async (req, res, next) => {
     // 9. INSERT ITEM
     // =========================================================
 
-    const [result] = await connection.execute(
-      `
-        INSERT INTO add_item
-        (
-          Item_Id,
-          Item_Name,
-          Item_HSN,
-          Item_Category,
+const [result] = await connection.execute(
+  `
+    INSERT INTO add_item
+    (
+      Item_Id,
+      Item_Name,
+      Item_HSN,
+      Item_Category,
+      Item_Unit,
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate,
+      Stock_Quantity,
+      Opening_Quantity,
+      At_Price,
+      As_Of_Date,
+      Min_Stock,
+      Location,
+      created_at,
+      updated_at
+    )
+    VALUES
+    (
+      ?, ?, ?, ?,
+      ?,
+      ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
+      NOW(),
+      NOW()
+    )
+  `,
+  [
+    itemId,
+    Item_Name,
+    Item_HSN || null,
+    Item_Category || "",
 
-          Item_Unit,
+    Item_Unit,
 
-          Primary_Unit,
-          Secondary_Unit,
-          Conversion_Rate,
+    primaryUnit,
+    secondaryUnit,
+    conversionRate,
 
-          Stock_Quantity,
-          Opening_Quantity,
-          At_Price,
-          As_Of_Date,
-          Min_Stock,
-          Location,
+    stockQuantity,
+    Opening_Quantity ?? null,
+    At_Price ?? null,
+    As_Of_Date || null,
+    Min_Stock ?? null,
+    Location || null,
+  ]
+);
 
-          created_at,
-          updated_at
-        )
-        VALUES
-        (
-          ?, ?, ?, ?,
-          ?,
-          ?, ?, ?,
-          ?, ?, ?, ?, ?, ?,
-          NOW(),
-          NOW()
-        )
-      `,
-      [
-        // =====================================================
-        // BASIC
-        // =====================================================
 
-        itemId,
-        Item_Name,
-        Item_HSN || null,
-        Item_Category || "",
+// =========================================================
+// 10. SAVE UNIT CONVERSION
+// =========================================================
 
-        // =====================================================
-        // LEGACY
-        // =====================================================
+if (
+  primaryUnit &&
+  secondaryUnit &&
+  conversionRate !== null &&
+  Number(conversionRate) > 0
+) {
+  await connection.execute(
+    `
+      INSERT IGNORE INTO item_unit_conversions
+      (
+        Item_Id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate
+      )
+      VALUES (?, ?, ?, ?)
+    `,
+    [
+      itemId,
+      primaryUnit,
+      secondaryUnit,
+      conversionRate,
+    ]
+  );
+}
 
-        Item_Unit,
 
-        // =====================================================
-        // NEW UNIT SYSTEM
-        // =====================================================
+// =========================================================
+// 11. COMMIT
+// =========================================================
 
-        primaryUnit,
-        secondaryUnit,
-        conversionRate,
+await connection.commit();
 
-        // =====================================================
-        // STOCK
-        // =====================================================
-
-        stockQuantity,
-        Opening_Quantity ?? null,
-        At_Price ?? null,
-        As_Of_Date || null,
-        Min_Stock ?? null,
-        Location || null,
-      ]
-    );
-
-    // =========================================================
-    // 10. COMMIT
-    // =========================================================
-
-    await connection.commit();
+ 
 
     // =========================================================
     // 11. RESPONSE
@@ -576,7 +590,109 @@ const addItem = async (req, res, next) => {
     }
   }
 };
+const addItemConversion = async (req, res, next) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
+
+    const {
+      Item_Id,
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate,
+    } = req.body;
+
+    if (
+      !Item_Id ||
+      !Primary_Unit ||
+      !Secondary_Unit ||
+      !Number(Conversion_Rate)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid conversion data.",
+      });
+    }
+
+    await connection.execute(
+      `
+      INSERT IGNORE INTO item_unit_conversions
+      (
+        Item_Id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate
+      )
+      VALUES (?, ?, ?, ?)
+      `,
+      [
+        Item_Id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate,
+      ]
+    );
+
+    const [conversions] = await connection.query(
+      `
+      SELECT
+        id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate
+      FROM item_unit_conversions
+      WHERE Item_Id = ?
+      ORDER BY id DESC
+      `,
+      [Item_Id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversion saved successfully.",
+      conversions,
+    });
+  } catch (err) {
+    console.error("❌ addItemConversion:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+const getItemConversions = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const { Item_Id } = req.params;
+
+    const [conversions] = await connection.query(
+      `
+      SELECT
+        id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate
+      FROM item_unit_conversions
+      WHERE Item_Id = ?
+      ORDER BY id DESC
+      `,
+      [Item_Id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      conversions,
+    });
+  } catch (err) {
+    console.error("❌ getItemConversions:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
 const editItem = async (req, res, next) => {
   let connection;
   try {
@@ -586,10 +702,31 @@ const editItem = async (req, res, next) => {
     const { Item_Id } = req.params;
     const cleanData = sanitizeObject(req.body);
     const validation = itemFormSchema.safeParse(cleanData);
-    if (!validation.success) {
-      return res.status(400).json({ errors: validation.error.errors });
-    }
-    const { Item_Name, Item_HSN, Item_Unit,  Item_Category } = validation.data;
+   if (!validation.success) {
+  await connection.rollback();
+
+  return res.status(400).json({
+    errors: validation.error.errors,
+  });
+}
+    // const { Item_Name, Item_HSN, Item_Unit,  Item_Category } = validation.data;
+    const {
+  Item_Name,
+  Item_HSN,
+  Item_Unit,          // legacy
+
+  Item_Category,
+
+  Primary_Unit,
+  Secondary_Unit,
+  Conversion_Rate,
+
+  Opening_Quantity,
+  At_Price,
+  As_Of_Date,
+  Min_Stock,
+  Location,
+} = validation.data;
     const normalizedName = Item_Name.trim().toLowerCase();
 
     const [duplicate] = await connection.query(
@@ -607,22 +744,106 @@ const editItem = async (req, res, next) => {
         message: "Another item with this name already exists.",
       });
     }
-    const [result] = await db.execute(
-      `UPDATE add_item SET Item_Name = ?, Item_HSN = ?, Item_Unit = ?, 
-           Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
-      [Item_Name, Item_HSN, Item_Unit,  Item_Category, Item_Id]
+    const [result] = await connection.execute(
+      `UPDATE add_item
+SET
+    Item_Name=?,
+    Item_HSN=?,
+    Item_Unit=?,
+
+    Item_Category=?,
+
+    Primary_Unit=?,
+    Secondary_Unit=?,
+    Conversion_Rate=?,
+
+    Opening_Quantity=?,
+    At_Price=?,
+    As_Of_Date=?,
+    Min_Stock=?,
+    Location=?,
+
+    updated_at=NOW()
+
+WHERE Item_Id=?`,
+     [
+  Item_Name,
+  Item_HSN || null,
+  Item_Unit || "",
+
+  Item_Category || "",
+
+  Primary_Unit || null,
+  Secondary_Unit || null,
+  Secondary_Unit
+    ? Conversion_Rate ?? null
+    : null,
+
+  Opening_Quantity ?? null,
+  At_Price ?? null,
+  As_Of_Date || null,
+  Min_Stock ?? null,
+  Location || null,
+
+  Item_Id,
+]
     );
 
     if (result.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ message: "Item not found" });
     }
+    // =========================================================
+// UPDATE UNIT CONVERSION
+// =========================================================
 
-    if (result.affectedRows > 0) {
-      await connection.commit();
-      return res.status(200).json({ success: true, message: "Item updated successfully" });
-    }
+// =========================================================
+// SAVE UNIT CONVERSION HISTORY
+// =========================================================
 
+if (
+  Primary_Unit &&
+  Secondary_Unit &&
+  Number(Conversion_Rate) > 0
+) {
+  await connection.execute(
+    `
+      INSERT INTO item_unit_conversions
+      (
+        Item_Id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate
+      )
+      SELECT ?, ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM item_unit_conversions
+        WHERE Item_Id = ?
+          AND Primary_Unit = ?
+          AND Secondary_Unit = ?
+          AND Conversion_Rate = ?
+      )
+    `,
+    [
+      Item_Id,
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate,
+
+      Item_Id,
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate,
+    ]
+  );
+}
+  await connection.commit();
+
+return res.status(200).json({
+  success: true,
+  message: "Item updated successfully",
+});
 
   } catch (err) {
     if (connection) await connection.rollback();
@@ -710,66 +931,99 @@ const eachItemBillAndInvoiceNumbers = async (req, res, next) => {
 };
 
 
+
 // const getAllItems = async (req, res, next) => {
+//   let connection;
 //   try {
+//     connection = await db.getConnection();
 //     const page = req.query.page ? parseInt(req.query.page, 10) : null;
 //     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
+//     const fromDate = req.query.fromDate || null;
+//     const toDate = req.query.toDate || null;
+//     console.log("🔍 Params =>", { page, search, fromDate, toDate });
+//     console.log(fromDate, toDate, search, page);
 //     const limit = 10;
-
 //     const offset = page ? (page - 1) * limit : 0;
 
-//     // ✅ Base SQL query
-//     let baseQuery = `SELECT * FROM add_item`;
-//     let whereClause = "";
-//     const params = [];
+//     // ✅ Build WHERE clause dynamically
+//     let whereClauses = [];
+//     let params = [];
 
-//     // ✅ Search filter across multiple columns
+//     // 🧠 Search term condition
 //     if (search) {
-//       whereClause = `
-//         WHERE LOWER(Item_Name) LIKE ? 
-//         OR LOWER(Item_Category) LIKE ? 
-//         OR LOWER(Item_HSN) LIKE ? 
-//         OR LOWER(Item_Id) LIKE ? 
-//         OR LOWER(Item_Unit) LIKE ?
-//       `;
-//       const likeSearch = `%${search}%`;
-//       params.push(likeSearch, likeSearch, likeSearch, likeSearch, likeSearch);
+//       whereClauses.push(`
+//         (LOWER(Item_Name) LIKE ? 
+//          OR LOWER(Item_Category) LIKE ? 
+//          OR LOWER(Item_HSN) LIKE ? 
+//          OR LOWER(Item_Id) LIKE ? 
+//          OR LOWER(Item_Unit) LIKE ?)
+//       `);
+//       const like = `%${search}%`;
+//       params.push(like, like, like, like, like);
 //     }
 
-//     // ✅ Pagination support
-//     let query = `${baseQuery} ${whereClause} ORDER BY created_at DESC`;
-//     if (page) query += ` LIMIT ? OFFSET ?`, params.push(limit, offset);
+//     // 📅 Date range condition
+//     // if (fromDate && toDate) {
+//     //   whereClauses.push("DATE(created_at) BETWEEN ? AND ?");
+//     //   params.push(fromDate, toDate);
+//     // } else if (fromDate) {
+//     //   whereClauses.push("DATE(created_at) >= ?");
+//     //   params.push(fromDate);
+//     // } else if (toDate) {
+//     //   whereClauses.push("DATE(created_at) <= ?");
+//     //   params.push(toDate);
+//     // }
+//     if (fromDate && toDate) {
+//       whereClauses.push(`DATE(created_at) BETWEEN ? AND ?`);
+//       params.push(
+//         `${fromDate} 00:00:00`,
+//         `${toDate} 23:59:59`
+//       );
+//     } else if (fromDate) {
+//       whereClauses.push(`DATE(created_at) >= ?`);
+//       params.push(`${fromDate} 00:00:00`);
+//     } else if (toDate) {
+//       whereClauses.push(`DATE(created_at) <= ?`);
+//       params.push(`${toDate} 23:59:59`);
+//     }
+//     // Combine WHERE clauses
+//     const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
+
+//     // ✅ Fetch items
+//     const query = `
+//       SELECT * FROM add_item 
+//       ${whereSQL}
+//       ORDER BY created_at DESC
+//       ${page ? "LIMIT ? OFFSET ?" : ""}
+//     `;
+//     if (page) params.push(limit, offset);
 
 //     const [items] = await db.query(query, params);
 
-//     // ✅ Get total count for pagination
-//     let totalItems = [{ total: 0 }];
-//     if (page) {
-//       const [countRows] = await db.query(
-//         `SELECT COUNT(*) AS total FROM add_item ${whereClause}`,
-//         search ? Array(5).fill(`%${search}%`) : []
-//       );
-//       totalItems = countRows;
-//     } else {
-//       totalItems = [{ total: items.length }];
-//     }
+//     // ✅ Count total for pagination
+//     let [totalItems] = await db.query(
+//       `SELECT COUNT(*) AS total FROM add_item ${whereSQL}`,
+//       params.slice(0, params.length - (page ? 2 : 0))
+//     );
 
-//     // ✅ Fetch purchase & sale prices
-//     const [purchaseItems] = await db.query(
-//       `SELECT Item_Id, Purchase_Price 
-//        FROM add_purchase_items 
-//        ORDER BY created_at DESC`
-//     );
-//     const [salesItems] = await db.query(
-//       `SELECT Item_Id, Sale_Price 
-//        FROM add_sale_items 
-//        ORDER BY created_at DESC`
-//     );
+//     // ✅ Get latest purchase and sales prices
+//     const [purchaseItems] = await db.query(`
+//       SELECT Item_Id, Purchase_Price,Tax_Type 
+//       FROM add_purchase_items 
+//       ORDER BY created_at DESC
+//     `);
+//     const [salesItems] = await db.query(`
+//       SELECT Item_Id, Sale_Price 
+//       FROM add_sale_items 
+//       ORDER BY created_at DESC
+//     `);
 
 //     const latestPurchasePrice = {};
+//     const latestTaxType = {};
 //     purchaseItems.forEach((row) => {
 //       if (!latestPurchasePrice[row.Item_Id]) {
 //         latestPurchasePrice[row.Item_Id] = row.Purchase_Price;
+//         latestTaxType[row.Item_Id] = row.Tax_Type;
 //       }
 //     });
 //     const latestSalePrice = {};
@@ -779,169 +1033,289 @@ const eachItemBillAndInvoiceNumbers = async (req, res, next) => {
 //       }
 //     });
 
-//     // ✅ Combine results
+//     //console.log(latestPurchasePrice, latestTaxType, latestSalePrice);
+//     // ✅ Merge results
 //     const combined = items.map((item) => ({
-//       Item_Id: item.Item_Id,
-//       Item_Category: item.Item_Category,
-//       Item_Name: item.Item_Name,
-//       Item_HSN: item.Item_HSN,
-//       Item_Unit: item.Item_Unit,
-//       Stock_Quantity: item.Stock_Quantity || 0,
+//       ...item,
 //       Purchase_Price: latestPurchasePrice[item.Item_Id] || 0.0,
+//       Tax_Type: latestTaxType[item.Item_Id],
 //       Sale_Price: latestSalePrice[item.Item_Id] || 0.0,
-//       created_at: item.created_at,
 //     }));
 
+//     //console.log(combined);
 //     // ✅ Response
-//     if (page) {
-//       return res.status(200).json({
-//         currentPage: page,
-//         totalPages: Math.ceil(totalItems[0].total / limit),
-//         totalItems: totalItems[0].total,
-//         items: combined,
-//       });
-//     } else {
-//       return res.status(200).json({
-//         items: combined,
-//       });
-//     }
+//     return res.status(200).json({
+//       success: true,
+//       currentPage: page || 1,
+//       totalPages: page ? Math.ceil(totalItems[0].total / limit) : 1,
+//       totalItems: totalItems[0].total,
+//       items: combined,
+//     });
 //   } catch (err) {
-//     console.error("❌ Error getting all items:", err);
-//     return res.status(500).json({ message: "Internal Server Error" });
+//     if (connection) connection.release();
+//     console.error("❌ Error fetching items:", err);
+//     next(err);
+//     // return res.status(500).json({ message: "Internal Server Error" });
+//   } finally {
+//     if (connection) connection.release();
 //   }
 // };
-
-//Recent items purchase and sale
-
 const getAllItems = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
-    const page = req.query.page ? parseInt(req.query.page, 10) : null;
-    const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
+
+    const page = req.query.page
+      ? parseInt(req.query.page, 10)
+      : null;
+
+    const search = req.query.search
+      ? req.query.search.trim().toLowerCase()
+      : "";
+
     const fromDate = req.query.fromDate || null;
     const toDate = req.query.toDate || null;
-    console.log("🔍 Params =>", { page, search, fromDate, toDate });
-    console.log(fromDate, toDate, search, page);
+
     const limit = 10;
     const offset = page ? (page - 1) * limit : 0;
 
-    // ✅ Build WHERE clause dynamically
-    let whereClauses = [];
-    let params = [];
+    // =========================================================
+    // 1. BUILD WHERE
+    // =========================================================
 
-    // 🧠 Search term condition
+    const whereClauses = [];
+    const params = [];
+
     if (search) {
       whereClauses.push(`
-        (LOWER(Item_Name) LIKE ? 
-         OR LOWER(Item_Category) LIKE ? 
-         OR LOWER(Item_HSN) LIKE ? 
-         OR LOWER(Item_Id) LIKE ? 
-         OR LOWER(Item_Unit) LIKE ?)
+        (
+          LOWER(Item_Name) LIKE ?
+          OR LOWER(Item_Category) LIKE ?
+          OR LOWER(Item_HSN) LIKE ?
+          OR LOWER(Item_Id) LIKE ?
+          OR LOWER(Item_Unit) LIKE ?
+          OR LOWER(Primary_Unit) LIKE ?
+          OR LOWER(Secondary_Unit) LIKE ?
+        )
       `);
+
       const like = `%${search}%`;
-      params.push(like, like, like, like, like);
+
+      params.push(
+        like,
+        like,
+        like,
+        like,
+        like,
+        like,
+        like
+      );
     }
 
-    // 📅 Date range condition
-    // if (fromDate && toDate) {
-    //   whereClauses.push("DATE(created_at) BETWEEN ? AND ?");
-    //   params.push(fromDate, toDate);
-    // } else if (fromDate) {
-    //   whereClauses.push("DATE(created_at) >= ?");
-    //   params.push(fromDate);
-    // } else if (toDate) {
-    //   whereClauses.push("DATE(created_at) <= ?");
-    //   params.push(toDate);
-    // }
+    // =========================================================
+    // 2. DATE FILTER
+    // =========================================================
+
     if (fromDate && toDate) {
       whereClauses.push(`DATE(created_at) BETWEEN ? AND ?`);
-      params.push(
-        `${fromDate} 00:00:00`,
-        `${toDate} 23:59:59`
-      );
+      params.push(fromDate, toDate);
+
     } else if (fromDate) {
       whereClauses.push(`DATE(created_at) >= ?`);
-      params.push(`${fromDate} 00:00:00`);
+      params.push(fromDate);
+
     } else if (toDate) {
       whereClauses.push(`DATE(created_at) <= ?`);
-      params.push(`${toDate} 23:59:59`);
+      params.push(toDate);
     }
-    // Combine WHERE clauses
-    const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
 
-    // ✅ Fetch items
-    const query = `
-      SELECT * FROM add_item 
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
+    // Keep params without pagination for COUNT query
+    const filterParams = [...params];
+
+    // =========================================================
+    // 3. GET ITEMS
+    // =========================================================
+
+    let query = `
+      SELECT *
+      FROM add_item
       ${whereSQL}
       ORDER BY created_at DESC
-      ${page ? "LIMIT ? OFFSET ?" : ""}
     `;
-    if (page) params.push(limit, offset);
 
-    const [items] = await db.query(query, params);
+    if (page) {
+      query += ` LIMIT ? OFFSET ?`;
+      params.push(limit, offset);
+    }
 
-    // ✅ Count total for pagination
-    let [totalItems] = await db.query(
-      `SELECT COUNT(*) AS total FROM add_item ${whereSQL}`,
-      params.slice(0, params.length - (page ? 2 : 0))
+    const [items] = await connection.query(
+      query,
+      params
     );
 
-    // ✅ Get latest purchase and sales prices
-    const [purchaseItems] = await db.query(`
-      SELECT Item_Id, Purchase_Price,Tax_Type 
-      FROM add_purchase_items 
+    // =========================================================
+    // 4. COUNT
+    // =========================================================
+
+    const [totalItems] = await connection.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM add_item
+        ${whereSQL}
+      `,
+      filterParams
+    );
+
+    // =========================================================
+    // 5. PURCHASE HISTORY
+    // =========================================================
+
+    const [purchaseItems] = await connection.query(`
+      SELECT
+        Item_Id,
+        Purchase_Price,
+        Tax_Type
+      FROM add_purchase_items
       ORDER BY created_at DESC
     `);
-    const [salesItems] = await db.query(`
-      SELECT Item_Id, Sale_Price 
-      FROM add_sale_items 
+
+    // =========================================================
+    // 6. SALES HISTORY
+    // =========================================================
+
+    const [salesItems] = await connection.query(`
+      SELECT
+        Item_Id,
+        Sale_Price
+      FROM add_sale_items
       ORDER BY created_at DESC
     `);
+
+    // =========================================================
+    // 7. UNIT CONVERSION HISTORY
+    // =========================================================
+
+    const [unitConversions] = await connection.query(`
+      SELECT
+        id,
+        Item_Id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate,
+        created_at
+      FROM item_unit_conversions
+      ORDER BY created_at DESC, id DESC
+    `);
+
+    // =========================================================
+    // 8. LATEST PURCHASE PRICE + TAX
+    // =========================================================
 
     const latestPurchasePrice = {};
     const latestTaxType = {};
+
     purchaseItems.forEach((row) => {
-      if (!latestPurchasePrice[row.Item_Id]) {
-        latestPurchasePrice[row.Item_Id] = row.Purchase_Price;
-        latestTaxType[row.Item_Id] = row.Tax_Type;
-      }
-    });
-    const latestSalePrice = {};
-    salesItems.forEach((row) => {
-      if (!latestSalePrice[row.Item_Id]) {
-        latestSalePrice[row.Item_Id] = row.Sale_Price;
+      if (latestPurchasePrice[row.Item_Id] === undefined) {
+        latestPurchasePrice[row.Item_Id] =
+          row.Purchase_Price;
+
+        latestTaxType[row.Item_Id] =
+          row.Tax_Type;
       }
     });
 
-    //console.log(latestPurchasePrice, latestTaxType, latestSalePrice);
-    // ✅ Merge results
+    // =========================================================
+    // 9. LATEST SALE PRICE
+    // =========================================================
+
+    const latestSalePrice = {};
+
+    salesItems.forEach((row) => {
+      if (latestSalePrice[row.Item_Id] === undefined) {
+        latestSalePrice[row.Item_Id] =
+          row.Sale_Price;
+      }
+    });
+
+    // =========================================================
+    // 10. GROUP CONVERSIONS BY ITEM
+    // =========================================================
+
+    const conversionsByItem = {};
+
+    unitConversions.forEach((conversion) => {
+      if (!conversionsByItem[conversion.Item_Id]) {
+        conversionsByItem[conversion.Item_Id] = [];
+      }
+
+      conversionsByItem[conversion.Item_Id].push({
+        id: conversion.id,
+
+        Primary_Unit:
+          conversion.Primary_Unit,
+
+        Secondary_Unit:
+          conversion.Secondary_Unit,
+
+        Conversion_Rate:
+          Number(conversion.Conversion_Rate),
+      });
+    });
+
+    // =========================================================
+    // 11. MERGE EVERYTHING
+    // =========================================================
+
     const combined = items.map((item) => ({
       ...item,
-      Purchase_Price: latestPurchasePrice[item.Item_Id] || 0.0,
-      Tax_Type: latestTaxType[item.Item_Id],
-      Sale_Price: latestSalePrice[item.Item_Id] || 0.0,
+
+      Purchase_Price:
+        latestPurchasePrice[item.Item_Id] ?? 0,
+
+      Tax_Type:
+        latestTaxType[item.Item_Id] ?? null,
+
+      Sale_Price:
+        latestSalePrice[item.Item_Id] ?? 0,
+
+      // All previously saved conversions
+      unitConversions:
+        conversionsByItem[item.Item_Id] || [],
     }));
 
-    //console.log(combined);
-    // ✅ Response
+    // =========================================================
+    // 12. RESPONSE
+    // =========================================================
+
     return res.status(200).json({
       success: true,
+
       currentPage: page || 1,
-      totalPages: page ? Math.ceil(totalItems[0].total / limit) : 1,
+
+      totalPages: page
+        ? Math.ceil(totalItems[0].total / limit)
+        : 1,
+
       totalItems: totalItems[0].total,
+
       items: combined,
     });
+
   } catch (err) {
-    if (connection) connection.release();
     console.error("❌ Error fetching items:", err);
     next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
+
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
-
 
 
 {/* add category */ }
@@ -1757,7 +2131,7 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
 
 export {
   addItem, editItem, addCategory, getAllItems, getAllCategories, eachItemSalesPurchaseDetails,
-  printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers
+  printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers,addItemConversion,getItemConversions
 };
 // ALTER TABLE add_item
 
@@ -1791,3 +2165,16 @@ export {
 // -- Storage location
 // ADD COLUMN Location VARCHAR(255) NULL DEFAULT NULL
 // AFTER Min_Stock;
+
+// }
+// | When bill was created | Unit used on bill | Item configuration NOW | OLD bill dropdown | NEW bill dropdown | Old stock effect              |
+// | --------------------- | ----------------- | ---------------------- | ----------------- | ----------------- | ----------------------------- |
+// | `None`                | None              | None                   | None              | None              | Stored `Base_Quantity`        |
+// | `None`                | None              | `Kg`                   | **Kg**            | **Kg**            | unchanged                     |
+// | `None`                | None              | `Kg + Gm`              | **Kg + Gm**       | **Kg + Gm**       | unchanged                     |
+// | `Kg`                  | Kg                | `Kg + Gm`              | **Kg + Gm**       | **Kg + Gm**       | unchanged                     |
+// | `Kg + Gm`             | **Kg**            | `Kg + Box`             | **Kg + Box**      | **Kg + Box**      | unchanged                     |
+// | `Kg + Gm`             | **Gm**            | `Kg + Box`             | **Kg + Gm**       | **Kg + Box**      | unchanged                     |
+// | `Kg + Gm`             | **Gm**            | secondary removed      | **Kg + Gm**       | **Kg**            | unchanged                     |
+// | `Kg + Gm`             | **Kg**            | secondary removed      | **Kg**            | **Kg**            | unchanged                     |
+// | `Kg + Gm`             | **Gm**            | rate changed           | **Kg + Gm**       | **Kg + Gm**       | old `Base_Quantity` unchanged |

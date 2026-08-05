@@ -9,18 +9,14 @@ import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
+import SelectUnitModal from "./SelectUnitModal";
+import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 
 
 export default function ItemModal({itemDetails,editingItem,onClose}) {
     const dropdownRef = useRef(null);
     const dispatch = useDispatch()
-      const itemUnits = {
-    "gm": "Gram",
-    "Kg": "Kilogram",
-    "lt": "Litre",
-    "pcs": "Piece",
-
-  }
+    
     // const {
     //   register,
     //   //handleSubmit,
@@ -34,36 +30,9 @@ export default function ItemModal({itemDetails,editingItem,onClose}) {
     //   resolver: zodResolver(itemFormSchema)
   
     // })
-    const { data: categories } = useGetAllCategoriesQuery()
-    console.log(categories)
-       const [newCategory, setNewCategory] = useState("");
-      const [addCategory] = useAddCategoryMutation();
-   const [search, setSearch] = useState("");
-     const [open, setOpen] = useState(false);
-     const [selected, setSelected] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [activeTab, setActiveTab] = useState("Purchase Items");
-    const[eachItemBillAndInvoiceNumbersModalOpen,setEachItemBillAndInvoiceNumbersModalOpen]=useState(false)
-    const primaryUnit = watch("Primary_Unit");
-const secondaryUnit = watch("Secondary_Unit");
-const conversionRate = watch("Conversion_Rate");
-    const[editItem,{isLoading:isEditingItem}]=useEditItemMutation()
-const [shouldFetchBills, setShouldFetchBills] = useState(false);
-
-const { data: apiResponse } =
-  useGetEachItemBillAndInvoiceNumbersQuery(itemDetails?.Item_Id, {
-    skip: !shouldFetchBills,  // fetch only when user clicks
-  });
-
-   
-    const eachItemBillAndInvoiceNumbers = apiResponse?.billAndInvoiceNumbers || {
-  purchaseDetails: { count: 0, details: [] },
-  saleDetails: { count: 0, details: [] },
-};
-    //  const [showModal, setShowModal] = useState(false);
       const {
         register,
-        
+         handleSubmit,
         setValue,
         reset,
         watch,
@@ -74,6 +43,85 @@ const { data: apiResponse } =
         resolver: zodResolver(itemFormSchema)
     
       })
+
+    const { data: categories } = useGetAllCategoriesQuery()
+   
+       const [newCategory, setNewCategory] = useState("");
+      const [addCategory] = useAddCategoryMutation();
+   const [search, setSearch] = useState("");
+     const [open, setOpen] = useState(false);
+     const [selected, setSelected] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [activeTab, setActiveTab] = useState("Purchase Items");
+    const[eachItemBillAndInvoiceNumbersModalOpen,setEachItemBillAndInvoiceNumbersModalOpen]=useState(false)
+    //const primaryUnit = watch("Primary_Unit");
+//const secondaryUnit = watch("Secondary_Unit");
+//const conversionRate = watch("Conversion_Rate");
+    const[editItem,{isLoading:isEditingItem}]=useEditItemMutation()
+const [shouldFetchBills, setShouldFetchBills] = useState(false);
+const[showSelectUnitModal,setShowSelectUnitModal] =useState(false)
+  const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
+  
+  const itemUnits=itemUnitsFetched
+const { data: apiResponse } =
+  useGetEachItemBillAndInvoiceNumbersQuery(itemDetails?.Item_Id, {
+    skip: !shouldFetchBills,  // fetch only when user clicks
+  });
+console.log(itemDetails,"itemDetails")
+// const primaryUnit=itemDetails?.Primary_Unit
+// const secondaryUnit=itemDetails?.Secondary_Unit
+// const conversionRate=itemDetails?.Conversion_Rate
+
+// useEffect(() => {
+//   if (!editingItem || !itemDetails) return;
+
+//   reset({
+//     Item_Name: itemDetails.Item_Name,
+//     Item_Description: itemDetails.Item_Description,
+//     Item_Category: itemDetails.Item_Category,
+//     Item_Unit: itemDetails.Item_Unit,
+//     Item_HSN: itemDetails.Item_HSN,
+
+//     Primary_Unit: itemDetails.Primary_Unit,
+//     Secondary_Unit: itemDetails.Secondary_Unit,
+//     Conversion_Rate: itemDetails.Conversion_Rate,
+//   });
+// }, [itemDetails, editingItem, reset]);
+useEffect(() => {
+  if (!editingItem) return;
+  if (!itemDetails) return;
+  if (Object.keys(itemDetails).length === 0) return;
+
+  setSearch(itemDetails.Item_Category);
+
+  reset({
+    Item_Name: itemDetails.Item_Name,
+    Item_Description: itemDetails.Item_Description,
+    Item_Category: itemDetails.Item_Category,
+    Item_Unit: itemDetails.Item_Unit,
+    Item_HSN: itemDetails.Item_HSN,
+    Primary_Unit: itemDetails.Primary_Unit,
+    Secondary_Unit: itemDetails.Secondary_Unit,
+    Conversion_Rate: itemDetails.Conversion_Rate,
+  });
+}, [itemDetails, editingItem, reset]);
+// useEffect(() => {
+//   register("Primary_Unit");
+//   register("Secondary_Unit");
+//   register("Conversion_Rate");
+// }, [register]);
+const primaryUnit = watch("Primary_Unit");
+const secondaryUnit = watch("Secondary_Unit");
+const conversionRate = watch("Conversion_Rate");
+
+console.log(primaryUnit, secondaryUnit, conversionRate);
+    const eachItemBillAndInvoiceNumbers = apiResponse?.billAndInvoiceNumbers || {
+  purchaseDetails: { count: 0, details: [] },
+  saleDetails: { count: 0, details: [] },
+};
+
+    //  const [showModal, setShowModal] = useState(false);
+    
 
 
       const handleSelect = (cat) => {
@@ -91,22 +139,22 @@ const { data: apiResponse } =
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(()=>{
-if(!editingItem) return
- if(!itemDetails) return
+//   useEffect(()=>{
+// if(!editingItem) return
+//  if(!itemDetails) return
 
- if(Object.keys(itemDetails).length===0) return
- setSearch(itemDetails.Item_Category)
- reset({
-   Item_Name:itemDetails.Item_Name,
-   Item_Description:itemDetails.Item_Description,
-   Item_Category:itemDetails.Item_Category,
-   Item_Unit:itemDetails.Item_Unit,
-   Item_HSN:itemDetails.Item_HSN
- })
+//  if(Object.keys(itemDetails).length===0) return
+//  setSearch(itemDetails.Item_Category)
+//  reset({
+//    Item_Name:itemDetails.Item_Name,
+//    Item_Description:itemDetails.Item_Description,
+//    Item_Category:itemDetails.Item_Category,
+//    Item_Unit:itemDetails.Item_Unit,
+//    Item_HSN:itemDetails.Item_HSN
+//  })
 
 
-  },[itemDetails,editingItem])
+//   },[itemDetails,editingItem])
 
 
   
@@ -148,8 +196,8 @@ if(!editingItem) return
     }
   };
  const formValues = watch();
-
-const handleEdit = async () => {
+console.log(formValues,"formValues")
+const onSubmit = async () => {
   if (!editingItem) return;
 
   try {
@@ -459,26 +507,26 @@ const handleEdit = async () => {
         color: "#4CA1AF",
       }}
     >
-      {primaryUnit ? "Change Unit" : "Select Unit"}
+     Edit Unit
     </button>
 
-    {/* Show selected configuration */}
     {primaryUnit && (
       <div className="mt-2 text-sm text-gray-600">
-        <span>
-          Primary: <strong>{primaryUnit}</strong>
-        </span>
+        <div>
+          Primary: <strong>{primaryUnit.toUpperCase()}</strong>
 
-        {secondaryUnit && (
-          <>
+          {secondaryUnit && (
             <span className="ml-3">
-              Secondary: <strong>{secondaryUnit}</strong>
+              Secondary: <strong>{secondaryUnit.toUpperCase()}</strong>
             </span>
+          )}
+        </div>
 
-            <div className="mt-1 text-xs text-gray-500">
-              1 {primaryUnit} = {conversionRate} {secondaryUnit}
-            </div>
-          </>
+        {secondaryUnit && conversionRate && (
+          <div className="mt-1 text-[#4CA1AF] ">
+            1 {primaryUnit.toUpperCase()} ={" "}
+            {Number(conversionRate)} {secondaryUnit.toUpperCase()}
+          </div>
         )}
       </div>
     )}
@@ -543,18 +591,18 @@ const handleEdit = async () => {
      <div className="flex justify-end mt-4">
                   <button
                     type="submit"
-                    disabled={formValues.errorCount > 0 ||isAddingItem}
+                    disabled={formValues.errorCount > 0 ||isEditingItem}
                     className=" text-white font-bold py-2 px-4 rounded"
                     style={{ backgroundColor: "#4CA1AF" }}
                   >
-                    {isAddingItem ? "Adding..." : "Add Item"}
+                     {isEditingItem ? "Saving..." : "Save"}
                   </button>
                 </div>
      </form>
     </div>
 
               </div>
-     </div>
+    
  
             
 
@@ -674,10 +722,61 @@ const handleEdit = async () => {
     </div>
   </div>
 )}
+ </div>
 
-
+  {showSelectUnitModal && (
+    <SelectUnitModal
+      units={itemUnits || []}
+     primaryUnit={primaryUnit}
+    secondaryUnit={secondaryUnit}
+    conversionRate={conversionRate}
+     conversionHistory={itemDetails?.unitConversions || []}
+Item_Id={itemDetails?.Item_Id}   // 🔹 add this
+      initialBase={primaryUnit || ""}
+        initialSecondary={secondaryUnit || ""}
+  initialConversionRate={conversionRate || ""}
   
+      onClose={() => {
+        setShowSelectUnitModal(false);
+      }}
+  
+      onSave={(newUnit) => {
+        console.log("Selected unit configuration:", newUnit);
+  
+        setValue(
+          "Primary_Unit",
+          newUnit.baseUnit || null,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+  
+        setValue(
+          "Secondary_Unit",
+          newUnit.secondaryUnit || null,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+  
+        setValue(
+          "Conversion_Rate",
+          newUnit.secondaryUnit
+            ? Number(newUnit.conversionRate)
+            : null,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+  
+        setShowSelectUnitModal(false);
+      }}
+    />
+  )}
   
     </>
     );
-}
+  }

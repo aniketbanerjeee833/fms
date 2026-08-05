@@ -8,7 +8,7 @@ export const itemApi = createApi({
     baseUrl: "http://localhost:4000/api/",
     credentials: "include",
   }),
-  invalidatesTags: ["Item"],
+  invalidatesTags: ["Item","ItemConversion"],
 
   endpoints: (builder) => ({
 
@@ -55,6 +55,20 @@ getAllItems: builder.query({
   }),
   invalidatesTags: ["Item", "Purchase", "Sale"],
 }),
+   getItemConversions: builder.query({
+      query: (Item_Id) => `/item/item-conversions/${Item_Id}`,
+      transformResponse: (res) => res.conversions,
+      providesTags: ["ItemConversions"],
+    }),
+
+    addItemConversion: builder.mutation({
+      query: (body) => ({
+        url: "/item/item-conversions",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["ItemConversions"],
+    }),
 
    
     getEachItemBillAndInvoiceNumbers: builder.query({
@@ -109,6 +123,8 @@ getAllItems: builder.query({
     useAddCategoryMutation,
     useGetAllCategoriesQuery,
     useGetEachItemSalesPurchasesDetailsQuery,
-    usePrintEachItemSalesPurchasesDetailsReportMutation
+    usePrintEachItemSalesPurchasesDetailsReportMutation,
+    useGetItemConversionsQuery,
+    useAddItemConversionMutation
  }=itemApi
    
