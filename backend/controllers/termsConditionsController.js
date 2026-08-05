@@ -193,32 +193,23 @@ const createTerms = async (req, res, next) => {
    Optional filter: ?applicable=Sale_Invoice
    Returns only terms where that flag = 1
 ═══════════════════════════════════════ */
-const getAllTerms = async (req, res, next) => {
+ const getAllTerms = async (req, res, next) => {
   try {
     const applicable = req.query.applicable || null;
 
-    // const VALID_FLAGS = [
-    //   "Sale_Invoice", "Sale_Order", "Delivery_Challan",
-    //   "Estimation_Quotation", "Purchase_Bill",
-    //   "Purchase_Order", "Proforma_Invoice",
-    // ];
-
-    const VALID_FLAGS = [
-      "Sale_Invoice", 
-      "Purchase_Bill"
-      
-    ];
+    const VALID_FLAGS = ["Sale_Invoice", "Purchase_Bill"];
 
     let whereSQL = "";
-    //et params   = [];
 
     if (applicable && VALID_FLAGS.includes(applicable)) {
       whereSQL = `WHERE ${applicable} = 1`;
     }
 
     const [templates] = await db.query(
-      `SELECT * FROM terms_conditions ${whereSQL} ORDER BY created_at DESC`,
-    
+      `SELECT id, Title, Terms, Sale_Invoice, Purchase_Bill, created_at
+       FROM terms_conditions
+       ${whereSQL}
+       ORDER BY created_at DESC`
     );
 
     res.status(200).json({ success: true, templates });

@@ -25,7 +25,7 @@ import { Trash2 } from "lucide-react";
 
 import TermsConditionsModal from "../../components/Modal/TermsConditionsModal";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
-import { useGetAllTermsQuery, useGetTermsByIdQuery } from "../../redux/api/termsConditionsApi";
+import { termsConditionsApi, useGetAllTermsQuery, useGetTermsByIdQuery } from "../../redux/api/termsConditionsApi";
 export default function PurchaseAdd() {
 
   const dispatch = useDispatch();
@@ -86,9 +86,10 @@ export default function PurchaseAdd() {
   ///const [originalTemplateDescription, setOriginalTemplateDescription] = useState("");
 
 
-  const { data: termsTemplates } = useGetAllTermsQuery();
-  console.log(termsTemplates, "termsTemplates");
+  const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
+  //console.log(termsTemplates, "termsTemplates");
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
+
 
 
 
@@ -217,8 +218,8 @@ export default function PurchaseAdd() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
-      Terms_Condition_Id: null,
-      Terms_Condition_Description: "",
+      Terms_Conditions_Id: null,
+      Terms_Conditions_Description: "",
       //Payment_Type: "Cash",
       //Bank_Account_Id: null,   // 🔹 added
       //Reference_Number: "",
@@ -2263,22 +2264,24 @@ export default function PurchaseAdd() {
 
                 <TermsAndConditionsSelector
                   termsList={termsTemplates}
-                  value={watch("Terms_Condition_Id")}
-                  onChange={({ Terms_Condition_Id, Terms_Condition_Description }) => {
-                    setValue("Terms_Condition_Id", Terms_Condition_Id, {
+                   applicable="Purchase_Bill"  
+                  value={watch("Terms_Conditions_Id")}
+                  onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
+                    setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
                       shouldDirty: true,
                       shouldValidate: true,
                     });
 
                     setValue(
-                      "Terms_Condition_Description",
-                      Terms_Condition_Description,
+                      "Terms_Conditions_Description",
+                      Terms_Conditions_Description,
                       {
                         shouldDirty: true,
                         shouldValidate: true,
                       }
                     );
                   }}
+                  onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
                 />
 
 
@@ -2286,7 +2289,7 @@ export default function PurchaseAdd() {
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
 
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                  <div className="flex flex-col mt-3 gap-2 w-full">
                     {!showSplitBox ? (
                       <>
                         <div className="flex flex-col w-full">
@@ -2731,8 +2734,8 @@ export default function PurchaseAdd() {
                     onClose={() => setShowTermsConditionsModal(false)}
                     onSave={(newTemplate) => {
                       setValue(
-                        "Terms_Condition_Id",
-                        newTemplate.Terms_Condition_Id,
+                        "Terms_Conditions_Id",
+                        newTemplate.Terms_Conditions_Id,
                         {
                           shouldValidate: true,
                           shouldDirty: true,
@@ -2742,7 +2745,7 @@ export default function PurchaseAdd() {
                       setOriginalTemplateDescription(newTemplate.Terms || "");
 
                       setValue(
-                        "Terms_Condition_Description",
+                        "Terms_Conditions_Description",
                         newTemplate.Terms || "",
                         {
                           shouldValidate: true,
@@ -2757,10 +2760,10 @@ export default function PurchaseAdd() {
                   //   onClose={() => setShowTermsConditionsModal(false)}
                   //   onSave={(newTemplate) => {
                   //     // refresh templates list via RTK invalidation, then auto-select the new one
-                  //     //setSelectedTemplateId(newTemplate.Terms_Condition_Id);
+                  //     //setSelectedTemplateId(newTemplate.Terms_Conditions_Id);
                   //     //setOriginalTemplateDescription(newTemplate.Description || "");
-                  //     setValue("Terms_Condition_Id", newTemplate.Terms_Condition_Id, { shouldValidate: true, shouldDirty: true });
-                  //     setValue("Terms_Condition_Description", newTemplate.Description || "", { shouldValidate: true, shouldDirty: true });
+                  //     setValue("Terms_Conditions_Id", newTemplate.Terms_Conditions_Id, { shouldValidate: true, shouldDirty: true });
+                  //     setValue("Terms_Conditions_Description", newTemplate.Description || "", { shouldValidate: true, shouldDirty: true });
                   //     setShowTermsConditionsModal(false);
                   //   }}
                   // />

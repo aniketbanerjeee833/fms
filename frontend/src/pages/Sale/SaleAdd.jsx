@@ -25,6 +25,8 @@ import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bank
 
 
 import { Trash2 } from "lucide-react";
+import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
+import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 
 export default function SaleAdd() {
 
@@ -118,7 +120,7 @@ export default function SaleAdd() {
     rowIndex: null
   });
   const { data: latestInvoiceNumber, refetch } = useGetLatestInvoiceNumberQuery();
-
+  const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
   // force refetch on component mount
   useEffect(() => {
     refetch();
@@ -277,6 +279,8 @@ export default function SaleAdd() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Received: "",
+      Terms_Conditions_Id: null,
+      Terms_Conditions_Description: "",
       splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
       // Payment_Type: "Cash",
       // Bank_Account_Id: null,   // 🔹 added
@@ -1188,7 +1192,7 @@ export default function SaleAdd() {
                   </div>
                 )}
 
-              
+
 
                 {showEditPartyModal && (
                   <PartyAddModal
@@ -2018,8 +2022,28 @@ export default function SaleAdd() {
                   + Add Row
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
+              <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
+                <TermsAndConditionsSelector
+                  termsList={termsTemplates}
+                  applicable="Sale_Invoice"
+                  value={watch("Terms_Conditions_Id")}
+                  onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
+                    setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
 
+                    setValue(
+                      "Terms_Conditions_Description",
+                      Terms_Conditions_Description,
+                      {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      }
+                    );
+                  }}
+                  onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
+                />
                 <div className="flex flex-col px-2">
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 

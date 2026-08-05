@@ -43,42 +43,42 @@ const paymentSplitSchema = z
   });
 
 export const saleEditFormSchema = z.object({
-    Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
+  Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
   // Party_Name: z.string().min(1, "Party_Name is required"),
-    Party_Name: z
+  Party_Name: z
     .string()
     .trim()
     .min(1, "Party name is required"),
-   Billing_Name: z
+  Billing_Name: z
     .string()
     .trim()
     .optional()
     .or(z.literal("")),
- Phone_Number: z
-  .string()
-  .trim()
-  .refine(
-    (value) => value === "" || /^\d{10}$/.test(value),
-    {
-      message: "Phone number must be exactly 10 digits",
-    }
-  )
-  .optional(),
+  Phone_Number: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || /^\d{10}$/.test(value),
+      {
+        message: "Phone number must be exactly 10 digits",
+      }
+    )
+    .optional(),
   Billing_Address: z
-  .string()
-  .trim()
-  .optional()
-  .or(z.literal("")),
-    GSTIN: z.preprocess(
-  (val) => (val === null || val === undefined ? "" : String(val)),
-  z.string().refine((val) => val === "" || val.length === 15, {
-    message: "GSTIN must be exactly 15 characters or left empty",
-  })
-),
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  GSTIN: z.preprocess(
+    (val) => (val === null || val === undefined ? "" : String(val)),
+    z.string().refine((val) => val === "" || val.length === 15, {
+      message: "GSTIN must be exactly 15 characters or left empty",
+    })
+  ),
 
-     
 
-   Invoice_Number: z.string().optional().default(""),
+
+  Invoice_Number: z.string().optional().default(""),
 
   Invoice_Date: z
     .string()
@@ -89,12 +89,12 @@ export const saleEditFormSchema = z.object({
   // State_Of_Supply: z.string().min(1, "State_Of_Supply is required"),
   State_Of_Supply: z.string().nullable().optional(),
   // 🔹 Auto-calculated but cannot be empty
-   Total_Amount: digitsOnly("Total_Amount", false).default(0),
-    Balance_Due: digitsOnly("Balance_Due", false).default(0),
+  Total_Amount: digitsOnly("Total_Amount", false).default(0),
+  Balance_Due: digitsOnly("Balance_Due", false).default(0),
 
   // 🔹 Optional but digits if provided
   Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
-  
+
 
   // Stock_Quantity: digitsOnly("Stock_Quantity"),
   splits: z
@@ -128,7 +128,7 @@ export const saleEditFormSchema = z.object({
       });
     }),
 
- items: z
+  items: z
     .array(
       z.object({
         Item_Category: z.string().optional().default(""),
@@ -164,5 +164,21 @@ export const saleEditFormSchema = z.object({
       })
     )
     .optional()
-    .default([]),   
+    .default([]),
+  Terms_Conditions_Id: z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === null || val === undefined) {
+        return null;
+      }
+
+      const id = Number(val);
+      return Number.isInteger(id) ? id : null;
+    }),
+Terms_Conditions_Description: z
+  .string()
+  .trim()
+  .nullable()
+  .optional(),
 })

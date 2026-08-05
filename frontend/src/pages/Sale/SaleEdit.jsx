@@ -24,6 +24,8 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { Trash2 } from "lucide-react";
 import { saleEditFormSchema } from "../../schema/saleEditFormSchema";
+import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
+import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 
 
 
@@ -131,7 +133,8 @@ export default function SaleEdit() {
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
-  console.log(itemUnits, "itemUnits");
+  const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
+
 
 
   const {
@@ -146,8 +149,8 @@ export default function SaleEdit() {
   } = useForm({
     resolver: zodResolver(saleEditFormSchema),
     defaultValues: {
-      
-       Party_Name: "",
+
+      Party_Name: "",
       Billing_Name: "",
       Phone_Number: "",
       Billing_Address: "",
@@ -158,6 +161,8 @@ export default function SaleEdit() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Received: "",
+      Terms_Conditions_Id: null,
+      Terms_Conditions_Description: "",
       // Payment_Type: "Cash",
       // Bank_Account_Id: null,   // 🔹 added
       // Reference_Number: "",
@@ -477,6 +482,10 @@ export default function SaleEdit() {
         Total_Amount: sale.invoicePartyDetails?.Total_Amount || "",
         Total_Received: sale.invoicePartyDetails?.Total_Received || "",
         Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
+          Terms_Conditions_Id: sale?.invoicePartyDetails?.Terms_Conditions_Id ?? null,
+
+        Terms_Conditions_Description:sale?.invoicePartyDetails?.Terms_Conditions_Description ?? "",
+
         // Payment_Type: sale.invoicePartyDetails?.Payment_Type || "",
         // Bank_Account_Id: sale.invoicePartyDetails?.Bank_Account_Id, // ✅ Add this
         // Reference_Number: sale.invoicePartyDetails?.Reference_Number || "",
@@ -725,8 +734,7 @@ export default function SaleEdit() {
     // 5. BALANCE DUE
     // =========================================================
 
-    const balanceDue =
-      totalAmount - totalReceived;
+    const balanceDue =totalAmount - totalReceived;
 
     // =========================================================
     // 6. BUILD PAYLOAD
@@ -907,25 +915,7 @@ export default function SaleEdit() {
   //   setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
   //   handleRowChange(i, "itemOpen", false);
 
-  //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-  //     {
-  //       ...itemsValues[i],
-  //       Item_Name: it.Item_Name,
-  //       Sale_Price: it.Sale_Price,
-  //       Quantity: itemsValues[i]?.Quantity || 0,
-  //       Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
-  //       Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
-  //       Tax_Type: itemsValues[i]?.Tax_Type,
-  //     },
-  //     i,
-  //     itemsValues
-  //   );
-
-  //   setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-  //   setValue(`items.${i}.Amount`, Amount);
-  //   setValue(`Total_Amount`, Total_Amount);
-  //   setValue(`Balance_Due`, Balance_Due);
-  // };
+  
   const showSalePayment = totalAmountWatch > 0;
 
   console.log(currentPartyDetails, "currentPartyDetails");
@@ -1067,7 +1057,7 @@ export default function SaleEdit() {
         </div>
         <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
-            
+
             <div className="flex flex-col justify-between gap-6 w-full lg:flex-row heading-wrapper">
 
               {/* ══════════════════ LEFT SIDE ══════════════════ */}
@@ -1239,9 +1229,9 @@ export default function SaleEdit() {
                       <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
                     )} */}
                   </div>
-                 
 
-                  {watch("Party_Name")?.trim().toLowerCase() !== "cash sale"   && (<div className="flex flex-col gap-2">
+
+                  {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2">
                     <span className="whitespace-nowrap active">
                       {currentPartyDetails?.Party_Name === "Cash Sale" ? "Billing Name (Optional)" : "Billing Name"}
                     </span>
@@ -1280,7 +1270,7 @@ export default function SaleEdit() {
                   </div>
 
                   {/* GSTIN — compact inline label+input, pinned to top */}
-                  {watch("Party_Name")?.trim().toLowerCase() !== "cash sale"  && (<div className="flex flex-col gap-2 self-start">
+                  {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
 
                     <span className="whitespace-nowrap active">GSTIN</span>
                     <input
@@ -1300,7 +1290,7 @@ export default function SaleEdit() {
                 </div>
 
                 {/* ── ROW 2: Billing Address + GSTIN ── */}
-                 {watch("Party_Name")?.trim().toLowerCase() !== "cash sale"  && (
+                {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
                     {/* Billing Address */}
@@ -2349,7 +2339,29 @@ export default function SaleEdit() {
                   + Add Row
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
+              <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
+                <TermsAndConditionsSelector
+                  termsList={termsTemplates}
+                  applicable="Sale_Invoice"
+                  value={watch("Terms_Conditions_Id")}
+                    description={watch("Terms_Conditions_Description")}
+                  onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
+                    setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+
+                    setValue(
+                      "Terms_Conditions_Description",
+                      Terms_Conditions_Description,
+                      {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      }
+                    );
+                  }}
+                  onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
+                />
                 <div className="flex flex-col px-2">
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
@@ -3098,8 +3110,8 @@ export default function SaleEdit() {
                 <div className="flex items-center w-full gap-3  justify-end">
                   {/* <div className="row  "> */}
 
-            {/* Invoice Number */}
-            {/* <div className="input-field col s6 mt-4"> 
+{/* Invoice Number */ }
+{/* <div className="input-field col s6 mt-4"> 
                   <span className="whitespace-nowrap ">
                     Invoice Number 
                     {/* <span className="text-red-500">*</span> 
@@ -3157,8 +3169,8 @@ export default function SaleEdit() {
                 <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
                   {/* <div className="row w-1/2"> */}
 
-            {/* State of Supply */}
-            {/* <div className="input-field col s6"> 
+{/* State of Supply */ }
+{/* <div className="input-field col s6"> 
                   <span className=" whitespace-nowrap active">
                     State of Supply
                     {/* <span className="text-red-500">*</span> 

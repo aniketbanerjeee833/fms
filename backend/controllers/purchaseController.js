@@ -355,6 +355,8 @@ const addPurchase = async (req, res, next) => {
       Balance_Due,
       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
+      Terms_Conditions_Id,          // nullable int — null if user typed fresh or cleared
+      Terms_Conditions_Description,
     } = validation.data;
 
     // 🔻 REMOVED: manual !Party_Name / !Bill_Number / !Bill_Date / items.length===0 check
@@ -365,20 +367,48 @@ const addPurchase = async (req, res, next) => {
 
 
 
+    let termsId = null;
+    let termsDescription = null;
 
-    // 🔹 validate splits — sum must equal totalPaid
-    // if (totalPaid > 0) {
-    //   try {
-    //     validateSplits(splits, totalPaid);
-    //   } catch (validationErr) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ success: false, message: validationErr.message });
-    //   }
-    // }
-    // 🔹 silently drop splits with no real amount — don't reject, just don't use them
-    // const validSplits = (splits || []).filter(
-    //   (s) => s.Payment_Type && Number(s.Amount) > 0
-    // );
+
+
+    if (
+      Terms_Conditions_Id &&
+      Terms_Conditions_Description?.trim()
+    ) {
+      // Template selected and untouched
+      termsId = Number(Terms_Conditions_Id);
+      termsDescription = Terms_Conditions_Description.trim();
+
+    } else if (Terms_Conditions_Description?.trim()) {
+      // Custom / edited description
+      // UI has already cleared the template ID/title
+      termsId = null;
+      termsDescription = Terms_Conditions_Description.trim();
+    }
+
+    // Otherwise:
+    // termsId = null
+    // termsDescription = null
+    if (termsId) {
+      const [[selectedTerm]] = await connection.query(
+        `SELECT id
+     FROM terms_conditions
+     WHERE id = ?
+       AND Purchase_Bill = 1
+     LIMIT 1`,
+        [termsId]
+      );
+
+      if (!selectedTerm) {
+        await connection.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Terms & Conditions for Purchase Bill.",
+        });
+      }
+    }
     const normalizedSplits = (splits || []).map((s) => ({ ...s, Amount: Number(s.Amount) || 0 }));
 
     const firstValidIndex = normalizedSplits.findIndex((s) => {
@@ -435,26 +465,26 @@ const addPurchase = async (req, res, next) => {
     // }
     // const Party_Id = partyRows[0].Party_Id;
     // =========================================================
-// 7. FIND PARTY / AUTO-CREATE NEW PARTY
-// =========================================================
+    // 7. FIND PARTY / AUTO-CREATE NEW PARTY
+    // =========================================================
 
-const [partyRows] = await connection.execute(
-  `SELECT *
+    const [partyRows] = await connection.execute(
+      `SELECT *
    FROM add_party
    WHERE TRIM(Party_Name) = TRIM(?)
    LIMIT 1`,
-  [Party_Name]
-);
+      [Party_Name]
+    );
 
-let Party_Id;
+    let Party_Id;
 
-if (partyRows.length === 0) {
-  // =======================================================
-  // A. CREATE PARTY MASTER
-  // =======================================================
+    if (partyRows.length === 0) {
+      // =======================================================
+      // A. CREATE PARTY MASTER
+      // =======================================================
 
-  const [partyResult] = await connection.execute(
-    `INSERT INTO add_party
+      const [partyResult] = await connection.execute(
+        `INSERT INTO add_party
      (
        Party_Name,
        
@@ -463,65 +493,65 @@ if (partyRows.length === 0) {
        updated_at
      )
      VALUES (?, NOW(), NOW())`,
-    [
-      Party_Name.trim(),
-     
-    
-    ]
-  );
+        [
+          Party_Name.trim(),
 
-  const partyIdNumber = partyResult.insertId;
 
-  Party_Id =
-    "PTY" +
-    partyIdNumber
-      .toString()
-      .padStart(3, "0");
+        ]
+      );
 
-  await connection.execute(
-    `UPDATE add_party
+      const partyIdNumber = partyResult.insertId;
+
+      Party_Id =
+        "PTY" +
+        partyIdNumber
+          .toString()
+          .padStart(3, "0");
+
+      await connection.execute(
+        `UPDATE add_party
      SET Party_Id = ?
      WHERE id = ?`,
-    [Party_Id, partyIdNumber]
-  );
+        [Party_Id, partyIdNumber]
+      );
 
-  // =======================================================
-  // B. CREATE DEFAULT BILLING ADDRESS
-  // =======================================================
+      // =======================================================
+      // B. CREATE DEFAULT BILLING ADDRESS
+      // =======================================================
 
-  // Only create address row if user actually entered address
-  // if (Billing_Address?.trim()) {
-  //   await connection.execute(
-  //     `INSERT INTO add_party_address
-  //      (
-  //        Party_Id,
-  //        Billing_Address,
-  //        Is_Default,
-  //        created_at,
-  //        updated_at
-  //      )
-  //      VALUES (?, ?, 1, NOW(), NOW())`,
-  //     [
-  //       Party_Id,
-  //       Billing_Address.trim(),
-  //     ]
-  //   );
-  // }
-}
+      // Only create address row if user actually entered address
+      // if (Billing_Address?.trim()) {
+      //   await connection.execute(
+      //     `INSERT INTO add_party_address
+      //      (
+      //        Party_Id,
+      //        Billing_Address,
+      //        Is_Default,
+      //        created_at,
+      //        updated_at
+      //      )
+      //      VALUES (?, ?, 1, NOW(), NOW())`,
+      //     [
+      //       Party_Id,
+      //       Billing_Address.trim(),
+      //     ]
+      //   );
+      // }
+    }
 
-// =========================================================
-// EXISTING PARTY
-// =========================================================
-else {
-  Party_Id = partyRows[0].Party_Id;
+    // =========================================================
+    // EXISTING PARTY
+    // =========================================================
+    else {
+      Party_Id = partyRows[0].Party_Id;
 
-  // IMPORTANT:
-  // Don't update party phone here.
-  // Don't update default billing address here.
-  //
-  // Phone_Number and Billing_Address entered in this sale
-  // belong to this invoice only.
-}
+      // IMPORTANT:
+      // Don't update party phone here.
+      // Don't update default billing address here.
+      //
+      // Phone_Number and Billing_Address entered in this sale
+      // belong to this invoice only.
+    }
 
     const [fy] = await connection.query(
       `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
@@ -534,19 +564,35 @@ else {
 
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase
-       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
-        Total_Amount, Total_Paid, Balance_Due,
-        created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?,  NOW(), NOW())`,
+   (
+     Party_Id,
+     Bill_Number,
+     Bill_Date,
+     financial_year,
+     State_Of_Supply,
+     Total_Amount,
+     Total_Paid,
+     Balance_Due,
+     Terms_Conditions_Id,
+     Terms_Conditions_Description,
+     created_at,
+     updated_at
+   )
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         Party_Id,
         Bill_Number,
         Bill_Date,
         activeFY,
         cleanValue(State_Of_Supply),
+
         totalAmount,
         totalPaid,
-        balanceDue
+        balanceDue,
+
+        // Terms
+        termsId,
+        termsDescription,
       ]
     );
 
@@ -1523,12 +1569,53 @@ const editPurchase = async (req, res, next) => {
       //Reference_Number,
       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
       items,
+      // Terms & Conditions
+      Terms_Conditions_Id,
+      Terms_Conditions_Description
     } = validation.data;
 
 
 
 
 
+    let termsId = null;
+    let termsDescription = null;
+
+    if (
+      Terms_Conditions_Id &&
+      Terms_Conditions_Description?.trim()
+    ) {
+      // Saved template selected and untouched
+      termsId = Number(Terms_Conditions_Id);
+      termsDescription =
+        Terms_Conditions_Description.trim();
+
+    } else if (Terms_Conditions_Description?.trim()) {
+      // Custom / edited description
+      termsId = null;
+      termsDescription =
+        Terms_Conditions_Description.trim();
+    }
+    if (termsId) {
+      const [[selectedTerm]] = await connection.query(
+        `SELECT id
+     FROM terms_conditions
+     WHERE id = ?
+       AND Purchase_Bill = 1
+     LIMIT 1`,
+        [termsId]
+      );
+
+      if (!selectedTerm) {
+        await connection.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid Terms & Conditions for Purchase Bill.",
+        });
+      }
+    }
     const normalizedSplits = (splits || []).map((s) => ({ ...s, Amount: Number(s.Amount) || 0 }));
 
     const firstValidIndex = normalizedSplits.findIndex((s) => {
@@ -1583,20 +1670,53 @@ const editPurchase = async (req, res, next) => {
     const Party_Id = partyRows[0].Party_Id;
 
     // update parent row — no Payment_Type / Bank_Account_Id columns anymore
+    // await connection.query(
+    //   `UPDATE add_purchase SET
+    //      Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
+    //      Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
+    //       updated_at = NOW()
+    //    WHERE Purchase_Id = ?`,
+    //   [
+    //     Party_Id,
+    //     Bill_Number,
+    //     Bill_Date,
+    //     cleanValue(State_Of_Supply),
+    //     totalAmount,
+    //     totalPaid,
+    //     balanceDue,
+
+    //     purchaseId,
+    //   ]
+    // );
     await connection.query(
       `UPDATE add_purchase SET
-         Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
-         Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
-          updated_at = NOW()
-       WHERE Purchase_Id = ?`,
+     Party_Id = ?,
+     Bill_Number = ?,
+     Bill_Date = ?,
+     State_Of_Supply = ?,
+     Total_Amount = ?,
+     Total_Paid = ?,
+     Balance_Due = ?,
+
+     Terms_Conditions_Id = ?,
+     Terms_Conditions_Description = ?,
+
+     updated_at = NOW()
+
+   WHERE Purchase_Id = ?`,
       [
         Party_Id,
         Bill_Number,
         Bill_Date,
         cleanValue(State_Of_Supply),
+
         totalAmount,
         totalPaid,
         balanceDue,
+
+        // Terms & Conditions
+        termsId,
+        termsDescription,
 
         purchaseId,
       ]
@@ -1700,32 +1820,32 @@ const editPurchase = async (req, res, next) => {
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           [Item_Id, Item_Name, Item_Category || "", cleanValue(Item_HSN), Item_Unit || "", 0]
         );
-         dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
+        dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
       }
-      else{
+      else {
 
-     
-      const updates = [];
-      const params = [];
 
-      if (Item_HSN && Item_HSN !== dbItemRow.Item_HSN) {
-        updates.push("Item_HSN = ?");
-        params.push(Item_HSN);
+        const updates = [];
+        const params = [];
+
+        if (Item_HSN && Item_HSN !== dbItemRow.Item_HSN) {
+          updates.push("Item_HSN = ?");
+          params.push(Item_HSN);
+        }
+
+        if (Item_Category !== undefined && Item_Category !== dbItemRow.Item_Category) {
+          updates.push("Item_Category = ?");
+          params.push(Item_Category || "");
+        }
+
+        if (updates.length > 0) {
+          params.push(Item_Id);
+          await connection.query(
+            `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
+            params
+          );
+        }
       }
-
-      if (Item_Category !== undefined && Item_Category !== dbItemRow.Item_Category) {
-        updates.push("Item_Category = ?");
-        params.push(Item_Category || "");
-      }
-
-      if (updates.length > 0) {
-        params.push(Item_Id);
-        await connection.query(
-          `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
-          params
-        );
-      }
-    }
 
       // else if (Item_HSN && Item_HSN !== dbItemRow.Item_HSN) {
       //   await connection.query(
@@ -1978,23 +2098,56 @@ const getSinglePurchase = async (req, res, next) => {
     }
 
     // ✅ Fetch purchase header — no Payment_Type/Bank_Account_Id anymore
+    // const [purchaseData] = await connection.query(
+    //   `SELECT
+    //   pu.id,
+    //      pu.Purchase_Id,
+    //      pu.Bill_Number,
+    //      pu.Bill_Date,
+
+    //      pu.State_Of_Supply,
+    //      pu.Total_Amount,
+    //      pu.Total_Paid,
+    //      pu.Balance_Due,
+    //      pu.Party_Id,
+    //      pu.Terms_Conditions_Id,
+    //      pu.Terms_Conditions_Description,
+    //      p.Party_Name,
+    //      p.GSTIN
+    //    FROM add_purchase pu
+    //    LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
+    //    WHERE pu.Purchase_Id = ?`,
+    //   [purchaseId]
+    // );
     const [purchaseData] = await connection.query(
       `SELECT
-      pu.id,
-         pu.Purchase_Id,
-         pu.Bill_Number,
-         pu.Bill_Date,
-        
-         pu.State_Of_Supply,
-         pu.Total_Amount,
-         pu.Total_Paid,
-         pu.Balance_Due,
-         pu.Party_Id,
-         p.Party_Name,
-         p.GSTIN
-       FROM add_purchase pu
-       LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
-       WHERE pu.Purchase_Id = ?`,
+     pu.id,
+     pu.Purchase_Id,
+     pu.Bill_Number,
+     pu.Bill_Date,
+     pu.State_Of_Supply,
+     pu.Total_Amount,
+     pu.Total_Paid,
+     pu.Balance_Due,
+     pu.Party_Id,
+
+     pu.Terms_Conditions_Id,
+     pu.Terms_Conditions_Description,
+
+     p.Party_Name,
+     p.GSTIN,
+
+     tc.Title AS Terms_Conditions_Title
+
+   FROM add_purchase pu
+
+   LEFT JOIN add_party p
+     ON pu.Party_Id = p.Party_Id
+
+   LEFT JOIN terms_conditions tc
+     ON pu.Terms_Conditions_Id = tc.id
+
+   WHERE pu.Purchase_Id = ?`,
       [purchaseId]
     );
 
@@ -2075,6 +2228,8 @@ const getSinglePurchase = async (req, res, next) => {
         Shipping_Address: purchaseHeader.Shipping_Address,
         // 🔹 split summary for display in UI header
         Payment_Type_Display: splitSummary,
+        Terms_Conditions_Id: purchaseHeader.Terms_Conditions_Id,
+        Terms_Conditions_Description: purchaseHeader.Terms_Conditions_Description,
       },
       // 🔹 full splits array — frontend uses this to pre-fill the payment split UI
       splits: splits.map((s) => ({

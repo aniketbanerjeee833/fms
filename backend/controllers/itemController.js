@@ -11,77 +11,571 @@ const cleanValue = (value) => {
   return value;  // ✅ returns the original value for valid data
 };
 {/* Add Item */ }
+// const addItem = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+//     await connection.beginTransaction(); // ✅ Start transaction
+//     // ✅ Validate request body with Zod
+//     const cleanData = sanitizeObject(req.body);
+//     const validation = itemFormSchema.safeParse(cleanData);
+//     if (!validation.success) {
+//       return res.status(400).json({ errors: validation.error.errors });
+//     }
+//     const { Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category } =
+//       validation.data;
+//     // ✅ Check duplicate
+//     const normalizedName = Item_Name.trim().toLowerCase();
+
+//     const [rows] = await connection.query(
+//       `SELECT Item_Id
+//    FROM add_item
+//    WHERE LOWER(TRIM(Item_Name)) = ?`,
+//       [normalizedName]
+//     );
+
+
+//     if (rows.length > 0) {
+//       await connection.rollback();
+//       return res
+//         .status(400)
+//         .json({ message: "Item already exists, please add a new item" });
+//     }
+
+//     // ✅ Generate new Item_Id
+//     const [last] = await db.query(
+//       "SELECT Item_Id FROM add_item ORDER BY id DESC LIMIT 1"
+//     );
+
+//     let itemId = "ITM001";
+//     if (last.length > 0) {
+//       const lastId = last[0].Item_Id; // e.g. "ITM005"
+//       const num = parseInt(lastId.replace("ITM", "")) + 1;
+//       itemId = "ITM" + num.toString().padStart(3, "0");
+//     }
+
+//     // ✅ Insert into DB
+//     const [result] = await db.execute(
+//       `INSERT INTO add_item (
+//         Item_Name, Item_Id, Item_HSN, Item_Unit,  Item_Category,
+//         created_at, updated_at
+//       ) VALUES (?, ?, ?, ?, ?,  NOW(), NOW())`,
+//       [Item_Name, itemId, Item_HSN, Item_Unit, , Item_Category]
+//     );
+//     await connection.commit();
+//     return res.status(201).json({
+//       message: "Item added successfully",
+//       success: true,
+//       id: result.insertId,
+//       itemId,
+//     });
+//   } catch (err) {
+//     // if (err.code === "ER_DUP_ENTRY") {
+//     //   return res.status(400).json({ message: "Duplicate entry" });
+//     // }
+//     if (connection) await connection.rollback();
+//     console.error("❌ Error adding item:", err);
+//     next(err);
+//     // return res.status(500).json({ message: "Internal Server Error" });
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+
+// Primary Unit
+// None → Kg                 ✅
+// Kg → Gm                   ❌ NEVER
+// Kg → NULL                 ❌ NEVER
+
+// Secondary Unit
+// None → Gm                 ✅
+// Gm → Box                  ✅
+// Box → Packet              ✅
+// Packet → NULL             ✅
+
+// Conversion Rate
+// 1000 → 5000               ✅
+// 5000 → 10                 ✅
+// 10 → 20                   ✅
+
+// Current Stock
+// Automatically changed
+// because unit config edited?   ❌ NEVER
+// const addItem = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+//     await connection.beginTransaction();
+
+//     const cleanData = sanitizeObject(req.body);
+//     const validation = itemFormSchema.safeParse(cleanData);
+//     if (!validation.success) {
+//       await connection.rollback();
+//       return res.status(400).json({ errors: validation.error.errors });
+//     }
+
+//     const {
+//       Item_Name,
+//       Item_HSN,
+//       Item_Unit,
+//       Item_Category,
+//       // Pricing
+//       // Sale_Price,
+//       // Purchase_Price,
+//       // Wholesale_Price,
+//       // Tax_Type,
+//       // Stock
+//       Opening_Quantity,
+//       At_Price,
+//       As_Of_Date,
+//       Min_Stock,
+//       Location,
+//     } = validation.data;
+
+//     // ── duplicate check ──────────────────────────────────────────
+//     const normalizedName = Item_Name.trim().toLowerCase();
+//     const [rows] = await connection.query(
+//       `SELECT Item_Id FROM add_item WHERE LOWER(TRIM(Item_Name)) = ?`,
+//       [normalizedName]
+//     );
+//     if (rows.length > 0) {
+//       await connection.rollback();
+//       return res.status(400).json({
+//         success: false,
+//         message: "Item already exists, please add a new item",
+//       });
+//     }
+
+//     // ── generate Item_Id ─────────────────────────────────────────
+//     const [last] = await connection.query(
+//       "SELECT Item_Id FROM add_item ORDER BY id DESC LIMIT 1"
+//     );
+//     let itemId = "ITM001";
+//     if (last.length > 0) {
+//       const num = parseInt(last[0].Item_Id.replace("ITM", ""), 10) + 1;
+//       itemId = "ITM" + num.toString().padStart(3, "0");
+//     }
+
+//     // ── insert ───────────────────────────────────────────────────
+//     const [result] = await connection.execute(
+//       `INSERT INTO add_item (
+//         Item_Id,    Item_Name,    Item_HSN,   Item_Unit,  Item_Category,
+        
+      
+//         Opening_Quantity, At_Price, As_Of_Date, Min_Stock, Location,
+//         created_at, updated_at
+//       ) VALUES (
+//         ?, ?, ?, ?, ?,
+       
+        
+//         ?, ?, ?, ?, ?,
+//         NOW(), NOW()
+//       )`,
+//       [
+//         itemId,
+//         Item_Name,
+//         Item_HSN,
+//         Item_Unit,
+//         Item_Category,
+//         // Pricing — null if not provided
+//         //Sale_Price     ?? null,
+//         //Purchase_Price ?? null,
+//         //Wholesale_Price ?? null,
+//         //Tax_Type       || "None",
+//         // Stock_Quantity seeded from Opening_Quantity so existing
+//         // purchase/sale stock logic still works against this column
+//         //Opening_Quantity ?? 0,
+//         // Stock tab extras
+//         Opening_Quantity ?? null,
+//         At_Price         ?? null,
+//         As_Of_Date       || null,
+//         Min_Stock        ?? null,
+//         Location         || null,
+//       ]
+//     );
+
+//     await connection.commit();
+//     return res.status(201).json({
+//       success: true,
+//       message: "Item added successfully",
+//       id: result.insertId,
+//       itemId,
+//     });
+//   } catch (err) {
+//     if (connection) await connection.rollback();
+//     console.error("❌ Error adding item:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+
 const addItem = async (req, res, next) => {
   let connection;
-  try {
-    connection = await db.getConnection();
-    await connection.beginTransaction(); // ✅ Start transaction
-    // ✅ Validate request body with Zod
-    const cleanData = sanitizeObject(req.body);
-    const validation = itemFormSchema.safeParse(cleanData);
-    if (!validation.success) {
-      return res.status(400).json({ errors: validation.error.errors });
-    }
-    const { Item_Name, Item_HSN, Item_Unit, Item_Image, Item_Category } =
-      validation.data;
-    // ✅ Check duplicate
-    const normalizedName = Item_Name.trim().toLowerCase();
 
-    const [rows] = await connection.query(
-      `SELECT Item_Id
-   FROM add_item
-   WHERE LOWER(TRIM(Item_Name)) = ?`,
+  try {
+    // =========================================================
+    // 1. GET CONNECTION + START TRANSACTION
+    // =========================================================
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // =========================================================
+    // 2. SANITIZE + VALIDATE
+    // =========================================================
+
+    const cleanData = sanitizeObject(req.body);
+
+    const validation = itemFormSchema.safeParse(cleanData);
+
+    if (!validation.success) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        errors: validation.error.errors,
+      });
+    }
+
+    // =========================================================
+    // 3. GET VALIDATED DATA
+    // =========================================================
+
+    const {
+      Item_Name,
+      Item_HSN,
+      Item_Category,
+        Item_Unit,
+      // =======================================================
+      // NEW UNIT SYSTEM
+      // =======================================================
+
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate,
+
+      // =======================================================
+      // STOCK
+      // =======================================================
+
+      Opening_Quantity,
+      At_Price,
+      As_Of_Date,
+      Min_Stock,
+      Location,
+    } = validation.data;
+
+    // =========================================================
+    // 4. DUPLICATE ITEM CHECK
+    // =========================================================
+
+    const normalizedName =
+      Item_Name.trim().toLowerCase();
+
+    const [existingItems] = await connection.query(
+      `
+        SELECT Item_Id
+        FROM add_item
+        WHERE LOWER(TRIM(Item_Name)) = ?
+        LIMIT 1
+      `,
       [normalizedName]
     );
 
-
-    if (rows.length > 0) {
+    if (existingItems.length > 0) {
       await connection.rollback();
-      return res
-        .status(400)
-        .json({ message: "Item already exists, please add a new item" });
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Item already exists, please add a new item",
+      });
     }
 
-    // ✅ Generate new Item_Id
-    const [last] = await db.query(
-      "SELECT Item_Id FROM add_item ORDER BY id DESC LIMIT 1"
+    // =========================================================
+    // 5. GENERATE ITEM ID
+    // =========================================================
+
+    const [last] = await connection.query(
+      `
+        SELECT Item_Id
+        FROM add_item
+        ORDER BY id DESC
+        LIMIT 1
+      `
     );
 
     let itemId = "ITM001";
+
     if (last.length > 0) {
-      const lastId = last[0].Item_Id; // e.g. "ITM005"
-      const num = parseInt(lastId.replace("ITM", "")) + 1;
-      itemId = "ITM" + num.toString().padStart(3, "0");
+      const lastNumber = parseInt(
+        last[0].Item_Id.replace("ITM", ""),
+        10
+      );
+
+      const nextNumber =
+        Number.isNaN(lastNumber)
+          ? 1
+          : lastNumber + 1;
+
+      itemId =
+        "ITM" +
+        nextNumber
+          .toString()
+          .padStart(3, "0");
     }
 
-    // ✅ Insert into DB
-    const [result] = await db.execute(
-      `INSERT INTO add_item (
-        Item_Name, Item_Id, Item_HSN, Item_Unit,  Item_Category,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?,  NOW(), NOW())`,
-      [Item_Name, itemId, Item_HSN, Item_Unit, , Item_Category]
+    // =========================================================
+    // 6. NORMALIZE UNIT DATA
+    // =========================================================
+
+    /*
+      CASE 1
+      ----------------------------
+      No units selected
+
+      Primary_Unit     = NULL
+      Secondary_Unit   = NULL
+      Conversion_Rate  = NULL
+
+
+      CASE 2
+      ----------------------------
+      Only primary selected
+
+      Primary_Unit     = Kg
+      Secondary_Unit   = NULL
+      Conversion_Rate  = NULL
+
+
+      CASE 3
+      ----------------------------
+      Primary + Secondary
+
+      Primary_Unit     = Kg
+      Secondary_Unit   = Gm
+      Conversion_Rate  = 1000
+    */
+
+    const primaryUnit =Primary_Unit || null;
+
+    const secondaryUnit =Secondary_Unit || null;
+
+    const conversionRate =secondaryUnit
+        ? Conversion_Rate ?? null
+        : null;
+
+    // =========================================================
+    // 7. INITIAL STOCK
+    // =========================================================
+
+    /*
+      Opening_Quantity is historical setup information.
+
+      Stock_Quantity is LIVE stock.
+
+      Example:
+
+      Opening_Quantity = NULL
+      Stock_Quantity   = 0
+
+      Opening_Quantity = 0
+      Stock_Quantity   = 0
+
+      Opening_Quantity = 10
+      Stock_Quantity   = 10
+
+
+      If item currently has NO unit:
+
+          Opening = 10
+          Stock   = 10
+
+      Later user assigns Primary Unit = Kg:
+
+          Stock becomes conceptually 10 Kg
+
+      Numeric Stock_Quantity does NOT need to change.
+    */
+
+    const stockQuantity =Opening_Quantity ?? 0;
+
+    // =========================================================
+    // 8. LEGACY Item_Unit
+    // =========================================================
+
+    /*
+      You said Item_Unit must remain in add_item because
+      old items still use it.
+
+      For NEW items we DON'T need to populate it.
+
+      New unit system:
+
+          Primary_Unit
+          Secondary_Unit
+          Conversion_Rate
+
+      Therefore:
+
+          Item_Unit = NULL
+
+      Existing old database rows can still contain their
+      previous Item_Unit values.
+    */
+
+    //const legacyItemUnit = null;
+
+    // =========================================================
+    // 9. INSERT ITEM
+    // =========================================================
+
+    const [result] = await connection.execute(
+      `
+        INSERT INTO add_item
+        (
+          Item_Id,
+          Item_Name,
+          Item_HSN,
+          Item_Category,
+
+          Item_Unit,
+
+          Primary_Unit,
+          Secondary_Unit,
+          Conversion_Rate,
+
+          Stock_Quantity,
+          Opening_Quantity,
+          At_Price,
+          As_Of_Date,
+          Min_Stock,
+          Location,
+
+          created_at,
+          updated_at
+        )
+        VALUES
+        (
+          ?, ?, ?, ?,
+          ?,
+          ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          NOW(),
+          NOW()
+        )
+      `,
+      [
+        // =====================================================
+        // BASIC
+        // =====================================================
+
+        itemId,
+        Item_Name,
+        Item_HSN || null,
+        Item_Category || "",
+
+        // =====================================================
+        // LEGACY
+        // =====================================================
+
+        Item_Unit,
+
+        // =====================================================
+        // NEW UNIT SYSTEM
+        // =====================================================
+
+        primaryUnit,
+        secondaryUnit,
+        conversionRate,
+
+        // =====================================================
+        // STOCK
+        // =====================================================
+
+        stockQuantity,
+        Opening_Quantity ?? null,
+        At_Price ?? null,
+        As_Of_Date || null,
+        Min_Stock ?? null,
+        Location || null,
+      ]
     );
+
+    // =========================================================
+    // 10. COMMIT
+    // =========================================================
+
     await connection.commit();
+
+    // =========================================================
+    // 11. RESPONSE
+    // =========================================================
+
     return res.status(201).json({
-      message: "Item added successfully",
       success: true,
+      message: "Item added successfully",
+
       id: result.insertId,
       itemId,
+
+      item: {
+        Item_Id: itemId,
+        Item_Name,
+        Item_HSN: Item_HSN || null,
+        Item_Category,
+
+        // New units
+        Primary_Unit: primaryUnit,
+        Secondary_Unit: secondaryUnit,
+        Conversion_Rate: conversionRate,
+
+        // Stock
+        Stock_Quantity: stockQuantity,
+        Opening_Quantity:
+          Opening_Quantity ?? null,
+
+        At_Price:
+          At_Price ?? null,
+
+        As_Of_Date:
+          As_Of_Date || null,
+
+        Min_Stock:
+          Min_Stock ?? null,
+
+        Location:
+          Location || null,
+      },
     });
+
   } catch (err) {
-    // if (err.code === "ER_DUP_ENTRY") {
-    //   return res.status(400).json({ message: "Duplicate entry" });
-    // }
-    if (connection) await connection.rollback();
-    console.error("❌ Error adding item:", err);
+    // =========================================================
+    // 12. ROLLBACK
+    // =========================================================
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error adding item:",
+      err
+    );
+
     next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
+
   } finally {
-    if (connection) connection.release();
+    // =========================================================
+    // 13. RELEASE CONNECTION
+    // =========================================================
+
+    if (connection) {
+      connection.release();
+    }
   }
 };
-
 
 const editItem = async (req, res, next) => {
   let connection;
@@ -1259,140 +1753,41 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
   }
 };
 
-// const eachItemSalesPurchaseDetails = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     connection = await db.getConnection();
-//     const { Item_Id } = req.params;
-
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-
-//     // Fetch the item
-//     const [items] = await connection.query(
-//       `SELECT Item_Id, Item_Name FROM add_item WHERE Item_Id = ?`,
-//       [Item_Id]
-//     );
-
-//     // Fetch full purchase rows for that item
-//     const [purchaseItemsList] = await connection.query(
-//       `SELECT * FROM add_purchase_items 
-//        WHERE Item_Id = ?
-//        ORDER BY created_at DESC`,
-//       [Item_Id]
-//     );
-
-//     // Fetch full sale rows
-//     const [salesItemsList] = await connection.query(
-//       `SELECT * FROM add_sale_items 
-//        WHERE Item_Id = ?
-//        ORDER BY created_at DESC`,
-//       [Item_Id]
-//     );
-
-//     const totalRecords = purchaseItemsList.length + salesItemsList.length;
-//     const totalPages = Math.ceil(totalRecords / limit);
-
-//     // Pagination
-//     let pagedPurchaseItemRows = [];
-//     let pagedSalesItemRows = [];
-
-//     if (offset < purchaseItemsList.length) {
-//       pagedPurchaseItemRows = purchaseItemsList.slice(offset, offset + limit);
-//     } else {
-//       let salesOffset = offset - purchaseItemsList.length;
-//       pagedSalesItemRows = salesItemsList.slice(salesOffset, salesOffset + limit);
-//     }
-
-//     // Extract bill IDs
-//     const purchaseIds = pagedPurchaseItemRows.map((item) => item.Purchase_Id);
-//     const saleIds = pagedSalesItemRows.map((item) => item.Sale_Id);
-
-//     // 🟢 Fetch Purchase bills + Party Name
-//     const [purchases] = purchaseIds.length
-//       ? await connection.query(
-//           `SELECT ap.*, pt.Party_Name, pt.Phone_Number, pt.GSTIN
-//            FROM add_purchase ap
-//            LEFT JOIN add_party pt ON pt.Party_Id = ap.Party_Id
-//            WHERE ap.Purchase_Id IN (?)`,
-//           [purchaseIds]
-//         )
-//       : [[]];
-
-//     // 🟢 Fetch Sale bills + Party Name
-//     const [sales] = saleIds.length
-//       ? await connection.query(
-//           `SELECT s.*, pt.Party_Name, pt.Phone_Number, pt.GSTIN
-//            FROM add_sale s
-//            LEFT JOIN add_party pt ON pt.Party_Id = s.Party_Id
-//            WHERE s.Sale_Id IN (?)`,
-//           [saleIds]
-//         )
-//       : [[]];
-
-//     // Fetch all items for those bills
-//     const [purchaseItemsAll] = purchaseIds.length
-//       ? await connection.query(
-//           `SELECT pi.*, it.Item_Name, it.Item_HSN, it.Item_Category,it.Item_Unit
-//            FROM add_purchase_items pi
-//            LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
-//            WHERE pi.Purchase_Id IN (?)`,
-//           [purchaseIds]
-//         )
-//       : [[]];
-
-//     const [saleItemsAll] = saleIds.length
-//       ? await connection.query(
-//           `SELECT si.*, it.Item_Name, it.Item_HSN, it.Item_Category,it.Item_Unit
-//            FROM add_sale_items si
-//            LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
-//            WHERE si.Sale_Id IN (?)`,
-//           [saleIds]
-//         )
-//       : [[]];
-
-//     // Build final objects
-//     const purchaseBills = purchases.map((bill) => ({
-//       Type: "Purchase",
-//       ...bill,
-//       Party_Name: bill.Party_Name,
-//       Party_GST: bill.GSTIN,
-//       Party_Phone: bill.Phone_Number,
-//       items: purchaseItemsAll.filter((it) => it.Purchase_Id === bill.Purchase_Id),
-//     }));
-
-//     const saleBills = sales.map((bill) => ({
-//       Type: "Sale",
-//       ...bill,
-//       Party_Name: bill.Party_Name,
-//       Party_GST: bill.GSTIN,
-//       Party_Phone: bill.Phone_Number,
-//       items: saleItemsAll.filter((it) => it.Sale_Id === bill.Sale_Id),
-//     }));
-
-//     return res.status(200).json({
-//       success: true,
-//       Item_Id,
-//       Item_Name: items[0]?.Item_Name ?? "",
-//       page,
-//       limit,
-//       totalRecords,
-//       totalPages,
-//       purchases: purchaseBills,
-//       sales: saleBills,
-//     });
-//   } catch (err) {
-//     console.error("❌ Error:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 
 export {
   addItem, editItem, addCategory, getAllItems, getAllCategories, eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers
 };
+// ALTER TABLE add_item
+
+
+// CHANGE COLUMN Item_Unit Primary_Unit VARCHAR(255) NULL AFTER `Item_Unit`,
+
+
+// ADD COLUMN Secondary_Unit VARCHAR(255) NULL
+// AFTER Primary_Unit,
+
+
+// ADD COLUMN Conversion_Rate DECIMAL(18,6) NULL
+// AFTER Secondary_Unit,
+
+// -- Opening stock entered from Item → Stock tab
+// ADD COLUMN Opening_Quantity DECIMAL(18,6) NULL DEFAULT NULL
+// AFTER Stock_Quantity,
+
+// -- Cost/value of opening stock
+// ADD COLUMN At_Price DECIMAL(10,2) NULL DEFAULT NULL
+// AFTER Opening_Quantity,
+
+// -- Date from which opening stock applies
+// ADD COLUMN As_Of_Date DATE NULL DEFAULT NULL
+// AFTER At_Price,
+
+// -- Low-stock warning level
+// ADD COLUMN Min_Stock DECIMAL(10,2) NULL DEFAULT NULL
+// AFTER As_Of_Date,
+
+// -- Storage location
+// ADD COLUMN Location VARCHAR(255) NULL DEFAULT NULL
+// AFTER Min_Stock;

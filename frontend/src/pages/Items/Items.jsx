@@ -16,6 +16,7 @@ import { toast } from "react-toastify";
 import {  LayoutDashboard } from "lucide-react";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
+import SelectUnitModal from "../../components/Modal/SelectUnitModal";
 
 
 
@@ -26,15 +27,9 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 
 export default function Items() {
-  //    const categories = ["Electrical", "Electronics", "AC", "Furniture", "Other"];
-  // const itemUnits = {
-  //   "gm": "Gram",
-  //   "Kg": "Kilogram",
-  //   "lt": "Litre",
-  //   "pcs": "Piece",
 
-  // }
-   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
+   //const [showAddUnitModal, setShowAddUnitModal] = useState(false);
+   const[showSelectUnitModal,setShowSelectUnitModal] =useState(false)
   const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
   console.log(itemUnitsFetched, "itemUnitsFetched");
   const itemUnits=itemUnitsFetched
@@ -61,7 +56,9 @@ export default function Items() {
   const [newCategory, setNewCategory] = useState("");
   const dropdownRef = useRef(null);
   const [addItem, { isLoading:isAddingItem }] = useAddItemMutation();
-  
+ const primaryUnit = watch("Primary_Unit");
+const secondaryUnit = watch("Secondary_Unit");
+const conversionRate = watch("Conversion_Rate");
   const [addCategory] = useAddCategoryMutation();
   const [search, setSearch] = useState("");
   const { data: categories } = useGetAllCategoriesQuery()
@@ -137,31 +134,6 @@ const handleAddCategory = async () => {
   console.log("Form errors:", errors);
 
 
-  // const onSubmit = async (data) => {
-  //   console.log("Form Data (from RHF):", data);
-  //   try {
-  //     const res = await addItem({
-  //       body: data,
-  //     }).unwrap();
-  //     console.log(" successfully:", res);
-  //     const resData = res?.data || res;
-  //     if (resData?.success) {
-
-  //       toast.success("New Item added successfully!");
-  //       navigate("/items/all-items");
-  //     } else {
-  //       toast.error("Failed to add new item");
-  //     }
-
-  //   } catch (error) {
-  //     const errorMessage =
-  //       error?.data?.message || error?.message || "Failed to add new lead";
-  //     toast.error(errorMessage);
-  //     // toast.error("Failed to add lead");
-  //     console.error("Submission failed", error);
-  //   }
-  // };
-
 const onSubmit = async (data) => {
   console.log("Form Data (from RHF):", data);
 
@@ -191,25 +163,7 @@ const selectedUnit=watch("Item_Unit")
   return (<>
 
 
-    {/* <div className="sb2-2-2">
-      <ul >
-        <li >
-          <NavLink style={{display:"flex" ,flexDirection:"row"}}
-            to="/home"
-
-          >
-            <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-           
-            Dashboard
-          </NavLink>
-        </li>
-
-      </ul>
-    </div> */}
-    {/* <div className="sb2-2-3 ">
-      <div className="row">
-        <div className="col-md-12">
-          <div className="box-inn-sp"> */}
+  
    
           <div className="flex flex-col bg-white">
             <div className="inn-title">
@@ -220,7 +174,7 @@ const selectedUnit=watch("Item_Unit")
             </div>
             <div className="flex gap-6 w-full mt-6 pb-3">
                   <div className=" flex space-x-8 pl-4">
-                                        {["Purchase Items"].map((tab) => (
+                                        {["Purchase Items","Stock"].map((tab) => (
                                             <button
                                                 type="button"
                                                 key={tab}
@@ -242,10 +196,13 @@ const selectedUnit=watch("Item_Unit")
                                     </div>
                                     
                                     </div>
-            {activeTab ==="Purchase Items"&& (<div className=" tab-inn">
-
-
+                                    <div className="tab-inn">
+                                      
               <form onSubmit={handleSubmit(onSubmit)}>
+            {activeTab ==="Purchase Items"&& (
+              <div className=" tab-inn">
+
+
                 <div className="row">
 
 
@@ -260,7 +217,7 @@ const selectedUnit=watch("Item_Unit")
   ref={dropdownRef}
 >
   <span className="active">Category</span>
-  <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
+  {/* //<span className="text-red-500 font-bold text-lg">&nbsp;*</span> */}
 
   {/* Search + Dropdown Trigger */}
   <input
@@ -405,7 +362,7 @@ const selectedUnit=watch("Item_Unit")
 <div className="input-field col s6 mt-4 ">
     <span className="active">
         Item HSN Code
-        <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
+        {/* <span className="text-red-500 font-bold text-lg">&nbsp;*</span> */}
     </span>
 
     <input
@@ -428,7 +385,172 @@ const selectedUnit=watch("Item_Unit")
         </p>
     )}
 </div>
+
+
 <div className="input-field col s6 mb-4 mt-4">
+  <span className="active">Unit</span>
+
+  <div className="mt-2">
+    <button
+      type="button"
+      onClick={() => setShowSelectUnitModal(true)}
+      className="px-4 py-2 rounded-md border"
+      style={{
+        backgroundColor: "white",
+        borderColor: "#4CA1AF",
+        color: "#4CA1AF",
+      }}
+    >
+      {primaryUnit ? "Change Unit" : "Select Unit"}
+    </button>
+
+    {/* Show selected configuration */}
+    {primaryUnit && (
+      <div className="mt-2 text-sm text-gray-600">
+        <span>
+          Primary: <strong>{primaryUnit}</strong>
+        </span>
+
+        {secondaryUnit && (
+          <>
+            <span className="ml-3">
+              Secondary: <strong>{secondaryUnit}</strong>
+            </span>
+
+            <div className="mt-1 text-xs text-gray-500">
+              1 {primaryUnit} = {conversionRate} {secondaryUnit}
+            </div>
+          </>
+        )}
+      </div>
+    )}
+  </div>
+</div>
+</div>
+                {/* Item Image */}
+                <div className="row mt-4  w-1/2 ">
+
+
+
+
+
+                </div>
+
+               
+             
+            </div>)}
+            {activeTab === "Stock" && (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mt-6 p-6">
+        <div className="flex flex-col">
+          <span className="active">Opening Quantity</span>
+          <input type="text" placeholder="0"
+            className="w-full outline-none border-b-2 text-gray-900"
+            {...register("Opening_Quantity")}
+            onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }} />
+        </div>
+
+        <div className="flex flex-col">
+          <span className="active">At Price</span>
+          <input type="text" placeholder="0.00"
+            className="w-full outline-none border-b-2 text-gray-900"
+            {...register("At_Price")}
+            onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }} />
+        </div>
+
+        <div className="flex flex-col">
+          <span className="active">As Of Date</span>
+          <input type="date"
+            className="w-full outline-none border-b-2 text-gray-900"
+            defaultValue={new Date().toISOString().slice(0, 10)}
+            {...register("As_Of_Date")} />
+        </div>
+
+        <div className="flex flex-col">
+          <span className="active">Min Stock To Maintain</span>
+          <input type="text" placeholder="0"
+            className="w-full outline-none border-b-2 text-gray-900"
+            {...register("Min_Stock")}
+            onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }} />
+        </div>
+
+        <div className="flex flex-col">
+          <span className="active">Location</span>
+          <input type="text"
+           //placeholder="e.g. Shelf A3"
+            className="w-full outline-none border-b-2 text-gray-900"
+            {...register("Location")} />
+        </div>
+      </div>
+    )}
+     <div className="flex justify-end mt-4">
+                  <button
+                    type="submit"
+                    disabled={formValues.errorCount > 0 ||isAddingItem}
+                    className=" text-white font-bold py-2 px-4 rounded"
+                    style={{ backgroundColor: "#4CA1AF" }}
+                  >
+                    {isAddingItem ? "Adding..." : "Add Item"}
+                  </button>
+                </div>
+     </form>
+    </div>
+   
+
+          </div>
+       
+
+
+{showSelectUnitModal && (
+  <SelectUnitModal
+    units={itemUnits || []}
+
+    initialBase={primaryUnit || ""}
+
+    onClose={() => {
+      setShowSelectUnitModal(false);
+    }}
+
+    onSave={(newUnit) => {
+      console.log("Selected unit configuration:", newUnit);
+
+      setValue(
+        "Primary_Unit",
+        newUnit.baseUnit || null,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setValue(
+        "Secondary_Unit",
+        newUnit.secondaryUnit || null,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setValue(
+        "Conversion_Rate",
+        newUnit.secondaryUnit
+          ? Number(newUnit.conversionRate)
+          : null,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setShowSelectUnitModal(false);
+    }}
+  />
+)}
+  </>
+  );
+};
+
+{/* <div className="input-field col s6 mb-4 mt-4">
                     <span className="active">Select Unit</span>
                     <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
                     <select
@@ -441,7 +563,7 @@ const selectedUnit=watch("Item_Unit")
           if (value === "__ADD_UNIT__") {
             // setActiveUnitRow(i);
             setValue(`Item_Unit`, "", { shouldValidate: true, shouldDirty: true });
-            setShowAddUnitModal(true);
+            setShowSelectUnitModal(true);
             return;
           }
 
@@ -460,7 +582,7 @@ const selectedUnit=watch("Item_Unit")
                           </option>
                         ))
                       }
-      */}
+      
            <option value=""></option>
         <option value="__ADD_UNIT__">➕ Add Unit</option>
       {Array.isArray(itemUnits) &&
@@ -479,73 +601,4 @@ const selectedUnit=watch("Item_Unit")
                         {errors?.Item_Unit?.message}
                       </p>
                     )}
-                  </div>
-
-</div>
-                {/* Item Image */}
-                <div className="row mt-4  w-1/2 ">
-
-
-
-
-
-                </div>
-
-                <div className="flex justify-end mt-4">
-                  <button
-                    type="submit"
-                    disabled={formValues.errorCount > 0 ||isAddingItem}
-                    className=" text-white font-bold py-2 px-4 rounded"
-                    style={{ backgroundColor: "#4CA1AF" }}
-                  >
-                    {isAddingItem ? "Adding..." : "Add Item"}
-                  </button>
-                </div>
-              </form>
-            </div>)}
-   
-
-          </div>
-       
-
-
-{showAddUnitModal && (
-  <AddUnitModal
-    onClose={() => {
-      setShowAddUnitModal(false);
-      // setActiveUnitRow(null);
-    }}
-                onSave={(newUnit) => {
-  setValue(
-    `Item_Unit`,
-    newUnit.Unit_Shorthand,
-    { shouldValidate: true, shouldDirty: true }
-  );
-
-
-
-  setShowAddUnitModal(false);
-
-}}
-   
-    // onSave={({  unitKey }) => {
-    //   // 1️⃣ Add unit to dropdown list
-    //   // setItemUnits((prev) => ({
-    //   //   ...prev,
-    //   //   [unitKey]: unitName,
-    //   // }));
-
-    //   // 2️⃣ Auto-select newly added unit
-    //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
-    //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
-
-    //   // 3️⃣ Close modal
-    //   setShowAddUnitModal(false);
-    //   setActiveUnitRow(null);
-    // }}
-  />
-)}
-  </>
-  );
-};
-
+                  </div> */}

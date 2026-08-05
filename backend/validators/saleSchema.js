@@ -196,6 +196,11 @@ splits: z
         const id = Number(val);
         return Number.isInteger(id) ? id : null;
       }),
+      Terms_Conditions_Description: z
+  .string()
+  .trim()
+  .nullable()
+  .optional(),
 })
 .superRefine((data, ctx) => {
   // =====================================================

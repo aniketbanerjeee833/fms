@@ -422,11 +422,11 @@ const purchaseSchema = z.object({
         const id = Number(val);
         return Number.isInteger(id) ? id : null;
       }),
-      Terms_Condition_Description: z
+ Terms_Conditions_Description: z
   .string()
   .trim()
-  .optional()
-  .or(z.literal("")),
+  .nullable()
+  .optional(),
 });
 
 export default purchaseSchema;

@@ -21,6 +21,8 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { Trash2 } from "lucide-react";
+import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
+import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 export default function PurchaseEdit() {
   const location = useLocation();
   const from = location.state?.from
@@ -61,6 +63,8 @@ export default function PurchaseEdit() {
   const { data: items } = useGetAllItemsQuery();
 
   const { data: categories } = useGetAllCategoriesQuery()
+  const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
+  console.log(termsTemplates, "termsTemplates");
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const { data: purchase }
     = useGetSinglePurchaseQuery(Purchase_Id)
@@ -233,6 +237,8 @@ export default function PurchaseEdit() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
+      Terms_Conditions_Id: null,
+      Terms_Conditions_Description: "",
       // Payment_Type: "Cash",
       // Reference_Number: "",
       //Bank_Account_Id: null,   // 🔹 added
@@ -489,24 +495,24 @@ export default function PurchaseEdit() {
   };
   console.log("purchase", purchase);
   const emptyRow = () => ({
-  Item_Category: "",
-  Item_Name: "",
-  itemSearch: "",
-  Item_HSN: "",
-  Quantity: "",
-  Item_Unit: "",
-  Purchase_Price: "",
-  Discount_On_Purchase_Price: "",
-  Discount_Type_On_Purchase_Price: "Percentage",
-  Tax_Type: "None",
-  Tax_Amount: "",
-  Amount: "",
-  itemOpen: false,
-  CategoryOpen: false,
-  isHSNLocked: false,
-  isUnitLocked: false,
-  isExistingItem: false,
-});
+    Item_Category: "",
+    Item_Name: "",
+    itemSearch: "",
+    Item_HSN: "",
+    Quantity: "",
+    Item_Unit: "",
+    Purchase_Price: "",
+    Discount_On_Purchase_Price: "",
+    Discount_Type_On_Purchase_Price: "Percentage",
+    Tax_Type: "None",
+    Tax_Amount: "",
+    Amount: "",
+    itemOpen: false,
+    CategoryOpen: false,
+    isHSNLocked: false,
+    isUnitLocked: false,
+    isExistingItem: false,
+  });
   useEffect(() => {
     if (purchase) {
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
@@ -520,8 +526,8 @@ export default function PurchaseEdit() {
       //   isExistingItem: true,
 
       // }))
-        const prefilledRows = purchase?.items?.length > 0
-      ? purchase.items.map((item) => ({
+      const prefilledRows = purchase?.items?.length > 0
+        ? purchase.items.map((item) => ({
           ...item,
           itemSearch: item.Item_Name,
           itemOpen: false,
@@ -530,7 +536,7 @@ export default function PurchaseEdit() {
           isUnitLocked: true,
           isExistingItem: true,
         }))
-      : [emptyRow()];
+        : [emptyRow()];
       setRows(prefilledRows)
       reset({
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
@@ -541,6 +547,9 @@ export default function PurchaseEdit() {
         Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
         Total_Paid: purchase?.billPurchaseDetails?.Total_Paid,
         Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
+        Terms_Conditions_Id: purchase?.billPurchaseDetails?.Terms_Conditions_Id ?? null,
+
+        Terms_Conditions_Description:purchase?.billPurchaseDetails?.Terms_Conditions_Description ?? "",
         //Payment_Type: purchase?.billPurchaseDetails?.Payment_Type,
         //Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id, // ✅ Add this
         //Reference_Number: purchase?.billPurchaseDetails?.Reference_Number,
@@ -561,7 +570,7 @@ export default function PurchaseEdit() {
               },
             ],
         //items: purchase?.items
-        items:  prefilledRows
+        items: prefilledRows
       })
       setShowSplitBox((purchase?.splits?.length || 0) > 1);
     }
@@ -574,259 +583,259 @@ export default function PurchaseEdit() {
 
 
 
-const onSubmit = async (data) => {
-  console.log("Form Data (from RHF):", data);
+  const onSubmit = async (data) => {
+    console.log("Form Data (from RHF):", data);
 
-  // =========================================================
-  // 1. NORMALIZE PAYMENT SPLITS
-  // =========================================================
+    // =========================================================
+    // 1. NORMALIZE PAYMENT SPLITS
+    // =========================================================
 
-  const rawSplits = data.splits || [];
+    const rawSplits = data.splits || [];
 
-  const normalizedSplits = rawSplits.map((split) => ({
-    ...split,
-    Amount: Number(split.Amount) || 0,
-  }));
+    const normalizedSplits = rawSplits.map((split) => ({
+      ...split,
+      Amount: Number(split.Amount) || 0,
+    }));
 
-  // =========================================================
-  // 2. FIND FIRST VALID PAYMENT METHOD
-  //
-  // Bank is valid only when account is selected.
-  // Cash / Cheque / Neft are valid when Payment_Type exists.
-  // =========================================================
+    // =========================================================
+    // 2. FIND FIRST VALID PAYMENT METHOD
+    //
+    // Bank is valid only when account is selected.
+    // Cash / Cheque / Neft are valid when Payment_Type exists.
+    // =========================================================
 
-  const firstValidIndex = normalizedSplits.findIndex((split) => {
-    if (!split.Payment_Type) {
-      return false;
-    }
+    const firstValidIndex = normalizedSplits.findIndex((split) => {
+      if (!split.Payment_Type) {
+        return false;
+      }
 
-    if (
-      split.Payment_Type === "Bank" &&
-      !split.Bank_Account_Id
-    ) {
-      return false;
-    }
+      if (
+        split.Payment_Type === "Bank" &&
+        !split.Bank_Account_Id
+      ) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
-  // =========================================================
-  // 3. BUILD VALID SPLITS
-  //
-  // RULE:
-  //
-  // Positive amount -> ALWAYS KEEP
-  //
-  // Blank / ₹0 -> ONLY keep if it is the FIRST
-  //               valid payment method
-  //
-  // Other ₹0 rows -> DROP
-  // =========================================================
+    // =========================================================
+    // 3. BUILD VALID SPLITS
+    //
+    // RULE:
+    //
+    // Positive amount -> ALWAYS KEEP
+    //
+    // Blank / ₹0 -> ONLY keep if it is the FIRST
+    //               valid payment method
+    //
+    // Other ₹0 rows -> DROP
+    // =========================================================
 
-  const validSplits = [];
+    const validSplits = [];
 
-  normalizedSplits.forEach((split, index) => {
-    // No payment type
-    if (!split.Payment_Type) {
-      return;
-    }
+    normalizedSplits.forEach((split, index) => {
+      // No payment type
+      if (!split.Payment_Type) {
+        return;
+      }
 
-    // Bank without account
-    if (
-      split.Payment_Type === "Bank" &&
-      !split.Bank_Account_Id
-    ) {
-      return;
-    }
+      // Bank without account
+      if (
+        split.Payment_Type === "Bank" &&
+        !split.Bank_Account_Id
+      ) {
+        return;
+      }
 
-    // ---------------------------------------------
-    // Positive amount -> always keep
-    // ---------------------------------------------
-    if (split.Amount > 0) {
-      validSplits.push(split);
-      return;
-    }
+      // ---------------------------------------------
+      // Positive amount -> always keep
+      // ---------------------------------------------
+      if (split.Amount > 0) {
+        validSplits.push(split);
+        return;
+      }
 
-    // ---------------------------------------------
-    // ₹0 / blank -> only FIRST valid payment method
-    // ---------------------------------------------
-    if (index === firstValidIndex) {
-      validSplits.push({
-        ...split,
-        Amount: 0,
-      });
-    }
-  });
+      // ---------------------------------------------
+      // ₹0 / blank -> only FIRST valid payment method
+      // ---------------------------------------------
+      if (index === firstValidIndex) {
+        validSplits.push({
+          ...split,
+          Amount: 0,
+        });
+      }
+    });
 
-  // =========================================================
-  // 4. CALCULATE TOTAL PAID FROM SURVIVING SPLITS
-  // =========================================================
+    // =========================================================
+    // 4. CALCULATE TOTAL PAID FROM SURVIVING SPLITS
+    // =========================================================
 
-  const totalPaid = validSplits.reduce(
-    (sum, split) => {
-      return sum + (Number(split.Amount) || 0);
-    },
-    0
-  );
-
-  // =========================================================
-  // 5. BUILD PAYLOAD
-  // =========================================================
-
-  const payload = {
-    ...data,
-
-    // Don't trust old Total_Paid from form.
-    // Recalculate from valid payment splits.
-    Total_Paid: totalPaid,
-
-    splits: validSplits,
-  };
-
-  // console.log("Raw Splits:", rawSplits);
-  // console.log("Normalized Splits:", normalizedSplits);
-  // console.log("First Valid Index:", firstValidIndex);
-  // console.log("Valid Splits:", validSplits);
-  // console.log("Total Paid:", totalPaid);
-  // console.log("Final Edit Payload:", payload);
-
-  // =========================================================
-  // 6. SUBMIT EDIT
-  // =========================================================
-
-  try {
-    const res = await editPurchase({
-      body: payload,
-      Purchase_Id,
-    }).unwrap();
-
-    console.log("Purchase updated successfully:", res);
-
-    const resData = res?.data || res;
-
-    // =======================================================
-    // 7. INVALIDATE CACHE
-    // =======================================================
-
-    dispatch(
-      purchaseApi.util.invalidateTags(["Purchase"])
+    const totalPaid = validSplits.reduce(
+      (sum, split) => {
+        return sum + (Number(split.Amount) || 0);
+      },
+      0
     );
 
-    dispatch(
-      itemApi.util.invalidateTags(["Item"])
-    );
+    // =========================================================
+    // 5. BUILD PAYLOAD
+    // =========================================================
 
-    dispatch(
-      dashboardApi.util.invalidateTags(["Dashboard"])
-    );
+    const payload = {
+      ...data,
 
-    dispatch(
-      cashInHandApi.util.invalidateTags(["CashInHand"])
-    );
+      // Don't trust old Total_Paid from form.
+      // Recalculate from valid payment splits.
+      Total_Paid: totalPaid,
 
-    // Since purchase can contain MULTIPLE banks,
-    // invalidate the general BankAccount tag.
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        "BankAccount",
-      ])
-    );
+      splits: validSplits,
+    };
 
-    dispatch(
-      partyApi.util.invalidateTags(["Party"])
-    );
+    // console.log("Raw Splits:", rawSplits);
+    // console.log("Normalized Splits:", normalizedSplits);
+    // console.log("First Valid Index:", firstValidIndex);
+    // console.log("Valid Splits:", validSplits);
+    // console.log("Total Paid:", totalPaid);
+    // console.log("Final Edit Payload:", payload);
 
-    // =======================================================
-    // 8. RESPONSE CHECK
-    // =======================================================
+    // =========================================================
+    // 6. SUBMIT EDIT
+    // =========================================================
 
-    if (!resData?.success) {
-      toast.error("Failed to update purchase");
-      return;
-    }
+    try {
+      const res = await editPurchase({
+        body: payload,
+        Purchase_Id,
+      }).unwrap();
 
-    toast.success("Purchase updated successfully!");
+      console.log("Purchase updated successfully:", res);
 
-    // =======================================================
-    // 9. NAVIGATION
-    // =======================================================
+      const resData = res?.data || res;
 
-    if (from === "party-payables") {
-      navigate({
-        pathname: "/party/payables",
-        search: location.search,
-      });
-    }
-
-    else if (
-      from === "party-sales-purchases-details"
-    ) {
-      navigate({
-        pathname:
-          `/party/party-sales-purchases-details/${Party_Id}`,
-        search: location.search,
-      });
+      // =======================================================
+      // 7. INVALIDATE CACHE
+      // =======================================================
 
       dispatch(
-        partyApi.util.invalidateTags(["Party"])
+        purchaseApi.util.invalidateTags(["Purchase"])
       );
-    }
-
-    else if (
-      from === "item-sales-purchases-details"
-    ) {
-      navigate({
-        pathname:
-          `/item/item-sales-purchases-details/${Item_Id}`,
-        search: location.search,
-      });
 
       dispatch(
         itemApi.util.invalidateTags(["Item"])
       );
+
+      dispatch(
+        dashboardApi.util.invalidateTags(["Dashboard"])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags(["CashInHand"])
+      );
+
+      // Since purchase can contain MULTIPLE banks,
+      // invalidate the general BankAccount tag.
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
+
+      dispatch(
+        partyApi.util.invalidateTags(["Party"])
+      );
+
+      // =======================================================
+      // 8. RESPONSE CHECK
+      // =======================================================
+
+      if (!resData?.success) {
+        toast.error("Failed to update purchase");
+        return;
+      }
+
+      toast.success("Purchase updated successfully!");
+
+      // =======================================================
+      // 9. NAVIGATION
+      // =======================================================
+
+      if (from === "party-payables") {
+        navigate({
+          pathname: "/party/payables",
+          search: location.search,
+        });
+      }
+
+      else if (
+        from === "party-sales-purchases-details"
+      ) {
+        navigate({
+          pathname:
+            `/party/party-sales-purchases-details/${Party_Id}`,
+          search: location.search,
+        });
+
+        dispatch(
+          partyApi.util.invalidateTags(["Party"])
+        );
+      }
+
+      else if (
+        from === "item-sales-purchases-details"
+      ) {
+        navigate({
+          pathname:
+            `/item/item-sales-purchases-details/${Item_Id}`,
+          search: location.search,
+        });
+
+        dispatch(
+          itemApi.util.invalidateTags(["Item"])
+        );
+      }
+
+      else if (from === "bank-accounts") {
+        navigate({
+          pathname: "/cash-bank/bank-accounts",
+          search: `?bankId=${bankId}`,
+        });
+      }
+
+      else if (from === "party-details") {
+        navigate({
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }
+
+      else if (from === "cash-in-hand") {
+        navigate({
+          pathname: "/cash-bank/cash-in-hand",
+        });
+      }
+
+      else {
+        navigate({
+          pathname: "/purchase/all-purchases",
+          search: location.search,
+        });
+      }
+
+    } catch (error) {
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to update purchase.";
+
+      toast.error(errorMessage);
+
+      console.error(
+        "Purchase update failed:",
+        error
+      );
     }
-
-    else if (from === "bank-accounts") {
-      navigate({
-        pathname: "/cash-bank/bank-accounts",
-        search: `?bankId=${bankId}`,
-      });
-    }
-
-    else if (from === "party-details") {
-      navigate({
-        pathname: "/party/parties",
-        search: location.search,
-      });
-    }
-
-    else if (from === "cash-in-hand") {
-      navigate({
-        pathname: "/cash-bank/cash-in-hand",
-      });
-    }
-
-    else {
-      navigate({
-        pathname: "/purchase/all-purchases",
-        search: location.search,
-      });
-    }
-
-  } catch (error) {
-    const errorMessage =
-      error?.data?.message ||
-      error?.message ||
-      "Failed to update purchase.";
-
-    toast.error(errorMessage);
-
-    console.error(
-      "Purchase update failed:",
-      error
-    );
-  }
-};
+  };
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
@@ -920,14 +929,14 @@ const onSubmit = async (data) => {
                       search: `?bankId=${bankId}`,
                     })
                   }
-                     else if (from === "party-details") {
-          // 🔹 new — return to Bank Accounts page with the same account selected
-          navigate({
-            pathname: `/party/parties`,
-             search: location.search,
-            // search: `?partyId=${partyId}`,
-          });
-        }
+                  else if (from === "party-details") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/party/parties`,
+                      search: location.search,
+                      // search: `?partyId=${partyId}`,
+                    });
+                  }
                   else if (from === "cash-in-hand") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
@@ -1251,83 +1260,83 @@ const onSubmit = async (data) => {
 
 
                       <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                                              <Controller
-                                                control={control}
-                                                name={`items.${i}.Item_Category`}
-                                                defaultValue="All"
-                                                render={({ field }) => (
-                                                  <select
-                                                    {...field}
-                                                    className="form-select"
-                                                    style={{ width: "100%", fontSize: "12px" }}
-                                                    onChange={(e) => {
-                                                      const value = e.target.value;
-                                                      if (value === "__ADD_CATEGORY__") {
-                                                        setShowModal(true);
-                                                        return; // don't commit this as the selected value
-                                                      }
-                                                      field.onChange(value);
-                                                    }}
-                                                  >
-                                                    <option value="All">All</option>
-                                                    <option value="__ADD_CATEGORY__">➕ Add Category</option>
-                                                    {categories?.map((cat) => (
-                                                      <option key={cat.Category_Id} value={cat.Item_Category}>
-                                                        {cat.Item_Category}
-                                                      </option>
-                                                    ))}
-                                                  </select>
-                                                )}
-                                              />
-                      
-                                              {showModal && (
-                                                <div
-                                                  style={{
-                                                    position: "fixed", inset: 0, display: "flex",
-                                                    alignItems: "center", justifyContent: "center",
-                                                    backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
-                                                  }}
-                                                >
-                                                  <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => setShowModal(false)}
-                                                      style={{ backgroundColor: "transparent" }}
-                                                      className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-                                                    >
-                                                      ✕
-                                                    </button>
-                                                    <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                                                    <input
-                                                      type="text"
-                                                      value={newCategory}
-                                                      onChange={(e) => setNewCategory(e.target.value)}
-                                                      className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                                      placeholder="Enter category name"
-                                                    />
-                                                    <div className="flex justify-end gap-3">
-                                                      <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
-                                                        Cancel
-                                                      </button>
-                                                      <button
-                                                        type="button"
-                                                        onClick={async () => {
-                                                          const created = await handleAddCategory(); // should return the created category object
-                                                          if (created?.Item_Category) {
-                                                            setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
-                                                          }
-                                                          setShowModal(false);
-                                                        }}
-                                                        style={{ backgroundColor: "#4CA1AF" }}
-                                                        className="px-4 py-2 rounded-md text-white"
-                                                      >
-                                                        Add
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </td>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        />
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </td>
                       {/* Item Dropdown */}
                       <td style={{ padding: "0px", width: "18%", position: "relative" }}>
                         <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
@@ -1348,7 +1357,7 @@ const onSubmit = async (data) => {
                               );
                               handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
-                              onBlur={() => {
+                            onBlur={() => {
                               setTimeout(() => {
                                 const typedValue = rows[i]?.itemSearch?.trim() || "";
                                 if (!typedValue) return;
@@ -1540,13 +1549,13 @@ const onSubmit = async (data) => {
                             //   handleRowChange(i, "Item_HSN", e.target.value);
                             //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
                             // }
-                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              handleRowChange(i, "Item_HSN", e.target.value);
-                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
                           }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
-                          //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
+                        //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
                         />
                         {errors?.items?.[i]?.Item_HSN && (
                           <p className="text-red-500 text-xs mt-1">
@@ -1868,27 +1877,39 @@ const onSubmit = async (data) => {
                   + Add Row
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
-                <div className="flex flex-col px-2">
-                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
 
-                
-                           {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
-            it's driven by setValue in the onChange below, not a native <select {...register}> */}
-                          {/* <input
-                            type="hidden"
-                            {...register("splits.0.Amount", {
-                              required: "Amount is required",
-                              validate: (v) => (v !== "" && !isNaN(v) && Number(v) > 0) || "Enter a valid amount greater than 0",
-                            })}
-                          /> */}
-                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+
+                <TermsAndConditionsSelector
+                  termsList={termsTemplates}
+                  value={watch("Terms_Conditions_Id")}
+                  description={watch("Terms_Conditions_Description")}
+                  onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
+                    setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+
+                    setValue(
+                      "Terms_Conditions_Description",
+                      Terms_Conditions_Description,
+                      {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      }
+                    );
+                  }}
+                  onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
+                />
+                <div className="flex flex-col px-2">
+                  <div className="flex flex-col mt-3 gap-2 w-full">
                     {!showSplitBox ? (
                       <>
                         <div className="flex flex-col w-full">
                           <span className="active">Payment Type</span>
 
-                           <input
+                          <input
                             type="hidden"
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
@@ -2002,7 +2023,7 @@ const onSubmit = async (data) => {
                                     onChange={(e) => {
                                       e.target.value = sanitizeAmount(e.target.value);
                                       amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`); 
+                                      clearErrors(`splits.${index}.Amount`);
                                     }}
                                   />
                                   {errors?.splits?.[index]?.Amount && (
@@ -2142,7 +2163,7 @@ const onSubmit = async (data) => {
 
                       <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                       <div className="flex items-center gap-2 relative">
+                        <div className="flex items-center gap-2 relative">
 
                           <input
                             type="checkbox"
@@ -2486,7 +2507,7 @@ const onSubmit = async (data) => {
 }
 
 
-                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+{/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
                             type="text"
