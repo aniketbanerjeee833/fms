@@ -1761,8 +1761,6 @@ const editPurchase = async (req, res, next) => {
     }
     const purchaseIdNumber = existingPurchase[0].id;
 
-    console.log(req.body);
-
     const cleanData = sanitizeObject(req.body);
     const validation = purchaseSchema.safeParse(cleanData);
     if (!validation.success) {
@@ -1779,56 +1777,38 @@ const editPurchase = async (req, res, next) => {
       Total_Amount,
       Total_Paid,
       Balance_Due,
-      //Reference_Number,
-      splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
+      splits,
       items,
-      // Terms & Conditions
       Terms_Conditions_Id,
-      Terms_Conditions_Description
+      Terms_Conditions_Description,
     } = validation.data;
 
-
-
-
-
+    // ── TERMS & CONDITIONS — unchanged ──
     let termsId = null;
     let termsDescription = null;
 
-    if (
-      Terms_Conditions_Id &&
-      Terms_Conditions_Description?.trim()
-    ) {
-      // Saved template selected and untouched
+    if (Terms_Conditions_Id && Terms_Conditions_Description?.trim()) {
       termsId = Number(Terms_Conditions_Id);
-      termsDescription =
-        Terms_Conditions_Description.trim();
-
+      termsDescription = Terms_Conditions_Description.trim();
     } else if (Terms_Conditions_Description?.trim()) {
-      // Custom / edited description
       termsId = null;
-      termsDescription =
-        Terms_Conditions_Description.trim();
+      termsDescription = Terms_Conditions_Description.trim();
     }
     if (termsId) {
       const [[selectedTerm]] = await connection.query(
-        `SELECT id
-     FROM terms_conditions
-     WHERE id = ?
-       AND Purchase_Bill = 1
-     LIMIT 1`,
+        `SELECT id FROM terms_conditions WHERE id = ? AND Purchase_Bill = 1 LIMIT 1`,
         [termsId]
       );
-
       if (!selectedTerm) {
         await connection.rollback();
-
         return res.status(400).json({
           success: false,
-          message:
-            "Invalid Terms & Conditions for Purchase Bill.",
+          message: "Invalid Terms & Conditions for Purchase Bill.",
         });
       }
     }
+
+    // ── SPLITS — unchanged ──
     const normalizedSplits = (splits || []).map((s) => ({ ...s, Amount: Number(s.Amount) || 0 }));
 
     const firstValidIndex = normalizedSplits.findIndex((s) => {
@@ -1849,8 +1829,6 @@ const editPurchase = async (req, res, next) => {
     const totalPaid = validSplits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
     const balanceDue = totalAmount - totalPaid;
 
-
-    // 🔹 total paid cannot exceed total amount
     if (totalPaid > totalAmount) {
       await connection.rollback();
       return res.status(400).json({
@@ -1858,8 +1836,6 @@ const editPurchase = async (req, res, next) => {
         message: "Received amount should be less than or equal to Total Amount",
       });
     }
-
-    // 🔹 validate splits sum === totalPaid
     if (totalPaid > 0) {
       try {
         validateSplits(validSplits, totalPaid);
@@ -1868,9 +1844,6 @@ const editPurchase = async (req, res, next) => {
         return res.status(400).json({ success: false, message: validationErr.message });
       }
     }
-
-
-
 
     const [partyRows] = await connection.query(
       "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
@@ -1882,77 +1855,27 @@ const editPurchase = async (req, res, next) => {
     }
     const Party_Id = partyRows[0].Party_Id;
 
-    // update parent row — no Payment_Type / Bank_Account_Id columns anymore
-    // await connection.query(
-    //   `UPDATE add_purchase SET
-    //      Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
-    //      Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
-    //       updated_at = NOW()
-    //    WHERE Purchase_Id = ?`,
-    //   [
-    //     Party_Id,
-    //     Bill_Number,
-    //     Bill_Date,
-    //     cleanValue(State_Of_Supply),
-    //     totalAmount,
-    //     totalPaid,
-    //     balanceDue,
-
-    //     purchaseId,
-    //   ]
-    // );
     await connection.query(
       `UPDATE add_purchase SET
-     Party_Id = ?,
-     Bill_Number = ?,
-     Bill_Date = ?,
-     State_Of_Supply = ?,
-     Total_Amount = ?,
-     Total_Paid = ?,
-     Balance_Due = ?,
-
-     Terms_Conditions_Id = ?,
-     Terms_Conditions_Description = ?,
-
-     updated_at = NOW()
-
-   WHERE Purchase_Id = ?`,
+         Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
+         Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
+         Terms_Conditions_Id = ?, Terms_Conditions_Description = ?,
+         updated_at = NOW()
+       WHERE Purchase_Id = ?`,
       [
-        Party_Id,
-        Bill_Number,
-        Bill_Date,
-        cleanValue(State_Of_Supply),
-
-        totalAmount,
-        totalPaid,
-        balanceDue,
-
-        // Terms & Conditions
-        termsId,
-        termsDescription,
-
+        Party_Id, Bill_Number, Bill_Date, cleanValue(State_Of_Supply),
+        totalAmount, totalPaid, balanceDue,
+        termsId, termsDescription,
         purchaseId,
       ]
     );
+
     await connection.query(
-      `UPDATE purchase_return
-   SET
-      Bill_Number = ?,
-      Bill_Date = ?,
-      updated_at = NOW()
-   WHERE Purchase_Id = ?`,
-      [
-        Bill_Number,
-        Bill_Date,
-        purchaseId
-      ]
+      `UPDATE purchase_return SET Bill_Number = ?, Bill_Date = ?, updated_at = NOW() WHERE Purchase_Id = ?`,
+      [Bill_Number, Bill_Date, purchaseId]
     );
-    // 🔹 wipe old splits + ledger rows, re-insert fresh ones
-    await deletePaymentSplits({
-      connection,
-      sourceType: "Purchase",
-      sourceId: purchaseIdNumber,
-    });
+
+    await deletePaymentSplits({ connection, sourceType: "Purchase", sourceId: purchaseIdNumber });
 
     if (validSplits.length > 0) {
       await insertPaymentSplits({
@@ -1964,6 +1887,7 @@ const editPurchase = async (req, res, next) => {
         splits: validSplits,
       });
     }
+
     await recordPartyLedger({
       connection,
       partyId: Party_Id,
@@ -1980,283 +1904,830 @@ const editPurchase = async (req, res, next) => {
       [purchaseId]
     );
 
-    // Step 1: resolve every line to its Item_Id (create new items if needed, sync HSN if changed)
-    const resolvedLines = [];
-    for (const item of items) {
-      const { Item_Name, Item_Category, Item_HSN, Item_Unit, Quantity } = item;
-      if (!Item_Name?.trim()) {
+    
+// ═══════════════════════════════════════════════════════
+// STEP 1 — RESOLVE ITEMS + UNITS + STOCK QUANTITY
+// ═══════════════════════════════════════════════════════
 
-        // Only Amount > 0 makes Item_Name mandatory
-        if ((normalizeNumber(item.Amount) ?? 0) > 0) {
-          await connection.rollback();
+const resolvedLines = [];
 
-          return res.status(400).json({
-            success: false,
-            message: "Please enter an item name for the row.",
-          });
-        }
+for (const item of items) {
+  const {
+    Item_Name,
+    Item_Category,
+    Item_HSN,
 
-        // Amount blank / 0 + no Item_Name
-        // Treat as empty placeholder row
-        continue;
-      }
-      let Item_Id = item.Item_Id || null;
-      let dbItemRow = null;
+    // Unit selected on THIS purchase row
+    Item_Unit,
 
-      if (Item_Id) {
-        const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
-        dbItemRow = rows[0] || null;
-      } else {
-        const [rows] = await connection.query(
-          "SELECT * FROM add_item WHERE TRIM(Item_Name) = TRIM(?) LIMIT 1",
-          [item.Item_Name]
-        );
-        // const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [Item_Name]);
-        dbItemRow = rows[0] || null;
+    Quantity,
 
-        //  THIS WAS MISSING
-        Item_Id = dbItemRow?.Item_Id || null;
-        //dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
-      }
+    // These may come from frontend for a brand-new item
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate,
+  } = item;
 
-      if (!dbItemRow) {
-        const [maxRow] = await connection.query(
-          `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
-        );
-        const autoId = (maxRow[0]?.maxId || 0) + 1;
-        Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+  // =====================================================
+  // SKIP COMPLETELY BLANK ROW
+  // =====================================================
 
-        await connection.execute(
-          `INSERT INTO add_item
-       (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit,
-        Stock_Quantity, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          [Item_Id, Item_Name, Item_Category || "", cleanValue(Item_HSN), Item_Unit || "", 0]
-        );
-        dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
-      }
-      else {
+  if (!Item_Name?.trim()) {
+    if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+      await connection.rollback();
 
-
-        const updates = [];
-        const params = [];
-
-        if (Item_HSN && Item_HSN !== dbItemRow.Item_HSN) {
-          updates.push("Item_HSN = ?");
-          params.push(Item_HSN);
-        }
-
-        if (Item_Category !== undefined && Item_Category !== dbItemRow.Item_Category) {
-          updates.push("Item_Category = ?");
-          params.push(Item_Category || "");
-        }
-
-        if (updates.length > 0) {
-          params.push(Item_Id);
-          await connection.query(
-            `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
-            params
-          );
-        }
-      }
-
-      // else if (Item_HSN && Item_HSN !== dbItemRow.Item_HSN) {
-      //   await connection.query(
-      //     `UPDATE add_item SET Item_HSN = ?,Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
-      //     [Item_HSN, Item_Category || "", Item_Id]
-      //   );
-      // }
-
-      resolvedLines.push({ ...item, Item_Id });
+      return res.status(400).json({
+        success: false,
+        message: "Please enter an item name for the row.",
+      });
     }
 
-    // Step 2: net stock delta per Item_Id — purchase adds stock, so diff is applied as "+"
-//     const newQtyByItem = new Map();
-//     for (const line of resolvedLines) {
-//       newQtyByItem.set(line.Item_Id, (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity));
-//     }
-//     const oldQtyByItem = new Map();
-//     oldItems.forEach((o) => {
-//       oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
-//     });
+    continue;
+  }
 
-//     const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
-//     for (const itemId of allItemIds) {
-//       const newQty = newQtyByItem.get(itemId) || 0;
-//       const oldQty = oldQtyByItem.get(itemId) || 0;
-//       const diff = newQty - oldQty;
-//       if (diff !== 0) {
-//         await connection.query(
-//           `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-//           [diff, itemId]
-//         );
-//       }
-//     }
+  // =====================================================
+  // SELECTED UNIT ON THIS PURCHASE LINE
+  // =====================================================
 
-//     // Step 3: delete old purchase_items rows, reinsert fresh (repeats-safe)
-//     await connection.query(`DELETE FROM add_purchase_items WHERE Purchase_Id = ?`, [purchaseId]);
+  const Selected_Unit = Item_Unit || null;
 
-//     for (const line of resolvedLines) {
-//       const [insertRes] = await connection.execute(
-//         `INSERT INTO add_purchase_items
-//      (Purchase_Id, Item_Id, Quantity, Purchase_Price,
-//       Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//       Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//         [
-//           purchaseId,
-//           line.Item_Id,
-//           normalizeNumber(line.Quantity) ?? 0,
-//           normalizeNumber(line.Purchase_Price) ?? 0,
+  let Item_Id = item.Item_Id || null;
+  let dbItemRow = null;
 
-//           cleanDiscount(line.Discount_On_Purchase_Price),
-//           cleanValue(line.Discount_Type_On_Purchase_Price),
-//           cleanValue(line.Tax_Type),
-//           normalizeNumber(line.Tax_Amount) ?? 0,
-//           normalizeNumber(line.Amount) ?? 0
-//         ]
-//       );
-//       const id = insertRes.insertId;
-//       await connection.execute(
-//         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
-//         ["PIT" + id.toString().padStart(3, "0"), id]
-//       );
-//       // ✅ INSIDE the loop
-//   await recordItemLedger({
-//     connection,
-//     itemId:      line.Item_Id,
-//     txnType:     "Purchase",
-//     referenceId: id,
-//     formattedId: purchaseId,         // existing "PUR001"
-//     partyName:   Party_Name,
-//     quantity:    normalizeNumber(line.Quantity) ?? 0,
-//     rate:        normalizeNumber(line.Purchase_Price) ?? null,
-//     txnDate:     Bill_Date,
-//   });
-//     }
+  // =====================================================
+  // FIND ITEM
+  // =====================================================
 
-   
-// for (const old of oldItems) {
-//   await reverseItemLedger({
-//     connection,
-//     itemId:      old.Item_Id,
-//     txnType:     "Purchase",
-//     referenceId: old.id,
-//   });
-// }
+  if (Item_Id) {
+    const [rows] = await connection.query(
+      `
+      SELECT *
+      FROM add_item
+      WHERE Item_Id = ?
+      LIMIT 1
+      `,
+      [Item_Id]
+    );
 
-// // Step 3: delete all old rows, reinsert fresh
-// await connection.query(`DELETE FROM add_purchase_items WHERE Purchase_Id = ?`, [purchaseId]);
+    dbItemRow = rows[0] || null;
+  } else {
+    const [rows] = await connection.query(
+      `
+      SELECT *
+      FROM add_item
+      WHERE TRIM(Item_Name) = TRIM(?)
+      LIMIT 1
+      `,
+      [Item_Name]
+    );
 
-// for (const line of resolvedLines) {
-//   const [insertRes] = await connection.execute(`INSERT INTO add_purchase_items ...`);
-//   const id = insertRes.insertId;
+    dbItemRow = rows[0] || null;
 
-//   await connection.execute(
-//     `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
-//     ["PIT" + id.toString().padStart(3, "0"), id]
-//   );
+    Item_Id = dbItemRow?.Item_Id || null;
+  }
 
-//   await recordItemLedger({
-//     connection,
-//     itemId:      line.Item_Id,
-//     txnType:     "Purchase",
-//     referenceId: id,
-//     formattedId: purchaseId,
-//     partyName:   Party_Name,
-//     quantity:    normalizeNumber(line.Quantity) ?? 0,
-//     rate:        normalizeNumber(line.Purchase_Price) ?? null,
-//     txnDate:     Bill_Date,
-//   });
-// }
+  // =====================================================
+  // VALUES THAT WILL BE STORED IN PURCHASE ITEM SNAPSHOT
+  // =====================================================
 
-// Step 2: net stock delta
-const newQtyByItem = new Map();
-for (const line of resolvedLines) {
-  newQtyByItem.set(line.Item_Id, (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity));
+  let snapshot = {
+    Primary_Unit_Snapshot: null,
+    Secondary_Unit_Snapshot: null,
+  };
+
+  let resolvedSelectedUnit = null;
+
+  // IMPORTANT:
+  // Stock_Quantity in add_item is maintained in PRIMARY UNIT.
+  let quantityInBaseUnit = 0;
+
+  // ═════════════════════════════════════════════════════
+  // BRAND-NEW ITEM
+  // ═════════════════════════════════════════════════════
+
+  if (!dbItemRow) {
+
+    /*
+      IMPORTANT RULE:
+
+      If frontend explicitly supplied Primary_Unit:
+          use Primary_Unit
+
+      Otherwise if user selected Item_Unit on purchase:
+          Selected_Unit becomes Primary_Unit
+
+      Otherwise:
+          no unit
+
+      Examples:
+
+      Item_Unit = "kg"
+      Primary_Unit = null
+          => primaryUnit = "kg"
+
+      Item_Unit = null
+      Primary_Unit = null
+          => primaryUnit = null
+
+      Primary_Unit = "kg"
+      Secondary_Unit = "gm"
+      Item_Unit = "gm"
+          => primaryUnit = "kg"
+          => selected purchase unit = "gm"
+    */
+
+    const primaryUnit =
+      Primary_Unit ||
+      Selected_Unit ||
+      null;
+
+    const secondaryUnit =
+      Secondary_Unit || null;
+
+    const conversionRate =
+      secondaryUnit && Number(Conversion_Rate) > 0
+        ? Number(Conversion_Rate)
+        : null;
+
+    // ===================================================
+    // GENERATE ITEM ID
+    // ===================================================
+
+    const [maxRow] = await connection.query(
+      `
+      SELECT
+        MAX(
+          CAST(
+            SUBSTRING(Item_Id, 4)
+            AS UNSIGNED
+          )
+        ) AS maxId
+      FROM add_item
+      WHERE Item_Id LIKE 'ITM%'
+      `
+    );
+
+    const autoId =
+      (maxRow[0]?.maxId || 0) + 1;
+
+    Item_Id =
+      "ITM" +
+      autoId.toString().padStart(3, "0");
+
+    // ===================================================
+    // CREATE NEW ITEM MASTER
+    // ===================================================
+
+    await connection.execute(
+      `
+      INSERT INTO add_item
+      (
+        Item_Id,
+        Item_Name,
+        Item_Category,
+        Item_HSN,
+
+        Item_Unit,
+
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate,
+
+        Stock_Quantity,
+
+        created_at,
+        updated_at
+      )
+      VALUES
+      (
+        ?, ?, ?, ?,
+        ?,
+        ?, ?, ?,
+        ?,
+        NOW(),
+        NOW()
+      )
+      `,
+      [
+        Item_Id,
+        Item_Name,
+        Item_Category || "",
+        cleanValue(Item_HSN),
+
+        // legacy field
+        Item_Unit || "",
+
+        primaryUnit,
+        secondaryUnit,
+        conversionRate,
+
+        // Stock gets updated below using diff calculation
+        0,
+      ]
+    );
+
+    // ===================================================
+    // SAVE CONVERSION HISTORY
+    // ===================================================
+
+    if (
+      primaryUnit &&
+      secondaryUnit &&
+      conversionRate &&
+      conversionRate > 0
+    ) {
+      await connection.query(
+        `
+        INSERT IGNORE INTO item_unit_conversions
+        (
+          Item_Id,
+          Primary_Unit,
+          Secondary_Unit,
+          Conversion_Rate
+        )
+        VALUES (?, ?, ?, ?)
+        `,
+        [
+          Item_Id,
+          primaryUnit,
+          secondaryUnit,
+          conversionRate,
+        ]
+      );
+    }
+
+    // ===================================================
+    // CREATE LOCAL MASTER REPRESENTATION
+    // ===================================================
+
+    dbItemRow = {
+      Item_Id,
+
+      Item_HSN: cleanValue(Item_HSN),
+
+      Item_Category:
+        Item_Category || "",
+
+      Primary_Unit:
+        primaryUnit,
+
+      Secondary_Unit:
+        secondaryUnit,
+
+      Conversion_Rate:
+        conversionRate,
+    };
+
+    // ===================================================
+    // SNAPSHOT
+    // ===================================================
+
+    snapshot = {
+      Primary_Unit_Snapshot:
+        primaryUnit,
+
+      Secondary_Unit_Snapshot:
+        secondaryUnit,
+    };
+
+    /*
+      Selected unit is whatever user selected on purchase.
+
+      If frontend did not send one, use primary.
+
+      Example:
+      New Coca Cola
+      Item_Unit = lt
+
+      primary = lt
+      selected = lt
+    */
+
+    resolvedSelectedUnit =
+      Selected_Unit ||
+      primaryUnit ||
+      null;
+
+    // ===================================================
+    // NORMALIZE STOCK INTO PRIMARY UNIT
+    // ===================================================
+
+    const qty =
+      normalizeNumber(Quantity) ?? 0;
+
+    /*
+      Convention:
+
+      1 PRIMARY = Conversion_Rate SECONDARY
+
+      Example:
+
+      1 lt = 1000 ml
+
+      Purchase:
+      500 ml
+
+      Base stock:
+      500 / 1000 = 0.5 lt
+    */
+
+    if (
+      primaryUnit &&
+      secondaryUnit &&
+      resolvedSelectedUnit === secondaryUnit
+    ) {
+      if (
+        !conversionRate ||
+        conversionRate <= 0
+      ) {
+        await connection.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message:
+            `Conversion rate is required for ${primaryUnit} → ${secondaryUnit}.`,
+        });
+      }
+
+      quantityInBaseUnit =
+        qty / conversionRate;
+    } else {
+      // primary unit OR item has no units
+      quantityInBaseUnit = qty;
+    }
+  }
+
+  // ═════════════════════════════════════════════════════
+  // EXISTING ITEM
+  // ═════════════════════════════════════════════════════
+
+  //   else {
+
+  // // ADD THIS ↓↓↓
+
+  // const oldPurchaseLine = oldItems.find(
+  //   (old) => String(old.Item_Id) === String(Item_Id)
+  // );
+
+  // const oldPrimary =
+  //   oldPurchaseLine?.Primary_Unit_Snapshot || null;
+
+  // const oldSecondary =
+  //   oldPurchaseLine?.Secondary_Unit_Snapshot || null;
+
+  // const oldSelected =
+  //   oldPurchaseLine?.Selected_Unit || null;
+
+  // const oldUsedSecondary =
+  //   oldPurchaseLine &&
+  //   oldSecondary &&
+  //   oldSelected === oldSecondary;
+  else {
+
+  // =====================================================
+  // FIRST UNIT ASSIGNMENT
+  //
+  // Item already exists, but was originally created
+  // with NO unit.
+  //
+  // Example:
+  // master Primary_Unit = NULL
+  // user now selects KG
+  //
+  // => KG becomes the item's Primary_Unit
+  // =====================================================
+
+  if (
+    !dbItemRow.Primary_Unit &&
+    Selected_Unit
+  ) {
+    await connection.query(
+      `
+        UPDATE add_item
+        SET
+          Primary_Unit = ?,
+          Secondary_Unit = NULL,
+          Conversion_Rate = NULL,
+          updated_at = NOW()
+        WHERE Item_Id = ?
+      `,
+      [
+        Selected_Unit,
+        Item_Id,
+      ]
+    );
+
+    // VERY IMPORTANT:
+    // Keep local object synchronized with DB
+    dbItemRow.Primary_Unit = Selected_Unit;
+    dbItemRow.Secondary_Unit = null;
+    dbItemRow.Conversion_Rate = null;
+  }
+
+
+  // =====================================================
+  // NOW YOUR EXISTING OLD PURCHASE LOGIC CONTINUES
+  // =====================================================
+
+  const oldPurchaseLine = oldItems.find(
+    (old) => String(old.Item_Id) === String(Item_Id)
+  );
+
+  const oldPrimary =
+    oldPurchaseLine?.Primary_Unit_Snapshot || null;
+
+  const oldSecondary =
+    oldPurchaseLine?.Secondary_Unit_Snapshot || null;
+
+  const oldSelected =
+    oldPurchaseLine?.Selected_Unit || null;
+
+  const oldUsedSecondary =
+    oldPurchaseLine &&
+    oldSecondary &&
+    oldSelected === oldSecondary;
+
+  // ADD UNTIL HERE ↑↑↑
+
+
+  
+  try {
+
+  // =====================================================
+  // OLD PURCHASE USED SECONDARY UNIT
+  // Example:
+  // old snapshot = KG / GM
+  // old selected = GM
+  // current master = KG / BOX
+  //
+  // Keep KG / GM for this old purchase
+  // =====================================================
+  if (oldUsedSecondary) {
+
+    snapshot = {
+      Primary_Unit_Snapshot: oldPrimary,
+      Secondary_Unit_Snapshot: oldSecondary,
+    };
+
+    // Only old KG / GM are valid for this old transaction
+    if (
+      Selected_Unit !== oldPrimary &&
+      Selected_Unit !== oldSecondary
+    ) {
+      throw new Error(
+        `Allowed units are ${oldPrimary} and ${oldSecondary}.`
+      );
+    }
+
+    resolvedSelectedUnit = Selected_Unit;
+
+    const qty =
+      normalizeNumber(Quantity) ?? 0;
+
+    // User selected primary KG
+    if (Selected_Unit === oldPrimary) {
+      quantityInBaseUnit = qty;
+    }
+
+    // User selected secondary GM
+    else {
+      const [[conversion]] =
+        await connection.query(
+          `
+          SELECT Conversion_Rate
+          FROM item_unit_conversions
+          WHERE Item_Id = ?
+            AND Primary_Unit = ?
+            AND Secondary_Unit = ?
+          ORDER BY id DESC
+          LIMIT 1
+          `,
+          [
+            Item_Id,
+            oldPrimary,
+            oldSecondary,
+          ]
+        );
+
+      const rate =
+        Number(conversion?.Conversion_Rate) || 0;
+
+      if (rate <= 0) {
+        throw new Error(
+          `Conversion rate not found for ${oldPrimary} → ${oldSecondary}.`
+        );
+      }
+
+      quantityInBaseUnit =
+        qty / rate;
+    }
+  }
+
+  // =====================================================
+  // OLD PURCHASE USED PRIMARY
+  // OR item is newly added to this edited purchase
+  //
+  // Use CURRENT master
+  //
+  // old = KG / GM, selected KG
+  // master now = KG / BOX
+  // => use KG / BOX
+  // =====================================================
+  else {
+
+    const result =
+      resolveUnitAndStockDelta({
+        dbItemRow,
+        Selected_Unit,
+        Quantity,
+      });
+
+    snapshot =
+      result.snapshot;
+
+    resolvedSelectedUnit =
+      result.resolvedSelectedUnit;
+
+    quantityInBaseUnit =
+      Number(result.stockDelta) || 0;
+  }
+
 }
-const oldQtyByItem = new Map();
-oldItems.forEach((o) => {
-  oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
-});
+    
+    catch (unitErr) {
+      await connection.rollback();
 
-const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
+      return res.status(400).json({
+        success: false,
+        message: unitErr.message,
+      });
+    }
+
+    // ===================================================
+    // HSN / CATEGORY MAY STILL BE SYNCED
+    // ===================================================
+
+    const updates = [];
+    const params = [];
+
+    if (
+      Item_HSN &&
+      Item_HSN !== dbItemRow.Item_HSN
+    ) {
+      updates.push("Item_HSN = ?");
+      params.push(Item_HSN);
+    }
+
+    if (
+      Item_Category !== undefined &&
+      Item_Category !==
+        dbItemRow.Item_Category
+    ) {
+      updates.push("Item_Category = ?");
+      params.push(Item_Category || "");
+    }
+
+    if (updates.length > 0) {
+      params.push(Item_Id);
+
+      await connection.query(
+        `
+        UPDATE add_item
+        SET
+          ${updates.join(", ")},
+          updated_at = NOW()
+        WHERE Item_Id = ?
+        `,
+        params
+      );
+    }
+  }
+
+  // =====================================================
+  // SAVE RESOLVED LINE
+  // =====================================================
+
+  resolvedLines.push({
+    ...item,
+
+    Item_Id,
+
+    snapshot,
+
+    resolvedSelectedUnit,
+
+    // Normalized quantity used ONLY for stock calculations
+    quantityInBaseUnit,
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════
+// STEP 2 — CALCULATE STOCK DIFFERENCE
+// ═══════════════════════════════════════════════════════
+
+/*
+  IMPORTANT:
+
+  We cannot compare raw purchase quantities.
+
+  Example:
+
+      OLD:
+      1 lt
+
+      NEW:
+      500 ml
+
+  Raw:
+      500 - 1 = 499 ❌
+
+  Base:
+      0.5 lt - 1 lt = -0.5 lt ✅
+*/
+
+
+// =======================================================
+// NEW PURCHASE QUANTITY — NORMALIZED TO PRIMARY UNIT
+// =======================================================
+
+const newQtyByItem = new Map();
+
+for (const line of resolvedLines) {
+  const qty =
+    Number(line.quantityInBaseUnit) || 0;
+
+  newQtyByItem.set(
+    line.Item_Id,
+    (newQtyByItem.get(line.Item_Id) || 0) +
+      qty
+  );
+}
+
+
+// =======================================================
+// OLD PURCHASE QUANTITY — NORMALIZE TO PRIMARY UNIT
+// =======================================================
+
+const oldQtyByItem = new Map();
+
+for (const old of oldItems) {
+
+  const rawQty =
+    Number(old.Quantity) || 0;
+
+  // Get CURRENT item conversion.
+  //
+  // Your rule is that historical conversion rate is
+  // NOT frozen — old transactions use the item's
+  // current conversion rate.
+
+  const snapPrimary = old.Primary_Unit_Snapshot || null;
+const snapSecondary = old.Secondary_Unit_Snapshot || null;
+
+let baseQty = rawQty;
+
+if (snapPrimary && snapSecondary && old.Selected_Unit === snapSecondary) {
+
+  const [[historicalRate]] =
+    await connection.query(
+      `
+      SELECT Conversion_Rate
+      FROM item_unit_conversions
+      WHERE Item_Id = ? AND Primary_Unit = ? AND Secondary_Unit = ?
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [old.Item_Id, snapPrimary, snapSecondary]
+    );
+
+  const conversionRate = Number(historicalRate?.Conversion_Rate) || 0;
+
+  if (conversionRate <= 0) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message:
+        `Missing historical conversion rate for item ${old.Item_Id} (${snapPrimary} → ${snapSecondary}).`,
+    });
+  }
+
+  baseQty =
+    rawQty / conversionRate;
+}
+  
+
+  oldQtyByItem.set(
+    old.Item_Id,
+    (oldQtyByItem.get(old.Item_Id) || 0) +
+      baseQty
+  );
+}
+
+
+// =======================================================
+// APPLY DIFFERENCE TO ITEM MASTER STOCK
+// =======================================================
+
+const allItemIds =
+  new Set([
+    ...newQtyByItem.keys(),
+    ...oldQtyByItem.keys(),
+  ]);
+
 for (const itemId of allItemIds) {
-  const newQty = newQtyByItem.get(itemId) || 0;
-  const oldQty = oldQtyByItem.get(itemId) || 0;
-  const diff   = newQty - oldQty;
+
+  const newQty =
+    newQtyByItem.get(itemId) || 0;
+
+  const oldQty =
+    oldQtyByItem.get(itemId) || 0;
+
+  const diff =
+    newQty - oldQty;
+
   if (diff !== 0) {
     await connection.query(
-      `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW() WHERE Item_Id = ?`,
-      [diff, itemId]
+      `
+      UPDATE add_item
+      SET
+        Stock_Quantity =
+          Stock_Quantity + ?,
+
+        updated_at = NOW()
+
+      WHERE Item_Id = ?
+      `,
+      [
+        diff,
+        itemId,
+      ]
     );
   }
 }
+    // ═══════════════════════════════════════════════════════
+    // STEP 3a — reverse ALL old item ledger rows before deleting purchase_items
+    // ═══════════════════════════════════════════════════════
+    for (const old of oldItems) {
+      await reverseItemLedger({
+        connection,
+        itemId: old.Item_Id,
+        txnType: "Purchase",
+        referenceId: old.id,
+      });
+    }
 
-// Step 3a: reverse ALL old item ledger rows BEFORE deleting purchase_items
-for (const old of oldItems) {
-  await reverseItemLedger({
-    connection,
-    itemId:      old.Item_Id,
-    txnType:     "Purchase",
-    referenceId: old.id,   // still valid — not deleted yet
-  });
-}
+    // STEP 3b — now safe to delete old rows
+    await connection.query(`DELETE FROM add_purchase_items WHERE Purchase_Id = ?`, [purchaseId]);
 
-// Step 3b: now safe to delete old rows
-await connection.query(`DELETE FROM add_purchase_items WHERE Purchase_Id = ?`, [purchaseId]);
+    // STEP 3c — insert fresh rows (WITH unit snapshot columns) + record new ledger entries
+    for (const line of resolvedLines) {
+      const [insertRes] = await connection.execute(
+        `INSERT INTO add_purchase_items
+         (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+          Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+          Tax_Type, Tax_Amount, Amount,
+          Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
+          created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          purchaseId,
+          line.Item_Id,
+          normalizeNumber(line.Quantity) ?? 0,
+          normalizeNumber(line.Purchase_Price) ?? 0,
+          cleanDiscount(line.Discount_On_Purchase_Price),
+          cleanValue(line.Discount_Type_On_Purchase_Price),
+          cleanValue(line.Tax_Type),
+          normalizeNumber(line.Tax_Amount) ?? 0,
+          normalizeNumber(line.Amount) ?? 0,
+          line.snapshot.Primary_Unit_Snapshot,
+          line.snapshot.Secondary_Unit_Snapshot,
+          line.resolvedSelectedUnit,
+        ]
+      );
 
-// Step 3c: insert fresh rows + record new ledger entries
-for (const line of resolvedLines) {
-  const [insertRes] = await connection.execute(
-    `INSERT INTO add_purchase_items
-     (Purchase_Id, Item_Id, Quantity, Purchase_Price,
-      Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-      Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    [
-      purchaseId,
-      line.Item_Id,
-      normalizeNumber(line.Quantity)         ?? 0,
-      normalizeNumber(line.Purchase_Price)   ?? 0,
-      cleanDiscount(line.Discount_On_Purchase_Price),
-      cleanValue(line.Discount_Type_On_Purchase_Price),
-      cleanValue(line.Tax_Type),
-      normalizeNumber(line.Tax_Amount)       ?? 0,
-      normalizeNumber(line.Amount)           ?? 0,
-    ]
-  );
+      const id = insertRes.insertId;
+      await connection.execute(
+        `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
+        ["PIT" + id.toString().padStart(3, "0"), id]
+      );
 
-  const id = insertRes.insertId;
+      await recordItemLedger({
+        connection,
+        itemId: line.Item_Id,
+        txnType: "Purchase",
+        referenceId: id,
+        billId: purchaseId,
+        billNumber: Bill_Number,
+        partyName: Party_Name,
+        quantity: normalizeNumber(line.Quantity) ?? 0,
+        rate: normalizeNumber(line.Purchase_Price) ?? null,
+        txnDate: Bill_Date,
+      });
+    }
 
-  await connection.execute(
-    `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
-    ["PIT" + id.toString().padStart(3, "0"), id]
-  );
-
-  await recordItemLedger({
-    connection,
-    itemId:      line.Item_Id,
-    txnType:     "Purchase",
-    referenceId: id,
-    billId:      purchaseId,
-    billNumber:Bill_Number,
-    //formattedId: purchaseId,
-    partyName:   Party_Name,
-    quantity:    normalizeNumber(line.Quantity)       ?? 0,
-    rate:        normalizeNumber(line.Purchase_Price) ?? null,
-    txnDate:     Bill_Date,
-  });
-}
-
-// NO second loop — stock handled by Step 2, ledger handled by 3a+3c
-
-await connection.commit();
-
-// ── NO second loop at all ──
-// Stock delta already handled by Step 2.
-// Ledger reversal already done above before Step 3.
-
+    await connection.commit();
 
     return res.status(200).json({
       success: true,
@@ -2539,29 +3010,33 @@ const getSinglePurchase = async (req, res, next) => {
 
     const [items] = await connection.query(
       `
-      SELECT
-        pi.Purchase_Items_Id,
-        pi.Item_Id,
+     SELECT
+  pi.Purchase_Items_Id,
+  pi.Item_Id,
 
-        i.Item_Name,
-        i.Item_HSN,
-        i.Item_Unit,
-        i.Item_Category,
+  i.Item_Name,
+  i.Item_HSN,
+  i.Item_Unit,
+  i.Item_Category,
 
-        pi.Quantity,
+  -- CURRENT MASTER
+  i.Primary_Unit AS Current_Primary_Unit,
+  i.Secondary_Unit AS Current_Secondary_Unit,
 
-        -- Historical unit information
-        pi.Primary_Unit_Snapshot,
-        pi.Secondary_Unit_Snapshot,
-        pi.Selected_Unit,
+  pi.Quantity,
 
-        pi.Purchase_Price,
-        pi.Discount_On_Purchase_Price,
-        pi.Discount_Type_On_Purchase_Price,
-        pi.Tax_Amount,
-        pi.Tax_Type,
-        pi.Amount,
-        pi.created_at
+  -- HISTORICAL SNAPSHOT
+  pi.Primary_Unit_Snapshot,
+  pi.Secondary_Unit_Snapshot,
+  pi.Selected_Unit,
+
+  pi.Purchase_Price,
+  pi.Discount_On_Purchase_Price,
+  pi.Discount_Type_On_Purchase_Price,
+  pi.Tax_Amount,
+  pi.Tax_Type,
+  pi.Amount,
+  pi.created_at
 
       FROM add_purchase_items pi
 
@@ -2640,64 +3115,150 @@ const getSinglePurchase = async (req, res, next) => {
       //
       // =======================================================
 
-      if (it.Primary_Unit_Snapshot) {
-        const snapshotUnits = [
-          it.Primary_Unit_Snapshot,
-          it.Secondary_Unit_Snapshot,
-        ].filter(Boolean);
+      // if (it.Primary_Unit_Snapshot) {
+      //   const snapshotUnits = [
+      //     it.Primary_Unit_Snapshot,
+      //     it.Secondary_Unit_Snapshot,
+      //   ].filter(Boolean);
 
-        availableUnits = snapshotUnits.map(
-          (unitCode) => {
-            // Get full unit name from unit master if it
-            // still exists there.
-            const masterUnit = allUnits.find(
-              (unit) =>
-                unit.Unit_Shorthand === unitCode
-            );
+      //   availableUnits = snapshotUnits.map(
+      //     (unitCode) => {
+      //       // Get full unit name from unit master if it
+      //       // still exists there.
+      //       const masterUnit = allUnits.find(
+      //         (unit) =>
+      //           unit.Unit_Shorthand === unitCode
+      //       );
 
-            return {
-              Unit_Shorthand: unitCode,
+      //       return {
+      //         Unit_Shorthand: unitCode,
 
-              // If old unit was removed from master,
-              // still preserve/display its shorthand.
-              Unit_Name:
-                masterUnit?.Unit_Name || unitCode,
-            };
-          }
-        );
-      }
+      //         // If old unit was removed from master,
+      //         // still preserve/display its shorthand.
+      //         Unit_Name:
+      //           masterUnit?.Unit_Name || unitCode,
+      //       };
+      //     }
+      //   );
+      // }
 
-      // =======================================================
-      // CASE 2:
-      // NO SNAPSHOT
-      // =======================================================
-      //
-      // This means the transaction happened while the item
-      // did not have Primary/Secondary configuration.
-      //
-      // Therefore dropdown uses:
-      //
-      // None + ALL CURRENT MASTER UNITS
-      //
-      // =======================================================
+     
 
-      else {
-        availableUnits = [
-          {
-            Unit_Shorthand: null,
-            Unit_Name: "None",
-          },
+      // else {
+      //   availableUnits = [
+      //     {
+      //       Unit_Shorthand: null,
+      //       Unit_Name: "None",
+      //     },
 
-          ...allUnits.map((unit) => ({
-            Unit_Shorthand:
-              unit.Unit_Shorthand,
+      //     ...allUnits.map((unit) => ({
+      //       Unit_Shorthand:
+      //         unit.Unit_Shorthand,
 
-            Unit_Name:
-              unit.Unit_Name,
-          })),
-        ];
-      }
+      //       Unit_Name:
+      //         unit.Unit_Name,
+      //     })),
+      //   ];
+      // }
+// =======================================================
+// DECIDE WHICH UNITS EDIT PURCHASE SHOULD SHOW
+// =======================================================
 
+const oldPrimary =
+  it.Primary_Unit_Snapshot || null;
+
+const oldSecondary =
+  it.Secondary_Unit_Snapshot || null;
+
+const oldSelected =
+  it.Selected_Unit || null;
+
+const currentPrimary =
+  it.Current_Primary_Unit || null;
+
+const currentSecondary =
+  it.Current_Secondary_Unit || null;
+
+
+// Did this OLD purchase actually use its secondary unit?
+//
+// Old snapshot: KG / GM
+// Selected:     GM
+//
+// => TRUE
+const oldUsedSecondary =
+  oldSecondary &&
+  oldSelected === oldSecondary;
+
+
+let unitCodes = [];
+
+
+// =======================================================
+// CASE 1: OLD PURCHASE USED OLD SECONDARY
+//
+// Old snapshot  = KG / GM
+// Old selected  = GM
+// Current master = KG / BOX
+//
+// SHOW => KG / GM
+// =======================================================
+
+if (oldUsedSecondary) {
+
+  unitCodes = [
+    oldPrimary,
+    oldSecondary,
+  ].filter(Boolean);
+
+}
+
+
+// =======================================================
+// CASE 2: OLD PURCHASE USED PRIMARY
+//
+// Old snapshot   = KG / GM
+// Old selected   = KG
+// Current master = KG / BOX
+//
+// SHOW => KG / BOX
+//
+// ALSO:
+// Current master KG only
+// => show KG only
+// =======================================================
+
+else {
+
+  unitCodes = [
+    currentPrimary,
+    currentSecondary,
+  ].filter(Boolean);
+
+}
+
+
+// Remove duplicates just in case
+unitCodes = [...new Set(unitCodes)];
+
+
+// =======================================================
+// CREATE Available_Units FOR FRONTEND
+// =======================================================
+
+availableUnits = unitCodes.map((unitCode) => {
+
+  const masterUnit = allUnits.find(
+    (unit) =>
+      unit.Unit_Shorthand === unitCode
+  );
+
+  return {
+    Unit_Shorthand: unitCode,
+    Unit_Name:
+      masterUnit?.Unit_Name || unitCode,
+  };
+});
       // =======================================================
       // RETURN FORMATTED ITEM
       // =======================================================
@@ -2729,10 +3290,10 @@ const getSinglePurchase = async (req, res, next) => {
         // UNIT DATA
         // =====================================================
 
-        Primary_Unit_Snapshot:
+        Primary_Unit:
           it.Primary_Unit_Snapshot,
 
-        Secondary_Unit_Snapshot:
+        Secondary_Unit:
           it.Secondary_Unit_Snapshot,
 
         // ONE unit selected by user for this bill row

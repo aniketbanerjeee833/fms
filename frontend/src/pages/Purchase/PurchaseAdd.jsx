@@ -1644,6 +1644,8 @@ export default function PurchaseAdd() {
                                   handleRowChange(i, "isExistingItem", false);
                                   handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
                                   handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                                  // ✅ IMPORTANT
+                                  handleRowChange(i, "Available_Units", []);
                                 }
                                 //handleRowChange(i, "isExistingItem", exists); // false if new item
                               }}
@@ -1673,6 +1675,10 @@ export default function PurchaseAdd() {
                                         itemOpen: false,
                                         Primary_Unit: matchedItem.Primary_Unit || null,      // 🔹 add this
                                         Secondary_Unit: matchedItem.Secondary_Unit || null,  // 🔹 add this
+                                        Conversion_Rate: matchedItem.Conversion_Rate || null,
+                                        Available_Units: Array.isArray(matchedItem.Available_Units)
+                                          ? matchedItem.Available_Units
+                                          : [],
 
                                       };
                                       return updated;
@@ -1756,6 +1762,11 @@ export default function PurchaseAdd() {
                                                 isUnitLocked: false,     // lock unit
                                                 Primary_Unit: it.Primary_Unit || null,      // 🔹 add this
                                                 Secondary_Unit: it.Secondary_Unit || null,  // 🔹 add this
+                                                //Available_Units: item.Available_Units || [],
+                                                Conversion_Rate: it.Conversion_Rate || null,
+                                                Available_Units: Array.isArray(it.Available_Units)
+                                                  ? it.Available_Units
+                                                  : [],
                                               };
                                               return updated;
                                             });
@@ -1769,7 +1780,7 @@ export default function PurchaseAdd() {
                                             setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
                                             //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Item_Unit`, it.Primary_Unit || it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                            setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
 
                                             handleRowChange(i, "itemOpen", false);
 
@@ -1965,7 +1976,7 @@ export default function PurchaseAdd() {
                           </p>
                         )}
                       </td> */}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        {/* <td style={{ padding: "0px", width: "12%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Item_Unit`}
@@ -2011,12 +2022,12 @@ export default function PurchaseAdd() {
                                 >
                                   {hasConfiguredUnits ? (
                                     <>
-                                      {/* PRIMARY UNIT */}
+                                      {/* PRIMARY UNIT 
                                       <option value={primaryUnit}>
                                         {primaryUnit}
                                       </option>
 
-                                      {/* SECONDARY UNIT */}
+                                      {/* SECONDARY UNIT 
                                       {secondaryUnit && (
                                         <option value={secondaryUnit}>
                                           {secondaryUnit}
@@ -2025,7 +2036,7 @@ export default function PurchaseAdd() {
                                     </>
                                   ) : (
                                     <>
-                                      {/* OLD / NO UNIT CONFIGURATION */}
+                                      {/* OLD / NO UNIT CONFIGURATION 
                                       <option value="">NONE</option>
 
                                       {Array.isArray(itemUnits) &&
@@ -2053,7 +2064,90 @@ export default function PurchaseAdd() {
                               {errors.items[i].Item_Unit.message}
                             </p>
                           )}
-                        </td>
+                        </td> */}
+                         <td style={{ padding: "0px", width: "12%" }}>
+                                                <Controller
+                                                  control={control}
+                                                  name={`items.${i}.Item_Unit`}
+                                                  render={({ field }) => {
+                                                    const row = rows[i];
+                        
+                                                    const availableUnits = Array.isArray(row?.Available_Units)
+                                                      ? row.Available_Units
+                                                      : [];
+                        
+                                                    return (
+                                                      <select
+                                                        {...field}
+                                                        value={field.value || ""}
+                                                        className="form-select"
+                                                        style={{
+                                                          width: "100%",
+                                                          fontSize: "12px",
+                                                          marginLeft: "0px",
+                                                        }}
+                                                        disabled={row?.isUnitLocked}
+                                                        onChange={(e) => {
+                                                          const value = e.target.value;
+                        
+                                                          if (value === "__ADD_UNIT__") {
+                                                            setActiveUnitRow(i);
+                                                            setShowAddUnitModal(true);
+                                                            return;
+                                                          }
+                        
+                                                          field.onChange(value);
+                        
+                                                          handleRowChange(i, "Item_Unit", value);
+                        
+                                                          setValue(`items.${i}.Item_Unit`, value, {
+                                                            shouldValidate: true,
+                                                            shouldDirty: true,
+                                                          });
+                                                        }}
+                                                      >
+                                                        {/* Item has configured units */}
+                                                        {availableUnits.length > 0 ? (
+                                                          availableUnits.map((unit) => (
+                                                            <option
+                                                              key={unit.Unit_Shorthand}
+                                                              value={unit.Unit_Shorthand}
+                                                            >
+                                                              {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                                            </option>
+                                                          ))
+                                                        ) : (
+                                                          <>
+                                                            <option value="">NONE</option>
+                        
+                                                            {/* Only allow choosing/adding unit when
+                                          selected item has NO configured units */}
+                                                            {Array.isArray(itemUnits) &&
+                                                              itemUnits.map((unit) => (
+                                                                <option
+                                                                  key={unit.Unit_Shorthand}
+                                                                  value={unit.Unit_Shorthand}
+                                                                >
+                                                                  {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                                                </option>
+                                                              ))}
+                        
+                                                            <option value="__ADD_UNIT__">
+                                                              ➕ Add Unit
+                                                            </option>
+                                                          </>
+                                                        )}
+                                                      </select>
+                                                    );
+                                                  }}
+                                                />
+                        
+                                                {errors?.items?.[i]?.Item_Unit && (
+                                                  <p className="text-red-500 text-xs mt-1">
+                                                    {errors.items[i].Item_Unit.message}
+                                                  </p>
+                                                )}
+                                              </td>
 
 
 

@@ -100,6 +100,16 @@ const handleSave = async () => {
     return;
   }
 
+   if (
+    baseUnit &&
+    secondaryUnit &&
+    baseUnit === secondaryUnit
+  ) {
+    setConversionError(
+      "Base unit and secondary unit cannot be the same"
+    );
+    return;
+  }
   // 3. BOTH UNITS BUT NO CONVERSION SELECTED
   if (!selectedRate) {
     setConversionError("Please select a conversion rate");

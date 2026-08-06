@@ -760,6 +760,88 @@ const editItem = async (req, res, next) => {
         message: "Another item with this name already exists.",
       });
     }
+    // =========================================================
+// PRIMARY UNIT LOCK
+//
+// RULE:
+// If this item has EVER been used in a transaction
+// with ANY selected unit, Primary_Unit cannot change.
+//
+// Secondary_Unit can still change.
+// =========================================================
+
+const [[existingItem]] = await connection.query(
+  `
+    SELECT Primary_Unit
+    FROM add_item
+    WHERE Item_Id = ?
+    LIMIT 1
+  `,
+  [Item_Id]
+);
+
+if (!existingItem) {
+  await connection.rollback();
+
+  return res.status(404).json({
+    success: false,
+    message: "Item not found.",
+  });
+}
+
+const oldPrimary = existingItem.Primary_Unit || null;
+const newPrimary = Primary_Unit || null;
+
+
+// =========================================================
+// ONLY CHECK WHEN PRIMARY IS BEING CHANGED
+// =========================================================
+ //+
+        // (
+        //   SELECT COUNT(*)
+        //   FROM add_sale_items
+        //   WHERE Item_Id = ?
+        //     AND Selected_Unit IS NOT NULL
+        //     AND TRIM(Selected_Unit) <> ''
+        // )
+if (oldPrimary !== newPrimary) {
+
+  const [[{ unitUsedCount }]] = await connection.query(
+    `
+      SELECT
+        (
+          SELECT COUNT(*)
+          FROM add_purchase_items
+          WHERE Item_Id = ?
+            AND Selected_Unit IS NOT NULL
+            AND TRIM(Selected_Unit) <> ''
+        )
+       
+        AS unitUsedCount
+    `,
+    [
+      Item_Id,
+     
+    ]
+  );
+
+
+  // =======================================================
+  // ANY UNIT HAS BEEN USED
+  // PRIMARY IS NOW LOCKED
+  // =======================================================
+
+  if (Number(unitUsedCount) > 0) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message:
+        `Primary Unit "${oldPrimary || "None"}" cannot be changed ` +
+        `because this item has already been used with a unit in a transaction.`,
+    });
+  }
+}
     const [result] = await connection.execute(
       `UPDATE add_item
 SET
@@ -1289,22 +1371,98 @@ const getAllItems = async (req, res, next) => {
     // 11. MERGE EVERYTHING
     // =========================================================
 
-    const combined = items.map((item) => ({
-      ...item,
+    // const combined = items.map((item) => ({
+    //   ...item,
 
-      Purchase_Price:
-        latestPurchasePrice[item.Item_Id] ?? 0,
+    //   Purchase_Price:
+    //     latestPurchasePrice[item.Item_Id] ?? 0,
 
-      Tax_Type:
-        latestTaxType[item.Item_Id] ?? null,
+    //   Tax_Type:
+    //     latestTaxType[item.Item_Id] ?? null,
 
-      Sale_Price:
-        latestSalePrice[item.Item_Id] ?? 0,
+    //   Sale_Price:
+    //     latestSalePrice[item.Item_Id] ?? 0,
 
-      // All previously saved conversions
-      unitConversions:
-        conversionsByItem[item.Item_Id] || [],
-    }));
+    //   // All previously saved conversions
+    //   unitConversions:
+    //     conversionsByItem[item.Item_Id] || [],
+    // }));
+    // =========================================================
+// 11. MERGE EVERYTHING
+// =========================================================
+const [unitMaster] = await connection.query(`
+  SELECT
+    Unit_Name,
+    Unit_Shorthand
+  FROM units
+`);
+const unitLookup = {};
+
+unitMaster.forEach((unit) => {
+  unitLookup[unit.Unit_Shorthand] = unit.Unit_Name;
+});
+const combined = items.map((item) => {
+  // =======================================================
+  // AVAILABLE UNITS = CURRENT ITEM MASTER ONLY
+  //
+  // Example:
+  // Current master:
+  // Primary   = Kgs
+  // Secondary = BOX
+  //
+  // Available_Units:
+  // Kgs + BOX
+  //
+  // OLD Kgs/gm conversions are NOT included here.
+  // =======================================================
+
+  const availableUnits = [];
+
+  // PRIMARY
+  if (item.Primary_Unit) {
+    availableUnits.push({
+      Unit_Shorthand: item.Primary_Unit,
+
+      Unit_Name:
+        unitLookup[item.Primary_Unit] ||
+        item.Primary_Unit,
+    });
+  }
+
+  // SECONDARY
+  if (
+    item.Secondary_Unit &&
+    item.Secondary_Unit !== item.Primary_Unit
+  ) {
+    availableUnits.push({
+      Unit_Shorthand: item.Secondary_Unit,
+
+      Unit_Name:
+        unitLookup[item.Secondary_Unit] ||
+        item.Secondary_Unit,
+    });
+  }
+
+  return {
+    ...item,
+
+    Purchase_Price:
+      latestPurchasePrice[item.Item_Id] ?? 0,
+
+    Tax_Type:
+      latestTaxType[item.Item_Id] ?? null,
+
+    Sale_Price:
+      latestSalePrice[item.Item_Id] ?? 0,
+
+    // CURRENT configured units
+    Available_Units: availableUnits,
+
+    // Historical conversion records
+    unitConversions:
+      conversionsByItem[item.Item_Id] || [],
+  };
+});
 
     // =========================================================
     // 12. RESPONSE
