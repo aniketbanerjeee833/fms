@@ -424,6 +424,7 @@ export default function SaleEdit() {
     Item_Name: "",
     itemSearch: "",
     Item_HSN: "",
+    Item_Unit: "",
     Quantity: "",
     Sale_Price: "",
     Discount_On_Sale_Price: "",
@@ -447,7 +448,7 @@ export default function SaleEdit() {
       //   isExistingItem: true,           // lock category/HSN if needed
 
       //   isHSNLocked: false,
-      //   isUnitLocked: true,
+      //   isUnitLocked: false,
       //   CategoryOpen: false,
       //   itemOpen: false,
       //   itemQuantity: it.Quantity || 0,
@@ -457,11 +458,12 @@ export default function SaleEdit() {
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item) => ({
           ...item,
+          Item_Unit: item.Selected_Unit || "",
           itemSearch: item.Item_Name,
           itemOpen: false,
           CategoryOpen: false,
           isHSNLocked: false,
-          isUnitLocked: true,
+          isUnitLocked: false,
           isExistingItem: true,
         }))
         : [emptyRow()];
@@ -482,9 +484,9 @@ export default function SaleEdit() {
         Total_Amount: sale.invoicePartyDetails?.Total_Amount || "",
         Total_Received: sale.invoicePartyDetails?.Total_Received || "",
         Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
-          Terms_Conditions_Id: sale?.invoicePartyDetails?.Terms_Conditions_Id ?? null,
+        Terms_Conditions_Id: sale?.invoicePartyDetails?.Terms_Conditions_Id ?? null,
 
-        Terms_Conditions_Description:sale?.invoicePartyDetails?.Terms_Conditions_Description ?? "",
+        Terms_Conditions_Description: sale?.invoicePartyDetails?.Terms_Conditions_Description ?? "",
 
         // Payment_Type: sale.invoicePartyDetails?.Payment_Type || "",
         // Bank_Account_Id: sale.invoicePartyDetails?.Bank_Account_Id, // ✅ Add this
@@ -734,7 +736,7 @@ export default function SaleEdit() {
     // 5. BALANCE DUE
     // =========================================================
 
-    const balanceDue =totalAmount - totalReceived;
+    const balanceDue = totalAmount - totalReceived;
 
     // =========================================================
     // 6. BUILD PAYLOAD
@@ -898,7 +900,7 @@ export default function SaleEdit() {
   //       categorySearch: it.Item_Category || "",
   //       isExistingItem: true,
   //       isHSNLocked: false,
-  //       isUnitLocked: true,
+  //       isUnitLocked: false,
   //     };
   //     return updated;
   //   });
@@ -915,7 +917,7 @@ export default function SaleEdit() {
   //   setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
   //   handleRowChange(i, "itemOpen", false);
 
-  
+
   const showSalePayment = totalAmountWatch > 0;
 
   console.log(currentPartyDetails, "currentPartyDetails");
@@ -1727,12 +1729,16 @@ export default function SaleEdit() {
                               );
                               if (exists) {
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                                setValue(`items.${i}.Item_Id`, exists.Item_Id, { shouldValidate: true }); // ✅ re-link if it matches another real item
+                                //setValue(`items.${i}.Item_Id`, exists.Item_Id, { shouldValidate: true }); // ✅ re-link if it matches another real item
                                 handleRowChange(i, "isExistingItem", true);
                               } else {
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });  // ✅ keep typed value (not "")
-                                setValue(`items.${i}.Item_Id`, "", { shouldValidate: false });           // ✅ detach old Item_Id → backend treats as new item
+                                //setValue(`items.${i}.Item_Id`, "", { shouldValidate: false });           // ✅ detach old Item_Id → backend treats as new item
                                 handleRowChange(i, "isExistingItem", false);
+
+                                handleRowChange(i, "Primary_Unit", null);
+                                handleRowChange(i, "Secondary_Unit", null);
+                                handleRowChange(i, "Available_Units", []);
                               }
                               // if (exists) {
                               //   // ✅ Only store if it's a valid item
@@ -1766,8 +1772,16 @@ export default function SaleEdit() {
                                       categorySearch: matchedItem.Item_Category || "",
                                       isExistingItem: true,
                                       isHSNLocked: false,
-                                      isUnitLocked: true,
+                                      isUnitLocked: false,
                                       itemOpen: false,
+                                      Primary_Unit: matchedItem.Primary_Unit || null,
+                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
+                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                                      // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
+                                      Available_Units: Array.isArray(matchedItem.Available_Units)
+                                        ? matchedItem.Available_Units
+                                        : [],
                                     };
                                     return updated;
                                   });
@@ -1776,8 +1790,8 @@ export default function SaleEdit() {
                                   setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-
+                                  //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1857,8 +1871,16 @@ export default function SaleEdit() {
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: true,     // lock unit
+                                              isUnitLocked: false,     // lock unit
                                               itemQuantity: it.Stock_Quantity || 0,
+                                              Primary_Unit: it.Primary_Unit || null,
+                                              Secondary_Unit: it.Secondary_Unit || null,
+                                              Conversion_Rate: it.Conversion_Rate || null,
+
+                                              Available_Units: Array.isArray(it.Available_Units)
+                                                ? it.Available_Units
+                                                : [],
+
                                             };
                                             return updated;
                                           });
@@ -1869,9 +1891,25 @@ export default function SaleEdit() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            it.Primary_Unit || "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
                                           setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
-                                          setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
+                                          //setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
+                                          // setValue(
+                                          //   `items.${i}.Tax_Type`,
+                                          //   it.Tax_Type || "None",
+                                          //   {
+                                          //     shouldValidate: true,
+                                          //     shouldDirty: true,
+                                          //   }
+                                          // );
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2052,7 +2090,7 @@ export default function SaleEdit() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -2088,11 +2126,94 @@ export default function SaleEdit() {
                                   </option>
                                 ))}
 
-                              {/* ➕ Add Unit always at bottom */}
+                              {/* ➕ Add Unit always at bottom *
 
                             </select>
                           )}
                         />
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Item_Unit.message}
+                          </p>
+                        )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+
+                            const availableUnits = Array.isArray(row?.Available_Units)
+                              ? row.Available_Units
+                              : [];
+
+                            return (
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="form-select"
+                                style={{
+                                  width: "100%",
+                                  fontSize: "12px",
+                                  marginLeft: "0px",
+                                }}
+                                disabled={row?.isUnitLocked}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+
+                                  if (value === "__ADD_UNIT__") {
+                                    setActiveUnitRow(i);
+                                    setShowAddUnitModal(true);
+                                    return;
+                                  }
+
+                                  field.onChange(value);
+
+                                  handleRowChange(i, "Item_Unit", value);
+
+                                  setValue(`items.${i}.Item_Unit`, value, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }}
+                              >
+                                {/* Item has configured units */}
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option
+                                      key={unit.Unit_Shorthand}
+                                      value={unit.Unit_Shorthand}
+                                    >
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="">NONE</option>
+
+                                    {/* Only allow choosing/adding unit when
+                                        selected item has NO configured units */}
+                                    {Array.isArray(itemUnits) &&
+                                      itemUnits.map((unit) => (
+                                        <option
+                                          key={unit.Unit_Shorthand}
+                                          value={unit.Unit_Shorthand}
+                                        >
+                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                        </option>
+                                      ))}
+
+                                    <option value="__ADD_UNIT__">
+                                      ➕ Add Unit
+                                    </option>
+                                  </>
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+
                         {errors?.items?.[i]?.Item_Unit && (
                           <p className="text-red-500 text-xs mt-1">
                             {errors.items[i].Item_Unit.message}
@@ -2344,7 +2465,7 @@ export default function SaleEdit() {
                   termsList={termsTemplates}
                   applicable="Sale_Invoice"
                   value={watch("Terms_Conditions_Id")}
-                    description={watch("Terms_Conditions_Description")}
+                  description={watch("Terms_Conditions_Description")}
                   onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
                     setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
                       shouldDirty: true,

@@ -10,6 +10,7 @@ import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
+import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
 // import puppeteer from "puppeteer";
 //import pdf from "html-pdf-node";
 const TAX_TYPES = {
@@ -4508,221 +4509,1081 @@ const editSale = async (req, res, next) => {
     //   docNumber: Invoice_Number,
     //   balanceDue: balanceDue,
     // });
-    const [oldItems] = await connection.query(
-      "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
-      [saleId]
+//     const [oldItems] = await connection.query(
+//       "SELECT * FROM add_sale_items WHERE Sale_Id = ?",
+//       [saleId]
+//     );
+//     // const oldMap = new Map();
+//     // oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
+
+//     // 🔹 Step 1: resolve every line to its real Item_Id first (create new items if needed)
+//     const resolvedLines = [];
+//     for (const item of items) {
+//       if (!item.Item_Name?.trim()) {
+
+//         // Only Amount > 0 makes Item_Name mandatory
+//         if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+//           await connection.rollback();
+
+//           return res.status(400).json({
+//             success: false,
+//             message: "Please enter an item name for the row.",
+//           });
+//         }
+
+//         // Amount blank / 0 + no Item_Name
+//         // Treat as empty placeholder row
+//         continue;
+//       }
+//       let Item_Id = item.Item_Id || null;
+//       let dbItemRow = null;
+
+//       if (Item_Id) {
+//         const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
+//         dbItemRow = rows[0] || null;
+//       } else {
+//         const [rows] = await connection.query("SELECT * FROM add_item WHERE TRIM(Item_Name)= TRIM(?) LIMIT 1", [item.Item_Name]);
+//         //const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [item.Item_Name]);
+//         dbItemRow = rows[0] || null;
+//         Item_Id = dbItemRow?.Item_Id || null;
+//       }
+
+//       if (!dbItemRow) {
+//         const [maxRow] = await connection.query(
+//           `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
+//         );
+//         const autoId = (maxRow[0]?.maxId || 0) + 1;
+//         Item_Id = "ITM" + autoId.toString().padStart(3, "0");
+
+//         await connection.execute(
+//           `INSERT INTO add_item
+//        (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit,
+//         Stock_Quantity, created_at, updated_at)
+//        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//           [
+//             Item_Id,
+//             item.Item_Name,
+//             item.Item_Category || "",
+//             cleanValue(item.Item_HSN),
+//             item.Item_Unit || "",
+//             0, // stock adjusted in step 2 below, based on net quantity
+//           ]
+//         );
+//         dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
+//       }
+//       else {
+//         const updates = [];
+//         const params = [];
+
+//         if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+//           updates.push("Item_HSN = ?");
+//           params.push(item.Item_HSN);
+//         }
+//         if (item.Item_Category !== undefined && item.Item_Category !== dbItemRow.Item_Category) {
+//           updates.push("Item_Category = ?");
+//           params.push(item.Item_Category || "");
+//         }
+
+//         if (updates.length > 0) {
+//           params.push(Item_Id);
+//           await connection.query(
+//             `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
+//             params
+//           );
+//         }
+//       }
+//       // else if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
+//       //   await connection.query(
+//       //     `UPDATE add_item SET Item_HSN = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
+//       //     [item.Item_HSN, Item_Id]
+//       //   );
+//       // }
+
+//       resolvedLines.push({ ...item, Item_Id });
+//     }
+
+//     // 🔹 Step 2: net stock delta per Item_Id across ALL new lines vs ALL old lines for that item
+//     const newQtyByItem = new Map();
+//     for (const line of resolvedLines) {
+//       newQtyByItem.set(
+//         line.Item_Id,
+//         (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity)
+//       );
+//     }
+//     const oldQtyByItem = new Map();
+//     oldItems.forEach((o) => {
+//       oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
+//     });
+
+//     const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
+//     for (const itemId of allItemIds) {
+//       const newQty = newQtyByItem.get(itemId) || 0;
+//       const oldQty = oldQtyByItem.get(itemId) || 0;
+//       const diff = newQty - oldQty; // positive → more sold → deduct more stock
+//       if (diff !== 0) {
+//         await connection.query(
+//           `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
+//           [diff, itemId]
+//         );
+//       }
+//     }
+
+  
+//     for (const old of oldItems) {
+//   await reverseItemLedger({
+//     connection,
+//     itemId:      old.Item_Id,
+//     txnType:     "Sale",
+//     referenceId: old.id,   // still valid — not deleted yet
+//   });
+// }
+
+// // Step 3b: delete old rows
+// await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
+
+// // Step 3c: insert fresh rows + record new ledger entries
+// for (const line of resolvedLines) {
+//   const [purchaseTax] = await connection.query(
+//     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+//     [line.Item_Id]
+//   );
+//   const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+
+//   const [insertRes] = await connection.execute(
+//     `INSERT INTO add_sale_items
+//      (Sale_Id, Item_Id, Quantity, Sale_Price,
+//       Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+//       Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+//      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//     [
+//       saleId,
+//       line.Item_Id,
+//       normalizeNumber(line.Quantity)        ?? 0,
+//       normalizeNumber(line.Sale_Price)      ?? 0,
+//       cleanDiscount(line.Discount_On_Sale_Price),
+//       cleanValue(line.Discount_Type_On_Sale_Price),
+//       cleanValue(safeTaxType),
+//       normalizeNumber(line.Tax_Amount)      ?? 0,
+//       normalizeNumber(line.Amount)          ?? 0,
+//     ]
+//   );
+
+//   const id    = insertRes.insertId;
+//   const newId = "SIT" + id.toString().padStart(3, "0");
+
+//   await connection.execute(
+//     `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
+//     [newId, id]
+//   );
+
+//   // ✅ record fresh item ledger entry
+//   await recordItemLedger({
+//     connection,
+//     itemId:      line.Item_Id,
+//     txnType:     "Sale",
+//     referenceId: id,
+//      billId:      saleId,
+//   billNumber: Invoice_Number,
+//     //formattedId: saleId,       // "SAL001"
+//     partyName:   Party_Name,
+//     quantity:    normalizeNumber(line.Quantity)   ?? 0,
+//     rate:        normalizeNumber(line.Sale_Price) ?? null,
+//     txnDate:     Invoice_Date,
+//   });
+// }
+
+// =========================================================
+// OLD SALE ITEMS
+// =========================================================
+
+const [oldItems] = await connection.query(
+  `SELECT *
+   FROM add_sale_items
+   WHERE Sale_Id = ?`,
+  [saleId]
+);
+
+
+// =========================================================
+// STEP 1: RESOLVE ALL NEW SALE LINES
+// =========================================================
+
+const resolvedLines = [];
+
+for (const item of items) {
+
+  // -------------------------------------------------------
+  // EMPTY ROW
+  // -------------------------------------------------------
+
+  if (!item.Item_Name?.trim()) {
+
+    if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Please enter an item name for the row.",
+      });
+    }
+
+    continue;
+  }
+
+
+  // =======================================================
+  // TRANSACTION SELECTED UNIT
+  //
+  // Frontend Item_Unit = selected transaction unit
+  // add_item.Item_Unit is legacy and remains ""
+  // =======================================================
+
+  const Selected_Unit =
+    item.Item_Unit?.trim() || null;
+
+
+  let Item_Id =
+    item.Item_Id || null;
+
+  let dbItemRow = null;
+
+
+  // =======================================================
+  // FIND ITEM MASTER
+  // =======================================================
+
+  if (Item_Id) {
+
+    const [rows] = await connection.query(
+      `
+        SELECT *
+        FROM add_item
+        WHERE Item_Id = ?
+        LIMIT 1
+      `,
+      [Item_Id]
     );
-    // const oldMap = new Map();
-    // oldItems.forEach((i) => oldMap.set(i.Item_Id, i));
 
-    // 🔹 Step 1: resolve every line to its real Item_Id first (create new items if needed)
-    const resolvedLines = [];
-    for (const item of items) {
-      if (!item.Item_Name?.trim()) {
+    dbItemRow = rows[0] || null;
 
-        // Only Amount > 0 makes Item_Name mandatory
-        if ((normalizeNumber(item.Amount) ?? 0) > 0) {
+  } else {
+
+    const [rows] = await connection.query(
+      `
+        SELECT *
+        FROM add_item
+        WHERE TRIM(Item_Name) = TRIM(?)
+        LIMIT 1
+      `,
+      [item.Item_Name]
+    );
+
+    dbItemRow = rows[0] || null;
+
+    Item_Id =
+      dbItemRow?.Item_Id || null;
+  }
+
+
+  // These are what THIS sale row will save
+  let stockDelta = 0;
+
+  let snapshot = {
+    Primary_Unit: null,
+    Secondary_Unit: null,
+  };
+
+  let resolvedSelectedUnit =
+    Selected_Unit;
+
+
+  // =======================================================
+  // CASE 1: BRAND-NEW ITEM
+  // =======================================================
+
+  if (!dbItemRow) {
+
+    const [maxRow] = await connection.query(
+      `
+        SELECT
+          MAX(
+            CAST(
+              SUBSTRING(Item_Id, 4)
+              AS UNSIGNED
+            )
+          ) AS maxId
+        FROM add_item
+        WHERE Item_Id LIKE 'ITM%'
+      `
+    );
+
+    const autoId =
+      (maxRow[0]?.maxId || 0) + 1;
+
+    Item_Id =
+      "ITM" +
+      autoId.toString().padStart(3, "0");
+
+
+    // -----------------------------------------------------
+    // FIRST SELECTED UNIT BECOMES PRIMARY
+    //
+    // New item + Kgs:
+    //
+    // Primary = Kgs
+    // Secondary = NULL
+    //
+    // New item + NONE:
+    //
+    // Primary = NULL
+    // -----------------------------------------------------
+
+    const firstPrimaryUnit =
+      Selected_Unit || null;
+
+
+    stockDelta =
+      normalizeNumber(item.Quantity) ?? 0;
+
+
+    snapshot = {
+      Primary_Unit:
+        firstPrimaryUnit,
+
+      Secondary_Unit:
+        null,
+    };
+
+
+    await connection.execute(
+      `
+        INSERT INTO add_item
+        (
+          Item_Id,
+          Item_Name,
+          Item_Category,
+          Item_HSN,
+
+          Item_Unit,
+
+          Primary_Unit,
+          Secondary_Unit,
+          Conversion_Rate,
+
+          Stock_Quantity,
+
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `,
+      [
+        Item_Id,
+
+        item.Item_Name.trim(),
+        item.Item_Category || "",
+        cleanValue(item.Item_HSN),
+
+        // legacy field
+        "",
+
+        firstPrimaryUnit,
+        null,
+        null,
+
+        // SALE = stock OUT
+        -stockDelta,
+      ]
+    );
+
+
+    dbItemRow = {
+      Item_Id,
+
+      Item_HSN:
+        item.Item_HSN,
+
+      Item_Category:
+        item.Item_Category || "",
+
+      Primary_Unit:
+        firstPrimaryUnit,
+
+      Secondary_Unit:
+        null,
+
+      Conversion_Rate:
+        null,
+    };
+  }
+
+
+  // =======================================================
+  // CASE 2: EXISTING ITEM
+  // =======================================================
+
+  else {
+
+    // =====================================================
+    // ⭐ IMPORTANT CASE:
+    // EXISTING MASTER HAS NO PRIMARY YET
+    //
+    // Master:
+    // Primary = NULL
+    //
+    // User edits sale and selects Kgs
+    //
+    // => Kgs becomes FIRST PRIMARY UNIT
+    // =====================================================
+
+    if (
+      !dbItemRow.Primary_Unit &&
+      Selected_Unit
+    ) {
+
+      await connection.query(
+        `
+          UPDATE add_item
+          SET
+            Primary_Unit = ?,
+            Secondary_Unit = NULL,
+            Conversion_Rate = NULL,
+            Item_Unit = '',
+            updated_at = NOW()
+          WHERE Item_Id = ?
+        `,
+        [
+          Selected_Unit,
+          Item_Id,
+        ]
+      );
+
+
+      // IMPORTANT:
+      // Keep our in-memory master synchronized
+
+      dbItemRow.Primary_Unit =
+        Selected_Unit;
+
+      dbItemRow.Secondary_Unit =
+        null;
+
+      dbItemRow.Conversion_Rate =
+        null;
+    }
+
+
+    // =====================================================
+    // FIND THIS ITEM'S OLD SALE LINE
+    // =====================================================
+
+    const oldSaleLine =
+      oldItems.find(
+        (old) =>
+          String(old.Item_Id) ===
+          String(Item_Id)
+      );
+
+
+    const oldPrimary =
+      oldSaleLine?.Primary_Unit_Snapshot ||
+      null;
+
+    const oldSecondary =
+      oldSaleLine?.Secondary_Unit_Snapshot ||
+      null;
+
+    const oldSelected =
+      oldSaleLine?.Selected_Unit ||
+      null;
+
+
+    // =====================================================
+    // OLD TRANSACTION ACTUALLY USED OLD SECONDARY?
+    // =====================================================
+
+    const oldUsedSecondary =
+      !!(
+        oldSaleLine &&
+        oldSecondary &&
+        oldSelected === oldSecondary
+      );
+
+
+    // =====================================================
+    // UNIT RESOLUTION
+    // =====================================================
+
+    if (oldUsedSecondary) {
+
+      // ---------------------------------------------------
+      // Historical secondary transaction
+      //
+      // Example:
+      //
+      // Old:
+      // KG / GM
+      // Selected GM
+      //
+      // Master now:
+      // KG / BOX
+      //
+      // Keep transaction KG / GM
+      // ---------------------------------------------------
+
+      snapshot = {
+        Primary_Unit:
+          oldPrimary,
+
+        Secondary_Unit:
+          oldSecondary,
+      };
+
+
+      resolvedSelectedUnit =
+        Selected_Unit ||
+        oldSelected;
+
+
+      const quantity =
+        normalizeNumber(item.Quantity) ?? 0;
+
+
+      // ---------------------------------------------------
+      // Need conversion corresponding to old unit pair.
+      // ---------------------------------------------------
+
+      if (
+        resolvedSelectedUnit ===
+        oldSecondary
+      ) {
+
+        const [[conversion]] =
+          await connection.query(
+            `
+              SELECT Conversion_Rate
+              FROM item_unit_conversions
+              WHERE Item_Id = ?
+                AND Primary_Unit = ?
+                AND Secondary_Unit = ?
+              ORDER BY id DESC
+              LIMIT 1
+            `,
+            [
+              Item_Id,
+              oldPrimary,
+              oldSecondary,
+            ]
+          );
+
+
+        const conversionRate =
+          Number(
+            conversion?.Conversion_Rate
+          );
+
+
+        if (
+          !Number.isFinite(conversionRate) ||
+          conversionRate <= 0
+        ) {
+
           await connection.rollback();
 
           return res.status(400).json({
             success: false,
-            message: "Please enter an item name for the row.",
+            message:
+              `Conversion rate not found for ` +
+              `"${oldPrimary}" to "${oldSecondary}" ` +
+              `for item "${item.Item_Name}".`,
           });
         }
 
-        // Amount blank / 0 + no Item_Name
-        // Treat as empty placeholder row
-        continue;
-      }
-      let Item_Id = item.Item_Id || null;
-      let dbItemRow = null;
 
-      if (Item_Id) {
-        const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Id = ? LIMIT 1", [Item_Id]);
-        dbItemRow = rows[0] || null;
+        stockDelta =
+          quantity / conversionRate;
+
       } else {
-        const [rows] = await connection.query("SELECT * FROM add_item WHERE TRIM(Item_Name)= TRIM(?) LIMIT 1", [item.Item_Name]);
-        //const [rows] = await connection.query("SELECT * FROM add_item WHERE Item_Name = ? LIMIT 1", [item.Item_Name]);
-        dbItemRow = rows[0] || null;
-        Item_Id = dbItemRow?.Item_Id || null;
+
+        // Selected primary
+        stockDelta =
+          quantity;
       }
-
-      if (!dbItemRow) {
-        const [maxRow] = await connection.query(
-          `SELECT MAX(CAST(SUBSTRING(Item_Id, 4) AS UNSIGNED)) AS maxId FROM add_item WHERE Item_Id LIKE 'ITM%'`
-        );
-        const autoId = (maxRow[0]?.maxId || 0) + 1;
-        Item_Id = "ITM" + autoId.toString().padStart(3, "0");
-
-        await connection.execute(
-          `INSERT INTO add_item
-       (Item_Id, Item_Name, Item_Category, Item_HSN, Item_Unit,
-        Stock_Quantity, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          [
-            Item_Id,
-            item.Item_Name,
-            item.Item_Category || "",
-            cleanValue(item.Item_HSN),
-            item.Item_Unit || "",
-            0, // stock adjusted in step 2 below, based on net quantity
-          ]
-        );
-        dbItemRow = { Item_Id, Item_HSN: item.Item_HSN };
-      }
-      else {
-        const updates = [];
-        const params = [];
-
-        if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
-          updates.push("Item_HSN = ?");
-          params.push(item.Item_HSN);
-        }
-        if (item.Item_Category !== undefined && item.Item_Category !== dbItemRow.Item_Category) {
-          updates.push("Item_Category = ?");
-          params.push(item.Item_Category || "");
-        }
-
-        if (updates.length > 0) {
-          params.push(Item_Id);
-          await connection.query(
-            `UPDATE add_item SET ${updates.join(", ")}, updated_at = NOW() WHERE Item_Id = ?`,
-            params
-          );
-        }
-      }
-      // else if (item.Item_HSN && item.Item_HSN !== dbItemRow.Item_HSN) {
-      //   await connection.query(
-      //     `UPDATE add_item SET Item_HSN = ?, Item_Category = ?, updated_at = NOW() WHERE Item_Id = ?`,
-      //     [item.Item_HSN, Item_Id]
-      //   );
-      // }
-
-      resolvedLines.push({ ...item, Item_Id });
     }
 
-    // 🔹 Step 2: net stock delta per Item_Id across ALL new lines vs ALL old lines for that item
-    const newQtyByItem = new Map();
-    for (const line of resolvedLines) {
-      newQtyByItem.set(
-        line.Item_Id,
-        (newQtyByItem.get(line.Item_Id) || 0) + normalizeNumber(line.Quantity)
+
+    // =====================================================
+    // NORMAL CASE:
+    // USE CURRENT ITEM MASTER
+    // =====================================================
+
+    else {
+
+      const resolved =
+        resolveUnitAndStockDelta({
+          dbItemRow,
+
+          Selected_Unit:
+            Selected_Unit,
+
+          Quantity:
+            item.Quantity,
+        });
+
+
+      stockDelta =
+        resolved.stockDelta;
+
+      snapshot =
+        resolved.snapshot;
+
+      resolvedSelectedUnit =
+        resolved.resolvedSelectedUnit;
+    }
+
+
+    // =====================================================
+    // UPDATE SAFE ITEM MASTER FIELDS
+    // =====================================================
+
+    const updates = [];
+    const params = [];
+
+
+    if (
+      item.Item_HSN &&
+      item.Item_HSN !==
+        dbItemRow.Item_HSN
+    ) {
+
+      updates.push(
+        "Item_HSN = ?"
+      );
+
+      params.push(
+        item.Item_HSN
       );
     }
-    const oldQtyByItem = new Map();
-    oldItems.forEach((o) => {
-      oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity));
-    });
 
-    const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
-    for (const itemId of allItemIds) {
-      const newQty = newQtyByItem.get(itemId) || 0;
-      const oldQty = oldQtyByItem.get(itemId) || 0;
-      const diff = newQty - oldQty; // positive → more sold → deduct more stock
-      if (diff !== 0) {
-        await connection.query(
-          `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-          [diff, itemId]
-        );
-      }
+
+    if (
+      item.Item_Category !== undefined &&
+      item.Item_Category !==
+        dbItemRow.Item_Category
+    ) {
+
+      updates.push(
+        "Item_Category = ?"
+      );
+
+      params.push(
+        item.Item_Category || ""
+      );
     }
 
-    // 🔹 Step 3: delete all old sale_items rows for this sale, re-insert fresh (simplest correct approach for repeats)
-    // await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
 
-    // for (const line of resolvedLines) {
-    //   const [purchaseTax] = await connection.query(
-    //     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-    //     [line.Item_Id]
-    //   );
-    //   const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+    if (updates.length > 0) {
 
-    //   const [insertRes] = await connection.execute(
-    //     `INSERT INTO add_sale_items
-    //  (Sale_Id, Item_Id, Quantity, Sale_Price,
-    //   Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-    //   Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-    //  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    //     [
-    //       saleId,
-    //       line.Item_Id,
-    //       normalizeNumber(line.Quantity) ?? 0,
-    //       normalizeNumber(line.Sale_Price) ?? 0,
-    //       cleanDiscount(line.Discount_On_Sale_Price),
-    //       cleanValue(line.Discount_Type_On_Sale_Price),
-    //       cleanValue(safeTaxType),
-    //       normalizeNumber(line.Tax_Amount) ?? 0,
-    //       normalizeNumber(line.Amount) ?? 0,
-    //     ]
-    //   );
-    //   const id = insertRes.insertId;
-    //   const newId = "SIT" + id.toString().padStart(3, "0");
-    //   await connection.execute(`UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`, [newId, id]);
-    // }
-    for (const old of oldItems) {
-  await reverseItemLedger({
-    connection,
-    itemId:      old.Item_Id,
-    txnType:     "Sale",
-    referenceId: old.id,   // still valid — not deleted yet
+      params.push(Item_Id);
+
+      await connection.query(
+        `
+          UPDATE add_item
+          SET
+            ${updates.join(", ")},
+            updated_at = NOW()
+          WHERE Item_Id = ?
+        `,
+        params
+      );
+    }
+  }
+
+
+  // =======================================================
+  // STORE RESOLVED TRANSACTION LINE
+  // =======================================================
+
+  resolvedLines.push({
+    ...item,
+
+    Item_Id,
+
+    Stock_Delta:
+      Number(stockDelta),
+
+    Primary_Unit_Snapshot:
+      snapshot.Primary_Unit || null,
+
+    Secondary_Unit_Snapshot:
+      snapshot.Secondary_Unit || null,
+
+    Selected_Unit:
+      resolvedSelectedUnit || null,
   });
 }
 
-// Step 3b: delete old rows
-await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
 
-// Step 3c: insert fresh rows + record new ledger entries
-for (const line of resolvedLines) {
-  const [purchaseTax] = await connection.query(
-    `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-    [line.Item_Id]
+// =========================================================
+// STEP 2:
+// CALCULATE OLD BASE QUANTITY PER ITEM
+//
+// IMPORTANT:
+// Raw sale Quantity cannot be compared anymore.
+//
+// 500 gm != 500 Kg
+//
+// We need normalized/base quantities.
+// =========================================================
+
+const oldBaseQtyByItem =
+  new Map();
+
+
+for (const old of oldItems) {
+
+  let oldBaseQty =
+    Number(old.Quantity) || 0;
+
+
+  const oldPrimary =
+    old.Primary_Unit_Snapshot || null;
+
+  const oldSecondary =
+    old.Secondary_Unit_Snapshot || null;
+
+  const oldSelected =
+    old.Selected_Unit || null;
+
+
+  if (
+    oldSecondary &&
+    oldSelected === oldSecondary
+  ) {
+
+    const [[conversion]] =
+      await connection.query(
+        `
+          SELECT Conversion_Rate
+          FROM item_unit_conversions
+          WHERE Item_Id = ?
+            AND Primary_Unit = ?
+            AND Secondary_Unit = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [
+          old.Item_Id,
+          oldPrimary,
+          oldSecondary,
+        ]
+      );
+
+
+    const conversionRate =
+      Number(
+        conversion?.Conversion_Rate
+      );
+
+
+    if (
+      Number.isFinite(conversionRate) &&
+      conversionRate > 0
+    ) {
+
+      oldBaseQty =
+        oldBaseQty /
+        conversionRate;
+    }
+  }
+
+
+  oldBaseQtyByItem.set(
+    old.Item_Id,
+
+    (
+      oldBaseQtyByItem.get(
+        old.Item_Id
+      ) || 0
+    ) + oldBaseQty
   );
-  const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+}
 
-  const [insertRes] = await connection.execute(
-    `INSERT INTO add_sale_items
-     (Sale_Id, Item_Id, Quantity, Sale_Price,
-      Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-      Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+
+// =========================================================
+// NEW BASE QUANTITY PER ITEM
+// =========================================================
+
+const newBaseQtyByItem =
+  new Map();
+
+
+for (const line of resolvedLines) {
+
+  newBaseQtyByItem.set(
+    line.Item_Id,
+
+    (
+      newBaseQtyByItem.get(
+        line.Item_Id
+      ) || 0
+    ) +
+      Number(line.Stock_Delta || 0)
+  );
+}
+
+
+// =========================================================
+// STEP 3:
+// APPLY NET STOCK DIFFERENCE
+//
+// Sale = OUT
+//
+// More sold => subtract more
+// Less sold => restore stock
+// =========================================================
+
+const allItemIds =
+  new Set([
+    ...newBaseQtyByItem.keys(),
+    ...oldBaseQtyByItem.keys(),
+  ]);
+
+
+for (const itemId of allItemIds) {
+
+  const newQty =
+    newBaseQtyByItem.get(itemId) || 0;
+
+  const oldQty =
+    oldBaseQtyByItem.get(itemId) || 0;
+
+
+  const diff =
+    newQty - oldQty;
+
+
+  if (diff !== 0) {
+
+    await connection.query(
+      `
+        UPDATE add_item
+        SET
+          Stock_Quantity =
+            Stock_Quantity - ?,
+
+          updated_at = NOW()
+
+        WHERE Item_Id = ?
+      `,
+      [
+        diff,
+        itemId,
+      ]
+    );
+  }
+}
+
+
+// =========================================================
+// STEP 4:
+// REVERSE OLD ITEM LEDGER ROWS
+// =========================================================
+
+for (const old of oldItems) {
+
+  await reverseItemLedger({
+    connection,
+
+    itemId:
+      old.Item_Id,
+
+    txnType:
+      "Sale",
+
+    referenceId:
+      old.id,
+  });
+}
+
+
+// =========================================================
+// STEP 5:
+// DELETE OLD SALE ITEMS
+// =========================================================
+
+await connection.query(
+  `
+    DELETE FROM add_sale_items
+    WHERE Sale_Id = ?
+  `,
+  [saleId]
+);
+
+
+// =========================================================
+// STEP 6:
+// INSERT FRESH SALE ITEMS
+// =========================================================
+
+for (const line of resolvedLines) {
+
+  const [purchaseTax] =
+    await connection.query(
+      `
+        SELECT Tax_Type
+        FROM add_purchase_items
+        WHERE Item_Id = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [line.Item_Id]
+    );
+
+
+  const safeTaxType =
+    line.Tax_Type ||
+    purchaseTax[0]?.Tax_Type ||
+    "None";
+
+
+  const [insertRes] =
+    await connection.execute(
+      `
+        INSERT INTO add_sale_items
+        (
+          Sale_Id,
+          Item_Id,
+
+          Quantity,
+
+          Primary_Unit_Snapshot,
+          Secondary_Unit_Snapshot,
+          Selected_Unit,
+
+          Sale_Price,
+
+          Discount_On_Sale_Price,
+          Discount_Type_On_Sale_Price,
+
+          Tax_Type,
+          Tax_Amount,
+          Amount,
+
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?, ?,
+          ?,
+          ?, ?, ?,
+          ?,
+          ?, ?,
+          ?, ?, ?,
+          NOW(), NOW()
+        )
+      `,
+      [
+        saleId,
+        line.Item_Id,
+
+        normalizeNumber(
+          line.Quantity
+        ) ?? 0,
+
+        line.Primary_Unit_Snapshot,
+        line.Secondary_Unit_Snapshot,
+        line.Selected_Unit,
+
+        normalizeNumber(
+          line.Sale_Price
+        ) ?? 0,
+
+        cleanDiscount(
+          line.Discount_On_Sale_Price
+        ),
+
+        cleanValue(
+          line.Discount_Type_On_Sale_Price
+        ),
+
+        cleanValue(
+          safeTaxType
+        ),
+
+        normalizeNumber(
+          line.Tax_Amount
+        ) ?? 0,
+
+        normalizeNumber(
+          line.Amount
+        ) ?? 0,
+      ]
+    );
+
+
+  const id =
+    insertRes.insertId;
+
+  const newId =
+    "SIT" +
+    id.toString().padStart(3, "0");
+
+
+  await connection.execute(
+    `
+      UPDATE add_sale_items
+      SET Sale_Items_Id = ?
+      WHERE id = ?
+    `,
     [
-      saleId,
-      line.Item_Id,
-      normalizeNumber(line.Quantity)        ?? 0,
-      normalizeNumber(line.Sale_Price)      ?? 0,
-      cleanDiscount(line.Discount_On_Sale_Price),
-      cleanValue(line.Discount_Type_On_Sale_Price),
-      cleanValue(safeTaxType),
-      normalizeNumber(line.Tax_Amount)      ?? 0,
-      normalizeNumber(line.Amount)          ?? 0,
+      newId,
+      id,
     ]
   );
 
-  const id    = insertRes.insertId;
-  const newId = "SIT" + id.toString().padStart(3, "0");
 
-  await connection.execute(
-    `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
-    [newId, id]
-  );
+  // =====================================================
+  // ITEM LEDGER
+  //
+  // Use BASE quantity, not transaction quantity.
+  //
+  // 500 gm => Stock_Delta 0.5 Kg
+  // =====================================================
 
-  // ✅ record fresh item ledger entry
   await recordItemLedger({
     connection,
-    itemId:      line.Item_Id,
-    txnType:     "Sale",
-    referenceId: id,
-     billId:      saleId,
-  billNumber: Invoice_Number,
-    //formattedId: saleId,       // "SAL001"
-    partyName:   Party_Name,
-    quantity:    normalizeNumber(line.Quantity)   ?? 0,
-    rate:        normalizeNumber(line.Sale_Price) ?? null,
-    txnDate:     Invoice_Date,
+
+    itemId:
+      line.Item_Id,
+
+    txnType:
+      "Sale",
+
+    referenceId:
+      id,
+
+    billId:
+      saleId,
+
+    billNumber:
+      Invoice_Number,
+
+    partyName:
+      Party_Name,
+
+    quantity:
+      Number(line.Stock_Delta),
+
+    rate:
+      normalizeNumber(
+        line.Sale_Price
+      ) ?? null,
+
+    txnDate:
+      Invoice_Date,
   });
 }
-
-
 
     await connection.commit();
 

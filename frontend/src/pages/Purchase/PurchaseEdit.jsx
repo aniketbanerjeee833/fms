@@ -1413,7 +1413,7 @@ export default function PurchaseEdit() {
                                   setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                   //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1508,7 +1508,7 @@ export default function PurchaseEdit() {
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
                                           //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Primary_Unit || it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
 
 
                                           handleRowChange(i, "itemOpen", false);
