@@ -551,3 +551,55 @@ const selectedUnit=watch("Item_Unit")
   );
 };
 
+{/* <div className="input-field col s6 mb-4 mt-4">
+                    <span className="active">Select Unit</span>
+                    <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
+                    <select
+                     value={selectedUnit || ""}   // 👈 control it
+                      id="Item_Unit"
+    onChange={(e) => {
+          const value = e.target.value;
+
+          // ➕ ADD UNIT
+          if (value === "__ADD_UNIT__") {
+            // setActiveUnitRow(i);
+            setValue(`Item_Unit`, "", { shouldValidate: true, shouldDirty: true });
+            setShowSelectUnitModal(true);
+            return;
+          }
+
+          // handleRowChange(i, "Item_Unit", value);
+          
+           setValue(`Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
+        }}
+                      // {...register("Item_Unit")}
+                      className="w-full border border-gray-300 text-gray-900 bg-white rounded-md p-2"
+                    >
+                      {/* {
+                        Object.keys(itemUnits).length > 0 && Object.entries(itemUnits).map(([key, value]) => (
+
+                          <option key={key} value={key}>
+                            {`${value}  (${key}) `}
+                          </option>
+                        ))
+                      }
+      
+           <option value=""></option>
+        <option value="__ADD_UNIT__">➕ Add Unit</option>
+      {Array.isArray(itemUnits) &&
+  itemUnits.map((unit) => (
+    <option
+      key={unit.Unit_Shorthand}
+      value={unit.Unit_Shorthand}
+    >
+      {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
+    </option>
+  ))}
+                    </select>
+
+                    {errors?.Item_Unit && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Item_Unit?.message}
+                      </p>
+                    )}
+                  </div> */}

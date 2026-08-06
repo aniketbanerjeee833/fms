@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
 import db from "../config/db.js";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+import { recordItemLedger } from "../utils/itemLedgerHelper.js";
 import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import {
   insertPaymentSplits,
@@ -894,7 +895,7 @@ const createPurchaseReturn = async (req, res, next) => {
       // 14. INSERT PURCHASE RETURN ITEM
       // =======================================================
 
-      await connection.query(
+     const [prItemResult]= await connection.query(
         `INSERT INTO purchase_return_items
          (
            Purchase_Return_Id,
@@ -927,7 +928,7 @@ const createPurchaseReturn = async (req, res, next) => {
           Number(Amount) || 0,
         ]
       );
-
+      const prItemId = prItemResult.insertId; // ← capture insertId
       // =======================================================
       // 15. STOCK
       //
@@ -949,6 +950,19 @@ const createPurchaseReturn = async (req, res, next) => {
           Item_Id,
         ]
       );
+      await recordItemLedger({
+  connection,
+  itemId:      Item_Id,
+  txnType:     "Purchase_Return",
+  referenceId: prItemId,
+  //formattedId: Return_Number || null,
+   billId: id,                  // purchase_return.id
+  billNumber: Return_Number || null,
+  partyName:   Party_Name,
+  quantity:    Number(Quantity) || 0,
+  rate:        Number(Purchase_Price) || null,
+  txnDate:     Return_Date,
+});
     }
 
     // =========================================================
@@ -1450,75 +1464,174 @@ const editPurchaseReturn = async (req, res, next) => {
     // diff = -3 -> adds 3 back
     // =========================================================
 
-    const allItemIds = new Set([
-      ...newQtyByItem.keys(),
-      ...oldQtyByItem.keys(),
-    ]);
+    // const allItemIds = new Set([
+    //   ...newQtyByItem.keys(),
+    //   ...oldQtyByItem.keys(),
+    // ]);
 
-    for (const itemId of allItemIds) {
-      const newQty =
-        newQtyByItem.get(itemId) || 0;
+    // for (const itemId of allItemIds) {
+    //   const newQty =
+    //     newQtyByItem.get(itemId) || 0;
 
-      const oldQty =
-        oldQtyByItem.get(itemId) || 0;
+    //   const oldQty =
+    //     oldQtyByItem.get(itemId) || 0;
 
-      const diff = newQty - oldQty;
+    //   const diff = newQty - oldQty;
 
-      if (diff !== 0) {
-        await connection.query(
-          `UPDATE add_item
-           SET
-             Stock_Quantity =
-               Stock_Quantity - ?,
-             updated_at = NOW()
-           WHERE Item_Id = ?`,
-          [diff, itemId]
-        );
-      }
-    }
+    //   if (diff !== 0) {
+    //     await connection.query(
+    //       `UPDATE add_item
+    //        SET
+    //          Stock_Quantity =
+    //            Stock_Quantity - ?,
+    //          updated_at = NOW()
+    //        WHERE Item_Id = ?`,
+    //       [diff, itemId]
+    //     );
+    //   }
+    // }
+// =========================================================
+// 17. ADJUST add_item.Stock_Quantity BY DIFF
+//     (item_ledger tracks history; Stock_Quantity is live stock)
+// =========================================================
 
-    // =========================================================
-    // 18. DELETE OLD RETURN ITEM ROWS
-    // =========================================================
+const allItemIds = new Set([
+  ...newQtyByItem.keys(),
+  ...oldQtyByItem.keys(),
+]);
 
+for (const itemId of allItemIds) {
+  const newQty = newQtyByItem.get(itemId) || 0;
+  const oldQty = oldQtyByItem.get(itemId) || 0;
+  const diff   = newQty - oldQty;
+
+  if (diff !== 0) {
+    // Purchase_Return sends items OUT of stock (debit stock)
+    // diff > 0 = returning more → deduct more from stock
+    // diff < 0 = returning less → restore some to stock
     await connection.query(
-      `DELETE FROM purchase_return_items
-       WHERE Purchase_Return_Id = ?`,
-      [Purchase_Return_Id]
+      `UPDATE add_item
+       SET Stock_Quantity = Stock_Quantity - ?,
+           updated_at = NOW()
+       WHERE Item_Id = ?`,
+      [diff, itemId]
     );
+  }
+}
 
-    // =========================================================
-    // 19. INSERT FRESH RETURN ITEM ROWS
-    // =========================================================
+// =========================================================
+// 18a. REVERSE OLD ITEM LEDGER ROWS
+//      Must happen BEFORE deleting the rows — reverseItemLedger
+//      looks up by Source_Id which is the purchase_return_items.id
+// =========================================================
 
-    for (const line of resolvedLines) {
-      await connection.query(
-        `INSERT INTO purchase_return_items
-         (
-           Purchase_Return_Id,
-           Item_Id,
-           Quantity,
-           Purchase_Price,
-           Discount_On_Purchase_Price,
-           Discount_Type_On_Purchase_Price,
-           Tax_Type,
-           Tax_Amount,
-           Amount
-         )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          Purchase_Return_Id,
-          line.Item_Id,
-          line.Quantity,
-          line.Purchase_Price,
-          line.Discount_On_Purchase_Price,
-          line.Discount_Type_On_Purchase_Price,
-          line.Tax_Type,
-          line.Tax_Amount,
-          line.Amount,
-        ]
-      );
-    }
+for (const old of oldItems) {
+  await reverseItemLedger({
+    connection,
+    itemId:      old.Item_Id,
+    txnType:     "Purchase_Return",
+    referenceId: old.id,   // purchase_return_items.id — still exists at this point
+  });
+}
+
+// =========================================================
+// 18b. DELETE OLD RETURN ITEM ROWS
+// =========================================================
+
+await connection.query(
+  `DELETE FROM purchase_return_items WHERE Purchase_Return_Id = ?`,
+  [Purchase_Return_Id]
+);
+
+// =========================================================
+// 19. INSERT FRESH RETURN ITEM ROWS + RECORD NEW LEDGER
+// =========================================================
+
+for (const line of resolvedLines) {
+  const [insertResult] = await connection.query(
+    `INSERT INTO purchase_return_items
+     (Purchase_Return_Id, Item_Id, Quantity, Purchase_Price,
+      Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
+      Tax_Type, Tax_Amount, Amount)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      Purchase_Return_Id,
+      line.Item_Id,
+      line.Quantity,
+      line.Purchase_Price,
+      line.Discount_On_Purchase_Price,
+      line.Discount_Type_On_Purchase_Price,
+      line.Tax_Type,
+      line.Tax_Amount,
+      line.Amount,
+    ]
+  );
+
+  const prItemId = insertResult.insertId;
+
+  // 🔹 record fresh item ledger entry
+  // Direction for Purchase_Return = "Out" (item leaves your inventory back to vendor)
+  await recordItemLedger({
+    connection,
+    itemId:      line.Item_Id,
+    txnType:     "Purchase_Return",
+    referenceId: prItemId,           // new purchase_return_items.id
+    //formattedId: Return_Number || null,
+     billId: id,                  // purchase_return.id
+  billNumber: Return_Number || null,
+
+    partyName:   Party_Name,
+    quantity:    line.Quantity,
+    rate:        line.Purchase_Price || null,
+    txnDate:     Return_Date,
+    remarks:     `Purchase Return #${Purchase_Return_Id}`,
+  });
+}
+    // // =========================================================
+    // // 18. DELETE OLD RETURN ITEM ROWS
+    // // =========================================================
+
+    // await connection.query(
+    //   `DELETE FROM purchase_return_items
+    //    WHERE Purchase_Return_Id = ?`,
+    //   [Purchase_Return_Id]
+    // );
+
+    // // =========================================================
+    // // 19. INSERT FRESH RETURN ITEM ROWS
+    // // =========================================================
+
+    // for (const line of resolvedLines) {
+    //   await connection.query(
+    //     `INSERT INTO purchase_return_items
+    //      (
+    //        Purchase_Return_Id,
+    //        Item_Id,
+    //        Quantity,
+    //        Purchase_Price,
+    //        Discount_On_Purchase_Price,
+    //        Discount_Type_On_Purchase_Price,
+    //        Tax_Type,
+    //        Tax_Amount,
+    //        Amount
+    //      )
+    //      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    //     [
+    //       Purchase_Return_Id,
+    //       line.Item_Id,
+    //       line.Quantity,
+    //       line.Purchase_Price,
+    //       line.Discount_On_Purchase_Price,
+    //       line.Discount_Type_On_Purchase_Price,
+    //       line.Tax_Type,
+    //       line.Tax_Amount,
+    //       line.Amount,
+    //     ]
+    //   );
+    // }
+    // Step 18a: reverse ALL old item ledger rows BEFORE deleting
+
+
 
     // =========================================================
     // 20. COMMIT
@@ -1548,320 +1661,6 @@ const editPurchaseReturn = async (req, res, next) => {
     }
   }
 };
-// const editPurchaseReturn = async (req, res, next) => {
-//   let connection;
-//   try {
-//     const { Purchase_Return_Id } = req.params;
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
 
-//     const [[existing]] = await connection.query(
-//       `SELECT * FROM purchase_return WHERE id = ?`,
-//       [Purchase_Return_Id]
-//     );
-//     if (!existing) {
-//       await connection.rollback();
-//       return res.status(404).json({ success: false, message: "Purchase Return not found" });
-//     }
-
-//     const {
-//       Party_Name,
-//       Return_Number,
-//       Bill_Number,
-//       Bill_Date,
-//       Return_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       Balance_Due,
-//       splits,
-//       items,
-//     } = req.body;
-
-//     if (!Array.isArray(splits) || splits.length === 0) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         success: false,
-//         message: "At least one payment split is required",
-//       });
-//     }
-
-//     // Total_Received always recalculated from splits
-
-//     const totalReceived = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-//     const totalAmount = Number(Total_Amount) || 0;
-//     const balanceDue = Number(Balance_Due) ?? totalAmount - totalReceived;
-//     if (totalReceived > totalAmount) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Received amount should be less than or equal to Total Amount",
-//       });
-//     }
-//     if (isNaN(totalReceived) || totalReceived < 0) {
-//       await connection.rollback();
-//       return res.status(400).json({ success: false, message: "Split amounts must be valid numbers" });
-//     }
-
-//     try {
-//       validateSplits(splits);
-//     } catch (err) {
-//       await connection.rollback();
-//       return res.status(400).json({ success: false, message: err.message });
-//     }
-
-//     const [[party]] = await connection.query(
-//       `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-//       [Party_Name]
-//     );
-//     if (!party) {
-//       await connection.rollback();
-//       return res.status(404).json({ success: false, message: "Party not found" });
-//     }
-
-
-
-//     await connection.query(
-//       `UPDATE purchase_return SET
-//          Party_Id        = ?, Return_Number   = ?, Bill_Number     = ?,
-//          Bill_Date       = ?, Return_Date     = ?, State_Of_Supply = ?,
-//          Total_Amount    = ?, Total_Received  = ?, Balance_Due     = ?,
-//          updated_at      = NOW()
-//        WHERE id = ?`,
-//       [
-//         party.Party_Id,
-//         Return_Number || null,
-//         Bill_Number || null,
-//         Bill_Date || null,
-//         Return_Date,
-//         State_Of_Supply || null,
-//         totalAmount,
-//         totalReceived,
-//         balanceDue,
-//         Purchase_Return_Id,
-//       ]
-//     );
-
-//     // 🔹 wipe old splits + reverse ledger entries, reinsert fresh
-//     await deletePaymentSplits({
-//       connection,
-//       sourceType: "Purchase_Return",
-//       sourceId: Purchase_Return_Id,
-//     });
-
-//     await insertPaymentSplits({
-//       connection,
-//       sourceType: "Purchase_Return",
-//       sourceId: Purchase_Return_Id,
-//       partyName: Party_Name,
-//       txnDate: Return_Date,
-//       splits,
-//     });
-
-//     await recordPartyLedger({
-//   connection,
-//   partyId: party.Party_Id,
-//   txnType: "Purchase_Return",
-//   referenceId: Purchase_Return_Id,
-//   amount: totalAmount,
-//   txnDate: Return_Date,
-//   docNumber: Return_Number,
-//   balanceDue: balanceDue,
-// });
-
-    
-    
-//     // const oldMap = new Map(oldItems.map((i) => [i.Item_Id, i]));
-//     // const newItemIds = new Set();
-
-//     // for (const item of items) {
-//     //   const {
-//     //     Item_Name, Item_Category, Item_HSN, Item_Unit,
-//     //     Quantity, Purchase_Price,
-//     //     Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//     //     Tax_Type, Tax_Amount, Amount,
-//     //   } = item;
-
-//     //   const [[existingItem]] = await connection.query(
-//     //     `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
-//     //     [Item_Name]
-//     //   );
-
-//     //   let Item_Id;
-//     //   if (!existingItem) {
-//     //     const [ins] = await connection.execute(
-//     //       `INSERT INTO add_item
-//     //          (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-//     //        VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-//     //       [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
-//     //     );
-//     //     Item_Id = `ITM${ins.insertId}`;
-//     //     await connection.execute(
-//     //       `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-//     //       [Item_Id, ins.insertId]
-//     //     );
-//     //   } else {
-//     //     Item_Id = existingItem.Item_Id;
-//     //   }
-
-//     //   newItemIds.add(Item_Id);
-//     //   const old = oldMap.get(Item_Id);
-
-//     //   if (old) {
-//     //     await connection.query(
-//     //       `UPDATE purchase_return_items SET
-//     //          Quantity = ?, Purchase_Price = ?,
-//     //          Discount_On_Purchase_Price = ?, Discount_Type_On_Purchase_Price = ?,
-//     //          Tax_Type = ?, Tax_Amount = ?, Amount = ?, updated_at = NOW()
-//     //        WHERE id = ?`,
-//     //       [
-//     //         Number(Quantity), Number(Purchase_Price),
-//     //         Number(Discount_On_Purchase_Price) || 0,
-//     //         Discount_Type_On_Purchase_Price || "percentage",
-//     //         Tax_Type || null, Number(Tax_Amount) || 0,
-//     //         Number(Amount), old.id,
-//     //       ]
-//     //     );
-//     //     const diff = Number(Quantity) - old.Quantity;
-//     //     if (diff !== 0) {
-//     //       await connection.query(
-//     //         `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
-//     //          WHERE Item_Id = ?`,
-//     //         [diff, Item_Id]
-//     //       );
-//     //     }
-//     //   } else {
-//     //     //  Item_Name,
-//     //     //   Item_Category, Item_HSN, Item_Unit, 
-//     //     await connection.query(
-//     //       `INSERT INTO purchase_return_items
-//     //          (Purchase_Return_Id, Item_Id, 
-           
-//     //           Quantity, Purchase_Price,
-//     //           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//     //           Tax_Type, Tax_Amount, Amount)
-//     //        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//     //       [
-//     //         Purchase_Return_Id, Item_Id,
-//     //         // Item_Name,
-//     //         // Item_Category || "", Item_HSN || "", Item_Unit || "",
-
-//     //         Number(Quantity), Number(Purchase_Price),
-//     //         Number(Discount_On_Purchase_Price) || 0,
-//     //         Discount_Type_On_Purchase_Price || "percentage",
-//     //         Tax_Type || null, Number(Tax_Amount) || 0, Number(Amount),
-//     //       ]
-//     //     );
-//     //     await connection.query(
-//     //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
-//     //        WHERE Item_Id = ?`,
-//     //       [Number(Quantity), Item_Id]
-//     //     );
-//     //   }
-//     // }
-
-//     // for (const old of oldItems) {
-//     //   if (!newItemIds.has(old.Item_Id)) {
-//     //     await connection.query(
-//     //       `DELETE FROM purchase_return_items WHERE id = ?`, [old.id]
-//     //     );
-//     //     await connection.query(
-//     //       `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
-//     //        WHERE Item_Id = ?`,
-//     //       [old.Quantity, old.Item_Id]
-//     //     );
-//     //   }
-//     // }
-//      // items upsert
-// const [oldItems] = await connection.query(
-//   `SELECT * FROM purchase_return_items WHERE Purchase_Return_Id = ?`,
-//   [Purchase_Return_Id]
-// );
-
-// const resolvedLines = [];
-// for (const item of items) {
-//   const { Item_Name, Item_Category, Item_HSN, Item_Unit, Quantity, Purchase_Price,
-//           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//           Tax_Type, Tax_Amount, Amount } = item;
-
-//   const [[existingItem]] = await connection.query(
-//     `SELECT Item_Id, Item_HSN FROM add_item WHERE TRIM(Item_Name) = TRIM(?)) LIMIT 1`,
-//     [Item_Name]
-//   );
-  
-
-//   let Item_Id;
-//   if (!existingItem) {
-//     const [ins] = await connection.execute(
-//       `INSERT INTO add_item
-//          (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-//        VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-//       [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
-//     );
-//     Item_Id = `ITM${ins.insertId}`;
-//     await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, ins.insertId]);
-//   } else {
-//     Item_Id = existingItem.Item_Id;
-//     if (Item_HSN && Item_HSN !== existingItem.Item_HSN) {
-//       await connection.query(
-//         `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
-//         [Item_HSN, Item_Id]
-//       );
-//     }
-//   }
-
-//   resolvedLines.push({ Item_Id, Quantity, Purchase_Price, Discount_On_Purchase_Price,
-//                         Discount_Type_On_Purchase_Price, Tax_Type, Tax_Amount, Amount });
-// }
-
-// // Step 2: net stock delta per Item_Id (return DEDUCTS stock, so diff applied as "-")
-// const newQtyByItem = new Map();
-// resolvedLines.forEach((l) => newQtyByItem.set(l.Item_Id, (newQtyByItem.get(l.Item_Id) || 0) + Number(l.Quantity)));
-// const oldQtyByItem = new Map();
-// oldItems.forEach((o) => oldQtyByItem.set(o.Item_Id, (oldQtyByItem.get(o.Item_Id) || 0) + Number(o.Quantity)));
-
-// const allItemIds = new Set([...newQtyByItem.keys(), ...oldQtyByItem.keys()]);
-// for (const itemId of allItemIds) {
-//   const diff = (newQtyByItem.get(itemId) || 0) - (oldQtyByItem.get(itemId) || 0);
-//   if (diff !== 0) {
-//     await connection.query(
-//       `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW() WHERE Item_Id = ?`,
-//       [diff, itemId]
-//     );
-//   }
-// }
-
-// // Step 3: delete old return items, reinsert fresh
-// await connection.query(`DELETE FROM purchase_return_items WHERE Purchase_Return_Id = ?`, [Purchase_Return_Id]);
-
-// for (const line of resolvedLines) {
-//   await connection.query(
-//     `INSERT INTO purchase_return_items
-//        (Purchase_Return_Id, Item_Id, Quantity, Purchase_Price,
-//         Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//         Tax_Type, Tax_Amount, Amount)
-//      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//     [
-//       Purchase_Return_Id, line.Item_Id,
-//       Number(line.Quantity), Number(line.Purchase_Price),
-//       Number(line.Discount_On_Purchase_Price) || 0,
-//       line.Discount_Type_On_Purchase_Price || "percentage",
-//       line.Tax_Type || null, Number(line.Tax_Amount) || 0, Number(line.Amount),
-//     ]
-//   );
-// }
-
-//     await connection.commit();
-//     return res.status(200).json({
-//       success: true,
-//       message: "Purchase Return updated",
-//       Purchase_Return_Id,
-//     });
-//   } catch (err) {
-//     if (connection) await connection.rollback();
-//     console.error("❌ editPurchaseReturn:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 export { getAllPurchaseReturns, getPurchaseReturnById, createPurchaseReturn, editPurchaseReturn };

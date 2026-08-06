@@ -9,6 +9,7 @@ import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
+import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 // import puppeteer from "puppeteer";
 //import pdf from "html-pdf-node";
 const TAX_TYPES = {
@@ -869,6 +870,20 @@ const addSale = async (req, res, next) => {
          WHERE id = ?`,
         [newSaleItemId, saleItemIdNum]
       );
+      // ✅ ADD THIS — record item ledger entry for this sale line
+await recordItemLedger({
+  connection,
+  itemId:      Item_Id,
+  txnType:     "Sale",
+  referenceId: saleItemIdNum,   // add_sale_items.id (auto-increment)
+  //formattedId: newSaleId,       // "SAL001"
+  billId:      newSaleId,
+  billNumber: Invoice_Number,
+  partyName:   resolvedPartyName,
+  quantity:    normalizeNumber(Quantity) ?? 0,
+  rate:        normalizeNumber(Sale_Price) ?? null,
+  txnDate:     Invoice_Date,
+});
     }
 
     // =========================================================
@@ -3505,37 +3520,99 @@ const editSale = async (req, res, next) => {
     }
 
     // 🔹 Step 3: delete all old sale_items rows for this sale, re-insert fresh (simplest correct approach for repeats)
-    await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
+    // await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
 
-    for (const line of resolvedLines) {
-      const [purchaseTax] = await connection.query(
-        `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-        [line.Item_Id]
-      );
-      const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+    // for (const line of resolvedLines) {
+    //   const [purchaseTax] = await connection.query(
+    //     `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+    //     [line.Item_Id]
+    //   );
+    //   const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
 
-      const [insertRes] = await connection.execute(
-        `INSERT INTO add_sale_items
+    //   const [insertRes] = await connection.execute(
+    //     `INSERT INTO add_sale_items
+    //  (Sale_Id, Item_Id, Quantity, Sale_Price,
+    //   Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
+    //   Tax_Type, Tax_Amount, Amount, created_at, updated_at)
+    //  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    //     [
+    //       saleId,
+    //       line.Item_Id,
+    //       normalizeNumber(line.Quantity) ?? 0,
+    //       normalizeNumber(line.Sale_Price) ?? 0,
+    //       cleanDiscount(line.Discount_On_Sale_Price),
+    //       cleanValue(line.Discount_Type_On_Sale_Price),
+    //       cleanValue(safeTaxType),
+    //       normalizeNumber(line.Tax_Amount) ?? 0,
+    //       normalizeNumber(line.Amount) ?? 0,
+    //     ]
+    //   );
+    //   const id = insertRes.insertId;
+    //   const newId = "SIT" + id.toString().padStart(3, "0");
+    //   await connection.execute(`UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`, [newId, id]);
+    // }
+    for (const old of oldItems) {
+  await reverseItemLedger({
+    connection,
+    itemId:      old.Item_Id,
+    txnType:     "Sale",
+    referenceId: old.id,   // still valid — not deleted yet
+  });
+}
+
+// Step 3b: delete old rows
+await connection.query(`DELETE FROM add_sale_items WHERE Sale_Id = ?`, [saleId]);
+
+// Step 3c: insert fresh rows + record new ledger entries
+for (const line of resolvedLines) {
+  const [purchaseTax] = await connection.query(
+    `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+    [line.Item_Id]
+  );
+  const safeTaxType = line.Tax_Type || purchaseTax[0]?.Tax_Type || "None";
+
+  const [insertRes] = await connection.execute(
+    `INSERT INTO add_sale_items
      (Sale_Id, Item_Id, Quantity, Sale_Price,
       Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
       Tax_Type, Tax_Amount, Amount, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          saleId,
-          line.Item_Id,
-          normalizeNumber(line.Quantity) ?? 0,
-          normalizeNumber(line.Sale_Price) ?? 0,
-          cleanDiscount(line.Discount_On_Sale_Price),
-          cleanValue(line.Discount_Type_On_Sale_Price),
-          cleanValue(safeTaxType),
-          normalizeNumber(line.Tax_Amount) ?? 0,
-          normalizeNumber(line.Amount) ?? 0,
-        ]
-      );
-      const id = insertRes.insertId;
-      const newId = "SIT" + id.toString().padStart(3, "0");
-      await connection.execute(`UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`, [newId, id]);
-    }
+    [
+      saleId,
+      line.Item_Id,
+      normalizeNumber(line.Quantity)        ?? 0,
+      normalizeNumber(line.Sale_Price)      ?? 0,
+      cleanDiscount(line.Discount_On_Sale_Price),
+      cleanValue(line.Discount_Type_On_Sale_Price),
+      cleanValue(safeTaxType),
+      normalizeNumber(line.Tax_Amount)      ?? 0,
+      normalizeNumber(line.Amount)          ?? 0,
+    ]
+  );
+
+  const id    = insertRes.insertId;
+  const newId = "SIT" + id.toString().padStart(3, "0");
+
+  await connection.execute(
+    `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
+    [newId, id]
+  );
+
+  // ✅ record fresh item ledger entry
+  await recordItemLedger({
+    connection,
+    itemId:      line.Item_Id,
+    txnType:     "Sale",
+    referenceId: id,
+     billId:      saleId,
+  billNumber: Invoice_Number,
+    //formattedId: saleId,       // "SAL001"
+    partyName:   Party_Name,
+    quantity:    normalizeNumber(line.Quantity)   ?? 0,
+    rate:        normalizeNumber(line.Sale_Price) ?? null,
+    txnDate:     Invoice_Date,
+  });
+}
 
 
 

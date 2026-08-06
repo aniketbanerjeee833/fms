@@ -163,7 +163,6 @@ export default function PurchaseAdd() {
       updated[index] = {
         ...updated[index],
         [field]: value,
-
       };
       return updated;
     });
@@ -1369,32 +1368,45 @@ export default function PurchaseAdd() {
                 </thead>
                 <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
                   {fields.map((field, i) => {
-                    return (
-                      <tr key={field.id}>
-                        {/* Action + Serial Number */}
-                        <td style={{ padding: "0px", textAlign: "center", verticalAlign: "middle" }}>
-                          <div
-                            className="flex align-center justify-center text-center gap-2"
-                            style={{ whiteSpace: "nowrap" }}
+                    const selectedItem = items?.items?.find(
+                      (item) =>
+                        item.Item_Name === watch(`items.${i}.Item_Name`)
+                    );
+
+                    const hasConfiguredUnits = !!selectedItem?.Primary_Unit;
+
+                    const availableUnits = hasConfiguredUnits
+                      ? [
+                        selectedItem.Primary_Unit,
+                        selectedItem.Secondary_Unit,
+                      ].filter(Boolean)
+                      : [];
+                      return(
+                    <tr key={field.id}>
+                      {/* Action + Serial Number */}
+                      <td style={{ padding: "0px", textAlign: "center", verticalAlign: "middle" }}>
+                        <div
+                          className="flex align-center justify-center text-center gap-2"
+                          style={{ whiteSpace: "nowrap" }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRow(i)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "red",
+                              cursor: "pointer",
+                            }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRow(i)}
-                              style={{
-                                background: "transparent",
-                                border: "none",
-                                color: "red",
-                                cursor: "pointer",
-                              }}
-                            >
-                              🗑
-                            </button>
-                            <span>{i + 1}</span>
-                          </div>
-                        </td>
+                            🗑
+                          </button>
+                          <span>{i + 1}</span>
+                        </div>
+                      </td>
 
 
-                        {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                      {/* <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <div ref={(el) => (categoryRefs.current[i] = el)}>
                           <input
                             type="text"
@@ -1531,373 +1543,518 @@ export default function PurchaseAdd() {
                           </div>
                         )}
                       </td> */}
-                        <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                          <Controller
-                            control={control}
-                            name={`items.${i}.Item_Category`}
-                            defaultValue="All"
-                            render={({ field }) => (
-                              <select
-                                {...field}
-                                className="form-select"
-                                style={{ width: "100%", fontSize: "12px" }}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (value === "__ADD_CATEGORY__") {
-                                    setShowModal(true);
-                                    return; // don't commit this as the selected value
-                                  }
-                                  field.onChange(value);
-                                }}
-                              >
-                                <option value="All">All</option>
-                                <option value="__ADD_CATEGORY__">➕ Add Category</option>
-                                {categories?.map((cat) => (
-                                  <option key={cat.Category_Id} value={cat.Item_Category}>
-                                    {cat.Item_Category}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          />
-
-                          {showModal && (
-                            <div
-                              style={{
-                                position: "fixed", inset: 0, display: "flex",
-                                alignItems: "center", justifyContent: "center",
-                                backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
                               }}
                             >
-                              <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        />
+
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
                                 <button
                                   type="button"
-                                  onClick={() => setShowModal(false)}
-                                  style={{ backgroundColor: "transparent" }}
-                                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
                                 >
-                                  ✕
+                                  Add
                                 </button>
-                                <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                                <input
-                                  type="text"
-                                  value={newCategory}
-                                  onChange={(e) => setNewCategory(e.target.value)}
-                                  className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                  placeholder="Enter category name"
-                                />
-                                <div className="flex justify-end gap-3">
-                                  <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
-                                    Cancel
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const created = await handleAddCategory(); // should return the created category object
-                                      if (created?.Item_Category) {
-                                        setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
-                                      }
-                                      setShowModal(false);
-                                    }}
-                                    style={{ backgroundColor: "#4CA1AF" }}
-                                    className="px-4 py-2 rounded-md text-white"
-                                  >
-                                    Add
-                                  </button>
-                                </div>
                               </div>
                             </div>
-                          )}
-                        </td>
+                          </div>
+                        )}
+                      </td>
 
-                        {/* Item Dropdown */}
-                        <td style={{ padding: "0px", width: "20%", position: "relative" }}>
-                          <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
-                            <input
-                              type="text"
-                              value={rows[i]?.itemSearch || ""}
-                              onChange={(e) => {
-                                const typedValue = e.target.value;
-                                handleRowChange(i, "itemSearch", typedValue);
-                                handleRowChange(i, "CategoryOpen", false);
+                      {/* Item Dropdown */}
+                      <td style={{ padding: "0px", width: "20%", position: "relative" }}>
+                        <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
+                          <input
+                            type="text"
+                            value={rows[i]?.itemSearch || ""}
+                            onChange={(e) => {
+                              const typedValue = e.target.value;
+                              handleRowChange(i, "itemSearch", typedValue);
+                              handleRowChange(i, "CategoryOpen", false);
+                              setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                              // setValue(`items.${i}.Item_Name`, typedValue);
+                              handleRowChange(i, "isHSNLocked", false);
+                              handleRowChange(i, "isExistingItem", false);
+                              handleRowChange(i, "isUnitLocked", false);
+                              // ✅ If typed value doesn’t match any existing item → unlock category
+                              // const exists = items?.items?.some(
+                              //   (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                              // );
+                              const exists = items?.items?.find(
+                                (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                              );
+                              if (exists) {
+                                // ✅ Only store if it's a valid item
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                // setValue(`items.${i}.Item_Name`, typedValue);
-                                handleRowChange(i, "isHSNLocked", false);
+                                handleRowChange(i, "isExistingItem", true);
+                              } else {
+                                // ❌ Clear Item_Name in RHF to trigger error
+                                // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                                // handleRowChange(i, "isExistingItem", false);
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
                                 handleRowChange(i, "isExistingItem", false);
-                                handleRowChange(i, "isUnitLocked", false);
-                                // ✅ If typed value doesn’t match any existing item → unlock category
-                                // const exists = items?.items?.some(
-                                //   (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                                // );
-                                const exists = items?.items?.find(
+                              }
+                              //handleRowChange(i, "isExistingItem", exists); // false if new item
+                            }}
+                            // Add onBlur to the item input — after the onChange:
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
                                   (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
                                 );
-                                if (exists) {
-                                  // ✅ Only store if it's a valid item
-                                  setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                  handleRowChange(i, "isExistingItem", true);
-                                } else {
-                                  // ❌ Clear Item_Name in RHF to trigger error
-                                  // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
-                                  // handleRowChange(i, "isExistingItem", false);
-                                  setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                  handleRowChange(i, "isExistingItem", false);
-                                  handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                                  handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                                }
-                                //handleRowChange(i, "isExistingItem", exists); // false if new item
-                              }}
-                              // Add onBlur to the item input — after the onChange:
-                              onBlur={() => {
-                                setTimeout(() => {
-                                  const typedValue = rows[i]?.itemSearch?.trim() || "";
-                                  if (!typedValue) return;
 
-                                  const matchedItem = items?.items?.find(
-                                    (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: true,
+                                      itemOpen: false,
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 0,
+                                    },
+                                    i,
+                                    itemsValues
                                   );
 
-                                  if (matchedItem) {
-                                    // ✅ auto-fill exactly like clicking from dropdown
-                                    setRows((prev) => {
-                                      const updated = [...prev];
-                                      updated[i] = {
-                                        ...updated[i],
-                                        itemSearch: matchedItem.Item_Name,   // normalize display
-                                        Item_Category: matchedItem.Item_Category || "",
-                                        Item_HSN: matchedItem.Item_HSN || "",
-                                        categorySearch: matchedItem.Item_Category || "",
-                                        isExistingItem: true,
-                                        isHSNLocked: false,
-                                        isUnitLocked: false,
-                                        itemOpen: false,
-                                        Primary_Unit: matchedItem.Primary_Unit || null,      // 🔹 add this
-                                        Secondary_Unit: matchedItem.Secondary_Unit || null,  // 🔹 add this
-
-                                      };
-                                      return updated;
-                                    });
-
-                                    setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                    //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      {
-                                        ...itemsValues[i],
-                                        Item_Name: matchedItem.Item_Name,
-                                        Purchase_Price: matchedItem.Purchase_Price || 0,
-                                        Quantity: itemsValues[i]?.Quantity || 0,
-                                      },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                  } else {
-                                    // no match — close dropdown
-                                    handleRowChange(i, "itemOpen", false);
-                                  }
-                                }, 150); // small delay so click-from-dropdown fires first
-                              }}
-                              onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
-                              placeholder="Item Name"
-                              className="w-full outline-none border-b-2 text-gray-900"
-                            />
-                            {/* RHF error */}
-                            {errors?.items?.[i]?.Item_Name && (
-                              <p className="text-red-500 text-xs mt-1">
-                                {errors?.items?.[i]?.Item_Name?.message}
-                              </p>
-                            )}
-                            {/* Dropdown List */}
-                            {rows[i]?.itemOpen && (
-                              <div
-                                style={{ width: "40rem" }}
-                                className="absolute z-20  w-full bg-white border
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
+                            }}
+                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            placeholder="Item Name"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                          />
+                          {/* RHF error */}
+                          {errors?.items?.[i]?.Item_Name && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors?.items?.[i]?.Item_Name?.message}
+                            </p>
+                          )}
+                          {/* Dropdown List */}
+                          {rows[i]?.itemOpen && (
+                            <div
+                              style={{ width: "40rem" }}
+                              className="absolute z-20  w-full bg-white border
       border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                              >
-                                <table className="w-full text-sm border-collapse">
-                                  <thead className="bg-gray-100 border-b">
-                                    <tr>
-                                      <th>Sl.No</th>
-                                      <th className="text-left px-3 py-2">Item Name</th>
-                                      <th className="text-left px-3 py-2">Sale Price</th>
-                                      <th className="text-left px-3 py-2">Purchase Price</th>
-                                      <th className="text-left px-3 py-2">Stock</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {items?.items
-                                      ?.filter((it) =>
-                                        it.Item_Name.toLowerCase().includes(
-                                          (rows[i]?.itemSearch || "").toLowerCase()
-                                        )
-                                      )
-                                      .map((it, idx) => (
-                                        <tr
-                                          key={idx}
-                                          onClick={() => {
-
-                                            setRows((prev) => {
-                                              const updated = [...prev];
-                                              updated[i] = {
-                                                ...updated[i],
-                                                Item_Category: it.Item_Category || "",
-                                                Item_HSN: it.Item_HSN || "",
-                                                categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                                isExistingItem: true,   // lock category
-                                                isHSNLocked: false,      // lock HSN
-                                                isUnitLocked: false,     // lock unit
-                                                Primary_Unit: it.Primary_Unit || null,      // 🔹 add this
-                                                Secondary_Unit: it.Secondary_Unit || null,  // 🔹 add this
-                                              };
-                                              return updated;
-                                            });
-                                            handleRowChange(i, "itemSearch", it.Item_Name);
-                                            handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                            handleRowChange(i, "CategoryOpen", false);
-                                            setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-
-                                            setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
-                                            //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Item_Unit`, it.Primary_Unit || it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-
-                                            handleRowChange(i, "itemOpen", false);
-
-
-                                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                              {
-                                                ...itemsValues[i],
-                                                Item_Name: it.Item_Name,
-                                                Purchase_Price: it.Purchase_Price || 0,
-                                                Quantity: itemsValues[i]?.Quantity || 0,
-                                                Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
-                                                Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
-                                                Tax_Type: itemsValues[i]?.Tax_Type
-                                              },
-                                              i,
-                                              itemsValues
-                                            );
-
-                                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                          }}
-
-                                          className="hover:bg-gray-100 cursor-pointer border-b"
-                                        >
-                                          <td>{idx + 1}</td>
-                                          <td className="px-3 py-2">{it.Item_Name}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                          {/* <td style={{color:"transparent"}}
-              className={`px-3 py-2 ${it.Stock_Quantity <= 0 ? "text-red-500" : "text-green-500"}`}>
-                {it.Stock_Quantity || 0}</td> */}
-                                          <td
-                                            style={{
-                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                              fontWeight: "500", // optional: matches Tailwind's medium weight
-                                            }}
-                                          >
-                                            {it.Stock_Quantity || 0}
-                                          </td>
-                                        </tr>
-                                      ))}
-
-                                    {items?.items?.filter((it) =>
+                            >
+                              <table className="w-full text-sm border-collapse">
+                                <thead className="bg-gray-100 border-b">
+                                  <tr>
+                                    <th>Sl.No</th>
+                                    <th className="text-left px-3 py-2">Item Name</th>
+                                    <th className="text-left px-3 py-2">Sale Price</th>
+                                    <th className="text-left px-3 py-2">Purchase Price</th>
+                                    <th className="text-left px-3 py-2">Stock</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {items?.items
+                                    ?.filter((it) =>
                                       it.Item_Name.toLowerCase().includes(
                                         (rows[i]?.itemSearch || "").toLowerCase()
                                       )
-                                    ).length === 0 && (
-                                        <tr>
-                                          <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                            No Item found
-                                          </td>
-                                        </tr>
-                                      )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
+                                    )
+                                    .map((it, idx) => (
+                                      <tr
+                                        key={idx}
+                                        onClick={() => {
+
+                                          setRows((prev) => {
+                                            const updated = [...prev];
+                                            updated[i] = {
+                                              ...updated[i],
+                                              Item_Category: it.Item_Category || "",
+                                              Item_HSN: it.Item_HSN || "",
+                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
+                                              isExistingItem: true,   // lock category
+                                              isHSNLocked: false,      // lock HSN
+                                              isUnitLocked: true,     // lock unit
+                                            };
+                                            return updated;
+                                          });
+                                          handleRowChange(i, "itemSearch", it.Item_Name);
+                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
+                                          handleRowChange(i, "CategoryOpen", false);
+                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
+
+                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                          handleRowChange(i, "itemOpen", false);
 
 
+                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                            {
+                                              ...itemsValues[i],
+                                              Item_Name: it.Item_Name,
+                                              Purchase_Price: it.Purchase_Price || 0,
+                                              Quantity: itemsValues[i]?.Quantity || 0,
+                                              Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
+                                              Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
+                                              Tax_Type: itemsValues[i]?.Tax_Type
+                                            },
+                                            i,
+                                            itemsValues
+                                          );
 
-                          </div>
-                        </td>
+                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                        }}
 
-                        {/*HSN Code */}
-                        <td style={{ padding: "0px", width: "8%" }}>
-                          <input
-                            type="text"
-                            value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-                            maxLength={8}              // limit to 8 digits
+                                        className="hover:bg-gray-100 cursor-pointer border-b"
+                                      >
+                                        <td>{idx + 1}</td>
+                                        <td className="px-3 py-2">{it.Item_Name}</td>
+                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
+                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        {/* <td style={{color:"transparent"}}
+              className={`px-3 py-2 ${it.Stock_Quantity <= 0 ? "text-red-500" : "text-green-500"}`}>
+                {it.Stock_Quantity || 0}</td> */}
+                                        <td
+                                          style={{
+                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                            fontWeight: "500", // optional: matches Tailwind's medium weight
+                                          }}
+                                        >
+                                          {it.Stock_Quantity || 0}
+                                        </td>
+                                      </tr>
+                                    ))}
 
-                            onChange={(e) => {
-                              // if (!rows[i]?.isHSNLocked) {
-                              //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              //   handleRowChange(i, "Item_HSN", e.target.value);
-                              //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                              //   // setValue(`items.${i}.Item_HSN`, e.target.value);
-                              // }
-
-                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              handleRowChange(i, "Item_HSN", e.target.value);
-                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                              // setValue(`items.${i}.Item_HSN`, e.target.value);
-
-                            }}
-                            placeholder="HSN Code"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                          //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
-                          />
-                          {errors?.items?.[i]?.Item_HSN && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_HSN.message}
-                            </p>
+                                  {items?.items?.filter((it) =>
+                                    it.Item_Name.toLowerCase().includes(
+                                      (rows[i]?.itemSearch || "").toLowerCase()
+                                    )
+                                  ).length === 0 && (
+                                      <tr>
+                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
+                                          No Item found
+                                        </td>
+                                      </tr>
+                                    )}
+                                </tbody>
+                              </table>
+                            </div>
                           )}
-                        </td>
 
-                        {/* Qty */}
-                        <td style={{ padding: "0px", width: "4%" }}>
+
+
+                        </div>
+                      </td>
+
+                      {/*HSN Code */}
+                      <td style={{ padding: "0px", width: "8%" }}>
+                        <input
+                          type="text"
+                          value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
+                          maxLength={8}              // limit to 8 digits
+
+                          onChange={(e) => {
+                            // if (!rows[i]?.isHSNLocked) {
+                            //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            //   handleRowChange(i, "Item_HSN", e.target.value);
+                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            //   // setValue(`items.${i}.Item_HSN`, e.target.value);
+                            // }
+
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // setValue(`items.${i}.Item_HSN`, e.target.value);
+
+                          }}
+                          placeholder="HSN Code"
+                          className="w-full outline-none border-b-2 text-gray-900"
+                        //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
+                        />
+                        {errors?.items?.[i]?.Item_HSN && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Item_HSN.message}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Qty */}
+                      <td style={{ padding: "0px", width: "4%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ width: "100%" }}
+                          {...register(`items.${i}.Quantity`)}
+
+
+                          onChange={(e) => {
+
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            setValue(`items.${i}.Quantity`, e.target.value, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                            //   return;
+                            // }
+                            // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                            //   ...itemsValues[i],
+                            //   Quantity: e.target.value,
+                            // });
+
+                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                              {
+                                ...itemsValues[i],
+                                Quantity: Number(e.target.value),
+                              },
+                              i,
+                              itemsValues
+                            );
+
+                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                            setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                            setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                          }}
+                          placeholder="Qty"
+                        />
+                        {errors?.items?.[i]?.Quantity && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Quantity.message}
+                          </p>
+                        )}
+                      </td>
+
+
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
+                      <Controller
+                        control={control}
+                        name={`items.${i}.Item_Unit`}
+                        render={({ field }) => (
+                          <select
+                            {...field}
+                            className="form-select"
+                            style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
+                            disabled={rows[i]?.isUnitLocked}
+                            onChange={(e) => {
+                              const value = e.target.value;
+
+                              // ➕ ADD UNIT
+                              if (value === "__ADD_UNIT__") {
+                                setActiveUnitRow(i);
+                                setShowAddUnitModal(true);
+                                return;
+                              }
+
+                              handleRowChange(i, "Item_Unit", value);
+                              setValue(`items.${i}.Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
+                            }}
+                          >
+                            {/* <option value=""></option> 
+                            <option value="">NONE</option>   // ✅ matches Vyapar's default label
+                            <option value="__ADD_UNIT__">➕ Add Unit</option>
+                            {Array.isArray(itemUnits) &&
+                              itemUnits.map((unit) => (
+                                <option
+                                  key={unit.Unit_Shorthand}
+                                  value={unit.Unit_Shorthand}
+                                >
+                                  {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
+                                </option>
+                              ))}
+
+                            {/* ➕ Add Unit always at bottom 
+
+                          </select>
+                        )}
+                      />
+                      {errors?.items?.[i]?.Item_Unit && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.items[i].Item_Unit.message}
+                        </p>
+                      )}
+                    </td> */}
+                    <td style={{ padding: "0px", width: "12%" }}>
+                      <Controller
+                        control={control}
+                        name={`items.${i}.Selected_Unit`}
+                        render={({ field }) => (
+                          <select
+                            {...field}
+                            className="form-select"
+                            style={{
+                              width: "100%",
+                              fontSize: "12px",
+                              marginLeft: "0px",
+                            }}
+                          >
+                            {hasConfiguredUnits ? (
+                              <>
+                                {availableUnits.map((unitCode) => {
+                                  const unit = itemUnits.find(
+                                    (u) => u.Unit_Shorthand === unitCode
+                                  );
+
+                                  return (
+                                    <option key={unitCode} value={unitCode}>
+                                      {unit
+                                        ? `${unit.Unit_Name} (${unit.Unit_Shorthand})`
+                                        : unitCode}
+                                    </option>
+                                  );
+                                })}
+                              </>
+                            ) : (
+                              <>
+                                <option value="">NONE</option>
+
+                                {itemUnits.map((unit) => (
+                                  <option
+                                    key={unit.Unit_Shorthand}
+                                    value={unit.Unit_Shorthand}
+                                  >
+                                    {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                  </option>
+                                ))}
+                              </>
+                            )}
+                          </select>
+                        )}
+                      />
+                      </td>
+
+
+
+                      {/* Price/Unit */}
+                      <td style={{ padding: "0px", width: "6%" }}>
+                        <div className="d-flex align-items-center">
                           <input
                             type="text"
                             className="form-control"
-                            style={{ width: "100%" }}
-                            {...register(`items.${i}.Quantity`)}
-
-
+                            style={{ width: "100%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Purchase_Price`)}
                             onChange={(e) => {
+                              let val = e.target.value;
 
-                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                              setValue(`items.${i}.Quantity`, e.target.value, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // ✅ allow digits and one dot
+                              val = val.replace(/[^0-9.]/g, "");
 
+                              // ✅ if more than one dot, keep only the first
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
+                              }
+
+                              // ✅ limit to 2 decimal places
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
+
+                              e.target.value = val;
+                              setValue(`items.${i}.Purchase_Price`, val,
+                                { shouldValidate: true, shouldDirty: true });
                               // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                               //   return;
                               // }
-                              // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                              //   ...itemsValues[i],
-                              //   Quantity: e.target.value,
-                              // });
+
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                {
-                                  ...itemsValues[i],
-                                  Quantity: Number(e.target.value),
-                                },
+                                { ...itemsValues[i], Purchase_Price: val },
                                 i,
                                 itemsValues
                               );
@@ -1907,215 +2064,18 @@ export default function PurchaseAdd() {
                               setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
                               setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                             }}
-                            placeholder="Qty"
-                          />
-                          {errors?.items?.[i]?.Quantity && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Quantity.message}
-                            </p>
-                          )}
-                        </td>
 
-
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => (
-                            <select
-                              {...field}
-                              className="form-select"
-                              style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                              disabled={rows[i]?.isUnitLocked}
-                              onChange={(e) => {
-                                const value = e.target.value;
-
-                                // ➕ ADD UNIT
-                                if (value === "__ADD_UNIT__") {
-                                  setActiveUnitRow(i);
-                                  setShowAddUnitModal(true);
-                                  return;
-                                }
-
-                                handleRowChange(i, "Item_Unit", value);
-                                setValue(`items.${i}.Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
-                              }}
-                            >
-                              
-                              <option value="">NONE</option>   // ✅ matches Vyapar's default label
-                              <option value="__ADD_UNIT__">➕ Add Unit</option>
-                              {Array.isArray(itemUnits) &&
-                                itemUnits.map((unit) => (
-                                  <option
-                                    key={unit.Unit_Shorthand}
-                                    value={unit.Unit_Shorthand}
-                                  >
-                                    {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
-                                  </option>
-                                ))}
-
-                              {/* ➕ Add Unit always at bottom 
-
-                            </select>
-                          )}
-                        />
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Item_Unit.message}
-                          </p>
-                        )}
-                      </td> */}
-                        <td style={{ padding: "0px", width: "12%" }}>
-                          <Controller
-                            control={control}
-                            name={`items.${i}.Item_Unit`}
-                            render={({ field }) => {
-                              const row = rows[i];
-
-                              const primaryUnit = row?.Primary_Unit;
-                              const secondaryUnit = row?.Secondary_Unit;
-
-                              // New unit system exists
-                              const hasConfiguredUnits = !!primaryUnit;
-
-                              return (
-                                <select
-                                  {...field}
-                                  value={field.value || ""}
-                                  className="form-select"
-                                  style={{
-                                    width: "100%",
-                                    fontSize: "12px",
-                                    marginLeft: "0px",
-                                  }}
-                                  disabled={row?.isUnitLocked}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-
-                                    // ADD UNIT — only possible for item without configured units
-                                    if (value === "__ADD_UNIT__") {
-                                      setActiveUnitRow(i);
-                                      setShowAddUnitModal(true);
-                                      return;
-                                    }
-
-                                    field.onChange(value);
-
-                                    handleRowChange(i, "Item_Unit", value);
-
-                                    setValue(`items.${i}.Item_Unit`, value, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    });
-                                  }}
-                                >
-                                  {hasConfiguredUnits ? (
-                                    <>
-                                      {/* PRIMARY UNIT */}
-                                      <option value={primaryUnit}>
-                                        {primaryUnit}
-                                      </option>
-
-                                      {/* SECONDARY UNIT */}
-                                      {secondaryUnit && (
-                                        <option value={secondaryUnit}>
-                                          {secondaryUnit}
-                                        </option>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <>
-                                      {/* OLD / NO UNIT CONFIGURATION */}
-                                      <option value="">NONE</option>
-
-                                      {Array.isArray(itemUnits) &&
-                                        itemUnits.map((unit) => (
-                                          <option
-                                            key={unit.Unit_Shorthand}
-                                            value={unit.Unit_Shorthand}
-                                          >
-                                            {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                          </option>
-                                        ))}
-
-                                      <option value="__ADD_UNIT__">
-                                        ➕ Add Unit
-                                      </option>
-                                    </>
-                                  )}
-                                </select>
-                              );
-                            }}
+                            placeholder="Price"
                           />
 
-                          {errors?.items?.[i]?.Item_Unit && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Unit.message}
-                            </p>
-                          )}
-                        </td>
-
-
-
-
-
-                        {/* Price/Unit */}
-                        <td style={{ padding: "0px", width: "6%" }}>
-                          <div className="d-flex align-items-center">
-                            <input
-                              type="text"
-                              className="form-control"
-                              style={{ width: "100%", marginBottom: "0px" }}
-                              {...register(`items.${i}.Purchase_Price`)}
-                              onChange={(e) => {
-                                let val = e.target.value;
-
-                                // ✅ allow digits and one dot
-                                val = val.replace(/[^0-9.]/g, "");
-
-                                // ✅ if more than one dot, keep only the first
-                                const parts = val.split(".");
-                                if (parts.length > 2) {
-                                  val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                                }
-
-                                // ✅ limit to 2 decimal places
-                                if (val.includes(".")) {
-                                  const [int, dec] = val.split(".");
-                                  val = int + "." + dec.slice(0, 2);
-                                }
-
-                                e.target.value = val;
-                                setValue(`items.${i}.Purchase_Price`, val,
-                                  { shouldValidate: true, shouldDirty: true });
-                                // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                //   return;
-                                // }
-
-
-                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                  { ...itemsValues[i], Purchase_Price: val },
-                                  i,
-                                  itemsValues
-                                );
-
-                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              }}
-
-                              placeholder="Price"
-                            />
-
-                            {/* </div>
+                          {/* </div>
                               {errors?.items?.[i]?.Purchase_Price && (
                                 <p className="text-red-500 text-xs mt-1">
                                   {errors.items[i].Purchase_Price.message}
                                 </p>
                               )} */}
 
-                            {/* <input
+                          {/* <input
   type="text"
   className="form-control"
   style={{ width: "100%", marginBottom: "0px" }}
@@ -2155,107 +2115,70 @@ export default function PurchaseAdd() {
   placeholder="Price"
 /> */}
 
-                          </div>
-                          {errors?.items?.[i]?.Purchase_Price && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Purchase_Price.message}
-                            </p>
-                          )}
-                        </td>
+                        </div>
+                        {errors?.items?.[i]?.Purchase_Price && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Purchase_Price.message}
+                          </p>
+                        )}
+                      </td>
 
-                        {/* Discount */}
-                        <td style={{ padding: "0px", width: "14%" }}>
-                          <div className="d-flex align-items-center">
-                            <input
-                              type="text"
-                              className="form-control"
-                              style={{ width: "50%", marginBottom: "0px" }}
-                              {...register(`items.${i}.Discount_On_Purchase_Price`)}
+                      {/* Discount */}
+                      <td style={{ padding: "0px", width: "14%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ width: "50%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Discount_On_Purchase_Price`)}
 
-                              onInput={(e) => {
-                                let val = e.target.value;
+                            onInput={(e) => {
+                              let val = e.target.value;
 
-                                // allow digits + 1 dot
-                                val = val.replace(/[^0-9.]/g, "");
+                              // allow digits + 1 dot
+                              val = val.replace(/[^0-9.]/g, "");
 
-                                const parts = val.split(".");
-                                if (parts.length > 2) {
-                                  val = parts[0] + "." + parts.slice(1).join("");
-                                }
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join("");
+                              }
 
-                                if (val.includes(".")) {
-                                  const [int, dec] = val.split(".");
-                                  val = int + "." + dec.slice(0, 2);
-                                }
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
 
-                                e.target.value = val;
+                              e.target.value = val;
 
-                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                  { ...itemsValues[i], Discount_On_Purchase_Price: val },
-                                  i,
-                                  itemsValues
-                                );
+                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                { ...itemsValues[i], Discount_On_Purchase_Price: val },
+                                i,
+                                itemsValues
+                              );
 
-                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              }}
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            }}
 
-                              placeholder="Discount"
-                            />
-                            <Controller
-                              control={control}
-                              name={`items.${i}.Discount_Type_On_Purchase_Price`}
-                              render={({ field }) => (
-                                <select
-                                  {...field}
-                                  className="form-select ms-2"
-                                  style={{ width: "50%", fontSize: "12px" }}
-                                  onChange={(e) => {
-                                    field.onChange(e); // ✅ let RHF handle its state
-
-
-
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                  }}
-                                >
-                                  <option value="Percentage">%</option>
-                                  <option value="Amount">Amount</option>
-                                </select>
-                              )}
-                            />
-                          </div>
-                        </td>
-
-
-                        <td style={{ padding: "0px", width: "12%" }}>
+                            placeholder="Discount"
+                          />
                           <Controller
                             control={control}
-                            name={`items.${i}.Tax_Type`}
+                            name={`items.${i}.Discount_Type_On_Purchase_Price`}
                             render={({ field }) => (
                               <select
                                 {...field}
-                                className="form-select"
-                                style={{ width: "100%", fontSize: "12px", marginBottom: "0px" }}
+                                className="form-select ms-2"
+                                style={{ width: "50%", fontSize: "12px" }}
                                 onChange={(e) => {
-                                  field.onChange(e); // ✅ update RHF value
+                                  field.onChange(e); // ✅ let RHF handle its state
 
-                                  // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                                  //   ...itemsValues[i],
-                                  //   Tax_Type: e.target.value,
-                                  // });
+
+
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                    { ...itemsValues[i], Tax_Type: e.target.value },
+                                    { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
                                     i,
                                     itemsValues
                                   );
@@ -2266,52 +2189,88 @@ export default function PurchaseAdd() {
                                   setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 }}
                               >
-                                <option value="None">None</option>
-                                <option value="GST0">GST @0%</option>
-                                <option value="IGST0">IGST @0%</option>
-                                <option value="GST0.25">GST @0.25%</option>
-                                <option value="IGST0.25">IGST @0.25%</option>
-                                <option value="GST3">GST @3%</option>
-                                <option value="IGST3">IGST @3%</option>
-                                <option value="GST5">GST @5%</option>
-                                <option value="IGST5">IGST @5%</option>
-                                <option value="GST12">GST @12%</option>
-                                <option value="IGST12">IGST @12%</option>
-                                <option value="GST18">GST @18%</option>
-                                <option value="IGST18">IGST @18%</option>
-                                <option value="GST28">GST @28%</option>
-                                <option value="IGST28">IGST @28%</option>
-                                <option value="GST40">GST @40%</option>
-                                <option value="IGST40">IGST @40%</option>
+                                <option value="Percentage">%</option>
+                                <option value="Amount">Amount</option>
                               </select>
                             )}
                           />
-                        </td>
+                        </div>
+                      </td>
 
-                        {/* Tax Amount */}
-                        <td style={{ width: "8%" }}>
-                          <input
-                            type="text"
-                            className="form-control"
-                            style={{ backgroundColor: "transparent" }}
-                            {...register(`items.${i}.Tax_Amount`)}
-                            readOnly
-                          />
-                        </td>
 
-                        {/* Amount */}
-                        <td style={{ width: "16%" }}>
-                          <input
-                            type="text"
-                            className="form-control"
-                            style={{ backgroundColor: "transparent" }}
-                            {...register(`items.${i}.Amount`)}
-                            readOnly
-                          />
-                        </td>
-                      </tr>
-                    )
-                  })}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`}
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px", marginBottom: "0px" }}
+                              onChange={(e) => {
+                                field.onChange(e); // ✅ update RHF value
+
+                                // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                                //   ...itemsValues[i],
+                                //   Tax_Type: e.target.value,
+                                // });
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                  { ...itemsValues[i], Tax_Type: e.target.value },
+                                  i,
+                                  itemsValues
+                                );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              }}
+                            >
+                              <option value="None">None</option>
+                              <option value="GST0">GST @0%</option>
+                              <option value="IGST0">IGST @0%</option>
+                              <option value="GST0.25">GST @0.25%</option>
+                              <option value="IGST0.25">IGST @0.25%</option>
+                              <option value="GST3">GST @3%</option>
+                              <option value="IGST3">IGST @3%</option>
+                              <option value="GST5">GST @5%</option>
+                              <option value="IGST5">IGST @5%</option>
+                              <option value="GST12">GST @12%</option>
+                              <option value="IGST12">IGST @12%</option>
+                              <option value="GST18">GST @18%</option>
+                              <option value="IGST18">IGST @18%</option>
+                              <option value="GST28">GST @28%</option>
+                              <option value="IGST28">IGST @28%</option>
+                              <option value="GST40">GST @40%</option>
+                              <option value="IGST40">IGST @40%</option>
+                            </select>
+                          )}
+                        />
+                      </td>
+
+                      {/* Tax Amount */}
+                      <td style={{ width: "8%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ backgroundColor: "transparent" }}
+                          {...register(`items.${i}.Tax_Amount`)}
+                          readOnly
+                        />
+                      </td>
+
+                      {/* Amount */}
+                      <td style={{ width: "16%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ backgroundColor: "transparent" }}
+                          {...register(`items.${i}.Amount`)}
+                          readOnly
+                        />
+                      </td>
+                    </tr>
+                  )})}
                 </tbody>
 
 

@@ -1,6 +1,7 @@
 
 
 import db from "../config/db.js";
+import { recordItemLedger } from "../utils/itemLedgerHelper.js";
 import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 const cleanValue = (value) => {
@@ -180,226 +181,7 @@ const getSaleReturnById = async (req, res, next) => {
 };
 
 /* ── CREATE ───────────────────────────────────────────────── */
-// const createSaleReturn = async (req, res, next) => {
-//   let connection;
-//   try {
-//     const { Sale_Id } = req.params;
 
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
-
-//     const {
-//       Party_Name,
-//       Return_Number,
-//       Invoice_Number,
-//       Invoice_Date,
-//       Return_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       Total_Paid,
-//       Balance_Due,
-//       //Reference_Number,
-//       splits,    // 🔹 replaces single Payment_Type / Bank_Account_Id
-//       items,
-//     } = req.body;
-
-//     if (!Sale_Id || !Party_Name || !Return_Date || !items?.length) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         success: false,
-//         message: "Sale_Id, Customer, Return Date and items are required",
-//       });
-//     }
-
-//     const totalAmount = Number(Total_Amount) || 0;
-//     const totalPaid   = Number(Total_Paid)   || 0;
-//     const balanceDue  = Number(Balance_Due)  || totalAmount - totalPaid;
-
-//     // 🔹 paid cannot exceed total
-//     if (totalPaid > totalAmount) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         success: false,
-//         message: "Paid amount should be less than or equal to Total Amount",
-//       });
-//     }
-
-//     // 🔹 validate splits sum === totalPaid
-//     if (totalPaid > 0) {
-//       try {
-//         validateSplits(splits, totalPaid);
-//       } catch (validationErr) {
-//         await connection.rollback();
-//         return res.status(400).json({ success: false, message: validationErr.message });
-//       }
-//     }
-
-//     const [[party]] = await connection.query(
-//       `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-//       [Party_Name]
-//     );
-//     if (!party) {
-//       await connection.rollback();
-//       return res.status(404).json({ success: false, message: "Customer not found" });
-//     }
-
-//     const [headerResult] = await connection.query(
-//   `INSERT INTO sale_return
-//     (
-//       Sale_Id,
-//       Party_Id,
-//       Return_Number,
-//       Invoice_Number,
-//       Invoice_Date,
-//       Return_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       Total_Paid,
-//       Balance_Due
-//     )
-//    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//   [
-//     Sale_Id,
-//     party.Party_Id,
-//     Return_Number || null,
-//     Invoice_Number || null,
-//     Invoice_Date || null,
-//     Return_Date,
-//     State_Of_Supply || null,
-//     totalAmount,
-//     totalPaid,
-//     balanceDue,
-//   ]
-// );
-
-//     const Sale_Return_Id = headerResult.insertId;
-
-//     // 🔹 insert splits + fan out to bank/cash ledgers
-//     if (totalPaid > 0 && Array.isArray(splits) && splits.length > 0) {
-//       await insertPaymentSplits({
-//         connection,
-//         sourceType: "Sale_Return",
-//         sourceId:   Sale_Return_Id,
-//         partyName:  Party_Name,
-//         txnDate:    Return_Date,
-//         splits,
-//       });
-//     }
-
-//     await recordPartyLedger({
-//   connection,
-//   partyId: party.Party_Id,
-//   txnType: "Sale_Return",
-//   referenceId: Sale_Return_Id,
-//   amount: totalAmount,
-//   txnDate: Return_Date,
-//   docNumber: Return_Number,
-//   balanceDue: balanceDue,
-// });
-
-
-//     // items loop — unchanged, item name/hsn pulled from add_item via FK
-//     for (const item of items) {
-//       const {
-//         Item_Name,
-//         Item_Category,
-//         Item_HSN,
-//         Item_Unit,
-//         Quantity,
-//         Sale_Price,
-//         Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price,
-//         Tax_Type,
-//         Tax_Amount,
-//         Amount,
-//       } = item;
-
-//       // const [[existingItem]] = await connection.query(
-//       //   `SELECT Item_Id FROM add_item WHERE Item_Name = ? LIMIT 1`,
-//       //   [Item_Name]
-//       // );
-//         const [[existingItem]] = await connection.query(
-//         `SELECT Item_Id FROM add_item WHERE TRIM(Item_Name) = TRIM(?)) LIMIT 1`,
-//         [Item_Name]
-//       );
-
-//       // let Item_Id;
-//       // if (!existingItem) {
-//       //   const [ins] = await connection.execute(
-//       //     `INSERT INTO add_item
-//       //        (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-//       //      VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-//       //     [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
-//       //   );
-//       //   Item_Id = `ITM${ins.insertId}`;
-//       //   await connection.execute(
-//       //     `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-//       //     [Item_Id, ins.insertId]
-//       //   );
-//       // } else {
-//       //   Item_Id = existingItem.Item_Id;
-//       // }
-//   let Item_Id;
-// if (!existingItem) {
-//   const [ins] = await connection.execute(
-//     `INSERT INTO add_item
-//        (Item_Name, Item_Category, Item_HSN, Item_Unit, Stock_Quantity, created_at, updated_at)
-//      VALUES (?, ?, ?, ?, 0, NOW(), NOW())`,
-//     [Item_Name, Item_Category || "", Item_HSN || "", Item_Unit || ""]
-//   );
-//   Item_Id = `ITM${ins.insertId}`;
-//   await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, ins.insertId]);
-// } else {
-//   Item_Id = existingItem.Item_Id;
-//   // 🔹 sync HSN to master if changed
-//   if (Item_HSN) {
-//     await connection.query(
-//       `UPDATE add_item SET Item_HSN = ?, updated_at = NOW() WHERE Item_Id = ?`,
-//       [Item_HSN, Item_Id]
-//     );
-//   }
-// }
-//       await connection.query(
-//         `INSERT INTO sale_return_items
-//            (Sale_Return_Id, Item_Id, Quantity, Sale_Price,
-//             Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-//             Tax_Type, Tax_Amount, Amount)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//         [
-//           Sale_Return_Id,
-//           Item_Id,
-//           Number(Quantity),
-//           Number(Sale_Price),
-//           Number(Discount_On_Sale_Price) || 0,
-//           Discount_Type_On_Sale_Price    || "Percentage",
-//           Tax_Type                       || null,
-//           Number(Tax_Amount)             || 0,
-//           Number(Amount),
-//         ]
-//       );
-
-//       // restore stock — item coming back into inventory
-//       await connection.query(
-//         `UPDATE add_item SET Stock_Quantity = Stock_Quantity + ?, updated_at = NOW()
-//          WHERE Item_Id = ?`,
-//         [Number(Quantity), Item_Id]
-//       );
-//     }
-
-//     await connection.commit();
-//     return res.status(201).json({
-//       success: true,
-//       message: "Sale Return created",
-//       Sale_Return_Id,
-//     });
-//   } catch (err) {
-//     if (connection) await connection.rollback();
-//     console.error("❌ createSaleReturn:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const createSaleReturn = async (req, res, next) => {
   let connection;
 
@@ -693,9 +475,7 @@ const createSaleReturn = async (req, res, next) => {
         const autoId =
           (maxRow[0]?.maxId || 0) + 1;
 
-        Item_Id =
-          "ITM" +
-          autoId.toString().padStart(3, "0");
+        Item_Id ="ITM" + autoId.toString().padStart(3, "0");
 
         await connection.execute(
           `INSERT INTO add_item
@@ -762,33 +542,61 @@ const createSaleReturn = async (req, res, next) => {
       // 13. INSERT RETURN ITEM
       // =======================================================
 
-      await connection.query(
-        `INSERT INTO sale_return_items
-        (
-          Sale_Return_Id,
-          Item_Id,
-          Quantity,
-          Sale_Price,
-          Discount_On_Sale_Price,
-          Discount_Type_On_Sale_Price,
-          Tax_Type,
-          Tax_Amount,
-          Amount
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          Sale_Return_Id,
-          Item_Id,
-          Number(Quantity) || 0,
-          Number(Sale_Price) || 0,
-          Number(Discount_On_Sale_Price) || 0,
-          Discount_Type_On_Sale_Price ||
-            "Percentage",
-          Tax_Type || null,
-          Number(Tax_Amount) || 0,
-          Number(Amount) || 0,
-        ]
-      );
+      // await connection.query(
+      //   `INSERT INTO sale_return_items
+      //   (
+      //     Sale_Return_Id,
+      //     Item_Id,
+      //     Quantity,
+      //     Sale_Price,
+      //     Discount_On_Sale_Price,
+      //     Discount_Type_On_Sale_Price,
+      //     Tax_Type,
+      //     Tax_Amount,
+      //     Amount
+      //   )
+      //   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      //   [
+      //     Sale_Return_Id,
+      //     Item_Id,
+      //     Number(Quantity) || 0,
+      //     Number(Sale_Price) || 0,
+      //     Number(Discount_On_Sale_Price) || 0,
+      //     Discount_Type_On_Sale_Price ||
+      //       "Percentage",
+      //     Tax_Type || null,
+      //     Number(Tax_Amount) || 0,
+      //     Number(Amount) || 0,
+      //   ]
+      // );
+      const [srItemResult] = await connection.query(
+  `INSERT INTO sale_return_items
+  (
+    Sale_Return_Id,
+    Item_Id,
+    Quantity,
+    Sale_Price,
+    Discount_On_Sale_Price,
+    Discount_Type_On_Sale_Price,
+    Tax_Type,
+    Tax_Amount,
+    Amount
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [
+    Sale_Return_Id,
+    Item_Id,
+    Number(Quantity) || 0,
+    Number(Sale_Price) || 0,
+    Number(Discount_On_Sale_Price) || 0,
+    Discount_Type_On_Sale_Price || "Percentage",
+    Tax_Type || null,
+    Number(Tax_Amount) || 0,
+    Number(Amount) || 0,
+  ]
+);
+
+const saleReturnItemId = srItemResult.insertId;
 
       // =======================================================
       // 14. SALE RETURN -> STOCK COMES BACK
@@ -806,6 +614,32 @@ const createSaleReturn = async (req, res, next) => {
           Item_Id,
         ]
       );
+      await recordItemLedger({
+  connection,
+
+  itemId: Item_Id,
+
+  txnType: "Sale_Return",
+
+  // Exact sale_return_items row.
+  // Used for reverse/edit/delete.
+  referenceId: saleReturnItemId,
+
+  // Parent sale_return header.
+  // Used to open the complete return bill.
+  billId: Sale_Return_Id,
+
+  // Human-readable number shown in UI.
+  billNumber: Return_Number || null,
+
+  partyName: Party_Name,
+
+  quantity: Number(Quantity) || 0,
+
+  rate: Number(Sale_Price) || null,
+
+  txnDate: Return_Date,
+});
     }
 
     // =========================================================
@@ -1685,7 +1519,21 @@ const editSaleReturn = async (req, res, next) => {
         );
       }
     }
+// =========================================================
+// 19. REVERSE OLD ITEM LEDGER ENTRIES
+// =========================================================
 
+for (const old of oldItems) {
+  await reverseItemLedger({
+    connection,
+
+    itemId: old.Item_Id,
+    txnType: "Sale_Return",
+
+    // old sale_return_items.id
+    referenceId: old.id,
+  });
+}
     // =========================================================
     // 19. DELETE OLD RETURN ITEMS
     // =========================================================
@@ -1699,41 +1547,63 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
     // 20. REINSERT
     // =========================================================
+for (const line of resolvedLines) {
 
-    for (const line of resolvedLines) {
-      await connection.query(
-        `INSERT INTO sale_return_items
-        (
-          Sale_Return_Id,
-          Item_Id,
-          Quantity,
-          Sale_Price,
-          Discount_On_Sale_Price,
-          Discount_Type_On_Sale_Price,
-          Tax_Type,
-          Tax_Amount,
-          Amount
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          Sale_Return_Id,
-          line.Item_Id,
-          line.Quantity,
-          line.Sale_Price,
-          line.Discount_On_Sale_Price,
-          line.Discount_Type_On_Sale_Price,
-          line.Tax_Type,
-          line.Tax_Amount,
-          line.Amount,
-        ]
-      );
-    }
+  const [srItemResult] = await connection.query(
+    `INSERT INTO sale_return_items
+    (
+      Sale_Return_Id,
+      Item_Id,
+      Quantity,
+      Sale_Price,
+      Discount_On_Sale_Price,
+      Discount_Type_On_Sale_Price,
+      Tax_Type,
+      Tax_Amount,
+      Amount
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      Sale_Return_Id,
+      line.Item_Id,
+      line.Quantity,
+      line.Sale_Price,
+      line.Discount_On_Sale_Price,
+      line.Discount_Type_On_Sale_Price,
+      line.Tax_Type,
+      line.Tax_Amount,
+      line.Amount,
+    ]
+  );
 
-    // =========================================================
-    // 21. COMMIT
-    // =========================================================
+  const saleReturnItemId = srItemResult.insertId;
 
-    await connection.commit();
+  await recordItemLedger({
+    connection,
+
+    itemId: line.Item_Id,
+    txnType: "Sale_Return",
+
+    referenceId: saleReturnItemId,
+
+    billId: Number(Sale_Return_Id),
+    billNumber: Return_Number || null,
+
+    partyName: Party_Name,
+
+    quantity: line.Quantity,
+    rate: line.Sale_Price ?? null,
+
+    txnDate: Return_Date,
+  });
+}
+
+
+// =========================================================
+// 22. COMMIT
+// =========================================================
+
+await connection.commit();
 
     return res.status(200).json({
       success: true,
