@@ -71,80 +71,109 @@ export default function SelectUnitModal({
     setConversionError("");
   }, [baseUnit, secondaryUnit]);
 
-  const handleSave = async () => {
-    setConversionError("");
+const handleSave = async () => {
+  setConversionError("");
 
-    // 1. NEITHER SELECTED
-    if (!baseUnit && !secondaryUnit) {
-      onSave({ baseUnit: null, secondaryUnit: null, conversionRate: null });
-      return;
-    }
+  // 1. BOTH NONE -> no units
+  if (!baseUnit && !secondaryUnit) {
+    onSave({
+      baseUnit: null,
+      secondaryUnit: null,
+      conversionRate: null,
+    });
+    return;
+  }
 
-    // 2. NO SECONDARY UNIT — conversion not required
-    if (!secondaryUnit) {
-      onSave({ baseUnit, secondaryUnit: null, conversionRate: null });
-      return;
-    }
+  // Secondary cannot exist without base
+  if (!baseUnit && secondaryUnit) {
+    setConversionError("Please select a base unit");
+    return;
+  }
 
-    // 3. SECONDARY EXISTS BUT NOTHING SELECTED
-    if (!selectedRate) {
-      setConversionError("Please select a conversion rate");
-      return;
-    }
+  // 2. ONLY BASE UNIT
+  if (!secondaryUnit) {
+    onSave({
+      baseUnit,
+      secondaryUnit: null,
+      conversionRate: null,
+    });
+    return;
+  }
 
-    let rate = null;
+  // 3. BOTH UNITS BUT NO CONVERSION SELECTED
+  if (!selectedRate) {
+    setConversionError("Please select a conversion rate");
+    return;
+  }
 
-    // 4. CUSTOM RATE
-    if (selectedRate === "custom") {
-      rate = Number(customRate);
-      if (customRate.trim() === "" || !Number.isFinite(rate) || rate <= 0) {
-        setConversionError("Please enter conversion rate");
-        return;
-      }
-    }
-    // 5. STANDARD SUGGESTION
-    else if (selectedRate.startsWith("suggestion-")) {
-      const index = Number(selectedRate.replace("suggestion-", ""));
-      rate = Number(suggestions[index]);
-    }
-    // 6. SAVED CONVERSION
-    else if (selectedRate.startsWith("saved-")) {
-      const id = selectedRate.replace("saved-", "");
-      const saved = savedConversions.find((c) => String(c.id) === String(id));
-      rate = saved ? Number(saved.Conversion_Rate) : null;
-    }
+  let rate = null;
 
-    // 7. FINAL SAFETY CHECK
-    if (!rate || rate <= 0) {
+  // 4. CUSTOM RATE
+  if (selectedRate === "custom") {
+    rate = Number(customRate);
+
+    if (
+      customRate.trim() === "" ||
+      !Number.isFinite(rate) ||
+      rate <= 0
+    ) {
       setConversionError("Please enter conversion rate");
       return;
     }
+  }
 
-    // 8. PERSIST to item_unit_conversions (so it shows up next time as "saved")
-    //    Only worth calling if this exact pair+rate isn't already saved (INSERT IGNORE handles dupes anyway)
-    const alreadyExists = savedConversions.some(
-  c =>
-    Number(c.Conversion_Rate) === Number(rate)
-);
+  // 5. STANDARD SUGGESTION
+  else if (selectedRate.startsWith("suggestion-")) {
+    const index = Number(
+      selectedRate.replace("suggestion-", "")
+    );
 
+    rate = Number(suggestions[index]);
+  }
 
-    if (Item_Id && !alreadyExists) {
-      try {
-        await addItemConversion({
-          Item_Id,
-          Primary_Unit: baseUnit,
-          Secondary_Unit: secondaryUnit,
-          Conversion_Rate: rate,
-        }).unwrap();
-      } catch (err) {
-        console.error("Failed to save conversion history:", err);
-        // don't block the form save on this — conversion history is a nice-to-have
-      }
+  // 6. PREVIOUSLY SAVED CONVERSION
+  else if (selectedRate.startsWith("saved-")) {
+    const id = selectedRate.replace("saved-", "");
+
+    const saved = savedConversions.find(
+      (c) => String(c.id) === String(id)
+    );
+
+    rate = saved
+      ? Number(saved.Conversion_Rate)
+      : null;
+  }
+
+  // 7. FINAL VALIDATION
+  if (!rate || rate <= 0) {
+    setConversionError("Please enter conversion rate");
+    return;
+  }
+
+  // 8. SAVE CONVERSION HISTORY
+  if (Item_Id) {
+    try {
+      await addItemConversion({
+        Item_Id,
+        Primary_Unit: baseUnit,
+        Secondary_Unit: secondaryUnit,
+        Conversion_Rate: rate,
+      }).unwrap();
+    } catch (err) {
+      console.error(
+        "Failed to save conversion history:",
+        err
+      );
     }
+  }
 
-    // 9. UPDATE PARENT FORM STATE
-    onSave({ baseUnit, secondaryUnit, conversionRate: rate });
-  };
+  // 9. UPDATE ITEM FORM
+  onSave({
+    baseUnit,
+    secondaryUnit,
+    conversionRate: rate,
+  });
+};
 
   console.log("baseUnit", baseUnit);
   console.log("secondaryUnit", secondaryUnit);
