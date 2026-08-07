@@ -446,24 +446,24 @@ export default function SaleReturndEdit() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
-   const emptyRow = () => ({
-  Item_Category: "",
-  Item_Name: "",
-  itemSearch: "",
-  Item_HSN: "",
-  Quantity: "",
-  Sale_Price: "",
-  Discount_On_Sale_Price: "",
-  Discount_Type_On_Sale_Price: "Percentage",
-  Tax_Type: "None",
-  Tax_Amount: "",
-  Amount: "",
-  itemOpen: false,
-  CategoryOpen: false,
-  isHSNLocked: false,
-  isUnitLocked: false,
-  isExistingItem: false,
-});
+  const emptyRow = () => ({
+    Item_Category: "",
+    Item_Name: "",
+    itemSearch: "",
+    Item_HSN: "",
+    Quantity: "",
+    Sale_Price: "",
+    Discount_On_Sale_Price: "",
+    Discount_Type_On_Sale_Price: "Percentage",
+    Tax_Type: "None",
+    Tax_Amount: "",
+    Amount: "",
+    itemOpen: false,
+    CategoryOpen: false,
+    isHSNLocked: false,
+    isUnitLocked: false,
+    isExistingItem: false,
+  });
   useEffect(() => {
     if (sale) {
 
@@ -473,23 +473,24 @@ export default function SaleReturndEdit() {
       //   itemSearch: it.Item_Name || "", // for UI display
       //   isExistingItem: true,           // lock category/HSN if needed
       //   isHSNLocked: false,
-      //   isUnitLocked: true,
+      //  isUnitLocked: false,
       //   CategoryOpen: false,
       //   itemOpen: false,
       //   itemQuantity: it.Quantity || "",
       //   itemTaxType: it.Tax_Type || "None",
       // }));
-         const prefilledRows = sale?.saleReturn?.items?.length > 0
-      ? sale.saleReturn.items.map((item) => ({
+      const prefilledRows = sale?.saleReturn?.items?.length > 0
+        ? sale.saleReturn.items.map((item) => ({
           ...item,
+          Item_Unit: item.Selected_Unit || "",
           itemSearch: item.Item_Name,
           itemOpen: false,
           CategoryOpen: false,
           isHSNLocked: false,
-          isUnitLocked: true,
+          isUnitLocked: false,
           isExistingItem: true,
         }))
-      : [emptyRow()];
+        : [emptyRow()];
 
       setRows(prefilledRows);
 
@@ -616,225 +617,225 @@ export default function SaleReturndEdit() {
   }, [totalAmountWatch, computedTotalPaid]);
 
 
- const onSubmit = async (data) => {
-  console.log("Form Data (from RHF):", data);
+  const onSubmit = async (data) => {
+    console.log("Form Data (from RHF):", data);
 
-  // =========================================================
-  // 1. ITEMS
-  //
-  // Do NOT filter blank rows here.
-  //
-  // Backend handles:
-  // No Item_Name + Amount > 0 -> ERROR
-  // No Item_Name + Amount 0   -> SKIP
-  // Empty items               -> allowed
-  // =========================================================
+    // =========================================================
+    // 1. ITEMS
+    //
+    // Do NOT filter blank rows here.
+    //
+    // Backend handles:
+    // No Item_Name + Amount > 0 -> ERROR
+    // No Item_Name + Amount 0   -> SKIP
+    // Empty items               -> allowed
+    // =========================================================
 
-  const itemsWithDefaults = (data.items || []).map((item) => ({
-    ...item,
+    const itemsWithDefaults = (data.items || []).map((item) => ({
+      ...item,
 
-    Tax_Type: item.Tax_Type || "None",
+      Tax_Type: item.Tax_Type || "None",
 
-    Tax_Amount:
-      item.Tax_Amount === "" ||
-      item.Tax_Amount === null ||
-      item.Tax_Amount === undefined
-        ? 0
-        : Number(item.Tax_Amount),
+      Tax_Amount:
+        item.Tax_Amount === "" ||
+          item.Tax_Amount === null ||
+          item.Tax_Amount === undefined
+          ? 0
+          : Number(item.Tax_Amount),
 
-    Amount:
-      item.Amount === "" ||
-      item.Amount === null ||
-      item.Amount === undefined
-        ? 0
-        : Number(item.Amount),
-  }));
+      Amount:
+        item.Amount === "" ||
+          item.Amount === null ||
+          item.Amount === undefined
+          ? 0
+          : Number(item.Amount),
+    }));
 
-  // =========================================================
-  // 2. TOTAL AMOUNT
-  // =========================================================
+    // =========================================================
+    // 2. TOTAL AMOUNT
+    // =========================================================
 
-  const totalAmount = Number(data.Total_Amount) || 0;
+    const totalAmount = Number(data.Total_Amount) || 0;
 
-  // =========================================================
-  // 3. PAYMENT SPLITS
-  //
-  // Send splits to backend.
-  //
-  // Backend decides:
-  //
-  // First valid:
-  // Cash ₹0 -> KEEP
-  //
-  // Later:
-  // HDFC ₹0 -> DROP
-  // ANCO ₹25 -> KEEP
-  //
-  // Don't remove zero splits here because backend needs to
-  // know which payment method was FIRST.
-  // =========================================================
+    // =========================================================
+    // 3. PAYMENT SPLITS
+    //
+    // Send splits to backend.
+    //
+    // Backend decides:
+    //
+    // First valid:
+    // Cash ₹0 -> KEEP
+    //
+    // Later:
+    // HDFC ₹0 -> DROP
+    // ANCO ₹25 -> KEEP
+    //
+    // Don't remove zero splits here because backend needs to
+    // know which payment method was FIRST.
+    // =========================================================
 
-  const splits = (data.splits || []).map((split) => ({
-    ...split,
+    const splits = (data.splits || []).map((split) => ({
+      ...split,
 
-    Amount:
-      split.Amount === "" ||
-      split.Amount === null ||
-      split.Amount === undefined
-        ? 0
-        : Number(split.Amount),
+      Amount:
+        split.Amount === "" ||
+          split.Amount === null ||
+          split.Amount === undefined
+          ? 0
+          : Number(split.Amount),
 
-    Bank_Account_Id:
-      split.Payment_Type === "Bank"
-        ? split.Bank_Account_Id || null
-        : null,
+      Bank_Account_Id:
+        split.Payment_Type === "Bank"
+          ? split.Bank_Account_Id || null
+          : null,
 
-    Reference_Number:
-      split.Reference_Number || "",
-  }));
+      Reference_Number:
+        split.Reference_Number || "",
+    }));
 
-  // =========================================================
-  // 4. PAYLOAD
-  //
-  // Backend recalculates:
-  // Total_Paid
-  // Balance_Due
-  //
-  // from validSplits.
-  // =========================================================
+    // =========================================================
+    // 4. PAYLOAD
+    //
+    // Backend recalculates:
+    // Total_Paid
+    // Balance_Due
+    //
+    // from validSplits.
+    // =========================================================
 
-  const payload = {
-    ...data,
+    const payload = {
+      ...data,
 
-    items: itemsWithDefaults,
-    splits,
+      items: itemsWithDefaults,
+      splits,
 
-    Total_Amount: totalAmount,
-  };
-
-  console.log(
-    "Final Edit Sale Return Payload:",
-    payload
-  );
-
-  // =========================================================
-  // 5. UPDATE
-  // =========================================================
-
-  try {
-    const res = await updateSaleReturn({
-      Sale_Return_Id,
-      ...payload,
-    }).unwrap();
+      Total_Amount: totalAmount,
+    };
 
     console.log(
-      "Sale Return Updated:",
-      res
+      "Final Edit Sale Return Payload:",
+      payload
     );
 
-    if (!res?.success) {
-      toast.error(
-        "Failed to update credit note"
+    // =========================================================
+    // 5. UPDATE
+    // =========================================================
+
+    try {
+      const res = await updateSaleReturn({
+        Sale_Return_Id,
+        ...payload,
+      }).unwrap();
+
+      console.log(
+        "Sale Return Updated:",
+        res
       );
-      return;
+
+      if (!res?.success) {
+        toast.error(
+          "Failed to update credit note"
+        );
+        return;
+      }
+
+      // =======================================================
+      // 6. INVALIDATE CACHE
+      // =======================================================
+
+      dispatch(
+        saleReturnApi.util.invalidateTags([
+          "SaleReturn",
+        ])
+      );
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+        ])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
+
+      // Bank IDs are inside splits now.
+      // No payload.Bank_Account_Id required.
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
+
+      dispatch(
+        partyApi.util.invalidateTags([
+          "Party",
+        ])
+      );
+
+      // =======================================================
+      // 7. SUCCESS
+      // =======================================================
+
+      toast.success(
+        "Credit note updated successfully!"
+      );
+
+      // =======================================================
+      // 8. NAVIGATION
+      // =======================================================
+
+      if (from === "all-sale-return-list") {
+        navigate({
+          pathname: "/sale/return",
+          search: location.search,
+        });
+      }
+
+      else if (from === "party-details") {
+        navigate({
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }
+
+      else if (from === "bank-accounts") {
+        navigate({
+          pathname: "/cash-bank/bank-accounts",
+          search: `?bankId=${bankId}`,
+        });
+      }
+
+      else if (from === "cash-in-hand") {
+        navigate({
+          pathname: "/cash-bank/cash-in-hand",
+        });
+      }
+
+      else {
+        navigate({
+          pathname: "/sale/return",
+          search: location.search,
+        });
+      }
+
+    } catch (error) {
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to update credit note.";
+
+      toast.error(errorMessage);
+
+      console.error(
+        "Sale Return update failed:",
+        error
+      );
     }
-
-    // =======================================================
-    // 6. INVALIDATE CACHE
-    // =======================================================
-
-    dispatch(
-      saleReturnApi.util.invalidateTags([
-        "SaleReturn",
-      ])
-    );
-
-    dispatch(
-      itemApi.util.invalidateTags([
-        "Item",
-      ])
-    );
-
-    dispatch(
-      cashInHandApi.util.invalidateTags([
-        "CashInHand",
-      ])
-    );
-
-    // Bank IDs are inside splits now.
-    // No payload.Bank_Account_Id required.
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        "BankAccount",
-      ])
-    );
-
-    dispatch(
-      partyApi.util.invalidateTags([
-        "Party",
-      ])
-    );
-
-    // =======================================================
-    // 7. SUCCESS
-    // =======================================================
-
-    toast.success(
-      "Credit note updated successfully!"
-    );
-
-    // =======================================================
-    // 8. NAVIGATION
-    // =======================================================
-
-    if (from === "all-sale-return-list") {
-      navigate({
-        pathname: "/sale/return",
-        search: location.search,
-      });
-    }
-
-    else if (from === "party-details") {
-      navigate({
-        pathname: "/party/parties",
-        search: location.search,
-      });
-    }
-
-    else if (from === "bank-accounts") {
-      navigate({
-        pathname: "/cash-bank/bank-accounts",
-        search: `?bankId=${bankId}`,
-      });
-    }
-
-    else if (from === "cash-in-hand") {
-      navigate({
-        pathname: "/cash-bank/cash-in-hand",
-      });
-    }
-
-    else {
-      navigate({
-        pathname: "/sale/return",
-        search: location.search,
-      });
-    }
-
-  } catch (error) {
-    const errorMessage =
-      error?.data?.message ||
-      error?.message ||
-      "Failed to update credit note.";
-
-    toast.error(errorMessage);
-
-    console.error(
-      "Sale Return update failed:",
-      error
-    );
-  }
-};
+  };
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -1393,6 +1394,10 @@ export default function SaleReturndEdit() {
                                 // ❌ Clear Item_Name in RHF to trigger error
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
                                 handleRowChange(i, "isExistingItem", false);
+
+                                handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                                handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                                handleRowChange(i, "Available_Units", [])
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
@@ -1417,8 +1422,16 @@ export default function SaleReturndEdit() {
                                       categorySearch: matchedItem.Item_Category || "",
                                       isExistingItem: true,
                                       isHSNLocked: false,
-                                      isUnitLocked: true,
+                                      isUnitLocked: false,
                                       itemOpen: false,
+                                      Primary_Unit: matchedItem.Primary_Unit || null,
+                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
+                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                                      //  ONLY CURRENT MASTER AVAILABLE UNITS
+                                      Available_Units: Array.isArray(matchedItem.Available_Units)
+                                        ? matchedItem.Available_Units
+                                        : [],
                                     };
                                     return updated;
                                   });
@@ -1427,8 +1440,11 @@ export default function SaleReturndEdit() {
                                   setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-
+                                  //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1502,7 +1518,7 @@ export default function SaleReturndEdit() {
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: true,     // lock unit
+                                              isUnitLocked: false,     // lock unit
                                               itemQuantity: it.Stock_Quantity || 0,
                                             };
                                             return updated;
@@ -1514,9 +1530,17 @@ export default function SaleReturndEdit() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
                                           setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
                                           setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            it.Primary_Unit || "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -1663,7 +1687,7 @@ export default function SaleReturndEdit() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -1699,11 +1723,94 @@ export default function SaleReturndEdit() {
                                   </option>
                                 ))}
 
-                              {/* ➕ Add Unit always at bottom */}
+                              {/* ➕ Add Unit always at bottom 
 
                             </select>
                           )}
                         />
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Item_Unit.message}
+                          </p>
+                        )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+
+                            const availableUnits = Array.isArray(row?.Available_Units)
+                              ? row.Available_Units
+                              : [];
+
+                            return (
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="form-select"
+                                style={{
+                                  width: "100%",
+                                  fontSize: "12px",
+                                  marginLeft: "0px",
+                                }}
+                                disabled={row?.isUnitLocked}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+
+                                  if (value === "__ADD_UNIT__") {
+                                    setActiveUnitRow(i);
+                                    setShowAddUnitModal(true);
+                                    return;
+                                  }
+
+                                  field.onChange(value);
+
+                                  handleRowChange(i, "Item_Unit", value);
+
+                                  setValue(`items.${i}.Item_Unit`, value, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }}
+                              >
+                                {/* Item has configured units */}
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option
+                                      key={unit.Unit_Shorthand}
+                                      value={unit.Unit_Shorthand}
+                                    >
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="">NONE</option>
+
+                                    {/* Only allow choosing/adding unit when
+                                                                                    selected item has NO configured units */}
+                                    {Array.isArray(itemUnits) &&
+                                      itemUnits.map((unit) => (
+                                        <option
+                                          key={unit.Unit_Shorthand}
+                                          value={unit.Unit_Shorthand}
+                                        >
+                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                        </option>
+                                      ))}
+
+                                    <option value="__ADD_UNIT__">
+                                      ➕ Add Unit
+                                    </option>
+                                  </>
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+
                         {errors?.items?.[i]?.Item_Unit && (
                           <p className="text-red-500 text-xs mt-1">
                             {errors.items[i].Item_Unit.message}

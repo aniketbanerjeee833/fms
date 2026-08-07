@@ -837,8 +837,7 @@ const addPurchase = async (req, res, next) => {
         // Stock was already inserted above.
         // This variable is needed for consistency,
         // but DON'T add it to stock again here.
-        stockDelta =
-          normalizeNumber(Quantity) ?? 0;
+        stockDelta =normalizeNumber(Quantity) ?? 0;
 
         // Bill snapshot
         snapshot = {

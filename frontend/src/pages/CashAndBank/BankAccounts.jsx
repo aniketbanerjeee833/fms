@@ -110,7 +110,7 @@ const { data: partiesList } = useGetAllPartiesQuery();
 
   /* ── RTK Query — one page at a time ── */
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
-    { Bank_Account_Id: bankId, page, limit: 15 },
+    { Bank_Account_Id: bankId, page, limit: 10 },
     { skip: !bankId }
   );
 

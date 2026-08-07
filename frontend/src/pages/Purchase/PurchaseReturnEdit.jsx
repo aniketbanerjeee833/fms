@@ -440,7 +440,7 @@ export default function PurchaseReturndEdit() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
-    const emptyRow = () => ({
+  const emptyRow = () => ({
     Item_Category: "",
     Item_Name: "",
     itemSearch: "",
@@ -463,14 +463,15 @@ export default function PurchaseReturndEdit() {
     if (purchase) {
 
       setPartySearch(purchase.purchaseReturn.Party_Name);
-        const prefilledRows = purchase.purchaseReturn.items.length > 0
+      const prefilledRows = purchase.purchaseReturn.items.length > 0
         ? purchase.purchaseReturn.items.map((item) => ({
           ...item,
+          Item_Unit: item.Selected_Unit || "",
           itemSearch: item.Item_Name,
           itemOpen: false,
           CategoryOpen: false,
           isHSNLocked: false,
-          isUnitLocked: true,
+          isUnitLocked: false,
           isExistingItem: true,
         }))
         : [emptyRow()];
@@ -480,7 +481,7 @@ export default function PurchaseReturndEdit() {
       //   itemSearch: it.Item_Name || "", // for UI display
       //   isExistingItem: true,           // lock category/HSN if needed
       //   isHSNLocked: false,
-      //   isUnitLocked: true,
+      //   isUnitLocked: false,
       //   CategoryOpen: false,
       //   itemOpen: false,
       //   itemQuantity: it.Quantity || 0,
@@ -522,7 +523,7 @@ export default function PurchaseReturndEdit() {
                 Amount: "",
               },
             ],
-            items:prefilledRows
+        items: prefilledRows
         // items: purchase.purchaseReturn.items || [],
       })
       setShowSplitBox((purchase?.purchaseReturn?.splits?.length || 0) > 1);
@@ -611,269 +612,269 @@ export default function PurchaseReturndEdit() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
- const onSubmit = async (data) => {
-  console.log("Form Data (from RHF):", data);
+  const onSubmit = async (data) => {
+    console.log("Form Data (from RHF):", data);
 
-  // =========================================================
-  // 1. ITEMS
-  //
-  // Do NOT filter blank rows here.
-  //
-  // Backend handles:
-  // Name blank + Amount > 0  -> ERROR
-  // Name blank + Amount 0    -> SKIP
-  // Empty items              -> allowed
-  // =========================================================
+    // =========================================================
+    // 1. ITEMS
+    //
+    // Do NOT filter blank rows here.
+    //
+    // Backend handles:
+    // Name blank + Amount > 0  -> ERROR
+    // Name blank + Amount 0    -> SKIP
+    // Empty items              -> allowed
+    // =========================================================
 
-  const itemsWithDefaults = (data.items || []).map((item) => ({
-    ...item,
+    const itemsWithDefaults = (data.items || []).map((item) => ({
+      ...item,
 
-    Tax_Type: item.Tax_Type || "None",
+      Tax_Type: item.Tax_Type || "None",
 
-    Tax_Amount:
-      item.Tax_Amount === "" ||
-      item.Tax_Amount === null ||
-      item.Tax_Amount === undefined
-        ? 0
-        : Number(item.Tax_Amount),
+      Tax_Amount:
+        item.Tax_Amount === "" ||
+          item.Tax_Amount === null ||
+          item.Tax_Amount === undefined
+          ? 0
+          : Number(item.Tax_Amount),
 
-    Amount:
-      item.Amount === "" ||
-      item.Amount === null ||
-      item.Amount === undefined
-        ? 0
-        : Number(item.Amount),
-  }));
-
-  // =========================================================
-  // 2. TOTAL AMOUNT
-  // =========================================================
-
-  const totalAmount = Number(data.Total_Amount) || 0;
-
-  // =========================================================
-  // 3. NORMALIZE PAYMENT SPLITS
-  //
-  // Payment type required to be considered valid.
-  // Bank requires Bank_Account_Id.
-  //
-  // "" / undefined Amount -> 0
-  // =========================================================
-
-  const normalizedSplits = (data.splits || [])
-    .filter((split) => {
-      if (!split.Payment_Type) {
-        return false;
-      }
-
-      if (
-        split.Payment_Type === "Bank" &&
-        !split.Bank_Account_Id
-      ) {
-        return false;
-      }
-
-      return true;
-    })
-    .map((split) => ({
-      ...split,
-      Amount: Number(split.Amount) || 0,
+      Amount:
+        item.Amount === "" ||
+          item.Amount === null ||
+          item.Amount === undefined
+          ? 0
+          : Number(item.Amount),
     }));
 
-  // =========================================================
-  // 4. FIRST VALID PAYMENT SPLIT ALWAYS STAYS
-  //
-  // Cash  ₹0      -> KEEP if first
-  // HDFC  ₹0      -> DROP if later
-  // ANCO  ₹500    -> KEEP
-  //
-  // Example:
-  //
-  // Cash  ₹0
-  // HDFC  ₹0
-  // ANCO  ₹500
-  //
-  // becomes:
-  //
-  // Cash  ₹0
-  // ANCO  ₹500
-  // =========================================================
+    // =========================================================
+    // 2. TOTAL AMOUNT
+    // =========================================================
 
-  const validSplits = normalizedSplits.filter(
-    (split, index) => {
-      if (index === 0) {
+    const totalAmount = Number(data.Total_Amount) || 0;
+
+    // =========================================================
+    // 3. NORMALIZE PAYMENT SPLITS
+    //
+    // Payment type required to be considered valid.
+    // Bank requires Bank_Account_Id.
+    //
+    // "" / undefined Amount -> 0
+    // =========================================================
+
+    const normalizedSplits = (data.splits || [])
+      .filter((split) => {
+        if (!split.Payment_Type) {
+          return false;
+        }
+
+        if (
+          split.Payment_Type === "Bank" &&
+          !split.Bank_Account_Id
+        ) {
+          return false;
+        }
+
         return true;
+      })
+      .map((split) => ({
+        ...split,
+        Amount: Number(split.Amount) || 0,
+      }));
+
+    // =========================================================
+    // 4. FIRST VALID PAYMENT SPLIT ALWAYS STAYS
+    //
+    // Cash  ₹0      -> KEEP if first
+    // HDFC  ₹0      -> DROP if later
+    // ANCO  ₹500    -> KEEP
+    //
+    // Example:
+    //
+    // Cash  ₹0
+    // HDFC  ₹0
+    // ANCO  ₹500
+    //
+    // becomes:
+    //
+    // Cash  ₹0
+    // ANCO  ₹500
+    // =========================================================
+
+    const validSplits = normalizedSplits.filter(
+      (split, index) => {
+        if (index === 0) {
+          return true;
+        }
+
+        return split.Amount > 0;
       }
-
-      return split.Amount > 0;
-    }
-  );
-
-  // =========================================================
-  // 5. TOTAL RECEIVED
-  //
-  // Always derive from the surviving splits.
-  // =========================================================
-
-  const totalReceived = validSplits.reduce(
-    (sum, split) => sum + (Number(split.Amount) || 0),
-    0
-  );
-
-  // =========================================================
-  // 6. BALANCE DUE
-  // =========================================================
-
-  const balanceDue = totalAmount - totalReceived;
-
-  // =========================================================
-  // 7. FRONTEND SAFETY CHECK
-  //
-  // Backend checks this again.
-  // =========================================================
-
-  if (totalReceived > totalAmount) {
-    toast.error(
-      "Received amount should be less than or equal to Total Amount"
     );
-    return;
-  }
 
-  // =========================================================
-  // 8. FINAL PAYLOAD
-  // =========================================================
+    // =========================================================
+    // 5. TOTAL RECEIVED
+    //
+    // Always derive from the surviving splits.
+    // =========================================================
 
-  const payload = {
-    ...data,
+    const totalReceived = validSplits.reduce(
+      (sum, split) => sum + (Number(split.Amount) || 0),
+      0
+    );
 
-    items: itemsWithDefaults,
+    // =========================================================
+    // 6. BALANCE DUE
+    // =========================================================
 
-    Total_Amount: totalAmount,
-    Total_Received: totalReceived,
-    Balance_Due: balanceDue,
+    const balanceDue = totalAmount - totalReceived;
 
-    splits: validSplits,
-  };
+    // =========================================================
+    // 7. FRONTEND SAFETY CHECK
+    //
+    // Backend checks this again.
+    // =========================================================
 
-  console.log("Final Edit Purchase Return Payload:", payload);
-
-  // =========================================================
-  // 9. SUBMIT
-  // =========================================================
-
-  try {
-    const res = await updatePurchaseReturn({
-      // Keep this according to your RTK Query argument.
-      // If your endpoint expects `id`, change this to:
-      // id: Purchase_Return_Id
-      Purchase_Return_Id,
-
-      ...payload,
-    }).unwrap();
-
-    console.log("Purchase Return updated:", res);
-
-    if (!res?.success) {
-      toast.error("Failed to update debit note");
+    if (totalReceived > totalAmount) {
+      toast.error(
+        "Received amount should be less than or equal to Total Amount"
+      );
       return;
     }
 
-    // =======================================================
-    // 10. INVALIDATE CACHE
-    // =======================================================
+    // =========================================================
+    // 8. FINAL PAYLOAD
+    // =========================================================
 
-    dispatch(
-      purchaseReturnApi.util.invalidateTags([
-        "PurchaseReturn",
-      ])
-    );
+    const payload = {
+      ...data,
 
-    dispatch(
-      itemApi.util.invalidateTags([
-        "Item",
-      ])
-    );
+      items: itemsWithDefaults,
 
-    dispatch(
-      cashInHandApi.util.invalidateTags([
-        "CashInHand",
-      ])
-    );
+      Total_Amount: totalAmount,
+      Total_Received: totalReceived,
+      Balance_Due: balanceDue,
 
-    // No need for payload.Bank_Account_Id anymore because
-    // payment accounts now live inside payload.splits.
-    dispatch(
-      bankAccountApi.util.invalidateTags([
-        "BankAccount",
-      ])
-    );
+      splits: validSplits,
+    };
 
-    dispatch(
-      partyApi.util.invalidateTags([
-        "Party",
-      ])
-    );
+    console.log("Final Edit Purchase Return Payload:", payload);
 
-    // =======================================================
-    // 11. SUCCESS
-    // =======================================================
+    // =========================================================
+    // 9. SUBMIT
+    // =========================================================
 
-    toast.success(
-      "Debit Note updated successfully!"
-    );
+    try {
+      const res = await updatePurchaseReturn({
+        // Keep this according to your RTK Query argument.
+        // If your endpoint expects `id`, change this to:
+        // id: Purchase_Return_Id
+        Purchase_Return_Id,
 
-    // =======================================================
-    // 12. NAVIGATION
-    // =======================================================
+        ...payload,
+      }).unwrap();
 
-    if (from === "all-purchase-return-list") {
-      navigate({
-        pathname: "/purchase/return",
-        search: location.search,
-      });
+      console.log("Purchase Return updated:", res);
+
+      if (!res?.success) {
+        toast.error("Failed to update debit note");
+        return;
+      }
+
+      // =======================================================
+      // 10. INVALIDATE CACHE
+      // =======================================================
+
+      dispatch(
+        purchaseReturnApi.util.invalidateTags([
+          "PurchaseReturn",
+        ])
+      );
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+        ])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
+
+      // No need for payload.Bank_Account_Id anymore because
+      // payment accounts now live inside payload.splits.
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
+
+      dispatch(
+        partyApi.util.invalidateTags([
+          "Party",
+        ])
+      );
+
+      // =======================================================
+      // 11. SUCCESS
+      // =======================================================
+
+      toast.success(
+        "Debit Note updated successfully!"
+      );
+
+      // =======================================================
+      // 12. NAVIGATION
+      // =======================================================
+
+      if (from === "all-purchase-return-list") {
+        navigate({
+          pathname: "/purchase/return",
+          search: location.search,
+        });
+      }
+
+      else if (from === "party-details") {
+        navigate({
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }
+
+      else if (from === "bank-accounts") {
+        navigate({
+          pathname: "/cash-bank/bank-accounts",
+          search: `?bankId=${bankId}`,
+        });
+      }
+
+      else if (from === "cash-in-hand") {
+        navigate({
+          pathname: "/cash-bank/cash-in-hand",
+        });
+      }
+
+      else {
+        navigate({
+          pathname: "/purchase/return",
+          search: location.search,
+        });
+      }
+
+    } catch (error) {
+      const errorMessage =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to update debit note.";
+
+      toast.error(errorMessage);
+
+      console.error(
+        "Purchase Return update failed:",
+        error
+      );
     }
-
-    else if (from === "party-details") {
-      navigate({
-        pathname: "/party/parties",
-        search: location.search,
-      });
-    }
-
-    else if (from === "bank-accounts") {
-      navigate({
-        pathname: "/cash-bank/bank-accounts",
-        search: `?bankId=${bankId}`,
-      });
-    }
-
-    else if (from === "cash-in-hand") {
-      navigate({
-        pathname: "/cash-bank/cash-in-hand",
-      });
-    }
-
-    else {
-      navigate({
-        pathname: "/purchase/return",
-        search: location.search,
-      });
-    }
-
-  } catch (error) {
-    const errorMessage =
-      error?.data?.message ||
-      error?.message ||
-      "Failed to update debit note.";
-
-    toast.error(errorMessage);
-
-    console.error(
-      "Purchase Return update failed:",
-      error
-    );
-  }
-};
+  };
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
@@ -1174,7 +1175,7 @@ export default function PurchaseReturndEdit() {
                   {/* Invoice Number */}
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
-                    Bill Number 
+                    Bill Number
                     {/* <span className="text-red-500">*</span> */}
                   </span>
 
@@ -1332,7 +1333,7 @@ export default function PurchaseReturndEdit() {
                         </div>
                       </td>
 
-                    <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Category`}
@@ -1436,6 +1437,10 @@ export default function PurchaseReturndEdit() {
                                 // ❌ Clear Item_Name in RHF to trigger error
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
                                 handleRowChange(i, "isExistingItem", false);
+                                
+                                handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                                handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                                handleRowChange(i, "Available_Units", [])
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
@@ -1460,8 +1465,16 @@ export default function PurchaseReturndEdit() {
                                       categorySearch: matchedItem.Item_Category || "",
                                       isExistingItem: true,
                                       isHSNLocked: false,
-                                      isUnitLocked: true,
+                                      isUnitLocked: false,
                                       itemOpen: false,
+                                      Primary_Unit: matchedItem.Primary_Unit || null,
+                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
+                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                                      //  ONLY CURRENT MASTER AVAILABLE UNITS
+                                      Available_Units: Array.isArray(matchedItem.Available_Units)
+                                        ? matchedItem.Available_Units
+                                        : [],
                                     };
                                     return updated;
                                   });
@@ -1470,8 +1483,11 @@ export default function PurchaseReturndEdit() {
                                   setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-
+                                  //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1544,8 +1560,15 @@ export default function PurchaseReturndEdit() {
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: true,     // lock unit
+                                              isUnitLocked: false,     // lock unit
                                               itemQuantity: it.Stock_Quantity || 0,
+                                              Primary_Unit: it.Primary_Unit || null,
+                                              Secondary_Unit: it.Secondary_Unit || null,
+                                              Conversion_Rate: it.Conversion_Rate || null,
+                                              // 
+                                              Available_Units: Array.isArray(it.Available_Units)
+                                                ? it.Available_Units
+                                                : [],
                                             };
                                             return updated;
                                           });
@@ -1556,7 +1579,15 @@ export default function PurchaseReturndEdit() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0.00, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            it.Primary_Unit || "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
                                           setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
                                           setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
                                           handleRowChange(i, "itemOpen", false);
@@ -1712,7 +1743,7 @@ export default function PurchaseReturndEdit() {
 
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -1748,7 +1779,7 @@ export default function PurchaseReturndEdit() {
                                   </option>
                                 ))}
 
-                              {/* ➕ Add Unit always at bottom */}
+                              {/* ➕ Add Unit always at bottom 
 
                             </select>
                           )}
@@ -1758,10 +1789,94 @@ export default function PurchaseReturndEdit() {
                             {errors.items[i].Item_Unit.message}
                           </p>
                         )}
+                      </td> */}
+
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+
+                            const availableUnits = Array.isArray(row?.Available_Units)
+                              ? row.Available_Units
+                              : [];
+
+                            return (
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="form-select"
+                                style={{
+                                  width: "100%",
+                                  fontSize: "12px",
+                                  marginLeft: "0px",
+                                }}
+                                disabled={row?.isUnitLocked}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+
+                                  if (value === "__ADD_UNIT__") {
+                                    setActiveUnitRow(i);
+                                    setShowAddUnitModal(true);
+                                    return;
+                                  }
+
+                                  field.onChange(value);
+
+                                  handleRowChange(i, "Item_Unit", value);
+
+                                  setValue(`items.${i}.Item_Unit`, value, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }}
+                              >
+                                {/* Item has configured units */}
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option
+                                      key={unit.Unit_Shorthand}
+                                      value={unit.Unit_Shorthand}
+                                    >
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="">NONE</option>
+
+                                    {/* Only allow choosing/adding unit when
+                                                              selected item has NO configured units */}
+                                    {Array.isArray(itemUnits) &&
+                                      itemUnits.map((unit) => (
+                                        <option
+                                          key={unit.Unit_Shorthand}
+                                          value={unit.Unit_Shorthand}
+                                        >
+                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                        </option>
+                                      ))}
+
+                                    <option value="__ADD_UNIT__">
+                                      ➕ Add Unit
+                                    </option>
+                                  </>
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Item_Unit.message}
+                          </p>
+                        )}
                       </td>
 
 
-                    
+
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input

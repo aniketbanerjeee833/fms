@@ -456,17 +456,18 @@ export default function PurchaseReturnAdd() {
       //   itemOpen: false,
       //   CategoryOpen: false,
       //   isHSNLocked: false,
-      //   isUnitLocked: true,
+      //   isUnitLocked: false,
       //   isExistingItem: true,
       // }));
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item) => ({
           ...item,
+          Item_Unit: item.Selected_Unit || "",
           itemSearch: item.Item_Name,
           itemOpen: false,
           CategoryOpen: false,
           isHSNLocked: false,
-          isUnitLocked: true,
+          isUnitLocked: false,
           isExistingItem: true,
         }))
         : [emptyRow()];
@@ -1604,12 +1605,16 @@ export default function PurchaseReturnAdd() {
                                 // ✅ Only store if it's a valid item
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
                                 handleRowChange(i, "isExistingItem", true);
+                                
                               } else {
                                 // ❌ Clear Item_Name in RHF to trigger error
                                 // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
                                 // handleRowChange(i, "isExistingItem", false);
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                handleRowChange(i, "isExistingItem", false);
+                                 handleRowChange(i, "isExistingItem", false);
+                                handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                                handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                                handleRowChange(i, "Available_Units", []);
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
                             }}
@@ -1634,8 +1639,16 @@ export default function PurchaseReturnAdd() {
                                       categorySearch: matchedItem.Item_Category || "",
                                       isExistingItem: true,
                                       isHSNLocked: false,
-                                      isUnitLocked: true,
+                                      isUnitLocked: false,
                                       itemOpen: false,
+                                        Primary_Unit: matchedItem.Primary_Unit || null,
+                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
+                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                                      // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
+                                      Available_Units: Array.isArray(matchedItem.Available_Units)
+                                        ? matchedItem.Available_Units
+                                        : [],
                                     };
                                     return updated;
                                   });
@@ -1644,8 +1657,15 @@ export default function PurchaseReturnAdd() {
                                   setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-
+                                  //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                  setValue(
+                                    `items.${i}.Item_Unit`,
+                                    matchedItem.Primary_Unit || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1715,7 +1735,14 @@ export default function PurchaseReturnAdd() {
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: true,     // lock unit
+                                              isUnitLocked: false,     // lock unit
+                                                Primary_Unit: it.Primary_Unit || null,
+                                              Secondary_Unit: it.Secondary_Unit || null,
+                                              Conversion_Rate: it.Conversion_Rate || null,
+                                              // ✅ VERY IMPORTANT
+                                              Available_Units: Array.isArray(it.Available_Units)
+                                                ? it.Available_Units
+                                                : [],
                                             };
                                             return updated;
                                           });
@@ -1728,7 +1755,16 @@ export default function PurchaseReturnAdd() {
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                          ///setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            it.Primary_Unit || "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
+
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -1863,8 +1899,8 @@ export default function PurchaseReturnAdd() {
                         )}
                       </td>
 
-                    
-                      <td style={{ padding: "0px", width: "12%" }}>
+
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -1900,7 +1936,7 @@ export default function PurchaseReturnAdd() {
                                   </option>
                                 ))}
 
-                              {/* ➕ Add Unit always at bottom */}
+                              {/* ➕ Add Unit always at bottom 
 
                             </select>
                           )}
@@ -1910,10 +1946,93 @@ export default function PurchaseReturnAdd() {
                             {errors.items[i].Item_Unit.message}
                           </p>
                         )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+
+                            const availableUnits = Array.isArray(row?.Available_Units)
+                              ? row.Available_Units
+                              : [];
+
+                            return (
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="form-select"
+                                style={{
+                                  width: "100%",
+                                  fontSize: "12px",
+                                  marginLeft: "0px",
+                                }}
+                                disabled={row?.isUnitLocked}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+
+                                  if (value === "__ADD_UNIT__") {
+                                    setActiveUnitRow(i);
+                                    setShowAddUnitModal(true);
+                                    return;
+                                  }
+
+                                  field.onChange(value);
+
+                                  handleRowChange(i, "Item_Unit", value);
+
+                                  setValue(`items.${i}.Item_Unit`, value, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }}
+                              >
+                                {/* Item has configured units */}
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option
+                                      key={unit.Unit_Shorthand}
+                                      value={unit.Unit_Shorthand}
+                                    >
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="">NONE</option>
+
+                                    {/* Only allow choosing/adding unit when
+                                        selected item has NO configured units */}
+                                    {Array.isArray(itemUnits) &&
+                                      itemUnits.map((unit) => (
+                                        <option
+                                          key={unit.Unit_Shorthand}
+                                          value={unit.Unit_Shorthand}
+                                        >
+                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                        </option>
+                                      ))}
+
+                                    <option value="__ADD_UNIT__">
+                                      ➕ Add Unit
+                                    </option>
+                                  </>
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Item_Unit.message}
+                          </p>
+                        )}
                       </td>
 
 
-                     
+
                       {/* Price/Unit */}
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
