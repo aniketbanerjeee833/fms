@@ -628,7 +628,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
                               color: "#4CA1AF",
                             }}
                           >
-                            Edit Unit Configuration
+                            Edit Unit
                           </button>
                         )}
                       </>
