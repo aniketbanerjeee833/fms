@@ -1764,18 +1764,32 @@ const addSale = async (req, res, next) => {
         [newSaleItemId, saleItemIdNum]
       );
 
+      // await recordItemLedger({
+      //   connection,
+      //   itemId: Item_Id,
+      //   txnType: "Sale",
+      //   referenceId: saleItemIdNum,
+      //   billId: newSaleId,
+      //   billNumber: Invoice_Number,
+      //   partyName: resolvedPartyName,
+      //   quantity: normalizeNumber(Quantity) ?? 0,
+      //   rate: normalizeNumber(Sale_Price) ?? null,
+      //   txnDate: Invoice_Date,
+      // });
       await recordItemLedger({
-        connection,
-        itemId: Item_Id,
-        txnType: "Sale",
-        referenceId: saleItemIdNum,
-        billId: newSaleId,
-        billNumber: Invoice_Number,
-        partyName: resolvedPartyName,
-        quantity: normalizeNumber(Quantity) ?? 0,
-        rate: normalizeNumber(Sale_Price) ?? null,
-        txnDate: Invoice_Date,
-      });
+  connection,
+  itemId:       Item_Id,
+  txnType: "Sale",
+  referenceId: saleItemIdNum,
+     billId: newSaleId,
+      billNumber: Invoice_Number,
+  partyName:    Party_Name,
+  quantity:     normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
+  selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+  baseQty:      stockDelta,                         // 🔹 normalized: e.g. 0.5
+  rate:         normalizeNumber(Sale_Price) ?? null,
+  txnDate:      Invoice_Date,
+});
     }
 
     // =========================================================
@@ -5412,38 +5426,45 @@ const editSale = async (req, res, next) => {
       // 500 gm => Stock_Delta 0.5 Kg
       // =====================================================
 
-      await recordItemLedger({
-        connection,
+      // await recordItemLedger({
+      //   connection,
 
-        itemId:
-          line.Item_Id,
+      //   itemId:line.Item_Id,
 
-        txnType:
-          "Sale",
+      //   txnType:"Sale",
 
-        referenceId:
-          id,
+      //   referenceId:id,
 
-        billId:
-          saleId,
+      //   billId:saleId,
 
-        billNumber:
-          Invoice_Number,
+      //   billNumber:Invoice_Number,
 
-        partyName:
-          Party_Name,
+      //   partyName:Party_Name,
 
-        quantity:
-          Number(line.Stock_Delta),
+      //   quantity:Number(line.Stock_Delta),
 
-        rate:
-          normalizeNumber(
-            line.Sale_Price
-          ) ?? null,
+      //   rate:
+      //     normalizeNumber(
+      //       line.Sale_Price
+      //     ) ?? null,
 
-        txnDate:
-          Invoice_Date,
-      });
+      //   txnDate:
+      //     Invoice_Date,
+      // });
+            await recordItemLedger({
+  connection,
+     itemId:line.Item_Id,
+  txnType: "Sale",
+   referenceId:id,
+     billId:saleId,
+      billNumber: Invoice_Number,
+  partyName:    Party_Name,
+  quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
+  selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+  baseQty:      line.Stock_Delta,                         // 🔹 normalized: e.g. 0.5
+  rate:         normalizeNumber(line.Sale_Price) ?? null,
+  txnDate:     Invoice_Date,
+})
     }
 
     await connection.commit();

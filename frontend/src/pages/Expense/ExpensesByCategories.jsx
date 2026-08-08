@@ -21,6 +21,8 @@ import {
   useGetExpensesByCategoryQuery,   // ✅ add
 } from "../../redux/api/expenseApi";
 
+import EditExpenseCategoryModal from "../../components/Modal/EditExpenseCategoryModal";
+
 
 
 const fmt = (n) =>
@@ -36,39 +38,60 @@ export default function ExpensesByCategories() {
 
   const {
     data: categoryResponse,
-    isLoading,
+    
   } = useGetAllExpenseCategoriesQuery();
 
   const categories = categoryResponse?.categories || [];
-  // console.log("raw category object:", categories[0]);
+  // console.log("raw category object:", categories);
+
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
 
   const {
     data: expenseResponse,
-    isLoading: isExpensesLoading,
+    //isLoading: isExpensesLoading,
   } = useGetExpensesByCategoryQuery(
     { categoryId: selectedCategoryId },
     { skip: !selectedCategoryId }     // don't call until a category is selected
   );
+  // console.log("Expense Response:", expenseResponse);
 
   const categoryExpenses = expenseResponse?.expenses || [];
 
 
-  
+
 
   useEffect(() => {
+    if (!categories.length) return;
+
     if (
-      categories.length > 0 &&
-      selectedCategoryId === null
+      selectedCategoryId === null &&
+      location.state?.categoryId
     ) {
+      setSelectedCategoryId(location.state.categoryId);
+
+      // Clear the state so it doesn't keep forcing the same category
+      navigate(location.pathname, {
+        replace: true,
+        state: null,
+      });
+
+      return;
+    }
+
+    if (selectedCategoryId === null) {
       setSelectedCategoryId(categories[0].id);
     }
-  }, [categories, selectedCategoryId]);
+  }, [categories, selectedCategoryId, navigate, location.pathname, location.state]);
 
   const [categorySearch, setCategorySearch] = useState("");
   const [txnSearch, setTxnSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(null);
   const [transactionMenu, setTransactionMenu] = useState(null);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+
+
   const ROW_ACTIONS = [
     {
       key: "view",
@@ -143,7 +166,7 @@ export default function ExpensesByCategories() {
           category.Category_Type === "Direct"
             ? "Direct Expense"
             : "Indirect Expense",
-        amount: 0,
+        amount: Number(category.Total_Spent) || 0,
         total: Number(category.Total_Spent) || 0,
         balance: expensesForThisCategory.reduce(
           (sum, e) => sum + Number(e.Balance_Due || 0),
@@ -154,7 +177,7 @@ export default function ExpensesByCategories() {
           date: e.Expense_Date,
           expNo: e.Expense_Number,
           party: e.Party_Name || "—",      // ⚠️ confirm field name below
-          paymentType: e.Payment_Type || "—", // ⚠️ confirm field name below
+          paymentType: e.Payment_Type_Display || "—", // ⚠️ confirm field name below
           amount: e.Total_Amount,
           balance: e.Balance_Due,
         })),
@@ -200,16 +223,7 @@ export default function ExpensesByCategories() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-      <div className="sb2-2-2">
-        <ul>
-          <li>
-            <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
-              <LayoutDashboard size={20} style={{ marginRight: "8px" }} />
-              Dashboard
-            </NavLink>
-          </li>
-        </ul>
-      </div>
+     
 
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
@@ -315,6 +329,25 @@ export default function ExpensesByCategories() {
                   <div
                     key={category.id}
                     onClick={() => handleSelectCategory(category)}
+
+                    onDoubleClick={() => {
+
+                      // Select the category
+                      handleSelectCategory(category);
+
+                      // Get original object from API response
+                      const originalCategory = categories.find(
+                        (c) => c.id === category.id
+                      );
+
+                      setEditingCategory(originalCategory);
+
+                      setShowEditCategoryModal(true);
+
+                      setMenuOpen(null);
+
+                    }}
+
                     className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                     style={{
                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
@@ -346,15 +379,25 @@ export default function ExpensesByCategories() {
 
                     {/* right: amount + actions */}
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <span className="text-sm text-gray-600 mr-1">
-                        ₹{category.amount}
-                      </span>
+                      {/* <span className="text-sm text-gray-600 mr-1">
+                        ₹ {fmt(category.amount)}
+                      </span> */}
 
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setMenuOpen(menuOpen === category.id ? null : category.id);
+
+                          // Select category immediately (Vyapar behaviour)
+                          setSelectedCategoryId(category.id);
+
+                          setTxnSearch("");
+
+                          setMenuOpen(
+                            menuOpen === category.id
+                              ? null
+                              : category.id
+                          );
                         }}
                         className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                         style={{ backgroundColor: "transparent" }}
@@ -382,7 +425,20 @@ export default function ExpensesByCategories() {
                       >
                         <button
                           type="button"
-                          className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 transition-colors"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
+                          onClick={() => {
+
+                            const originalCategory = categories.find(
+                              (c) => c.id === category.id
+                            );
+
+                            setEditingCategory(originalCategory);
+
+                            setShowEditCategoryModal(true);
+
+                            setMenuOpen(null);
+
+                          }}
                         >
                           View/Edit
                         </button>
@@ -513,7 +569,17 @@ export default function ExpensesByCategories() {
                         <tr
                           key={txn.id}
                           style={{ borderBottom: "1px solid #f1f5f9" }}
-                          className="hover:bg-gray-50 transition-colors"
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                          onDoubleClick={() => {
+                            navigate(`/expense/edit/${txn.id}`, {
+                              state: {
+                                from: location.pathname,
+                                categoryId: selectedCategoryId,
+                                txnSearch,
+                                categorySearch,
+                              },
+                            });
+                          }}
                         >
                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
@@ -583,11 +649,35 @@ export default function ExpensesByCategories() {
                                               ? "#dc2626"
                                               : "#374151",
                                           }}
+
                                           onClick={() => {
 
                                             setTransactionMenu(null);
 
+                                            if (key === "view") {
+                                              navigate(`/expense/edit/${txn.id}`, {
+                                                state: {
+                                                  from: location.pathname,
+                                                  categoryId: selectedCategoryId,
+                                                  txnSearch,
+                                                  categorySearch,
+                                                },
+                                              });
+                                            }
+
+                                            if (key === "preview") {
+                                              navigate(`/expense/preview/${txn.id}`, {
+                                                state: {
+                                                  from: location.pathname,
+                                                  categoryId: selectedCategoryId,
+                                                  txnSearch,
+                                                  categorySearch,
+                                                },
+                                              });
+                                            }
+
                                           }}
+
                                           onMouseOver={(e) =>
 
                                             e.currentTarget.style.backgroundColor =
@@ -639,6 +729,17 @@ export default function ExpensesByCategories() {
 
         </div>
       </div>
+
+      {showEditCategoryModal && (
+        <EditExpenseCategoryModal
+          category={editingCategory}
+          onClose={() => {
+            setShowEditCategoryModal(false);
+            setEditingCategory(null);
+          }}
+        />
+      )}
+
     </>
   );
 }

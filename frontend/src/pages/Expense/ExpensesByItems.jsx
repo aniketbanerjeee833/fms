@@ -19,6 +19,8 @@ import {
   useGetExpenseItemUsageQuery
 } from "../../redux/api/expenseApi";
 
+import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
+
 
 
 const fmt = (n) =>
@@ -45,8 +47,8 @@ export default function ExpensesByItems() {
 
   const {
     data: itemResponse,
-    isLoading,
-    error,
+    //isLoading,
+    //error,
   } = useGetAllExpenseItemMastersQuery();
 
   // console.log("itemResponse:", itemResponse);
@@ -56,7 +58,7 @@ export default function ExpensesByItems() {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const {
     data: usageResponse,
-    isLoading: isUsageLoading,
+    //isLoading: isUsageLoading,
   } = useGetExpenseItemUsageQuery(
     { masterItemId: selectedItemId },
     { skip: !selectedItemId }
@@ -65,20 +67,43 @@ export default function ExpensesByItems() {
   const itemUsage = usageResponse?.usage || [];
 
   // console.log("usageResponse:", usageResponse);
+  // console.log("itemUsage", itemUsage);
 
   useEffect(() => {
+    if (!items.length) return;
+
     if (
-      items.length > 0 &&
-      selectedItemId === null
+      selectedItemId === null &&
+      location.state?.itemId
     ) {
+      setSelectedItemId(location.state.itemId);
+
+      navigate(location.pathname, {
+        replace: true,
+        state: null,
+      });
+
+      return;
+    }
+
+    if (selectedItemId === null) {
       setSelectedItemId(items[0].id);
     }
-  }, [items, selectedItemId]);
+  }, [
+    items,
+    selectedItemId,
+    navigate,
+    location.pathname,
+    location.state,
+  ]);
 
   const [itemSearch, setItemSearch] = useState("");
   const [txnSearch, setTxnSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(null);
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+
   useEffect(() => {
 
     const closeMenus = () => {
@@ -97,7 +122,6 @@ export default function ExpensesByItems() {
 
   const itemsWithTotals = useMemo(() => {
     return items.map((item) => {
-      //c
       const isSelected = item.id === selectedItemId;
       const usageForThisItem = isSelected ? itemUsage : [];
 
@@ -118,7 +142,7 @@ export default function ExpensesByItems() {
           date: u.Expense_Date,
           expNo: u.Expense_Number,
           party: u.Party_Name || "—",
-          paymentType: u.Payment_Type || "—",
+          paymentType: u.Payment_Type_Display || "—",
           amount: u.Amount,
           balance: u.Balance_Due,
         })),
@@ -161,16 +185,7 @@ export default function ExpensesByItems() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-      <div className="sb2-2-2">
-        <ul>
-          <li>
-            <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
-              <LayoutDashboard size={20} style={{ marginRight: "8px" }} />
-              Dashboard
-            </NavLink>
-          </li>
-        </ul>
-      </div>
+   
 
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
@@ -268,11 +283,31 @@ export default function ExpensesByItems() {
               </div>
             ) : (
               filteredItems.map((item) => {
-                const isSelected = selectedItem.id === item.id;
+                const isSelected =
+                  selectedItemId === item.id;
                 return (
                   <div
                     key={item.id}
                     onClick={() => handleSelectItem(item)}
+
+                    onDoubleClick={() => {
+
+                      // Select the item
+                      handleSelectItem(item);
+
+                      // Get original object from API response
+                      const originalItem = items.find(
+                        (i) => i.id === item.id
+                      );
+
+                      setEditingItem(originalItem);
+
+                      setShowEditItemModal(true);
+
+                      setMenuOpen(null);
+
+                    }}
+
                     className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                     style={{
                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
@@ -301,15 +336,20 @@ export default function ExpensesByItems() {
 
                     {/* right: amount + actions */}
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <span className="text-sm text-gray-600 mr-1">
+                      {/* <span className="text-sm text-gray-600 mr-1">
                         ₹ {fmt(item.amount)}
-                      </span>
+                      </span> */}
 
                       <button
                         type="button"
                         onClick={(e) => {
 
                           e.stopPropagation();
+
+                          // Select immediately (Vyapar behaviour)
+                          setSelectedItemId(item.id);
+
+                          setTxnSearch("");
 
                           setMenuOpen(
                             menuOpen === item.id
@@ -343,7 +383,22 @@ export default function ExpensesByItems() {
                           border: "1px solid #e2e8f0",
                         }}
                       >
-                        <button className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm">
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                          onClick={() => {
+
+                            const originalItem = items.find(
+                              (i) => i.id === item.id
+                            );
+
+                            setEditingItem(originalItem);
+
+                            setShowEditItemModal(true);
+
+                            setMenuOpen(null);
+
+                          }}
+                        >
                           View/Edit
                         </button>
                         <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500">
@@ -376,7 +431,7 @@ export default function ExpensesByItems() {
                     </div>
                     <div>
                       <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
-                        {selectedItem?.Name}
+                        {selectedItem?.name}
                       </h6>
                       <p className="text-gray-500 text-sm mt-0.5">
                         Expense Item
@@ -465,7 +520,17 @@ export default function ExpensesByItems() {
                         <tr
                           key={txn.id}
                           style={{ borderBottom: "1px solid #f1f5f9" }}
-                          className="hover:bg-gray-50 transition-colors"
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                          onDoubleClick={() => {
+                            navigate(`/expense/edit/${txn.id}`, {
+                              state: {
+                                from: location.pathname,
+                                itemId: selectedItemId,
+                                txnSearch,
+                                itemSearch,
+                              },
+                            });
+                          }}
                         >
                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
@@ -518,7 +583,30 @@ export default function ExpensesByItems() {
                                     key={key}
                                     className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
                                     style={{ color: danger ? "#dc2626" : "#374151" }}
-                                    onClick={() => setRowMenuOpen(null)}
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      if (key === "view") {
+                                        navigate(`/expense/edit/${txn.id}`, {
+                                          state: {
+                                            from: location.pathname,
+                                            itemId: selectedItemId,
+                                            txnSearch,
+                                            itemSearch,
+                                          },
+                                        });
+                                      }
+                                      if (key === "preview") {
+                                        navigate(`/expense/preview/${txn.id}`, {
+                                          state: {
+                                            from: location.pathname,
+                                            itemId: selectedItemId,
+                                            txnSearch,
+                                            itemSearch,
+                                          },
+                                        });
+                                      }
+                                    }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                   >
@@ -541,6 +629,17 @@ export default function ExpensesByItems() {
 
         </div>
       </div>
+
+      {showEditItemModal && (
+        <EditExpenseItemModal
+          item={editingItem}
+          onClose={() => {
+            setShowEditItemModal(false);
+            setEditingItem(null);
+          }}
+        />
+      )}
+
     </>
   );
 }

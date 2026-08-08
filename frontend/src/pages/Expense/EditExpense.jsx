@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, useNavigate, useLocation, useParams } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { createPortal } from "react-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,7 +23,8 @@ import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import {
     useGetAllExpenseCategoriesQuery,
     useGetAllExpenseItemMastersQuery,
-    useCreateExpenseMutation,
+    useGetExpenseByIdQuery,
+    useEditExpenseMutation,
 } from "../../redux/api/expenseApi";
 
 
@@ -70,9 +71,10 @@ const emptyRow = () => ({
     Amount: "",
 });
 
-export default function AddExpense() {
+export default function EditExpense() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { id } = useParams();
 
 
     /* ───────────────────────── MOCK DATA (replace with API) ───────────────────────── */
@@ -123,12 +125,21 @@ export default function AddExpense() {
 
     // TODO: const [addExpense, { isLoading: isAddingExpense }] = useAddExpenseMutation();
     const [
-        createExpense,
-        { isLoading: isAddingExpense },
-    ] = useCreateExpenseMutation();
+        editExpense,
+        { isLoading: isUpdatingExpense },
+    ] = useEditExpenseMutation();
+
+    const {
+        data: expenseResponse,
+        isLoading: isExpenseLoading,
+    } = useGetExpenseByIdQuery(id);
+
+
 
     /* ───────────────────────── UI STATE ───────────────────────── */
-    const [gstEnabled, setGstEnabled] = useState(false);
+    // const [gstEnabled, setGstEnabled] = useState(false);
+    const gstEnabled = expenseResponse?.expense?.With_GST ?? false;
+
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [showPartyModal, setShowPartyModal] = useState(false);
 
@@ -239,6 +250,7 @@ export default function AddExpense() {
         handleSubmit,
         setValue,
         watch,
+        reset,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(expenseFormSchema),
@@ -267,6 +279,97 @@ export default function AddExpense() {
         append: appendSplit,
         remove: removeSplit,
     } = useFieldArray({ control, name: "splits" });
+
+    useEffect(() => {
+        if (!expenseResponse?.expense) return;
+
+        const expense = expenseResponse.expense;
+
+        console.log("Expense ID:", expense.id);
+        console.log("Expense:", expense);
+        console.log("Items:", expense.items);
+        console.log("Splits:", expense.splits);
+        console.log("Items Length:", expense.items?.length);
+        console.log("Splits Length:", expense.splits?.length);
+
+        reset({
+            Category_Name: expense.Category_Name || "",
+            Category_Type: expense.Category_Type || "Indirect",
+
+            Party_Id: expense.Party_Id || "",
+            Party_Name: expense.Party_Name || "",
+
+            Expense_Number: expense.Expense_Number || "",
+
+            Expense_Date: expense.Expense_Date
+                ? expense.Expense_Date.split("T")[0]
+                : "",
+
+            Bill_Date: expense.Bill_Date
+                ? expense.Bill_Date.split("T")[0]
+                : "",
+
+            With_GST: Boolean(expense.With_GST),
+
+            State_Of_Supply: expense.State_Of_Supply || "",
+
+            Total_Amount: expense.Total_Amount || "0.00",
+            Total_Paid: expense.Total_Paid || "0.00",
+            Balance_Due: expense.Balance_Due || "0.00",
+
+
+            items: (() => {
+                console.log("Items going into reset:", expense.items);
+
+                return expense.items?.map((item) => ({
+                    Item_Name: item.Item_Name || "",
+                    Item_HSN: item.Item_HSN || "",
+                    Quantity: item.Quantity || "",
+                    Price: item.Price || "",
+                    Discount_On_Price: item.Discount_On_Price || "",
+                    Discount_Type_On_Price:
+                        item.Discount_Type_On_Price || "Percentage",
+                    Tax_Type: item.Tax_Type || "None",
+                    Tax_Amount: item.Tax_Amount || "",
+                    Amount: item.Amount || "",
+                })) || [emptyRow()];
+            })(),
+
+            splits:
+                expense.splits?.length > 0
+                    ? expense.splits.map((split) => ({
+                        Payment_Type: split.Payment_Type || "Cash",
+                        Bank_Account_Id: split.Bank_Account_Id || null,
+                        Reference_Number: split.Reference_Number || "",
+                        Amount: split.Amount || "",
+                    }))
+                    : [
+                        {
+                            Payment_Type: "Cash",
+                            Bank_Account_Id: null,
+                            Reference_Number: "",
+                            Amount: "",
+                        },
+                    ],
+        });
+
+        // These are controlled by useState, not react-hook-form
+        setCategorySearch(expense.Category_Name || "");
+        setPartySearch(expense.Party_Name || "");
+
+        const searchValues = {};
+
+        expense.items?.forEach((item, index) => {
+            searchValues[index] = item.Item_Name || "";
+        });
+
+        setItemSearch(searchValues);
+
+        setShowSplitBox(
+            expense.splits && expense.splits.length > 1
+        );
+
+    }, [expenseResponse, reset]);
 
     const itemsValues = watch("items");
     const splitsValues = watch("splits") || [];
@@ -407,7 +510,8 @@ export default function AddExpense() {
             // console.log("Submitting Expense :", payload);
             // console.log(payload.items);
 
-            const response = await createExpense({
+            const response = await editExpense({
+                id,
                 body: payload,
             }).unwrap();
 
@@ -416,10 +520,23 @@ export default function AddExpense() {
                 return;
             }
 
-            toast.success("Expense created successfully");
+            toast.success("Expense updated successfully");
 
             setTimeout(() => {
-                navigate("/expense/categories");
+                navigate(
+                    location.state?.from || "/expense/categories",
+                    {
+                        state: {
+                            categoryId: location.state?.categoryId,
+                            itemId: location.state?.itemId,
+
+                            txnSearch: location.state?.txnSearch,
+
+                            categorySearch: location.state?.categorySearch,
+                            itemSearch: location.state?.itemSearch,
+                        },
+                    }
+                );
             }, 1200);
 
         } catch (error) {
@@ -533,10 +650,10 @@ export default function AddExpense() {
 
                         <h4 className="text-2xl font-bold whitespace-nowrap"
                             style={{ margin: 0, padding: 0 }}>
-                            Add New Expense
+                            Edit Expense
                         </h4>
 
-                        <div
+                        {/* <div
                             className="flex items-center gap-3 cursor-pointer select-none whitespace-nowrap"
                             style={{ display: "flex", alignItems: "center" }}
                             onClick={() =>
@@ -597,7 +714,7 @@ export default function AddExpense() {
                                     {gstEnabled ? "✓" : ""}
                                 </div>
                             </div>
-                        </div>
+                        </div> */}
 
                     </div>
 
@@ -605,7 +722,20 @@ export default function AddExpense() {
                         <button
                             type="button"
                             onClick={() =>
-                                navigate(location.state?.from || -1)
+                                navigate(
+                                    location.state?.from || "/expense/categories",
+                                    {
+                                        state: {
+                                            categoryId: location.state?.categoryId,
+                                            itemId: location.state?.itemId,
+
+                                            txnSearch: location.state?.txnSearch,
+
+                                            categorySearch: location.state?.categorySearch,
+                                            itemSearch: location.state?.itemSearch,
+                                        },
+                                    }
+                                )
                             }
                             className="text-white font-bold py-2 px-4 rounded"
                             style={{ backgroundColor: "#4CA1AF" }}
@@ -1561,11 +1691,11 @@ export default function AddExpense() {
                             </button>
                             <button
                                 type="submit"
-                                disabled={isAddingExpense}
+                                disabled={isUpdatingExpense}
                                 className="text-white font-bold py-2 px-4 rounded"
                                 style={{ backgroundColor: "#4CA1AF" }}
                             >
-                                {isAddingExpense ? "Saving..." : "Save"}
+                                {isUpdatingExpense ? "Updating..." : "Update"}
                             </button>
                         </div>
                     </form>

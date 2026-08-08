@@ -11,6 +11,12 @@ const cleanValue = (value) => {
   }
   return value;  // ✅ returns the original value for valid data
 };
+const normalizeNumber = (val) =>
+  val !== undefined &&
+  val !== null &&
+  String(val).trim() !== ""
+    ? Number(val)
+    : null;
 /* ── GET ALL ──────────────────────────────────────────────── */
 const getAllSaleReturns = async (req, res, next) => {
   let connection;
@@ -1412,18 +1418,45 @@ const createSaleReturn = async (req, res, next) => {
       );
 
       // step 8 — item ledger unchanged (uses raw Quantity, not stockDelta)
+      // await recordItemLedger({
+      //   connection,
+      //   itemId: Item_Id,
+      //   txnType: "Sale_Return",
+      //   referenceId: srItemId,
+      //   billId: id,
+      //   billNumber: Return_Number || null,
+      //   partyName: Party_Name,
+      //   quantity: Number(Quantity) || 0,   // step 8: keep raw Quantity
+      //   rate: Number(Sale_Price) || null,
+      //   txnDate: Return_Date,
+      // });
       await recordItemLedger({
-        connection,
-        itemId: Item_Id,
-        txnType: "Sale_Return",
-        referenceId: srItemId,
-        billId: id,
-        billNumber: Return_Number || null,
-        partyName: Party_Name,
-        quantity: Number(Quantity) || 0,   // step 8: keep raw Quantity
-        rate: Number(Sale_Price) || null,
-        txnDate: Return_Date,
-      });
+  connection,
+
+  itemId: Item_Id,
+
+  txnType: "Sale_Return",
+
+  referenceId: srItemId,
+
+  billId: id,                     // sale_return.id
+  billNumber: Return_Number || null,
+
+  partyName: Party_Name,
+
+  // User-entered quantity
+  quantity: normalizeNumber(Quantity) ?? 0,
+
+  // Unit used in this transaction
+  selectedUnit: resolvedSelectedUnit,
+
+  // Normalized quantity in primary unit
+  baseQty: normalizeNumber(stockDelta) ?? 0,
+
+  rate: normalizeNumber(Sale_Price),
+
+  txnDate: Return_Date,
+});
     }
 
     // =========================================================
@@ -2649,24 +2682,51 @@ const editSaleReturn = async (req, res, next) => {
       const saleReturnItemId = srItemResult.insertId;
 
       // 🔹 Item Ledger — unchanged, still uses line.Quantity, NOT stockDelta
+      // await recordItemLedger({
+      //   connection,
+
+      //   itemId: line.Item_Id,
+      //   txnType: "Sale_Return",
+
+      //   referenceId: saleReturnItemId,
+
+      //   billId: Number(Sale_Return_Id),
+      //   billNumber: Return_Number || null,
+
+      //   partyName: Party_Name,
+
+      //   quantity: line.Quantity,
+      //   rate: line.Sale_Price ?? null,
+
+      //   txnDate: Return_Date,
+      // });
       await recordItemLedger({
-        connection,
+  connection,
 
-        itemId: line.Item_Id,
-        txnType: "Sale_Return",
+  itemId: Item_Id,
 
-        referenceId: saleReturnItemId,
+  txnType: "Sale_Return",
 
-        billId: Number(Sale_Return_Id),
-        billNumber: Return_Number || null,
+   referenceId: saleReturnItemId,
 
-        partyName: Party_Name,
+  billId: Number(Sale_Return_Id),                     // sale_return.id
+  billNumber: Return_Number || null,
 
-        quantity: line.Quantity,
-        rate: line.Sale_Price ?? null,
+  partyName: Party_Name,
 
-        txnDate: Return_Date,
-      });
+  // User-entered quantity
+  quantity: normalizeNumber(line.Quantity) ?? 0,
+
+  // Unit used in this transaction
+  selectedUnit: line.resolvedSelectedUnit,
+
+  // Normalized quantity in primary unit
+  baseQty: normalizeNumber(line.stockDelta) ?? 0,
+
+  rate: normalizeNumber(line.Sale_Price),
+
+  txnDate: Return_Date,
+});
     }
 
     // =========================================================

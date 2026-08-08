@@ -61,6 +61,8 @@ const SaleEdit = lazy(() => import('./pages/Sale/SaleEdit'));
 const ExpensesByCategories = lazy(() => import('./pages/Expense/ExpensesByCategories'));
 const ExpensesByItems = lazy(() => import('./pages/Expense/ExpensesByItems'));
 const AddExpense = lazy(() => import('./pages/Expense/AddExpense'));
+const EditExpense = lazy(() => import('./pages/Expense/EditExpense'));
+const ExpensePreview = lazy(() => import('./pages/Expense/ExpensePreview'));
 
 const CashInHand= lazy(() => import('./pages/CashAndBank/CashInHand'));
 const BankAccounts= lazy(() => import('./pages/CashAndBank/BankAccounts'));
@@ -367,31 +369,42 @@ function RouterWrapper() {
                 </Layout>
               }
             /> */}
-             <Route
-              path="/expense/categories"
-              element={
-                <Layout>
-                  <ExpensesByCategories/>
-                </Layout>
-              }
-            />
-             <Route
-              path="/expense/items"
-              element={
-                <Layout>
-                  <ExpensesByItems/>
-                </Layout>
-              }
-            />
-             <Route
-              path="/expense/add"
-              element={
-              
-                  <AddExpense/>
-               
-              }
-            />
+              <Route
+                           path="/expense/categories"
+                           element={
+                             <Layout>
+                               <ExpensesByCategories />
+                             </Layout>
+                           }
+                         />
+                         <Route
+                           path="/expense/items"
+                           element={
+                             <Layout>
+                               <ExpensesByItems />
+                             </Layout>
+                           }
+                         />
+                         <Route
+                           path="/expense/add"
+                           element={
              
+                             <AddExpense />
+             
+                           }
+                         />
+                         <Route
+                           path="/expense/edit/:id"
+                           element={
+                             <EditExpense />
+                           }
+                         />
+                         <Route
+                           path="/expense/preview/:id"
+                           element={
+                             <ExpensePreview />
+                           }
+                         />
             {/* <Route
               path="/reports"
               element={

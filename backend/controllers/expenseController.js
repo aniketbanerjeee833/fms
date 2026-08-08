@@ -8,7 +8,7 @@ const PAGE_SIZE = 20;
 ═══════════════════════════════════════ */
 const createExpenseCategory = async (req, res, next) => {
   try {
-    const { Category_Name, Category_Type} = req.body;
+    const { Category_Name, Category_Type } = req.body;
     if (!Category_Name?.trim()) {
       return res.status(400).json({ success: false, message: "Category Name is required" });
     }
@@ -17,20 +17,20 @@ const createExpenseCategory = async (req, res, next) => {
     }
     const normalizedName = Category_Name.trim().toLowerCase();
 
-const [existing] = await db.query(
-  `SELECT id
+    const [existing] = await db.query(
+      `SELECT id
    FROM expense_categories
    WHERE LOWER(TRIM(Category_Name)) = ?`,
-  [normalizedName]
-);
+      [normalizedName]
+    );
 
-if (existing.length > 0) {
-  return res.status(400).json({
-    success: false,
-    message: "Category already exists.",
-  });
-}
-    
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Category already exists.",
+      });
+    }
+
     const [result] = await db.query(
       `INSERT INTO expense_categories (Category_Name, Category_Type) VALUES (?, ?)`,
       [Category_Name.trim(), Category_Type]
@@ -44,7 +44,7 @@ if (existing.length > 0) {
 const editExpenseCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { Category_Name, Category_Type} = req.body;
+    const { Category_Name, Category_Type } = req.body;
     if (!Category_Name?.trim()) {
       return res.status(400).json({ success: false, message: "Category Name is required" });
     }
@@ -53,20 +53,20 @@ const editExpenseCategory = async (req, res, next) => {
     }
     const normalizedName = Category_Name.trim().toLowerCase();
 
-const [existing] = await db.query(
-  `SELECT id
+    const [existing] = await db.query(
+      `SELECT id
    FROM expense_categories
    WHERE LOWER(TRIM(Category_Name)) = ?
      AND id <> ?`,
-  [normalizedName, id]
-);
+      [normalizedName, id]
+    );
 
-if (existing.length > 0) {
-  return res.status(400).json({
-    success: false,
-    message: "Another category with this name already exists.",
-  });
-}
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Another category with this name already exists.",
+      });
+    }
     await db.query(
       `UPDATE expense_categories SET Category_Name = ?, Category_Type = ? WHERE id = ?`,
       [Category_Name.trim(), Category_Type, id]
@@ -121,7 +121,6 @@ const createExpenseItemMaster = async (req, res, next) => {
       itemName,
       itemHSN,
       price,
-      priceType,   // "Tax Excluded" | "Tax Included" | null
       taxType,     // "GST5" | "GST12" | "GST18" | "GST28" | "None" | null
     } = req.body;
 
@@ -130,19 +129,17 @@ const createExpenseItemMaster = async (req, res, next) => {
     }
 
     const [result] = await db.query(
-      `INSERT INTO expense_item_master (Item_Name, Item_HSN, Price, Price_Type, Tax_Type)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO expense_item_master (Item_Name, Item_HSN, Price, Tax_Type)
+       VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          Item_HSN   = VALUES(Item_HSN),
          Price      = VALUES(Price),
-         Price_Type = VALUES(Price_Type),
          Tax_Type  = VALUES(Tax_Type)`,
       [
         itemName.trim(),
-        itemHSN   || null,
-        price     != null && price !== "" ? Number(price) : null,
-        priceType || "Tax Excluded",
-        taxType   || null,
+        itemHSN || null,
+        price != null && price !== "" ? Number(price) : null,
+        taxType || null,
       ]
     );
 
@@ -159,7 +156,6 @@ const editExpenseItemMaster = async (req, res, next) => {
       itemName,
       itemHSN,
       price,
-      priceType,
       taxType,
     } = req.body;
 
@@ -170,14 +166,13 @@ const editExpenseItemMaster = async (req, res, next) => {
     // name/HSN/price change propagates everywhere via FK join — no child row updates needed
     await db.query(
       `UPDATE expense_item_master
-       SET Item_Name = ?, Item_HSN = ?, Price = ?, Price_Type = ?, Tax_Type= ?
+       SET Item_Name = ?, Item_HSN = ?, Price = ?, Tax_Type= ?
        WHERE id = ?`,
       [
         itemName.trim(),
-        itemHSN   || null,
-        price     != null && price !== "" ? Number(price) : null,
-        priceType || "Tax Excluded",
-        taxType   || null,
+        itemHSN || null,
+        price != null && price !== "" ? Number(price) : null,
+        taxType || null,
         id,
       ]
     );
@@ -212,9 +207,9 @@ const deleteExpenseItemMaster = async (req, res, next) => {
 
 const getAllExpenseItemMasters = async (req, res, next) => {
   try {
-    const search   = req.query.search?.trim().toLowerCase() || "";
+    const search = req.query.search?.trim().toLowerCase() || "";
     const whereSQL = search ? `WHERE LOWER(Item_Name) LIKE ?` : "";
-    const params   = search ? [`%${search}%`] : [];
+    const params = search ? [`%${search}%`] : [];
 
     const [items] = await db.query(
       `SELECT * FROM expense_item_master ${whereSQL} ORDER BY Item_Name ASC`,
@@ -233,22 +228,44 @@ const getAllExpenseItemMasters = async (req, res, next) => {
 /* ═══════════════════════════════════════
    HELPER — get or create expense item master by name
 ═══════════════════════════════════════ */
-const getOrCreateExpenseItemMaster = async (connection, itemName, itemHSN) => {
+const getOrCreateExpenseItemMaster = async (
+  connection,
+  itemName,
+  itemHSN,
+  price,
+  taxType
+) => {
   const [[existing]] = await connection.query(
-    `SELECT id FROM expense_item_master WHERE Item_Name = ? LIMIT 1`,
+    `SELECT id FROM expense_item_master
+         WHERE Item_Name = ?
+         LIMIT 1`,
     [itemName.trim()]
   );
+
   if (existing) return existing.id;
 
   const [result] = await connection.query(
-    `INSERT INTO expense_item_master (Item_Name, Item_HSN) VALUES (?, ?)`,
-    [itemName.trim(), itemHSN || null]
+    `INSERT INTO expense_item_master
+        (
+            Item_Name,
+            Item_HSN,
+            Price,
+            Tax_Type
+        )
+        VALUES (?, ?, ?, ?)`,
+    [
+      itemName.trim(),
+      itemHSN || null,
+      price !== "" && price != null ? Number(price) : null,
+      taxType || null,
+    ]
   );
+
   return result.insertId;
 };
 
 /* ─── get or create expense category by name ─── */
-const getOrCreateExpenseCategory = async (connection, Category_Name, Category_Type= "Indirect") => {
+const getOrCreateExpenseCategory = async (connection, Category_Name, Category_Type = "Indirect") => {
   const [[existing]] = await connection.query(
     `SELECT id FROM expense_categories WHERE Category_Name = ? LIMIT 1`,
     [Category_Name.trim()]
@@ -257,7 +274,7 @@ const getOrCreateExpenseCategory = async (connection, Category_Name, Category_Ty
 
   const [result] = await connection.query(
     `INSERT INTO expense_categories (Category_Name, Category_Type) VALUES (?, ?)`,
-    [Category_Name.trim(), Category_Type|| "Indirect"]
+    [Category_Name.trim(), Category_Type || "Indirect"]
   );
   return result.insertId;
 };
@@ -293,25 +310,25 @@ const createExpense = async (req, res, next) => {
 
     const withGST = !!With_GST;
 
-    
 
-  // 1. VALIDATION
-// =========================================================
-if (!Category_Name?.trim()) {
-  await connection.rollback();
-  return res.status(400).json({
-    success: false,
-    message: "Expense Category is required.",
-  });
-}
 
-if (withGST && !Party_Name?.trim()) {
-  await connection.rollback();
-  return res.status(400).json({
-    success: false,
-    message: "Party is required for GST expenses.",
-  });
-}
+    // 1. VALIDATION
+    // =========================================================
+    if (!Category_Name?.trim()) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Expense Category is required.",
+      });
+    }
+
+    if (withGST && !Party_Name?.trim()) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Party is required for GST expenses.",
+      });
+    }
 
     // =========================================================
     // 2. FIND PARTY
@@ -319,24 +336,24 @@ if (withGST && !Party_Name?.trim()) {
     // Party is now used regardless of GST / non-GST.
     // =========================================================
 
-   let Party_Id = null;
+    let Party_Id = null;
 
-if (Party_Name?.trim()) {
-  const [[party]] = await connection.query(
-    `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-    [Party_Name]
-  );
+    if (Party_Name?.trim()) {
+      const [[party]] = await connection.query(
+        `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
+        [Party_Name]
+      );
 
-  if (!party) {
-    await connection.rollback();
-    return res.status(404).json({
-      success: false,
-      message: "Party not found.",
-    });
-  }
+      if (!party) {
+        await connection.rollback();
+        return res.status(404).json({
+          success: false,
+          message: "Party not found.",
+        });
+      }
 
-  Party_Id = party.Party_Id;
-}
+      Party_Id = party.Party_Id;
+    }
 
     // =========================================================
     // 3. CATEGORY
@@ -656,7 +673,9 @@ if (Party_Name?.trim()) {
         await getOrCreateExpenseItemMaster(
           connection,
           Item_Name,
-          Item_HSN
+          Item_HSN,
+          Price,
+          Tax_Type
         );
 
       // =======================================================
@@ -667,49 +686,49 @@ if (Party_Name?.trim()) {
 
       await connection.query(
         `INSERT INTO expense_items
-         (
-           Expense_Id,
-           Expense_Item_Master_Id,
+          (
+              Expense_Id,
+              Expense_Item_Master_Id,
 
-           Quantity,
-           Price,
+              Quantity,
+              Price,
 
-           Discount_On_Price,
-           Discount_Type_On_Price,
+              Discount_On_Price,
+              Discount_Type_On_Price,
 
-           Tax_Type,
-           Tax_Amount,
+              Tax_Type,
+              Tax_Amount,
 
-           Amount,
+              Amount,
 
-           created_at,
-           updated_at
-         )
-         VALUES (
-           ?, ?, ?, ?, ?, ?, ?, ?, ?,
-           NOW(), NOW()
-         )`,
+              created_at,
+              updated_at
+          )
+          VALUES
+          (
+              ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              NOW(), NOW()
+          )`,
         [
           expenseId,
 
           masterItemId,
 
           Quantity === "" ||
-          Quantity === null ||
-          Quantity === undefined
+            Quantity === null ||
+            Quantity === undefined
             ? null
             : Number(Quantity),
 
           Price === "" ||
-          Price === null ||
-          Price === undefined
+            Price === null ||
+            Price === undefined
             ? null
             : Number(Price),
 
           Number(Discount_On_Price) || 0,
 
-          Discount_Type_On_Price ||
-            "Percentage",
+          Discount_Type_On_Price || "Percentage",
 
           Tax_Type || "None",
 
@@ -810,49 +829,49 @@ const editExpense = async (req, res, next) => {
     // =========================================================
 
     // =========================================================
-// 2. REQUIRED FIELDS
-// =========================================================
-if (!Category_Name?.trim()) {
-  return res.status(400).json({
-    success: false,
-    message: "Expense Category is required.",
-  });
-}
+    // 2. REQUIRED FIELDS
+    // =========================================================
+    if (!Category_Name?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Expense Category is required.",
+      });
+    }
 
-if (withGST && !Party_Name?.trim()) {
-  return res.status(400).json({
-    success: false,
-    message: "Party is required for GST expenses.",
-  });
-}
+    if (withGST && !Party_Name?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Party is required for GST expenses.",
+      });
+    }
 
     // =========================================================
     // 3. START TRANSACTION
     // =========================================================
 
     await connection.beginTransaction();
-// =========================================================
-// 4. FIND PARTY — only when provided
-// =========================================================
-let Party_Id = null;
+    // =========================================================
+    // 4. FIND PARTY — only when provided
+    // =========================================================
+    let Party_Id = null;
 
-if (Party_Name?.trim()) {
-  const [[party]] = await connection.query(
-    `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-    [Party_Name]
-  );
-  if (!party) {
-    await connection.rollback();
-    return res.status(404).json({
-      success: false,
-      message: "Party not found.",
-    });
-  }
-  Party_Id = party.Party_Id;
-}
+    if (Party_Name?.trim()) {
+      const [[party]] = await connection.query(
+        `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
+        [Party_Name]
+      );
+      if (!party) {
+        await connection.rollback();
+        return res.status(404).json({
+          success: false,
+          message: "Party not found.",
+        });
+      }
+      Party_Id = party.Party_Id;
+    }
 
 
-   
+
 
     // =========================================================
     // 5. GET / CREATE EXPENSE CATEGORY
@@ -1112,7 +1131,9 @@ if (Party_Name?.trim()) {
         await getOrCreateExpenseItemMaster(
           connection,
           Item_Name,
-          Item_HSN
+          Item_HSN,
+          Price,
+          Tax_Type
         );
 
       // =======================================================
@@ -1149,21 +1170,21 @@ if (Party_Name?.trim()) {
           masterItemId,
 
           Quantity === "" ||
-          Quantity === null ||
-          Quantity === undefined
+            Quantity === null ||
+            Quantity === undefined
             ? null
             : Number(Quantity),
 
           Price === "" ||
-          Price === null ||
-          Price === undefined
+            Price === null ||
+            Price === undefined
             ? null
             : Number(Price),
 
           Number(Discount_On_Price) || 0,
 
           Discount_Type_On_Price ||
-            "Percentage",
+          "Percentage",
 
           Tax_Type || "None",
 
@@ -1313,10 +1334,10 @@ const getExpensesByCategory = async (req, res, next) => {
     const { categoryId } = req.params;
     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
     const search = req.query.search?.trim().toLowerCase() || "";
-    const date   = req.query.date || null;
+    const date = req.query.date || null;
 
     const whereClauses = [`e.Category_Id = ?`];
-    const params       = [categoryId];
+    const params = [categoryId];
 
     if (lastId) { whereClauses.push(`e.id < ?`); params.push(lastId); }
     if (search) {
@@ -1338,7 +1359,7 @@ const getExpensesByCategory = async (req, res, next) => {
       [...params, PAGE_SIZE + 1]
     );
 
-    const hasMore  = rows.length > PAGE_SIZE;
+    const hasMore = rows.length > PAGE_SIZE;
     const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
     // 🔹 attach Payment_Type_Display from payment_splits
@@ -1392,10 +1413,10 @@ const getExpenseItemUsage = async (req, res, next) => {
     }
 
     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
-    const date   = req.query.date || null;
+    const date = req.query.date || null;
 
     const whereClauses = [`ei.Expense_Item_Master_Id = ?`];
-    const params       = [masterItemId];
+    const params = [masterItemId];
 
     if (lastId) { whereClauses.push(`ei.id < ?`); params.push(lastId); }
     if (date) {
@@ -1418,7 +1439,7 @@ const getExpenseItemUsage = async (req, res, next) => {
       [...params, PAGE_SIZE + 1]
     );
 
-    const hasMore  = rows.length > PAGE_SIZE;
+    const hasMore = rows.length > PAGE_SIZE;
     const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
     // 🔹 attach Payment_Type_Display — key off e.Expense_Id (parent expense)
@@ -1460,6 +1481,8 @@ const getExpenseItemUsage = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+
+
 export {
   getExpenseItemUsage,
   getExpenseById,
@@ -1472,9 +1495,9 @@ export {
   editExpense,
   deleteExpense,
   createExpenseItemMaster,
-  editExpenseItemMaster,  
+  editExpenseItemMaster,
   deleteExpenseItemMaster,
- 
+
   getAllExpenseItemMasters,
 };
 //WITH GST

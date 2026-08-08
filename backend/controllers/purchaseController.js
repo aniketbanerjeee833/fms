@@ -933,20 +933,34 @@ const addPurchase = async (req, res, next) => {
         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
         [newPurchaseItemId, pitId]
       );
-         await recordItemLedger({
-        connection,
-        itemId: Item_Id,
-        txnType: "Purchase",
-        referenceId: pitResult.insertId,   // purchase_item row's numeric id
-        //formattedId: newPurchaseId,
-         billId:      newPurchaseId,
-          billNumber: Bill_Number,   // AEPL-22
-        partyName: Party_Name,
-        quantity: normalizeNumber(Quantity) ?? 0,
-        rate: normalizeNumber(Purchase_Price) ?? null,
-        txnDate: Bill_Date,
+      //    await recordItemLedger({
+      //   connection,
+      //   itemId: Item_Id,
+      //   txnType: "Purchase",
+      //   referenceId: pitResult.insertId,   // purchase_item row's numeric id
+      //   //formattedId: newPurchaseId,
+      //    billId:      newPurchaseId,
+      //     billNumber: Bill_Number,   // AEPL-22
+      //   partyName: Party_Name,
+      //   quantity: normalizeNumber(Quantity) ?? 0,
+      //   rate: normalizeNumber(Purchase_Price) ?? null,
+      //   txnDate: Bill_Date,
 
-      });
+      // });
+      await recordItemLedger({
+  connection,
+  itemId:       Item_Id,
+  txnType:      "Purchase",
+  referenceId:  pitResult.insertId,
+  billId:       newPurchaseId,
+  billNumber:   Bill_Number,
+  partyName:    Party_Name,
+  quantity:     normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
+  selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+  baseQty:      stockDelta,                         // 🔹 normalized: e.g. 0.5
+  rate:         normalizeNumber(Purchase_Price) ?? null,
+  txnDate:      Bill_Date,
+});
     }
 
     await connection.commit();
@@ -2441,11 +2455,9 @@ for (const item of items) {
         Quantity,
       });
 
-    snapshot =
-      result.snapshot;
+    snapshot =result.snapshot;
 
-    resolvedSelectedUnit =
-      result.resolvedSelectedUnit;
+    resolvedSelectedUnit =result.resolvedSelectedUnit;
 
     quantityInBaseUnit =
       Number(result.stockDelta) || 0;
@@ -2712,18 +2724,32 @@ for (const itemId of allItemIds) {
         ["PIT" + id.toString().padStart(3, "0"), id]
       );
 
+      // await recordItemLedger({
+      //   connection,
+      //   itemId: line.Item_Id,
+      //   txnType: "Purchase",
+      //   referenceId: id,
+      //   billId: purchaseId,
+      //   billNumber: Bill_Number,
+      //   partyName: Party_Name,
+      //   quantity: normalizeNumber(line.Quantity) ?? 0,
+      //   rate: normalizeNumber(line.Purchase_Price) ?? null,
+      //   txnDate: Bill_Date,
+      // });
       await recordItemLedger({
-        connection,
-        itemId: line.Item_Id,
-        txnType: "Purchase",
-        referenceId: id,
-        billId: purchaseId,
-        billNumber: Bill_Number,
-        partyName: Party_Name,
-        quantity: normalizeNumber(line.Quantity) ?? 0,
-        rate: normalizeNumber(line.Purchase_Price) ?? null,
-        txnDate: Bill_Date,
-      });
+  connection,
+ itemId: line.Item_Id,
+  txnType:      "Purchase",
+  referenceId: id,
+ billId: purchaseId,
+  billNumber:   Bill_Number,
+  partyName:    Party_Name,
+  quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
+  selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+  baseQty:     line.quantityInBaseUnit,                         // 🔹 normalized: e.g. 0.5
+   rate: normalizeNumber(line.Purchase_Price) ?? null,
+  txnDate:      Bill_Date,
+});
     }
 
     await connection.commit();

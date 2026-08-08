@@ -1249,8 +1249,8 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
     const limit = 10;
     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
     const searchDate = req.query.date || null;
-    const cursor = req.query.cursor ? Number(req.query.cursor) : null;
-
+    //const cursor = req.query.cursor ? Number(req.query.cursor) : null;
+    const cursor = req.query.cursor || null;
     if (!Party_Id) {
       return res.status(400).json({ success: false, message: "Party Id is required" });
     }
@@ -1328,9 +1328,46 @@ const partyDetails = {
     //   params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     // }
 
-    if (cursor) {
-  where += ` AND pl.id < ?`;
-  params.push(cursor);
+//     if (cursor) {
+//   where += ` AND pl.id < ?`;
+//   params.push(cursor);
+// }
+
+if (cursor) {
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(cursor, "base64").toString("utf8")
+    );
+
+    if (!decoded.date || !decoded.id) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid cursor.",
+      });
+    }
+
+    where += `
+      AND (
+        pl.Txn_Date < ?
+        OR (
+          pl.Txn_Date = ?
+          AND pl.id < ?
+        )
+      )
+    `;
+
+    params.push(
+      decoded.date,
+      decoded.date,
+      Number(decoded.id)
+    );
+
+  } catch {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid cursor.",
+    });
+  }
 }
 
 if (searchDate) {
@@ -1390,13 +1427,29 @@ const [ledgerRows] = await connection.query(
 
    ${where}
 
-   ORDER BY pl.id DESC
+ 
+  ORDER BY
+  pl.Txn_Date DESC,
+  pl.id DESC
    LIMIT ${limit + 1}`,
   params
 );
+ //  ORDER BY pl.id DESC
     const hasMore = ledgerRows.length > limit;
     const pageRows = hasMore ? ledgerRows.slice(0, limit) : ledgerRows;
-    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
+    //const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
+    let nextCursor = null;
+
+if (hasMore && pageRows.length > 0) {
+  const last = pageRows[pageRows.length - 1];
+
+  nextCursor = Buffer.from(
+    JSON.stringify({
+      date: last.Txn_Date,
+      id: last.id,
+    })
+  ).toString("base64");
+}
 
     // 🔹 Summary — ALL TIME
     const [[purchaseSummary]] = await connection.query(

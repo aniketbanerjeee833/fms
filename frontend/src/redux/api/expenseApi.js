@@ -8,6 +8,8 @@ export const expenseApi = createApi({
   }),
   tagTypes: ["Expense", "ExpenseCategory", "ExpenseItem"],
   endpoints: (builder) => ({
+
+
     createExpenseCategory: builder.mutation({
       query: ({ body }) => ({
         url: "expense-category/",
@@ -38,6 +40,7 @@ export const expenseApi = createApi({
       query: () => "expense-category/",
       providesTags: [{ type: "ExpenseCategory", id: "LIST" }],
     }),
+
 
     createExpenseItemMaster: builder.mutation({
       query: ({ body }) => ({
@@ -75,13 +78,18 @@ export const expenseApi = createApi({
       providesTags: [{ type: "ExpenseItem", id: "LIST" }],
     }),
 
+
     createExpense: builder.mutation({
       query: ({ body }) => ({
         url: "expense/",
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Expense", id: "LIST" }],
+      invalidatesTags: [
+        { type: "Expense", id: "LIST" },
+        { type: "ExpenseCategory", id: "LIST" },
+        { type: "ExpenseItem", id: "LIST" },
+      ],
     }),
 
     editExpense: builder.mutation({
@@ -90,7 +98,11 @@ export const expenseApi = createApi({
         method: "PUT",
         body,
       }),
-      invalidatesTags: [{ type: "Expense", id: "LIST" }],
+      invalidatesTags: [
+        { type: "Expense", id: "LIST" },
+        { type: "ExpenseCategory", id: "LIST" },
+        { type: "ExpenseItem", id: "LIST" },
+      ],
     }),
 
     deleteExpense: builder.mutation({
@@ -98,7 +110,11 @@ export const expenseApi = createApi({
         url: `expense/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: [{ type: "Expense", id: "LIST" }],
+      invalidatesTags: [
+        { type: "Expense", id: "LIST" },
+        { type: "ExpenseCategory", id: "LIST" },
+        { type: "ExpenseItem", id: "LIST" },
+      ],
     }),
 
     getExpenseById: builder.query({
@@ -106,56 +122,56 @@ export const expenseApi = createApi({
       providesTags: (result, error, id) => [{ type: "Expense", id }],
     }),
 
-getExpensesByCategory: builder.query({
-  query: ({ categoryId, cursor = null, search = "", date = "" }) => {
-    const params = new URLSearchParams();
-    if (cursor) params.append("lastId", cursor);
-    if (search) params.append("search", search);
-    if (date)   params.append("date", date);       // 🔹 single date
-    const qs = params.toString();
-    return `expense/by-category/${categoryId}${qs ? `?${qs}` : ""}`;
-  },
-  serializeQueryArgs: ({ queryArgs }) => ({
-    categoryId: queryArgs.categoryId,
-    search:     queryArgs.search,
-    date:       queryArgs.date,
-  }),
-  merge: (currentCache, newData) => {
-    currentCache.expenses.push(...newData.expenses);
-    currentCache.hasMore    = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
-  },
-  forceRefetch: ({ currentArg, previousArg }) =>
-    currentArg?.cursor !== previousArg?.cursor,
-  providesTags: (result, error, { categoryId }) => [
-    { type: "Expense", id: `CATEGORY_${categoryId}` },
-  ],
-}),
+    getExpensesByCategory: builder.query({
+      query: ({ categoryId, cursor = null, search = "", date = "" }) => {
+        const params = new URLSearchParams();
+        if (cursor) params.append("lastId", cursor);
+        if (search) params.append("search", search);
+        if (date) params.append("date", date);       // 🔹 single date
+        const qs = params.toString();
+        return `expense/by-category/${categoryId}${qs ? `?${qs}` : ""}`;
+      },
+      serializeQueryArgs: ({ queryArgs }) => ({
+        categoryId: queryArgs.categoryId,
+        search: queryArgs.search,
+        date: queryArgs.date,
+      }),
+      merge: (currentCache, newData) => {
+        currentCache.expenses.push(...newData.expenses);
+        currentCache.hasMore = newData.hasMore;
+        currentCache.nextCursor = newData.nextCursor;
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.cursor !== previousArg?.cursor,
+      providesTags: (result, error, { categoryId }) => [
+        { type: "Expense", id: `CATEGORY_${categoryId}` },
+      ],
+    }),
 
-getExpenseItemUsage: builder.query({
-  query: ({ masterItemId, cursor = null, date = "" }) => {
-    const params = new URLSearchParams();
-    if (masterItemId) params.append("masterItemId", masterItemId);
-    if (cursor)       params.append("lastId", cursor);
-    if (date)         params.append("date", date);   // 🔹 single date
-    const qs = params.toString();
-    return `expense/item-usage${qs ? `?${qs}` : ""}`;
-  },
-  serializeQueryArgs: ({ queryArgs }) => ({
-    masterItemId: queryArgs.masterItemId,
-    date:         queryArgs.date,
-  }),
-  merge: (currentCache, newData) => {
-    currentCache.usage.push(...newData.usage);
-    currentCache.hasMore    = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
-  },
-  forceRefetch: ({ currentArg, previousArg }) =>
-    currentArg?.cursor !== previousArg?.cursor,
-  providesTags: (result, error, { masterItemId }) => [
-    { type: "Expense", id: `ITEM_${masterItemId}` },
-  ],
-}),
+    getExpenseItemUsage: builder.query({
+      query: ({ masterItemId, cursor = null, date = "" }) => {
+        const params = new URLSearchParams();
+        if (masterItemId) params.append("masterItemId", masterItemId);
+        if (cursor) params.append("lastId", cursor);
+        if (date) params.append("date", date);   // 🔹 single date
+        const qs = params.toString();
+        return `expense/item-usage${qs ? `?${qs}` : ""}`;
+      },
+      serializeQueryArgs: ({ queryArgs }) => ({
+        masterItemId: queryArgs.masterItemId,
+        date: queryArgs.date,
+      }),
+      merge: (currentCache, newData) => {
+        currentCache.usage.push(...newData.usage);
+        currentCache.hasMore = newData.hasMore;
+        currentCache.nextCursor = newData.nextCursor;
+      },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.cursor !== previousArg?.cursor,
+      providesTags: (result, error, { masterItemId }) => [
+        { type: "Expense", id: `ITEM_${masterItemId}` },
+      ],
+    }),
   }),
 });
 
