@@ -1890,7 +1890,11 @@ export default function PurchaseAdd() {
 
                             onChange={(e) => {
 
-                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                              // e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                              e.target.value = e.target.value
+                                .replace(/[^0-9.]/g, "")
+                                .replace(/(\..*)\./g, "$1");
+
                               setValue(`items.${i}.Quantity`, e.target.value, {
                                 shouldValidate: true,
                                 shouldDirty: true,
@@ -2065,89 +2069,89 @@ export default function PurchaseAdd() {
                             </p>
                           )}
                         </td> */}
-                         <td style={{ padding: "0px", width: "12%" }}>
-                                                <Controller
-                                                  control={control}
-                                                  name={`items.${i}.Item_Unit`}
-                                                  render={({ field }) => {
-                                                    const row = rows[i];
-                        
-                                                    const availableUnits = Array.isArray(row?.Available_Units)
-                                                      ? row.Available_Units
-                                                      : [];
-                        
-                                                    return (
-                                                      <select
-                                                        {...field}
-                                                        value={field.value || ""}
-                                                        className="form-select"
-                                                        style={{
-                                                          width: "100%",
-                                                          fontSize: "12px",
-                                                          marginLeft: "0px",
-                                                        }}
-                                                        disabled={row?.isUnitLocked}
-                                                        onChange={(e) => {
-                                                          const value = e.target.value;
-                        
-                                                          if (value === "__ADD_UNIT__") {
-                                                            setActiveUnitRow(i);
-                                                            setShowAddUnitModal(true);
-                                                            return;
-                                                          }
-                        
-                                                          field.onChange(value);
-                        
-                                                          handleRowChange(i, "Item_Unit", value);
-                        
-                                                          setValue(`items.${i}.Item_Unit`, value, {
-                                                            shouldValidate: true,
-                                                            shouldDirty: true,
-                                                          });
-                                                        }}
-                                                      >
-                                                        {/* Item has configured units */}
-                                                        {availableUnits.length > 0 ? (
-                                                          availableUnits.map((unit) => (
-                                                            <option
-                                                              key={unit.Unit_Shorthand}
-                                                              value={unit.Unit_Shorthand}
-                                                            >
-                                                              {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                                            </option>
-                                                          ))
-                                                        ) : (
-                                                          <>
-                                                            <option value="">NONE</option>
-                        
-                                                            {/* Only allow choosing/adding unit when
+                        <td style={{ padding: "0px", width: "12%" }}>
+                          <Controller
+                            control={control}
+                            name={`items.${i}.Item_Unit`}
+                            render={({ field }) => {
+                              const row = rows[i];
+
+                              const availableUnits = Array.isArray(row?.Available_Units)
+                                ? row.Available_Units
+                                : [];
+
+                              return (
+                                <select
+                                  {...field}
+                                  value={field.value || ""}
+                                  className="form-select"
+                                  style={{
+                                    width: "100%",
+                                    fontSize: "12px",
+                                    marginLeft: "0px",
+                                  }}
+                                  disabled={row?.isUnitLocked}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+
+                                    if (value === "__ADD_UNIT__") {
+                                      setActiveUnitRow(i);
+                                      setShowAddUnitModal(true);
+                                      return;
+                                    }
+
+                                    field.onChange(value);
+
+                                    handleRowChange(i, "Item_Unit", value);
+
+                                    setValue(`items.${i}.Item_Unit`, value, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                  }}
+                                >
+                                  {/* Item has configured units */}
+                                  {availableUnits.length > 0 ? (
+                                    availableUnits.map((unit) => (
+                                      <option
+                                        key={unit.Unit_Shorthand}
+                                        value={unit.Unit_Shorthand}
+                                      >
+                                        {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                      </option>
+                                    ))
+                                  ) : (
+                                    <>
+                                      <option value="">NONE</option>
+
+                                      {/* Only allow choosing/adding unit when
                                           selected item has NO configured units */}
-                                                            {Array.isArray(itemUnits) &&
-                                                              itemUnits.map((unit) => (
-                                                                <option
-                                                                  key={unit.Unit_Shorthand}
-                                                                  value={unit.Unit_Shorthand}
-                                                                >
-                                                                  {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                                                </option>
-                                                              ))}
-                        
-                                                            <option value="__ADD_UNIT__">
-                                                              ➕ Add Unit
-                                                            </option>
-                                                          </>
-                                                        )}
-                                                      </select>
-                                                    );
-                                                  }}
-                                                />
-                        
-                                                {errors?.items?.[i]?.Item_Unit && (
-                                                  <p className="text-red-500 text-xs mt-1">
-                                                    {errors.items[i].Item_Unit.message}
-                                                  </p>
-                                                )}
-                                              </td>
+                                      {Array.isArray(itemUnits) &&
+                                        itemUnits.map((unit) => (
+                                          <option
+                                            key={unit.Unit_Shorthand}
+                                            value={unit.Unit_Shorthand}
+                                          >
+                                            {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                          </option>
+                                        ))}
+
+                                      <option value="__ADD_UNIT__">
+                                        ➕ Add Unit
+                                      </option>
+                                    </>
+                                  )}
+                                </select>
+                              );
+                            }}
+                          />
+
+                          {errors?.items?.[i]?.Item_Unit && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_Unit.message}
+                            </p>
+                          )}
+                        </td>
 
 
 

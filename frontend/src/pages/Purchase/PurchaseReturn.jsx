@@ -1,9 +1,14 @@
 
-import { NavLink, useLocation,  useSearchParams } from "react-router-dom";
+import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 
 
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
-import { useGetAllPurchaseReturnsQuery } from "../../redux/api/purchaseReturnApi";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
+import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery } from "../../redux/api/purchaseReturnApi";
+import { useState } from "react";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
+import { itemApi } from "../../redux/api/itemApi";
+import { useDispatch } from "react-redux";
 
 
 export default function PurchaseReturn() {
@@ -13,6 +18,7 @@ export default function PurchaseReturn() {
 
   // const [selectedPurchase, setSelectedpurchaseReturns] = useState(null);
   // const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
@@ -21,7 +27,8 @@ export default function PurchaseReturn() {
   //const [searchTerm, setSearchTerm] = useState("");
   const fromDate = searchParams.get("fromDate") || "";
   const toDate = searchParams.get("toDate") || "";
-  
+  const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+  const [deletePurchaseReturn, { isLoading: isDeleting }] = useDeletePurchaseReturnMutation();
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -54,11 +61,11 @@ export default function PurchaseReturn() {
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
   const { data: purchaseReturns, isLoading } = useGetAllPurchaseReturnsQuery({
-  page,
-  search: searchTerm,
-  fromDate,
-  toDate,
-});
+    page,
+    search: searchTerm,
+    fromDate,
+    toDate,
+  });
   console.log(purchaseReturns, fromDate, toDate);
   const handleExportExcel = () => {
     const params = new URLSearchParams();
@@ -74,7 +81,26 @@ export default function PurchaseReturn() {
     document.body.removeChild(a);
   };
 
-  
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      console.log(deleteTarget);
+      const res = await deletePurchaseReturn(deleteTarget.Purchase_Return_Id).unwrap();
+      toast.success(res?.message || "Debit Note deleted successfully");
+      setDeleteTarget(null);
+    
+           dispatch(
+          itemApi.util.invalidateTags([
+            "Item",
+            "ItemLedger",
+          ])
+        );
+    } catch (err) {
+      console.log(err);
+      toast.error(err?.data?.message || "Failed to delete debit note");
+    }
+  };
   return (
     <>
       {/* // <div className="container-fluid sb2  ">
@@ -262,56 +288,57 @@ export default function PurchaseReturn() {
 
 
           </div>
-           </div>
-          <div className="tab-inn">
-            <div className="table-responsive table-desi">
-              {isLoading ? (
-                <p className="text-center mt-4">Fetching purchaseReturns...</p>
-              ) : purchaseReturns?.length === 0 ? (
-                <p className="text-center mt-4">No purchaseReturns found.</p>
-              ) : (
+        </div>
+        <div className="tab-inn">
+          <div className="table-responsive table-desi">
+            {isLoading ? (
+              <p className="text-center mt-4">Fetching purchaseReturns...</p>
+            ) : purchaseReturns?.length === 0 ? (
+              <p className="text-center mt-4">No purchaseReturns found.</p>
+            ) : (
 
 
 
 
 
-                <table className="w-full min-w-[500px]">
-                  <thead>
-                    <tr>
-                      <th className="text-left">Sl.No</th>
-                      <th className="text-left ">Bill Date</th>
-                      <th className="text-left ">Party Name</th>
-                      <th className="text-left">Payment Type</th>
-                      <th className="text-left">Amount </th>
-                       <th className="text-left">Received </th>
-                      <th className="text-left">Balance Due</th>
-                      <th>View/Edit</th>
-                      {/* <th>Edit</th> */}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {purchaseReturns && purchaseReturns?.purchaseReturns?.length > 0 ? (
-                      purchaseReturns?.purchaseReturns?.map((purchaseReturn, idx) => (
-                        <tr key={purchaseReturn?.id}>
-                          <td>
-                            {(purchaseReturns?.currentPage - 1) * 10 + (idx + 1)}.
-                          </td>
-                          {/* <td>
+              <table className="w-full min-w-[500px]">
+                <thead>
+                  <tr>
+                    <th className="text-left">Sl.No</th>
+                    <th className="text-left ">Bill Date</th>
+                    <th className="text-left ">Party Name</th>
+                    <th className="text-left">Payment Type</th>
+                    <th className="text-left">Amount </th>
+                    <th className="text-left">Received </th>
+                    <th className="text-left">Balance Due</th>
+                    <th>View/Edit</th>
+                    <th>Delete</th>
+                    {/* <th>Edit</th> */}
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchaseReturns && purchaseReturns?.purchaseReturns?.length > 0 ? (
+                    purchaseReturns?.purchaseReturns?.map((purchaseReturn, idx) => (
+                      <tr key={purchaseReturn?.id}>
+                        <td>
+                          {(purchaseReturns?.currentPage - 1) * 10 + (idx + 1)}.
+                        </td>
+                        {/* <td>
   {purchaseReturn?.Bill_Date
     ? purchaseReturn.Bill_Date.split("T")[0]
     : "N/A"}
 </td> */}
-                          <td>
-                            {purchaseReturn?.Bill_Date
-                              ? new Date(purchaseReturn?.Bill_Date).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "numeric",
-                                year: "numeric",
-                              })
-                              : "N/A"}
-                          </td>
-                          <td>{purchaseReturn?.Party_Name || "N/A"}</td>
-                          {/* <td>
+                        <td>
+                          {purchaseReturn?.Bill_Date
+                            ? new Date(purchaseReturn?.Bill_Date).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "numeric",
+                              year: "numeric",
+                            })
+                            : "N/A"}
+                        </td>
+                        <td>{purchaseReturn?.Party_Name || "N/A"}</td>
+                        {/* <td>
                           {purchaseReturn?.Payment_Type
                             ? purchaseReturn.Payment_Type === "Bank"
                               ? `Bank (${purchaseReturn?.Bank_Display_Name || "N/A"})`
@@ -319,11 +346,11 @@ export default function PurchaseReturn() {
                             : "N/A"}
                         </td> */}
                         <td>{purchaseReturn?.Payment_Type_Display || "N/A"}</td>
-                          <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
-                           <td>{purchaseReturn?.Total_Received || "N/A"}</td>
-                          <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
+                        <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
+                        <td>{purchaseReturn?.Total_Received || "N/A"}</td>
+                        <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
 
-                          {/* <td >
+                        {/* <td >
                            
                             <NavLink to={`/purchaseReturn/view/${purchaseReturn?.Purchase_Id}${location.search}`}
                               state={{ from: "all-purchaseReturn-list" }}>
@@ -335,36 +362,48 @@ export default function PurchaseReturn() {
                                 }} />
                             </NavLink>
                           </td> */}
-                          <td
+                        <td
+                        >
+                          <NavLink
+                            to={`/purchase/return/edit/${purchaseReturn?.id}${location.search}`}
+                            state={{ from: "all-purchase-return-list" }}
+
                           >
-                            <NavLink
-                              to={`/purchase/return/edit/${purchaseReturn?.id}${location.search}`}
-                              state={{ from: "all-purchase-return-list" }}
 
-                            >
+                            <SquarePen
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
 
-                              <SquarePen
-                                style={{
-                                  cursor: "pointer",
-                                  backgroundColor: "transparent",
-                                  color: "#4CA1AF"
-                                }} />
-                            </NavLink>
-                          
 
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td className="mx-auto text-center" colSpan={10}>
-                          No purchaseReturn found
+                        </td>
+                        <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Purchase_Return_Id: purchaseReturn.id,
+
+                              })
+                            }
+                          />
                         </td>
                       </tr>
-                    )}
-                  </tbody>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="mx-auto text-center" colSpan={10}>
+                        No purchaseReturn found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
 
-                </table>
+              </table>
 
 
 
@@ -374,129 +413,129 @@ export default function PurchaseReturn() {
 
 
 
-              )}
-            </div>
+            )}
           </div>
-          <div className="flex justify-center align-center p-4">
-            <div className="flex items-center space-x-2 flex-wrap justify-center">
+        </div>
+        <div className="flex justify-center align-center p-4">
+          <div className="flex items-center space-x-2 flex-wrap justify-center">
 
-              {/* PREVIOUS */}
-              <button
-                type="button"
-                onClick={() => handlePreviousPage()}
-                disabled={page === 1}
-                className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+            {/* PREVIOUS */}
+            <button
+              type="button"
+              onClick={() => handlePreviousPage()}
+              disabled={page === 1}
+              className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
         ${page === 1 ? 'opacity-50 ' : ''}
       `}
-              >
-                ← Previous
-              </button>
+            >
+              ← Previous
+            </button>
 
-              {/* PAGE NUMBERS — DESKTOP / TABLET */}
-              <div style={{ marginRight: "0px" }}
-                className="hidden sm:flex space-x-2">
-              
-                {(() => {
-                  const totalPages = purchaseReturns?.totalPages || 1;
-                  const maxVisible = 5; // how many pages around current
-                  const pages = [];
+            {/* PAGE NUMBERS — DESKTOP / TABLET */}
+            <div style={{ marginRight: "0px" }}
+              className="hidden sm:flex space-x-2">
 
-                  let start = Math.max(1, page - 2);
-                  let end = Math.min(totalPages, page + 2);
+              {(() => {
+                const totalPages = purchaseReturns?.totalPages || 1;
+                const maxVisible = 5; // how many pages around current
+                const pages = [];
 
-                  // Adjust if near start
-                  if (page <= 3) {
-                    end = Math.min(totalPages, maxVisible);
-                  }
+                let start = Math.max(1, page - 2);
+                let end = Math.min(totalPages, page + 2);
 
-                  // Adjust if near end
-                  if (page > totalPages - 3) {
-                    start = Math.max(1, totalPages - maxVisible + 1);
-                  }
+                // Adjust if near start
+                if (page <= 3) {
+                  end = Math.min(totalPages, maxVisible);
+                }
 
-                  // First page + dots
-                  if (start > 1) {
+                // Adjust if near end
+                if (page > totalPages - 3) {
+                  start = Math.max(1, totalPages - maxVisible + 1);
+                }
+
+                // First page + dots
+                if (start > 1) {
+                  pages.push(
+                    <button
+                      key={1}
+                      onClick={() => handlePageChange(1)}
+                      className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                    >
+                      1
+                    </button>
+                  );
+
+                  if (start > 2) {
                     pages.push(
-                      <button
-                        key={1}
-                        onClick={() => handlePageChange(1)}
-                        className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                      >
-                        1
-                      </button>
-                    );
-
-                    if (start > 2) {
-                      pages.push(
-                        <span key="start-dots" className="px-2">...</span>
-                      );
-                    }
-                  }
-
-                  // Middle pages
-                  for (let i = start; i <= end; i++) {
-                    pages.push(
-                      <button
-                        key={i}
-                        onClick={() => handlePageChange(i)}
-                        className={`px-3 py-1 rounded ${page === i
-                          ? 'bg-[#4CA1AF] text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
-                      >
-                        {i}
-                      </button>
+                      <span key="start-dots" className="px-2">...</span>
                     );
                   }
+                }
 
-                  // Last page + dots
-                  if (end < totalPages) {
-                    if (end < totalPages - 1) {
-                      pages.push(
-                        <span key="end-dots" className="px-2">...</span>
-                      );
-                    }
+                // Middle pages
+                for (let i = start; i <= end; i++) {
+                  pages.push(
+                    <button
+                      key={i}
+                      onClick={() => handlePageChange(i)}
+                      className={`px-3 py-1 rounded ${page === i
+                        ? 'bg-[#4CA1AF] text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                      {i}
+                    </button>
+                  );
+                }
 
+                // Last page + dots
+                if (end < totalPages) {
+                  if (end < totalPages - 1) {
                     pages.push(
-                      <button
-                        key={totalPages}
-                        onClick={() => handlePageChange(totalPages)}
-                        className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                      >
-                        {totalPages}
-                      </button>
+                      <span key="end-dots" className="px-2">...</span>
                     );
                   }
 
-                  return pages;
-                })()}
-              </div>
+                  pages.push(
+                    <button
+                      key={totalPages}
+                      onClick={() => handlePageChange(totalPages)}
+                      className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                    >
+                      {totalPages}
+                    </button>
+                  );
+                }
 
-              {/* CURRENT PAGE — MOBILE ONLY */}
-              <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-                Page {page} / {purchaseReturns?.totalPages || 1}
-              </div>
-
-              {/* NEXT */}
-              <button
-                type="button"
-                onClick={() => handleNextPage()}
-                disabled={page === purchaseReturns?.totalPages ||
-                  purchaseReturns?.totalPages === 0}
-                className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === purchaseReturns?.totalPages ||
-                    purchaseReturns?.totalPages === 0
-                    ? 'opacity-50 '
-                    : ''
-                  }
-      `}
-              >
-                Next →
-              </button>
-
+                return pages;
+              })()}
             </div>
+
+            {/* CURRENT PAGE — MOBILE ONLY */}
+            <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
+              Page {page} / {purchaseReturns?.totalPages || 1}
+            </div>
+
+            {/* NEXT */}
+            <button
+              type="button"
+              onClick={() => handleNextPage()}
+              disabled={page === purchaseReturns?.totalPages ||
+                purchaseReturns?.totalPages === 0}
+              className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+        ${page === purchaseReturns?.totalPages ||
+                  purchaseReturns?.totalPages === 0
+                  ? 'opacity-50 '
+                  : ''
+                }
+      `}
+            >
+              Next →
+            </button>
+
           </div>
-          {/* <div className="flex justify-center align-center space-x-2 p-4">
+        </div>
+        {/* <div className="flex justify-center align-center space-x-2 p-4">
                 <button type="button"
                   onClick={() => handlePreviousPage()}
                   disabled={page === 1}
@@ -531,13 +570,22 @@ export default function PurchaseReturn() {
                   Next →
                 </button>
               </div> */}
-        </div>
+      </div>
+
+   {deleteTarget && (
+        <DeleteConfirmModal
+          title="Delete Debit Note"
+          message={`Are you sure you want to delete this Debit Note ? This action cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+          //isDeleting={false}
+        />
+      )}
+    </>
+    
 
 
-      </>
-
-
-      )
+  )
 }
 
-     

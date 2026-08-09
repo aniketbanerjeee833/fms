@@ -2,13 +2,22 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 
 
+
 export const itemApi = createApi({
   reducerPath: "itemApi",
   baseQuery: fetchBaseQuery({
     baseUrl: "http://localhost:4000/api/",
     credentials: "include",
   }),
-  invalidatesTags: ["Item","ItemConversion","ItemLedger"],
+  tagTypes: [
+  "Item",
+  "ItemConversion",
+  "ItemLedger",
+  "ItemConversions",
+  "ItemsByCategory",
+  "Items",
+  "Category",
+],
 
   endpoints: (builder) => ({
 
@@ -47,13 +56,21 @@ getAllItems: builder.query({
       ],
     }),
 
-  editItem: builder.mutation({
+editItem: builder.mutation({
   query: ({ body, Item_Id }) => ({
     url: `item/edit-item/${Item_Id}`,
     method: "PATCH",
     body,
   }),
-  invalidatesTags: ["Item", "Purchase", "Sale"],
+  invalidatesTags: ["Item"],
+}),
+
+deleteItem: builder.mutation({
+  query: (Item_Id) => ({
+    url: `item/delete-item/${Item_Id}`,
+    method: "DELETE",
+  }),
+  invalidatesTags: ["Item"],
 }),
    getItemConversions: builder.query({
       query: (Item_Id) => `/item/item-conversions/${Item_Id}`,
@@ -131,14 +148,14 @@ getAllItems: builder.query({
 
     getAllItemsForLedger: builder.query({
       query: ({ search = "" } = {}) => ({
-        url: "/items/ledger",
+        url: "/item/ledger",
         method: "GET",
         params: {
           ...(search && { search }),
         },
       }),
 
-      providesTags: ["Items"],
+      providesTags: ["Item"],
     }),
 
     // =====================================================
@@ -176,7 +193,7 @@ getAllItems: builder.query({
     }
 
     return (
-      `item/get-item-bills/${Item_Id}` +
+      `item/${Item_Id}/bills` +
       `?${params.toString()}`
     );
   },
@@ -265,6 +282,23 @@ getAllItems: builder.query({
   }),
 }),
 
+addStockAdjustment: builder.mutation({
+  query: (body) => ({
+    url: "/item/stock-adjustment/add",
+    method: "POST",
+    body,
+  }),
+  invalidatesTags: ["Item","ItemLedger"],
+}),
+editStockAdjustment: builder.mutation({
+  query: ({ id, ...body }) => ({
+    url: `/item/stock-adjustment/edit/${id}`,
+    method: "PUT",
+    body,
+  }),
+  invalidatesTags: ["Item","ItemLedger"],
+}),
+
   
 
   
@@ -279,6 +313,7 @@ getAllItems: builder.query({
    
     useAddItemMutation,
     useEditItemMutation,
+    useDeleteItemMutation,
     useGetEachItemBillAndInvoiceNumbersQuery,
     
     useAddCategoryMutation,
@@ -287,6 +322,10 @@ getAllItems: builder.query({
     usePrintEachItemSalesPurchasesDetailsReportMutation,
     useGetItemConversionsQuery,
     useAddItemConversionMutation,
-    useGetItemsByCategoryQuery
+    useGetItemsByCategoryQuery,
+    useGetItemBillsQuery,
+    useGetAllItemsForLedgerQuery,
+    useAddStockAdjustmentMutation,
+    useEditStockAdjustmentMutation
  }=itemApi
    

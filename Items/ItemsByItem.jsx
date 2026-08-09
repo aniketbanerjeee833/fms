@@ -167,8 +167,7 @@ export default function ItemsByItem() {
         );
     }, [items, itemSearch]);
 
-    const selectedItemMeta =
-        items.find((it) => it.Item_Id === selectedItemId) || null;
+    const selectedItemMeta =items.find((it) => it.Item_Id === selectedItemId) || null;
 
     const fmtDate = (d) =>
         d

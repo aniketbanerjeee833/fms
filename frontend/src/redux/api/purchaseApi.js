@@ -12,33 +12,33 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 //   endpoints: (builder) => ({
 
 
-    
- 
- 
+
+
+
 //     // ✅ Add a party
 //     addPurchase: builder.mutation({
-    
+
 //       query: ({ body }) => ({
-        
+
 //         url: `purchase/add-purchase`,
 //         method: "POST",
 //         body,
 //       }),
 //       invalidatesTags: [
 //         { type: "Purchase", id: "LIST" },
-      
+
 //       ],
 //     }),
 //   editPurchase: builder.mutation({
 //       query: ({ body,Purchase_Id }) => ({
-        
+
 //         url: `purchase/edit-purchase/${Purchase_Id}`,
 //         method: "PUT",
 //         body,
 //       }),
 //       invalidatesTags: [
 //         { type: "Purchase", id: "LIST" },
-      
+
 //       ],
 //     }),
 
@@ -63,16 +63,16 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 //           id: "LIST"
 //         }],
 //       }),
-  
+
 //       getTotalPurchasesEachDay: builder.query({
 //         query: () => `purchase/total-purchases-by-day`,
 //         providesTags: [{ type: "Purchase", id: "LIST" }],
 //       })
 
-  
-   
-   
-  
+
+
+
+
 //   }),
 // });
 export const purchaseApi = createApi({
@@ -108,7 +108,7 @@ export const purchaseApi = createApi({
     getAllPurchases: builder.query({
       query: ({ page, search = "", fromDate = "", toDate = "" }) => {
         const params = new URLSearchParams();
-     params.append("page", page || 1);
+        params.append("page", page || 1);
         if (search) params.append("search", search);
         if (fromDate) params.append("fromDate", fromDate);
         if (toDate) params.append("toDate", toDate);
@@ -134,18 +134,29 @@ export const purchaseApi = createApi({
         method: "POST",
         body,
       }),
-    })
+    }),
+    deletePurchase: builder.mutation({
+  query: (Purchase_Id) => ({
+    url: `/purchase/delete-purchase/${Purchase_Id}`,
+    method: "DELETE",
+  }),
+  invalidatesTags: (result, error, Purchase_Id) => [
+    { type: "Purchase", id: Purchase_Id },
+    { type: "Purchase", id: "LIST" },
+  ],
+}),
 
   }),
 });
 
- export const {
-   
-    useAddPurchaseMutation,
-    useEditPurchaseMutation,
-    useGetAllPurchasesQuery,
-    useGetSinglePurchaseQuery,
-    useGetTotalPurchasesEachDayQuery,
-    useUploadPurchaseBillMutation
- }=purchaseApi
-   
+export const {
+
+  useAddPurchaseMutation,
+  useEditPurchaseMutation,
+  useGetAllPurchasesQuery,
+  useGetSinglePurchaseQuery,
+  useGetTotalPurchasesEachDayQuery,
+  useUploadPurchaseBillMutation,
+  useDeletePurchaseMutation
+} = purchaseApi
+

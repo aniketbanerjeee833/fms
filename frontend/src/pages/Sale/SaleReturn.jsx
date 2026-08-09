@@ -1,12 +1,18 @@
 
-import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 
 
-import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
-import { useGetAllSaleReturnsQuery } from "../../redux/api/saleReturnApi";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
+import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery } from "../../redux/api/saleReturnApi";
+import { useState } from "react";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
+import { itemApi } from "../../redux/api/itemApi";
+import { useDispatch } from "react-redux";
 
 // import { SiMicrosoftexcel } from "react-icons/si";
 export default function SaleReturn() {
+  const dispatch =useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
@@ -23,7 +29,9 @@ export default function SaleReturn() {
   //   fromDate,
   //   toDate,
   // });
-    const { data: saleReturns, isLoading } = useGetAllSaleReturnsQuery({
+  const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+  const [deleteSaleReturn, { isLoading: isDeleting }] = useDeleteSaleReturnMutation();
+  const { data: saleReturns, isLoading } = useGetAllSaleReturnsQuery({
     page,
     search: searchTerm,
     fromDate,
@@ -33,7 +41,7 @@ export default function SaleReturn() {
 
   // const[selecedSales,setSelectedSales]= useState(null);
 
-  const navigate = useNavigate();
+
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -78,7 +86,26 @@ export default function SaleReturn() {
     document.body.removeChild(a);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
 
+    try {
+      console.log(deleteTarget);
+      const res = await deleteSaleReturn(deleteTarget.Sale_Return_Id).unwrap();
+      toast.success(res?.message || "Credit Note deleted successfully");
+      setDeleteTarget(null);
+
+           dispatch(
+          itemApi.util.invalidateTags([
+            "Item",
+            "ItemLedger",
+          ])
+        );
+    } catch (err) {
+      console.log(err);
+      toast.error(err?.data?.message || "Failed to delete credit note");
+    }
+  };
   // console.log(saleReturns?.saleReturns);
 
   return (
@@ -256,7 +283,7 @@ export default function SaleReturn() {
 
           </div>
           <div className="flex justify-end sm: mt-4">
-      {/* <button
+            {/* <button
   type="button"
   onClick={handleExportExcel}
   className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#217346] text-white shadow-md transition-all hover:scale-105 hover:shadow-lg active:scale-95"
@@ -264,17 +291,17 @@ export default function SaleReturn() {
 >
   <SiMicrosoftexcel size={22} />
 </button> */}
-<button
-  type="button"
-  onClick={handleExportExcel}
-  className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
-  title="Export to Excel"
->
-  <FileSpreadsheet
-    size={22}
-    className="transition-transform duration-200 group-hover:scale-110"
-  />
-</button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet
+                size={22}
+                className="transition-transform duration-200 group-hover:scale-110"
+              />
+            </button>
           </div>
         </div>
 
@@ -302,52 +329,53 @@ export default function SaleReturn() {
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
-                     <th className="text-left">Paid</th>
+                    <th className="text-left">Paid</th>
                     <th className="text-left">Balance Due</th>
                     {/* <th>View</th> */}
-                    <th>Edit/View</th>
+                    <th>View/Edit</th>
+                    <th>Delete</th>
 
                   </tr>
                 </thead>
                 <tbody>
                   {saleReturns && saleReturns?.saleReturns?.length > 0 ? (
-                    saleReturns?.saleReturns?.map((sale, idx) => (
-                      <tr key={sale?.id}>
+                    saleReturns?.saleReturns?.map((saleReturn, idx) => (
+                      <tr key={saleReturn?.id}>
                         <td>
                           {(saleReturns?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
                         <td >
-                          {sale?.Invoice_Date
-                            ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
+                          {saleReturn?.Invoice_Date
+                            ? new Date(saleReturn?.Invoice_Date).toLocaleDateString("en-IN", {
                               day: "numeric",
                               month: "numeric",
                               year: "numeric",
                             })
                             : "N/A"}
                         </td>
-                        
-                        <td>{sale?.Party_Name || "N/A"}</td>
+
+                        <td>{saleReturn?.Party_Name || "N/A"}</td>
                         {/* <td>
-                          {sale?.Payment_Type
-                            ? sale.Payment_Type === "Bank"
-                              ? `Bank (${sale?.Bank_Display_Name || "N/A"})`
-                              : sale.Payment_Type
+                          {saleReturn?.Payment_Type
+                            ? saleReturn.Payment_Type === "Bank"
+                              ? `Bank (${saleReturn?.Bank_Display_Name || "N/A"})`
+                              : saleReturn.Payment_Type
                             : "N/A"}
                         </td> */}
-                        <td>{sale?.Payment_Type_Display || "N/A"}</td>
-                        <td>{sale?.Total_Amount || "N/A"}</td>
-                        <td>{sale?.Total_Paid || "N/A"}</td>
-                        <td>{sale?.Balance_Due || "N/A"}</td>
+                        <td>{saleReturn?.Payment_Type_Display || "N/A"}</td>
+                        <td>{saleReturn?.Total_Amount || "N/A"}</td>
+                        <td>{saleReturn?.Total_Paid || "N/A"}</td>
+                        <td>{saleReturn?.Balance_Due || "N/A"}</td>
 
                         {/* <td > */}
-                          {/* <NavLink
-                                  to={`/sale/edit/${sale.Sale_Id}${location.search}`}
+                        {/* <NavLink
+                                  to={`/saleReturn/edit/${saleReturn.Sale_Id}${location.search}`}
 
                                 > */}
-                          {/* <NavLink to={`/sale/view/${sale?.Sale_Id}`}
-                                  state={{ from: "all-sale-list" }}> */}
-                          {/* <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
-                            state={{ from: "all-sale-list" }}>
+                        {/* <NavLink to={`/saleReturn/view/${saleReturn?.Sale_Id}`}
+                                  state={{ from: "all-saleReturn-list" }}> */}
+                        {/* <NavLink to={`/saleReturn/view/${saleReturn?.Sale_Id}${location.search}`}
+                            state={{ from: "all-saleReturn-list" }}>
                             <Eye
                               style={{
                                 cursor: "pointer",
@@ -355,7 +383,7 @@ export default function SaleReturn() {
                                 color: "#4CA1AF"
                               }} />
                           </NavLink> */}
-                          {/* <i
+                        {/* <i
                                                                     style={{
                                                                         cursor: "pointer",
                                                                         backgroundColor: "transparent",
@@ -364,10 +392,10 @@ export default function SaleReturn() {
                                                                     className="fa fa-eye mr-o" aria-hidden="true"></i> */}
                         {/* //</td> */}
                         <td>
-                          {/* <NavLink to={`/sale/edit/${sale?.Sale_Id}`}
+                          {/* <NavLink to={`/sale/edit/${saleReturn?.Sale_Id}`}
                                                                 state={{from:"all-sale-list"}}>               */}
                           <NavLink
-                            to={`/sale/return/edit/${sale.id}${location.search}`}
+                            to={`/sale/return/edit/${saleReturn.id}${location.search}`}
                             state={{ from: "all-sale-return-list" }}
 
                           >
@@ -380,6 +408,18 @@ export default function SaleReturn() {
                               }} />
                           </NavLink>
 
+                        </td>
+                        <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Sale_Return_Id: saleReturn.id,
+
+                              })
+                            }
+                          />
                         </td>
                       </tr>
                     ))
@@ -574,7 +614,17 @@ export default function SaleReturn() {
                 </button>
               </div> */}
       </div>
-
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title="Delete Credit Note"
+          //message={`Are you sure you want to delete purchase bill "${deleteTarget.Bill_Number || deleteTarget.Purchase_Id}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete this credit note ? This action cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+         
+        />
+      )}
 
     </>
 

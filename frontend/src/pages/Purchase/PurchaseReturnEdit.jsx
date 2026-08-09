@@ -1694,7 +1694,11 @@ export default function PurchaseReturndEdit() {
                           //value={watch(`items.${i}.Quantity`)?.toString() || ""}
                           {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
-                            let value = e.target.value.replace(/[^0-9]/g, "");
+                            //let value = e.target.value.replace(/[^0-9]/g, "");
+                                let value = e.target.value;
+                           value = value
+                                .replace(/[^0-9.]/g, "")
+                                .replace(/(\..*)\./g, "$1");
                             // let currentItemName = itemsValues[i]?.Item_Name?.trim();
                             // if (!currentItemName) return;
 
@@ -1710,17 +1714,20 @@ export default function PurchaseReturndEdit() {
                             // // ✅ Effective available stock = stock + previously sold quantity
                             // const effectiveAvailableStock = currentStock + previousQuantity;
 
-                            let num = parseInt(value, 10);
-                            if (isNaN(num) || num < 0) num = 0;
+                            // let num = Number(value);
+
+                            // if (!Number.isFinite(num) || num < 0) {
+                            //   num = 0;
+                            // }
                             // if (num > effectiveAvailableStock) num = effectiveAvailableStock;
 
                             // ✅ Update via RHF
-                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true });
+                            setValue(`items.${i}.Quantity`, value, { shouldValidate: true });
 
                             // ✅ Recalculate row + totals
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
                               calculateRowAmount(
-                                { ...itemsValues[i], Quantity: num || 0 },
+                                { ...itemsValues[i], Quantity: Number(value) || 0 },
                                 i,
                                 itemsValues
                               );

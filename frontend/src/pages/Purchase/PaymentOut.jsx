@@ -2,16 +2,18 @@
 import { NavLink, useSearchParams } from "react-router-dom";
 
 // import { useGetAllpaymentOutDataQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useState } from "react";
-import { useAddPaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useAddPaymentOutMutation, useDeletePaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
+import { itemApi } from "../../redux/api/itemApi";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 
 
 export default function PaymentOut() {
@@ -39,6 +41,8 @@ export default function PaymentOut() {
     const [updatePaymentOut, { isLoading: isUpdating }] = useUpdatePaymentOutMutation();
     const { data: banks = [] } = useGetAllBankAccountsQuery();
     const isSaving = isAdding || isUpdating;
+    const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+    const [deletePaymentOut, { isLoading: isDeleting }] = useDeletePaymentOutMutation();
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -115,6 +119,40 @@ export default function PaymentOut() {
         } catch (err) {
             console.error("Failed to save payment out:", err);
             toast.error(err?.data?.message || "Failed to save payment out. Please try again.");
+        }
+    };
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return;
+
+        try {
+            const res = await deletePaymentOut(
+              deleteTarget.Payment_Out_Id
+            ).unwrap();
+
+            toast.success(
+              res?.message || "Purchase deleted successfully"
+            );
+
+            setDeleteTarget(null);
+            dispatch(partyApi.util.invalidateTags(["Party"]));
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(
+                bankAccountApi.util.invalidateTags(["BankAccount"])
+            );
+
+            dispatch(
+                itemApi.util.invalidateTags([
+                    "Item",
+                    "ItemLedger",
+                ])
+            );
+        } catch (err) {
+            console.log(err);
+
+            toast.error(
+                err?.data?.message ||
+                "Failed to delete purchase"
+            );
         }
     };
     return (
@@ -328,6 +366,7 @@ export default function PaymentOut() {
                                         <th className="text-left">Total Paid</th>
                                         {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
+                                        <th>Delete</th>
                                         {/* <th>Edit</th> */}
                                     </tr>
                                 </thead>
@@ -433,6 +472,18 @@ export default function PaymentOut() {
                                                     >
                                                         <SquarePen size={18} color="#4CA1AF" />
                                                     </button>
+                                                </td>
+                                                <td>
+                                                    <Trash2
+                                                        size={18}
+                                                        style={{ cursor: "pointer", color: "#ef4444" }}
+                                                        onClick={() =>
+                                                            setDeleteTarget({
+                                                                Payment_Out_Id: paymentOut?.id,
+
+                                                            })
+                                                        }
+                                                    />
                                                 </td>
                                             </tr>
                                         ))
@@ -605,6 +656,17 @@ export default function PaymentOut() {
                     PartyAddModal={PartyAddModal}
                 />
             )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    title="Delete Payment Out"
+                    message={`Are you sure you want to delete this payment out ? This action cannot be undone.`}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={handleConfirmDelete}
+                    isDeleting={isDeleting}
+
+                />
+            )}
+        
             {/* {modal.open && (
                 <PaymentOutModal
                     mode={modal.mode}

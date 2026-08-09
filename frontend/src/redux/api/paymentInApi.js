@@ -52,13 +52,13 @@ export const paymentInApi = createApi({
       ],
     }),
 
-    // deletePaymentIn: builder.mutation({
-    //   query: (id) => ({
-    //     url: `/payment-in/${id}`,
-    //     method: "DELETE",
-    //   }),
-    //   invalidatesTags: [{ type: "PaymentIn", id: "LIST" }],
-    // }),
+    deletePaymentIn: builder.mutation({
+      query: (id) => ({
+        url: `/payment-in/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "PaymentIn", id: "LIST" }],
+    }),
   }),
 });
 
@@ -66,5 +66,6 @@ export const {
   useGetAllPaymentInsQuery,
   useGetPaymentInByIdQuery,
   useAddPaymentInMutation,
-  useUpdatePaymentInMutation
+  useUpdatePaymentInMutation,
+  useDeletePaymentInMutation,
 } = paymentInApi;

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Search,
@@ -28,8 +28,8 @@ const fmt = (n) =>
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ItemsByCategory() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  //const navigate = useNavigate();
+  //const location = useLocation();
 
   // controller's getAllCategories returns the raw array directly
   const { data: categoriesRaw, isLoading } = useGetAllCategoriesQuery();

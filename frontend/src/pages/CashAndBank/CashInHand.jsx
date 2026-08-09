@@ -3,60 +3,66 @@
 import { NavLink, useSearchParams } from "react-router-dom";
 
 ;
-import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2 } from "lucide-react";
 import { cashInHandApi, useGetCashBalanceQuery, useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
 import { useState } from "react";
 import CashAdjustmentModal from "../../components/Modal/CashAdjustmentModal";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
-import { useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useDeletePaymentInMutation, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { purchaseApi, useDeletePurchaseMutation } from "../../redux/api/purchaseApi";
+import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
+import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
+import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
+import { itemApi } from "../../redux/api/itemApi";
 
-function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving,parties  }) {
-  const { data: record, isLoading } = useGetPaymentInByIdQuery(id);
-  if (isLoading || !record) return null;
+function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
+    const { data: record, isLoading } = useGetPaymentInByIdQuery(id);
+    if (isLoading || !record) return null;
 
-  return (
-    <PaymentInModal
-      mode="edit"          // or "edit" if you want it editable from here
-      initialData={record?.paymentIn}
-      onClose={onClose}
-      banks={banks}
-      onSave={onSave}
-      isSaving={isSaving}
-      parties={parties}
-      PartyAddModal={PartyAddModal} 
+    return (
+        <PaymentInModal
+            mode="edit"          // or "edit" if you want it editable from here
+            initialData={record?.paymentIn}
+            onClose={onClose}
+            banks={banks}
+            onSave={onSave}
+            isSaving={isSaving}
+            parties={parties}
+            PartyAddModal={PartyAddModal}
 
-    />
-  );
+        />
+    );
 }
 
-function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving,parties  }) {
-  const { data: record, isLoading } = useGetPaymentOutByIdQuery(id);
-  console.log(record, "BankAccounts Payment Out");
-  if (isLoading || !record) return null;
+function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
+    const { data: record, isLoading } = useGetPaymentOutByIdQuery(id);
+    console.log(record, "BankAccounts Payment Out");
+    if (isLoading || !record) return null;
 
-  return (
-    <PaymentOutModal
-      mode="edit"
-      initialData={record?.paymentOut}
-      banks={banks}
-      onClose={onClose}
-      onSave={onSave}
-      isSaving={isSaving}
-      parties={parties}
-      PartyAddModal={PartyAddModal} 
-    />
-  );
+    return (
+        <PaymentOutModal
+            mode="edit"
+            initialData={record?.paymentOut}
+            banks={banks}
+            onClose={onClose}
+            onSave={onSave}
+            isSaving={isSaving}
+            parties={parties}
+            PartyAddModal={PartyAddModal}
+        />
+    );
 }
 export default function CashInHand() {
     const TYPE_META = {
-        sale: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
+        row: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         purchase: { label: "Purchase", color: "#dc2626", bg: "#fff1f2", dir: "out" },
         payment_in: { label: "Payment In", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         payment_out: { label: "Payment Out", color: "#dc2626", bg: "#fff1f2", dir: "out" },
@@ -72,6 +78,32 @@ export default function CashInHand() {
         Purchase_Return: "purchase/return",
     };
     const MODAL_TXN_TYPES = ["Payment_In", "Payment_Out"];
+    const DELETE_CONFIG = {
+  Sale: {
+    title: "Delete Sale",
+    label: "sale invoice",
+  },
+  Purchase: {
+    title: "Delete Purchase",
+    label: "purchase bill",
+  },
+  Sale_Return: {
+    title: "Delete Credit Note",
+    label: "credit note",
+  },
+  Purchase_Return: {
+    title: "Delete Debit Note",
+    label: "debit note",
+  },
+  Payment_In: {
+    title: "Delete Payment In",
+    label: "payment in entry",
+  },
+  Payment_Out: {
+    title: "Delete Payment Out",
+    label: "payment out entry",
+  },
+};
     const [modalState, setModalState] = useState({ open: false, type: null, id: null });
     const openModal = (type, id) => setModalState({ open: true, type, id });
     const closeModal = () => setModalState({ open: false, type: null, id: null });
@@ -79,7 +111,7 @@ export default function CashInHand() {
     //const location = useLocation();
     const page = Number(searchParams.get("page")) || 1;
     const searchTerm = searchParams.get("search") || "";
-      const dispatch = useDispatch();
+    const dispatch = useDispatch();
     // const [page, setPage] = useState(1);
     //const [searchTerm, setSearchTerm] = useState("");
     const fromDate = searchParams.get("fromDate") || "";
@@ -96,12 +128,13 @@ export default function CashInHand() {
     const { data: cashBalance } = useGetCashBalanceQuery();
     const { data: cashInHand, isLoading } = useGetCashInHandQuery({ fromDate, toDate, page, search: searchTerm });
     console.log(cashInHand, "cashInHand", cashBalance, "cashBalance");
-  const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
-  const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
+    const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
+    const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
     const { data: banks = [] } = useGetAllBankAccountsQuery();
     const { data: partiesList } = useGetAllPartiesQuery();
     // const[selecedSales,setSelectedSales]= useState(null);
-
+    const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+    //const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -149,39 +182,128 @@ export default function CashInHand() {
 
 
     //console.log(cashInHand?.cashInHand);
-const handleSavePaymentIn = async (formData) => {
-    try {
-      await updatePaymentIn({ id: modalState.id, ...formData }).unwrap();
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: formData.Bank_Account_Id },
-        "BankAccount",
-      ]));
-      /* reset scroll so updated data reloads */
-     
-      closeModal();
-      toast.success("Payment In updated");
-    } catch (err) {
-      toast.error(err?.data?.message || "Failed to save payment in.");
-    }
-  };
+    const handleSavePaymentIn = async (formData) => {
+        try {
+            await updatePaymentIn({ id: modalState.id, ...formData }).unwrap();
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(bankAccountApi.util.invalidateTags([
+                { type: "BankAccount", id: formData.Bank_Account_Id },
+                "BankAccount",
+            ]));
+            /* reset scroll so updated data reloads */
 
-  const handleSavePaymentOut = async (formData) => {
-    try {
-      await updatePaymentOut({ id: modalState.id, ...formData }).unwrap();
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: formData.Bank_Account_Id },
-        "BankAccount",
-      ]));
-     
-     
-      closeModal();
-      toast.success("Payment Out updated");
-    } catch (err) {
-      toast.error(err?.data?.message || "Failed to save payment out.");
+            closeModal();
+            toast.success("Payment In updated");
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to save payment in.");
+        }
+    };
+
+    const handleSavePaymentOut = async (formData) => {
+        try {
+            await updatePaymentOut({ id: modalState.id, ...formData }).unwrap();
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(bankAccountApi.util.invalidateTags([
+                { type: "BankAccount", id: formData.Bank_Account_Id },
+                "BankAccount",
+            ]));
+
+
+            closeModal();
+            toast.success("Payment Out updated");
+        } catch (err) {
+            toast.error(err?.data?.message || "Failed to save payment out.");
+        }
+    };
+      const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
+   const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
+      const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
+       const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
+      const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
+       const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
+    
+       const isDeleting =
+      isDeletingSale ||
+         isDeletingPurchase ||
+        isDeletingSaleReturn ||
+         isDeletingPurchaseReturn ||
+        isDeletingPaymentIn ||
+       isDeletingPaymentOut;
+    const handleConfirmDelete = async () => {
+      if (!deleteTarget) return;
+    
+      try {
+        let res;
+    
+        switch (deleteTarget.Txn_Type) {
+          case "Sale":
+            res = await deleteSale(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Purchase":
+            res = await deletePurchase(
+              deleteTarget.Id
+            ).unwrap();
+            break;
+    
+          case "Sale_Return":
+            res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Purchase_Return":
+             res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Payment_In":
+            res = await deletePaymentIn(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Payment_Out":
+            res = await deletePaymentOut(deleteTarget.Id).unwrap();
+            break;
+    
+          default:
+            toast.error(
+              "Unknown transaction type — cannot delete"
+            );
+            return;
+        }
+    
+        toast.success(res?.message || "Deleted successfully");
+    
+        setDeleteTarget(null);
+        dispatch(partyApi.util.invalidateTags(["Party"]));
+         dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+       dispatch(
+    bankAccountApi.util.invalidateTags(["BankAccount"])
+  );
+  dispatch(saleApi.util.invalidateTags(["Sale"]));
+  dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+     dispatch(
+    itemApi.util.invalidateTags([
+      "Item",
+      "ItemLedger",
+    ])
+  );
+    
+      } catch (err) {
+    
+        console.error(
+          "❌ Delete error:",
+          err
+        );
+    
+        toast.error(
+          err?.data?.message ||
+          "Failed to delete"
+        );
+        setDeleteTarget(null);
+    
+        // IMPORTANT:
+        // Don't close modal here.
+        // User should see the error and can close it manually.
+      }
     }
-  };
     return (
         <>
             {/* // <div className="container-fluid sb2  ">
@@ -413,19 +535,19 @@ const handleSavePaymentIn = async (formData) => {
                                         <th className="text-left">Amount </th>
                                         {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
-                                        {/* <th>Edit</th> */}
+                                        <th>Delete</th>
                                         {/* <th>Return</th> */}
 
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {cashInHand && cashInHand?.ledger?.length > 0 ? (
-                                        cashInHand?.ledger?.map((sale, idx) => {
+                                        cashInHand?.ledger?.map((row, idx) => {
                                             const meta =
-                                                TYPE_META[sale.Txn_Type?.toLowerCase()] ?? {
-                                                    label: sale.Txn_Type,
+                                                TYPE_META[row.Txn_Type?.toLowerCase()] ?? {
+                                                    label: row.Txn_Type,
                                                     color: "#6b7280",
-                                                    dir: sale.Direction === "Credit" ? "in" : "out",
+                                                    dir: row.Direction === "Credit" ? "in" : "out",
                                                 };
                                             return (
                                                 <tr key={idx}>
@@ -434,11 +556,11 @@ const handleSavePaymentIn = async (formData) => {
                                                     </td>
 
 
-                                                    <td>{sale?.Txn_Type || "N/A"}</td>
-                                                    <td>{sale?.Party_Name || "N/A"}</td>
+                                                    <td>{row?.Txn_Type || "N/A"}</td>
+                                                    <td>{row?.Party_Name || "N/A"}</td>
                                                     <td >
-                                                        {sale?.Txn_Date
-                                                            ? new Date(sale?.Txn_Date).toLocaleDateString("en-IN", {
+                                                        {row?.Txn_Date
+                                                            ? new Date(row?.Txn_Date).toLocaleDateString("en-IN", {
                                                                 day: "numeric",
                                                                 month: "numeric",
                                                                 year: "numeric",
@@ -446,13 +568,13 @@ const handleSavePaymentIn = async (formData) => {
                                                             : "N/A"}
                                                     </td>
                                                     <td style={{ color: meta.color, fontWeight: 600 }}>
-                                                        {sale?.Amount || "N/A"}</td>
-                                                    {/* //<td>{sale?.Balance_Due || "N/A"}</td> */}
+                                                        {row?.Amount || "N/A"}</td>
+                                                    {/* //<td>{row?.Balance_Due || "N/A"}</td> */}
 
                                                     {/* <td >
                        
-                          <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
-                            state={{ from: "all-sale-list" }}>
+                          <NavLink to={`/row/view/${row?.Sale_Id}${location.search}`}
+                            state={{ from: "all-row-list" }}>
                             <Eye
                               style={{
                                 cursor: "pointer",
@@ -463,39 +585,35 @@ const handleSavePaymentIn = async (formData) => {
                       
                         </td> */}
                                                     <td>
-                                                        {sale.Formatted_Reference_Id && (
-                                                            MODAL_TXN_TYPES.includes(sale.Txn_Type) ? (
+                                                        {row.Formatted_Reference_Id && (
+                                                            MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
                                                                 <Eye
                                                                     style={{ cursor: "pointer", color: "#4CA1AF" }}
-                                                                    onClick={() => openModal(sale.Txn_Type, sale.Formatted_Reference_Id)}
+                                                                    onClick={() => openModal(row.Txn_Type, row.Formatted_Reference_Id)}
                                                                 />
                                                             ) : (
                                                                 <NavLink
-                                                                    to={`/${TXN_TYPE_ROUTE_MAP[sale.Txn_Type]}/edit/${sale.Formatted_Reference_Id}`}
-                                                                state={{ from: "cash-in-hand" }}
+                                                                    to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
+                                                                    state={{ from: "cash-in-hand" }}
                                                                 >
                                                                     <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
                                                                 </NavLink>
                                                             )
                                                         )}
                                                     </td>
-                                                    {/* <td>
-                                                  
-                                                    <NavLink
-                                                        to={`/sale/edit/${sale.Sale_Id}${location.search}`}
-                                                        state={{ from: "all-sale-list" }}
-
-                                                    >
-
-                                                        <SquarePen
-                                                            style={{
-                                                                cursor: "pointer",
-                                                                backgroundColor: "transparent",
-                                                                color: "#4CA1AF"
-                                                            }} />
-                                                    </NavLink>
-
-                                                </td> */}
+                                                    <td>
+                                                        <Trash2
+                                                            size={18}
+                                                            style={{ cursor: "pointer", color: "#ef4444" }}
+                                                            onClick={() =>
+                                                                setDeleteTarget({
+                                                                    Id: row.Formatted_Reference_Id,
+                                                                    Txn_Type: row.Txn_Type,   // ✅ must be here
+                                                                    //Doc_Number: row.Doc_Number,
+                                                                })
+                                                            }
+                                                        />
+                                                    </td>
 
                                                 </tr>
                                             )
@@ -667,25 +785,36 @@ const handleSavePaymentIn = async (formData) => {
                 />
             )}
             {modalState.open && modalState.type === "Payment_In" && (
-        <PaymentInModalLoader
-          id={modalState.id}
-          banks={banks}
-          onClose={closeModal}
-          onSave={handleSavePaymentIn}
-          isSaving={isUpdatingPaymentIn}
-          parties={partiesList}
-        />
-      )}
-      {modalState.open && modalState.type === "Payment_Out" && (
-        <PaymentOutModalLoader
-          id={modalState.id}
-          banks={banks}
-          onClose={closeModal}
-          onSave={handleSavePaymentOut}
-          isSaving={isUpdatingPaymentOut}
-          parties={partiesList}
-        />
-      )}
+                <PaymentInModalLoader
+                    id={modalState.id}
+                    banks={banks}
+                    onClose={closeModal}
+                    onSave={handleSavePaymentIn}
+                    isSaving={isUpdatingPaymentIn}
+                    parties={partiesList}
+                />
+            )}
+            {modalState.open && modalState.type === "Payment_Out" && (
+                <PaymentOutModalLoader
+                    id={modalState.id}
+                    banks={banks}
+                    onClose={closeModal}
+                    onSave={handleSavePaymentOut}
+                    isSaving={isUpdatingPaymentOut}
+                    parties={partiesList}
+                />
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
+                    message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
+                        }? This action cannot be undone.`}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={handleConfirmDelete}
+                    isDeleting={isDeleting}
+                    //isDeleting={false}
+                />
+            )}
         </>
 
 

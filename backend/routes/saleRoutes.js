@@ -2,7 +2,8 @@ import express from "express";
 import { addInvoice, addSale, editSale, getAllSales, getLatestInvoiceNumber, getSingleInvoice,
      getSingleSale, printSaleBill, updateInvoice, getSingleNewSaleInvoice,
      getTotalSalesEachDay,
-     exportAllSalesReportToExcel
+     exportAllSalesReportToExcel,
+     deleteSale
 } from "../controllers/saleController.js";
 import userAuth from "../middleware/userAuth.js";
 const router = express.Router();
@@ -29,7 +30,7 @@ router.get("/get-latest-invoice-number",userAuth,getLatestInvoiceNumber)
 router.post("/print-sale-invoice",userAuth,printSaleBill)
 router.put("/edit-sale/:Sale_Id",userAuth,editSale)
 
-
+router.delete("/delete-sale/:Sale_Id",userAuth,deleteSale);
 
 router.get("/total-sales-by-day",userAuth,getTotalSalesEachDay)
 

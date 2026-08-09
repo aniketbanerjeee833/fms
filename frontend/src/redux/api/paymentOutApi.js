@@ -59,13 +59,13 @@ export const paymentOutApi = createApi({
       ],
     }),
  
-    // deletePaymentOut: builder.mutation({
-    //   query: (id) => ({
-    //     url: `/payment-out/${id}`,
-    //     method: "DELETE",
-    //   }),
-    //   invalidatesTags: [{ type: "PaymentOut", id: "LIST" }],
-    // }),
+    deletePaymentOut: builder.mutation({
+      query: (id) => ({
+        url: `/payment-out/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "PaymentOut", id: "LIST" }],
+    }),
   }),
  
 
@@ -75,5 +75,6 @@ export const {
   useGetPaymentOutByIdQuery,
   useAddPaymentOutMutation,
   useUpdatePaymentOutMutation,
+  useDeletePaymentOutMutation,
  
 } = paymentOutApi;

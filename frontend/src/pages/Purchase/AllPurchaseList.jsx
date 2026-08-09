@@ -1,15 +1,23 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useGetAllPurchasesQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
+import { useDeletePurchaseMutation, useGetAllPurchasesQuery } from "../../redux/api/purchaseApi";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2 } from "lucide-react";
+import { useState } from "react";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
+import { partyApi } from "../../redux/api/partyAPi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { bankAccountApi } from "../../redux/api/bankAccountApi";
+import { itemApi } from "../../redux/api/itemApi";
 
 
 export default function AllPurchaseList() {
 
   // const [page, setPage] = useState(1);
 
-
+  const dispatch = useDispatch();
   // const [selectedPurchase, setSelectedPurchases] = useState(null);
   // const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -22,7 +30,8 @@ export default function AllPurchaseList() {
   const toDate = searchParams.get("toDate") || "";
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
-
+  const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
 
   // const[selecedSales,setSelectedSales]= useState(null);
 
@@ -79,108 +88,42 @@ export default function AllPurchaseList() {
     document.body.removeChild(a);
   };
 
-  // useEffect(() => {
-  //     if (purchases && purchases.length > 0) {
-  //         setSelectedPurchases(purchases[0]);
-  //     }
-  // }, [purchases]);
 
-  // Set first party as default when data is loaded
+ const handleConfirmDelete = async () => {
+  if (!deleteTarget) return;
 
-  // const filteredPurchases = useMemo(() =>{
+  try {
+    const res = await deletePurchase(
+      deleteTarget.Purchase_Id
+    ).unwrap();
 
-  //   const lowerSearch = searchTerm.toLowerCase();
-  // return purchases?.purchases?.filter((purchase) => {
-  //   if (!searchTerm.trim()) return true; // show all if search is empty
+    toast.success(
+      res?.message || "Purchase deleted successfully"
+    );
 
-  //    const purchaseDate = new Date(purchase?.created_at);
+    setDeleteTarget(null);
+     dispatch(partyApi.util.invalidateTags(["Party"]));
+             dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+           dispatch(
+        bankAccountApi.util.invalidateTags(["BankAccount"])
+      );
+      
+           dispatch(
+          itemApi.util.invalidateTags([
+            "Item",
+            "ItemLedger",
+          ])
+        );
+  } catch (err) {
+    console.log(err);
 
-  //   const createdDate = new Date(purchase?.created_at).toLocaleDateString("en-IN", {
-  //       day: "numeric",
-  //       month: "numeric",
-  //       year: "numeric",
-  //     });
-  //        const matchesSearch = !lowerSearch || (purchase?.Party_Name &&
-  //       purchase.Party_Name.toLowerCase().startsWith(lowerSearch)) ||
-  //     (purchase?.Payment_Type &&
-  //       purchase.Payment_Type.toLowerCase().startsWith(lowerSearch)) ||
-  //     (purchase?.created_at &&
-  //       createdDate.startsWith(lowerSearch)) ||
-  //     (purchase?.Total_Amount &&
-  //       purchase.Total_Amount.toString().startsWith(lowerSearch)) ||
-  //     (purchase?.Balance_Due &&
-  //       purchase.Balance_Due.toString().startsWith(lowerSearch))
+    toast.error(
+      err?.data?.message ||
+      "Failed to delete purchase"
+    );
+  }
+};
 
-  //      const matchesDate =
-  //       (!fromDate && !toDate) ||
-  //       (fromDate && !toDate && purchaseDate >= new Date(fromDate)) ||
-  //       (!fromDate && toDate && purchaseDate <= new Date(toDate)) ||
-  //       (fromDate && toDate && purchaseDate >= new Date(fromDate) && purchaseDate <= new Date(toDate));
-
-  //     return matchesSearch && matchesDate;
-  // });
-  // }, [purchases, searchTerm, fromDate, toDate]);
-  // const normalizeToLocalMidnight = (dateStr) => {
-  //   const d = new Date(dateStr);
-  //   d.setHours(0, 0, 0, 0);
-  //   return d;
-  // };
-
-  // const filteredPurchases = useMemo(() => {
-  //   if (!purchases?.purchases) return [];
-
-  //   const lowerSearch = searchTerm.trim().toLowerCase();
-
-  //   return purchases.purchases.filter((purchase) => {
-  //     if (!purchase.created_at) return false;
-
-  //     // 🕒 Convert to local date only (ignore time zones)
-  //     const purchaseDate = new Date(purchase.created_at);
-  //     const purchaseLocalDate = new Date(
-  //       purchaseDate.getFullYear(),
-  //       purchaseDate.getMonth(),
-  //       purchaseDate.getDate()
-  //     );
-
-  //     // 🧭 Date filters normalized to local midnight
-  //     const from = fromDate ? normalizeToLocalMidnight(fromDate) : null;
-  //     const to = toDate ? normalizeToLocalMidnight(toDate) : null;
-
-  //     const createdDate = purchaseLocalDate.toLocaleDateString("en-IN", {
-  //       day: "2-digit",
-  //       month: "2-digit",
-  //       year: "numeric",
-  //     });
-
-  //     // 🔍 Search filter
-  //     const matchesSearch =
-  //       !lowerSearch ||
-  //       purchase.Party_Name?.toLowerCase().includes(lowerSearch) ||
-  //       purchase.Payment_Type?.toLowerCase().includes(lowerSearch) ||
-  //       createdDate.includes(lowerSearch) ||
-  //       purchase.Total_Amount?.toString().includes(lowerSearch) ||
-  //       purchase.Balance_Due?.toString().includes(lowerSearch);
-
-  //     // 📅 Date range filter (local-safe)
-  //     const matchesDate =
-  //       (!from && !to) ||
-  //       (from && !to && purchaseLocalDate >= from) ||
-  //       (!from && to && purchaseLocalDate <= to) ||
-  //       (from && to && purchaseLocalDate >= from && purchaseLocalDate <= to);
-
-  //     return matchesSearch && matchesDate;
-  //   });
-  // }, [purchases, searchTerm, fromDate, toDate]);
-
-
-  // console.log(filteredPurchases,toDate,fromDate);
-
-
-  //    useEffect(() => {
-  //         if (purchases && purchases?.purchases?.length > 0) {
-  //             setSelectedPurchases(purchases?.purchases[0]);
-  //         }
-  //     }, [purchases]);
   return (
     <>
       {/* // <div className="container-fluid sb2  ">
@@ -394,7 +337,9 @@ export default function AllPurchaseList() {
                     <th className="text-left">Balance</th>
                     {/* <th>View</th> */}
                     <th>View/Edit</th>
+                   
                     <th>Return</th>
+                     <th>Delete</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -404,7 +349,7 @@ export default function AllPurchaseList() {
                         <td>
                           {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
-                       
+
                         <td>
                           {purchase?.Bill_Date
                             ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
@@ -414,7 +359,7 @@ export default function AllPurchaseList() {
                             })
                             : "N/A"}
                         </td>
-                         <td>
+                        <td>
                           {purchase?.Bill_Number
                             ? purchase.Bill_Number.split("T")[0]
                             : "N/A"}
@@ -444,6 +389,7 @@ export default function AllPurchaseList() {
                               }} />
                           </NavLink>
                         </td> */}
+                       
                         <td
                         >
                           <NavLink
@@ -475,6 +421,18 @@ export default function AllPurchaseList() {
                           </NavLink>
 
 
+                        </td>
+                         <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Purchase_Id: purchase.Purchase_Id,
+                               
+                              })
+                            }
+                          />
                         </td>
                       </tr>
                     ))
@@ -670,42 +628,19 @@ export default function AllPurchaseList() {
               </div> */}
       </div>
 
-
+   {deleteTarget && (
+        <DeleteConfirmModal
+          title="Delete Purchase"
+          message={`Are you sure you want to delete this purchase bill ? This action cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+       
+        />
+      )}
     </>
 
 
   )
 }
 
-{/* <div className="p-2 border-r border-gray-300 overflow-x-auto ">
-                                                    <table className="w-full ">
-                                                        <thead>
-                                                            <tr>
-                                                                <th className="text-left">Item Name</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {purchases &&
-                                                                purchases.length > 0 &&
-                                                                purchases.map((purchase) => (
-                                                                    <tr
-                                                                        key={ purchase?.Purchase_Id }
-                                                                        className={
-                                                                            selectedPurchase?.Purchase_Id=== purchase?.Purchase_Id
-                                                                                ? "bg-[#f3f2fd]  text-[#7346ff]"
-                                                                                : ""
-                                                                        }
-                                                                    >
-                                                                        <td
-                                                                            onClick={() => handleItemClick(purchase?.Item_Id)}
-                                                                            className="cursor-pointer"
-                                                                        >
-                                                                            {item?.Item_Name}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div> */}
-
-{/* Right side (Party Details) */ }

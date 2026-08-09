@@ -5114,30 +5114,171 @@ const editSale = async (req, res, next) => {
     const oldBaseQtyByItem = new Map();
 
 
-    for (const old of oldItems) {
+    // for (const old of oldItems) {
 
-      let oldBaseQty =
-        Number(old.Quantity) || 0;
-
-
-      const oldPrimary =
-        old.Primary_Unit_Snapshot || null;
-
-      const oldSecondary =
-        old.Secondary_Unit_Snapshot || null;
-
-      const oldSelected =
-        old.Selected_Unit || null;
+    //   let oldBaseQty =
+    //     Number(old.Quantity) || 0;
 
 
-      if (
-        oldSecondary &&
-        oldSelected === oldSecondary
-      ) {
+    //   const oldPrimary =
+    //     old.Primary_Unit_Snapshot || null;
 
-        const [[conversion]] =
-          await connection.query(
-            `
+    //   const oldSecondary =
+    //     old.Secondary_Unit_Snapshot || null;
+
+    //   const oldSelected =
+    //     old.Selected_Unit || null;
+
+
+    //   if (
+    //     oldSecondary &&
+    //     oldSelected === oldSecondary
+    //   ) {
+
+    //     const [[conversion]] =
+    //       await connection.query(
+    //         `
+    //       SELECT Conversion_Rate
+    //       FROM item_unit_conversions
+    //       WHERE Item_Id = ?
+    //         AND Primary_Unit = ?
+    //         AND Secondary_Unit = ?
+    //       ORDER BY id DESC
+    //       LIMIT 1
+    //     `,
+    //         [
+    //           old.Item_Id,
+    //           oldPrimary,
+    //           oldSecondary,
+    //         ]
+    //       );
+
+
+    //     const conversionRate =
+    //       Number(
+    //         conversion?.Conversion_Rate
+    //       );
+
+
+    //     if (
+    //       Number.isFinite(conversionRate) &&
+    //       conversionRate > 0
+    //     ) {
+
+    //       oldBaseQty =
+    //         oldBaseQty /
+    //         conversionRate;
+    //     }
+    //   }
+
+
+    //   oldBaseQtyByItem.set(
+    //     old.Item_Id,
+
+    //     (
+    //       oldBaseQtyByItem.get(
+    //         old.Item_Id
+    //       ) || 0
+    //     ) + oldBaseQty
+    //   );
+    // }
+// =========================================================
+// STEP 2:
+// GET OLD BASE QUANTITY PER ITEM
+//
+// Priority:
+// 1. item_ledger.Base_Qty  ← preferred / exact value
+// 2. Snapshot + conversion  ← fallback for old/missing ledger
+// =========================================================
+
+for (const old of oldItems) {
+
+  // =======================================================
+  // HISTORICAL UNIT SNAPSHOT
+  // =======================================================
+
+  const oldPrimary =old.Primary_Unit_Snapshot || null;
+
+  const oldSecondary =old.Secondary_Unit_Snapshot || null;
+
+  const oldSelected =old.Selected_Unit || null;
+
+
+  // =======================================================
+  // FIRST: TRY ITEM LEDGER
+  // =======================================================
+
+  const [[ledgerRow]] = await connection.query(
+    `
+    SELECT Base_Qty
+    FROM item_ledger
+    WHERE Item_Id = ?
+      AND Txn_Type = 'Sale'
+      AND Source_Id = ?
+    LIMIT 1
+    `,
+    [
+      old.Item_Id,
+      old.id,
+    ]
+  );
+
+
+  let oldBaseQty;
+
+
+  // =======================================================
+  // CASE 1:
+  // LEDGER EXISTS
+  //
+  // Use the exact Base_Qty that was originally applied
+  // to add_item.Stock_Quantity.
+  // =======================================================
+
+  if (ledgerRow) {
+
+    oldBaseQty =
+      Number(ledgerRow.Base_Qty) || 0;
+  }
+
+
+  // =======================================================
+  // CASE 2:
+  // LEDGER DOES NOT EXIST
+  //
+  // Fallback using historical snapshot + conversion.
+  // =======================================================
+
+  else {
+
+    const rawQty =
+      Number(old.Quantity) || 0;
+
+    oldBaseQty = rawQty;
+
+
+    // -------------------------------------------------------
+    // If the old transaction used the secondary unit,
+    // convert it into the primary unit.
+    //
+    // Example:
+    //
+    // Primary   = Kg
+    // Secondary = Gm
+    // Quantity  = 500
+    //
+    // Base_Qty = 500 / 1000 = 0.5 Kg
+    // -------------------------------------------------------
+
+    if (
+      oldPrimary &&
+      oldSecondary &&
+      oldSelected === oldSecondary
+    ) {
+
+      const [[conversion]] =
+        await connection.query(
+          `
           SELECT Conversion_Rate
           FROM item_unit_conversions
           WHERE Item_Id = ?
@@ -5145,44 +5286,52 @@ const editSale = async (req, res, next) => {
             AND Secondary_Unit = ?
           ORDER BY id DESC
           LIMIT 1
-        `,
-            [
-              old.Item_Id,
-              oldPrimary,
-              oldSecondary,
-            ]
-          );
+          `,
+          [
+            old.Item_Id,
+            oldPrimary,
+            oldSecondary,
+          ]
+        );
 
 
-        const conversionRate =
-          Number(
-            conversion?.Conversion_Rate
-          );
+      const conversionRate =
+        Number(
+          conversion?.Conversion_Rate
+        );
 
 
-        if (
-          Number.isFinite(conversionRate) &&
-          conversionRate > 0
-        ) {
+      if (
+        Number.isFinite(conversionRate) &&
+        conversionRate > 0
+      ) {
 
-          oldBaseQty =
-            oldBaseQty /
-            conversionRate;
-        }
+        oldBaseQty =
+          rawQty / conversionRate;
       }
 
-
-      oldBaseQtyByItem.set(
-        old.Item_Id,
-
-        (
-          oldBaseQtyByItem.get(
-            old.Item_Id
-          ) || 0
-        ) + oldBaseQty
-      );
+      // If conversion is missing/invalid,
+      // keep rawQty as fallback instead of throwing.
     }
+  }
 
+
+  // =======================================================
+  // ACCUMULATE BY ITEM
+  //
+  // Same item can occur multiple times in one sale.
+  // =======================================================
+
+  oldBaseQtyByItem.set(
+    old.Item_Id,
+
+    (
+      oldBaseQtyByItem.get(
+        old.Item_Id
+      ) || 0
+    ) + oldBaseQty
+  );
+}
 
     // =========================================================
     // NEW BASE QUANTITY PER ITEM
@@ -5477,6 +5626,277 @@ const editSale = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+//DELETE
+
+ const deleteSale = async (req, res, next) => {
+  let connection;
+
+  try {
+    const { Sale_Id: saleId } = req.params;
+
+    if (!saleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Sale ID is required.",
+      });
+    }
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    // =========================================================
+    // 1. GET SALE HEADER
+    // =========================================================
+
+    const [[sale]] = await connection.query(
+      `
+      SELECT
+        id,
+        Sale_Id,
+        Party_Id,
+        Invoice_Number,
+        Bill_Date
+      FROM add_sale
+      WHERE Sale_Id = ?
+      LIMIT 1
+      `,
+      [saleId]
+    );
+
+    if (!sale) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Sale not found.",
+      });
+    }
+
+    // Numeric add_sale.id
+    //
+    // Used by:
+    // - party_ledger.Source_Id
+    // - payment_splits.Source_Id
+    const saleDbId = sale.id;
+
+    // =========================================================
+    // 2. CHECK SALE RETURNS
+    //
+    // Do not allow deleting Sale while a Sale Return exists.
+    // =========================================================
+
+    const [[saleReturn]] = await connection.query(
+      `
+      SELECT id
+      FROM sale_return
+      WHERE Sale_Id = ?
+      LIMIT 1
+      `,
+      [saleId]
+    );
+
+    if (saleReturn) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "This sale cannot be deleted because a sale return exists for it. Delete the sale return first.",
+      });
+    }
+
+    // =========================================================
+    // 3. GET ALL SALE ITEMS
+    //
+    // item_ledger.Source_Id = add_sale_items.id
+    // =========================================================
+
+    const [saleItems] = await connection.query(
+      `
+      SELECT
+        id,
+        Item_Id
+      FROM add_sale_items
+      WHERE Sale_Id = ?
+      `,
+      [saleId]
+    );
+
+    // =========================================================
+    // 4. REVERSE STOCK + ITEM LEDGER
+    //
+    // Sale = OUT
+    //
+    // Original Sale:
+    //     Stock - Base_Qty
+    //
+    // Delete Sale:
+    //     Stock + Base_Qty
+    // =========================================================
+
+    for (const saleItem of saleItems) {
+
+      // -------------------------------------------------------
+      // Find corresponding Sale ledger row.
+      //
+      // Source_Id = add_sale_items.id
+      // -------------------------------------------------------
+
+      const [[ledgerRow]] = await connection.query(
+        `
+        SELECT
+          Base_Qty,
+          Quantity
+        FROM item_ledger
+        WHERE Item_Id = ?
+          AND Txn_Type = 'Sale'
+          AND Source_Id = ?
+        LIMIT 1
+        `,
+        [
+          saleItem.Item_Id,
+          saleItem.id,
+        ]
+      );
+
+      if (!ledgerRow) {
+        // No ledger row.
+        // Nothing to reverse for this item.
+        continue;
+      }
+
+      // Always prefer normalized Base_Qty.
+      //
+      // Example:
+      // 500 Gm = 0.5 Kg Base_Qty
+      const baseQty =
+        Number(
+          ledgerRow.Base_Qty ??
+          ledgerRow.Quantity
+        ) || 0;
+
+      // -------------------------------------------------------
+      // Sale was OUT.
+      //
+      // Deleting Sale means putting the stock back.
+      // -------------------------------------------------------
+
+      if (baseQty !== 0) {
+        await connection.query(
+          `
+          UPDATE add_item
+          SET
+            Stock_Quantity = Stock_Quantity + ?,
+            updated_at = NOW()
+          WHERE Item_Id = ?
+          `,
+          [
+            baseQty,
+            saleItem.Item_Id,
+          ]
+        );
+      }
+
+      // -------------------------------------------------------
+      // Remove Sale ledger row.
+      //
+      // reverseItemLedger() also fixes Running_Stock of all
+      // subsequent ledger rows.
+      // -------------------------------------------------------
+
+      await reverseItemLedger({
+        connection,
+        itemId: saleItem.Item_Id,
+        txnType: "Sale",
+        referenceId: saleItem.id,
+      });
+    }
+
+    // =========================================================
+    // 5. DELETE PAYMENT SPLITS
+    //
+    // payment_splits.Source_Id = add_sale.id
+    // =========================================================
+
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Sale",
+      sourceId: saleDbId,
+    });
+
+    // =========================================================
+    // 6. REVERSE PARTY LEDGER
+    //
+    // party_ledger.Source_Id = add_sale.id
+    //
+    // Opening Balance is NOT touched.
+    // =========================================================
+
+    await reversePartyLedger({
+      connection,
+      partyId: sale.Party_Id,
+      txnType: "Sale",
+      referenceId: saleDbId,
+    });
+
+    // =========================================================
+    // 7. DELETE SALE ITEMS
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM add_sale_items
+      WHERE Sale_Id = ?
+      `,
+      [saleId]
+    );
+
+    // =========================================================
+    // 8. DELETE SALE HEADER
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM add_sale
+      WHERE Sale_Id = ?
+      `,
+      [saleId]
+    );
+
+    // =========================================================
+    // 9. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Sale deleted successfully.",
+      Sale_Id: saleId,
+    });
+
+  } catch (err) {
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error deleting sale:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
 const editNewSale = async (req, res, next) => {
   let connection;
   try {
@@ -5926,7 +6346,7 @@ export {
   addSale, addNewSale, getAllSales, exportAllSalesReportToExcel, getAllNewSales, getSingleSale, getLatestInvoiceNumber,
   addInvoice, updateInvoice, getSingleInvoice,
   addNewSaleInvoice, updateNewSaleInvoice, getSingleNewSaleInvoice, getNewSaleLatestInvoiceNumber,
-  printSaleBill, editSale, editNewSale, getTotalNewSalesEachDay, getTotalSalesEachDay
+  printSaleBill, editSale, deleteSale, editNewSale, getTotalNewSalesEachDay, getTotalSalesEachDay
 };
 
 // const getTotalSalesEachDay = async (req, res, next) => {

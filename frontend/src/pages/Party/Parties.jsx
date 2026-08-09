@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
-import { useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery } from "../../redux/api/partyAPi";
 import { MoreVertical, Users, SquarePen, Trash2, Eye } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useDispatch } from "react-redux";
-import { useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
-import { useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useDeletePaymentInMutation, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { toast } from "react-toastify";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { purchaseApi, useDeletePurchaseMutation } from "../../redux/api/purchaseApi";
+import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
+
+import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
+import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
+import { itemApi } from "../../redux/api/itemApi";
 
 const TXN_TYPE_ROUTE_MAP = {
   Sale: "sale",
@@ -67,7 +74,32 @@ function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties }
     />
   );
 }
-
+const DELETE_CONFIG = {
+  Sale: {
+    title: "Delete Sale",
+    label: "sale invoice",
+  },
+  Purchase: {
+    title: "Delete Purchase",
+    label: "purchase bill",
+  },
+  Sale_Return: {
+    title: "Delete Credit Note",
+    label: "credit note",
+  },
+  Purchase_Return: {
+    title: "Delete Debit Note",
+    label: "debit note",
+  },
+  Payment_In: {
+    title: "Delete Payment In",
+    label: "payment in entry",
+  },
+  Payment_Out: {
+    title: "Delete Payment Out",
+    label: "payment out entry",
+  },
+};
 /* ════════════════════════════════════════════════════════════
    RIGHT PANEL — Party Detail (infinite scroll ledger)
    Transaction search persists in the URL (?txnSearch=...) so it
@@ -96,6 +128,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     { Party_Id: partyId, cursor, search },
     { skip: !partyId }
   );
+  const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+
   useEffect(() => {
     if (data?.partyDetails) {
       setSelectedPartyDetails(data.partyDetails);
@@ -180,6 +214,135 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     }
   };
 
+  const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
+   const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
+  const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
+   const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
+  const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
+  const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
+
+   const isDeleting =
+     isDeletingSale ||
+     isDeletingPurchase ||
+    isDeletingSaleReturn ||
+     isDeletingPurchaseReturn ||
+     isDeletingPaymentIn ||
+   isDeletingPaymentOut;
+const handleConfirmDelete = async () => {
+  if (!deleteTarget) return;
+
+  try {
+    let res;
+
+    switch (deleteTarget.Txn_Type) {
+      case "Sale":
+         res = await deleteSale(deleteTarget.Id).unwrap();
+        break;
+
+      case "Purchase":
+        res = await deletePurchase(
+          deleteTarget.Id
+        ).unwrap();
+        break;
+
+      case "Sale_Return":
+        res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+        break;
+
+      case "Purchase_Return":
+         res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+        break;
+
+      case "Payment_In":
+        res = await deletePaymentIn(deleteTarget.Id).unwrap();
+        break;
+
+      case "Payment_Out":
+        res = await deletePaymentOut(deleteTarget.Id).unwrap();
+        break;
+
+      default:
+        toast.error(
+          "Unknown transaction type — cannot delete"
+        );
+        return;
+    }
+
+    toast.success(res?.message || "Deleted successfully");
+
+    setDeleteTarget(null);
+    dispatch(partyApi.util.invalidateTags(["Party"]));
+      dispatch(partyApi.util.invalidateTags(["Party"]));
+             dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+           dispatch(
+        bankAccountApi.util.invalidateTags(["BankAccount"])
+      )
+      dispatch(saleApi.util.invalidateTags(["Sale"]));
+          dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+     dispatch(
+    itemApi.util.invalidateTags([
+      "Item",
+      "ItemLedger",
+    ])
+  );
+  } catch (err) {
+
+    console.error(
+      "❌ Delete error:",
+      err
+    );
+
+    toast.error(
+      err?.data?.message ||
+      "Failed to delete"
+    );
+    setDeleteTarget(null);
+
+    // IMPORTANT:
+    // Don't close modal here.
+    // User should see the error and can close it manually.
+  }
+};
+  // const handleConfirmDelete = async () => {
+  //   if (!deleteTarget) return;
+
+  //   try {
+  //     let res;
+
+  //     switch (deleteTarget.Txn_Type) {
+  //       case "Sale":
+  //         //res = await deleteSale(deleteTarget.Id).unwrap();
+  //         break;
+  //       case "Purchase":
+  //         res = await deletePurchase(deleteTarget.Id).unwrap();
+  //         break;
+  //       case "Sale_Return":
+  //         //res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+  //         break;
+  //       case "Purchase_Return":
+  //         //res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+  //         break;
+  //       case "Payment_In":
+  //         //res = await deletePaymentIn(deleteTarget.Id).unwrap();
+  //         break;
+  //       case "Payment_Out":
+  //         //res = await deletePaymentOut(deleteTarget.Id).unwrap();
+  //         break;
+  //       default:
+  //         //toast.error("Unknown transaction type — cannot delete");
+  //         setDeleteTarget(null);
+  //         return;
+  //     }
+
+  //     //toast.success(res?.message || "Deleted successfully");
+  //     setDeleteTarget(null);
+  //   } catch (err) {
+  //     console.log(err);
+  //     //toast.error(err?.data?.message || "Failed to delete");
+  //     setDeleteTarget(null);
+  //   }
+  // };
+
   if (!partyId) {
     return (
       <div
@@ -250,6 +413,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
               <th className="text-left">Total</th>
               <th className="text-left">Balance Due</th>
               <th>View/Edit</th>
+              <th>Delete</th>
             </tr>
           </thead>
 
@@ -310,6 +474,19 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                           </NavLink>
                         ))}
                     </td>
+                    <td>
+                      <Trash2
+                        size={18}
+                        style={{ cursor: "pointer", color: "#ef4444" }}
+                        onClick={() =>
+                          setDeleteTarget({
+                            Id: row.Formatted_Reference_Id,
+                            Txn_Type: row.Txn_Type,   // ✅ must be here
+                            //Doc_Number: row.Doc_Number,
+                          })
+                        }
+                      />
+                    </td>
                   </tr>
                 );
               })
@@ -354,6 +531,18 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           parties={partiesList}
         />
       )}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
+          message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
+            }? This action cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+          //isDeleting={false}
+        />
+      )}
+
     </div>
   );
 }

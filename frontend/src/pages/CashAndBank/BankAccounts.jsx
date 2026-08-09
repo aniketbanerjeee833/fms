@@ -3,22 +3,28 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
 import { NavLink, useSearchParams } from "react-router-dom";
-import { LayoutDashboard, Building2, SquarePen, ChevronRight, ArrowUpRight, Eye, ArrowDownLeft, CreditCard, Landmark, Wallet } from "lucide-react";
+import { LayoutDashboard, Building2, SquarePen, ChevronRight, ArrowUpRight, Eye, ArrowDownLeft, CreditCard, Landmark, Wallet, Trash2 } from "lucide-react";
 import {
   bankAccountApi,
   useGetAllBankAccountsQuery,
   useGetBankAccountByIdQuery,
 } from "../../redux/api/bankAccountApi";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
-import { useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
-import { useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useDeletePaymentInMutation, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { toast } from "react-toastify";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { purchaseApi, useDeletePurchaseMutation } from "../../redux/api/purchaseApi";
+import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
+import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
+import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
+import { itemApi } from "../../redux/api/itemApi";
 
 /* ── source_type → icon + label ── */
 const TYPE_META = {
@@ -48,7 +54,7 @@ const fmt = (n) =>
    RIGHT PANEL — bank details + transaction ledger
 ════════════════════════════════════════════════════════════ */
 
-function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving,parties  }) {
+function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
   const { data: record, isLoading } = useGetPaymentInByIdQuery(id);
   if (isLoading || !record) return null;
 
@@ -61,13 +67,13 @@ function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving,parties  })
       onSave={onSave}
       isSaving={isSaving}
       parties={parties}
-       PartyAddModal={PartyAddModal} 
+      PartyAddModal={PartyAddModal}
 
     />
   );
 }
 
-function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties}) {
+function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
   const { data: record, isLoading } = useGetPaymentOutByIdQuery(id);
   console.log(record, "BankAccounts Payment Out");
   if (isLoading || !record) return null;
@@ -80,13 +86,38 @@ function PaymentOutModalLoader({ id, banks, onClose, onSave, isSaving, parties})
       onClose={onClose}
       onSave={onSave}
       isSaving={isSaving}
-       parties={parties}
-        PartyAddModal={PartyAddModal}   // 🔹 add this
+      parties={parties}
+      PartyAddModal={PartyAddModal}   // 🔹 add this
     />
   );
 }
-
-function BankDetailPanel({ bankId, onEdit }) {
+const DELETE_CONFIG = {
+  Sale: {
+    title: "Delete Sale",
+    label: "sale invoice",
+  },
+  Purchase: {
+    title: "Delete Purchase",
+    label: "purchase bill",
+  },
+  Sale_Return: {
+    title: "Delete Credit Note",
+    label: "credit note",
+  },
+  Purchase_Return: {
+    title: "Delete Debit Note",
+    label: "debit note",
+  },
+  Payment_In: {
+    title: "Delete Payment In",
+    label: "payment in entry",
+  },
+  Payment_Out: {
+    title: "Delete Payment Out",
+    label: "payment out entry",
+  },
+};
+function BankDetailPanel({ bankId }) {
   const dispatch = useDispatch();
 
   /* ── infinite scroll state ── */
@@ -104,7 +135,7 @@ function BankDetailPanel({ bankId, onEdit }) {
   /* ── mutations ── */
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
-const { data: partiesList } = useGetAllPartiesQuery();
+  const { data: partiesList } = useGetAllPartiesQuery();
   /* ── bank list for modals ── */
   const { data: banks = [] } = useGetAllBankAccountsQuery();
 
@@ -113,7 +144,8 @@ const { data: partiesList } = useGetAllPartiesQuery();
     { Bank_Account_Id: bankId, page, limit: 10 },
     { skip: !bankId }
   );
-
+  const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+  //const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
   /* ── Reset when bankId changes ── */
   useEffect(() => {
     setPage(1);
@@ -205,7 +237,98 @@ const { data: partiesList } = useGetAllPartiesQuery();
   };
 
   const bank = data?.bankAccount;
-
+  const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
+  const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
+    const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
+     const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
+    const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
+     const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
+  
+     const isDeleting =
+     isDeletingSale ||
+       isDeletingPurchase ||
+      isDeletingSaleReturn ||
+       isDeletingPurchaseReturn ||
+      isDeletingPaymentIn ||
+      isDeletingPaymentOut;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+  
+    try {
+      let res;
+  
+      switch (deleteTarget.Txn_Type) {
+        case "Sale":
+          res = await deleteSale(deleteTarget.Id).unwrap();
+          break;
+  
+        case "Purchase":
+          res = await deletePurchase(
+            deleteTarget.Id
+          ).unwrap();
+          break;
+  
+        case "Sale_Return":
+          res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+          break;
+  
+        case "Purchase_Return":
+           res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+          break;
+  
+        case "Payment_In":
+          res = await deletePaymentIn(deleteTarget.Id).unwrap();
+          break;
+  
+        case "Payment_Out":
+           res = await deletePaymentOut(deleteTarget.Id).unwrap();
+          break;
+  
+        default:
+          toast.error(
+            "Unknown transaction type — cannot delete"
+          );
+          return;
+      }
+  
+      toast.success(res?.message || "Deleted successfully");
+  
+      setDeleteTarget(null);
+      dispatch(partyApi.util.invalidateTags(["Party"]));
+       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+     dispatch(
+  bankAccountApi.util.invalidateTags([
+    { type: "BankAccount", id: bankId },
+    "BankAccount",
+  ])
+  
+);
+dispatch(saleApi.util.invalidateTags(["Sale"]));
+    dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+    dispatch(
+  itemApi.util.invalidateTags([
+    "Item",
+    "ItemLedger",
+  ])
+);
+    } catch (err) {
+  
+      console.error(
+        "❌ Delete error:",
+        err
+      );
+  
+      toast.error(
+        err?.data?.message ||
+        "Failed to delete"
+      );
+      setDeleteTarget(null);
+  
+      // IMPORTANT:
+      // Don't close modal here.
+      // User should see the error and can close it manually.
+    }
+  }
   /* ── empty state ── */
   if (!bankId) {
     return (
@@ -261,6 +384,7 @@ const { data: partiesList } = useGetAllPartiesQuery();
               <th className="text-left">Date</th>
               <th className="text-left">Amount</th>
               <th>View/Edit</th>
+              <th>Delete</th>
             </tr>
           </thead>
 
@@ -312,6 +436,19 @@ const { data: partiesList } = useGetAllPartiesQuery();
                         )
                       )}
                     </td>
+                    <td>
+                      <Trash2
+                        size={18}
+                        style={{ cursor: "pointer", color: "#ef4444" }}
+                        onClick={() =>
+                          setDeleteTarget({
+                            Id: row.Formatted_Reference_Id,
+                            Txn_Type: row.Txn_Type,   // ✅ must be here
+                            //Doc_Number: row.Doc_Number,
+                          })
+                        }
+                      />
+                    </td>
                   </tr>
                 );
               })
@@ -353,12 +490,24 @@ const { data: partiesList } = useGetAllPartiesQuery();
           onClose={closeModal}
           onSave={handleSavePaymentOut}
           isSaving={isUpdatingPaymentOut}
-           parties={partiesList}
+          parties={partiesList}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
+          message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
+            }? This action cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+        //isDeleting={false}
         />
       )}
     </div>
   );
 }
+
 /* ════════════════════════════════════════════════════════════
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
@@ -492,10 +641,10 @@ export default function BankAccounts() {
                         </p>
                         <p
                           className={`text-xs truncate ${Number(bank.Current_Balance) > 0
-                              ? "text-green-600"
-                              : Number(bank.Current_Balance) < 0
-                                ? "text-red-600"
-                                : "text-gray-400"
+                            ? "text-green-600"
+                            : Number(bank.Current_Balance) < 0
+                              ? "text-red-600"
+                              : "text-gray-400"
                             }`}
                         >
                           {bank.Current_Balance != null

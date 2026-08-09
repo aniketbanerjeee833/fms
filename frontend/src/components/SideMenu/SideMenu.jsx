@@ -264,9 +264,11 @@ if (
           {renderMenu("Items", <Package size={20} />, [
              { to: "/items/add-category", text: "Add Category" },
             { to: "/items/add", text: "Add Items" },
-            { to: "/items/all-items", text: "Item Details" },
+            //{ to: "/items/all-items", text: "Item Details" },
+                { to: "/items/items", text: "Items" },
          
           ])}
+          
         
              {renderMenu("Purchase", <ShoppingCart size={20} />, [
            

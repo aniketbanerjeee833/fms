@@ -8,8 +8,8 @@ import db from "../config/db.js";
   Running_Stock = previous stock + (In ? +qty : -qty)
 */
 
-const IN_TYPES  = ["Purchase", "Sale_Return", "Opening_Stock", "Adjustment_Add"];
-const OUT_TYPES = ["Sale", "Purchase_Return", "Adjustment_Reduce"];
+const IN_TYPES  = ["Purchase", "Sale_Return", "Opening_Stock", "Add_Adjustment"];
+const OUT_TYPES = ["Sale", "Purchase_Return", "Reduce_Adjustment"];
 
 export const recordItemLedger = async ({
   connection,

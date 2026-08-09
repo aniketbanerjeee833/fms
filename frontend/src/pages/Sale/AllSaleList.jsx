@@ -1,11 +1,17 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useGetAllSalesQuery } from "../../redux/api/saleApi";
-import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Undo2 } from "lucide-react";
+import { useDeleteSaleMutation, useGetAllSalesQuery } from "../../redux/api/saleApi";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2 } from "lucide-react";
+import { useState } from "react";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
+import { itemApi } from "../../redux/api/itemApi";
+import { useDispatch } from "react-redux";
 
 // import { SiMicrosoftexcel } from "react-icons/si";
 export default function AllSaleList() {
+  const dispatch=useDispatch()
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
@@ -16,6 +22,8 @@ export default function AllSaleList() {
   const toDate = searchParams.get("toDate") || "";
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteSale, { isLoading: isDeleting }] = useDeleteSaleMutation();
   const { data: sales, isLoading } = useGetAllSalesQuery({
     page,
     search: searchTerm,
@@ -70,7 +78,27 @@ export default function AllSaleList() {
     a.click();
     document.body.removeChild(a);
   };
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
 
+    try {
+      console.log(deleteTarget);
+      const res = await deleteSale(deleteTarget.Sale_Id).unwrap();
+      toast.success(res?.message || "Purchase deleted successfully");
+      setDeleteTarget(null);
+        
+               
+           dispatch(
+          itemApi.util.invalidateTags([
+            "Item",
+            "ItemLedger",
+          ])
+        );
+    } catch (err) {
+      console.log(err);
+      toast.error(err?.data?.message || "Failed to delete purchase");
+    }
+  };
 
   console.log(sales?.sales);
 
@@ -292,14 +320,15 @@ export default function AllSaleList() {
                   <tr>
                     <th className="text-left">Sl.No</th>
                     <th className="text-left ">Date</th>
-                     <th className="text-left ">Invoice No.</th>
+                    <th className="text-left ">Invoice No.</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
                     <th className="text-left">Balance </th>
-                    {/* <th>View</th> */}
+
                     <th>View/Edit</th>
                     <th>Return</th>
+                    <th>Delete</th>
 
                   </tr>
                 </thead>
@@ -320,13 +349,13 @@ export default function AllSaleList() {
                             : "N/A"}
                         </td>
                         <td>
-                                {sale?.Invoice_Number
-                                  ? sale?.Invoice_Number
-                                  : "N/A"}
-                              </td>
+                          {sale?.Invoice_Number
+                            ? sale?.Invoice_Number
+                            : "N/A"}
+                        </td>
                         <td >{sale?.Party_Name || "N/A"}</td>
-                      <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
-                         {/* <td>
+                        <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
+                        {/* <td>
                           {sale?.Payment_Type
                             ? sale.Payment_Type === "Bank"
                               ? `Bank (${sale?.Bank_Display_Name || "N/A"})`
@@ -382,6 +411,18 @@ export default function AllSaleList() {
                           </NavLink>
 
 
+                        </td>
+                        <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Sale_Id: sale?.Sale_Id,
+
+                              })
+                            }
+                          />
                         </td>
                       </tr>
                     ))
@@ -577,7 +618,17 @@ export default function AllSaleList() {
               </div> */}
       </div>
 
-
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title="Delete Sale"
+          //message={`Are you sure you want to delete purchase bill "${deleteTarget.Bill_Number || deleteTarget.Purchase_Id}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete this sale invoice ? This action cannot be undone.`}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={isDeleting}
+          //isDeleting={false}
+        />
+      )}
     </>
 
 

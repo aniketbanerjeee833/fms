@@ -230,18 +230,6 @@ className=" flex flex-col ">
   
                  
   
-                  {/* <div className="flex justify-end mt-4 gap-4">
-                      {editingDailyExpense && <button
-                      type="button"
-                  onClick={handleSave}
-      disabled={isLoading}
-                      className=" text-white font-bold py-2 px-4 rounded"
-                      style={{ backgroundColor: "#4CA1AF" }}
-                    >
-                           {isLoading ? "Saving..." : "Save"}
-                    </button>}
-              
-                  </div> */}
     </div>
   </div>
 );

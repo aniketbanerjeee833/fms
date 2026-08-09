@@ -1694,25 +1694,28 @@ export default function SaleAdd() {
                           //value={watch(`items.${i}.Quantity`)?.toString() || ""}
                           {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
-                            let value = e.target.value.replace(/[^0-9]/g, "");
+                            let value = e.target.value;
+                           value = value
+                                .replace(/[^0-9.]/g, "")
+                                .replace(/(\..*)\./g, "$1");
                             //let stockQty = items?.items?.find((item) => item.Item_Name === itemsValues[i]?.Item_Name)?.Stock_Quantity || 0;
                             //console.log(stockQty);
 
                             // if (!itemsValues[i]?.Item_Name?.trim()) return;
 
                             // ✅ Clamp value
-                            let num = parseInt(value, 10);
+                            // let num = Number(value);
 
-                            if (isNaN(num) || num < 0) {
-                              num = 0; // reset to 0
-                            }
+                            // if (!Number.isFinite(num) || num < 0) {
+                            //   num = 0;
+                            // }
 
                             // ✅ Update only via RHF
-                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true, shouldDirty: true });
+                            setValue(`items.${i}.Quantity`, value, { shouldValidate: true, shouldDirty: true });
 
                             // ✅ Recalculate row + totals
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
-                              calculateRowAmount({ ...itemsValues[i], Quantity: num || 0 }, i, itemsValues);
+                              calculateRowAmount({ ...itemsValues[i], Quantity:Number(value) || 0 }, i, itemsValues);
 
                             setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                             setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });

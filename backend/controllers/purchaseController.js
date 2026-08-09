@@ -9,7 +9,7 @@ import ExcelJS from "exceljs";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
-import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
+import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 
@@ -1201,120 +1201,6 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
   }
 };
 
-// const getAllPurchases = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     connection = await db.getConnection();
-
-//     /* ---------- PAGINATION ---------- */
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-
-//     /* ---------- FILTERS ---------- */
-//     const search = req.query.search?.trim().toLowerCase() || "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     let whereClauses = [];
-//     let params = [];
-
-//     /* ---------- SEARCH ---------- */
-//     if (search) {
-//       whereClauses.push(`
-//         (
-//           LOWER(a.Party_Name) LIKE ?
-//           OR LOWER(p.Payment_Type) LIKE ?
-//           OR LOWER(ba.Account_Display_Name) LIKE ?
-//           OR CAST(p.Total_Amount AS CHAR) LIKE ?
-//           OR CAST(p.Balance_Due AS CHAR) LIKE ?
-//         )
-//       `);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like, like);
-//     }
-
-//     /* ---------- DATE FILTER ---------- */
-//     if (fromDate && toDate) {
-//       whereClauses.push(`DATE(p.Bill_Date) BETWEEN ? AND ?`);
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(p.Bill_Date) >= ?`);
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(p.Bill_Date) <= ?`);
-//       params.push(toDate);
-//     }
-
-//     const whereSQL = whereClauses.length
-//       ? `WHERE ${whereClauses.join(" AND ")}`
-//       : "";
-
-//     /* ---------- MAIN QUERY ---------- */
-//     const purchasesQuery = `
-//       SELECT p.*, a.Party_Name,
-//         ba.Account_Display_Name AS Bank_Display_Name,
-//         CASE 
-//           WHEN p.Payment_Type = 'Bank' THEN ba.Account_Display_Name
-//           ELSE p.Payment_Type
-//         END AS Payment_Type_Display
-//       FROM add_purchase p
-//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-//       LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
-//       ${whereSQL}
-//       ORDER BY p.created_at DESC
-//       LIMIT ? OFFSET ?
-//     `;
-
-//     const [rows] = await db.query(purchasesQuery, [
-//       ...params,
-//       limit,
-//       offset,
-//     ]);
-
-//     /* ---------- COUNT QUERY ---------- */
-//     const countQuery = `
-//       SELECT COUNT(*) AS total
-//       FROM add_purchase p
-//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-//       LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
-//       ${whereSQL}
-//     `;
-
-//     const [countResult] = await db.query(countQuery, params);
-
-//     /* ---------- TOTALS QUERY ---------- */
-//     const totalsQuery = `
-//       SELECT
-//         COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
-//         COALESCE(SUM(p.Balance_Due), 0) AS totalUnpaid,
-//         COALESCE(SUM(p.Total_Paid), 0) AS totalPaid
-//       FROM add_purchase p
-//       LEFT JOIN add_party a ON p.Party_Id = a.Party_Id
-//       LEFT JOIN bank_accounts ba ON p.Bank_Account_Id = ba.id
-//       ${whereSQL}
-//     `;
-
-//     const [totalsResult] = await db.query(totalsQuery, params);
-
-//     /* ---------- RESPONSE ---------- */
-//     return res.status(200).json({
-//       success: true,
-//       currentPage: page,
-//       totalPages: Math.ceil(countResult[0].total / limit),
-//       totalPurchases: countResult[0].total,
-//       purchases: rows,
-//       totals: totalsResult[0],
-//     });
-
-//   } catch (err) {
-//     console.error("❌ Error fetching purchases:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 const getAllPurchases = async (req, res, next) => {
   let connection;
@@ -2582,52 +2468,189 @@ for (const line of resolvedLines) {
 
 const oldQtyByItem = new Map();
 
+// for (const old of oldItems) {
+
+//   const rawQty =
+//     Number(old.Quantity) || 0;
+
+//   // Get CURRENT item conversion.
+//   //
+//   // Your rule is that historical conversion rate is
+//   // NOT frozen — old transactions use the item's
+//   // current conversion rate.
+
+//   const snapPrimary = old.Primary_Unit_Snapshot || null;
+// const snapSecondary = old.Secondary_Unit_Snapshot || null;
+
+// let baseQty = rawQty;
+
+// if (snapPrimary && snapSecondary && old.Selected_Unit === snapSecondary) {
+
+//   const [[historicalRate]] =
+//     await connection.query(
+//       `
+//       SELECT Conversion_Rate
+//       FROM item_unit_conversions
+//       WHERE Item_Id = ? AND Primary_Unit = ? AND Secondary_Unit = ?
+//       ORDER BY id DESC
+//       LIMIT 1
+//       `,
+//       [old.Item_Id, snapPrimary, snapSecondary]
+//     );
+
+//   const conversionRate = Number(historicalRate?.Conversion_Rate) || 0;
+
+//   if (conversionRate <= 0) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         `Missing historical conversion rate for item ${old.Item_Id} (${snapPrimary} → ${snapSecondary}).`,
+//     });
+//   }
+
+//   baseQty =
+//     rawQty / conversionRate;
+// }
+  
+//   const [[ledgerRow]] = await connection.query(
+//     `
+//     SELECT Base_Qty
+//     FROM item_ledger
+//     WHERE Item_Id = ?
+//       AND Txn_Type = 'Purchase'
+//       AND Source_Id = ?
+//     LIMIT 1
+//     `,
+//     [old.Item_Id, old.id]
+//   );
+
+//   const baseQty = Number(ledgerRow?.Base_Qty) || 0;
+
+//   oldQtyByItem.set(
+//     old.Item_Id,
+//     (oldQtyByItem.get(old.Item_Id) || 0) + baseQty
+//   );
+//   // oldQtyByItem.set(
+//   //   old.Item_Id,
+//   //   (oldQtyByItem.get(old.Item_Id) || 0) +
+//   //     baseQty
+//   // );
+// }
+
+
+// =======================================================
+// APPLY DIFFERENCE TO ITEM MASTER STOCK
+// =======================================================
+
+
 for (const old of oldItems) {
+  // =======================================================
+  // HISTORICAL UNIT SNAPSHOT
+  // =======================================================
 
-  const rawQty =
-    Number(old.Quantity) || 0;
+  const snapPrimary =
+    old.Primary_Unit_Snapshot || null;
 
-  // Get CURRENT item conversion.
-  //
-  // Your rule is that historical conversion rate is
-  // NOT frozen — old transactions use the item's
-  // current conversion rate.
+  const snapSecondary =
+    old.Secondary_Unit_Snapshot || null;
 
-  const snapPrimary = old.Primary_Unit_Snapshot || null;
-const snapSecondary = old.Secondary_Unit_Snapshot || null;
+  const selectedUnit =
+    old.Selected_Unit || null;
 
-let baseQty = rawQty;
 
-if (snapPrimary && snapSecondary && old.Selected_Unit === snapSecondary) {
+  // =======================================================
+  // FIRST: TRY TO GET EXACT OLD BASE_QTY FROM LEDGER
+  // =======================================================
 
-  const [[historicalRate]] =
-    await connection.query(
-      `
-      SELECT Conversion_Rate
-      FROM item_unit_conversions
-      WHERE Item_Id = ? AND Primary_Unit = ? AND Secondary_Unit = ?
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [old.Item_Id, snapPrimary, snapSecondary]
-    );
+  const [[ledgerRow]] = await connection.query(
+    `
+    SELECT
+      Base_Qty,
+      Quantity,
+      Selected_Unit
+    FROM item_ledger
+    WHERE Item_Id = ?
+      AND Txn_Type = 'Purchase'
+      AND Source_Id = ?
+    LIMIT 1
+    `,
+    [old.Item_Id, old.id]
+  );
 
-  const conversionRate = Number(historicalRate?.Conversion_Rate) || 0;
 
-  if (conversionRate <= 0) {
-    await connection.rollback();
+  let baseQty;
 
-    return res.status(400).json({
-      success: false,
-      message:
-        `Missing historical conversion rate for item ${old.Item_Id} (${snapPrimary} → ${snapSecondary}).`,
-    });
+
+  // =======================================================
+  // CASE 1: LEDGER EXISTS
+  // =======================================================
+  // This is the preferred source.
+  // =======================================================
+
+  if (ledgerRow) {
+    baseQty = Number(ledgerRow.Base_Qty) || 0;
   }
 
-  baseQty =
-    rawQty / conversionRate;
-}
-  
+
+  // =======================================================
+  // CASE 2: LEDGER DOES NOT EXIST
+  // =======================================================
+  // Fallback for old/migrated/broken records.
+  // Use the transaction's snapshot information.
+  // =======================================================
+
+  else {
+    const rawQty =
+      Number(old.Quantity) || 0;
+
+    baseQty = rawQty;
+
+    // If the old transaction was entered using
+    // the historical secondary unit, convert it
+    // using the stored snapshot conversion.
+
+    if (
+      snapPrimary &&
+      snapSecondary &&
+      selectedUnit === snapSecondary
+    ) {
+      const [[conversionRow]] =
+        await connection.query(
+          `
+          SELECT Conversion_Rate
+          FROM item_unit_conversions
+          WHERE Item_Id = ?
+            AND Primary_Unit = ?
+            AND Secondary_Unit = ?
+          ORDER BY id DESC
+          LIMIT 1
+          `,
+          [
+            old.Item_Id,
+            snapPrimary,
+            snapSecondary,
+          ]
+        );
+
+      const conversionRate =
+        Number(conversionRow?.Conversion_Rate) || 0;
+
+      if (conversionRate > 0) {
+        baseQty =
+          rawQty / conversionRate;
+      }
+      // If conversion cannot be found,
+      // don't crash the user's edit.
+      // Keep rawQty as fallback.
+    }
+  }
+
+
+  // =======================================================
+  // ADD OLD BASE_QTY
+  // =======================================================
 
   oldQtyByItem.set(
     old.Item_Id,
@@ -2635,12 +2658,6 @@ if (snapPrimary && snapSecondary && old.Selected_Unit === snapSecondary) {
       baseQty
   );
 }
-
-
-// =======================================================
-// APPLY DIFFERENCE TO ITEM MASTER STOCK
-// =======================================================
-
 const allItemIds =
   new Set([
     ...newQtyByItem.keys(),
@@ -2767,187 +2784,270 @@ for (const itemId of allItemIds) {
     if (connection) connection.release();
   }
 };
-//OLD
+//DELETE
 
-// const getSinglePurchase = async (req, res, next) => {
-//   let connection;
-//   try {
-//     const { Purchase_Id: purchaseId } = req.params;
+const deletePurchase = async (req, res, next) => {
+  let connection;
 
-//     connection = await db.getConnection();
+  try {
+    const { Purchase_Id: purchaseId } = req.params;
 
-//     if (!purchaseId) {
-//       return res.status(400).json({ success: false, message: "Purchase ID is required." });
-//     }
+    if (!purchaseId) {
+      return res.status(400).json({
+        success: false,
+        message: "Purchase ID is required.",
+      });
+    }
 
-//     // ✅ Fetch purchase header — no Payment_Type/Bank_Account_Id anymore
-//     // const [purchaseData] = await connection.query(
-//     //   `SELECT
-//     //   pu.id,
-//     //      pu.Purchase_Id,
-//     //      pu.Bill_Number,
-//     //      pu.Bill_Date,
+    connection = await db.getConnection();
 
-//     //      pu.State_Of_Supply,
-//     //      pu.Total_Amount,
-//     //      pu.Total_Paid,
-//     //      pu.Balance_Due,
-//     //      pu.Party_Id,
-//     //      pu.Terms_Conditions_Id,
-//     //      pu.Terms_Conditions_Description,
-//     //      p.Party_Name,
-//     //      p.GSTIN
-//     //    FROM add_purchase pu
-//     //    LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
-//     //    WHERE pu.Purchase_Id = ?`,
-//     //   [purchaseId]
-//     // );
-//     const [purchaseData] = await connection.query(
-//       `SELECT
-//      pu.id,
-//      pu.Purchase_Id,
-//      pu.Bill_Number,
-//      pu.Bill_Date,
-//      pu.State_Of_Supply,
-//      pu.Total_Amount,
-//      pu.Total_Paid,
-//      pu.Balance_Due,
-//      pu.Party_Id,
+    await connection.beginTransaction();
 
-//      pu.Terms_Conditions_Id,
-//      pu.Terms_Conditions_Description,
+    // =========================================================
+    // 1. GET PURCHASE HEADER
+    // =========================================================
 
-//      p.Party_Name,
-//      p.GSTIN,
+    const [[purchase]] = await connection.query(
+      `
+      SELECT
+        id,
+        Purchase_Id,
+        Party_Id,
+        Bill_Number,
+        Bill_Date
+      FROM add_purchase
+      WHERE Purchase_Id = ?
+      LIMIT 1
+      `,
+      [purchaseId]
+    );
 
-//      tc.Title AS Terms_Conditions_Title
+    if (!purchase) {
+      await connection.rollback();
 
-//    FROM add_purchase pu
+      return res.status(404).json({
+        success: false,
+        message: "Purchase not found.",
+      });
+    }
 
-//    LEFT JOIN add_party p
-//      ON pu.Party_Id = p.Party_Id
+    // Numeric add_purchase.id
+    //
+    // This is used by:
+    // - party_ledger.Source_Id
+    // - payment_splits.Source_Id
+    const purchaseDbId = purchase.id;
 
-//    LEFT JOIN terms_conditions tc
-//      ON pu.Terms_Conditions_Id = tc.id
+    
 
-//    WHERE pu.Purchase_Id = ?`,
-//       [purchaseId]
-//     );
+// =========================================================
+// CHECK PURCHASE RETURNS
+// =========================================================
 
-//     if (purchaseData.length === 0) {
-//       return res.status(404).json({ success: false, message: "Purchase not found." });
-//     }
+const [[purchaseReturn]] = await connection.query(
+  `
+  SELECT id
+  FROM purchase_return
+  WHERE Purchase_Id = ?
+  LIMIT 1
+  `,
+  [purchaseId]
+);
 
-//     const purchaseHeader = purchaseData[0];
+if (purchaseReturn) {
+  await connection.rollback();
 
-//     // ✅ Fetch purchase items
-//     const [items] = await connection.query(
-//       `SELECT 
-//          pi.Purchase_Items_Id,
-//          pi.Item_Id,
-//          i.Item_Name,
-//          i.Item_HSN,
-//          i.Item_Unit,
-//          i.Item_Category,
-//          pi.Quantity,
-//          pi.Purchase_Price,
-//          pi.Discount_On_Purchase_Price,
-//          pi.Discount_Type_On_Purchase_Price,
-//          pi.Tax_Amount,
-//          pi.Tax_Type,
-//          pi.Amount,
-//          pi.created_at
-//        FROM add_purchase_items pi
-//        LEFT JOIN add_item i ON pi.Item_Id = i.Item_Id
-//        WHERE pi.Purchase_Id = ?
-//        ORDER BY pi.created_at DESC`,
-//       [purchaseId]
-//     );
+  return res.status(400).json({
+    success: false,
+    message:
+      "This purchase cannot be deleted because a purchase return exists for it. Delete the purchase return first.",
+  });
+}
 
-//     // if (items.length === 0) {
-//     //   return res.status(404).json({ success: false, message: "No purchase items found for this invoice." });
-//     // }
+    // =========================================================
+    // 2. GET ALL PURCHASE ITEMS
+    //
+    // item_ledger.Source_Id = add_purchase_items.id
+    // =========================================================
 
-//     // ✅ Fetch payment splits for this purchase
-//     const [splits] = await connection.query(
-//       `SELECT
-//          ps.id,
-//          ps.Payment_Type,
-//          ps.Bank_Account_Id,
-//          ps.Reference_Number,
-//          ps.Amount,
-//          ba.Account_Display_Name,
-//          CASE
-//            WHEN ps.Payment_Type = 'Bank' THEN ba.Account_Display_Name
-//            ELSE ps.Payment_Type
-//          END AS Payment_Type_Display
-//        FROM payment_splits ps
-//        LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//        WHERE ps.Source_Type = 'Purchase' AND ps.Source_Id = ?
-//        ORDER BY ps.id ASC`,
-//       [purchaseHeader.id]
-//       //[purchaseHeader.id ?? purchaseId]  
+    const [purchaseItems] = await connection.query(
+      `
+      SELECT
+        id,
+        Item_Id
+      FROM add_purchase_items
+      WHERE Purchase_Id = ?
+      `,
+      [purchaseId]
+    );
 
-//       // use numeric id if your splits store numeric; adjust if stored as 'PUR001'
-//     );
+    // =========================================================
+    // 3. REVERSE STOCK + ITEM LEDGER
+    // =========================================================
 
-//     // ✅ Build a human-readable summary of splits for easy display
-//     const splitSummary = splits.map((s) => s.Payment_Type_Display).join(" + ") || "—";
+    for (const purchaseItem of purchaseItems) {
 
-//     return res.status(200).json({
-//       success: true,
-//       billPurchaseDetails: {
-//         Purchase_Id: purchaseHeader.Purchase_Id,
-//         Party_Name: purchaseHeader.Party_Name,
-//         GSTIN: purchaseHeader.GSTIN,
-//         State_Of_Supply: purchaseHeader.State_Of_Supply,
-//         Bill_Number: purchaseHeader.Bill_Number,
-//         Bill_Date: purchaseHeader.Bill_Date,
-//         //Reference_Number: purchaseHeader.Reference_Number,
-//         Total_Amount: purchaseHeader.Total_Amount,
-//         Total_Paid: purchaseHeader.Total_Paid,
-//         Balance_Due: purchaseHeader.Balance_Due,
-//         Billing_Address: purchaseHeader.Billing_Address,
-//         Shipping_Address: purchaseHeader.Shipping_Address,
-//         // 🔹 split summary for display in UI header
-//         Payment_Type_Display: splitSummary,
-//         Terms_Conditions_Id: purchaseHeader.Terms_Conditions_Id,
-//         Terms_Conditions_Description: purchaseHeader.Terms_Conditions_Description,
-//       },
-//       // 🔹 full splits array — frontend uses this to pre-fill the payment split UI
-//       splits: splits.map((s) => ({
-//         id: s.id,
-//         Payment_Type: s.Payment_Type,
-//         Bank_Account_Id: s.Bank_Account_Id,
-//         Account_Display_Name: s.Account_Display_Name,
-//         Payment_Type_Display: s.Payment_Type_Display,
-//         Reference_Number: s.Reference_Number,
-//         Amount: s.Amount,
-//       })),
-//       items: items.map((it) => ({
-//         Purchase_Items_Id: it.Purchase_Items_Id,
-//         Item_Id: it.Item_Id,
-//         Item_Name: it.Item_Name,
-//         Item_HSN: it.Item_HSN,
-//         Item_Unit: it.Item_Unit,
-//         Item_Category: it.Item_Category,
-//         Quantity: it.Quantity,
-//         Purchase_Price: it.Purchase_Price,
-//         Discount_On_Purchase_Price: it.Discount_On_Purchase_Price,
-//         Discount_Type_On_Purchase_Price: it.Discount_Type_On_Purchase_Price,
-//         Tax_Amount: it.Tax_Amount,
-//         Tax_Type: it.Tax_Type,
-//         Amount: it.Amount,
-//         created_at: it.created_at,
-//       })),
-//     });
-//   } catch (err) {
-//     console.error("❌ Error getting single purchase:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
+      // -------------------------------------------------------
+      // Find the corresponding Purchase ledger row.
+      //
+      // Source_Id = add_purchase_items.id
+      // -------------------------------------------------------
+
+      const [[ledgerRow]] = await connection.query(
+        `
+        SELECT
+          Base_Qty,
+          Quantity
+        FROM item_ledger
+        WHERE Item_Id = ?
+          AND Txn_Type = 'Purchase'
+          AND Source_Id = ?
+        LIMIT 1
+        `,
+        [
+          purchaseItem.Item_Id,
+          purchaseItem.id,
+        ]
+      );
+
+      // -------------------------------------------------------
+      // If ledger row exists:
+      //
+      // 1. Get normalized Base_Qty
+      // 2. Remove that quantity from add_item stock
+      // 3. Reverse/delete ledger row
+      //
+      // DO NOT use raw Quantity for stock because it can be
+      // secondary-unit quantity such as 500 Gm.
+      // -------------------------------------------------------
+
+      if (ledgerRow) {
+
+        const baseQty =
+          Number(
+            ledgerRow.Base_Qty ??
+            ledgerRow.Quantity
+          ) || 0;
+
+        // Purchase is an IN transaction.
+        // Deleting it means stock must decrease.
+        if (baseQty !== 0) {
+
+          await connection.query(
+            `
+            UPDATE add_item
+            SET
+              Stock_Quantity = Stock_Quantity - ?,
+              updated_at = NOW()
+            WHERE Item_Id = ?
+            `,
+            [
+              baseQty,
+              purchaseItem.Item_Id,
+            ]
+          );
+        }
+
+        // -----------------------------------------------------
+        // Delete ledger row and fix Running_Stock of all
+        // subsequent ledger rows.
+        // -----------------------------------------------------
+
+        await reverseItemLedger({
+          connection,
+          itemId: purchaseItem.Item_Id,
+          txnType: "Purchase",
+          referenceId: purchaseItem.id,
+        });
+      }
+    }
+
+    // =========================================================
+    // 4. DELETE PAYMENT SPLITS
+    //
+    // payment_splits.Source_Id = add_purchase.id
+    // =========================================================
+
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Purchase",
+      sourceId: purchaseDbId,
+    });
+
+    // =========================================================
+    // 5. REVERSE PARTY LEDGER
+    //
+    // party_ledger.Source_Id = add_purchase.id
+    //
+    // IMPORTANT:
+    // Opening Balance is NOT touched here.
+    // reversePartyLedger() only removes this Purchase's
+    // effect from party_ledger.
+    // =========================================================
+
+    await reversePartyLedger({
+      connection,
+      partyId: purchase.Party_Id,
+      txnType: "Purchase",
+      referenceId: purchaseDbId,
+    });
+
+    // =========================================================
+    // 6. DELETE PURCHASE ITEMS
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM add_purchase_items
+      WHERE Purchase_Id = ?
+      `,
+      [purchaseId]
+    );
+
+    // =========================================================
+    // 7. DELETE PURCHASE HEADER
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM add_purchase
+      WHERE Purchase_Id = ?
+      `,
+      [purchaseId]
+    );
+
+    // =========================================================
+    // 8. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Purchase deleted successfully.",
+      purchaseId,
+    });
+
+  } catch (err) {
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error deleting purchase:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 
 //TRYING
 const getSinglePurchase = async (req, res, next) => {
@@ -3568,7 +3668,7 @@ const uploadBillAndCreatePurchase = async (req, res, next) => {
 export {
   addPurchase, editPurchase, getSinglePurchase, getAllPurchases, exportAllPurchasesReportToExcel, getTotalPurchasesEachDay,
 
-  uploadBillAndCreatePurchase
+  uploadBillAndCreatePurchase,deletePurchase
 };
 
 

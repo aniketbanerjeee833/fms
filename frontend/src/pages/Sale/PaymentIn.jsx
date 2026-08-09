@@ -2,18 +2,20 @@
 import { NavLink, useSearchParams } from "react-router-dom";
 
 // import { useGetAllpaymentInDataQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen } from "lucide-react";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
 
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useState } from "react";
 
 import { toast } from "react-toastify";
-import { useAddPaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
+import { itemApi } from "../../redux/api/itemApi";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 
 
 export default function PaymentIn() {
@@ -40,6 +42,8 @@ export default function PaymentIn() {
     const [updatePaymentIn, { isLoading: isUpdating }] = useUpdatePaymentInMutation();
     const { data: banks = [] } = useGetAllBankAccountsQuery();
     const isSaving = isAdding || isUpdating;
+    const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+    const [deletePaymentIn, { isLoading: isDeleting }] = useDeletePaymentInMutation();
     //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
@@ -108,6 +112,40 @@ export default function PaymentIn() {
         } catch (err) {
             console.error("Failed to save payment in:", err);
             toast.error(err?.data?.message || "Failed to save payment in. Please try again.");
+        }
+    };
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return;
+
+        try {
+            const res = await deletePaymentIn(
+                deleteTarget.Payment_In_Id
+            ).unwrap();
+
+            toast.success(
+                res?.message || "Purchase deleted successfully"
+            );
+
+            setDeleteTarget(null);
+            dispatch(partyApi.util.invalidateTags(["Party"]));
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(
+                bankAccountApi.util.invalidateTags(["BankAccount"])
+            );
+
+            dispatch(
+                itemApi.util.invalidateTags([
+                    "Item",
+                    "ItemLedger",
+                ])
+            );
+        } catch (err) {
+            console.log(err);
+
+            toast.error(
+                err?.data?.message ||
+                "Failed to delete purchase"
+            );
         }
     };
     return (
@@ -312,6 +350,7 @@ export default function PaymentIn() {
                                         <th className="text-left">Total Received</th>
                                         {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
+                                        <th>Delete</th>
                                         {/* <th>Edit</th> */}
                                     </tr>
                                 </thead>
@@ -382,6 +421,18 @@ export default function PaymentIn() {
                                                     >
                                                         <SquarePen size={18} color="#4CA1AF" />
                                                     </button>
+                                                </td>
+                                                <td>
+                                                    <Trash2
+                                                        size={18}
+                                                        style={{ cursor: "pointer", color: "#ef4444" }}
+                                                        onClick={() =>
+                                                            setDeleteTarget({
+                                                                Payment_In_Id: paymentIn?.id,
+
+                                                            })
+                                                        }
+                                                    />
                                                 </td>
                                             </tr>
                                         ))
@@ -538,6 +589,16 @@ export default function PaymentIn() {
                     onSave={handleSavePaymentIn}
                     isSaving={isSaving}
                     PartyAddModal={PartyAddModal}
+                />
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    title="Delete Payment In"
+                    message={`Are you sure you want to delete this payment in ? This action cannot be undone.`}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={handleConfirmDelete}
+                    isDeleting={isDeleting}
+
                 />
             )}
 

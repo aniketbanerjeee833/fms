@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 export const saleReturnApi = createApi({
   reducerPath: "saleReturnApi",
-  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000/api" }),
+  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000/api",credentials: "include" }),
   tagTypes: ["SaleReturn"],
 
   endpoints: (builder) => ({
@@ -44,8 +44,8 @@ export const saleReturnApi = createApi({
 
     /* DELETE */
     deleteSaleReturn: builder.mutation({
-      query: (id) => ({
-        url: `/sale-return/${id}`,
+      query: (Sale_Return_Id) => ({
+        url: `/sale-return/${Sale_Return_Id}`,
         method: "DELETE",
       }),
       invalidatesTags: ["SaleReturn"],

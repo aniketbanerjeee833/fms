@@ -1,7 +1,7 @@
 import db from "../config/db.js"; // mysql2/promise connection
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
-import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
+import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 import { validateDateRange } from "../utils/validateDate.js";
 
@@ -60,6 +60,28 @@ const createPaymentIn = async (req, res, next) => {
     //     message: "At least one payment split is required",
     //   });
     // }
+     // =====================================================
+    // FINANCIAL YEAR
+    // =====================================================
+
+    const [fy] = await connection.query(
+      `
+      SELECT Financial_Year
+      FROM financial_year
+      WHERE Current_Financial_Year = 1
+      LIMIT 1
+      `
+    );
+
+    if (fy.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No active financial year found. Please set one in settings.",
+      });
+    }
+
+    const activeFY = fy[0].Financial_Year;
 
     // =====================================================
     // 1. NORMALIZE VALID PAYMENT METHODS
@@ -152,14 +174,17 @@ const createPaymentIn = async (req, res, next) => {
          Party_Id,
          Receipt_No,
          Payment_Date,
+         financial_year,
          Received
        )
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?)`,
       [
         Party_Id,
         Receipt_No || null,
         Payment_Date,
+        activeFY,
         totalReceived,
+
       ]
     );
 
@@ -285,7 +310,126 @@ const createPaymentIn = async (req, res, next) => {
 //     if (connection) connection.release();
 //   }
 // };
+ const deletePaymentIn = async (req, res, next) => {
+  let connection;
 
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment In ID is required.",
+      });
+    }
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    // =========================================================
+    // 1. GET PAYMENT IN
+    // =========================================================
+
+    const [[paymentIn]] = await connection.query(
+      `
+      SELECT
+        id,
+        Party_Id,
+        Receipt_No,
+        Payment_Date,
+        Received
+      FROM payment_in
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (!paymentIn) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Payment In not found.",
+      });
+    }
+
+    const paymentInId = paymentIn.id;
+
+    // =========================================================
+    // 2. DELETE PAYMENT SPLITS
+    //
+    // payment_splits.Source_Id = payment_in.id
+    // Source_Type = Payment_In
+    // =========================================================
+
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Payment_In",
+      sourceId: paymentInId,
+    });
+
+    // =========================================================
+    // 3. REVERSE PARTY LEDGER
+    //
+    // party_ledger.Source_Id = payment_in.id
+    // Txn_Type = Payment_In
+    //
+    // Opening Balance is NOT touched.
+    // =========================================================
+
+    await reversePartyLedger({
+      connection,
+      partyId: paymentIn.Party_Id,
+      txnType: "Payment_In",
+      referenceId: paymentInId,
+    });
+
+    // =========================================================
+    // 4. DELETE PAYMENT IN HEADER
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM payment_in
+      WHERE id = ?
+      `,
+      [paymentInId]
+    );
+
+    // =========================================================
+    // 5. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment In deleted successfully.",
+      Payment_In_Id: paymentInId,
+    });
+
+  } catch (err) {
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error deleting Payment In:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 /* ── UPDATE ─────────────────────────────────────────────── */
 const updatePaymentIn = async (req, res, next) => {
   let connection;
@@ -424,7 +568,7 @@ const updatePaymentIn = async (req, res, next) => {
     // =====================================================
 
     const [[existing]] = await connection.query(
-      `SELECT Id
+      `SELECT Id,financial_year
        FROM payment_in
        WHERE Id = ?`,
       [id]
@@ -746,7 +890,7 @@ const getPaymentInById = async (req, res, next) => {
   }
 };
 
-export { getAllPaymentIns, getPaymentInById, createPaymentIn, updatePaymentIn };
+export { getAllPaymentIns, getPaymentInById, createPaymentIn, updatePaymentIn, deletePaymentIn };
 
 
 

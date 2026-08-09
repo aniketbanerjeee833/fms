@@ -1614,7 +1614,9 @@ export default function PurchaseEdit() {
 
                           onChange={(e) => {
 
-                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                             e.target.value = e.target.value
+                                .replace(/[^0-9.]/g, "")
+                                .replace(/(\..*)\./g, "$1");
                             setValue(`items.${i}.Quantity`, e.target.value, {
                               shouldValidate: true,
                               shouldDirty: true,

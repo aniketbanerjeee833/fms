@@ -3,7 +3,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
  
 export const cashInHandApi = createApi({
   reducerPath: "cashInHandApi",
-  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000/api" }),
+  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000/api" ,credentials: "include",}),
   tagTypes: ["CashInHand", "Adjustment"],
  
   endpoints: (builder) => ({

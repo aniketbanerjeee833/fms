@@ -377,7 +377,7 @@
 import db from "../config/db.js";
 import { recordBankTransaction } from "../utils/bankAccountHelper.js";
 import { recordCashTransaction }  from "../utils/cashTransactionHelper.js";
-import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
+import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 import { validateDateRange } from "../utils/validateDate.js";
 
@@ -581,6 +581,29 @@ const createPaymentOut = async (req, res, next) => {
       });
     }
 
+     // =====================================================
+    // FINANCIAL YEAR
+    // =====================================================
+
+    const [fy] = await connection.query(
+      `
+      SELECT Financial_Year
+      FROM financial_year
+      WHERE Current_Financial_Year = 1
+      LIMIT 1
+      `
+    );
+
+    if (fy.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No active financial year found. Please set one in settings.",
+      });
+    }
+
+    const activeFY = fy[0].Financial_Year;
+
     // =====================================================
     // 2. NORMALIZE SPLITS
     //
@@ -691,13 +714,15 @@ const createPaymentOut = async (req, res, next) => {
          Party_Id,
          Receipt_No,
          Payment_Date,
+         financial_year,
          Paid
        )
-       VALUES (?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?)`,
       [
         Party_Id,
         Receipt_No || null,
         Payment_Date,
+        activeFY,
         totalPaid,
       ]
     );
@@ -762,7 +787,126 @@ const createPaymentOut = async (req, res, next) => {
     }
   }
 };
+ const deletePaymentOut = async (req, res, next) => {
+  let connection;
 
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment Out ID is required.",
+      });
+    }
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    // =========================================================
+    // 1. GET PAYMENT OUT
+    // =========================================================
+
+    const [[paymentOut]] = await connection.query(
+      `
+      SELECT
+        id,
+        Party_Id,
+        Receipt_No,
+        Payment_Date,
+        Paid
+      FROM payment_out
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (!paymentOut) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Payment Out not found.",
+      });
+    }
+
+    const paymentOutId = paymentOut.id;
+
+    // =========================================================
+    // 2. DELETE PAYMENT SPLITS
+    //
+    // payment_splits.Source_Id = payment_out.id
+    // Source_Type = Payment_Out
+    // =========================================================
+
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Payment_Out",
+      sourceId: paymentOutId,
+    });
+
+    // =========================================================
+    // 3. REVERSE PARTY LEDGER
+    //
+    // party_ledger.Source_Id = payment_out.id
+    // Txn_Type = Payment_Out
+    //
+    // Opening Balance is NOT touched.
+    // =========================================================
+
+    await reversePartyLedger({
+      connection,
+      partyId: paymentOut.Party_Id,
+      txnType: "Payment_Out",
+      referenceId: paymentOutId,
+    });
+
+    // =========================================================
+    // 4. DELETE PAYMENT OUT HEADER
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM payment_out
+      WHERE id = ?
+      `,
+      [paymentOutId]
+    );
+
+    // =========================================================
+    // 5. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+  return res.status(200).json({
+  success: true,
+  message: "Payment Out deleted successfully.",
+  Payment_Out_Id: paymentOut.id,
+});
+
+  } catch (err) {
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error deleting Payment Out:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 /* ── UPDATE ───────────────────────────────────────────────── */
 // const updatePaymentOut = async (req, res, next) => {
 //   let connection;
@@ -970,7 +1114,7 @@ const updatePaymentOut = async (req, res, next) => {
     // =====================================================
 
     const [[existing]] = await connection.query(
-      `SELECT id
+      `SELECT id,financial_year
        FROM payment_out
        WHERE id = ?`,
       [id]
@@ -1077,4 +1221,4 @@ const updatePaymentOut = async (req, res, next) => {
     }
   }
 };
-export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut };
+export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut, deletePaymentOut };

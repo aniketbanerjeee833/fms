@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Layout from './components/Layout/Layout';
 import { useGetUserQuery } from './redux/api/userApi';
 import Spinner from './components/Layout/Spinner';
+import ItemsByItem from './pages/Items/AllItemsList';
 
 
 
@@ -140,7 +141,7 @@ function RouterWrapper() {
                 </Layout>
               }
             />
-
+{/* 
             <Route
               path="/items/add-category"
               element={
@@ -162,6 +163,39 @@ function RouterWrapper() {
               element={
                 <Layout>
                   <AllItemsList />
+                </Layout>
+              }
+            /> */}
+            
+            <Route
+              path="/items/category"
+              element={
+                <Layout>
+                  <AddCategory />
+                </Layout>
+              }
+            />
+            <Route
+              path="/items/add"
+              element={
+                <Layout>
+                  <Items />
+                </Layout>
+              }
+            />
+            {/* <Route
+              path="/items/all-items"
+              element={
+                <Layout>
+                  <AllItemsList />
+                </Layout>
+              }
+            /> */}
+            <Route
+              path="/items/items"
+              element={
+                <Layout>
+                  <ItemsByItem/>
                 </Layout>
               }
             />

@@ -4,12 +4,13 @@ import {
   getAllTerms,
   getTermsById,
 } from "../controllers/termsConditionsController.js";
+import userAuth from "../middleware/userAuth.js";
 
 const router = express.Router();
 
-router.post("/",        createTerms);
+router.post("/",   userAuth,      createTerms);
 
-router.get("/",         getAllTerms);
-router.get("/:id",      getTermsById);
+router.get("/",     userAuth,     getAllTerms);
+router.get("/:id",   userAuth,    getTermsById);
 
 export default router;

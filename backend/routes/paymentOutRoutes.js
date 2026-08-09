@@ -4,12 +4,15 @@ import {
     getAllPaymentOuts,
     getPaymentOutById,
     createPaymentOut,
-    updatePaymentOut} from "../controllers/paymentOutController.js";
+    updatePaymentOut,
+    deletePaymentOut} from "../controllers/paymentOutController.js";
+import userAuth from "../middleware/userAuth.js";
 
-router.get("/",          getAllPaymentOuts);
-router.get("/:id",       getPaymentOutById);
-router.post("/",         createPaymentOut);
-router.put("/:id",       updatePaymentOut);
+router.get("/",    userAuth,      getAllPaymentOuts);
+router.get("/:id",  userAuth,     getPaymentOutById);
+router.post("/",   userAuth,      createPaymentOut);
+router.put("/:id",  userAuth,     updatePaymentOut);
+router.delete("/:id",userAuth,    deletePaymentOut);
 
 
 export default router;

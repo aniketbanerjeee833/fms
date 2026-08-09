@@ -2,7 +2,7 @@
 
 import db from "../config/db.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
-import { recordPartyLedger } from "../utils/partyLedgerHelper.js";
+import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
 const cleanValue = (value) => {
@@ -13,8 +13,8 @@ const cleanValue = (value) => {
 };
 const normalizeNumber = (val) =>
   val !== undefined &&
-  val !== null &&
-  String(val).trim() !== ""
+    val !== null &&
+    String(val).trim() !== ""
     ? Number(val)
     : null;
 /* ── GET ALL ──────────────────────────────────────────────── */
@@ -471,7 +471,7 @@ const getSaleReturnById = async (req, res, next) => {
 
     //   purchaseReturnDetails: {
     //     id:                  header.id,
-    //     Purchase_Return_Id:  header.id,
+    //     Sale_Return_Id:  header.id,
     //     Party_Name:          header.Party_Name,
     //     GSTIN:               header.GSTIN,
     //     Return_Number:       header.Return_Number,
@@ -1043,7 +1043,24 @@ const createSaleReturn = async (req, res, next) => {
         message: "Sale_Id, Party and Return Date are required",
       });
     }
+    const [fy] = await connection.query(
+      `
+      SELECT Financial_Year
+      FROM financial_year
+      WHERE Current_Financial_Year = 1
+      LIMIT 1
+      `
+    );
 
+    if (fy.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No active financial year found. Please set one in settings.",
+      });
+    }
+
+    const activeFY = fy[0].Financial_Year;
     // =========================================================
     // 2. NORMALIZE PAYMENT SPLITS
     // =========================================================
@@ -1135,19 +1152,21 @@ const createSaleReturn = async (req, res, next) => {
          Return_Number,
          Invoice_Number,
          Invoice_Date,
+         financial_year,
          Return_Date,
          State_Of_Supply,
          Total_Amount,
          Total_Paid,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Sale_Id,
         party.Party_Id,
         Return_Number || null,
         Invoice_Number || null,
         Invoice_Date || null,
+        activeFY,
         Return_Date,
         State_Of_Supply || null,
         totalAmount,
@@ -1431,32 +1450,32 @@ const createSaleReturn = async (req, res, next) => {
       //   txnDate: Return_Date,
       // });
       await recordItemLedger({
-  connection,
+        connection,
 
-  itemId: Item_Id,
+        itemId: Item_Id,
 
-  txnType: "Sale_Return",
+        txnType: "Sale_Return",
 
-  referenceId: srItemId,
+        referenceId: srItemId,
 
-  billId: id,                     // sale_return.id
-  billNumber: Return_Number || null,
+        billId: id,                     // sale_return.id
+        billNumber: Return_Number || null,
 
-  partyName: Party_Name,
+        partyName: Party_Name,
 
-  // User-entered quantity
-  quantity: normalizeNumber(Quantity) ?? 0,
+        // User-entered quantity
+        quantity: normalizeNumber(Quantity) ?? 0,
 
-  // Unit used in this transaction
-  selectedUnit: resolvedSelectedUnit,
+        // Unit used in this transaction
+        selectedUnit: resolvedSelectedUnit,
 
-  // Normalized quantity in primary unit
-  baseQty: normalizeNumber(stockDelta) ?? 0,
+        // Normalized quantity in primary unit
+        baseQty: normalizeNumber(stockDelta) ?? 0,
 
-  rate: normalizeNumber(Sale_Price),
+        rate: normalizeNumber(Sale_Price),
 
-  txnDate: Return_Date,
-});
+        txnDate: Return_Date,
+      });
     }
 
     // =========================================================
@@ -2129,53 +2148,7 @@ const createSaleReturn = async (req, res, next) => {
 //   }
 // };
 /* ── DELETE ───────────────────────────────────────────────── */
-const deleteSaleReturn = async (req, res, next) => {
-  let connection;
-  try {
-    const { id } = req.params;
 
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    const [items] = await connection.query(
-      `SELECT Item_Id, Quantity FROM sale_return_items WHERE Sale_Return_Id = ?`,
-      [id]
-    );
-
-    // reverse stock
-    for (const item of items) {
-      await connection.query(
-        `UPDATE add_item SET Stock_Quantity = Stock_Quantity - ?, updated_at = NOW()
-         WHERE Item_Id = ?`,
-        [item.Quantity, item.Item_Id]
-      );
-    }
-
-    // 🔹 wipe splits + ledger rows before deleting header
-    await deletePaymentSplits({
-      connection,
-      sourceType: "Sale_Return",
-      sourceId: Number(id),
-    });
-
-    await connection.query(
-      `DELETE FROM sale_return_items WHERE Sale_Return_Id = ?`,
-      [id]
-    );
-    await connection.query(
-      `DELETE FROM sale_return WHERE id = ?`,
-      [id]
-    );
-
-    await connection.commit();
-    return res.status(200).json({ success: true, message: "Sale Return deleted" });
-  } catch (err) {
-    if (connection) await connection.rollback();
-    next(err);
-  } finally {
-    if (connection) connection.release();
-  }
-};
 const editSaleReturn = async (req, res, next) => {
   let connection;
 
@@ -2190,7 +2163,7 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
 
     const [[existing]] = await connection.query(
-      `SELECT * FROM sale_return WHERE id = ?`,
+      `SELECT id,financial_year FROM sale_return WHERE id = ?`,
       [Sale_Return_Id]
     );
 
@@ -2555,10 +2528,17 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
 
     const newQtyByItem = new Map();
+    // for (const line of resolvedLines) {
+    //   newQtyByItem.set(
+    //     line.Item_Id,
+    //     (newQtyByItem.get(line.Item_Id) || 0) + line.Quantity
+    //   );
+    // }
     for (const line of resolvedLines) {
       newQtyByItem.set(
         line.Item_Id,
-        (newQtyByItem.get(line.Item_Id) || 0) + line.Quantity
+        (newQtyByItem.get(line.Item_Id) || 0) +
+        Number(line.stockDelta || 0)
       );
     }
 
@@ -2567,12 +2547,96 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
 
     const oldQtyByItem = new Map();
+
     for (const old of oldItems) {
+
+      const [[ledgerRow]] = await connection.query(
+        `
+    SELECT Base_Qty
+    FROM item_ledger
+    WHERE Item_Id = ?
+      AND Txn_Type = 'Sale_Return'
+      AND Source_Id = ?
+    LIMIT 1
+    `,
+        [
+          old.Item_Id,
+          old.id,
+        ]
+      );
+
+      let oldBaseQty;
+
+      if (ledgerRow) {
+        // Exact historical quantity used for stock
+        oldBaseQty =
+          Number(ledgerRow.Base_Qty) || 0;
+      } else {
+
+        // Fallback for old records where ledger is missing
+        const rawQty =
+          Number(old.Quantity) || 0;
+
+        oldBaseQty = rawQty;
+
+        const oldPrimary =
+          old.Primary_Unit_Snapshot || null;
+
+        const oldSecondary =
+          old.Secondary_Unit_Snapshot || null;
+
+        const oldSelected =
+          old.Selected_Unit || null;
+
+        if (
+          oldPrimary &&
+          oldSecondary &&
+          oldSelected === oldSecondary
+        ) {
+
+          const [[conversion]] =
+            await connection.query(
+              `
+          SELECT Conversion_Rate
+          FROM item_unit_conversions
+          WHERE Item_Id = ?
+            AND Primary_Unit = ?
+            AND Secondary_Unit = ?
+          ORDER BY id DESC
+          LIMIT 1
+          `,
+              [
+                old.Item_Id,
+                oldPrimary,
+                oldSecondary,
+              ]
+            );
+
+          const conversionRate =
+            Number(conversion?.Conversion_Rate) || 0;
+
+          if (
+            Number.isFinite(conversionRate) &&
+            conversionRate > 0
+          ) {
+            oldBaseQty =
+              rawQty / conversionRate;
+          }
+        }
+      }
+
       oldQtyByItem.set(
         old.Item_Id,
-        (oldQtyByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
+        (oldQtyByItem.get(old.Item_Id) || 0) +
+        oldBaseQty
       );
     }
+    // for (const old of oldItems) {
+    //   oldQtyByItem.set(
+    //     old.Item_Id,
+    //     (oldQtyByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
+    //   );
+    // }
 
     // =========================================================
     // 19. STOCK DIFFERENCE — Sale Return ADDS stock
@@ -2585,38 +2649,63 @@ const editSaleReturn = async (req, res, next) => {
     ]);
 
     // build stockDelta-based new/old maps in parallel to qty maps
-    const newStockDeltaByItem = new Map();
-    for (const line of resolvedLines) {
-      newStockDeltaByItem.set(
-        line.Item_Id,
-        (newStockDeltaByItem.get(line.Item_Id) || 0) + line.stockDelta
-      );
-    }
-    // old items have no stored stockDelta (pre-unit-architecture rows may not),
-    // fall back to their raw Quantity as their historical stock contribution
-    const oldStockDeltaByItem = new Map();
-    for (const old of oldItems) {
-      oldStockDeltaByItem.set(
-        old.Item_Id,
-        (oldStockDeltaByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
-      );
-    }
-
+    //const newStockDeltaByItem = new Map();
+    // for (const line of resolvedLines) {
+    //   newStockDeltaByItem.set(
+    //     line.Item_Id,
+    //     (newStockDeltaByItem.get(line.Item_Id) || 0) + line.stockDelta
+    //   );
+    // }
+    // // old items have no stored stockDelta (pre-unit-architecture rows may not),
+    // // fall back to their raw Quantity as their historical stock contribution
+    // const oldStockDeltaByItem = new Map();
+    // for (const old of oldItems) {
+    //   oldStockDeltaByItem.set(
+    //     old.Item_Id,
+    //     (oldStockDeltaByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
+    //   );
+    // }
     for (const itemId of allItemIds) {
-      const newDelta = newStockDeltaByItem.get(itemId) || 0;
-      const oldDelta = oldStockDeltaByItem.get(itemId) || 0;
-      const diff = newDelta - oldDelta;
 
-      if (diff !== 0) {
-        await connection.query(
-          `UPDATE add_item
-           SET Stock_Quantity = Stock_Quantity + ?,
-               updated_at = NOW()
-           WHERE Item_Id = ?`,
-          [diff, itemId]
-        );
-      }
-    }
+  const newBaseQty =
+    newQtyByItem.get(itemId) || 0;
+
+  const oldBaseQty =
+    oldQtyByItem.get(itemId) || 0;
+
+  const diff =
+    newBaseQty - oldBaseQty;
+
+  if (diff !== 0) {
+
+    await connection.query(
+      `
+      UPDATE add_item
+      SET
+        Stock_Quantity = Stock_Quantity + ?,
+        updated_at = NOW()
+      WHERE Item_Id = ?
+      `,
+      [diff, itemId]
+    );
+  }
+}
+
+    // for (const itemId of allItemIds) {
+    //   const newDelta = newStockDeltaByItem.get(itemId) || 0;
+    //   const oldDelta = oldStockDeltaByItem.get(itemId) || 0;
+    //   const diff = newDelta - oldDelta;
+
+    //   if (diff !== 0) {
+    //     await connection.query(
+    //       `UPDATE add_item
+    //        SET Stock_Quantity = Stock_Quantity + ?,
+    //            updated_at = NOW()
+    //        WHERE Item_Id = ?`,
+    //       [diff, itemId]
+    //     );
+    //   }
+    // }
 
     // =========================================================
     // 20. REVERSE OLD ITEM LEDGER ENTRIES — unchanged
@@ -2701,32 +2790,32 @@ const editSaleReturn = async (req, res, next) => {
       //   txnDate: Return_Date,
       // });
       await recordItemLedger({
-  connection,
+        connection,
 
-  itemId: Item_Id,
+        itemId: line.Item_Id,
 
-  txnType: "Sale_Return",
+        txnType: "Sale_Return",
 
-   referenceId: saleReturnItemId,
+        referenceId: saleReturnItemId,
 
-  billId: Number(Sale_Return_Id),                     // sale_return.id
-  billNumber: Return_Number || null,
+        billId: existing.id,                     // sale_return.id
+        billNumber: Return_Number || null,
 
-  partyName: Party_Name,
+        partyName: Party_Name,
 
-  // User-entered quantity
-  quantity: normalizeNumber(line.Quantity) ?? 0,
+        // User-entered quantity
+        quantity: normalizeNumber(line.Quantity) ?? 0,
 
-  // Unit used in this transaction
-  selectedUnit: line.resolvedSelectedUnit,
+        // Unit used in this transaction
+        selectedUnit: line.Selected_Unit,
 
-  // Normalized quantity in primary unit
-  baseQty: normalizeNumber(line.stockDelta) ?? 0,
+        // Normalized quantity in primary unit
+        baseQty: normalizeNumber(line.stockDelta) ?? 0,
 
-  rate: normalizeNumber(line.Sale_Price),
+        rate: normalizeNumber(line.Sale_Price),
 
-  txnDate: Return_Date,
-});
+        txnDate: Return_Date,
+      });
     }
 
     // =========================================================
@@ -2754,6 +2843,246 @@ const editSaleReturn = async (req, res, next) => {
     next(err);
 
   } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+ const deleteSaleReturn = async (req, res, next) => {
+  let connection;
+
+  try {
+    const { Sale_Return_Id } = req.params;
+
+    if (!Sale_Return_Id) {
+      return res.status(400).json({
+        success: false,
+        message: "Sale Return ID is required.",
+      });
+    }
+
+    connection = await db.getConnection();
+
+    await connection.beginTransaction();
+
+    // =========================================================
+    // 1. GET SALE RETURN HEADER
+    // =========================================================
+
+    const [[saleReturn]] = await connection.query(
+      `
+      SELECT
+        id,
+        Sale_Id,
+        Party_Id,
+        Return_Number,
+        Return_Date
+      FROM sale_return
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [Sale_Return_Id]
+    );
+
+    if (!saleReturn) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Sale Return not found.",
+      });
+    }
+
+    const saleReturnDbId = saleReturn.id;
+
+    // =========================================================
+    // 2. GET ALL SALE RETURN ITEMS
+    //
+    // sale_return_items.id
+    //        ↓
+    // item_ledger.Source_Id
+    // =========================================================
+
+    const [returnItems] = await connection.query(
+      `
+      SELECT
+        id,
+        Item_Id
+      FROM sale_return_items
+      WHERE Sale_Return_Id = ?
+      `,
+      [Sale_Return_Id]
+    );
+
+    // =========================================================
+    // 3. REVERSE STOCK + ITEM LEDGER
+    //
+    // Sale Return = IN
+    //
+    // Sale Return originally:
+    //
+    //     Stock + Base_Qty
+    //
+    // Deleting Sale Return:
+    //
+    //     Stock - Base_Qty
+    //
+    // Use Base_Qty from item_ledger.
+    // =========================================================
+
+    for (const returnItem of returnItems) {
+
+      // -------------------------------------------------------
+      // Get exact historical quantity from ledger
+      // -------------------------------------------------------
+
+      const [[ledgerRow]] = await connection.query(
+        `
+        SELECT
+          id,
+          Direction,
+          Base_Qty,
+          Quantity
+        FROM item_ledger
+        WHERE Item_Id = ?
+          AND Txn_Type = 'Sale_Return'
+          AND Source_Id = ?
+        LIMIT 1
+        `,
+        [
+          returnItem.Item_Id,
+          returnItem.id,
+        ]
+      );
+
+      if (!ledgerRow) {
+        // No ledger row.
+        // Nothing to reverse for this item.
+        continue;
+      }
+
+      const baseQty =
+        Number(
+          ledgerRow.Base_Qty ??
+          ledgerRow.Quantity
+        ) || 0;
+
+      // -------------------------------------------------------
+      // Sale Return was IN.
+      //
+      // Delete Sale Return => remove that stock.
+      // -------------------------------------------------------
+
+      if (
+        ledgerRow.Direction === "In" &&
+        baseQty !== 0
+      ) {
+        await connection.query(
+          `
+          UPDATE add_item
+          SET
+            Stock_Quantity = Stock_Quantity - ?,
+            updated_at = NOW()
+          WHERE Item_Id = ?
+          `,
+          [
+            baseQty,
+            returnItem.Item_Id,
+          ]
+        );
+      }
+
+      // -------------------------------------------------------
+      // Delete ledger row and fix Running_Stock of all
+      // subsequent ledger rows.
+      // -------------------------------------------------------
+
+      await reverseItemLedger({
+        connection,
+        itemId: returnItem.Item_Id,
+        txnType: "Sale_Return",
+        referenceId: returnItem.id,
+      });
+    }
+
+    // =========================================================
+    // 4. DELETE PAYMENT SPLITS
+    //
+    // payment_splits.Source_Id = sale_return.id
+    // =========================================================
+
+    await deletePaymentSplits({
+      connection,
+      sourceType: "Sale_Return",
+      sourceId: saleReturnDbId,
+    });
+
+    // =========================================================
+    // 5. REVERSE PARTY LEDGER
+    //
+    // party_ledger.Source_Id = sale_return.id
+    //
+    // Opening Balance is NOT touched.
+    // =========================================================
+
+    await reversePartyLedger({
+      connection,
+      partyId: saleReturn.Party_Id,
+      txnType: "Sale_Return",
+      referenceId: saleReturnDbId,
+    });
+
+    // =========================================================
+    // 6. DELETE SALE RETURN ITEMS
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM sale_return_items
+      WHERE Sale_Return_Id = ?
+      `,
+      [Sale_Return_Id]
+    );
+
+    // =========================================================
+    // 7. DELETE SALE RETURN HEADER
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM sale_return
+      WHERE id = ?
+      `,
+      [Sale_Return_Id]
+    );
+
+    // =========================================================
+    // 8. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Sale Return deleted successfully.",
+      Sale_Return_Id,
+    });
+
+  } catch (err) {
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error deleting sale return:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+
     if (connection) {
       connection.release();
     }

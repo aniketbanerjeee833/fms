@@ -1867,7 +1867,10 @@ export default function PurchaseReturnAdd() {
 
                           onChange={(e) => {
 
-                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            //e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                             e.target.value = e.target.value
+                                .replace(/[^0-9.]/g, "")
+                                .replace(/(\..*)\./g, "$1");
                             // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                             //   return;
                             // }
