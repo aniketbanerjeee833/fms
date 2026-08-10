@@ -1693,8 +1693,35 @@ const addSale = async (req, res, next) => {
         // exactly like addPurchase.
         // =========================================================
 
-        Item_Id = itemRows[0].Item_Id;
-        const dbItemRow = itemRows[0];
+         Item_Id = itemRows[0].Item_Id;
+
+  let dbItemRow = itemRows[0];
+        if (
+  !dbItemRow.Primary_Unit &&
+  Selected_Unit
+) {
+  await connection.execute(
+    `
+    UPDATE add_item
+    SET
+      Primary_Unit = ?,
+      Item_Unit = ?,
+      updated_at = NOW()
+    WHERE Item_Id = ?
+    `,
+    [
+      Selected_Unit,
+      Selected_Unit,
+      Item_Id,
+    ]
+  );
+
+  dbItemRow = {
+    ...dbItemRow,
+    Primary_Unit: Selected_Unit,
+    Item_Unit: Selected_Unit,
+  };
+}
 
         try {
           const result = resolveUnitAndStockDelta({

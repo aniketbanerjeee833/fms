@@ -854,38 +854,112 @@ VALUES
         // The actual unit selected in this purchase row
         resolvedSelectedUnit = selectedUnit;
 
-      } else {
+      }
+       else {
 
         // =========================================================
         // EXISTING ITEM
         // =========================================================
 
+        // Item_Id = itemRows[0].Item_Id;
+
+        // const dbItemRow = itemRows[0];
+
+        // try {
+        //   const result = resolveUnitAndStockDelta({
+        //     dbItemRow,
+        //     Selected_Unit,
+        //     Quantity,
+        //   });
+
+        //   stockDelta = result.stockDelta;
+
+        //   snapshot = result.snapshot;
+
+        //   resolvedSelectedUnit = result.resolvedSelectedUnit;
+
+        // } catch (unitErr) {
+
+        //   await connection.rollback();
+
+        //   return res.status(400).json({
+        //     success: false,
+        //     message: unitErr.message,
+        //   });
+        // }
         Item_Id = itemRows[0].Item_Id;
 
-        const dbItemRow = itemRows[0];
+let dbItemRow = itemRows[0];
 
-        try {
-          const result = resolveUnitAndStockDelta({
-            dbItemRow,
-            Selected_Unit,
-            Quantity,
-          });
+// =========================================================
+// EXISTING ITEM BUT NO UNIT CONFIGURED YET
+//
+// Example:
+// add_item:
+// Primary_Unit = NULL
+// Secondary_Unit = NULL
+//
+// User selects Kgs in Purchase.
+//
+// → Make Kgs the Primary_Unit immediately.
+// =========================================================
 
-          stockDelta = result.stockDelta;
+if (
+  !dbItemRow.Primary_Unit &&
+  Selected_Unit
+) {
+  await connection.execute(
+    `
+    UPDATE add_item
+    SET
+      Primary_Unit = ?,
+      Item_Unit = ?,
+      updated_at = NOW()
+    WHERE Item_Id = ?
+    `,
+    [
+      Selected_Unit,
+      Selected_Unit,
+      Item_Id,
+    ]
+  );
 
-          snapshot = result.snapshot;
+  // IMPORTANT:
+  // Update local object too because resolveUnitAndStockDelta()
+  // uses dbItemRow, not the database again.
+  dbItemRow = {
+    ...dbItemRow,
+    Primary_Unit: Selected_Unit,
+    Item_Unit: Selected_Unit,
+  };
+}
 
-          resolvedSelectedUnit = result.resolvedSelectedUnit;
+// =========================================================
+// NOW RESOLVE UNIT + STOCK
+// =========================================================
 
-        } catch (unitErr) {
+try {
+  const result = resolveUnitAndStockDelta({
+    dbItemRow,
+    Selected_Unit,
+    Quantity,
+  });
 
-          await connection.rollback();
+  stockDelta = result.stockDelta;
 
-          return res.status(400).json({
-            success: false,
-            message: unitErr.message,
-          });
-        }
+  snapshot = result.snapshot;
+
+  resolvedSelectedUnit =
+    result.resolvedSelectedUnit;
+
+} catch (unitErr) {
+  await connection.rollback();
+
+  return res.status(400).json({
+    success: false,
+    message: unitErr.message,
+  });
+}
 
         // Existing item → increase existing stock
        await connection.execute(
@@ -3171,7 +3245,7 @@ const getSinglePurchase = async (req, res, next) => {
   -- CURRENT MASTER
   i.Primary_Unit AS Current_Primary_Unit,
   i.Secondary_Unit AS Current_Secondary_Unit,
-
+       i.Conversion_Rate,
   pi.Quantity,
 
   -- HISTORICAL SNAPSHOT
@@ -3448,7 +3522,10 @@ availableUnits = unitCodes.map((unitCode) => {
         // ONE unit selected by user for this bill row
         Selected_Unit:
           it.Selected_Unit,
-
+        Conversion_Rate:
+  it.Conversion_Rate !== null
+    ? Number(it.Conversion_Rate)
+    : 0,
         // Units frontend should show in edit dropdown
         Available_Units:
           availableUnits,

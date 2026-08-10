@@ -52,16 +52,16 @@ export default function PurchaseAdd() {
 
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
-
+  const basePurchasePriceRef = useRef({});
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
   const [newlyAddedItem, setNewlyAddedItem] = useState(null);
-    const [activeItemRow, setActiveItemRow] = useState(null);
+  const [activeItemRow, setActiveItemRow] = useState(null);
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   // const { data: items, } = useGetAllItemsQuery();
-  // console.log(items, parties);
+  console.log(items);
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   //console.log(banks, "banks");
@@ -705,7 +705,7 @@ export default function PurchaseAdd() {
     }
 
   }, [watch("Party_Name"), parties]);
-  console.log("showGSTIN:", showGSTIN, parties);
+  //console.log("showGSTIN:", showGSTIN, parties);
 
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
@@ -1735,6 +1735,7 @@ export default function PurchaseAdd() {
                                     setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                     //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                     setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                    basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
                                     const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                       {
                                         ...itemsValues[i],
@@ -1972,7 +1973,7 @@ export default function PurchaseAdd() {
                                             setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
                                             //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-
+                                            basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
                                             handleRowChange(i, "itemOpen", false);
 
 
@@ -2002,7 +2003,7 @@ export default function PurchaseAdd() {
                                           <td className="px-3 py-2">{it.Item_Name}</td>
                                           <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                           <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                          <td  className="px-3 py-2 whitespace-nowrap"
+                                          <td className="px-3 py-2 whitespace-nowrap"
                                             style={{
                                               padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
                                               color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
@@ -2120,21 +2121,21 @@ export default function PurchaseAdd() {
                         </td>
 
 
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
+                        <td style={{ padding: "0px", width: "12%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Item_Unit`}
                             render={({ field }) => {
                               const row = rows[i];
                               const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-
+                              console.log(row, "row")
                               return (
                                 <select
                                   {...field}
                                   value={field.value || ""}
                                   className="form-select"
                                   style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                  disabled={row?.isUnitLocked}
+                                  //disabled={row?.isUnitLocked}
                                   onChange={(e) => {
                                     const newUnit = e.target.value;
 
@@ -2148,11 +2149,11 @@ export default function PurchaseAdd() {
                                     field.onChange(newUnit);
                                     handleRowChange(i, "Item_Unit", newUnit);
                                     setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
-                                    const quantity = Number(itemsValues[i]?.Quantity);
+                                    //const quantity = Number(itemsValues[i]?.Quantity);
 
-                                    if (!Number.isFinite(quantity) || quantity <= 0) {
-                                      return;
-                                    }
+                                    // if (!Number.isFinite(quantity) || quantity <= 0) {
+                                    //   return;
+                                    // }
                                     // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
                                     const primaryUnit = row?.Primary_Unit;
                                     const secondaryUnit = row?.Secondary_Unit;
@@ -2166,20 +2167,68 @@ export default function PurchaseAdd() {
                                       secondaryUnit &&
                                       conversionRate > 0
                                     ) {
-                                      const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
+                                      //const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
 
-                                      let newPrice = currentPrice;
+                                      //let newPrice = currentPrice;
 
                                       // switching FROM primary TO secondary — price per unit gets smaller
-                                      if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
-                                        newPrice = currentPrice / conversionRate;
+                                      // if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
+                                      //   newPrice = currentPrice / conversionRate;
+                                      // }
+                                      // // switching FROM secondary TO primary — price per unit gets bigger
+                                      // else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
+                                      //   newPrice = currentPrice * conversionRate;
+                                      // }
+
+                                      //const roundedPrice = newPrice.toFixed(2);
+                                      const basePrice =
+                                        Number(basePurchasePriceRef.current[i]) || 0;
+
+                                      if (basePrice <= 0) {
+                                        return;
                                       }
-                                      // switching FROM secondary TO primary — price per unit gets bigger
-                                      else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
-                                        newPrice = currentPrice * conversionRate;
+
+                                      let newPrice = basePrice;
+
+                                      // =====================================================
+                                      // PRIMARY → SECONDARY
+                                      // Example:
+                                      // ₹45 / Kg
+                                      // 1 Kg = 1000 Gm
+                                      // ₹45 / 1000 = ₹0.045
+                                      // UI allows only 2 decimals → ₹0.05
+                                      // =====================================================
+
+                                      if (
+                                        previousUnit === primaryUnit &&
+                                        newUnit === secondaryUnit
+                                      ) {
+                                        newPrice = basePrice / conversionRate;
+                                      }
+
+                                      // =====================================================
+                                      // SECONDARY → PRIMARY
+                                      // IMPORTANT:
+                                      // Do NOT use current displayed price.
+                                      // Restore original base price.
+                                      // =====================================================
+
+                                      else if (
+                                        previousUnit === secondaryUnit &&
+                                        newUnit === primaryUnit
+                                      ) {
+                                        newPrice = basePrice;
+                                      }
+
+                                      else {
+                                        return;
                                       }
 
                                       const roundedPrice = newPrice.toFixed(2);
+
+                                      
+
+
                                       setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
 
                                       // recompute Amount/Tax/Total with the new price
@@ -2222,8 +2271,8 @@ export default function PurchaseAdd() {
                           {errors?.items?.[i]?.Item_Unit && (
                             <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
                           )}
-                        </td> */}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        </td>
+                        {/* <td style={{ padding: "0px", width: "12%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Item_Unit`}
@@ -2244,7 +2293,7 @@ export default function PurchaseAdd() {
                                     fontSize: "12px",
                                     marginLeft: "0px",
                                   }}
-                                  disabled={row?.isUnitLocked}
+                                  //disabled={row?.isUnitLocked}
                                   onChange={(e) => {
                                     const value = e.target.value;
 
@@ -2264,7 +2313,7 @@ export default function PurchaseAdd() {
                                     });
                                   }}
                                 >
-                                  {/* Item has configured units */}
+                                 
                                   {availableUnits.length > 0 ? (
                                     availableUnits.map((unit) => (
                                       <option
@@ -2278,8 +2327,7 @@ export default function PurchaseAdd() {
                                     <>
                                       <option value="">NONE</option>
 
-                                      {/* Only allow choosing/adding unit when
-                                                                selected item has NO configured units */}
+                                    
                                       {Array.isArray(itemUnits) &&
                                         itemUnits.map((unit) => (
                                           <option
@@ -2305,92 +2353,9 @@ export default function PurchaseAdd() {
                               {errors.items[i].Item_Unit.message}
                             </p>
                           )}
-                        </td>
+                        </td> */}
 
 
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
-                          <Controller
-                            control={control}
-                            name={`items.${i}.Item_Unit`}
-                            render={({ field }) => {
-                              const row = rows[i];
-
-                              const availableUnits = Array.isArray(row?.Available_Units)
-                                ? row.Available_Units
-                                : [];
-
-                              return (
-                                <select
-                                  {...field}
-                                  value={field.value || ""}
-                                  className="form-select"
-                                  style={{
-                                    width: "100%",
-                                    fontSize: "12px",
-                                    marginLeft: "0px",
-                                  }}
-                                  disabled={row?.isUnitLocked}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-
-                                    if (value === "__ADD_UNIT__") {
-                                      setActiveUnitRow(i);
-                                      setShowAddUnitModal(true);
-                                      return;
-                                    }
-
-                                    field.onChange(value);
-
-                                    handleRowChange(i, "Item_Unit", value);
-
-                                    setValue(`items.${i}.Item_Unit`, value, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    });
-                                  }}
-                                >
-                                 
-                        {availableUnits.length > 0 ? (
-                          availableUnits.map((unit) => (
-                            <option
-                              key={unit.Unit_Shorthand}
-                              value={unit.Unit_Shorthand}
-                            >
-                              {unit.Unit_Name} ({unit.Unit_Shorthand})
-                            </option>
-                          ))
-                        ) : (
-                          <>
-                            <option value="">NONE</option>
-
-                            {/* Only allow choosing/adding unit when
-                                          selected item has NO configured units 
-                            {Array.isArray(itemUnits) &&
-                              itemUnits.map((unit) => (
-                                <option
-                                  key={unit.Unit_Shorthand}
-                                  value={unit.Unit_Shorthand}
-                                >
-                                  {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                </option>
-                              ))}
-
-                            <option value="__ADD_UNIT__">
-                              ➕ Add Unit
-                            </option>
-                          </>
-                        )}
-                      </select>
-                    );
-                  }}
-                          />
-
-                  {errors?.items?.[i]?.Item_Unit && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.items[i].Item_Unit.message}
-                    </p>
-                  )}
-                </td> */}
 
 
 
@@ -2428,7 +2393,7 @@ export default function PurchaseAdd() {
                                 // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                                 //   return;
                                 // }
-
+                                basePurchasePriceRef.current[i] = Number(val) || 0;
 
                                 const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                   { ...itemsValues[i], Purchase_Price: val },
