@@ -1465,26 +1465,26 @@ const getAllItems = async (req, res, next) => {
     // 5. PURCHASE HISTORY
     // =========================================================
 
-    const [purchaseItems] = await connection.query(`
-      SELECT
-        Item_Id,
-        Purchase_Price,
-        Tax_Type
-      FROM add_purchase_items
-      ORDER BY created_at DESC
-    `);
+    // const [purchaseItems] = await connection.query(`
+    //   SELECT
+    //     Item_Id,
+    //     Purchase_Price,
+    //     Tax_Type
+    //   FROM add_purchase_items
+    //   ORDER BY created_at DESC
+    // `);
 
     // =========================================================
     // 6. SALES HISTORY
     // =========================================================
 
-    const [salesItems] = await connection.query(`
-      SELECT
-        Item_Id,
-        Sale_Price
-      FROM add_sale_items
-      ORDER BY created_at DESC
-    `);
+    // const [salesItems] = await connection.query(`
+    //   SELECT
+    //     Item_Id,
+    //     Sale_Price
+    //   FROM add_sale_items
+    //   ORDER BY created_at DESC
+    // `);
 
     // =========================================================
     // 7. UNIT CONVERSION HISTORY
@@ -1532,31 +1532,31 @@ FROM (
     // 8. LATEST PURCHASE PRICE + TAX
     // =========================================================
 
-    const latestPurchasePrice = {};
-    const latestTaxType = {};
+    // const latestPurchasePrice = {};
+    // const latestTaxType = {};
 
-    purchaseItems.forEach((row) => {
-      if (latestPurchasePrice[row.Item_Id] === undefined) {
-        latestPurchasePrice[row.Item_Id] =
-          row.Purchase_Price;
+    // purchaseItems.forEach((row) => {
+    //   if (latestPurchasePrice[row.Item_Id] === undefined) {
+    //     latestPurchasePrice[row.Item_Id] =
+    //       row.Purchase_Price;
 
-        latestTaxType[row.Item_Id] =
-          row.Tax_Type;
-      }
-    });
+    //     latestTaxType[row.Item_Id] =
+    //       row.Tax_Type;
+    //   }
+    // });
 
     // =========================================================
     // 9. LATEST SALE PRICE
     // =========================================================
 
-    const latestSalePrice = {};
+    // const latestSalePrice = {};
 
-    salesItems.forEach((row) => {
-      if (latestSalePrice[row.Item_Id] === undefined) {
-        latestSalePrice[row.Item_Id] =
-          row.Sale_Price;
-      }
-    });
+    // salesItems.forEach((row) => {
+    //   if (latestSalePrice[row.Item_Id] === undefined) {
+    //     latestSalePrice[row.Item_Id] =
+    //       row.Sale_Price;
+    //   }
+    // });
 
     // =========================================================
     // 10. GROUP CONVERSIONS BY ITEM
@@ -1667,26 +1667,41 @@ FROM (
           : !item.Secondary_Unit
             ? true
             : !hasTransactions;
-      return {
-        ...item,
+            return {
+  ...item,
 
-        Purchase_Price:
-          latestPurchasePrice[item.Item_Id] ?? 0,
+  // Prices now come directly from add_item
+  Purchase_Price:item.Purchase_Price ?? 0,
 
-        Tax_Type:
-          latestTaxType[item.Item_Id] ?? null,
+  Sale_Price:item.Sale_Price ?? 0,
 
-        Sale_Price:
-          latestSalePrice[item.Item_Id] ?? 0,
+  Available_Units: availableUnits,
 
-        // CURRENT configured units
-        Available_Units: availableUnits,
+  unitConversions:
+    conversionsByItem[item.Item_Id] || [],
 
-        // Historical conversion records
-        unitConversions: conversionsByItem[item.Item_Id] || [],
+  Can_Edit_Units: canEditUnits,
+};
+      // return {
+      //   ...item,
 
-        Can_Edit_Units: canEditUnits,
-      };
+      //   Purchase_Price:
+      //     latestPurchasePrice[item.Item_Id] ?? 0,
+
+      //   Tax_Type:
+      //     latestTaxType[item.Item_Id] ?? null,
+
+      //   Sale_Price:
+      //     latestSalePrice[item.Item_Id] ?? 0,
+
+      //   // CURRENT configured units
+      //   Available_Units: availableUnits,
+
+      //   // Historical conversion records
+      //   unitConversions: conversionsByItem[item.Item_Id] || [],
+
+      //   Can_Edit_Units: canEditUnits,
+      // };
     });
 
     // =========================================================

@@ -37,7 +37,7 @@ export default function AddItemModal({ onClose, onSave }) {
     const [addItem, { isLoading: isAddingItem }] = useAddItemMutation();
     const [addCategory] = useAddCategoryMutation();
 
-    const [activeTab, setActiveTab] = useState("Purchase Items");
+    const [activeTab, setActiveTab] = useState("Items");
     const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState(null);
     const [search, setSearch] = useState("");
@@ -116,333 +116,339 @@ export default function AddItemModal({ onClose, onSave }) {
     };
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            style={{
-                backgroundColor: "rgba(0,0,0,0.3)",
-                backdropFilter: "blur(4px)",
-                padding: "1rem",
-            }}
-            onClick={onClose}
-        >
+        <>
             <div
-                className="bg-white w-full max-w-4xl rounded-lg shadow-lg p-6 overflow-y-auto max-h-[90vh]"
-                onClick={(e) => e.stopPropagation()}
+                className="fixed inset-0 z-50 flex  items-center justify-center"
+                style={{
+                    backgroundColor: "rgba(39, 19, 19, 0.3)",
+                    backdropFilter: "blur(4px)",
+                    padding: "1rem",
+                     marginTop: "50px",
+
+                }}
+                onClick={onClose}
             >
-                <div className="flex justify-between items-center mb-6" style={{ paddingBottom: "10px" }}>
-                    <div className="flex flex-col">
-                        <h4 className="text-xl font-semibold text-gray-900">Add New Item</h4>
-                        <p className="text-gray-500 text-sm">Add new item details</p>
+                <div
+                    className="bg-white w-full max-w-4xl rounded-lg shadow-lg p-6 overflow-y-auto max-h-[90vh]"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center mb-6" style={{ paddingBottom: "10px" }}>
+                        <div className="flex flex-col">
+                            <h4 className="text-xl font-semibold text-gray-900">Add New Item</h4>
+                            <p className="text-gray-500 text-sm">Add new item details</p>
+                        </div>
+                        <button
+                            type="button"
+                            style={{ backgroundColor: "transparent" }}
+                            onClick={onClose}
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            <X size={22} />
+                        </button>
                     </div>
-                    <button
-                        type="button"
-                        style={{ backgroundColor: "transparent" }}
-                        onClick={onClose}
-                        className="text-gray-500 hover:text-gray-700"
-                    >
-                        <X size={22} />
-                    </button>
-                </div>
 
-                {/* Tabs */}
-                <div className="flex gap-6 w-full mb-3">
-                    <div className="flex space-x-8">
-                        {["Purchase Items", "Stock"].map((tab) => (
-                            <button
-                                type="button"
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                style={{
-                                    cursor: "pointer",
-                                    backgroundColor: "transparent",
-                                    border: "none",
-                                    outline: "none",
-                                    padding: "0.5rem 1rem",
-                                    borderBottom: activeTab === tab ? "1px solid red" : "none",
-                                    color: activeTab === tab ? "red" : "gray",
-                                    fontWeight: activeTab === tab ? "600" : "500",
-                                }}
-                            >
-                                {tab}
-                            </button>
-                        ))}
+                    {/* Tabs */}
+                    <div className="flex gap-6 w-full mb-3">
+                        <div className="flex space-x-8">
+                            {["Items", "Stock"].map((tab) => (
+                                <button
+                                    type="button"
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    style={{
+                                        cursor: "pointer",
+                                        backgroundColor: "transparent",
+                                        border: "none",
+                                        outline: "none",
+                                        padding: "0.5rem 1rem",
+                                        borderBottom: activeTab === tab ? "1px solid red" : "none",
+                                        color: activeTab === tab ? "red" : "gray",
+                                        fontWeight: activeTab === tab ? "600" : "500",
+                                    }}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
 
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    {activeTab === "Purchase Items" && (
-                        <div>
-                            <div className="row flex gap-4">
-                                {/* Category dropdown */}
-                                <div style={{ width: "50%" }} className="relative mt-3" ref={dropdownRef}>
-                                    <span className="active">Category</span>
+                    <form onSubmit={handleSubmit(onSubmit)}>
+                        {activeTab === "Items" && (
+                            <div>
+                                <div className="flex gap-4">
+                                    {/* Category dropdown */}
+                                    <div style={{ width: "50%" }} className="relative mt-3" ref={dropdownRef}>
+                                        <span className="active">Category</span>
 
-                                    <input
-                                        type="text"
-                                        value={search}
-                                        onClick={() => setOpen((prev) => !prev)}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        placeholder="Search category"
-                                        className="w-full outline-none border-b-2 text-gray-900"
-                                    />
+                                        <input
+                                            type="text"
+                                            value={search}
+                                            onClick={() => setOpen((prev) => !prev)}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                            placeholder="Search category"
+                                            className="w-full outline-none border-b-2 text-gray-900"
+                                        />
 
-                                    {open && (
-                                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                            <span
-                                                onClick={() => {
-                                                    setShowCategoryModal(true);
-                                                    setOpen(false);
-                                                }}
-                                                className="w-full text-left px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                                            >
-                                                + Add Category
-                                            </span>
-
-                                            {categories
-                                                ?.filter((cat) =>
-                                                    cat.Item_Category.toLowerCase().includes(search.toLowerCase())
-                                                )
-                                                .map((cat, i) => (
-                                                    <div
-                                                        key={i}
-                                                        onClick={() => {
-                                                            handleSelect(cat.Item_Category);
-                                                            setSearch(cat.Item_Category);
-                                                        }}
-                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                    >
-                                                        {cat.Item_Category}
-                                                    </div>
-                                                ))}
-
-                                            {categories?.filter((cat) =>
-                                                cat.Item_Category.toLowerCase().includes(search.toLowerCase())
-                                            ).length === 0 && (
-                                                    <p className="px-3 py-2 text-gray-500">No categories found</p>
-                                                )}
-                                        </div>
-                                    )}
-
-                                    <input type="hidden" {...register("Item_Category")} value={selected || ""} />
-
-                                    {showCategoryModal && (
-                                        <div
-                                            style={{
-                                                position: "fixed",
-                                                inset: 0,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                backgroundColor: "rgba(0,0,0,0.4)",
-                                                backdropFilter: "blur(4px)",
-                                                zIndex: 60,
-                                            }}
-                                            onClick={() => setShowCategoryModal(false)}
-                                        >
-                                            <div
-                                                className="bg-white p-6 rounded-lg shadow-lg w-96 relative"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <button
-                                                    type="button"
-                                                    style={{ backgroundColor: "transparent" }}
-                                                    onClick={() => setShowCategoryModal(false)}
-                                                    className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                                        {open && (
+                                            <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                                <span
+                                                    onClick={() => {
+                                                        setShowCategoryModal(true);
+                                                        setOpen(false);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
                                                 >
-                                                    ✕
-                                                </button>
-
-                                                <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                                                <input
-                                                    type="text"
-                                                    value={newCategory}
-                                                    onChange={(e) => setNewCategory(e.target.value)}
-                                                    className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                                    placeholder="Enter category name"
-                                                />
-                                                <div className="flex justify-end gap-3">
-                                                    <button
-                                                        type="button"
-                                                        style={{ backgroundColor: "lightgray" }}
-                                                        onClick={() => setShowCategoryModal(false)}
-                                                        className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleAddCategory}
-                                                        style={{ backgroundColor: "#4CA1AF" }}
-                                                        className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
-                                                    >
-                                                        Add
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Item Name */}
-                                <div className="input-field col s6" style={{ width: "50%" }}>
-                                    <span className="active">
-                                        Item Name
-                                        <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
-                                    </span>
-                                    <input
-                                        type="text"
-                                        id="Item_Name"
-                                        {...register("Item_Name")}
-                                        placeholder=" Item Name"
-                                        className="w-full outline-none border-b-2 text-gray-900"
-                                    />
-                                    {errors?.Item_Name && (
-                                        <p className="text-red-500 text-xs mt-1">{errors?.Item_Name?.message}</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="row flex gap-4 mt-4">
-                                {/* HSN */}
-                                <div className="input-field col s6" style={{ width: "50%" }}>
-                                    <span className="active">Item HSN Code</span>
-                                    <input
-                                        type="text"
-                                        id="Item_HSN"
-                                        {...register("Item_HSN")}
-                                        placeholder=" Item HSN Code"
-                                        className="w-full outline-none border-b-2 text-gray-900"
-                                        maxLength={8}
-                                        onInput={(e) => {
-                                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                                        }}
-                                    />
-                                    {errors?.Item_HSN && (
-                                        <p className="text-red-500 text-xs mt-1">{errors?.Item_HSN?.message}</p>
-                                    )}
-                                </div>
-
-                                {/* Unit */}
-                                <div className="input-field col s6" style={{ width: "50%" }}>
-                                    <span className="active">Unit</span>
-
-                                    <div className="mt-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSelectUnitModal(true)}
-                                            className="px-4 py-2 rounded-md border"
-                                            style={{ backgroundColor: "white", borderColor: "#4CA1AF", color: "#4CA1AF" }}
-                                        >
-                                            {primaryUnit ? "Change Unit" : "Select Unit"}
-                                        </button>
-
-                                        {primaryUnit && (
-                                            <div className="mt-2 text-sm text-gray-600">
-                                                <span>
-                                                    Primary: <strong>{primaryUnit}</strong>
+                                                    + Add Category
                                                 </span>
 
-                                                {secondaryUnit && (
-                                                    <>
-                                                        <span className="ml-3">
-                                                            Secondary: <strong>{secondaryUnit}</strong>
-                                                        </span>
-                                                        <div className="mt-1 text-[#4CA1AF]">
-                                                            1 {primaryUnit} = {conversionRate} {secondaryUnit}
+                                                {categories
+                                                    ?.filter((cat) =>
+                                                        cat.Item_Category.toLowerCase().includes(search.toLowerCase())
+                                                    )
+                                                    .map((cat, i) => (
+                                                        <div
+                                                            key={i}
+                                                            onClick={() => {
+                                                                handleSelect(cat.Item_Category);
+                                                                setSearch(cat.Item_Category);
+                                                            }}
+                                                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                                        >
+                                                            {cat.Item_Category}
                                                         </div>
-                                                    </>
-                                                )}
+                                                    ))}
+
+                                                {categories?.filter((cat) =>
+                                                    cat.Item_Category.toLowerCase().includes(search.toLowerCase())
+                                                ).length === 0 && (
+                                                        <p className="px-3 py-2 text-gray-500">No categories found</p>
+                                                    )}
+                                            </div>
+                                        )}
+
+                                        <input type="hidden" {...register("Item_Category")} value={selected || ""} />
+
+                                        {showCategoryModal && (
+                                            <div
+                                                style={{
+                                                    position: "fixed",
+                                                    inset: 0,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    backgroundColor: "rgba(0,0,0,0.4)",
+                                                    backdropFilter: "blur(4px)",
+                                                    zIndex: 60,
+                                                }}
+                                                onClick={() => setShowCategoryModal(false)}
+                                            >
+                                                <div
+                                                    className="bg-white p-6 rounded-lg shadow-lg w-96 relative"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        style={{ backgroundColor: "transparent" }}
+                                                        onClick={() => setShowCategoryModal(false)}
+                                                        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                                                    >
+                                                        ✕
+                                                    </button>
+
+                                                    <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                                                    <input
+                                                        type="text"
+                                                        value={newCategory}
+                                                        onChange={(e) => setNewCategory(e.target.value)}
+                                                        className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                                        placeholder="Enter category name"
+                                                    />
+                                                    <div className="flex justify-end gap-3">
+                                                        <button
+                                                            type="button"
+                                                            style={{ backgroundColor: "lightgray" }}
+                                                            onClick={() => setShowCategoryModal(false)}
+                                                            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleAddCategory}
+                                                            style={{ backgroundColor: "#4CA1AF" }}
+                                                            className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#5c52d4]"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Item Name */}
+                                    <div className="input-field col s6" style={{ width: "50%" }}>
+                                        <span className="active">
+                                            Item Name
+                                            <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
+                                        </span>
+                                        <input
+                                            type="text"
+                                            id="Item_Name"
+                                            {...register("Item_Name")}
+                                            placeholder=" Item Name"
+                                            className="w-full outline-none border-b-2 text-gray-900"
+                                        />
+                                        {errors?.Item_Name && (
+                                            <p className="text-red-500 text-xs mt-1">{errors?.Item_Name?.message}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-4">
+                                    {/* HSN */}
+                                    <div className="input-field col s6" style={{ width: "50%" }}>
+                                        <span className="active">Item HSN Code</span>
+                                        <input
+                                            type="text"
+                                            id="Item_HSN"
+                                            {...register("Item_HSN")}
+                                            placeholder=" Item HSN Code"
+                                            className="w-full outline-none border-b-2 text-gray-900"
+                                            maxLength={8}
+                                            onInput={(e) => {
+                                                e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                                            }}
+                                        />
+                                        {errors?.Item_HSN && (
+                                            <p className="text-red-500 text-xs mt-1">{errors?.Item_HSN?.message}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Unit */}
+                                    <div className="input-field col s6" style={{ width: "50%" }}>
+                                        <span className="active">Unit</span>
+
+                                        <div className="mt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowSelectUnitModal(true)}
+                                                className="px-4 py-2 rounded-md border"
+                                                style={{ backgroundColor: "white", borderColor: "#4CA1AF", color: "#4CA1AF" }}
+                                            >
+                                                {primaryUnit ? "Change Unit" : "Select Unit"}
+                                            </button>
+
+                                            {primaryUnit && (
+                                                <div className="mt-2 text-sm text-gray-600">
+                                                    <span>
+                                                        Primary: <strong>{primaryUnit}</strong>
+                                                    </span>
+
+                                                    {secondaryUnit && (
+                                                        <>
+                                                            <span className="ml-3">
+                                                                Secondary: <strong>{secondaryUnit}</strong>
+                                                            </span>
+                                                            <div className="mt-1 text-[#4CA1AF]">
+                                                                1 {primaryUnit} = {conversionRate} {secondaryUnit}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                              
+                            </div>
+                        )}
+
+                        {activeTab === "Stock" && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mt-6">
+                                <div className="flex flex-col">
+                                    <span className="active">Opening Quantity</span>
+                                    <input
+                                        type="text"
+                                        placeholder="0"
+                                        className="w-full outline-none border-b-2 text-gray-900"
+                                        {...register("Opening_Quantity")}
+                                        onInput={(e) => {
+                                            e.target.value = e.target.value.replace(/[^0-9.]/g, "");
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col">
+                                    <span className="active">At Price</span>
+                                    <input
+                                        type="text"
+                                        placeholder="0.00"
+                                        className="w-full outline-none border-b-2 text-gray-900"
+                                        {...register("At_Price")}
+                                        onInput={(e) => {
+                                            e.target.value = e.target.value.replace(/[^0-9.]/g, "");
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col">
+                                    <span className="active">As Of Date</span>
+                                    <input
+                                        type="date"
+                                        className="w-full outline-none border-b-2 text-gray-900"
+                                        defaultValue={new Date().toISOString().slice(0, 10)}
+                                        {...register("As_Of_Date")}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col">
+                                    <span className="active">Min Stock To Maintain</span>
+                                    <input
+                                        type="text"
+                                        placeholder="0"
+                                        className="w-full outline-none border-b-2 text-gray-900"
+                                        {...register("Min_Stock")}
+                                        onInput={(e) => {
+                                            e.target.value = e.target.value.replace(/[^0-9.]/g, "");
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="flex flex-col">
+                                    <span className="active">Location</span>
+                                    <input
+                                        type="text"
+                                        className="w-full outline-none border-b-2 text-gray-900"
+                                        {...register("Location")}
+                                    />
                                 </div>
                             </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="text-white font-bold py-2 px-4 rounded"
+                                style={{ backgroundColor: "#94a3b8" }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isAddingItem}
+                                className="text-white font-bold py-2 px-4 rounded"
+                                style={{ backgroundColor: "#4CA1AF" }}
+                            >
+                                {isAddingItem ? "Adding..." : "Add Item"}
+                            </button>
                         </div>
-                    )}
+                    </form>
+                </div>
 
-                    {activeTab === "Stock" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 mt-6">
-                            <div className="flex flex-col">
-                                <span className="active">Opening Quantity</span>
-                                <input
-                                    type="text"
-                                    placeholder="0"
-                                    className="w-full outline-none border-b-2 text-gray-900"
-                                    {...register("Opening_Quantity")}
-                                    onInput={(e) => {
-                                        e.target.value = e.target.value.replace(/[^0-9.]/g, "");
-                                    }}
-                                />
-                            </div>
 
-                            <div className="flex flex-col">
-                                <span className="active">At Price</span>
-                                <input
-                                    type="text"
-                                    placeholder="0.00"
-                                    className="w-full outline-none border-b-2 text-gray-900"
-                                    {...register("At_Price")}
-                                    onInput={(e) => {
-                                        e.target.value = e.target.value.replace(/[^0-9.]/g, "");
-                                    }}
-                                />
-                            </div>
-
-                            <div className="flex flex-col">
-                                <span className="active">As Of Date</span>
-                                <input
-                                    type="date"
-                                    className="w-full outline-none border-b-2 text-gray-900"
-                                    defaultValue={new Date().toISOString().slice(0, 10)}
-                                    {...register("As_Of_Date")}
-                                />
-                            </div>
-
-                            <div className="flex flex-col">
-                                <span className="active">Min Stock To Maintain</span>
-                                <input
-                                    type="text"
-                                    placeholder="0"
-                                    className="w-full outline-none border-b-2 text-gray-900"
-                                    {...register("Min_Stock")}
-                                    onInput={(e) => {
-                                        e.target.value = e.target.value.replace(/[^0-9.]/g, "");
-                                    }}
-                                />
-                            </div>
-
-                            <div className="flex flex-col">
-                                <span className="active">Location</span>
-                                <input
-                                    type="text"
-                                    className="w-full outline-none border-b-2 text-gray-900"
-                                    {...register("Location")}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-3 mt-6">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="text-white font-bold py-2 px-4 rounded"
-                            style={{ backgroundColor: "#94a3b8" }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isAddingItem}
-                            className="text-white font-bold py-2 px-4 rounded"
-                            style={{ backgroundColor: "#4CA1AF" }}
-                        >
-                            {isAddingItem ? "Adding..." : "Add Item"}
-                        </button>
-                    </div>
-                </form>
             </div>
-
             {showSelectUnitModal && (
                 <SelectUnitModal
                     units={itemUnits || []}
@@ -471,6 +477,168 @@ export default function AddItemModal({ onClose, onSave }) {
                     }}
                 />
             )}
-        </div>
+        </>
     );
 }
+
+//   <div className="mt-6">
+
+//                                     {/* <h3 className="font-semibold text-gray-800 mb-3">
+//                                         Sale Price
+//                                     </h3> */}
+
+//                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+
+//                                         {/* Sale Price */}
+//                                         <div className="w-full">
+//                                             <span className="font-semibold text-gray-800">Sale Price</span>
+
+//                                             <input
+//                                                 type="text"
+//                                                 placeholder="Sale Price"
+//                                                 className="
+//           w-full
+//           border-b-2 border-gray-300
+//           outline-none
+//           py-1.5
+//           text-gray-900
+//         "
+//                                                 {...register("Sale_Price")}
+//                                                 onInput={(e) => {
+//                                                     e.target.value = e.target.value
+//                                                         .replace(/[^0-9.]/g, "")
+//                                                         .replace(/(\..*)\./g, "$1");
+//                                                 }}
+//                                             />
+//                                         </div>
+
+//                                         {/* Sale Price Type */}
+//                                         {/* <div className="w-full">
+//                                             <label className="block text-xs text-gray-600 mb-1">
+//                                                 Sale Price Type
+//                                             </label>
+
+//                                             <select
+//                                                 className="
+//           w-full
+//           border-b-2 border-gray-300
+//           outline-none
+//           py-1.5
+//           bg-white
+//         "
+//                                                 {...register("Sale_Price_Type")}
+//                                             >
+//                                                 <option value="Without_Tax">Without Tax</option>
+//                                                 <option value="With_Tax">With Tax</option>
+//                                             </select>
+//                                         </div> */}
+
+//                                         {/* Discount */}
+//                                         <div className="w-full">
+//                                             <label className="block text-xs text-gray-600 mb-1">
+//                                                 Disc. On Sale Price
+//                                             </label>
+
+//                                             <input
+//                                                 type="text"
+//                                                 placeholder="Disc. On Sale Price"
+//                                                 className="
+//           w-full
+//           border-b-2 border-gray-300
+//           outline-none
+//           py-1.5
+//           text-gray-900
+//         "
+//                                                 {...register("Discount_On_Sale_Price")}
+//                                                 onInput={(e) => {
+//                                                     e.target.value = e.target.value
+//                                                         .replace(/[^0-9.]/g, "")
+//                                                         .replace(/(\..*)\./g, "$1");
+//                                                 }}
+//                                             />
+//                                         </div>
+
+//                                         {/* Discount Type */}
+//                                         <div className="w-full">
+//                                             <label className="block text-xs text-gray-600 mb-1">
+//                                                 Discount Type
+//                                             </label>
+
+//                                             <select
+//                                                 className="
+//           w-full
+//           border-b-2 border-gray-300
+//           outline-none
+//           py-1.5
+//           bg-white
+//         "
+//                                                 {...register("Discount_Type_On_Sale_Price")}
+//                                             >
+//                                                 <option value="Percentage">Percentage</option>
+//                                                 <option value="Amount">Amount</option>
+//                                             </select>
+//                                         </div>
+
+//                                     </div>
+
+//                                     {errors?.Discount_On_Sale_Price && (
+//                                         <p className="text-red-500 text-xs mt-1">
+//                                             {errors.Discount_On_Sale_Price.message}
+//                                         </p>
+//                                     )}
+
+//                                 </div>
+
+//                                 <div className="mt-6">
+
+                                    
+
+//                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+//                                         {/* Purchase Price */}
+//                                         <div className="w-full">
+//                                            <span className="font-semibold text-gray-800">Purchase Price</span>
+
+//                                             <input
+//                                                 type="text"
+//                                                 placeholder="Purchase Price"
+//                                                 className="
+//           w-full
+//           border-b-2 border-gray-300
+//           outline-none
+//           py-1.5
+//           text-gray-900
+//         "
+//                                                 {...register("Purchase_Price")}
+//                                                 onInput={(e) => {
+//                                                     e.target.value = e.target.value
+//                                                         .replace(/[^0-9.]/g, "")
+//                                                         .replace(/(\..*)\./g, "$1");
+//                                                 }}
+//                                             />
+//                                         </div>
+
+//                                         {/* Purchase Price Type */}
+//                                         {/* <div className="w-full">
+//                                             <label className="block text-xs text-gray-600 mb-1">
+//                                                 Purchase Price Type
+//                                             </label>
+
+//                                             <select
+//                                                 className="
+//           w-full
+//           border-b-2 border-gray-300
+//           outline-none
+//           py-1.5
+//           bg-white
+//         "
+//                                                 {...register("Purchase_Price_Type")}
+//                                             >
+//                                                 <option value="Without_Tax">Without Tax</option>
+//                                                 <option value="With_Tax">With Tax</option>
+//                                             </select>
+//                                         </div> */}
+
+//                                     </div>
+
+//                                 </div>

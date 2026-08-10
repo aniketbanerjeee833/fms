@@ -27,6 +27,7 @@ import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { Trash2 } from "lucide-react";
+import AddItemModal from "../../components/Modal/AddItemModal";
 
 
 
@@ -110,7 +111,10 @@ export default function PurchaseReturndEdit() {
     });
 
   const { data: parties } = useGetAllPartiesQuery();
-  const { data: items } = useGetAllItemsQuery();
+   const [showItemAddModal, setShowItemAddModal] = useState(false);
+  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+    const [activeItemRow, setActiveItemRow] = useState(null);
+  const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   // console.log(items);
@@ -1109,12 +1113,51 @@ export default function PurchaseReturndEdit() {
                       </div>
                     )}
                   </div>
-                  {showPartyModal && (
+                  {/* {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
                       onSave={(newParty) => {
                         setPartySearch(newParty);
                         setValue("Party_Name", newParty, { shouldValidate: true });
+                        setShowPartyModal(false);
+                      }}
+                    />
+                  )} */}
+                  {showPartyModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={(newParty) => {
+                        setPartySearch(newParty.Party_Name);
+
+                        setValue(
+                          "Party_Name",
+                          newParty.Party_Name,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "GSTIN",
+                          newParty.GSTIN || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "Billing_Name",
+                          newParty.Billing_Name || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        //setCurrentPartyDetails(newParty);
+
                         setShowPartyModal(false);
                       }}
                     />
@@ -1437,7 +1480,7 @@ export default function PurchaseReturndEdit() {
                                 // ❌ Clear Item_Name in RHF to trigger error
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
                                 handleRowChange(i, "isExistingItem", false);
-                                
+
                                 handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
                                 handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
                                 handleRowChange(i, "Available_Units", [])
@@ -1525,10 +1568,32 @@ export default function PurchaseReturndEdit() {
                           {/* Dropdown List */}
                           {rows[i]?.itemOpen && (
                             <div
-                              style={{ width: "40rem" }}
+                              style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
       border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
+                               <div
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleRowChange(i, "itemOpen", true);
+                                    setActiveItemRow(i);
+                                    setShowItemAddModal(true);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                  style={{
+                                    borderBottom: "1px solid #e5e7eb",
+                                    color: "#4CA1AF",
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    position: "sticky",
+                                    top: 0,
+                                    backgroundColor: "#fff",
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                  Add Item
+                                </div>
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1620,15 +1685,15 @@ export default function PurchaseReturndEdit() {
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
                                         {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
-                                        <td
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}
-                                        </td>
+                                        <td  className="px-3 py-2 whitespace-nowrap"
+                                            style={{
+                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                              fontWeight: "500", // optional: matches Tailwind's medium weight
+                                            }}
+                                          >
+                                            {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                          </td>
                                       </tr>
                                     ))}
 
@@ -1695,10 +1760,10 @@ export default function PurchaseReturndEdit() {
                           {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
                             //let value = e.target.value.replace(/[^0-9]/g, "");
-                                let value = e.target.value;
-                           value = value
-                                .replace(/[^0-9.]/g, "")
-                                .replace(/(\..*)\./g, "$1");
+                            let value = e.target.value;
+                            value = value
+                              .replace(/[^0-9.]/g, "")
+                              .replace(/(\..*)\./g, "$1");
                             // let currentItemName = itemsValues[i]?.Item_Name?.trim();
                             // if (!currentItemName) return;
 
@@ -2645,6 +2710,40 @@ export default function PurchaseReturndEdit() {
 
         />
       )}
+       {showItemAddModal && (
+                    <AddItemModal
+                      onClose={() => {
+                        setShowItemAddModal(false);
+            
+                        if (activeItemRow !== null) {
+                          handleRowChange(activeItemRow, "itemOpen", true);
+                        }
+                      }}
+                      onSave={async (savedItem) => {
+                        if (!savedItem || typeof savedItem !== "object") {
+                          setShowItemAddModal(false);
+                          return;
+                        }
+            
+                        await refetchItems();
+            
+                        setNewlyAddedItem(savedItem);
+            
+                        setTimeout(() => {
+                          setNewlyAddedItem(null);
+                        }, 8000);
+            
+                        setShowItemAddModal(false);
+            
+                        // Reopen the SAME row's dropdown
+                        if (activeItemRow !== null) {
+                          handleRowChange(activeItemRow, "itemOpen", true);
+                        }
+            
+                        setActiveItemRow(null);
+                      }}
+                    />
+                  )}
       <style>
         {`
   /*  screens between 1000px and 640px */

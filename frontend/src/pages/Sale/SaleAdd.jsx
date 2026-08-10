@@ -27,6 +27,7 @@ import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bank
 import { Trash2 } from "lucide-react";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
+import AddItemModal from "../../components/Modal/AddItemModal";
 
 export default function SaleAdd() {
 
@@ -95,7 +96,11 @@ export default function SaleAdd() {
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
-  const { data: items } = useGetAllItemsQuery();
+  const [showItemAddModal, setShowItemAddModal] = useState(false);
+  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+  const [activeItemRow, setActiveItemRow] = useState(null);
+  // find this line in your code and add refetch:
+  const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   //console.log(items,parties);
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
@@ -1038,12 +1043,51 @@ export default function SaleAdd() {
                       )}
                     </div>
 
-                    {showPartyModal && (
+                    {/* {showPartyModal && (
                       <PartyAddModal
                         onClose={() => setShowPartyModal(false)}
                         onSave={(newParty) => {
                           setPartySearch(newParty);
                           setValue("Party_Name", newParty, { shouldValidate: true, shouldDirty: true });
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )} */}
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartySearch(newParty.Party_Name);
+
+                          setValue(
+                            "Party_Name",
+                            newParty.Party_Name,
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          setValue(
+                            "GSTIN",
+                            newParty.GSTIN || "",
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          setValue(
+                            "Billing_Name",
+                            newParty.Billing_Name || "",
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          setCurrentPartyDetails(newParty);
+
                           setShowPartyModal(false);
                         }}
                       />
@@ -1541,10 +1585,32 @@ export default function SaleAdd() {
 
                           {rows[i]?.itemOpen && (
                             <div
-                              style={{ width: "40rem" }}
+                              style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
       border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
+                              <div
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleRowChange(i, "itemOpen", true);
+                                  setActiveItemRow(i);
+                                  setShowItemAddModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                style={{
+                                  borderBottom: "1px solid #e5e7eb",
+                                  color: "#4CA1AF",
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  position: "sticky",
+                                  top: 0,
+                                  backgroundColor: "#fff",
+                                  zIndex: 1,
+                                }}
+                              >
+                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                Add Item
+                              </div>
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1584,15 +1650,15 @@ export default function SaleAdd() {
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
-                                        <td
+
+                                        <td  className="px-3 py-2 whitespace-nowrap"
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
                                             color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
                                             fontWeight: "500", // optional: matches Tailwind's medium weight
                                           }}
                                         >
-                                          {it.Stock_Quantity || 0}
+                                            {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
                                         </td>
                                       </tr>
                                     ))}
@@ -1612,6 +1678,102 @@ export default function SaleAdd() {
                               </table>
                             </div>
                           )}
+                          {/* {rows[i]?.itemOpen && (
+                              <div
+                                style={{ width: "40rem" }}
+                                className="absolute z-20  w-full bg-white border
+                      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                              >
+                               
+                                <div
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleRowChange(i, "itemOpen", true);
+                                    setActiveItemRow(i);
+                                    setShowItemAddModal(true);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                  style={{
+                                    borderBottom: "1px solid #e5e7eb",
+                                    color: "#4CA1AF",
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    position: "sticky",
+                                    top: 0,
+                                    backgroundColor: "#fff",
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                  Add Item
+                                </div>
+
+                             
+                                <table className="w-full text-sm border-collapse">
+                                  <thead className="bg-gray-100 border-b">
+                                    <tr>
+                                      <th>Sl.No</th>
+                                      <th className="text-left px-3 py-2">Item Name</th>
+                                      <th className="text-left px-3 py-2">Sale Price</th>
+                                      <th className="text-left px-3 py-2">Purchase Price</th>
+                                      <th className="text-left px-3 py-2">Stock</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {items?.items
+                                      ?.filter((it) =>
+                                        it.Item_Name.toLowerCase().includes(
+                                          (rows[i]?.itemSearch || "").toLowerCase()
+                                        )
+                                      )
+                                      .map((it, idx) => (
+                                        <tr
+                                          key={idx}
+                                          onClick={() => {
+                                             if (it.Stock_Quantity <= 0) {
+                                            // show confirmation modal instead of directly adding
+                                            setConfirmModal({ open: true, item: it, rowIndex: i });
+                                            return;
+                                          }
+
+                                          // ✅ proceed directly if stock > 0
+                                          handleItemSelect(it, i);
+                                            
+                                          }}
+
+                                          className="hover:bg-gray-100 cursor-pointer border-b"
+                                        >
+                                          <td>{idx + 1}</td>
+                                          <td className="px-3 py-2">{it.Item_Name}</td>
+                                          <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
+                                          <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                          <td
+                                            style={{
+                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                              fontWeight: "500", // optional: matches Tailwind's medium weight
+                                            }}
+                                          >
+                                            {it.Stock_Quantity || 0}
+                                          </td>
+                                        </tr>
+                                      ))}
+
+                                    {items?.items?.filter((it) =>
+                                      it.Item_Name.toLowerCase().includes(
+                                        (rows[i]?.itemSearch || "").toLowerCase()
+                                      )
+                                    ).length === 0 && (
+                                        <tr>
+                                          <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
+                                            No Item found
+                                          </td>
+                                        </tr>
+                                      )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )} */}
                           {confirmModal.open && (
                             <div
                               className="fixed inset-0 
@@ -1695,9 +1857,9 @@ export default function SaleAdd() {
                           {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
                             let value = e.target.value;
-                           value = value
-                                .replace(/[^0-9.]/g, "")
-                                .replace(/(\..*)\./g, "$1");
+                            value = value
+                              .replace(/[^0-9.]/g, "")
+                              .replace(/(\..*)\./g, "$1");
                             //let stockQty = items?.items?.find((item) => item.Item_Name === itemsValues[i]?.Item_Name)?.Stock_Quantity || 0;
                             //console.log(stockQty);
 
@@ -1715,7 +1877,7 @@ export default function SaleAdd() {
 
                             // ✅ Recalculate row + totals
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
-                              calculateRowAmount({ ...itemsValues[i], Quantity:Number(value) || 0 }, i, itemsValues);
+                              calculateRowAmount({ ...itemsValues[i], Quantity: Number(value) || 0 }, i, itemsValues);
 
                             setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                             setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
@@ -1822,8 +1984,6 @@ export default function SaleAdd() {
                               ? row.Available_Units
                               : [];
 
-                            const isExistingItem = row?.isExistingItem === true;
-
                             return (
                               <select
                                 {...field}
@@ -1838,10 +1998,6 @@ export default function SaleAdd() {
                                 onChange={(e) => {
                                   const value = e.target.value;
 
-                                  // ==========================================
-                                  // ADD NEW UNIT
-                                  // Only relevant for brand-new item
-                                  // ==========================================
                                   if (value === "__ADD_UNIT__") {
                                     setActiveUnitRow(i);
                                     setShowAddUnitModal(true);
@@ -1858,52 +2014,22 @@ export default function SaleAdd() {
                                   });
                                 }}
                               >
-                                {isExistingItem ? (
-                                  <>
-                                    {/* ========================================
-                  EXISTING ITEM
-
-                  Use CURRENT units from getAllItems.
-
-                  Example:
-                  Primary   = Kgs
-                  Secondary = gm
-
-                  Available_Units = [Kgs, gm]
-
-                  Show ONLY:
-                  Kgs
-                  gm
-              ======================================== */}
-
-                                    {availableUnits.length === 0 && (
-                                      <option value="">NONE</option>
-                                    )}
-
-                                    {availableUnits.map((unit) => (
-                                      <option
-                                        key={unit.Unit_Shorthand}
-                                        value={unit.Unit_Shorthand}
-                                      >
-                                        {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                      </option>
-                                    ))}
-                                  </>
+                                {/* Item has configured units */}
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option
+                                      key={unit.Unit_Shorthand}
+                                      value={unit.Unit_Shorthand}
+                                    >
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
                                 ) : (
                                   <>
-                                    {/* ========================================
-                  BRAND-NEW ITEM
-
-                  No item master exists yet.
-
-                  Allow:
-                  NONE
-                  all units
-                  Add Unit
-              ======================================== */}
-
                                     <option value="">NONE</option>
 
+                                    {/* Only allow choosing/adding unit when
+                                                                                      selected item has NO configured units */}
                                     {Array.isArray(itemUnits) &&
                                       itemUnits.map((unit) => (
                                         <option
@@ -2638,21 +2764,41 @@ export default function SaleAdd() {
             setShowAddUnitModal(false);
             setActiveUnitRow(null);
           }}
-        // onSave={({  unitKey }) => {
-        //   // 1️⃣ Add unit to dropdown list
-        //   // setItemUnits((prev) => ({
-        //   //   ...prev,
-        //   //   [unitKey]: unitName,
-        //   // }));
+      
+        />
+      )}
+      {showItemAddModal && (
+        <AddItemModal
+          onClose={() => {
+            setShowItemAddModal(false);
 
-        //   // 2️⃣ Auto-select newly added unit
-        //   setValue(`items.${activeUnitRow}.Item_Unit`, unitKey);
-        //   handleRowChange(activeUnitRow, "Item_Unit", unitKey);
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
+          }}
+          onSave={async (savedItem) => {
+            if (!savedItem || typeof savedItem !== "object") {
+              setShowItemAddModal(false);
+              return;
+            }
 
-        //   // 3️⃣ Close modal
-        //   setShowAddUnitModal(false);
-        //   setActiveUnitRow(null);
-        // }}
+            await refetchItems();
+
+            setNewlyAddedItem(savedItem);
+
+            setTimeout(() => {
+              setNewlyAddedItem(null);
+            }, 8000);
+
+            setShowItemAddModal(false);
+
+            // Reopen the SAME row's dropdown
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
+
+            setActiveItemRow(null);
+          }}
         />
       )}
       <style>

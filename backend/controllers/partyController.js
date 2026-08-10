@@ -99,7 +99,7 @@ const addParty = async (req, res, next) => {
        (Party_Id, Party_Name,Billing_Name, GSTIN, Phone_Number, State, Email_Id,
         Opening_Balance, Opening_Balance_Type, Opening_Balance_Date,
         Credit_Limit_Type, Credit_Limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`,
       [
         newId,
         Party_Name,

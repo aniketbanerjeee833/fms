@@ -27,6 +27,7 @@ import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bank
 
 
 import { Trash2 } from "lucide-react";
+import AddItemModal from "../../components/Modal/AddItemModal";
 
 export default function SaleReturndEdit() {
 
@@ -108,7 +109,11 @@ export default function SaleReturndEdit() {
     });
   const { data: parties } = useGetAllPartiesQuery();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const { data: items } = useGetAllItemsQuery();
+  const [showItemAddModal, setShowItemAddModal] = useState(false);
+    const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+    const [activeItemRow, setActiveItemRow] = useState(null);
+    // find this line in your code and add refetch:
+    const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   const [addCategory] = useAddCategoryMutation();
   const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
@@ -1066,12 +1071,51 @@ export default function SaleReturndEdit() {
                       </div>
                     )}
                   </div>
-                  {showPartyModal && (
+                  {/* {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
                       onSave={(newParty) => {
                         setPartySearch(newParty);
                         setValue("Party_Name", newParty, { shouldValidate: true });
+                        setShowPartyModal(false);
+                      }}
+                    />
+                  )} */}
+                  {showPartyModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={(newParty) => {
+                        setPartySearch(newParty.Party_Name);
+
+                        setValue(
+                          "Party_Name",
+                          newParty.Party_Name,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "GSTIN",
+                          newParty.GSTIN || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "Billing_Name",
+                          newParty.Billing_Name || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        //setCurrentPartyDetails(newParty);
+
                         setShowPartyModal(false);
                       }}
                     />
@@ -1482,11 +1526,33 @@ export default function SaleReturndEdit() {
 
                           {/* Dropdown List */}
                           {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "40rem" }}
+                           <div
+                              style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                              border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
+                              <div
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleRowChange(i, "itemOpen", true);
+                                  setActiveItemRow(i);
+                                  setShowItemAddModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                style={{
+                                  borderBottom: "1px solid #e5e7eb",
+                                  color: "#4CA1AF",
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  position: "sticky",
+                                  top: 0,
+                                  backgroundColor: "#fff",
+                                  zIndex: 1,
+                                }}
+                              >
+                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                Add Item
+                              </div>
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1570,15 +1636,15 @@ export default function SaleReturndEdit() {
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
-                                        <td
+                                      
+                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
                                             color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
                                             fontWeight: "500", // optional: matches Tailwind's medium weight
                                           }}
                                         >
-                                          {it.Stock_Quantity || 0}
+                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
                                         </td>
                                       </tr>
                                     ))}
@@ -1659,7 +1725,7 @@ export default function SaleReturndEdit() {
                             // // ✅ Effective available stock = stock + previously sold quantity
                             // const effectiveAvailableStock = currentStock + previousQuantity;
 
-                          
+
                             // let num = Number(value);
 
                             // if (!Number.isFinite(num) || num < 0) {
@@ -1673,7 +1739,7 @@ export default function SaleReturndEdit() {
                             // ✅ Recalculate row + totals
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
                               calculateRowAmount(
-                                { ...itemsValues[i], Quantity: Number(value) || 0},
+                                { ...itemsValues[i], Quantity: Number(value) || 0 },
                                 i,
                                 itemsValues
                               );
@@ -2527,6 +2593,40 @@ export default function SaleReturndEdit() {
 
         />
       )}
+        {showItemAddModal && (
+              <AddItemModal
+                onClose={() => {
+                  setShowItemAddModal(false);
+      
+                  if (activeItemRow !== null) {
+                    handleRowChange(activeItemRow, "itemOpen", true);
+                  }
+                }}
+                onSave={async (savedItem) => {
+                  if (!savedItem || typeof savedItem !== "object") {
+                    setShowItemAddModal(false);
+                    return;
+                  }
+      
+                  await refetchItems();
+      
+                  setNewlyAddedItem(savedItem);
+      
+                  setTimeout(() => {
+                    setNewlyAddedItem(null);
+                  }, 8000);
+      
+                  setShowItemAddModal(false);
+      
+                  // Reopen the SAME row's dropdown
+                  if (activeItemRow !== null) {
+                    handleRowChange(activeItemRow, "itemOpen", true);
+                  }
+      
+                  setActiveItemRow(null);
+                }}
+              />
+            )}
       <style>
         {`
   /*  screens between 1000px and 640px */

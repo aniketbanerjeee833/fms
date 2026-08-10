@@ -22,6 +22,7 @@ import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { Trash2 } from "lucide-react"
+import AddItemModal from "../../components/Modal/AddItemModal";
 export default function PurchaseReturnAdd() {
   const location = useLocation();
   const from = location.state?.from
@@ -57,7 +58,10 @@ export default function PurchaseReturnAdd() {
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
-  const { data: items } = useGetAllItemsQuery();
+   const [showItemAddModal, setShowItemAddModal] = useState(false);
+  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+    const [activeItemRow, setActiveItemRow] = useState(null);
+  const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
 
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: banks = [] } = useGetAllBankAccountsQuery();
@@ -1150,12 +1154,51 @@ export default function PurchaseReturnAdd() {
                   </div>
 
                   {/* Add Party Modal */}
-                  {showPartyModal && (
+                  {/* {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
                       onSave={(newParty) => {
                         setPartySearch(newParty);
                         setValue("Party_Name", newParty, { shouldValidate: true });
+                        setShowPartyModal(false);
+                      }}
+                    />
+                  )} */}
+                  {showPartyModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={(newParty) => {
+                        setPartySearch(newParty.Party_Name);
+
+                        setValue(
+                          "Party_Name",
+                          newParty.Party_Name,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "GSTIN",
+                          newParty.GSTIN || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "Billing_Name",
+                          newParty.Billing_Name || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        //setCurrentPartyDetails(newParty);
+
                         setShowPartyModal(false);
                       }}
                     />
@@ -1605,13 +1648,13 @@ export default function PurchaseReturnAdd() {
                                 // ✅ Only store if it's a valid item
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
                                 handleRowChange(i, "isExistingItem", true);
-                                
+
                               } else {
                                 // ❌ Clear Item_Name in RHF to trigger error
                                 // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
                                 // handleRowChange(i, "isExistingItem", false);
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                 handleRowChange(i, "isExistingItem", false);
+                                handleRowChange(i, "isExistingItem", false);
                                 handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
                                 handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
                                 handleRowChange(i, "Available_Units", []);
@@ -1641,7 +1684,7 @@ export default function PurchaseReturnAdd() {
                                       isHSNLocked: false,
                                       isUnitLocked: false,
                                       itemOpen: false,
-                                        Primary_Unit: matchedItem.Primary_Unit || null,
+                                      Primary_Unit: matchedItem.Primary_Unit || null,
                                       Secondary_Unit: matchedItem.Secondary_Unit || null,
                                       Conversion_Rate: matchedItem.Conversion_Rate || null,
 
@@ -1700,10 +1743,32 @@ export default function PurchaseReturnAdd() {
                           {/* Dropdown List */}
                           {rows[i]?.itemOpen && (
                             <div
-                              style={{ width: "40rem" }}
+                              style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
                            border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
+                               <div
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleRowChange(i, "itemOpen", true);
+                                    setActiveItemRow(i);
+                                    setShowItemAddModal(true);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                  style={{
+                                    borderBottom: "1px solid #e5e7eb",
+                                    color: "#4CA1AF",
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    position: "sticky",
+                                    top: 0,
+                                    backgroundColor: "#fff",
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                  Add Item
+                                </div>
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1736,7 +1801,7 @@ export default function PurchaseReturnAdd() {
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: false,      // lock HSN
                                               isUnitLocked: false,     // lock unit
-                                                Primary_Unit: it.Primary_Unit || null,
+                                              Primary_Unit: it.Primary_Unit || null,
                                               Secondary_Unit: it.Secondary_Unit || null,
                                               Conversion_Rate: it.Conversion_Rate || null,
                                               // ✅ VERY IMPORTANT
@@ -1794,18 +1859,16 @@ export default function PurchaseReturnAdd() {
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        {/* <td style={{color:"transparent"}}
-              className={`px-3 py-2 ${it.Stock_Quantity <= 0 ? "text-red-500" : "text-green-500"}`}>
-                {it.Stock_Quantity || 0}</td> */}
-                                        <td
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}
-                                        </td>
+                                       
+                                        <td  className="px-3 py-2 whitespace-nowrap"
+                                            style={{
+                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                              fontWeight: "500", // optional: matches Tailwind's medium weight
+                                            }}
+                                          >
+                                            {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                          </td>
                                       </tr>
                                     ))}
 
@@ -1868,9 +1931,9 @@ export default function PurchaseReturnAdd() {
                           onChange={(e) => {
 
                             //e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                             e.target.value = e.target.value
-                                .replace(/[^0-9.]/g, "")
-                                .replace(/(\..*)\./g, "$1");
+                            e.target.value = e.target.value
+                              .replace(/[^0-9.]/g, "")
+                              .replace(/(\..*)\./g, "$1");
                             // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                             //   return;
                             // }
@@ -1903,53 +1966,7 @@ export default function PurchaseReturnAdd() {
                       </td>
 
 
-                      {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => (
-                            <select
-                              {...field}
-                              className="form-select"
-                              style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                              disabled={rows[i]?.isUnitLocked}
-                              onChange={(e) => {
-                                const value = e.target.value;
-
-                                // ➕ ADD UNIT
-                                if (value === "__ADD_UNIT__") {
-                                  setActiveUnitRow(i);
-                                  setShowAddUnitModal(true);
-                                  return;
-                                }
-
-                                handleRowChange(i, "Item_Unit", value);
-                                setValue(`items.${i}.Item_Unit`, value, { shouldValidate: true, shouldDirty: true });
-                              }}
-                            >
-                              <option value=""></option>
-                              <option value="__ADD_UNIT__">➕ Add Unit</option>
-                              {Array.isArray(itemUnits) &&
-                                itemUnits.map((unit) => (
-                                  <option
-                                    key={unit.Unit_Shorthand}
-                                    value={unit.Unit_Shorthand}
-                                  >
-                                    {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
-                                  </option>
-                                ))}
-
-                              {/* ➕ Add Unit always at bottom 
-
-                            </select>
-                          )}
-                        />
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Item_Unit.message}
-                          </p>
-                        )}
-                      </td> */}
+                    
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
@@ -2802,6 +2819,40 @@ export default function PurchaseReturnAdd() {
 
         />
       )}
+         {showItemAddModal && (
+              <AddItemModal
+                onClose={() => {
+                  setShowItemAddModal(false);
+      
+                  if (activeItemRow !== null) {
+                    handleRowChange(activeItemRow, "itemOpen", true);
+                  }
+                }}
+                onSave={async (savedItem) => {
+                  if (!savedItem || typeof savedItem !== "object") {
+                    setShowItemAddModal(false);
+                    return;
+                  }
+      
+                  await refetchItems();
+      
+                  setNewlyAddedItem(savedItem);
+      
+                  setTimeout(() => {
+                    setNewlyAddedItem(null);
+                  }, 8000);
+      
+                  setShowItemAddModal(false);
+      
+                  // Reopen the SAME row's dropdown
+                  if (activeItemRow !== null) {
+                    handleRowChange(activeItemRow, "itemOpen", true);
+                  }
+      
+                  setActiveItemRow(null);
+                }}
+              />
+            )}
       <style>
         {`
   /*  screens between 1000px and 640px */

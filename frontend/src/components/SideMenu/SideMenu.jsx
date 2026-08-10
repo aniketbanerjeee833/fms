@@ -263,7 +263,7 @@ if (
           ])}
           {renderMenu("Items", <Package size={20} />, [
              { to: "/items/add-category", text: "Add Category" },
-            { to: "/items/add", text: "Add Items" },
+            //{ to: "/items/add", text: "Add Items" },
             //{ to: "/items/all-items", text: "Item Details" },
                 { to: "/items/items", text: "Items" },
          
@@ -272,7 +272,7 @@ if (
         
              {renderMenu("Purchase", <ShoppingCart size={20} />, [
            
-            { to: "/purchase/add", text: "Add Purchase" },
+            //{ to: "/purchase/add", text: "Add Purchase" },
               { to: "/purchase/return", text: "Purchase Return" },
             { to: "/purchase/payment-out", text: "Payment Out" },
             { to: "/purchase/all-purchases", text: " All Purchases " },
@@ -282,7 +282,7 @@ if (
                {renderMenu("Sales", <DollarSign size={20} />, [
            
            {to: "/sale/invoice", text: " Invoice" },
-            { to: "/sale/add", text: "Add Sale" },
+            //{ to: "/sale/add", text: "Add Sale" },
               { to: "/sale/return", text: "Sale Return" },
              { to: "/sale/payment-in", text: "Payment In" },
              { to: "/sale/all-sales", text: " All Sales" },

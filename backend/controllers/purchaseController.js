@@ -779,46 +779,52 @@ const addPurchase = async (req, res, next) => {
         const [itemResult] = await connection.execute(
           `
     INSERT INTO add_item
-    (
-      Item_Name,
-      Item_HSN,
-      Item_Unit,
-      Item_Category,
+(
+  Item_Name,
+  Item_HSN,
+  Item_Unit,
+  Item_Category,
 
-      Primary_Unit,
-      Secondary_Unit,
-      Conversion_Rate,
+  Primary_Unit,
+  Secondary_Unit,
+  Conversion_Rate,
 
-      Stock_Quantity,
+  Purchase_Price,
 
-      created_at,
-      updated_at
-    )
-    VALUES
-    (
-      ?, ?, ?, ?,
-      ?, ?, ?,
-      ?,
-      NOW(), NOW()
-    )
+  Stock_Quantity,
+
+  created_at,
+  updated_at
+)
+VALUES
+(
+  ?, ?, ?, ?,
+  ?, ?, ?,
+  ?,
+  ?,
+  NOW(), NOW()
+)
     `,
           [
-            Item_Name,
-            cleanValue(Item_HSN),
+  Item_Name,
+  cleanValue(Item_HSN),
 
-            // Legacy field
-            Item_Unit || "",
+  // Legacy field
+  Item_Unit || "",
 
-            Item_Category || "",
+  Item_Category || "",
 
-            // New unit system
-            primaryUnit,
-            null,
-            null,
+  // Unit system
+  primaryUnit,
+  null,
+  null,
 
-            // Initial live stock
-            normalizeNumber(Quantity) ?? 0,
-          ]
+  // ✅ Latest purchase price
+  normalizeNumber(Purchase_Price) ?? null,
+
+  // Initial stock
+  normalizeNumber(Quantity) ?? 0,
+]
         );
 
         const itemIdNum = itemResult.insertId;
@@ -882,26 +888,30 @@ const addPurchase = async (req, res, next) => {
         }
 
         // Existing item → increase existing stock
-        await connection.execute(
-          `
-    UPDATE add_item
-    SET
-      Stock_Quantity = Stock_Quantity + ?,
-      Item_HSN = ?,
-      Item_Category = ?,
-      updated_at = NOW()
-    WHERE Item_Id = ?
-    `,
-          [
-            stockDelta,
+       await connection.execute(
+  `
+  UPDATE add_item
+  SET
+    Stock_Quantity = Stock_Quantity + ?,
+    Item_HSN = ?,
+    Item_Category = ?,
+    Purchase_Price = ?,
+    updated_at = NOW()
+  WHERE Item_Id = ?
+  `,
+  [
+    stockDelta,
 
-            cleanValue(Item_HSN) || dbItemRow.Item_HSN,
+    cleanValue(Item_HSN) || dbItemRow.Item_HSN,
 
-            Item_Category || "",
+    Item_Category || "",
 
-            Item_Id,
-          ]
-        );
+    // ✅ Always keep latest purchase price
+    normalizeNumber(Purchase_Price) ?? null,
+
+    Item_Id,
+  ]
+);
       }
 
       const [pitResult] = await connection.execute(
@@ -1820,6 +1830,7 @@ for (const item of items) {
     Item_Unit,
 
     Quantity,
+    Purchase_Price, // ✅ ADD
 
     // These may come from frontend for a brand-new item
     Primary_Unit,
@@ -1977,53 +1988,61 @@ for (const item of items) {
     // CREATE NEW ITEM MASTER
     // ===================================================
 
-    await connection.execute(
-      `
-      INSERT INTO add_item
-      (
-        Item_Id,
-        Item_Name,
-        Item_Category,
-        Item_HSN,
+   await connection.execute(
+  `
+  INSERT INTO add_item
+  (
+    Item_Id,
+    Item_Name,
+    Item_Category,
+    Item_HSN,
 
-        Item_Unit,
+    Item_Unit,
 
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate,
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate,
 
-        Stock_Quantity,
+    Purchase_Price,
 
-        created_at,
-        updated_at
-      )
-      VALUES
-      (
-        ?, ?, ?, ?,
-        ?,
-        ?, ?, ?,
-        ?,
-        NOW(),
-        NOW()
-      )
-      `,
-      [
-        Item_Id,
-        Item_Name,
-        Item_Category || "",
-        cleanValue(Item_HSN),
+    Stock_Quantity,
 
-        // legacy field
-        Item_Unit || "",
+    created_at,
+    updated_at
+  )
+  VALUES
+  (
+    ?, ?, ?, ?,
+    ?,
+    ?, ?, ?,
 
-        primaryUnit,
-        secondaryUnit,
-        conversionRate,
+    ?,
 
-        // Stock gets updated below using diff calculation
-        0,
-      ]
-    );
+    ?,
+
+    NOW(),
+    NOW()
+  )
+  `,
+  [
+    Item_Id,
+    Item_Name,
+    Item_Category || "",
+    cleanValue(Item_HSN),
+
+    Item_Unit || "",
+
+    primaryUnit,
+    secondaryUnit,
+    conversionRate,
+
+    // ✅ Latest purchase price
+    normalizeNumber(Purchase_Price) ?? null,
+
+    // Stock gets updated later
+    0,
+  ]
+);
 
     // ===================================================
     // SAVE CONVERSION HISTORY
@@ -2383,7 +2402,12 @@ for (const item of items) {
       updates.push("Item_Category = ?");
       params.push(Item_Category || "");
     }
+    // ===================================================
+// ✅ LATEST PURCHASE PRICE
+// ===================================================
 
+updates.push("Purchase_Price = ?");
+params.push(normalizeNumber(Purchase_Price) ?? null);
     if (updates.length > 0) {
       params.push(Item_Id);
 

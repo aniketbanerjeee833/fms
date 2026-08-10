@@ -68,6 +68,15 @@ const decimalNumber = (fieldName, decimals = 6) =>
     .transform((val) =>
       val === "" ? null : Number(val)
     );
+    const priceField = (fieldName) =>
+  z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .transform((val) => String(val ?? "").trim())
+    .refine(
+      (val) => val === "" || /^\d+(\.\d{1,2})?$/.test(val),
+      { message: `${fieldName} must be a valid number` }
+    )
+    .transform((val) => (val === "" ? null : Number(val)));
 export const itemFormSchema = z
   .object({
     Item_Name: z
@@ -123,6 +132,26 @@ Item_Unit: z
       .transform((val) => val || null),
 
   Conversion_Rate:decimalNumber("Conversion Rate", 6),
+  Sale_Price: priceField("Sale Price"),
+
+    // Sale_Price_Type: z
+    //   .enum(["With_Tax", "Without_Tax"])
+    //   .optional()
+    //   .default("Without_Tax"),
+
+    Discount_On_Sale_Price: priceField("Discount on Sale Price"),
+
+    Discount_Type_On_Sale_Price: z
+      .enum(["Percentage", "Amount"])
+      .optional()
+      .default("Percentage"),
+
+    Purchase_Price: priceField("Purchase Price"),
+
+    // Purchase_Price_Type: z
+    //   .enum(["With_Tax", "Without_Tax"])
+    //   .optional()
+    //   .default("Without_Tax"),
 
     // =====================================================
     // PRICING
@@ -183,6 +212,13 @@ Item_Unit: z
   // =======================================================
 
   .superRefine((data, ctx) => {
+        if (data.Discount_On_Sale_Price && !data.Sale_Price) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["Discount_On_Sale_Price"],
+        message: "Enter a Sale Price before adding a discount.",
+      });
+    }
     // Secondary cannot exist without Primary
     if (
       data.Secondary_Unit &&
@@ -225,17 +261,5 @@ Item_Unit: z
       });
     }
 
-    // No secondary → conversion should not exist
-    // if (
-    //   !data.Secondary_Unit &&
-    //   data.Conversion_Rate !== null &&
-    //   data.Conversion_Rate !== undefined
-    // ) {
-    //   ctx.addIssue({
-    //     code: z.ZodIssueCode.custom,
-    //     path: ["Conversion_Rate"],
-    //     message:
-    //       "Conversion rate requires a secondary unit.",
-    //   });
-    // }
+    
   });

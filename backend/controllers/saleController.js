@@ -1617,30 +1617,33 @@ const addSale = async (req, res, next) => {
 
         const [itemResult] = await connection.execute(
           `
-      INSERT INTO add_item
-      (
-        Item_Name,
-        Item_HSN,
-        Item_Unit,
-        Item_Category,
+  INSERT INTO add_item
+  (
+    Item_Name,
+    Item_HSN,
+    Item_Unit,
+    Item_Category,
 
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate,
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate,
 
-        Stock_Quantity,
+    Sale_Price,
 
-        created_at,
-        updated_at
-      )
-      VALUES
-      (
-        ?, ?, ?, ?,
-        ?, ?, ?,
-        ?,
-        NOW(), NOW()
-      )
-      `,
+    Stock_Quantity,
+
+    created_at,
+    updated_at
+  )
+  VALUES
+  (
+    ?, ?, ?, ?,
+    ?, ?, ?,
+    ?,
+    ?,
+    NOW(), NOW()
+  )
+  `,
           [
             Item_Name.trim(),
             cleanValue(Item_HSN),
@@ -1650,12 +1653,15 @@ const addSale = async (req, res, next) => {
 
             Item_Category || "",
 
-            // New unit system
+            // Unit system
             primaryUnit,
             null,
             null,
 
-            // Sale decreases stock — new item starting stock can go negative
+            // ✅ Save latest sale price
+            normalizeNumber(Sale_Price) ?? null,
+
+            // Sale decreases stock
             -(normalizeNumber(Quantity) ?? 0),
           ]
         );
@@ -1706,20 +1712,31 @@ const addSale = async (req, res, next) => {
         }
 
         // Sale DECREASES stock — the only difference from addPurchase's "+"
+
         await connection.execute(
           `
-      UPDATE add_item
-      SET
-        Stock_Quantity = Stock_Quantity - ?,
-        Item_HSN = ?,
-        Item_Category = ?,
-        updated_at = NOW()
-      WHERE Item_Id = ?
-      `,
+  UPDATE add_item
+  SET
+    Stock_Quantity = Stock_Quantity - ?,
+    Item_HSN = ?,
+    Item_Category = ?,
+
+    -- ✅ Keep latest sale price in item master
+    Sale_Price = ?,
+
+    updated_at = NOW()
+  WHERE Item_Id = ?
+  `,
           [
             stockDelta,
+
             cleanValue(Item_HSN) || dbItemRow.Item_HSN,
+
             Item_Category || "",
+
+            // ✅ Latest sale price
+            normalizeNumber(Sale_Price) ?? null,
+
             Item_Id,
           ]
         );
@@ -1777,19 +1794,19 @@ const addSale = async (req, res, next) => {
       //   txnDate: Invoice_Date,
       // });
       await recordItemLedger({
-  connection,
-  itemId:       Item_Id,
-  txnType: "Sale",
-  referenceId: saleItemIdNum,
-     billId: newSaleId,
-      billNumber: Invoice_Number,
-  partyName:    Party_Name,
-  quantity:     normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
-  selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
-  baseQty:      stockDelta,                         // 🔹 normalized: e.g. 0.5
-  rate:         normalizeNumber(Sale_Price) ?? null,
-  txnDate:      Invoice_Date,
-});
+        connection,
+        itemId: Item_Id,
+        txnType: "Sale",
+        referenceId: saleItemIdNum,
+        billId: newSaleId,
+        billNumber: Invoice_Number,
+        partyName: Party_Name,
+        quantity: normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
+        selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+        baseQty: stockDelta,                         // 🔹 normalized: e.g. 0.5
+        rate: normalizeNumber(Sale_Price) ?? null,
+        txnDate: Invoice_Date,
+      });
     }
 
     // =========================================================
@@ -4698,17 +4715,18 @@ const editSale = async (req, res, next) => {
           Item_HSN,
 
           Item_Unit,
-
+           
           Primary_Unit,
           Secondary_Unit,
           Conversion_Rate,
+           Sale_Price,
 
           Stock_Quantity,
 
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?, NOW(), NOW())
       `,
           [
             Item_Id,
@@ -4723,7 +4741,7 @@ const editSale = async (req, res, next) => {
             firstPrimaryUnit,
             null,
             null,
-
+            normalizeNumber(item.Sale_Price) ?? null,
             // SALE = stock OUT
             -stockDelta,
           ]
@@ -4855,23 +4873,23 @@ const editSale = async (req, res, next) => {
         // =====================================================
         // UNIT RESOLUTION
         // =====================================================
-          if (firstUnitAssigned) {
+        if (firstUnitAssigned) {
 
-    stockDelta =
-        normalizeNumber(item.Quantity) ?? 0;
+          stockDelta =
+            normalizeNumber(item.Quantity) ?? 0;
 
-    snapshot = {
-        Primary_Unit_Snapshot:
-            dbItemRow.Primary_Unit,
+          snapshot = {
+            Primary_Unit_Snapshot:
+              dbItemRow.Primary_Unit,
 
-        Secondary_Unit_Snapshot:
-            dbItemRow.Secondary_Unit,
-    };
+            Secondary_Unit_Snapshot:
+              dbItemRow.Secondary_Unit,
+          };
 
-    resolvedSelectedUnit =
-        dbItemRow.Primary_Unit;
-}
-       else if (oldUsedSecondary) {
+          resolvedSelectedUnit =
+            dbItemRow.Primary_Unit;
+        }
+        else if (oldUsedSecondary) {
 
           // ---------------------------------------------------
           // Historical secondary transaction
@@ -5044,6 +5062,10 @@ const editSale = async (req, res, next) => {
             item.Item_Category || ""
           );
         }
+        updates.push("Sale_Price = ?");
+        params.push(
+          normalizeNumber(item.Sale_Price) ?? null
+        );
 
 
         if (updates.length > 0) {
@@ -5086,16 +5108,16 @@ const editSale = async (req, res, next) => {
       //     resolvedSelectedUnit || null,
       // });
       resolvedLines.push({
-  ...item,
+        ...item,
 
-  Item_Id,
+        Item_Id,
 
-  Stock_Delta: Number(stockDelta),
+        Stock_Delta: Number(stockDelta),
 
-  snapshot,
+        snapshot,
 
-  resolvedSelectedUnit,
-});
+        resolvedSelectedUnit,
+      });
     }
 
 
@@ -5182,34 +5204,34 @@ const editSale = async (req, res, next) => {
     //     ) + oldBaseQty
     //   );
     // }
-// =========================================================
-// STEP 2:
-// GET OLD BASE QUANTITY PER ITEM
-//
-// Priority:
-// 1. item_ledger.Base_Qty  ← preferred / exact value
-// 2. Snapshot + conversion  ← fallback for old/missing ledger
-// =========================================================
+    // =========================================================
+    // STEP 2:
+    // GET OLD BASE QUANTITY PER ITEM
+    //
+    // Priority:
+    // 1. item_ledger.Base_Qty  ← preferred / exact value
+    // 2. Snapshot + conversion  ← fallback for old/missing ledger
+    // =========================================================
 
-for (const old of oldItems) {
+    for (const old of oldItems) {
 
-  // =======================================================
-  // HISTORICAL UNIT SNAPSHOT
-  // =======================================================
+      // =======================================================
+      // HISTORICAL UNIT SNAPSHOT
+      // =======================================================
 
-  const oldPrimary =old.Primary_Unit_Snapshot || null;
+      const oldPrimary = old.Primary_Unit_Snapshot || null;
 
-  const oldSecondary =old.Secondary_Unit_Snapshot || null;
+      const oldSecondary = old.Secondary_Unit_Snapshot || null;
 
-  const oldSelected =old.Selected_Unit || null;
+      const oldSelected = old.Selected_Unit || null;
 
 
-  // =======================================================
-  // FIRST: TRY ITEM LEDGER
-  // =======================================================
+      // =======================================================
+      // FIRST: TRY ITEM LEDGER
+      // =======================================================
 
-  const [[ledgerRow]] = await connection.query(
-    `
+      const [[ledgerRow]] = await connection.query(
+        `
     SELECT Base_Qty
     FROM item_ledger
     WHERE Item_Id = ?
@@ -5217,68 +5239,68 @@ for (const old of oldItems) {
       AND Source_Id = ?
     LIMIT 1
     `,
-    [
-      old.Item_Id,
-      old.id,
-    ]
-  );
+        [
+          old.Item_Id,
+          old.id,
+        ]
+      );
 
 
-  let oldBaseQty;
+      let oldBaseQty;
 
 
-  // =======================================================
-  // CASE 1:
-  // LEDGER EXISTS
-  //
-  // Use the exact Base_Qty that was originally applied
-  // to add_item.Stock_Quantity.
-  // =======================================================
+      // =======================================================
+      // CASE 1:
+      // LEDGER EXISTS
+      //
+      // Use the exact Base_Qty that was originally applied
+      // to add_item.Stock_Quantity.
+      // =======================================================
 
-  if (ledgerRow) {
+      if (ledgerRow) {
 
-    oldBaseQty =
-      Number(ledgerRow.Base_Qty) || 0;
-  }
-
-
-  // =======================================================
-  // CASE 2:
-  // LEDGER DOES NOT EXIST
-  //
-  // Fallback using historical snapshot + conversion.
-  // =======================================================
-
-  else {
-
-    const rawQty =
-      Number(old.Quantity) || 0;
-
-    oldBaseQty = rawQty;
+        oldBaseQty =
+          Number(ledgerRow.Base_Qty) || 0;
+      }
 
 
-    // -------------------------------------------------------
-    // If the old transaction used the secondary unit,
-    // convert it into the primary unit.
-    //
-    // Example:
-    //
-    // Primary   = Kg
-    // Secondary = Gm
-    // Quantity  = 500
-    //
-    // Base_Qty = 500 / 1000 = 0.5 Kg
-    // -------------------------------------------------------
+      // =======================================================
+      // CASE 2:
+      // LEDGER DOES NOT EXIST
+      //
+      // Fallback using historical snapshot + conversion.
+      // =======================================================
 
-    if (
-      oldPrimary &&
-      oldSecondary &&
-      oldSelected === oldSecondary
-    ) {
+      else {
 
-      const [[conversion]] =
-        await connection.query(
-          `
+        const rawQty =
+          Number(old.Quantity) || 0;
+
+        oldBaseQty = rawQty;
+
+
+        // -------------------------------------------------------
+        // If the old transaction used the secondary unit,
+        // convert it into the primary unit.
+        //
+        // Example:
+        //
+        // Primary   = Kg
+        // Secondary = Gm
+        // Quantity  = 500
+        //
+        // Base_Qty = 500 / 1000 = 0.5 Kg
+        // -------------------------------------------------------
+
+        if (
+          oldPrimary &&
+          oldSecondary &&
+          oldSelected === oldSecondary
+        ) {
+
+          const [[conversion]] =
+            await connection.query(
+              `
           SELECT Conversion_Rate
           FROM item_unit_conversions
           WHERE Item_Id = ?
@@ -5287,51 +5309,51 @@ for (const old of oldItems) {
           ORDER BY id DESC
           LIMIT 1
           `,
-          [
-            old.Item_Id,
-            oldPrimary,
-            oldSecondary,
-          ]
-        );
+              [
+                old.Item_Id,
+                oldPrimary,
+                oldSecondary,
+              ]
+            );
 
 
-      const conversionRate =
-        Number(
-          conversion?.Conversion_Rate
-        );
+          const conversionRate =
+            Number(
+              conversion?.Conversion_Rate
+            );
 
 
-      if (
-        Number.isFinite(conversionRate) &&
-        conversionRate > 0
-      ) {
+          if (
+            Number.isFinite(conversionRate) &&
+            conversionRate > 0
+          ) {
 
-        oldBaseQty =
-          rawQty / conversionRate;
+            oldBaseQty =
+              rawQty / conversionRate;
+          }
+
+          // If conversion is missing/invalid,
+          // keep rawQty as fallback instead of throwing.
+        }
       }
 
-      // If conversion is missing/invalid,
-      // keep rawQty as fallback instead of throwing.
+
+      // =======================================================
+      // ACCUMULATE BY ITEM
+      //
+      // Same item can occur multiple times in one sale.
+      // =======================================================
+
+      oldBaseQtyByItem.set(
+        old.Item_Id,
+
+        (
+          oldBaseQtyByItem.get(
+            old.Item_Id
+          ) || 0
+        ) + oldBaseQty
+      );
     }
-  }
-
-
-  // =======================================================
-  // ACCUMULATE BY ITEM
-  //
-  // Same item can occur multiple times in one sale.
-  // =======================================================
-
-  oldBaseQtyByItem.set(
-    old.Item_Id,
-
-    (
-      oldBaseQtyByItem.get(
-        old.Item_Id
-      ) || 0
-    ) + oldBaseQty
-  );
-}
 
     // =========================================================
     // NEW BASE QUANTITY PER ITEM
@@ -5600,20 +5622,20 @@ for (const old of oldItems) {
       //   txnDate:
       //     Invoice_Date,
       // });
-            await recordItemLedger({
-  connection,
-     itemId:line.Item_Id,
-  txnType: "Sale",
-   referenceId:id,
-     billId:saleId,
-      billNumber: Invoice_Number,
-  partyName:    Party_Name,
-  quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
-  selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
-  baseQty:      line.Stock_Delta,                         // 🔹 normalized: e.g. 0.5
-  rate:         normalizeNumber(line.Sale_Price) ?? null,
-  txnDate:     Invoice_Date,
-})
+      await recordItemLedger({
+        connection,
+        itemId: line.Item_Id,
+        txnType: "Sale",
+        referenceId: id,
+        billId: saleId,
+        billNumber: Invoice_Number,
+        partyName: Party_Name,
+        quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
+        selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+        baseQty: line.Stock_Delta,                         // 🔹 normalized: e.g. 0.5
+        rate: normalizeNumber(line.Sale_Price) ?? null,
+        txnDate: Invoice_Date,
+      })
     }
 
     await connection.commit();
@@ -5628,7 +5650,7 @@ for (const old of oldItems) {
 };
 //DELETE
 
- const deleteSale = async (req, res, next) => {
+const deleteSale = async (req, res, next) => {
   let connection;
 
   try {
