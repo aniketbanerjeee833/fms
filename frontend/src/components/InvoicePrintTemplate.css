@@ -1,0 +1,440 @@
+/* .invoice-table-header {
+  background-color: #0b7fa3 !important;
+  color: #ffffff !important;
+  padding: 6px 4px;
+  border: 1px solid #777;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .invoice-print {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .invoice-blue {
+    background-color: #0b7fa3 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+   .invoice-table-header {
+    background-color: #0b7fa3 !important;
+    color: #ffffff !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+.invoice-amounts,
+.invoice-terms-conditons,
+.invoice-blue {
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+} */
+ /* =========================================================
+   INVOICE BASE
+========================================================= */
+
+.invoice-print {
+  width: 100%;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+
+  background: #fff;
+  color: #111;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.invoice-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+
+/* =========================================================
+   COMPANY HEADER
+========================================================= */
+
+.invoice-company-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  border: 1px solid #777;
+  border-bottom: none;
+
+  padding: 8px;
+}
+
+.invoice-logo {
+  width: 48%;
+}
+
+.invoice-logo img {
+  width: 220px;
+  height: 75px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.invoice-company-details {
+  width: 52%;
+  text-align: right;
+  line-height: 1.45;
+}
+
+.invoice-company-name {
+  font-size: 17px;
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   COMMON TABLE
+========================================================= */
+
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.invoice-cell {
+  padding: 6px;
+  border: 1px solid #777;
+  font-size: 11px;
+  vertical-align: top;
+}
+
+.invoice-cell-right {
+  padding: 6px;
+  border: 1px solid #777;
+  font-size: 11px;
+  text-align: right;
+  vertical-align: top;
+}
+
+
+/* =========================================================
+   BLUE SECTION HEADERS
+========================================================= */
+
+.invoice-section-header {
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+
+  padding: 6px;
+  border: 1px solid #777;
+
+  font-size: 11px;
+  font-weight: bold;
+  text-align: left;
+}
+
+.invoice-section-header-right {
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+
+  padding: 6px;
+  border: 1px solid #777;
+
+  font-size: 11px;
+  font-weight: bold;
+  text-align: right;
+}
+
+
+/* =========================================================
+   ITEM TABLE
+========================================================= */
+
+.invoice-items {
+  margin-top: 0;
+}
+
+.invoice-table-header {
+  background-color: #0b7fa3 !important;
+  color: #ffffff !important;
+
+  padding: 6px 4px;
+  border: 1px solid #777;
+
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.invoice-item-cell {
+  padding: 6px 4px;
+  border: 1px solid #777;
+  font-size: 10px;
+  vertical-align: top;
+}
+
+.invoice-item-center {
+  padding: 6px 4px;
+  border: 1px solid #777;
+  font-size: 10px;
+
+  text-align: center;
+  vertical-align: top;
+}
+
+.invoice-item-right {
+  padding: 6px 4px;
+  border: 1px solid #777;
+  font-size: 10px;
+
+  text-align: right;
+  vertical-align: top;
+}
+
+.invoice-item-name {
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   TOTAL ROW
+========================================================= */
+
+.invoice-total-cell {
+  padding: 6px 4px;
+  border: 1px solid #777;
+
+  font-size: 10px;
+  font-weight: bold;
+  text-align: right;
+}
+
+
+/* =========================================================
+   TAX + AMOUNTS
+========================================================= */
+
+.invoice-summary {
+  display: grid;
+  grid-template-columns: 50% 50%;
+
+  border-left: 1px solid #777;
+  border-right: 1px solid #777;
+}
+
+.invoice-summary-column {
+  min-width: 0;
+}
+
+.invoice-summary-header {
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+
+  padding: 5px 7px;
+  border: 1px solid #777;
+
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.invoice-summary-header-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+
+  border: 1px solid #777;
+
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.invoice-summary-header-title {
+color: #fff !important;
+  padding: 5px 7px;
+}
+
+.invoice-summary-header-value {
+color: #fff !important;
+  padding: 5px 7px;
+  text-align: right;
+}
+
+.invoice-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoice-summary-cell {
+  padding: 6px 4px;
+  border: 1px solid #777;
+  font-size: 10px;
+}
+
+.invoice-summary-cell-right {
+  padding: 6px 4px;
+  border: 1px solid #777;
+
+  font-size: 10px;
+  text-align: right;
+}
+
+
+/* =========================================================
+   BILL AMOUNT IN WORDS
+========================================================= */
+
+.invoice-words-header {
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+
+  padding: 5px 7px;
+  border: 1px solid #777;
+
+  text-align: center;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.invoice-words {
+  padding: 8px;
+
+  border: 1px solid #777;
+  border-top: none;
+
+  text-align: center;
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   TERMS + SIGNATURE
+========================================================= */
+
+.invoice-bottom {
+  display: grid;
+  grid-template-columns: 50% 50%;
+}
+
+.invoice-terms-header {
+  background-color: #0b7fa3 !important;
+  color: #fff !important;
+
+  padding: 5px 7px;
+  border: 1px solid #777;
+
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.invoice-terms-body {
+  border: 1px solid #777;
+
+  min-height: 120px;
+  padding: 8px;
+
+  line-height: 1.35;
+}
+
+.invoice-signature {
+  border: 1px solid #777;
+
+  min-height: 150px;
+
+  text-align: center;
+}
+
+.invoice-signature-company {
+  margin-top: 55px;
+  font-weight: bold;
+}
+
+.invoice-signature-authorized {
+  margin-top: 45px;
+  font-weight: bold;
+}
+
+
+/* =========================================================
+   PRINT
+========================================================= */
+
+@media print {
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .invoice-print {
+    width: 100%;
+    max-width: none;
+
+    margin: 0;
+    padding: 8mm;
+
+    background: white !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .invoice-section-header,
+  .invoice-section-header-right,
+  .invoice-table-header,
+  .invoice-summary-header,
+  .invoice-summary-header-row,
+  .invoice-words-header,
+  .invoice-terms-header {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

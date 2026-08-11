@@ -1,9 +1,9 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useDeletePurchaseMutation, useGetAllPurchasesQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2 } from "lucide-react";
-import { useState } from "react";
+import { useDeletePurchaseMutation, useGetAllPurchasesQuery, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2, Printer } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
@@ -11,6 +11,9 @@ import { partyApi } from "../../redux/api/partyAPi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi } from "../../redux/api/bankAccountApi";
 import { itemApi } from "../../redux/api/itemApi";
+import { useReactToPrint } from "react-to-print";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
+
 
 
 export default function AllPurchaseList() {
@@ -31,9 +34,15 @@ export default function AllPurchaseList() {
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
-const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
-
+  const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
+  const [printPurchaseId, setPrintPurchaseId] = useState(null);
+  const printRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetSinglePurchaseQuery(printPurchaseId, {
+    skip: !printPurchaseId,
+  });
+
+
 
   const navigate = useNavigate();
   const handlePageChange = (newPage) => {
@@ -89,41 +98,52 @@ const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
   };
 
 
- const handleConfirmDelete = async () => {
-  if (!deleteTarget) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
 
-  try {
-    const res = await deletePurchase(
-      deleteTarget.Purchase_Id
-    ).unwrap();
+    try {
+      const res = await deletePurchase(
+        deleteTarget.Purchase_Id
+      ).unwrap();
 
-    toast.success(
-      res?.message || "Purchase deleted successfully"
-    );
+      toast.success(
+        res?.message || "Purchase deleted successfully"
+      );
 
-    setDeleteTarget(null);
-     dispatch(partyApi.util.invalidateTags(["Party"]));
-             dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-           dispatch(
+      setDeleteTarget(null);
+      dispatch(partyApi.util.invalidateTags(["Party"]));
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(
         bankAccountApi.util.invalidateTags(["BankAccount"])
       );
-      
-           dispatch(
-          itemApi.util.invalidateTags([
-            "Item",
-            "ItemLedger",
-          ])
-        );
-  } catch (err) {
-    console.log(err);
 
-    toast.error(
-      err?.data?.message ||
-      "Failed to delete purchase"
-    );
-  }
-};
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+          "ItemLedger",
+        ])
+      );
+    } catch (err) {
+      console.log(err);
 
+      toast.error(
+        err?.data?.message ||
+        "Failed to delete purchase"
+      );
+    }
+  };
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printPurchaseId ? `Purchase-${printPurchaseId}` : "Purchase",
+    onAfterPrint: () => setPrintPurchaseId(null),
+  });
+
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printPurchaseId) {
+      handlePrint();
+    }
+  }, [printData, printPurchaseId]);
   return (
     <>
       {/* // <div className="container-fluid sb2  ">
@@ -337,9 +357,10 @@ const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
                     <th className="text-left">Balance</th>
                     {/* <th>View</th> */}
                     <th>View/Edit</th>
-                   
+
                     <th>Return</th>
-                     <th>Delete</th>
+                    <th>Delete</th>
+                    <th>Print</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -389,7 +410,7 @@ const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
                               }} />
                           </NavLink>
                         </td> */}
-                       
+
                         <td
                         >
                           <NavLink
@@ -422,18 +443,37 @@ const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
 
 
                         </td>
-                         <td>
+                        <td>
                           <Trash2
                             size={18}
                             style={{ cursor: "pointer", color: "#ef4444" }}
                             onClick={() =>
                               setDeleteTarget({
                                 Purchase_Id: purchase.Purchase_Id,
-                               
+
                               })
                             }
                           />
                         </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{ cursor: "pointer", color: "#4CA1AF" }}
+                            onClick={() => setPrintPurchaseId(purchase.Purchase_Id)}
+                          />
+                        </td>
+
+                        {/* hidden printable content — off-screen, only used by react-to-print */}
+                        {/* <div style={{ display: "none" }}>
+                          <InvoicePrintTemplate
+                            ref={printRef}
+                            purchase={printData?.billPurchaseDetails ? {
+                              ...printData.billPurchaseDetails,
+                              items: printData.items,
+                              companyDetails: { /* your business info — hardcode or fetch from settings ,
+                            } : null}
+                          />
+                        </div> */}
                       </tr>
                     ))
                   ) : (
@@ -591,51 +631,30 @@ const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
 
           </div>
         </div>
-        {/* <div className="flex justify-center align-center space-x-2 p-4">
-                <button type="button"
-                  onClick={() => handlePreviousPage()}
-                  disabled={page === 1}
-                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-                ${page === 1 ? 'opacity-50 ' : ''}
-                `}
-                >
-                  ← Previous
-                </button>
-                {[...Array(purchases?.totalPages).keys()].map((index) => (
-                  <button
-                    key={index}
-                    onClick={() => handlePageChange(index + 1)}
-                    //   className={`px-3 py-1 rounded ${page === index + 1 ? 'bg-[#7346ff] text-white' : 'bg-gray-200 hover:bg-gray-300'
-                    //     }`}
-                    className={
-                      `px-3 py-1 rounded ${page === index + 1 ? 'bg-[#4CA1AF] text-white' :
-                        'bg-gray-200 hover:bg-gray-300'
-                      }`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
 
-                <button type="button"
-                  onClick={() => handleNextPage()}
-                  disabled={page === purchases?.totalPages || purchases?.totalPages === 0}
-                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-                ${page === purchases?.totalPages || purchases?.totalPages === 0 ? 'opacity-50 ' : ''}
-                `}
-                >
-                  Next →
-                </button>
-              </div> */}
       </div>
-
-   {deleteTarget && (
+      {/* // After the closing </table>, outside the map: */}
+      {printData?.billPurchaseDetails && (
+        <div style={{ display: "none" }}>
+          <InvoicePrintTemplate
+  ref={printRef}
+  invoice={{
+    ...printData.billPurchaseDetails,
+    items: printData.items || [],
+    companyDetails: {},
+    type: "purchase",
+  }}
+/>
+        </div>
+      )}
+      {deleteTarget && (
         <DeleteConfirmModal
           title="Delete Purchase"
           message={`Are you sure you want to delete this purchase bill ? This action cannot be undone.`}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
-       
+
         />
       )}
     </>

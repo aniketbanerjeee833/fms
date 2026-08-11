@@ -54,13 +54,13 @@ export default function PurchaseReturnAdd() {
 
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
-
+  const basePurchasePriceRef = useRef({});
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
-   const [showItemAddModal, setShowItemAddModal] = useState(false);
+  const [showItemAddModal, setShowItemAddModal] = useState(false);
   const [newlyAddedItem, setNewlyAddedItem] = useState(null);
-    const [activeItemRow, setActiveItemRow] = useState(null);
+  const [activeItemRow, setActiveItemRow] = useState(null);
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
 
   const { data: categories } = useGetAllCategoriesQuery()
@@ -454,28 +454,119 @@ export default function PurchaseReturnAdd() {
   useEffect(() => {
     if (purchase) {
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name);
-      // const prefilledRows = purchase?.items?.map((item) => ({
-      //   ...item,
-      //   itemSearch: item.Item_Name,
-      //   itemOpen: false,
-      //   CategoryOpen: false,
-      //   isHSNLocked: false,
-      //   isUnitLocked: false,
-      //   isExistingItem: true,
-      // }));
+
+      // const prefilledRows = purchase?.items?.length > 0
+      //   ? purchase.items.map((item) => ({
+      //     ...item,
+      //     Item_Unit: item.Selected_Unit || "",
+      //     itemSearch: item.Item_Name,
+      //     itemOpen: false,
+      //     CategoryOpen: false,
+      //     isHSNLocked: false,
+      //     isUnitLocked: false,
+      //     isExistingItem: true,
+      //   }))
+      //   : [emptyRow()];
+      // setRows(prefilledRows);
       const prefilledRows = purchase?.items?.length > 0
-        ? purchase.items.map((item) => ({
-          ...item,
-          Item_Unit: item.Selected_Unit || "",
-          itemSearch: item.Item_Name,
-          itemOpen: false,
-          CategoryOpen: false,
-          isHSNLocked: false,
-          isUnitLocked: false,
-          isExistingItem: true,
-        }))
+        ? purchase.items.map((item, index) => {
+
+          // Original purchase price saved in this purchase line
+          const purchasePrice = Number(item.Purchase_Price) || 0;
+
+          // If this purchase was saved in secondary unit,
+          // convert its price back to PRIMARY price.
+          // const primaryUnit = item.Primary_Unit || "";
+          // const secondaryUnit = item.Secondary_Unit || "";
+          //       const primaryUnit =
+          //   item.Primary_Unit ||
+          //   availableUnits[0]?.Unit_Shorthand ||
+          //   "";
+
+          // const secondaryUnit =
+          //   item.Secondary_Unit ||
+          //   availableUnits.find(
+          //     (u) => u.Unit_Shorthand !== primaryUnit
+          //   )?.Unit_Shorthand ||
+          //   "";
+          //       const conversionRate = Number(item.Conversion_Rate) || 0;
+          //       const selectedUnit = item.Selected_Unit || primaryUnit;
+          const conversionRate = Number(item.Conversion_Rate) || 0;
+
+          const availableUnits = Array.isArray(item.Available_Units)
+            ? item.Available_Units
+            : [];
+
+          // Historical snapshot may have Secondary_Unit = null.
+          // In that case use CURRENT available units.
+          const primaryUnit =
+            item.Primary_Unit ||
+            availableUnits[0]?.Unit_Shorthand ||
+            "";
+
+          const secondaryUnit =
+            item.Secondary_Unit ||
+            availableUnits.find(
+              (u) => u.Unit_Shorthand !== primaryUnit
+            )?.Unit_Shorthand ||
+            "";
+
+          const selectedUnit =
+            item.Selected_Unit || primaryUnit;
+
+          let basePurchasePrice = purchasePrice;
+
+          if (
+            selectedUnit === secondaryUnit &&
+            conversionRate > 0
+          ) {
+            basePurchasePrice = purchasePrice * conversionRate;
+          }
+
+          // Store original/base price separately
+          basePurchasePriceRef.current[index] = basePurchasePrice;
+
+          return {
+            ...item,
+
+            Item_Unit: selectedUnit,
+
+            itemSearch: item.Item_Name,
+            itemOpen: false,
+            CategoryOpen: false,
+
+            isHSNLocked: false,
+            isUnitLocked: false,
+            isExistingItem: true,
+
+            Primary_Unit: primaryUnit,
+            Secondary_Unit: secondaryUnit,
+            Conversion_Rate: conversionRate,
+
+            Available_Units: availableUnits,
+          };
+        })
         : [emptyRow()];
-      setRows(prefilledRows);
+      const formItems = prefilledRows.map((item) => ({
+        Item_Id: item.Item_Id,
+        Item_Name: item.Item_Name || "",
+        Item_Category: item.Item_Category || "",
+        Item_HSN: item.Item_HSN || "",
+        Quantity: item.Quantity || "",
+        Item_Unit: item.Item_Unit || "",
+        Purchase_Price: item.Purchase_Price || "",
+
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price || "",
+
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price || "Percentage",
+
+        Tax_Type: item.Tax_Type || "None",
+        Tax_Amount: item.Tax_Amount || "",
+        Amount: item.Amount || "",
+      }));
+      setRows(prefilledRows)
 
       reset({
         Return_Date: new Date().toISOString().slice(0, 10),
@@ -515,7 +606,8 @@ export default function PurchaseReturnAdd() {
                 Amount: "",
               },
             ],
-        items: prefilledRows,
+        //items: prefilledRows,
+        items: formItems,
       });
 
       // always start single-payment for a brand new return — there's no prior
@@ -1328,8 +1420,7 @@ export default function PurchaseReturnAdd() {
 
 
 
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
+                <div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
                   <span className="whitespace-nowrap ">
                     State of Supply
@@ -1709,6 +1800,7 @@ export default function PurchaseReturnAdd() {
                                       shouldDirty: true,
                                     }
                                   );
+                                  basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1747,28 +1839,28 @@ export default function PurchaseReturnAdd() {
                               className="absolute z-20  w-full bg-white border
                            border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
-                               <div
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    handleRowChange(i, "itemOpen", true);
-                                    setActiveItemRow(i);
-                                    setShowItemAddModal(true);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
-                                  style={{
-                                    borderBottom: "1px solid #e5e7eb",
-                                    color: "#4CA1AF",
-                                    fontWeight: 600,
-                                    fontSize: 13,
-                                    position: "sticky",
-                                    top: 0,
-                                    backgroundColor: "#fff",
-                                    zIndex: 1,
-                                  }}
-                                >
-                                  <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
-                                  Add Item
-                                </div>
+                              <div
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleRowChange(i, "itemOpen", true);
+                                  setActiveItemRow(i);
+                                  setShowItemAddModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                style={{
+                                  borderBottom: "1px solid #e5e7eb",
+                                  color: "#4CA1AF",
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  position: "sticky",
+                                  top: 0,
+                                  backgroundColor: "#fff",
+                                  zIndex: 1,
+                                }}
+                              >
+                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                Add Item
+                              </div>
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1829,7 +1921,7 @@ export default function PurchaseReturnAdd() {
                                               shouldDirty: true,
                                             }
                                           );
-
+                                          basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -1859,16 +1951,16 @@ export default function PurchaseReturnAdd() {
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                       
-                                        <td  className="px-3 py-2 whitespace-nowrap"
-                                            style={{
-                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                              fontWeight: "500", // optional: matches Tailwind's medium weight
-                                            }}
-                                          >
-                                            {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                          </td>
+
+                                        <td className="px-3 py-2 whitespace-nowrap"
+                                          style={{
+                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                            fontWeight: "500", // optional: matches Tailwind's medium weight
+                                          }}
+                                        >
+                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                        </td>
                                       </tr>
                                     ))}
 
@@ -1966,8 +2058,8 @@ export default function PurchaseReturnAdd() {
                       </td>
 
 
-                    
-                      <td style={{ padding: "0px", width: "12%" }}>
+
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -2008,7 +2100,7 @@ export default function PurchaseReturnAdd() {
                                   });
                                 }}
                               >
-                                {/* Item has configured units */}
+                                
                                 {availableUnits.length > 0 ? (
                                   availableUnits.map((unit) => (
                                     <option
@@ -2022,8 +2114,7 @@ export default function PurchaseReturnAdd() {
                                   <>
                                     <option value="">NONE</option>
 
-                                    {/* Only allow choosing/adding unit when
-                                        selected item has NO configured units */}
+                                 
                                     {Array.isArray(itemUnits) &&
                                       itemUnits.map((unit) => (
                                         <option
@@ -2049,8 +2140,193 @@ export default function PurchaseReturnAdd() {
                             {errors.items[i].Item_Unit.message}
                           </p>
                         )}
-                      </td>
+                      </td> */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+                            const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
+                            console.log(row, "row")
+                            return (
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="form-select"
+                                style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
+                                //disabled={row?.isUnitLocked}
+                                onChange={(e) => {
+                                  const newUnit = e.target.value;
 
+                                  if (newUnit === "__ADD_UNIT__") {
+                                    setActiveUnitRow(i);
+                                    setShowAddUnitModal(true);
+                                    return;
+                                  }
+
+                                  const previousUnit = field.value;
+                                  field.onChange(newUnit);
+                                  handleRowChange(i, "Item_Unit", newUnit);
+                                  setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
+                                  //const quantity = Number(itemsValues[i]?.Quantity);
+
+                                  // if (!Number.isFinite(quantity) || quantity <= 0) {
+                                  //   return;
+                                  // }
+                                  // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
+                                  // const primaryUnit = row?.Primary_Unit;
+                                  // const secondaryUnit = row?.Secondary_Unit;
+                                  // const conversionRate = Number(row?.Conversion_Rate) || 0;
+                                  // const currentItem = itemsValues[i];
+
+                                  // const primaryUnit =
+                                  //   currentItem?.Primary_Unit ||
+                                  //   availableUnits?.[0]?.Unit_Shorthand ||
+                                  //   "";
+
+                                  // const secondaryUnit =
+                                  //   currentItem?.Secondary_Unit ||
+                                  //   availableUnits?.find(
+                                  //     (u) => u.Unit_Shorthand !== primaryUnit
+                                  //   )?.Unit_Shorthand ||
+                                  //   "";
+
+                                  // const conversionRate =
+                                  //   Number(currentItem?.Conversion_Rate) || 0;
+                                  // const row = rows[i];
+
+                                  // const availableUnits = Array.isArray(row?.Available_Units)
+                                  //   ? row.Available_Units
+                                  //   : [];
+
+                                  const primaryUnit =
+                                    row?.Primary_Unit ||
+                                    availableUnits?.[0]?.Unit_Shorthand ||
+                                    "";
+
+                                  const secondaryUnit =
+                                    row?.Secondary_Unit ||
+                                    availableUnits?.find(
+                                      (u) => u.Unit_Shorthand !== primaryUnit
+                                    )?.Unit_Shorthand ||
+                                    "";
+
+                                  const conversionRate =
+                                    Number(row?.Conversion_Rate) || 0;
+
+                                  if (
+                                    previousUnit &&
+                                    newUnit &&
+                                    previousUnit !== newUnit &&
+                                    primaryUnit &&
+                                    secondaryUnit &&
+                                    conversionRate > 0
+                                  ) {
+                                    //const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
+
+                                    //let newPrice = currentPrice;
+
+                                    // switching FROM primary TO secondary — price per unit gets smaller
+                                    // if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
+                                    //   newPrice = currentPrice / conversionRate;
+                                    // }
+                                    // // switching FROM secondary TO primary — price per unit gets bigger
+                                    // else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
+                                    //   newPrice = currentPrice * conversionRate;
+                                    // }
+
+                                    //const roundedPrice = newPrice.toFixed(2);
+                                    const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
+
+                                    if (basePrice <= 0) {
+                                      return;
+                                    }
+
+                                    let newPrice = basePrice;
+
+                                    // =====================================================
+                                    // PRIMARY → SECONDARY
+                                    // Example:
+                                    // ₹45 / Kg
+                                    // 1 Kg = 1000 Gm
+                                    // ₹45 / 1000 = ₹0.045
+                                    // UI allows only 2 decimals → ₹0.05
+                                    // =====================================================
+
+                                    if (
+                                      previousUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      newPrice = basePrice / conversionRate;
+                                    }
+
+                                    // =====================================================
+                                    // SECONDARY → PRIMARY
+                                    // IMPORTANT:
+                                    // Do NOT use current displayed price.
+                                    // Restore original base price.
+                                    // =====================================================
+
+                                    else if (
+                                      previousUnit === secondaryUnit &&
+                                      newUnit === primaryUnit
+                                    ) {
+                                      newPrice = basePrice;
+                                    }
+
+                                    else {
+                                      return;
+                                    }
+
+                                    const roundedPrice = newPrice.toFixed(2);
+
+
+
+
+                                    setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
+
+                                    // recompute Amount/Tax/Total with the new price
+                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                      { ...itemsValues[i], Purchase_Price: roundedPrice },
+                                      i,
+                                      itemsValues
+                                    );
+
+                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  }
+                                }}
+                              >
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="">NONE</option>
+                                    {Array.isArray(itemUnits) &&
+                                      itemUnits.map((unit) => (
+                                        <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
+                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                        </option>
+                                      ))}
+                                    <option value="__ADD_UNIT__">➕ Add Unit</option>
+                                  </>
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
+                        )}
+                      </td>
 
 
                       {/* Price/Unit */}
@@ -2081,6 +2357,7 @@ export default function PurchaseReturnAdd() {
 
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
+                              basePurchasePriceRef.current[i] = Number(val) || 0;
                               //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
                               // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                               //   return;
@@ -2819,40 +3096,40 @@ export default function PurchaseReturnAdd() {
 
         />
       )}
-         {showItemAddModal && (
-              <AddItemModal
-                onClose={() => {
-                  setShowItemAddModal(false);
-      
-                  if (activeItemRow !== null) {
-                    handleRowChange(activeItemRow, "itemOpen", true);
-                  }
-                }}
-                onSave={async (savedItem) => {
-                  if (!savedItem || typeof savedItem !== "object") {
-                    setShowItemAddModal(false);
-                    return;
-                  }
-      
-                  await refetchItems();
-      
-                  setNewlyAddedItem(savedItem);
-      
-                  setTimeout(() => {
-                    setNewlyAddedItem(null);
-                  }, 8000);
-      
-                  setShowItemAddModal(false);
-      
-                  // Reopen the SAME row's dropdown
-                  if (activeItemRow !== null) {
-                    handleRowChange(activeItemRow, "itemOpen", true);
-                  }
-      
-                  setActiveItemRow(null);
-                }}
-              />
-            )}
+      {showItemAddModal && (
+        <AddItemModal
+          onClose={() => {
+            setShowItemAddModal(false);
+
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
+          }}
+          onSave={async (savedItem) => {
+            if (!savedItem || typeof savedItem !== "object") {
+              setShowItemAddModal(false);
+              return;
+            }
+
+            await refetchItems();
+
+            setNewlyAddedItem(savedItem);
+
+            setTimeout(() => {
+              setNewlyAddedItem(null);
+            }, 8000);
+
+            setShowItemAddModal(false);
+
+            // Reopen the SAME row's dropdown
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
+
+            setActiveItemRow(null);
+          }}
+        />
+      )}
       <style>
         {`
   /*  screens between 1000px and 640px */

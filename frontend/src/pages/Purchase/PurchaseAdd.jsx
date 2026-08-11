@@ -53,11 +53,12 @@ export default function PurchaseAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
   const basePurchasePriceRef = useRef({});
+  const basePurchaseUnitRef = useRef({});
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+  //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
   const [activeItemRow, setActiveItemRow] = useState(null);
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   // const { data: items, } = useGetAllItemsQuery();
@@ -605,8 +606,7 @@ export default function PurchaseAdd() {
       // =======================================================
       // 8. Invalidate RTK Query caches
       // =======================================================
-      dispatch(itemApi.util.invalidateTags(["Item"])
-      );
+      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
 
       dispatch(
         cashInHandApi.util.invalidateTags(["CashInHand",])
@@ -1736,6 +1736,7 @@ export default function PurchaseAdd() {
                                     //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                     setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                     basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
+                                    basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                     const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                       {
                                         ...itemsValues[i],
@@ -1974,6 +1975,7 @@ export default function PurchaseAdd() {
                                             //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                             basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
+                                            basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
                                             handleRowChange(i, "itemOpen", false);
 
 
@@ -2181,52 +2183,95 @@ export default function PurchaseAdd() {
                                       // }
 
                                       //const roundedPrice = newPrice.toFixed(2);
+                                      // const basePrice =
+                                      //   Number(basePurchasePriceRef.current[i]) || 0;
+
+                                      // if (basePrice <= 0) {
+                                      //   return;
+                                      // }
+
+                                      // let newPrice = basePrice;
+
+                                      // // =====================================================
+                                      // // PRIMARY → SECONDARY
+                                      // // Example:
+                                      // // ₹45 / Kg
+                                      // // 1 Kg = 1000 Gm
+                                      // // ₹45 / 1000 = ₹0.045
+                                      // // UI allows only 2 decimals → ₹0.05
+                                      // // =====================================================
+
+                                      // if (
+                                      //   previousUnit === primaryUnit &&
+                                      //   newUnit === secondaryUnit
+                                      // ) {
+                                      //   newPrice = basePrice / conversionRate;
+                                      // }
+
+                                      // // =====================================================
+                                      // // SECONDARY → PRIMARY
+                                      // // IMPORTANT:
+                                      // // Do NOT use current displayed price.
+                                      // // Restore original base price.
+                                      // // =====================================================
+
+                                      // else if (
+                                      //   previousUnit === secondaryUnit &&
+                                      //   newUnit === primaryUnit
+                                      // ) {
+                                      //   //newPrice = basePrice;
+                                      //    newPrice = basePrice * conversionRate;
+                                      // }
+
+                                      // else {
+                                      //   return;
+                                      // }
+
+                                      // const roundedPrice = newPrice.toFixed(2);
+//                                       If going to the original unit
+//         ↓
+// Restore basePrice
+
+// Otherwise
+//         ↓
+// Convert basePrice
                                       const basePrice =
                                         Number(basePurchasePriceRef.current[i]) || 0;
 
-                                      if (basePrice <= 0) {
+                                      const baseUnit =
+                                        basePurchaseUnitRef.current[i];
+
+                                      if (basePrice <= 0 || !baseUnit) {
                                         return;
                                       }
 
-                                      let newPrice = basePrice;
+                                      let newPrice;
 
-                                      // =====================================================
-                                      // PRIMARY → SECONDARY
-                                      // Example:
-                                      // ₹45 / Kg
-                                      // 1 Kg = 1000 Gm
-                                      // ₹45 / 1000 = ₹0.045
-                                      // UI allows only 2 decimals → ₹0.05
-                                      // =====================================================
-
-                                      if (
-                                        previousUnit === primaryUnit &&
-                                        newUnit === secondaryUnit
-                                      ) {
-                                        newPrice = basePrice / conversionRate;
-                                      }
-
-                                      // =====================================================
-                                      // SECONDARY → PRIMARY
-                                      // IMPORTANT:
-                                      // Do NOT use current displayed price.
-                                      // Restore original base price.
-                                      // =====================================================
-
-                                      else if (
-                                        previousUnit === secondaryUnit &&
-                                        newUnit === primaryUnit
-                                      ) {
+                                      if (newUnit === baseUnit) {
+                                        // Restore original entered price
                                         newPrice = basePrice;
                                       }
-
+                                      else if (
+                                        baseUnit === primaryUnit &&
+                                        newUnit === secondaryUnit
+                                      ) {
+                                        // Primary → Secondary
+                                        newPrice = basePrice / conversionRate;
+                                      }
+                                      else if (
+                                        baseUnit === secondaryUnit &&
+                                        newUnit === primaryUnit
+                                      ) {
+                                        // Secondary → Primary
+                                        newPrice = basePrice * conversionRate;
+                                      }
                                       else {
                                         return;
                                       }
 
                                       const roundedPrice = newPrice.toFixed(2);
 
-                                      
+
 
 
                                       setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
@@ -2394,6 +2439,8 @@ export default function PurchaseAdd() {
                                 //   return;
                                 // }
                                 basePurchasePriceRef.current[i] = Number(val) || 0;
+                                basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+
 
                                 const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                   { ...itemsValues[i], Purchase_Price: val },
@@ -2655,7 +2702,7 @@ export default function PurchaseAdd() {
 
 
                 <div className="flex flex-col px-2">
-               
+
 
 
                   <div className="flex flex-col mt-3 gap-2 w-full">
@@ -2688,7 +2735,7 @@ export default function PurchaseAdd() {
                               }
                             }}
                           >
-                         
+
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Neft">Neft</option>
@@ -2710,7 +2757,7 @@ export default function PurchaseAdd() {
                             <label className="text-sm">Reference Number</label>
                             <input
                               type="text"
-                            
+
                               style={{ marginBottom: "0px" }}
                               {...register("splits.0.Reference_Number")}
                             />
@@ -3106,11 +3153,11 @@ export default function PurchaseAdd() {
 
             await refetchItems();
 
-            setNewlyAddedItem(savedItem);
+            //setNewlyAddedItem(savedItem);
 
-            setTimeout(() => {
-              setNewlyAddedItem(null);
-            }, 8000);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
             setShowItemAddModal(false);
 

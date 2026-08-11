@@ -2194,11 +2194,11 @@ export default function PurchaseReturnAdd() {
 
                                   // const conversionRate =
                                   //   Number(currentItem?.Conversion_Rate) || 0;
-                                  const row = rows[i];
+                                  // const row = rows[i];
 
-                                  const availableUnits = Array.isArray(row?.Available_Units)
-                                    ? row.Available_Units
-                                    : [];
+                                  // const availableUnits = Array.isArray(row?.Available_Units)
+                                  //   ? row.Available_Units
+                                  //   : [];
 
                                   const primaryUnit =
                                     row?.Primary_Unit ||

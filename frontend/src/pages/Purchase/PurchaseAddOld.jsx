@@ -2655,7 +2655,7 @@ export default function PurchaseAdd() {
 
 
                 <div className="flex flex-col px-2">
-                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+               
 
 
                   <div className="flex flex-col mt-3 gap-2 w-full">
@@ -2664,8 +2664,6 @@ export default function PurchaseAdd() {
                         <div className="flex flex-col w-full">
                           <span className="active">Payment Type</span>
 
-                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
-            it's driven by setValue in the onChange below, not a native <select {...register}> */}
                           <input
                             type="hidden"
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
@@ -2690,7 +2688,7 @@ export default function PurchaseAdd() {
                               }
                             }}
                           >
-                            {/* <option value="">Select Payment Type</option> */}
+                         
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Neft">Neft</option>
@@ -2712,7 +2710,7 @@ export default function PurchaseAdd() {
                             <label className="text-sm">Reference Number</label>
                             <input
                               type="text"
-                              //readOnly={isView}
+                            
                               style={{ marginBottom: "0px" }}
                               {...register("splits.0.Reference_Number")}
                             />

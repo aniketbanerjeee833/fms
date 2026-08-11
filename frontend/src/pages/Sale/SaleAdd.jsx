@@ -92,6 +92,7 @@ export default function SaleAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
   const baseSalePriceRef = useRef({});
+    const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -746,7 +747,7 @@ export default function SaleAdd() {
       }
     );
     baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-
+     baseSaleUnitRef.current[i] = it.Primary_Unit || "";
     setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
     handleRowChange(i, "itemOpen", false);
 
@@ -1550,6 +1551,7 @@ export default function SaleAdd() {
                                     }
                                   );
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
+                                   baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -2072,13 +2074,13 @@ export default function SaleAdd() {
                                     // }
 
                                     //const roundedPrice = newPrice.toFixed(2);
-                                    const basePrice =Number(baseSalePriceRef.current[i]) || 0;
+                                    //const basePrice =Number(baseSalePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2089,12 +2091,12 @@ export default function SaleAdd() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2103,20 +2105,53 @@ export default function SaleAdd() {
                                     // Restore original base price.
                                     // =====================================================
 
-                                    else if (
-                                      previousUnit === secondaryUnit &&
-                                      newUnit === primaryUnit
-                                    ) {
-                                      newPrice = basePrice;
-                                    }
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
 
-                                    else {
-                                      return;
-                                    }
+                                    // else {
+                                    //   return;
+                                    // }
 
-                                    const roundedPrice = newPrice.toFixed(2);
+                                    // const roundedPrice = newPrice.toFixed(2);
 
 
+                                  const basePrice =Number(baseSalePriceRef.current[i]) || 0;
+
+                                      const baseUnit =baseSaleUnitRef.current[i];
+
+                                      if (basePrice <= 0 || !baseUnit) {
+                                        return;
+                                      }
+
+                                      let newPrice;
+
+                                      if (newUnit === baseUnit) {
+                                        // Restore original entered price
+                                        newPrice = basePrice;
+                                      }
+                                      else if (
+                                        baseUnit === primaryUnit &&
+                                        newUnit === secondaryUnit
+                                      ) {
+                                        // Primary → Secondary
+                                        newPrice = basePrice / conversionRate;
+                                      }
+                                      else if (
+                                        baseUnit === secondaryUnit &&
+                                        newUnit === primaryUnit
+                                      ) {
+                                        // Secondary → Primary
+                                        newPrice = basePrice * conversionRate;
+                                      }
+                                      else {
+                                        return;
+                                      }
+
+                                      const roundedPrice = newPrice.toFixed(2);
 
 
                                     setValue(`items.${i}.Sale_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
@@ -2222,6 +2257,7 @@ export default function SaleAdd() {
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true, shouldDirty: true });
                                 baseSalePriceRef.current[i] = Number(val) || 0;
+                                baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
                                 i,

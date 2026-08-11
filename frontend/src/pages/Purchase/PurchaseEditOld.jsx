@@ -57,7 +57,7 @@ export default function PurchaseEdit() {
 
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
-const basePurchasePriceRef = useRef({});
+  const basePurchasePriceRef = useRef({});
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
@@ -552,54 +552,104 @@ const basePurchasePriceRef = useRef({});
       //   }))
       //   : [emptyRow()];
 
-        const prefilledRows = purchase?.items?.length > 0
-  ? purchase.items.map((item, index) => {
+      const prefilledRows = purchase?.items?.length > 0
+        ? purchase.items.map((item, index) => {
 
-      // Original purchase price saved in this purchase line
-      const purchasePrice = Number(item.Purchase_Price) || 0;
+          // Original purchase price saved in this purchase line
+          const purchasePrice = Number(item.Purchase_Price) || 0;
 
-      // If this purchase was saved in secondary unit,
-      // convert its price back to PRIMARY price.
-      const primaryUnit = item.Primary_Unit || "";
-      const secondaryUnit = item.Secondary_Unit || "";
-      const conversionRate = Number(item.Conversion_Rate) || 0;
-      const selectedUnit = item.Selected_Unit || primaryUnit;
+          // If this purchase was saved in secondary unit,
+          // convert its price back to PRIMARY price.
+          // const primaryUnit = item.Primary_Unit || "";
+          // const secondaryUnit = item.Secondary_Unit || "";
+          //       const primaryUnit =
+          //   item.Primary_Unit ||
+          //   availableUnits[0]?.Unit_Shorthand ||
+          //   "";
 
-      let basePurchasePrice = purchasePrice;
+          // const secondaryUnit =
+          //   item.Secondary_Unit ||
+          //   availableUnits.find(
+          //     (u) => u.Unit_Shorthand !== primaryUnit
+          //   )?.Unit_Shorthand ||
+          //   "";
+          //       const conversionRate = Number(item.Conversion_Rate) || 0;
+          //       const selectedUnit = item.Selected_Unit || primaryUnit;
+          const conversionRate = Number(item.Conversion_Rate) || 0;
 
-      if (
-        selectedUnit === secondaryUnit &&
-        conversionRate > 0
-      ) {
-        basePurchasePrice = purchasePrice * conversionRate;
-      }
+          const availableUnits = Array.isArray(item.Available_Units)
+            ? item.Available_Units
+            : [];
 
-      // Store original/base price separately
-      basePurchasePriceRef.current[index] = basePurchasePrice;
+          // Historical snapshot may have Secondary_Unit = null.
+          // In that case use CURRENT available units.
+          const primaryUnit =
+            item.Primary_Unit ||
+            availableUnits[0]?.Unit_Shorthand ||
+            "";
 
-      return {
-        ...item,
+          const secondaryUnit =
+            item.Secondary_Unit ||
+            availableUnits.find(
+              (u) => u.Unit_Shorthand !== primaryUnit
+            )?.Unit_Shorthand ||
+            "";
 
-        Item_Unit: selectedUnit,
+          const selectedUnit =
+            item.Selected_Unit || primaryUnit;
 
-        itemSearch: item.Item_Name,
-        itemOpen: false,
-        CategoryOpen: false,
+          let basePurchasePrice = purchasePrice;
 
-        isHSNLocked: false,
-        isUnitLocked: false,
-        isExistingItem: true,
+          if (
+            selectedUnit === secondaryUnit &&
+            conversionRate > 0
+          ) {
+            basePurchasePrice = purchasePrice * conversionRate;
+          }
 
-        Primary_Unit: primaryUnit,
-        Secondary_Unit: secondaryUnit,
-        Conversion_Rate: conversionRate,
+          // Store original/base price separately
+          basePurchasePriceRef.current[index] = basePurchasePrice;
 
-        Available_Units: Array.isArray(item.Available_Units)
-          ? item.Available_Units
-          : [],
-      };
-    })
-  : [emptyRow()];
+          return {
+            ...item,
+
+            Item_Unit: selectedUnit,
+
+            itemSearch: item.Item_Name,
+            itemOpen: false,
+            CategoryOpen: false,
+
+            isHSNLocked: false,
+            isUnitLocked: false,
+            isExistingItem: true,
+
+            Primary_Unit: primaryUnit,
+            Secondary_Unit: secondaryUnit,
+            Conversion_Rate: conversionRate,
+
+            Available_Units: availableUnits,
+          };
+        })
+        : [emptyRow()];
+      const formItems = prefilledRows.map((item) => ({
+        Item_Id: item.Item_Id,
+        Item_Name: item.Item_Name || "",
+        Item_Category: item.Item_Category || "",
+        Item_HSN: item.Item_HSN || "",
+        Quantity: item.Quantity || "",
+        Item_Unit: item.Item_Unit || "",
+        Purchase_Price: item.Purchase_Price || "",
+
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price || "",
+
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price || "Percentage",
+
+        Tax_Type: item.Tax_Type || "None",
+        Tax_Amount: item.Tax_Amount || "",
+        Amount: item.Amount || "",
+      }));
       setRows(prefilledRows)
       reset({
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
@@ -632,8 +682,9 @@ const basePurchasePriceRef = useRef({});
                 Amount: "",
               },
             ],
-        //items: purchase?.items
-        items: prefilledRows
+        // ✅ CLEAN RHF DATA
+        items: formItems,
+        //items: prefilledRows
       })
       setShowSplitBox((purchase?.splits?.length || 0) > 1);
     }
@@ -857,7 +908,12 @@ const basePurchasePriceRef = useRef({});
           itemApi.util.invalidateTags(["Item"])
         );
       }
-
+        else if (from === "items-by-item") {
+        navigate({
+          pathname: "/items/all-items",
+          search: `?itemId=${Item_Id}`,
+        });
+      }
       else if (from === "bank-accounts") {
         navigate({
           pathname: "/cash-bank/bank-accounts",
@@ -985,7 +1041,16 @@ const basePurchasePriceRef = useRef({});
                       pathname: `/item/item-sales-purchases-details/${Item_Id}`,
                       search: location.search,
                     })
-                  } else if (from === "bank-accounts") {
+                  } 
+                         else if (from === "items-by-item") {
+                    
+
+                    navigate({
+                      pathname: "/items/all-items",
+                      search: `?itemId=${Item_Id}`,
+                    });
+                  }
+                  else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
                       pathname: `/cash-bank/bank-accounts`,
@@ -1513,9 +1578,9 @@ const basePurchasePriceRef = useRef({});
                                   setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                  
+
                                   setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-                                  basePurchasePriceRef.current[i] =Number(matchedItem.Purchase_Price) || 0;
+                                  basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -2058,9 +2123,45 @@ const basePurchasePriceRef = useRef({});
                                   //   return;
                                   // }
                                   // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
-                                  const primaryUnit = row?.Primary_Unit;
-                                  const secondaryUnit = row?.Secondary_Unit;
-                                  const conversionRate = Number(row?.Conversion_Rate) || 0;
+                                  // const primaryUnit = row?.Primary_Unit;
+                                  // const secondaryUnit = row?.Secondary_Unit;
+                                  // const conversionRate = Number(row?.Conversion_Rate) || 0;
+                                  // const currentItem = itemsValues[i];
+
+                                  // const primaryUnit =
+                                  //   currentItem?.Primary_Unit ||
+                                  //   availableUnits?.[0]?.Unit_Shorthand ||
+                                  //   "";
+
+                                  // const secondaryUnit =
+                                  //   currentItem?.Secondary_Unit ||
+                                  //   availableUnits?.find(
+                                  //     (u) => u.Unit_Shorthand !== primaryUnit
+                                  //   )?.Unit_Shorthand ||
+                                  //   "";
+
+                                  // const conversionRate =
+                                  //   Number(currentItem?.Conversion_Rate) || 0;
+                                  const row = rows[i];
+
+                                  const availableUnits = Array.isArray(row?.Available_Units)
+                                    ? row.Available_Units
+                                    : [];
+
+                                  const primaryUnit =
+                                    row?.Primary_Unit ||
+                                    availableUnits?.[0]?.Unit_Shorthand ||
+                                    "";
+
+                                  const secondaryUnit =
+                                    row?.Secondary_Unit ||
+                                    availableUnits?.find(
+                                      (u) => u.Unit_Shorthand !== primaryUnit
+                                    )?.Unit_Shorthand ||
+                                    "";
+
+                                  const conversionRate =
+                                    Number(row?.Conversion_Rate) || 0;
 
                                   if (
                                     previousUnit &&
@@ -2084,7 +2185,7 @@ const basePurchasePriceRef = useRef({});
                                     // }
 
                                     //const roundedPrice = newPrice.toFixed(2);
-                                    const basePrice =Number(basePurchasePriceRef.current[i]) || 0;
+                                    const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
 
                                     if (basePrice <= 0) {
                                       return;
@@ -2120,6 +2221,7 @@ const basePurchasePriceRef = useRef({});
                                       newUnit === primaryUnit
                                     ) {
                                       newPrice = basePrice;
+                                      
                                     }
 
                                     else {
@@ -2174,744 +2276,745 @@ const basePurchasePriceRef = useRef({});
                           <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
                         )}
                       </td>
-                      
-
-              {/* Price/Unit */}
-              <td style={{ padding: "0px", width: "6%" }}>
-                <div className="d-flex align-items-center">
-                  <input
-                    type="text"
-                    className="form-control"
-                    style={{ width: "100%", marginBottom: "0px" }}
-                    {...register(`items.${i}.Purchase_Price`)}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/[^0-9.]/g, "");;
-
-                      // ✅ allow digits and one dot
 
 
-                      // ✅ if more than one dot, keep only the first
-                      const parts = val.split(".");
-                      if (parts.length > 2) {
-                        val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                      }
+                      {/* Price/Unit */}
+                      <td style={{ padding: "0px", width: "6%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ width: "100%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Purchase_Price`)}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");;
 
-                      // ✅ limit to 2 decimal places
-                      if (val.includes(".")) {
-                        const [int, dec] = val.split(".");
-                        val = int + "." + dec.slice(0, 2);
-                      }
-
-                      e.target.value = val;
-                      setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
-                      basePurchasePriceRef.current[i] = Number(val) || 0;
-                      //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
-                      // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                      //   return;
-                      // }
+                              // ✅ allow digits and one dot
 
 
-                      const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                        { ...itemsValues[i], Purchase_Price: val },
-                        i,
-                        itemsValues
-                      );
+                              // ✅ if more than one dot, keep only the first
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
+                              }
 
-                      setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                      setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                      setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                      setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                    }}
+                              // ✅ limit to 2 decimal places
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
 
-                    placeholder="Price"
-                  />
-
-                </div>
-                {errors?.items?.[i]?.Purchase_Price && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.items[i].Purchase_Price.message}
-                  </p>
-                )}
-              </td>
-              {/* Discount */}
-              <td style={{ padding: "0px", width: "14%" }}>
-                <div className="d-flex align-items-center">
-                  <input
-                    type="text"
-                    className="form-control"
-                    style={{ width: "50%", marginBottom: "0px" }}
-                    {...register(`items.${i}.Discount_On_Purchase_Price`)}
-
-                    onInput={(e) => {
-                      let val = e.target.value;
-
-                      // allow digits + 1 dot
-                      val = val.replace(/[^0-9.]/g, "");
-
-                      const parts = val.split(".");
-                      if (parts.length > 2) {
-                        val = parts[0] + "." + parts.slice(1).join("");
-                      }
-
-                      if (val.includes(".")) {
-                        const [int, dec] = val.split(".");
-                        val = int + "." + dec.slice(0, 2);
-                      }
-
-                      e.target.value = val;
-
-                      const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                        { ...itemsValues[i], Discount_On_Purchase_Price: val },
-                        i,
-                        itemsValues
-                      );
-
-                      setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                      setValue(`items.${i}.Amount`, Amount);
-                      setValue("Total_Amount", Total_Amount);
-                      setValue("Balance_Due", Balance_Due);
-                    }}
-
-                    placeholder="Discount"
-                  />
-                  <Controller
-                    control={control}
-                    name={`items.${i}.Discount_Type_On_Purchase_Price`}
-                    render={({ field }) => (
-                      <select
-                        {...field}
-                        className="form-select ms-2"
-                        style={{ width: "50%", fontSize: "12px" }}
-                        onChange={(e) => {
-                          field.onChange(e); // ✅ let RHF handle its state
+                              e.target.value = val;
+                              setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
+                              basePurchasePriceRef.current[i] = Number(val) || 0;
+                              
+                              //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
+                              // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                              //   return;
+                              // }
 
 
-                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                            { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
-                            i,
-                            itemsValues
-                          );
+                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                { ...itemsValues[i], Purchase_Price: val },
+                                i,
+                                itemsValues
+                              );
 
-                          setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                          setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                          setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                          setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                        }}
-                      >
-                        <option value="Percentage">%</option>
-                        <option value="Amount">Amount</option>
-                      </select>
-                    )}
-                  />
-                </div>
-              </td>
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            }}
+
+                            placeholder="Price"
+                          />
+
+                        </div>
+                        {errors?.items?.[i]?.Purchase_Price && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Purchase_Price.message}
+                          </p>
+                        )}
+                      </td>
+                      {/* Discount */}
+                      <td style={{ padding: "0px", width: "14%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ width: "50%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Discount_On_Purchase_Price`)}
+
+                            onInput={(e) => {
+                              let val = e.target.value;
+
+                              // allow digits + 1 dot
+                              val = val.replace(/[^0-9.]/g, "");
+
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join("");
+                              }
+
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
+
+                              e.target.value = val;
+
+                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                { ...itemsValues[i], Discount_On_Purchase_Price: val },
+                                i,
+                                itemsValues
+                              );
+
+                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                              setValue(`items.${i}.Amount`, Amount);
+                              setValue("Total_Amount", Total_Amount);
+                              setValue("Balance_Due", Balance_Due);
+                            }}
+
+                            placeholder="Discount"
+                          />
+                          <Controller
+                            control={control}
+                            name={`items.${i}.Discount_Type_On_Purchase_Price`}
+                            render={({ field }) => (
+                              <select
+                                {...field}
+                                className="form-select ms-2"
+                                style={{ width: "50%", fontSize: "12px" }}
+                                onChange={(e) => {
+                                  field.onChange(e); // ✅ let RHF handle its state
 
 
-              <td style={{ padding: "0px", width: "12%" }}>
-                <Controller
-                  control={control}
-                  name={`items.${i}.Tax_Type`}
-                  render={({ field }) => (
-                    <select
-                      {...field}
-                      className="form-select"
-                      style={{ width: "100%", fontSize: "12px", marginBottom: "0px" }}
-                      onChange={(e) => {
-                        field.onChange(e); // ✅ update RHF value
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                }}
+                              >
+                                <option value="Percentage">%</option>
+                                <option value="Amount">Amount</option>
+                              </select>
+                            )}
+                          />
+                        </div>
+                      </td>
 
 
-                        const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                          { ...itemsValues[i], Tax_Type: e.target.value },
-                          i,
-                          itemsValues
-                        );
-                        setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                        setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                        setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                        setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                      }}
-                    >
-                      <option value="None">None</option>
-                      <option value="GST0">GST @0%</option>
-                      <option value="IGST0">IGST @0%</option>
-                      <option value="GST0.25">GST @0.25%</option>
-                      <option value="IGST0.25">IGST @0.25%</option>
-                      <option value="GST3">GST @3%</option>
-                      <option value="IGST3">IGST @3%</option>
-                      <option value="GST5">GST @5%</option>
-                      <option value="IGST5">IGST @5%</option>
-                      <option value="GST12">GST @12%</option>
-                      <option value="IGST12">IGST @12%</option>
-                      <option value="GST18">GST @18%</option>
-                      <option value="IGST18">IGST @18%</option>
-                      <option value="GST28">GST @28%</option>
-                      <option value="IGST28">IGST @28%</option>
-                      <option value="GST40">GST @40%</option>
-                      <option value="IGST40">IGST @40%</option>
-                    </select>
-                  )}
-                />
-              </td>
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`}
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px", marginBottom: "0px" }}
+                              onChange={(e) => {
+                                field.onChange(e); // ✅ update RHF value
 
-              {/* Tax Amount */}
-              <td style={{ width: "8%" }}>
-                <input
-                  type="text"
-                  className="form-control"
-                  style={{ backgroundColor: "transparent" }}
-                  {...register(`items.${i}.Tax_Amount`)}
-                  readOnly
-                />
-              </td>
 
-              {/* Amount */}
-              <td style={{ width: "8%" }}>
-                <input
-                  type="text"
-                  className="form-control"
-                  style={{ backgroundColor: "transparent" }}
-                  {...register(`items.${i}.Amount`)}
-                  readOnly
-                />
-              </td>
-            </tr>
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                  { ...itemsValues[i], Tax_Type: e.target.value },
+                                  i,
+                                  itemsValues
+                                );
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              }}
+                            >
+                              <option value="None">None</option>
+                              <option value="GST0">GST @0%</option>
+                              <option value="IGST0">IGST @0%</option>
+                              <option value="GST0.25">GST @0.25%</option>
+                              <option value="IGST0.25">IGST @0.25%</option>
+                              <option value="GST3">GST @3%</option>
+                              <option value="IGST3">IGST @3%</option>
+                              <option value="GST5">GST @5%</option>
+                              <option value="IGST5">IGST @5%</option>
+                              <option value="GST12">GST @12%</option>
+                              <option value="IGST12">IGST @12%</option>
+                              <option value="GST18">GST @18%</option>
+                              <option value="IGST18">IGST @18%</option>
+                              <option value="GST28">GST @28%</option>
+                              <option value="IGST28">IGST @28%</option>
+                              <option value="GST40">GST @40%</option>
+                              <option value="IGST40">IGST @40%</option>
+                            </select>
+                          )}
+                        />
+                      </td>
+
+                      {/* Tax Amount */}
+                      <td style={{ width: "8%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ backgroundColor: "transparent" }}
+                          {...register(`items.${i}.Tax_Amount`)}
+                          readOnly
+                        />
+                      </td>
+
+                      {/* Amount */}
+                      <td style={{ width: "8%" }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ backgroundColor: "transparent" }}
+                          {...register(`items.${i}.Amount`)}
+                          readOnly
+                        />
+                      </td>
+                    </tr>
                   ))}
-          </tbody>
+                </tbody>
 
 
-        </table>
-        <div className="flex sm:w-1/4 p-2">
-          <button
-            type="button"
-            onClick={handleAddRow}
-            className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
-            style={{ backgroundColor: "#4CA1AF" }}
-          >
-            + Add Row
-          </button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
+              </table>
+              <div className="flex sm:w-1/4 p-2">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  + Add Row
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
 
-          {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+                {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
-          <TermsAndConditionsSelector
-            termsList={termsTemplates}
-            value={watch("Terms_Conditions_Id")}
-            description={watch("Terms_Conditions_Description")}
-            onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
-              setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
-
-              setValue(
-                "Terms_Conditions_Description",
-                Terms_Conditions_Description,
-                {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                }
-              );
-            }}
-            onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
-          />
-          <div className="flex flex-col px-2">
-            <div className="flex flex-col mt-3 gap-2 w-full">
-              {!showSplitBox ? (
-                <>
-                  <div className="flex flex-col w-full">
-                    <span className="active">Payment Type</span>
-
-                    <input
-                      type="hidden"
-                      {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
-                    />
-
-                    <select
-                      id="Payment_Type"
-                      value={
-                        paymentType === "Bank"
-                          ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                          : paymentType || ""
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val.startsWith("bank_")) {
-                          const bankId = val.replace("bank_", "");
-                          setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                          setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                        } else {
-                          setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                          setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                        }
-                      }}
-                    >
-                      {/* <option value="">Select Payment Type</option> */}
-                      <option value="Cash">Cash</option>
-                      <option value="Cheque">Cheque</option>
-                      <option value="Neft">Neft</option>
-                      {banks?.map((bank) => (
-                        <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                          {bank.Account_Display_Name}
-                        </option>
-                      ))}
-                    </select>
-
-                    {errors?.splits?.[0]?.Payment_Type && (
-                      <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
-                    )}
-                  </div>
-
-
-                  {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                    <div className="mt-3 flex flex-col">
-                      <label className="text-sm">Reference Number</label>
-                      <input
-                        type="text"
-                        //readOnly={isView}
-                        style={{ marginBottom: "0px" }}
-                        {...register("splits.0.Reference_Number")}
-                      />
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={handleAddPaymentType}
-                    className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                    style={{ background: "transparent", border: "none", padding: 0 }}
-                  >
-                    + Add Payment Type
-                  </button>
-                </>
-              ) : (
-                <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
-                  {splitFields.map((field, index) => {
-                    const rowType = watch(`splits.${index}.Payment_Type`);
-                    const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                    const rowOptions = getAvailableOptions(index);
-                    const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
-                    const amountField = register(`splits.${index}.Amount`, {
-                      required: "Required",
-                      validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                <TermsAndConditionsSelector
+                  termsList={termsTemplates}
+                  value={watch("Terms_Conditions_Id")}
+                  description={watch("Terms_Conditions_Description")}
+                  onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
+                    setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
+                      shouldDirty: true,
+                      shouldValidate: true,
                     });
 
-                    return (
-                      <div key={field.id} className="flex flex-col gap-2">
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                          <div className="flex flex-col flex-1">
-                            <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                            <select
-                              value={currentIdentifier || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val.startsWith("bank_")) {
-                                  setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                  setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                } else {
-                                  setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                  setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                }
-                              }}
-                              className="border rounded-md px-2 py-1.5"
-                            >
-                              <option value="">Select Type</option>
-                              {rowOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                    setValue(
+                      "Terms_Conditions_Description",
+                      Terms_Conditions_Description,
+                      {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      }
+                    );
+                  }}
+                  onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
+                />
+                <div className="flex flex-col px-2">
+                  <div className="flex flex-col mt-3 gap-2 w-full">
+                    {!showSplitBox ? (
+                      <>
+                        <div className="flex flex-col w-full">
+                          <span className="active">Payment Type</span>
 
-                          <div className="flex flex-col flex-1">
-                            <span className="text-xs text-gray-500 mb-1">Amount</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="Amount"
-                              style={{ marginBottom: "0px", width: "80%" }}
-                              className="border rounded-md px-2 py-1.5"
-                              {...amountField}
-                              onChange={(e) => {
-                                e.target.value = sanitizeAmount(e.target.value);
-                                amountField.onChange(e);
-                                clearErrors(`splits.${index}.Amount`);
-                              }}
-                            />
-                            {errors?.splits?.[index]?.Amount && (
-                              <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
-                            )}
-                          </div>
+                          <input
+                            type="hidden"
+                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
+                          />
 
-                          {splitFields.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeSplit(index)}
-                              className="text-gray-500 mb-2 mt-4"
-                              style={{ background: "transparent", border: "none" }}
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                          <select
+                            id="Payment_Type"
+                            value={
+                              paymentType === "Bank"
+                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                : paymentType || ""
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val.startsWith("bank_")) {
+                                const bankId = val.replace("bank_", "");
+                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                              }
+                            }}
+                          >
+                            {/* <option value="">Select Payment Type</option> */}
+                            <option value="Cash">Cash</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Neft">Neft</option>
+                            {banks?.map((bank) => (
+                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
+                                {bank.Account_Display_Name}
+                              </option>
+                            ))}
+                          </select>
+
+                          {errors?.splits?.[0]?.Payment_Type && (
+                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
                           )}
                         </div>
 
-                        {needsRef && (
-                          <input
-                            type="text"
-                            placeholder="Reference Number"
-                            style={{ width: "80%" }}
-                            // className="border rounded-md px-2 py-1.5 w-full"
-                            {...register(`splits.${index}.Reference_Number`)}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                    }
-                    className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                    style={{ background: "transparent", border: "none" }}
-                  >
-                    + Add Another Payment
-                  </button>
+                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                          <div className="mt-3 flex flex-col">
+                            <label className="text-sm">Reference Number</label>
+                            <input
+                              type="text"
+                              //readOnly={isView}
+                              style={{ marginBottom: "0px" }}
+                              {...register("splits.0.Reference_Number")}
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handleAddPaymentType}
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none", padding: 0 }}
+                        >
+                          + Add Payment Type
+                        </button>
+                      </>
+                    ) : (
+                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
+                        {splitFields.map((field, index) => {
+                          const rowType = watch(`splits.${index}.Payment_Type`);
+                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
+                          const rowOptions = getAvailableOptions(index);
+                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
+                          const amountField = register(`splits.${index}.Amount`, {
+                            required: "Required",
+                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                          });
+
+                          return (
+                            <div key={field.id} className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                  <select
+                                    value={currentIdentifier || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                    className="border rounded-md px-2 py-1.5"
+                                  >
+                                    <option value="">Select Type</option>
+                                    {rowOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Amount"
+                                    style={{ marginBottom: "0px", width: "80%" }}
+                                    className="border rounded-md px-2 py-1.5"
+                                    {...amountField}
+                                    onChange={(e) => {
+                                      e.target.value = sanitizeAmount(e.target.value);
+                                      amountField.onChange(e);
+                                      clearErrors(`splits.${index}.Amount`);
+                                    }}
+                                  />
+                                  {errors?.splits?.[index]?.Amount && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                  )}
+                                </div>
+
+                                {splitFields.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSplit(index)}
+                                    className="text-gray-500 mb-2 mt-4"
+                                    style={{ background: "transparent", border: "none" }}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {needsRef && (
+                                <input
+                                  type="text"
+                                  placeholder="Reference Number"
+                                  style={{ width: "80%" }}
+                                  // className="border rounded-md px-2 py-1.5 w-full"
+                                  {...register(`splits.${index}.Reference_Number`)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                          }
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none" }}
+                        >
+                          + Add Another Payment
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-          {/* <div style={{ width: "100%" }}
+                {/* <div style={{ width: "100%" }}
                   className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
                   > */}
 
-          <div style={{ width: "100%" }}
-            className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
-          >
-
-            <div style={{ width: "100%" }}
-              className="flex justify-between items-start gap-6 w-full mr-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="roundOffCheck"
-                  className="w-4 h-4 cursor-pointer"
-                  onChange={(e) => {
-                    const isChecked = e.target.checked;
-                    const totalAmount = parseFloat(watch("Total_Amount"));
-                    const totalReceived = parseFloat(watch("Total_Paid")) || 0;
-
-
-                    if (!totalAmount || isNaN(totalAmount)) return;
-
-                    if (isChecked) {
-                      setOriginalTotal(totalAmount);
-
-                      // Round off to nearest integer
-                      const rounded = Math.round(totalAmount);
-
-                      setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                      setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
-
-                    } else {
-                      if (originalTotal !== null) {
-                        setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
-
-                        setValue(
-                          "Balance_Due",
-                          (originalTotal - totalReceived).toFixed(2),
-                          { shouldValidate: true }
-                        );
-                      }
-                    }
-                  }}
-                />
-
-                <span className="font-medium whitespace-nowrap">Round Off</span>
-
-
-                <input
-
-                  type="text"
-
-                  style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                  className="w-3  border border-gray-300  text-right text-sm"
-                  {...register("Round_Off")}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                    const totalReceived = parseFloat(watch("Total_Paid")) || 0;
-
-                    if (isNaN(totalAmount)) return;
-
-                    // New Total
-                    const newTotal = totalAmount + val;
-
-                    setValue("Total_Amount", newTotal.toFixed(2));
-                    setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                  }}
-                //disabled={!watch("roundOffCheck") && originalTotal === null}
-                />
-              </div>
-
-              <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                <div className="flex gap-3 items-center  w-full sm:w-auto">
-
-                  <div style={{ width: "100%" }} className="flex gap-2 ">
-                    <span className="font-medium whitespace-nowrap">Total Amount</span>
-
-                    <input
-                      style={{ backgroundColor: "transparent", height: "1rem" }}
-                      type="text"
-                      className="form-control"
-                      {...register("Total_Amount")}
-                      readOnly
-                    />
-                  </div>
-                </div>
-
-
-
-                <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
-
-                  <div className="flex items-center gap-2 relative">
-
-                    <input
-                      type="checkbox"
-
-
-                      id="totalPaidCheck"
-                      className="w-4 h-4 cursor-pointer"
-                      disabled={splitsWatch.length > 1}   // 🔹 add this
-
-                      onChange={(e) => {
-
-                        const isChecked = e.target.checked;
-                        const totalAmount = parseFloat(watch("Total_Amount"));
-
-                        // 🧠 If no total amount entered, do nothing
-                        if (!totalAmount || isNaN(totalAmount)) {
-                          // Optional: visually reset the checkbox
-
-
-                          // Clear both fields to stay consistent
-                          setValue("Total_Paid", "");
-                          setValue("Balance_Due", "");
-                          if (splitsWatch.length === 1) {
-                            setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
-                          }
-                          return;
-                        }
-
-                        if (isChecked) {
-                          // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
-                          setValue("Total_Paid", totalAmount.toFixed(2));
-                          setValue("Balance_Due", 0);
-                        } else {
-                          // ✅ When unchecked, restore Balance_Due = Total_Amount
-                          setValue("Total_Paid", "");
-                          setValue("Balance_Due", totalAmount.toFixed(2));
-                        }
-                        if (splitsWatch.length === 1) {
-                          setValue(
-                            "splits.0.Amount",
-                            isChecked ? totalAmount.toFixed(2) : "",
-                            { shouldValidate: true, shouldDirty: true }
-                          );
-                        }
-                      }}
-                    />
-                    <span
-                      htmlFor="totalPaidCheck"
-                      className="font-medium whitespace-nowrap"
-                    >
-                      Total Paid
-                    </span>
-
-                  </div>
-
-
-                  <input
-                    type="text"
-                    {...register("Total_Paid")}
-                    style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                    readOnly={splitsWatch.length > 1}
-                    onChange={(e) => {
-                      if (splitsWatch.length > 1) return;
-                      let val = e.target.value.replace(/[^0-9.]/g, "");
-
-                      // Allow only one dot
-                      const parts = val.split(".");
-                      if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-                      // Limit to 2 decimals
-                      if (val.includes(".")) {
-                        const [int, dec] = val.split(".");
-                        val = int + "." + dec.slice(0, 2);
-                      }
-
-                      e.target.value = val;
-                      setValue("Total_Paid", val);
-
-                      const totalReceived = parseFloat(val || 0);
-                      const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                      setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                      if (splitsWatch.length === 1) {
-                        const val = e.target.value;
-                        setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                      }
-                      clearErrors("splits.0.Amount"); // already there ✅
-                    }}
-                    className="form-control"
-                  />
-                </div>
-
-
-
                 <div style={{ width: "100%" }}
-                  className="flex  gap-2 items-center ">
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
+                >
 
-                  <span className="font-medium whitespace-nowrap">Balance Due</span>
-                  <input
-                    style={{
-                      backgroundColor: "transparent", marginBottom: "0px",
-                      height: "1rem", width: "100%"
-                    }}
-                    type="text"
-                    className="form-control  "
-                    {...register("Balance_Due")}
+                  <div style={{ width: "100%" }}
+                    className="flex justify-between items-start gap-6 w-full mr-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          const totalAmount = parseFloat(watch("Total_Amount"));
+                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
 
-                    readOnly
-                  />
+
+                          if (!totalAmount || isNaN(totalAmount)) return;
+
+                          if (isChecked) {
+                            setOriginalTotal(totalAmount);
+
+                            // Round off to nearest integer
+                            const rounded = Math.round(totalAmount);
+
+                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+
+                          } else {
+                            if (originalTotal !== null) {
+                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+
+                              setValue(
+                                "Balance_Due",
+                                (originalTotal - totalReceived).toFixed(2),
+                                { shouldValidate: true }
+                              );
+                            }
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+
+                      <input
+
+                        type="text"
+
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="w-3  border border-gray-300  text-right text-sm"
+                        {...register("Round_Off")}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
+                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+
+                          if (isNaN(totalAmount)) return;
+
+                          // New Total
+                          const newTotal = totalAmount + val;
+
+                          setValue("Total_Amount", newTotal.toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
+                        }}
+                      //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div>
+
+                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+                      <div className="flex gap-3 items-center  w-full sm:w-auto">
+
+                        <div style={{ width: "100%" }} className="flex gap-2 ">
+                          <span className="font-medium whitespace-nowrap">Total Amount</span>
+
+                          <input
+                            style={{ backgroundColor: "transparent", height: "1rem" }}
+                            type="text"
+                            className="form-control"
+                            {...register("Total_Amount")}
+                            readOnly
+                          />
+                        </div>
+                      </div>
+
+
+
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+
+                        <div className="flex items-center gap-2 relative">
+
+                          <input
+                            type="checkbox"
+
+
+                            id="totalPaidCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            disabled={splitsWatch.length > 1}   // 🔹 add this
+
+                            onChange={(e) => {
+
+                              const isChecked = e.target.checked;
+                              const totalAmount = parseFloat(watch("Total_Amount"));
+
+                              // 🧠 If no total amount entered, do nothing
+                              if (!totalAmount || isNaN(totalAmount)) {
+                                // Optional: visually reset the checkbox
+
+
+                                // Clear both fields to stay consistent
+                                setValue("Total_Paid", "");
+                                setValue("Balance_Due", "");
+                                if (splitsWatch.length === 1) {
+                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                }
+                                return;
+                              }
+
+                              if (isChecked) {
+                                // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
+                                setValue("Total_Paid", totalAmount.toFixed(2));
+                                setValue("Balance_Due", 0);
+                              } else {
+                                // ✅ When unchecked, restore Balance_Due = Total_Amount
+                                setValue("Total_Paid", "");
+                                setValue("Balance_Due", totalAmount.toFixed(2));
+                              }
+                              if (splitsWatch.length === 1) {
+                                setValue(
+                                  "splits.0.Amount",
+                                  isChecked ? totalAmount.toFixed(2) : "",
+                                  { shouldValidate: true, shouldDirty: true }
+                                );
+                              }
+                            }}
+                          />
+                          <span
+                            htmlFor="totalPaidCheck"
+                            className="font-medium whitespace-nowrap"
+                          >
+                            Total Paid
+                          </span>
+
+                        </div>
+
+
+                        <input
+                          type="text"
+                          {...register("Total_Paid")}
+                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                          readOnly={splitsWatch.length > 1}
+                          onChange={(e) => {
+                            if (splitsWatch.length > 1) return;
+                            let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                            // Allow only one dot
+                            const parts = val.split(".");
+                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+
+                            // Limit to 2 decimals
+                            if (val.includes(".")) {
+                              const [int, dec] = val.split(".");
+                              val = int + "." + dec.slice(0, 2);
+                            }
+
+                            e.target.value = val;
+                            setValue("Total_Paid", val);
+
+                            const totalReceived = parseFloat(val || 0);
+                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
+                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                            if (splitsWatch.length === 1) {
+                              const val = e.target.value;
+                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                            }
+                            clearErrors("splits.0.Amount"); // already there ✅
+                          }}
+                          className="form-control"
+                        />
+                      </div>
+
+
+
+                      <div style={{ width: "100%" }}
+                        className="flex  gap-2 items-center ">
+
+                        <span className="font-medium whitespace-nowrap">Balance Due</span>
+                        <input
+                          style={{
+                            backgroundColor: "transparent", marginBottom: "0px",
+                            height: "1rem", width: "100%"
+                          }}
+                          type="text"
+                          className="form-control  "
+                          {...register("Balance_Due")}
+
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+
                 </div>
               </div>
             </div>
+            <div className="flex justify-end gap-4 ">
+              <button
+                type="button"
+                onClick={() => {
+                  // setShowModal(false)
+                  if (from === "party-sales-purchases-details") {
 
+                    navigate({
+                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                      search: location.search,
+                    })
+                  }
+                  else if (from === "item-sales-purchases-details") {
+                    navigate({
+                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                      search: location.search,
+                    })
+                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else {
+                    navigate({
+                      pathname: "/purchase/all-purchases",
+                      search: location.search,
+                    })
 
-          </div>
-        </div>
-      </div>
-      <div className="flex justify-end gap-4 ">
-        <button
-          type="button"
-          onClick={() => {
-            // setShowModal(false)
-            if (from === "party-sales-purchases-details") {
-
-              navigate({
-                pathname: `/party/party-sales-purchases-details/${Party_Id}`,
-                search: location.search,
-              })
-            }
-            else if (from === "item-sales-purchases-details") {
-              navigate({
-                pathname: `/item/item-sales-purchases-details/${Item_Id}`,
-                search: location.search,
-              })
-              // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
-            }
-            else {
-              navigate({
-                pathname: "/purchase/all-purchases",
-                search: location.search,
-              })
-
-              // navigate("/sale/all-sales");
-            }
-          }}
-          // onClick={() => navigate({
-          //   pathname: "/purchase/all-purchases",
-          //   search: location.search,
-          // })}
-          // onClick={() => navigate("/purchase/all-purchases")}
-          className=" text-white font-bold py-2 px-4 rounded"
-          style={{ backgroundColor: "#4CA1AF" }}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={formValues.errorCount > 0 || isEditingPurchase}
-          className=" text-white font-bold py-2 px-4 rounded"
-          style={{ backgroundColor: "#4CA1AF" }}
-        >
-          {isEditingPurchase ? "Updating..." : "Update Purchase"}
-        </button>
-      </div>
-    </form >
+                    // navigate("/sale/all-sales");
+                  }
+                }}
+                // onClick={() => navigate({
+                //   pathname: "/purchase/all-purchases",
+                //   search: location.search,
+                // })}
+                // onClick={() => navigate("/purchase/all-purchases")}
+                className=" text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={formValues.errorCount > 0 || isEditingPurchase}
+                className=" text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                {isEditingPurchase ? "Updating..." : "Update Purchase"}
+              </button>
+            </div>
+          </form >
 
         </div >
 
 
       </div >
 
-    { showAddUnitModal && (
-      <AddUnitModal
-        onClose={() => {
-          setShowAddUnitModal(false);
-          setActiveUnitRow(null);
-        }}
-        onSave={(newUnit) => {
-          setValue(
-            `items.${activeUnitRow}.Item_Unit`,
-            newUnit.Unit_Shorthand,
-            { shouldValidate: true, shouldDirty: true }
-          );
+      {showAddUnitModal && (
+        <AddUnitModal
+          onClose={() => {
+            setShowAddUnitModal(false);
+            setActiveUnitRow(null);
+          }}
+          onSave={(newUnit) => {
+            setValue(
+              `items.${activeUnitRow}.Item_Unit`,
+              newUnit.Unit_Shorthand,
+              { shouldValidate: true, shouldDirty: true }
+            );
 
-          handleRowChange(
-            activeUnitRow,
-            "Item_Unit",
-            newUnit.Unit_Shorthand
-          );
+            handleRowChange(
+              activeUnitRow,
+              "Item_Unit",
+              newUnit.Unit_Shorthand
+            );
 
-          setShowAddUnitModal(false);
-          setActiveUnitRow(null);
-        }}
+            setShowAddUnitModal(false);
+            setActiveUnitRow(null);
+          }}
 
 
-      />
-    )
-}
-{
-  showItemAddModal && (
-    <AddItemModal
-      onClose={() => {
-        setShowItemAddModal(false);
+        />
+      )
+      }
+      {
+        showItemAddModal && (
+          <AddItemModal
+            onClose={() => {
+              setShowItemAddModal(false);
 
-        if (activeItemRow !== null) {
-          handleRowChange(activeItemRow, "itemOpen", true);
-        }
-      }}
-      onSave={async (savedItem) => {
-        if (!savedItem || typeof savedItem !== "object") {
-          setShowItemAddModal(false);
-          return;
-        }
+              if (activeItemRow !== null) {
+                handleRowChange(activeItemRow, "itemOpen", true);
+              }
+            }}
+            onSave={async (savedItem) => {
+              if (!savedItem || typeof savedItem !== "object") {
+                setShowItemAddModal(false);
+                return;
+              }
 
-        await refetchItems();
+              await refetchItems();
 
-        setNewlyAddedItem(savedItem);
+              setNewlyAddedItem(savedItem);
 
-        setTimeout(() => {
-          setNewlyAddedItem(null);
-        }, 8000);
+              setTimeout(() => {
+                setNewlyAddedItem(null);
+              }, 8000);
 
-        setShowItemAddModal(false);
+              setShowItemAddModal(false);
 
-        // Reopen the SAME row's dropdown
-        if (activeItemRow !== null) {
-          handleRowChange(activeItemRow, "itemOpen", true);
-        }
+              // Reopen the SAME row's dropdown
+              if (activeItemRow !== null) {
+                handleRowChange(activeItemRow, "itemOpen", true);
+              }
 
-        setActiveItemRow(null);
-      }}
-    />
-  )
-}
-<style>
-  {`
+              setActiveItemRow(null);
+            }}
+          />
+        )
+      }
+      <style>
+        {`
   /*  screens between 1000px and 640px */
   @media (max-width: 1000px) and (min-width: 641px) {
 
@@ -3038,7 +3141,7 @@ const basePurchasePriceRef = useRef({});
     }
   }
 `}
-</style>
+      </style>
     </>
   );
 }

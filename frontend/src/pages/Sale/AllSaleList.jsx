@@ -1,17 +1,19 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { useDeleteSaleMutation, useGetAllSalesQuery } from "../../redux/api/saleApi";
-import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2 } from "lucide-react";
-import { useState } from "react";
+import { useDeleteSaleMutation, useGetAllSalesQuery, useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
+import { useReactToPrint } from "react-to-print";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 
 // import { SiMicrosoftexcel } from "react-icons/si";
 export default function AllSaleList() {
-  const dispatch=useDispatch()
+  const dispatch = useDispatch()
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
@@ -33,7 +35,13 @@ export default function AllSaleList() {
   console.log(sales);
 
   // const[selecedSales,setSelectedSales]= useState(null);
+const [printSaleId, setPrintSaleId] = useState(null);
 
+const printRef = useRef(null);
+
+const { data: printData } = useGetSingleSaleQuery(printSaleId, {
+  skip: !printSaleId,
+});
   const navigate = useNavigate();
   const handlePageChange = (newPage) => {
     setSearchParams({
@@ -86,20 +94,31 @@ export default function AllSaleList() {
       const res = await deleteSale(deleteTarget.Sale_Id).unwrap();
       toast.success(res?.message || "Purchase deleted successfully");
       setDeleteTarget(null);
-        
-               
-           dispatch(
-          itemApi.util.invalidateTags([
-            "Item",
-            "ItemLedger",
-          ])
-        );
+
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+          "ItemLedger",
+        ])
+      );
     } catch (err) {
       console.log(err);
       toast.error(err?.data?.message || "Failed to delete purchase");
     }
   };
-
+const handlePrint = useReactToPrint({
+  contentRef: printRef,
+  documentTitle: printSaleId
+    ? `Sale-${printSaleId}`
+    : "Sale",
+  onAfterPrint: () => setPrintSaleId(null),
+});
+useEffect(() => {
+  if (printData && printSaleId) {
+    handlePrint();
+  }
+}, [printData, printSaleId]);
   console.log(sales?.sales);
 
   return (
@@ -329,6 +348,7 @@ export default function AllSaleList() {
                     <th>View/Edit</th>
                     <th>Return</th>
                     <th>Delete</th>
+                    <th>Print</th>
 
                   </tr>
                 </thead>
@@ -424,6 +444,69 @@ export default function AllSaleList() {
                             }
                           />
                         </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{
+                              cursor: "pointer",
+                              color: "#4CA1AF",
+                            }}
+                            onClick={() => setPrintSaleId(sale.Sale_Id)}
+                          />
+                        </td>
+                          {/* <div style={{ display: "none" }}>
+      <InvoicePrintTemplate
+        ref={printRef}
+        invoice={
+          printData?.billSaleDetails
+            ? {
+                invoiceId:
+                  printData.billSaleDetails.Sale_Id,
+
+                billNumber:
+                  printData.billSaleDetails.Invoice_Number,
+
+                billDate:
+                  printData.billSaleDetails.Invoice_Date,
+
+                partyName:
+                  printData.billSaleDetails.Party_Name,
+
+                gstin:
+                  printData.billSaleDetails.GSTIN,
+
+                billingAddress:
+                  printData.billSaleDetails.Billing_Address,
+
+                stateOfSupply:
+                  printData.billSaleDetails.State_Of_Supply,
+
+                totalAmount:
+                  printData.billSaleDetails.Total_Amount,
+
+                totalPaid:
+                  printData.billSaleDetails.Total_Received,
+
+                balanceDue:
+                  printData.billSaleDetails.Balance_Due,
+
+                paymentType:
+                  printData.billSaleDetails.Payment_Type_Display,
+
+                terms:
+                  printData.billSaleDetails
+                    .Terms_Conditions_Description,
+
+                items: printData.items || [],
+
+                type: "sale",
+
+                companyDetails: {},
+              }
+            : null
+        }
+      />
+    </div> */}
                       </tr>
                     ))
                   ) : (
@@ -617,7 +700,19 @@ export default function AllSaleList() {
                 </button>
               </div> */}
       </div>
-
+ {printData?.invoicePartyDetails && (
+  <div style={{ display: "none" }}>
+    <InvoicePrintTemplate
+      ref={printRef}
+      invoice={{
+        ...printData.invoicePartyDetails,   // ✅ matches backend response key
+        items: printData.items || [],
+        companyDetails: {},
+        type: "sale",
+      }}
+    />
+  </div>
+)}
       {deleteTarget && (
         <DeleteConfirmModal
           title="Delete Sale"
@@ -626,9 +721,10 @@ export default function AllSaleList() {
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
-          //isDeleting={false}
+        //isDeleting={false}
         />
       )}
+    
     </>
 
 
