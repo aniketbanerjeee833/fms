@@ -262,10 +262,10 @@ if (
              
           ])}
           {renderMenu("Items", <Package size={20} />, [
-             { to: "/items/add-category", text: "Add Category" },
+             { to: "/items/categories", text: "Category" },
             //{ to: "/items/add", text: "Add Items" },
             //{ to: "/items/all-items", text: "Item Details" },
-                { to: "/items/items", text: "Items" },
+                { to: "/items/all-items", text: "Items" },
          
           ])}
           

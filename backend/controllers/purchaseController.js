@@ -3496,15 +3496,12 @@ availableUnits = unitCodes.map((unitCode) => {
         Item_Name:
           it.Item_Name,
 
-        Item_HSN:
-          it.Item_HSN,
+        Item_HSN:it.Item_HSN,
 
         // Keep legacy column for old application data
-        Item_Unit:
-          it.Item_Unit,
+        Item_Unit:it.Item_Unit,
 
-        Item_Category:
-          it.Item_Category,
+        Item_Category:it.Item_Category,
 
         Quantity:
           it.Quantity,
@@ -3513,17 +3510,14 @@ availableUnits = unitCodes.map((unitCode) => {
         // UNIT DATA
         // =====================================================
 
-        Primary_Unit:
-          it.Primary_Unit_Snapshot,
+        Primary_Unit:it.Primary_Unit_Snapshot,
 
         Secondary_Unit:
           it.Secondary_Unit_Snapshot,
 
         // ONE unit selected by user for this bill row
-        Selected_Unit:
-          it.Selected_Unit,
-        Conversion_Rate:
-  it.Conversion_Rate !== null
+        Selected_Unit:it.Selected_Unit,
+        Conversion_Rate:it.Conversion_Rate !== null
     ? Number(it.Conversion_Rate)
     : 0,
         // Units frontend should show in edit dropdown

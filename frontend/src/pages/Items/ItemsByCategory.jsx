@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   Search,
@@ -7,8 +7,7 @@ import {
   ChevronRight,
   Package,
   Tags,
-  Eye,
-  Trash2,
+  
 } from "lucide-react";
 
 import {
@@ -28,29 +27,34 @@ const fmt = (n) =>
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ItemsByCategory() {
-  //const navigate = useNavigate();
-  //const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // controller's getAllCategories returns the raw array directly
   const { data: categoriesRaw, isLoading } = useGetAllCategoriesQuery();
   const categories = categoriesRaw || [];
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
-  const [categorySearch, setCategorySearch] = useState("");
-  const [itemSearch, setItemSearch] = useState("");
+  const selectedCategoryId = searchParams.get("categoryId") || null;
+  const categorySearch = searchParams.get("q") || "";
+  const itemSearch = searchParams.get("itemSearch") || "";
   const [menuOpen, setMenuOpen] = useState(null);
   const [itemRowMenu, setItemRowMenu] = useState(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-  const [showEditItemModal, setShowEditItemModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
+  //const [showEditItemModal, setShowEditItemModal] = useState(false);
+  //const [editingItem, setEditingItem] = useState(null);
 
 
   const {
     data: itemsResponse,
     isLoading: isItemsLoading,
   } = useGetItemsByCategoryQuery(
-    { categoryId: selectedCategoryId, search: itemSearch },
-    { skip: !selectedCategoryId }
+    {
+      categoryId: selectedCategoryId || "all",
+      search: itemSearch,
+    },
+    {
+      skip: !selectedCategoryId,
+    }
   );
 
   const items = itemsResponse?.items || [];
@@ -58,10 +62,18 @@ export default function ItemsByCategory() {
 
   // default to "all" bucket on first load
   useEffect(() => {
-    if (selectedCategoryId === null) {
-      setSelectedCategoryId("all");
-    }
-  }, [selectedCategoryId]);
+    if (!categories.length || selectedCategoryId) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.set("categoryId", "all");
+
+    setSearchParams(next, { replace: true });
+  }, [
+    categories,
+    selectedCategoryId,
+    searchParams,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -86,38 +98,39 @@ export default function ItemsByCategory() {
   const selectedCategory =
     sidebarCategories.find((c) => c.Category_Id === selectedCategoryId) || null;
 
-  const totalStockValue = useMemo(
-    () => items.reduce((sum, it) => sum + Number(it.Stock_Value || 0), 0),
-    [items]
-  );
+  // const totalStockValue = useMemo(
+  //   () => items.reduce((sum, it) => sum + Number(it.Stock_Value || 0), 0),
+  //   [items]
+  // );
 
   const handleSelectCategory = (category) => {
-    setSelectedCategoryId(category.Category_Id);
-    setItemSearch("");
+    const next = new URLSearchParams(searchParams);
+    next.set("categoryId", category.Category_Id);
+    next.delete("itemSearch");
+    setSearchParams(next);
     setMenuOpen(null);
   };
 
   const handleCategoryAdded = (savedCategory) => {
     setShowAddCategoryModal(false);
+
     if (savedCategory?.Category_Id) {
-      setSelectedCategoryId(savedCategory.Category_Id);
-      setItemSearch("");
+      const next = new URLSearchParams(searchParams);
+
+      next.set("categoryId", savedCategory.Category_Id);
+
+      next.delete("itemSearch");
+
+      setSearchParams(next);
     }
   };
+
+
 
   return (
     <>
       {/* ── BREADCRUMB ── */}
-      <div className="sb2-2-2">
-        <ul>
-          <li>
-            <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
-              <LayoutDashboard size={20} style={{ marginRight: "8px" }} />
-              Dashboard
-            </NavLink>
-          </li>
-        </ul>
-      </div>
+     
 
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
@@ -166,7 +179,19 @@ export default function ItemsByCategory() {
                 <input
                   type="text"
                   value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+
+                    const next = new URLSearchParams(searchParams);
+
+                    if (value) {
+                      next.set("q", value);
+                    } else {
+                      next.delete("q");
+                    }
+
+                    setSearchParams(next, { replace: true });
+                  }}
                   placeholder="Search Category"
                   className="border rounded-md text-sm outline-none"
                   style={{
@@ -235,9 +260,19 @@ export default function ItemsByCategory() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedCategoryId(category.Category_Id);
-                            setItemSearch("");
-                            setMenuOpen(menuOpen === category.Category_Id ? null : category.Category_Id);
+
+                            const next = new URLSearchParams(searchParams);
+
+                            next.set("categoryId", category.Category_Id);
+                            next.delete("itemSearch");
+
+                            setSearchParams(next);
+
+                            setMenuOpen(
+                              menuOpen === category.Category_Id
+                                ? null
+                                : category.Category_Id
+                            );
                           }}
                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                           style={{ backgroundColor: "transparent" }}
@@ -308,14 +343,14 @@ export default function ItemsByCategory() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-8">
+                {/* <div className="flex items-center gap-8">
                   <div className="text-right">
                     <p className="text-xs uppercase text-gray-400 mb-1">Stock Value</p>
                     <p className="font-bold" style={{ color: "#4CA1AF", fontSize: 18 }}>
                       ₹ {fmt(totalStockValue)}
                     </p>
                   </div>
-                </div>
+                </div> */}
               </div>
 
               {/* ── SEARCH ITEMS ── */}
@@ -328,7 +363,19 @@ export default function ItemsByCategory() {
                   <input
                     type="text"
                     value={itemSearch}
-                    onChange={(e) => setItemSearch(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+
+                      const next = new URLSearchParams(searchParams);
+
+                      if (value) {
+                        next.set("itemSearch", value);
+                      } else {
+                        next.delete("itemSearch");
+                      }
+
+                      setSearchParams(next, { replace: true });
+                    }}
                     placeholder="Search"
                     className="w-full h-full border rounded-md text-sm outline-none"
                     style={{ height: 36, paddingLeft: 34, paddingRight: 10, borderColor: "#dbe3ea" }}
@@ -344,7 +391,7 @@ export default function ItemsByCategory() {
                       {["Item Name", "Unit", "Stock", "Stock Value", ""].map((h, index) => (
                         <th
                           key={index}
-                          className="text-left py-2 px-3 font-semibold text-gray-500"
+                          className="text-left py-2 px-3 font-semibold text-black"
                           style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}
                         >
                           {h}
@@ -376,18 +423,18 @@ export default function ItemsByCategory() {
                             setShowEditItemModal(true);
                           }}
                         >
-                          <td className="py-2 px-3 text-gray-700">{item.Item_Name}</td>
-                          <td className="py-2 px-3 text-gray-500">{item.Unit || "—"}</td>
+                          <td className="py-2 px-3 text-black">{item.Item_Name}</td>
+                          <td className="py-2 px-3 text-black">{item.Unit || "—"}</td>
                           <td
                             className="py-2 px-3"
-                            style={{ color: item.Stock_Quantity < 0 ? "#dc2626" : "#374151" }}
+                            style={{ color: item.Stock_Quantity < 0 ? "#dc2626" : "#000000" }}
                           >
                             {item.Stock_Quantity}
                           </td>
-                          <td className="py-2 px-3 font-semibold" style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                          <td className="py-2 px-3 font-semibold" style={{ color: "#000000", whiteSpace: "nowrap" }}>
                             ₹ {fmt(item.Stock_Value)}
                           </td>
-                          <td className="py-2 px-3">
+                          {/* <td className="py-2 px-3">
                             <div className="relative">
                               <button
                                 type="button"
@@ -434,7 +481,7 @@ export default function ItemsByCategory() {
                                 </div>
                               )}
                             </div>
-                          </td>
+                          </td> */}
                         </tr>
                       ))
                     )}
@@ -455,7 +502,7 @@ export default function ItemsByCategory() {
         />
       )}
 
-      {showEditItemModal && (
+      {/* {showEditItemModal && (
         <ItemModal
           itemDetails={editingItem}
           editingItem={true}
@@ -464,7 +511,7 @@ export default function ItemsByCategory() {
             setEditingItem(null);
           }}
         />
-      )}
+      )} */}
 
     </>
   );

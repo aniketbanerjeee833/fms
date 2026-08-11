@@ -57,8 +57,11 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
     });
   //console.log(itemDetails, "itemDetails")
   console.log(editingItem, "editingItem")
-  const canEditUnits = itemDetails?.Can_Edit_Units ?? true;
-  ;
+  //const canEditUnits = itemDetails?.Can_Edit_Units ?? true;
+  const canEditUnits = itemDetails?.Can_Edit_Units ?? {
+  Primary: true,
+  Secondary: true,
+};
   useEffect(() => {
     if (!editingItem) return;
     if (!itemDetails) return;
@@ -504,7 +507,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
                           </div>
                         </div>
 
-                        {canEditUnits && (
+                        {/* {canEditUnits && (
                           <button
                             type="button"
                             onClick={() => setShowSelectUnitModal(true)}
@@ -517,12 +520,26 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
                           >
                             Add Secondary Unit
                           </button>
-                        )}
+                        )} */}
+                        {canEditUnits.Secondary && (
+  <button
+    type="button"
+    onClick={() => setShowSelectUnitModal(true)}
+    className="mt-3 px-4 py-2 rounded-md border"
+    style={{
+      backgroundColor: "white",
+      borderColor: "#4CA1AF",
+      color: "#4CA1AF",
+    }}
+  >
+    Add Secondary Unit
+  </button>
+)}
                       </>
                     )}
 
                     {/* Fully configured */}
-                    {primaryUnit && secondaryUnit && (
+                    {/* {primaryUnit && secondaryUnit && (
                       <>
                         <div className="mt-2 p-2 rounded-md border bg-gray-50">
                           <div className="text-sm">
@@ -560,7 +577,46 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
                           </button>
                         )}
                       </>
-                    )}
+                    )} */}
+                    {primaryUnit && secondaryUnit && (
+  <>
+    <div className="mt-2 p-2 rounded-md border bg-gray-50">
+      <div className="text-sm">
+        <div>
+          <strong>Primary Unit:</strong>{" "}
+          {primaryUnit.toUpperCase()}
+        </div>
+
+        <div className="mt-1">
+          <strong>Secondary Unit:</strong>{" "}
+          {secondaryUnit.toUpperCase()}
+        </div>
+
+        <div className="mt-1 text-[#4CA1AF]">
+          <strong>Conversion:</strong>{" "}
+          1 {primaryUnit.toUpperCase()} ={" "}
+          {formatConversionRate(conversionRate)}{" "}
+          {secondaryUnit.toUpperCase()}
+        </div>
+      </div>
+    </div>
+
+    {canEditUnits.Secondary && (
+      <button
+        type="button"
+        onClick={() => setShowSelectUnitModal(true)}
+        className="mt-3 px-4 py-2 rounded-md border"
+        style={{
+          backgroundColor: "white",
+          borderColor: "#4CA1AF",
+          color: "#4CA1AF",
+        }}
+      >
+        Edit Secondary Unit
+      </button>
+    )}
+  </>
+)}
                   </div>
                 </div>
 

@@ -4,8 +4,8 @@ import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
 
 
 
@@ -26,7 +26,8 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 
-
+import { Trash2 } from "lucide-react";
+import AddItemModal from "../../components/Modal/AddItemModal";
 
 export default function SaleReturndEdit() {
 
@@ -35,7 +36,8 @@ export default function SaleReturndEdit() {
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
   const bankId = location.state?.bankId;
-  console.log("Sale return Edit page query:", location.search);
+  // console.log("Sale return Edit page query:", location.search);
+  ///const partyId = location.state?.partyId;
   const { id: Sale_Return_Id } = useParams();
   const dispatch = useDispatch();
   const TAX_RATES = {
@@ -107,14 +109,19 @@ export default function SaleReturndEdit() {
     });
   const { data: parties } = useGetAllPartiesQuery();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const { data: items } = useGetAllItemsQuery();
-  // console.log(items);
-  //const { data: categories, isLoading: isLoadingCategories } = useGetAllCategoriesQuery()
+  const [showItemAddModal, setShowItemAddModal] = useState(false);
+    const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+    const [activeItemRow, setActiveItemRow] = useState(null);
+    // find this line in your code and add refetch:
+    const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
+  const [addCategory] = useAddCategoryMutation();
+  const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
-
+  const [showModal, setShowModal] = useState(false);
   const [partySearch, setPartySearch] = useState("");
-  //const [newCategory, setNewCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showSplitBox, setShowSplitBox] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
 
   const [showGSTIN, setShowGSTIN] = useState("");
@@ -152,6 +159,7 @@ export default function SaleReturndEdit() {
     setValue,
     watch,
     reset,
+    clearErrors,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(saleReturnFormSchema),
@@ -169,12 +177,13 @@ export default function SaleReturndEdit() {
       Payment_Type: "Cash",
       Bank_Account_Id: null,   // 🔹 added
       Reference_Number: "",
+      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
       items: [{
 
 
         Item_Category: "",
         Item_Name: "",
-        Quantity: 0,
+        Quantity: "",
         Item_Unit: "",
         Sale_Price: "",
 
@@ -193,8 +202,52 @@ export default function SaleReturndEdit() {
     name: "items",
   });
 
+  const {
+    fields: splitFields,
+    append: appendSplit,
+    remove: removeSplit,
+  } = useFieldArray({
+    control,
+    name: "splits",
+  });
 
+  const handleAddCategory = async () => {
 
+    if (newCategory.trim() === "") {
+      return
+    }
+    else if (newCategory.trim() !== "") {
+      try {
+        // ✅ Call backend
+        const res = await addCategory({
+          body: { Item_Category: newCategory.trim() },
+        });
+
+        // Some RTK Query wrappers put the response under `.data`
+        const data = res?.data || res;
+
+        if (data?.success) {
+          const addedCat = newCategory.trim();
+
+          // ✅ Auto-select the new category (single value)
+          //setSelected(addedCat);
+          setValue("Item_Category", addedCat); // directly set single category
+
+          // ✅ Refresh cache
+          dispatch(itemApi.util.invalidateTags(["Category"]));
+
+          // ✅ Reset modal & input
+          setShowModal(false);
+          setNewCategory("");
+          setOpen(true);
+        } else {
+          console.warn("⚠️ Category not added. Response:", data);
+        }
+      } catch (err) {
+        console.error("❌ Error adding category:", err);
+      }
+    }
+  };
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
@@ -275,7 +328,7 @@ export default function SaleReturndEdit() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-      Quantity: 0,
+      Quantity: "",
       Item_Unit: "",
       Sale_Price: "",
       Discount_On_Sale_Price: "",
@@ -367,7 +420,20 @@ export default function SaleReturndEdit() {
 
 
 
+  // const handleSelect = (rowIndex, categoryName) => {
+  //   setRows((prev) => {
+  //     const updated = [...prev];
+  //     updated[rowIndex] = {
+  //       ...updated[rowIndex],
+  //       Item_Category: categoryName,
+  //       CategoryOpen: false,
+  //       isExistingItem: false,   // user-typed, so still editable
+  //     };
+  //     return updated;
+  //   });
 
+  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
+  // };
 
   useEffect(() => {
     const gstin = parties?.parties?.find(
@@ -376,7 +442,7 @@ export default function SaleReturndEdit() {
 
     setShowGSTIN(gstin || ""); // ✅ never undefined
   }, [watch("Party_Name"), parties]);
-  console.log(sale)
+
   const toLocalDateString = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -385,21 +451,51 @@ export default function SaleReturndEdit() {
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
+  const emptyRow = () => ({
+    Item_Category: "",
+    Item_Name: "",
+    itemSearch: "",
+    Item_HSN: "",
+    Quantity: "",
+    Sale_Price: "",
+    Discount_On_Sale_Price: "",
+    Discount_Type_On_Sale_Price: "Percentage",
+    Tax_Type: "None",
+    Tax_Amount: "",
+    Amount: "",
+    itemOpen: false,
+    CategoryOpen: false,
+    isHSNLocked: false,
+    isUnitLocked: false,
+    isExistingItem: false,
+  });
   useEffect(() => {
     if (sale) {
 
       setPartySearch(sale.saleReturn.Party_Name);
-      const prefilledRows = sale.saleReturn.items.map((it) => ({
-        ...it,
-        itemSearch: it.Item_Name || "", // for UI display
-        isExistingItem: true,           // lock category/HSN if needed
-        isHSNLocked: true,
-        isUnitLocked: true,
-        CategoryOpen: false,
-        itemOpen: false,
-        itemQuantity: it.Quantity || 0,
-        itemTaxType: it.Tax_Type || "None",
-      }));
+      // const prefilledRows = sale.saleReturn.items.map((it) => ({
+      //   ...it,
+      //   itemSearch: it.Item_Name || "", // for UI display
+      //   isExistingItem: true,           // lock category/HSN if needed
+      //   isHSNLocked: false,
+      //  isUnitLocked: false,
+      //   CategoryOpen: false,
+      //   itemOpen: false,
+      //   itemQuantity: it.Quantity || "",
+      //   itemTaxType: it.Tax_Type || "None",
+      // }));
+      const prefilledRows = sale?.saleReturn?.items?.length > 0
+        ? sale.saleReturn.items.map((item) => ({
+          ...item,
+          Item_Unit: item.Selected_Unit || "",
+          itemSearch: item.Item_Name,
+          itemOpen: false,
+          CategoryOpen: false,
+          isHSNLocked: false,
+          isUnitLocked: false,
+          isExistingItem: true,
+        }))
+        : [emptyRow()];
 
       setRows(prefilledRows);
 
@@ -417,12 +513,29 @@ export default function SaleReturndEdit() {
         //Total_Paid: sale.saleReturn?.Total_Paid || "",
         Balance_Due: sale.saleReturn?.Balance_Due || "",
         //Balance_Due: sale.saleReturn?.Balance_Due || "",
-        Payment_Type: sale.saleReturn?.Payment_Type || "",
-        Bank_Account_Id: sale.saleReturn?.Bank_Account_Id, // ✅ Add this
-        Reference_Number: sale.saleReturn?.Reference_Number || "",
+        // Payment_Type: sale.saleReturn?.Payment_Type || "",
+        // Bank_Account_Id: sale.saleReturn?.Bank_Account_Id, // ✅ Add this
+        // Reference_Number: sale.saleReturn?.Reference_Number || "",
+        splits:
+          sale?.saleReturn?.splits?.length > 0
+            ? sale?.saleReturn?.splits.map((split) => ({
+              Payment_Type: split.Payment_Type,
+              Bank_Account_Id: split.Bank_Account_Id,
+              Reference_Number: split.Reference_Number || "",
+              Amount: split.Amount, // or split.Amount if you want to prefill the original amount
+            }))
+            : [
+              {
+                Payment_Type: "Cash",
+                Bank_Account_Id: null,
+                Reference_Number: "",
+                Amount: "",
+              },
+            ],
 
-        items: sale.saleReturn.items || [],
+        items: prefilledRows,
       })
+      setShowSplitBox((sale?.saleReturn?.splits?.length || 0) > 1);
     }
   }, [sale]);
   //const Invoice_Number=sale.saleReturn?.Invoice_Number 
@@ -430,7 +543,7 @@ export default function SaleReturndEdit() {
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
-  //const paymentType = watch("Payment_Type", "");
+  const paymentType = watch("splits.0.Payment_Type");
   useEffect(() => {
     if (sale) {
 
@@ -438,80 +551,275 @@ export default function SaleReturndEdit() {
       setShowGSTIN(sale.GSTIN ? String(sale.GSTIN) : "");
     }
   }, [sale]);
+  const sanitizeAmount = (value) => {
+    let val = value.replace(/[^0-9.]/g, "");
+    const parts = val.split(".");
+    if (parts.length > 2) {
+      val = parts[0] + "." + parts.slice(1).join("");
+    }
+    return val;
+  };
+
+  // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
+  // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
+  const buildPaymentTypeOptions = (banks) => [
+    { value: "Cash", label: "Cash", repeatable: false },
+    { value: "Cheque", label: "Cheque", repeatable: true },
+    { value: "Neft", label: "Neft", repeatable: true },
+    ...(banks || []).map((bank) => ({
+      value: `bank_${bank.Bank_Account_Id}`,
+      label: bank.Account_Display_Name,
+      repeatable: false,
+    })),
+  ];
+
+  const getRowIdentifier = (type, bankId) =>
+    type === "Bank" ? `bank_${bankId ?? ""}` : type;
+
+  //Inside the component:
+
+  const getUsedIdentifiers = (excludeIndex) => {
+    const splitValues = watch("splits") || [];
+    return splitValues
+      .map((s, i) =>
+        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+      )
+      .filter(Boolean);
+  };
+
+  const getAvailableOptions = (excludeIndex) => {
+    const used = getUsedIdentifiers(excludeIndex);
+    return buildPaymentTypeOptions(banks).filter(
+      (opt) => opt.repeatable || !used.includes(opt.value)
+    );
+  };
+
+  const handleAddPaymentType = () => {
+    appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+    setShowSplitBox(true);
+  };
+
+  // live-derived total — never stored as a separate field
+  const splitsWatch = watch("splits") || [];
+  const computedTotalPaid = splitsWatch.reduce(
+    (sum, s) => sum + (parseFloat(s.Amount) || 0),
+    0
+  );
+
+  // one-directional: recompute Balance_Due whenever the total-amount or splits change.
+  // (One-directional only — do NOT also sync splits from Balance_Due, that
+  // two-way sync is exactly what caused the "value shown but still required"
+  // bug in the Payment-Out modal.)
+  const totalAmountWatch = watch("Total_Amount");
+  useEffect(() => {
+    const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
+    setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
+    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+      shouldValidate: false,
+      shouldDirty: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalAmountWatch, computedTotalPaid]);
 
 
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
-    const payload = { ...data };
+    // =========================================================
+    // 1. ITEMS
+    //
+    // Do NOT filter blank rows here.
+    //
+    // Backend handles:
+    // No Item_Name + Amount > 0 -> ERROR
+    // No Item_Name + Amount 0   -> SKIP
+    // Empty items               -> allowed
+    // =========================================================
 
-    // ── validate items ──
-    const seenItems = new Set();
-    for (const item of payload.items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      const category = item.Item_Category?.trim().toLowerCase();
-      const itemHSN = item.Item_HSN?.trim().toLowerCase();
-      const Quantity = item.Quantity;
+    const itemsWithDefaults = (data.items || []).map((item) => ({
+      ...item,
 
-      if (!name || !category || !itemHSN || !Quantity) {
-        toast.error("Each item must have a valid name, category, HSN and quantity.");
-        return;
-      }
+      Tax_Type: item.Tax_Type || "None",
 
-      if (seenItems.has(name)) {
-        toast.error(
-          `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-        );
-        return;
-      }
-      seenItems.add(name);
-    }
+      Tax_Amount:
+        item.Tax_Amount === "" ||
+          item.Tax_Amount === null ||
+          item.Tax_Amount === undefined
+          ? 0
+          : Number(item.Tax_Amount),
 
-    console.log("payload:", payload);
+      Amount:
+        item.Amount === "" ||
+          item.Amount === null ||
+          item.Amount === undefined
+          ? 0
+          : Number(item.Amount),
+    }));
+
+    // =========================================================
+    // 2. TOTAL AMOUNT
+    // =========================================================
+
+    const totalAmount = Number(data.Total_Amount) || 0;
+
+    // =========================================================
+    // 3. PAYMENT SPLITS
+    //
+    // Send splits to backend.
+    //
+    // Backend decides:
+    //
+    // First valid:
+    // Cash ₹0 -> KEEP
+    //
+    // Later:
+    // HDFC ₹0 -> DROP
+    // ANCO ₹25 -> KEEP
+    //
+    // Don't remove zero splits here because backend needs to
+    // know which payment method was FIRST.
+    // =========================================================
+
+    const splits = (data.splits || []).map((split) => ({
+      ...split,
+
+      Amount:
+        split.Amount === "" ||
+          split.Amount === null ||
+          split.Amount === undefined
+          ? 0
+          : Number(split.Amount),
+
+      Bank_Account_Id:
+        split.Payment_Type === "Bank"
+          ? split.Bank_Account_Id || null
+          : null,
+
+      Reference_Number:
+        split.Reference_Number || "",
+    }));
+
+    // =========================================================
+    // 4. PAYLOAD
+    //
+    // Backend recalculates:
+    // Total_Paid
+    // Balance_Due
+    //
+    // from validSplits.
+    // =========================================================
+
+    const payload = {
+      ...data,
+
+      items: itemsWithDefaults,
+      splits,
+
+      Total_Amount: totalAmount,
+    };
+
+    console.log(
+      "Final Edit Sale Return Payload:",
+      payload
+    );
+
+    // =========================================================
+    // 5. UPDATE
+    // =========================================================
 
     try {
       const res = await updateSaleReturn({
-        Sale_Return_Id: Sale_Return_Id,   // ← from useParams() or props
-        ...payload,                 // ← everything else (Party_Name, items, etc.)
+        Sale_Return_Id,
+        ...payload,
       }).unwrap();
-      //console.log("Created successfully:", res);
 
-      // invalidate so list refetches
-      dispatch(saleReturnApi.util.invalidateTags(["PurchaseReturn"]));
-      dispatch(itemApi.util.invalidateTags(["Item"]));
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(bankAccountApi.util.invalidateTags([
-        { type: "BankAccount", id: payload.Bank_Account_Id },
-        "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-      ]));
+      console.log(
+        "Sale Return Updated:",
+        res
+      );
+
       if (!res?.success) {
-        toast.error("Failed to update credit note");
+        toast.error(
+          "Failed to update credit note"
+        );
         return;
       }
 
-      toast.success("Credit note updated  successfull!");
+      // =======================================================
+      // 6. INVALIDATE CACHE
+      // =======================================================
 
-      // ── navigate back based on where user came from ──
+      dispatch(
+        saleReturnApi.util.invalidateTags([
+          "SaleReturn",
+        ])
+      );
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+        ])
+      );
+
+      dispatch(
+        cashInHandApi.util.invalidateTags([
+          "CashInHand",
+        ])
+      );
+
+      // Bank IDs are inside splits now.
+      // No payload.Bank_Account_Id required.
+      dispatch(
+        bankAccountApi.util.invalidateTags([
+          "BankAccount",
+        ])
+      );
+
+      dispatch(
+        partyApi.util.invalidateTags([
+          "Party",
+        ])
+      );
+
+      // =======================================================
+      // 7. SUCCESS
+      // =======================================================
+
+      toast.success(
+        "Credit note updated successfully!"
+      );
+
+      // =======================================================
+      // 8. NAVIGATION
+      // =======================================================
+
       if (from === "all-sale-return-list") {
         navigate({
           pathname: "/sale/return",
           search: location.search,
         });
       }
-      else if (from === "bank-accounts") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
+
+      else if (from === "party-details") {
         navigate({
-          pathname: `/cash-bank/bank-accounts`,
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }
+
+      else if (from === "bank-accounts") {
+        navigate({
+          pathname: "/cash-bank/bank-accounts",
           search: `?bankId=${bankId}`,
         });
       }
-      else if (from === "cash-in-hand") {
-        // 🔹 new — return to Bank Accounts page with the same account selected
-        navigate({
-          pathname: `/cash-bank/cash-in-hand`,
 
+      else if (from === "cash-in-hand") {
+        navigate({
+          pathname: "/cash-bank/cash-in-hand",
         });
       }
+
       else {
         navigate({
           pathname: "/sale/return",
@@ -521,15 +829,21 @@ export default function SaleReturndEdit() {
 
     } catch (error) {
       const errorMessage =
-        error?.data?.message || error?.message || "Failed to updae credit note.";
+        error?.data?.message ||
+        error?.message ||
+        "Failed to update credit note.";
+
       toast.error(errorMessage);
-      //console.error("Submission failed", error);
+
+      console.error(
+        "Sale Return update failed:",
+        error
+      );
     }
   };
-
   return (
     <>
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
 
           <NavLink style={{ display: "flex", flexDirection: "row" }}
@@ -537,12 +851,12 @@ export default function SaleReturndEdit() {
 
           >
             <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-            {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+            
             Dashboard
           </NavLink>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -602,6 +916,14 @@ export default function SaleReturndEdit() {
                       search: location.search,
                     })
                     // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else if (from === "party-details") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/party/parties`,
+                      search: location.search,
+                      // search: `?partyId=${partyId}`,
+                    });
                   }
                   else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
@@ -749,12 +1071,51 @@ export default function SaleReturndEdit() {
                       </div>
                     )}
                   </div>
-                  {showPartyModal && (
+                  {/* {showPartyModal && (
                     <PartyAddModal
                       onClose={() => setShowPartyModal(false)}
                       onSave={(newParty) => {
                         setPartySearch(newParty);
                         setValue("Party_Name", newParty, { shouldValidate: true });
+                        setShowPartyModal(false);
+                      }}
+                    />
+                  )} */}
+                  {showPartyModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={(newParty) => {
+                        setPartySearch(newParty.Party_Name);
+
+                        setValue(
+                          "Party_Name",
+                          newParty.Party_Name,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "GSTIN",
+                          newParty.GSTIN || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "Billing_Name",
+                          newParty.Billing_Name || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        //setCurrentPartyDetails(newParty);
+
                         setShowPartyModal(false);
                       }}
                     />
@@ -844,7 +1205,7 @@ export default function SaleReturndEdit() {
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className=" whitespace-nowrap active">
                     Invoice Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -870,7 +1231,7 @@ export default function SaleReturndEdit() {
                 <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Date
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input
@@ -895,7 +1256,7 @@ export default function SaleReturndEdit() {
                   {/* <div className="input-field col s6"> */}
                   <span className=" whitespace-nowrap active">
                     State of Supply
-                    <span className="text-red-500">*</span>
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
                   <select
                     style={{ marginBottom: "0px", width: "50%", border: "none" }}
@@ -972,35 +1333,83 @@ export default function SaleReturndEdit() {
                         </div>
                       </td>
 
-                      <td
-                        style={{ padding: "0px", position: "relative" }}>
-
-                        <div ref={(el) => (categoryRefs.current[i] = el)}>
-
-
-
-                          <input
-                            type="text"
-                            value={rows[i]?.categorySearch || watch(`items.${i}.Item_Category`) || ""}
-                            style={{ marginBottom: "0px" }}
-                            readOnly
-
-                            placeholder="Category"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                          // readOnly={rows[i]?.isExistingItem} // 🔒 lock if item exists
-                          />
-
-                          {errors?.items?.[i]?.Item_Category && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Category.message}
-                            </p>
+                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Category`}
+                          defaultValue="All"
+                          render={({ field }) => (
+                            <select
+                              {...field}
+                              className="form-select"
+                              style={{ width: "100%", fontSize: "12px" }}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "__ADD_CATEGORY__") {
+                                  setShowModal(true);
+                                  return; // don't commit this as the selected value
+                                }
+                                field.onChange(value);
+                              }}
+                            >
+                              <option value="All">All</option>
+                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                              {categories?.map((cat) => (
+                                <option key={cat.Category_Id} value={cat.Item_Category}>
+                                  {cat.Item_Category}
+                                </option>
+                              ))}
+                            </select>
                           )}
+                        />
 
-
-
-                        </div>
-                        {/* Modal */}
-
+                        {showModal && (
+                          <div
+                            style={{
+                              position: "fixed", inset: 0, display: "flex",
+                              alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                            }}
+                          >
+                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                style={{ backgroundColor: "transparent" }}
+                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                placeholder="Enter category name"
+                              />
+                              <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const created = await handleAddCategory(); // should return the created category object
+                                    if (created?.Item_Category) {
+                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                    }
+                                    setShowModal(false);
+                                  }}
+                                  style={{ backgroundColor: "#4CA1AF" }}
+                                  className="px-4 py-2 rounded-md text-white"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Item Dropdown */}
@@ -1027,10 +1436,79 @@ export default function SaleReturndEdit() {
                                 handleRowChange(i, "isExistingItem", true);
                               } else {
                                 // ❌ Clear Item_Name in RHF to trigger error
-                                setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
+                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
                                 handleRowChange(i, "isExistingItem", false);
+
+                                handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                                handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                                handleRowChange(i, "Available_Units", [])
                               }
                               //handleRowChange(i, "isExistingItem", exists); // false if new item
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = rows[i]?.itemSearch?.trim() || "";
+                                if (!typedValue) return;
+
+                                const matchedItem = items?.items?.find(
+                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                );
+
+                                if (matchedItem) {
+                                  // ✅ auto-fill exactly like clicking from dropdown
+                                  setRows((prev) => {
+                                    const updated = [...prev];
+                                    updated[i] = {
+                                      ...updated[i],
+                                      itemSearch: matchedItem.Item_Name,   // normalize display
+                                      Item_Category: matchedItem.Item_Category || "",
+                                      Item_HSN: matchedItem.Item_HSN || "",
+                                      categorySearch: matchedItem.Item_Category || "",
+                                      isExistingItem: true,
+                                      isHSNLocked: false,
+                                      isUnitLocked: false,
+                                      itemOpen: false,
+                                      Primary_Unit: matchedItem.Primary_Unit || null,
+                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
+                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                                      //  ONLY CURRENT MASTER AVAILABLE UNITS
+                                      Available_Units: Array.isArray(matchedItem.Available_Units)
+                                        ? matchedItem.Available_Units
+                                        : [],
+                                    };
+                                    return updated;
+                                  });
+
+                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Item_Name: matchedItem.Item_Name,
+                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Quantity: itemsValues[i]?.Quantity || 0,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  // no match — close dropdown
+                                  handleRowChange(i, "itemOpen", false);
+                                }
+                              }, 150); // small delay so click-from-dropdown fires first
                             }}
 
                             onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
@@ -1048,11 +1526,33 @@ export default function SaleReturndEdit() {
 
                           {/* Dropdown List */}
                           {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "40rem" }}
+                           <div
+                              style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                              border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
+                              <div
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleRowChange(i, "itemOpen", true);
+                                  setActiveItemRow(i);
+                                  setShowItemAddModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+                                style={{
+                                  borderBottom: "1px solid #e5e7eb",
+                                  color: "#4CA1AF",
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  position: "sticky",
+                                  top: 0,
+                                  backgroundColor: "#fff",
+                                  zIndex: 1,
+                                }}
+                              >
+                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+                                Add Item
+                              </div>
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1083,8 +1583,8 @@ export default function SaleReturndEdit() {
                                               Item_HSN: it.Item_HSN || "",
                                               categorySearch: it.Item_Category || "", // ✅ sync UI state
                                               isExistingItem: true,   // lock category
-                                              isHSNLocked: true,      // lock HSN
-                                              isUnitLocked: true,     // lock unit
+                                              isHSNLocked: false,      // lock HSN
+                                              isUnitLocked: false,     // lock unit
                                               itemQuantity: it.Stock_Quantity || 0,
                                             };
                                             return updated;
@@ -1096,9 +1596,17 @@ export default function SaleReturndEdit() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
+                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
                                           setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
                                           setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            it.Primary_Unit || "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -1128,15 +1636,15 @@ export default function SaleReturndEdit() {
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
-                                        <td
+                                      
+                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
                                             color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
                                             fontWeight: "500", // optional: matches Tailwind's medium weight
                                           }}
                                         >
-                                          {it.Stock_Quantity || 0}
+                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
                                         </td>
                                       </tr>
                                     ))}
@@ -1166,14 +1674,17 @@ export default function SaleReturndEdit() {
                       <td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
-                          readOnly
+
                           value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-                          // onChange={(e) => {
-                          //   if (!rows[i]?.isHSNLocked) {
-                          //     handleRowChange(i, "Item_HSN", e.target.value);
-                          //     setValue(`items.${i}.Item_HSN`, e.target.value);
-                          //   }
-                          // }}
+                          onChange={(e) => {
+                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                            handleRowChange(i, "Item_HSN", e.target.value);
+                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // if (!rows[i]?.isHSNLocked) {
+                            //   handleRowChange(i, "Item_HSN", e.target.value);
+                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            // }
+                          }}
                           placeholder="HSN Code"
                           className="w-full outline-none border-b-2 text-gray-900"
                         // readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
@@ -1191,10 +1702,14 @@ export default function SaleReturndEdit() {
                           type="text"
                           className="form-control"
                           style={{ width: "100%" }}
-                          value={watch(`items.${i}.Quantity`)?.toString() || ""}
-                          {...register(`items.${i}.Quantity`, { valueAsNumber: true })}
+                          //value={watch(`items.${i}.Quantity`)?.toString() || ""}
+                          {...register(`items.${i}.Quantity`)}
                           onChange={(e) => {
-                            let value = e.target.value.replace(/[^0-9]/g, "");
+                            //let value = e.target.value.replace(/[^0-9]/g, "");
+                            let value = e.target.value;
+                            value = value
+                              .replace(/[^0-9.]/g, "")
+                              .replace(/(\..*)\./g, "$1");
                             // let currentItemName = itemsValues[i]?.Item_Name?.trim();
                             // if (!currentItemName) return;
 
@@ -1210,17 +1725,21 @@ export default function SaleReturndEdit() {
                             // // ✅ Effective available stock = stock + previously sold quantity
                             // const effectiveAvailableStock = currentStock + previousQuantity;
 
-                            let num = parseInt(value, 10);
-                            if (isNaN(num) || num < 0) num = 0;
+
+                            // let num = Number(value);
+
+                            // if (!Number.isFinite(num) || num < 0) {
+                            //   num = 0;
+                            // }
                             // if (num > effectiveAvailableStock) num = effectiveAvailableStock;
 
                             // ✅ Update via RHF
-                            setValue(`items.${i}.Quantity`, num, { shouldValidate: true });
+                            setValue(`items.${i}.Quantity`, value, { shouldValidate: true });
 
                             // ✅ Recalculate row + totals
                             const { Tax_Amount, Amount, Total_Amount, Balance_Due } =
                               calculateRowAmount(
-                                { ...itemsValues[i], Quantity: num || 0 },
+                                { ...itemsValues[i], Quantity: Number(value) || 0 },
                                 i,
                                 itemsValues
                               );
@@ -1242,39 +1761,7 @@ export default function SaleReturndEdit() {
                       </td>
 
 
-                      {/* Unit */}
-                      {/* <td style={{ padding: "0px",width: "6%" }}>
-                              <Controller
-                                control={control}
-                                name={`items.${i}.Item_Unit`}
-                                render={({ field }) => (
-                                  <select
-                                    {...field}
-                                    className="form-select "
-                                    style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                    disabled={rows[i]?.isUnitLocked} // ✅ lock only if item is from dropdown
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      handleRowChange(i, "Item_Unit", value);
-                                      setValue(`items.${i}.Item_Unit`, value);
-                                    }}
-                                  >
-                                    <option value="">Select</option>
-                                    {Object.entries(itemUnits).map(([key, value]) => (
-                                      <option key={key} value={key}>
-                                        {`${value} (${key})`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              />
-                              {errors?.items?.[i]?.Item_Unit && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Item_Unit.message}
-                                </p>
-                              )}
-                            </td> */}
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -1310,7 +1797,7 @@ export default function SaleReturndEdit() {
                                   </option>
                                 ))}
 
-                              {/* ➕ Add Unit always at bottom */}
+                              {/* ➕ Add Unit always at bottom 
 
                             </select>
                           )}
@@ -1320,67 +1807,93 @@ export default function SaleReturndEdit() {
                             {errors.items[i].Item_Unit.message}
                           </p>
                         )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+
+                            const availableUnits = Array.isArray(row?.Available_Units)
+                              ? row.Available_Units
+                              : [];
+
+                            return (
+                              <select
+                                {...field}
+                                value={field.value || ""}
+                                className="form-select"
+                                style={{
+                                  width: "100%",
+                                  fontSize: "12px",
+                                  marginLeft: "0px",
+                                }}
+                                disabled={row?.isUnitLocked}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+
+                                  if (value === "__ADD_UNIT__") {
+                                    setActiveUnitRow(i);
+                                    setShowAddUnitModal(true);
+                                    return;
+                                  }
+
+                                  field.onChange(value);
+
+                                  handleRowChange(i, "Item_Unit", value);
+
+                                  setValue(`items.${i}.Item_Unit`, value, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }}
+                              >
+                                {/* Item has configured units */}
+                                {availableUnits.length > 0 ? (
+                                  availableUnits.map((unit) => (
+                                    <option
+                                      key={unit.Unit_Shorthand}
+                                      value={unit.Unit_Shorthand}
+                                    >
+                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="">NONE</option>
+
+                                    {/* Only allow choosing/adding unit when
+                                                                                    selected item has NO configured units */}
+                                    {Array.isArray(itemUnits) &&
+                                      itemUnits.map((unit) => (
+                                        <option
+                                          key={unit.Unit_Shorthand}
+                                          value={unit.Unit_Shorthand}
+                                        >
+                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                        </option>
+                                      ))}
+
+                                    <option value="__ADD_UNIT__">
+                                      ➕ Add Unit
+                                    </option>
+                                  </>
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].Item_Unit.message}
+                          </p>
+                        )}
                       </td>
 
 
-                      {/* Price/Unit */}
-                      {/* <td style={{ padding: "0px" ,width: "6%"}}>
-                              <div className="d-flex align-items-center">
-                                <input
-                                  type="text"
-                                  className="form-control"
-                                  style={{ width: "100%", marginBottom: "0px" }}
-                                  {...register(`items.${i}.Sale_Price`)}
-                                  onChange={(e) => {
-                                    let val = e.target.value;
 
-                                    // ✅ allow digits and one dot
-                                    val = val.replace(/[^0-9.]/g, "");
-
-                                    // ✅ if more than one dot, keep only the first
-                                    const parts = val.split(".");
-                                    if (parts.length > 2) {
-                                      val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                                    }
-
-                                    // ✅ limit to 2 decimal places
-                                    if (val.includes(".")) {
-                                      const [int, dec] = val.split(".");
-                                      val = int + "." + dec.slice(0, 2);
-                                    }
-
-                                    e.target.value = val;
-                                    //setValue(`items.${i}.Sale_Price`, Number(val), { shouldValidate: true });
-                                    if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                                      return;
-                                    }
-
-                                    // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                                    //   ...itemsValues[i],
-                                    //   Purchase_Price: val,
-                                    // });
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Sale_Price: val },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
-                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                                  }}
-
-                                  placeholder="Price"
-                                />
-
-                              </div>
-                              {errors?.items?.[i]?.Sale_Price && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Sale_Price.message}
-                                </p>
-                              )}
-                            </td> */}
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
@@ -1532,14 +2045,14 @@ export default function SaleReturndEdit() {
                             <select
                               {...field}
                               className="form-select bg-gray-100 text-gray-700"
-                              style={{
-                                width: "100%",
-                                fontSize: "12px",
-                                marginBottom: "0px",
-                                pointerEvents: "none", // ✅ visually disabled
-                                cursor: "not-allowed",
-                                backgroundColor: "#f3f4f6", // light gray
-                              }}
+                              // style={{
+                              //   width: "100%",
+                              //   fontSize: "12px",
+                              //   marginBottom: "0px",
+                              //   pointerEvents: "none", // ✅ visually disabled
+                              //   cursor: "not-allowed",
+                              //   backgroundColor: "#f3f4f6", // light gray
+                              // }}
                               onChange={(e) => {
                                 field.onChange(e);
 
@@ -1610,70 +2123,197 @@ export default function SaleReturndEdit() {
 
               </table>
 
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 px-2 w-full sale-wrapper">
+              <div className="flex sm:w-1/4 p-2">
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  + Add Row
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 px-2 gap-4 w-full sale-wrapper">
+                <div className="flex flex-col px-2">
+                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
-                <div className="flex flex-col px-2 w-full sm:w-64 sale-left">
-                  {/* <div className="flex flex-col w-1/8"> */}
-                  <button
-                    type="button"
-                    onClick={handleAddRow}
-                    className=" text-white font-bold py-2 px-4 w-1/2 rounded  "
-                    style={{ backgroundColor: "#4CA1AF" }}
-                  >
-                    + Add Row
-                  </button>
-                  <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64"
-                  >
-                    <div className="flex flex-col w-full">
-                      <span className="active">Payment Type</span>
 
-                      <select
-                        id="Payment_Type"
-                        value={
-                          watch("Payment_Type") === "Bank"
-                            ? `bank_${watch("Bank_Account_Id") || ""}`
-                            : watch("Payment_Type") || ""
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val.startsWith("bank_")) {
-                            const bankId = val.replace("bank_", "");
-                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                          } else {
-                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                          }
-                        }}
-                      >
-                        <option value="">Select Payment Type</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Neft">Neft</option>
-                        {banks?.map((bank) => (
-                          <option
-                            key={bank.Bank_Account_Id}
-                            value={`bank_${bank.Bank_Account_Id}`}
+                  <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                    {!showSplitBox ? (
+                      <>
+                        <div className="flex flex-col w-full">
+                          <span className="active">Payment Type</span>
+
+                          {/* Hidden field so RHF tracks/validates splits.0.Payment_Type even though
+                               it's driven by setValue in the onChange below, not a native <select {...register}> */}
+                          <input
+                            type="hidden"
+                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
+                          />
+
+                          <select
+                            id="Payment_Type"
+                            value={
+                              paymentType === "Bank"
+                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                : paymentType || ""
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val.startsWith("bank_")) {
+                                const bankId = val.replace("bank_", "");
+                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                              }
+                            }}
                           >
-                            {bank.Account_Display_Name}
-                          </option>
-                        ))}
+                            <option value="">Select Payment Type</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Neft">Neft</option>
+                            {banks?.map((bank) => (
+                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
+                                {bank.Account_Display_Name}
+                              </option>
+                            ))}
+                          </select>
 
-                      </select>
+                          {errors?.splits?.[0]?.Payment_Type && (
+                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
+                          )}
+                        </div>
 
-                      {errors?.Payment_Type && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
-                      )}
-                      {errors?.Bank_Account_Id && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
-                      )}
-                    </div>
+
+                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                          <div className="mt-3 flex flex-col">
+                            <label className="text-sm">Reference Number</label>
+                            <input
+                              type="text"
+                              //readOnly={isView}
+                              style={{ marginBottom: "0px" }}
+                              {...register("splits.0.Reference_Number")}
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handleAddPaymentType}
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none", padding: 0 }}
+                        >
+                          + Add Payment Type
+                        </button>
+                      </>
+                    ) : (
+                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
+                        {splitFields.map((field, index) => {
+                          const rowType = watch(`splits.${index}.Payment_Type`);
+                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
+                          const rowOptions = getAvailableOptions(index);
+                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
+                          const amountField = register(`splits.${index}.Amount`, {
+                            required: "Required",
+                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                          });
+
+                          return (
+                            <div key={field.id} className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                  <select
+                                    value={currentIdentifier || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                    className="border rounded-md px-2 py-1.5"
+                                  >
+                                    <option value="">Select Type</option>
+                                    {rowOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Amount"
+                                    style={{ marginBottom: "0px", width: "80%" }}
+                                    className="border rounded-md px-2 py-1.5"
+                                    {...amountField}
+                                    onChange={(e) => {
+                                      e.target.value = sanitizeAmount(e.target.value);
+                                      amountField.onChange(e);
+                                      clearErrors(`splits.${index}.Amount`);
+                                    }}
+                                  />
+                                  {errors?.splits?.[index]?.Amount && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                  )}
+                                </div>
+
+                                {splitFields.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSplit(index)}
+                                    className="text-gray-500 mb-2 mt-4"
+                                    style={{ background: "transparent", border: "none" }}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {needsRef && (
+                                <input
+                                  type="text"
+                                  placeholder="Reference Number"
+                                  style={{ width: "80%" }}
+                                  // className="border rounded-md px-2 py-1.5 w-full"
+                                  {...register(`splits.${index}.Reference_Number`)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                          }
+                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                          style={{ background: "transparent", border: "none" }}
+                        >
+                          + Add Another Payment
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
+                {/* <div style={{ width: "100%" }}
+                                     className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
+                                     > */}
 
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right">
-
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
+                >
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
@@ -1685,7 +2325,7 @@ export default function SaleReturndEdit() {
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
+                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
 
                           if (!totalAmount || isNaN(totalAmount)) return;
 
@@ -1696,7 +2336,7 @@ export default function SaleReturndEdit() {
                             const rounded = Math.round(totalAmount);
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalPaid).toFixed(2), { shouldValidate: true });
+                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
 
                           } else {
                             if (originalTotal !== null) {
@@ -1704,7 +2344,7 @@ export default function SaleReturndEdit() {
 
                               setValue(
                                 "Balance_Due",
-                                (originalTotal - totalPaid).toFixed(2),
+                                (originalTotal - totalReceived).toFixed(2),
                                 { shouldValidate: true }
                               );
                             }
@@ -1725,7 +2365,7 @@ export default function SaleReturndEdit() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
                           const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalPaid = parseFloat(watch("Total_Paid")) || 0;
+                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
 
                           if (isNaN(totalAmount)) return;
 
@@ -1733,9 +2373,9 @@ export default function SaleReturndEdit() {
                           const newTotal = totalAmount + val;
 
                           setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalPaid).toFixed(2));
+                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
-                      // disabled={!watch("roundOffCheck") && originalTotal === null}
+                      //disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div>
 
@@ -1757,7 +2397,7 @@ export default function SaleReturndEdit() {
 
 
 
-                      <div className="flex items-center  gap-3 relative ">
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
                         <div className="flex items-center gap-2 relative">
 
@@ -1765,9 +2405,12 @@ export default function SaleReturndEdit() {
                             type="checkbox"
 
 
-                            id="totalReceivedCheck"
+                            id="totalPaidCheck"
                             className="w-4 h-4 cursor-pointer"
+                            disabled={splitsWatch.length > 1}   // 🔹 add this
+
                             onChange={(e) => {
+
                               const isChecked = e.target.checked;
                               const totalAmount = parseFloat(watch("Total_Amount"));
 
@@ -1779,6 +2422,9 @@ export default function SaleReturndEdit() {
                                 // Clear both fields to stay consistent
                                 setValue("Total_Paid", "");
                                 setValue("Balance_Due", "");
+                                if (splitsWatch.length === 1) {
+                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                }
                                 return;
                               }
 
@@ -1791,10 +2437,17 @@ export default function SaleReturndEdit() {
                                 setValue("Total_Paid", "");
                                 setValue("Balance_Due", totalAmount.toFixed(2));
                               }
+                              if (splitsWatch.length === 1) {
+                                setValue(
+                                  "splits.0.Amount",
+                                  isChecked ? totalAmount.toFixed(2) : "",
+                                  { shouldValidate: true, shouldDirty: true }
+                                );
+                              }
                             }}
                           />
                           <span
-                            htmlFor="totalReceivedCheck"
+                            htmlFor="totalPaidCheck"
                             className="font-medium whitespace-nowrap"
                           >
                             Total Paid
@@ -1807,7 +2460,9 @@ export default function SaleReturndEdit() {
                           type="text"
                           {...register("Total_Paid")}
                           style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                          readOnly={splitsWatch.length > 1}
                           onChange={(e) => {
+                            if (splitsWatch.length > 1) return;
                             let val = e.target.value.replace(/[^0-9.]/g, "");
 
                             // Allow only one dot
@@ -1823,24 +2478,30 @@ export default function SaleReturndEdit() {
                             e.target.value = val;
                             setValue("Total_Paid", val);
 
-                            const totalPaid = parseFloat(val || 0);
+                            const totalReceived = parseFloat(val || 0);
                             const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalPaid).toFixed(2));
+                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                            if (splitsWatch.length === 1) {
+                              const val = e.target.value;
+                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                            }
+                            clearErrors("splits.0.Amount"); // already there ✅
                           }}
-                        // className="form-control"
+                          className="form-control"
                         />
                       </div>
 
 
 
 
-                      <div className="flex  gap-2 items-center ">
+                      <div style={{ width: "100%" }}
+                        className="flex  gap-2 items-center ">
 
                         <span className="font-medium whitespace-nowrap">Balance Due</span>
                         <input
                           style={{
-                            backgroundColor: "transparent",
-                            marginBottom: "0px", height: "1rem", width: "100%"
+                            backgroundColor: "transparent", marginBottom: "0px",
+                            height: "1rem", width: "100%"
                           }}
                           type="text"
                           className="form-control  "
@@ -1932,6 +2593,40 @@ export default function SaleReturndEdit() {
 
         />
       )}
+        {showItemAddModal && (
+              <AddItemModal
+                onClose={() => {
+                  setShowItemAddModal(false);
+      
+                  if (activeItemRow !== null) {
+                    handleRowChange(activeItemRow, "itemOpen", true);
+                  }
+                }}
+                onSave={async (savedItem) => {
+                  if (!savedItem || typeof savedItem !== "object") {
+                    setShowItemAddModal(false);
+                    return;
+                  }
+      
+                  await refetchItems();
+      
+                  setNewlyAddedItem(savedItem);
+      
+                  setTimeout(() => {
+                    setNewlyAddedItem(null);
+                  }, 8000);
+      
+                  setShowItemAddModal(false);
+      
+                  // Reopen the SAME row's dropdown
+                  if (activeItemRow !== null) {
+                    handleRowChange(activeItemRow, "itemOpen", true);
+                  }
+      
+                  setActiveItemRow(null);
+                }}
+              />
+            )}
       <style>
         {`
   /*  screens between 1000px and 640px */

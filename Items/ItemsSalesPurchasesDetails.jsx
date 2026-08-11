@@ -3,7 +3,10 @@ import { useGetEachItemSalesPurchasesDetailsQuery, usePrintEachItemSalesPurchase
 import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Eye, Square, SquarePen } from "lucide-react";
 import ItemDetailsPrint from "../../components/ItemDetailsPrint/ItemDetailsPrint";
-
+import {
+    
+    useGetItemBillsQuery,
+} from "../../redux/api/itemApi";
 
 export default function ItemsSalesPurchasesDetails() {
     const location = useLocation();
@@ -27,7 +30,21 @@ export default function ItemsSalesPurchasesDetails() {
     }
    const {id:Item_Id} = useParams();
    console.log(Item_Id);
-     
+     const {
+             data: billsResponse,
+            
+         } = useGetItemBillsQuery(
+             {
+                 Item_Id: Item_Id,
+                 //cursor,
+                 //search: txnSearch,
+             },
+             {
+                 skip: !Item_Id,
+             }
+         );
+
+         console.log(billsResponse, "billsResponse");
     const { data: eachItemSalesPurchaseDetails } = 
     useGetEachItemSalesPurchasesDetailsQuery(Item_Id);
     console.log(eachItemSalesPurchaseDetails, "eachItemSalesPurchaseDetails");

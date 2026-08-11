@@ -1,22 +1,35 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
     LayoutDashboard,
     Search,
     MoreVertical,
     ChevronRight,
-    Package,
-    Eye,
-    Trash2,
+    Package
 } from "lucide-react";
 
 import {
+    itemApi,
     useGetAllItemsForLedgerQuery,
     useGetItemBillsQuery,
 } from "../../redux/api/itemApi";
 
 import AddItemModal from "../../components/Modal/AddItemModal";
 import ItemModal from "../../components/Modal/ItemModal";
+import StockAdjustmentModal from "../../components/Modal/StockAdjustmentModal";
+import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
+import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
+import { purchaseApi, useDeletePurchaseMutation } from "../../redux/api/purchaseApi";
+import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
+import { useDeletePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
+import { partyApi } from "../../redux/api/partyAPi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { bankAccountApi } from "../../redux/api/bankAccountApi";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+
 
 const fmt = (n) =>
     Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -25,25 +38,56 @@ const fmt = (n) =>
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ItemsByItem() {
-
+    const DELETE_CONFIG = {
+        Sale: {
+            title: "Delete Sale",
+            label: "sale invoice",
+        },
+        Purchase: {
+            title: "Delete Purchase",
+            label: "purchase bill",
+        },
+        Sale_Return: {
+            title: "Delete Credit Note",
+            label: "credit note",
+        },
+        Purchase_Return: {
+            title: "Delete Debit Note",
+            label: "debit note",
+        },
+        Payment_In: {
+            title: "Delete Payment In",
+            label: "payment in entry",
+        },
+        Payment_Out: {
+            title: "Delete Payment Out",
+            label: "payment out entry",
+        },
+    };
     const navigate = useNavigate();
-    const location = useLocation();
+    const dispatch = useDispatch();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const selectedItemId = searchParams.get("itemId") || null;
+    const itemSearch = searchParams.get("q") || "";
+    const txnSearch = searchParams.get("txnSearch") || "";
 
     const {
         data: itemsResponse,
         isLoading,
-    } = useGetAllItemsForLedgerQuery({});
+    } = useGetAllItemsForLedgerQuery({
+        search: itemSearch,
+    });
 
     const items = itemsResponse?.items || [];
 
-    const [selectedItemId, setSelectedItemId] = useState(null);
-    const [itemSearch, setItemSearch] = useState("");
-    const [txnSearch, setTxnSearch] = useState("");
     const [menuOpen, setMenuOpen] = useState(null);
     const [rowMenuOpen, setRowMenuOpen] = useState(null);
     const [showAddItemModal, setShowAddItemModal] = useState(false);
     const [showEditItemModal, setShowEditItemModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
+    const [showStockAdjustmentModal, setShowStockAdjustmentModal] = useState(false);
+    const [editingAdjustment, setEditingAdjustment] = useState(null);
     // Cursor pagination
     const [cursor, setCursor] = useState(null);
     const sentinelRef = useRef(null);
@@ -84,27 +128,18 @@ export default function ItemsByItem() {
 
 
     useEffect(() => {
-        if (!items.length) return;
+        if (!items.length || selectedItemId) return;
 
-        if (
-            selectedItemId === null &&
-            location.state?.itemId
-        ) {
-            setSelectedItemId(location.state.itemId);
+        const next = new URLSearchParams(searchParams);
+        next.set("itemId", items[0].Item_Id);
 
-            navigate(location.pathname, {
-                replace: true,
-                state: null,
-            });
-
-            return;
-        }
-
-        if (selectedItemId === null) {
-            setSelectedItemId(items[0].Item_Id);
-        }
-    }, [items, selectedItemId, navigate, location.pathname, location.state]);
-
+        setSearchParams(next, { replace: true });
+    }, [
+        items,
+        selectedItemId,
+        searchParams,
+        setSearchParams,
+    ]);
 
     useEffect(() => {
         setCursor(null);
@@ -161,29 +196,23 @@ export default function ItemsByItem() {
         return () => document.removeEventListener("click", closeMenus);
     }, []);
 
-    const filteredItems = useMemo(() => {
-        return items.filter((it) =>
-            it.Item_Name.toLowerCase().includes(itemSearch.toLowerCase())
-        );
-    }, [items, itemSearch]);
+    const filteredItems = items;
 
-    const selectedItemMeta =items.find((it) => it.Item_Id === selectedItemId) || null;
+    const selectedItemMeta =
+        items.find((it) => it.Item_Id === selectedItemId) || null;
 
     const fmtDate = (d) =>
-        d
-            ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+        d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
             : "—";
 
     const handleSelectItem = (item) => {
+        const next = new URLSearchParams(searchParams);
 
-        // console.log("========== ITEM SELECTED ==========");
-        // console.log("Full Item:", item);
-        // console.log("Item_Id being selected:", item.Item_Id);
-        // console.log("Item Name:", item.Item_Name);
-        // console.log("====================================");
+        next.set("itemId", item.Item_Id);
+        next.delete("txnSearch");
 
-        setSelectedItemId(item.Item_Id);
-        setTxnSearch("");
+        setSearchParams(next);
+
         setMenuOpen(null);
         setRowMenuOpen(null);
     };
@@ -191,8 +220,62 @@ export default function ItemsByItem() {
     const handleTransactionEdit = (txn) => {
         setRowMenuOpen(null);
 
-        if (!txn?.Source_Id) {
-            console.error("No Source_Id found for transaction:", txn);
+        console.log("========== ITEM TRANSACTION EDIT ==========");
+        console.log("Transaction:", txn);
+        console.log("Txn Type:", txn?.Txn_Type);
+        console.log("Source ID:", txn?.Source_Id);
+        console.log("Document ID:", txn?.Document_Id);
+        console.log("Bill Number:", txn?.Number);
+        console.log("Selected Item ID:", selectedItemId);
+        console.log("============================================");
+
+        // =====================================================
+        // STOCK ADJUSTMENT
+        // =====================================================
+
+        if (
+            txn?.Txn_Type === "Add_Adjustment" ||
+            txn?.Txn_Type === "Reduce_Adjustment"
+        ) {
+            if (!txn?.Source_Id) {
+                console.error(
+                    "No Source_Id found for stock adjustment:",
+                    txn
+                );
+                return;
+            }
+
+            setEditingAdjustment({
+                ...txn,
+
+                // The adjustment database record ID
+                id: txn.Source_Id,
+
+                // Make sure modal receives the correct item
+                Item_Id: txn.Item_Id || selectedItemId,
+
+                // Make sure Adjustment_Type exists
+                Adjustment_Type:
+                    txn.Adjustment_Type ||
+                    (txn.Txn_Type === "Add_Adjustment"
+                        ? "Add"
+                        : "Reduce"),
+            });
+
+            setShowStockAdjustmentModal(true);
+
+            return;
+        }
+
+        // =====================================================
+        // NORMAL DOCUMENT TRANSACTIONS
+        // =====================================================
+
+        if (!txn?.Document_Id) {
+            console.error(
+                "No Document_Id found for transaction:",
+                txn
+            );
             return;
         }
 
@@ -202,28 +285,53 @@ export default function ItemsByItem() {
         };
 
         switch (txn.Txn_Type) {
+
             case "Sale":
-                navigate(`/sale/edit/${txn.Source_Id}`, {
-                    state: navigationState,
-                });
+                navigate(
+                    {
+                        pathname: `/sale/edit/${txn.Document_Id}`,
+                        search: searchParams.toString(),
+                    },
+                    {
+                        state: navigationState,
+                    }
+                );
                 break;
 
             case "Purchase":
-                navigate(`/purchase/edit/${txn.Source_Id}`, {
-                    state: navigationState,
-                });
+                navigate(
+                    {
+                        pathname: `/purchase/edit/${txn.Document_Id}`,
+                        search: searchParams.toString(),
+                    },
+                    {
+                        state: navigationState,
+                    }
+                );
                 break;
 
             case "Sale_Return":
-                navigate(`/sale/return/edit/${txn.Source_Id}`, {
-                    state: navigationState,
-                });
+                navigate(
+                    {
+                        pathname: `/sale/return/edit/${txn.Document_Id}`,
+                        search: searchParams.toString(),
+                    },
+                    {
+                        state: navigationState,
+                    }
+                );
                 break;
 
             case "Purchase_Return":
-                navigate(`/purchase/return/edit/${txn.Source_Id}`, {
-                    state: navigationState,
-                });
+                navigate(
+                    {
+                        pathname: `/purchase/return/edit/${txn.Document_Id}`,
+                        search: searchParams.toString(),
+                    },
+                    {
+                        state: navigationState,
+                    }
+                );
                 break;
 
             default:
@@ -236,30 +344,117 @@ export default function ItemsByItem() {
 
     const handleItemAdded = (savedItem) => {
         setShowAddItemModal(false);
+
         if (savedItem?.Item_Id) {
-            setSelectedItemId(savedItem.Item_Id);
-            setItemSearch("");
+            const next = new URLSearchParams(searchParams);
+
+            next.set("itemId", savedItem.Item_Id);
+            next.delete("q");
+            next.delete("txnSearch");
+
+            setSearchParams(next);
         }
     };
 
     const handleAdjustItem = () => {
-        // TODO: wire up actual adjust-item flow
-        console.log("Adjust Item clicked for:", selectedItemMeta?.Item_Id);
+        setEditingAdjustment(null);
+        setShowStockAdjustmentModal(true);
+    };
+    const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+    const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
+    const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
+    const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
+    const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
+    const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
+    const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
+
+    const isDeleting =
+        isDeletingSale ||
+        isDeletingPurchase ||
+        isDeletingSaleReturn ||
+        isDeletingPurchaseReturn ||
+        isDeletingPaymentIn ||
+        isDeletingPaymentOut;
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return;
+
+        try {
+            let res;
+
+            switch (deleteTarget.Txn_Type) {
+                case "Sale":
+                    res = await deleteSale(deleteTarget.Id).unwrap();
+                    break;
+
+                case "Purchase":
+                    res = await deletePurchase(
+                        deleteTarget.Id
+                    ).unwrap();
+                    break;
+
+                case "Sale_Return":
+                    res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+                    break;
+
+                case "Purchase_Return":
+                    res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+                    break;
+
+                case "Payment_In":
+                    res = await deletePaymentIn(deleteTarget.Id).unwrap();
+                    break;
+
+                case "Payment_Out":
+                    res = await deletePaymentOut(deleteTarget.Id).unwrap();
+                    break;
+
+                default:
+                    toast.error(
+                        "Unknown transaction type — cannot delete"
+                    );
+                    return;
+            }
+
+            toast.success(res?.message || "Deleted successfully");
+
+            setDeleteTarget(null);
+            dispatch(partyApi.util.invalidateTags(["Party"]));
+
+            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+            dispatch(
+                bankAccountApi.util.invalidateTags(["BankAccount"])
+            )
+            dispatch(saleApi.util.invalidateTags(["Sale"]));
+            dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+            dispatch(
+                itemApi.util.invalidateTags([
+                    "Item",
+                    "ItemLedger",
+                ])
+            );
+        } catch (err) {
+
+            console.error(
+                "❌ Delete error:",
+                err
+            );
+
+            toast.error(
+                err?.data?.message ||
+                "Failed to delete"
+            );
+            setDeleteTarget(null);
+
+            // IMPORTANT:
+            // Don't close modal here.
+            // User should see the error and can close it manually.
+        }
     };
 
     return (
         <>
             {/* ── BREADCRUMB ── */}
-            <div className="sb2-2-2">
-                <ul>
-                    <li>
-                        <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
-                            <LayoutDashboard size={20} style={{ marginRight: "8px" }} />
-                            Dashboard
-                        </NavLink>
-                    </li>
-                </ul>
-            </div>
+
 
             <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
@@ -308,7 +503,16 @@ export default function ItemsByItem() {
                                 <input
                                     type="text"
                                     value={itemSearch}
-                                    onChange={(e) => setItemSearch(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        const next = new URLSearchParams(searchParams);
+                                        if (value) {
+                                            next.set("q", value);
+                                        } else {
+                                            next.delete("q");
+                                        }
+                                        setSearchParams(next, { replace: true });
+                                    }}
                                     placeholder="Search Item"
                                     className="border rounded-md text-sm outline-none"
                                     style={{
@@ -329,7 +533,7 @@ export default function ItemsByItem() {
                             style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
                         >
                             <Package size={15} style={{ color: "#4CA1AF" }} />
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Items ({filteredItems.length})
                             </span>
                         </div>
@@ -370,10 +574,14 @@ export default function ItemsByItem() {
                                                 <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+                                                <p
+                                                    className="font-semibold text-black truncate text-sm"
+                                                    style={{ margin: 0 }}
+                                                >
                                                     {item.Item_Name}
                                                 </p>
-                                                <p className="text-xs text-gray-400 truncate">
+
+                                                <p className="text-xs text-gray-600 truncate">
                                                     {item.Item_Category || "N/A"}
                                                 </p>
                                             </div>
@@ -384,9 +592,16 @@ export default function ItemsByItem() {
                                                 type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    setSelectedItemId(item.Item_Id);
-                                                    setTxnSearch("");
-                                                    setMenuOpen(menuOpen === item.Item_Id ? null : item.Item_Id);
+
+                                                    const next = new URLSearchParams(searchParams);
+                                                    next.set("itemId", item.Item_Id);
+                                                    next.delete("txnSearch");
+
+                                                    setSearchParams(next);
+
+                                                    setMenuOpen(
+                                                        menuOpen === item.Item_Id ? null : item.Item_Id
+                                                    );
                                                 }}
                                                 className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                 style={{ backgroundColor: "transparent" }}
@@ -416,9 +631,12 @@ export default function ItemsByItem() {
                                                 </button>
                                                 <button
                                                     className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
-                                                    disabled
-                                                    title="Delete item — coming soon"
-                                                    style={{ opacity: 0.5, cursor: "not-allowed" }}
+                                                    title="Delete item"
+                                                    style={{ cursor: "pointer" }}
+                                                    onClick={() => {
+                                                        console.log("Delete item:", item.Item_Id);
+                                                    }}
+                                                   
                                                 >
                                                     Delete
                                                 </button>
@@ -441,19 +659,23 @@ export default function ItemsByItem() {
                             {selectedItemMeta && (
                                 <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
                                     {/* Row 1: icon + name/category on left, Adjust Item button on right */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                        <div className="flex items-center gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
                                             <div
-                                                className="flex items-center justify-center rounded-xl"
+                                                className="flex items-center justify-center rounded-xl flex-shrink-0"
                                                 style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
                                             >
                                                 <Package size={22} style={{ color: "#4CA1AF" }} />
                                             </div>
-                                            <div>
-                                                <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
+                                            <div className="min-w-0">
+                                                <h6
+                                                    className="font-bold text-black truncate"
+                                                    style={{ fontSize: 18, margin: 0 }}
+                                                    title={liveItem?.Item_Name || selectedItemMeta.Item_Name}
+                                                >
                                                     {liveItem?.Item_Name || selectedItemMeta.Item_Name}
                                                 </h6>
-                                                <p className="text-gray-500 text-sm mt-0.5">
+                                                <p className="text-gray-600 text-sm mt-0.5">
                                                     {selectedItemMeta.Item_Category || "N/A"}
                                                 </p>
                                             </div>
@@ -490,7 +712,16 @@ export default function ItemsByItem() {
                                             <input
                                                 type="text"
                                                 value={txnSearch}
-                                                onChange={(e) => setTxnSearch(e.target.value)}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    const next = new URLSearchParams(searchParams);
+                                                    if (value) {
+                                                        next.set("txnSearch", value);
+                                                    } else {
+                                                        next.delete("txnSearch");
+                                                    }
+                                                    setSearchParams(next, { replace: true });
+                                                }}
                                                 placeholder="Search"
                                                 className="w-full h-full border rounded-md text-sm outline-none"
                                                 style={{
@@ -502,9 +733,9 @@ export default function ItemsByItem() {
                                             />
                                         </div>
 
-                                        <div className="flex items-center gap-8">
+                                        <div className="flex items-center ">
                                             <div className="text-right">
-                                                <p className="text-xs uppercase text-gray-400 mb-1">Stock</p>
+                                                <p className="text-xs uppercase text-gray-600 mb-1">Stock</p>
                                                 <p
                                                     className="font-bold"
                                                     style={{
@@ -520,12 +751,6 @@ export default function ItemsByItem() {
                                                 </p>
                                             </div>
 
-                                            <div className="text-right">
-                                                <p className="text-xs uppercase text-gray-400 mb-1">HSN</p>
-                                                <p className="font-bold" style={{ fontSize: 18, color: "#374151" }}>
-                                                    {selectedItemMeta.Item_HSN || "—"}
-                                                </p>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -542,13 +767,12 @@ export default function ItemsByItem() {
                                                 "Party",
                                                 "Type",
                                                 "Qty",
-                                                "Rate",
-                                                "Running Stock",
+                                                "Price/Unit",
                                                 ""
                                             ].map((h, index) => (
                                                 <th
                                                     key={index}
-                                                    className="text-left py-2 px-3 font-semibold text-gray-500"
+                                                    className="text-left py-2 px-3 font-semibold text-black"
                                                     style={{
                                                         fontSize: 11,
                                                         textTransform: "uppercase",
@@ -564,13 +788,13 @@ export default function ItemsByItem() {
                                     <tbody>
                                         {isBillsLoading && !cursor ? (
                                             <tr>
-                                                <td colSpan={8} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+                                                <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
                                                     Loading...
                                                 </td>
                                             </tr>
                                         ) : transactions.length === 0 ? (
                                             <tr>
-                                                <td colSpan={8} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+                                                <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
                                                     No transactions to show
                                                 </td>
                                             </tr>
@@ -588,19 +812,19 @@ export default function ItemsByItem() {
                                                 >
                                                     {/* DATE */}
                                                     <td
-                                                        className="py-2 px-3 text-gray-500"
+                                                        className="py-2 px-3 text-black"
                                                         style={{ whiteSpace: "nowrap" }}
                                                     >
                                                         {fmtDate(txn.Txn_Date)}
                                                     </td>
 
                                                     {/* BILL NUMBER */}
-                                                    <td className="py-2 px-3 text-gray-700">
+                                                    <td className="py-2 px-3 text-black">
                                                         {txn.Bill_Number || "—"}
                                                     </td>
 
                                                     {/* PARTY */}
-                                                    <td className="py-2 px-3 text-gray-700">
+                                                    <td className="py-2 px-3 text-black">
                                                         {txn.Party_Name || "—"}
                                                     </td>
 
@@ -618,82 +842,96 @@ export default function ItemsByItem() {
                                                     </td>
 
                                                     {/* QTY */}
-                                                    <td className="py-2 px-3 text-gray-700">
+                                                    <td className="py-2 px-3 text-black">
                                                         {fmt(txn.Quantity)}
                                                     </td>
 
                                                     {/* RATE */}
-                                                    <td className="py-2 px-3 text-gray-700">
+                                                    <td className="py-2 px-3 text-black">
                                                         {txn.Rate !== null
                                                             ? `₹ ${fmt(txn.Rate)}`
                                                             : "—"}
                                                     </td>
 
-                                                    {/* RUNNING STOCK */}
-                                                    <td
-                                                        className="py-2 px-3 font-semibold"
-                                                        style={{ color: "#4CA1AF" }}
-                                                    >
-                                                        {fmt(txn.Running_Stock)}
-                                                    </td>
-
                                                     {/* THREE DOT MENU */}
-                                                    <td
-                                                        className="py-2 px-2"
-                                                        style={{
-                                                            position: "relative",
-                                                            width: 50,
-                                                            textAlign: "center",
-                                                        }}
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-
-                                                                setRowMenuOpen(
-                                                                    rowMenuOpen === txn.Ledger_Id
-                                                                        ? null
-                                                                        : txn.Ledger_Id
-                                                                );
-                                                            }}
-                                                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                    {/* THREE DOT MENU */}
+                                                    {txn.Txn_Type !== "Opening_Stock" && (
+                                                        <td
+                                                            className="py-2 px-2"
                                                             style={{
-                                                                backgroundColor: "transparent",
-                                                                border: "none",
-                                                                cursor: "pointer",
+                                                                position: "relative",
+                                                                width: 50,
+                                                                textAlign: "center",
                                                             }}
-                                                            title="More"
                                                         >
-                                                            <MoreVertical
-                                                                size={16}
-                                                                style={{ color: "#94a3b8" }}
-                                                            />
-                                                        </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
 
-                                                        {/* ROW MENU */}
-                                                        {rowMenuOpen === txn.Ledger_Id && (
-                                                            <div
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="absolute bg-white shadow-lg rounded-md"
-                                                                style={{
-                                                                    right: 10,
-                                                                    top: 36,
-                                                                    width: 150,
-                                                                    zIndex: 100,
-                                                                    border: "1px solid #e2e8f0",
+                                                                    setRowMenuOpen(
+                                                                        rowMenuOpen === txn.Ledger_Id
+                                                                            ? null
+                                                                            : txn.Ledger_Id
+                                                                    );
                                                                 }}
+                                                                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                                style={{
+                                                                    backgroundColor: "transparent",
+                                                                    border: "none",
+                                                                    cursor: "pointer",
+                                                                }}
+                                                                title="More"
                                                             >
-                                                                <button
-                                                                    type="button"
-                                                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
-                                                                    onClick={() => handleTransactionEdit(txn)}
+                                                                <MoreVertical
+                                                                    size={16}
+                                                                    style={{ color: "#94a3b8" }}
+                                                                />
+                                                            </button>
+
+                                                            {/* ROW MENU */}
+                                                            {rowMenuOpen === txn.Ledger_Id && (
+                                                                <div
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="absolute bg-white shadow-lg rounded-md"
+                                                                    style={{
+                                                                        right: 10,
+                                                                        top: 36,
+                                                                        width: 150,
+                                                                        zIndex: 100,
+                                                                        border: "1px solid #e2e8f0",
+                                                                    }}
                                                                 >
-                                                                    View / Edit
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                                                                        onClick={() => handleTransactionEdit(txn)}
+                                                                    >
+                                                                        View / Edit
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+                                                                        title="Delete transaction"
+                                                                        style={{ cursor: "pointer" }}
+                                                                        // onClick={() => {
+                                                                        //     console.log("Delete transaction:", txn);
+                                                                        // }}
+                                                                         onClick={() =>
+                                                        setDeleteTarget({
+                                                            Id: txn.Document_Id,
+                                                            Txn_Type: txn.Txn_Type,   // ✅ must be here
+                                                            //Doc_Number: row.Doc_Number,
+                                                        })
+                                                    }
+                                                                    >
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                 </tr>
                                             ))
                                         )}
@@ -747,6 +985,31 @@ export default function ItemsByItem() {
                 />
             )}
 
+            {showStockAdjustmentModal && (
+                <StockAdjustmentModal
+                    itemDetails={liveItem || selectedItemMeta}
+                    editingAdjustment={editingAdjustment}
+                    onClose={() => {
+                        setShowStockAdjustmentModal(false);
+                        setEditingAdjustment(null);
+                    }}
+                    onSave={() => {
+                        setShowStockAdjustmentModal(false);
+                        setEditingAdjustment(null);
+                    }}
+                />
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
+                    message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
+                        }? This action cannot be undone.`}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={handleConfirmDelete}
+                    isDeleting={isDeleting}
+                //isDeleting={false}
+                />
+            )}
         </>
     );
 }

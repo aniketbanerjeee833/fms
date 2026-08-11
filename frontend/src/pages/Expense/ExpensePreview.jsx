@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   useNavigate,
   useLocation,
@@ -41,7 +41,30 @@ export default function ExpensePreview() {
     isLoading,
     error,
   } = useGetExpenseByIdQuery(id);
+   // ✅ MUST be before any conditional return
+useEffect(() => {
+  if (isLoading) return;
+  if (!expenseResponse?.expense) return;
 
+  const params = new URLSearchParams(location.search);
+
+  if (params.get("autoPrint") !== "1") return;
+
+  const timer = setTimeout(() => {
+    window.print();
+  }, 500);
+
+  const handleAfterPrint = () => {
+    window.close();
+  };
+
+  window.addEventListener("afterprint", handleAfterPrint);
+
+  return () => {
+    clearTimeout(timer);
+    window.removeEventListener("afterprint", handleAfterPrint);
+  };
+}, [isLoading, expenseResponse, location.search]);
   if (isLoading) {
     return (
       <div
@@ -71,7 +94,7 @@ export default function ExpensePreview() {
   }
 
   const expense = expenseResponse.expense;
-
+  
   const back = () => {
     navigate(
       location.state?.from || "/expense/categories",

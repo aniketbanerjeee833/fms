@@ -908,7 +908,12 @@ export default function PurchaseEdit() {
           itemApi.util.invalidateTags(["Item"])
         );
       }
-
+        else if (from === "items-by-item") {
+        navigate({
+          pathname: "/items/all-items",
+          search: `?itemId=${Item_Id}`,
+        });
+      }
       else if (from === "bank-accounts") {
         navigate({
           pathname: "/cash-bank/bank-accounts",
@@ -1036,7 +1041,16 @@ export default function PurchaseEdit() {
                       pathname: `/item/item-sales-purchases-details/${Item_Id}`,
                       search: location.search,
                     })
-                  } else if (from === "bank-accounts") {
+                  } 
+                         else if (from === "items-by-item") {
+                    
+
+                    navigate({
+                      pathname: "/items/all-items",
+                      search: `?itemId=${Item_Id}`,
+                    });
+                  }
+                  else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
                       pathname: `/cash-bank/bank-accounts`,
@@ -2207,6 +2221,7 @@ export default function PurchaseEdit() {
                                       newUnit === primaryUnit
                                     ) {
                                       newPrice = basePrice;
+                                      
                                     }
 
                                     else {
@@ -2291,7 +2306,7 @@ export default function PurchaseEdit() {
 
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
-                              // basePurchasePriceRef.current[i] = Number(val) || 0;
+                              basePurchasePriceRef.current[i] = Number(val) || 0;
                               
                               //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
                               // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {

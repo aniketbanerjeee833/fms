@@ -120,7 +120,7 @@ deleteItem: builder.mutation({
         const params = new URLSearchParams();
         if (cursor) params.set("cursor", cursor);
         if (search?.trim()) params.set("search", search.trim());
-        return `items-by-category/${categoryId}?${params.toString()}`;
+        return `item/items-by-category/${categoryId}?${params.toString()}`;
       },
 
       // group pages under one cache entry per (categoryId, search) — cursor excluded

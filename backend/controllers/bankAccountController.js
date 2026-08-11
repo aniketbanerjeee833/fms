@@ -226,17 +226,16 @@ ORDER BY ba.Account_Display_Name;
    GET SINGLE BANK ACCOUNT + ALL TRANSACTIONS
    (reads straight from the running-balance ledger — no recompute)
 ═══════════════════════════════════════ */
-//  const getBankAccountById = async (req, res, next) => {
+
+// const getBankAccountById = async (req, res, next) => {
 //   try {
 //     const { Bank_Account_Id } = req.params;
-
 //     const page = Number(req.query.page) || 1;
 //     const limit = Number(req.query.limit) || 10;
 //     const offset = (page - 1) * limit;
 
-//     // Bank account
-//    const [[account]] = await db.query(
-//   `SELECT
+//     const [[account]] = await db.query(
+//       `SELECT
 //       id AS Bank_Account_Id,
 //       Account_Display_Name,
 //       Bank_Name,
@@ -248,55 +247,82 @@ ORDER BY ba.Account_Display_Name;
 //       As_Of_Date
 //    FROM bank_accounts
 //    WHERE id = ?`,
-//   [Bank_Account_Id]
-// );
-
+//       [Bank_Account_Id]
+//     );
 //     if (!account) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Bank account not found",
-//       });
+//       return res.status(404).json({ success: false, message: "Bank account not found" });
 //     }
 
-//     // Total transactions
 //     const [[{ totalCount }]] = await db.query(
-//       `SELECT COUNT(*) AS totalCount
-//        FROM bank_transactions
-//        WHERE Bank_Account_Id = ?`,
+//       `SELECT COUNT(*) AS totalCount FROM bank_transactions WHERE Bank_Account_Id = ?`,
 //       [Bank_Account_Id]
 //     );
 
-//     // Transactions
-//    const [transactions] = await db.query(
-//   `SELECT
-//       id,
-//       Txn_Type,
-//       Party_Name,
-//       Direction,
-//       Amount,
-//       Running_Balance,
-//       Txn_Date,
-//       Reference_Id
-//    FROM bank_transactions
-//    WHERE Bank_Account_Id = ?
-//    ORDER BY Txn_Date DESC, id DESC
-//    LIMIT ? OFFSET ?`,
-//   [Bank_Account_Id, limit, offset]
-// );
-
-//     // Current balance
-//     const [[lastTxn]] = await db.query(
-//       `SELECT Running_Balance
-//        FROM bank_transactions
-//        WHERE Bank_Account_Id = ?
-//        ORDER BY id DESC
-//        LIMIT 1`,
-//       [Bank_Account_Id]
+//     const [transactions] = await db.query(
+//       // `SELECT 
+//       //    bt.*,
+//       //    CASE bt.Txn_Type
+//       //      WHEN 'Sale'             THEN s.Sale_Id
+//       //      WHEN 'Purchase'         THEN p.Purchase_Id
+//       //      WHEN 'Payment_In'       THEN bt.Reference_Id   -- these use raw numeric id in your routes already
+//       //      WHEN 'Payment_Out'      THEN bt.Reference_Id
+//       //      WHEN 'Sale_Return'      THEN sr.id
+//       //      WHEN 'Purchase_Return'  THEN pr.id
+//       //    END AS Formatted_Reference_Id
+//       //  FROM bank_transactions bt
+//       //  LEFT JOIN add_sale         s  ON bt.Txn_Type = 'Sale'             AND bt.Reference_Id = s.id
+//       //  LEFT JOIN add_purchase     p  ON bt.Txn_Type = 'Purchase'         AND bt.Reference_Id = p.id
+//       //  LEFT JOIN sale_return      sr ON bt.Txn_Type = 'Sale_Return'      AND bt.Reference_Id = sr.id
+//       //  LEFT JOIN purchase_return  pr ON bt.Txn_Type = 'Purchase_Return'  AND bt.Reference_Id = pr.id
+//       //  WHERE bt.Bank_Account_Id = ?
+//       //  ORDER BY  bt.id DESC
+//       //  LIMIT ? OFFSET ?`,
+//       `WITH txn AS (
+//   SELECT
+//     bt.*,
+//     ps.Source_Type,
+//     ps.Source_Id
+//   FROM bank_transactions bt
+//   LEFT JOIN payment_splits ps
+//     ON bt.Reference_Id = ps.id
+//     AND bt.Txn_Type IN (
+//       'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
+//       'Payment_In', 'Payment_Out'
+//     )
+//   WHERE bt.Bank_Account_Id = ?
+// )
+// SELECT
+//   txn.*,
+//   CASE txn.Txn_Type
+//     WHEN 'Sale'            THEN s.Sale_Id
+//     WHEN 'Purchase'        THEN p.Purchase_Id
+//     WHEN 'Sale_Return'     THEN sr.id
+//     WHEN 'Purchase_Return' THEN pr.id
+//     WHEN 'Payment_In'      THEN pi.id
+//     WHEN 'Payment_Out'     THEN po.id
+//   END AS Formatted_Reference_Id
+// FROM txn
+// LEFT JOIN add_sale s
+//   ON txn.Txn_Type = 'Sale' AND txn.Source_Id = s.id
+// LEFT JOIN add_purchase p
+//   ON txn.Txn_Type = 'Purchase' AND txn.Source_Id = p.id
+// LEFT JOIN sale_return sr
+//   ON txn.Txn_Type = 'Sale_Return' AND txn.Source_Id = sr.id
+// LEFT JOIN purchase_return pr
+//   ON txn.Txn_Type = 'Purchase_Return' AND txn.Source_Id = pr.id
+// LEFT JOIN payment_in pi
+//   ON txn.Txn_Type = 'Payment_In' AND txn.Source_Id = pi.Id
+// LEFT JOIN payment_out po
+//   ON txn.Txn_Type = 'Payment_Out' AND txn.Source_Id = po.id
+// ORDER BY txn.id DESC
+// LIMIT ? OFFSET ?`,
+//       [Bank_Account_Id, limit, offset]
 //     );
 
-//     const currentBalance = lastTxn
-//       ? Number(lastTxn.Running_Balance)
-//       : Number(account.Opening_Balance);
+//     const currentBalance =
+//       transactions.length > 0
+//         ? Number(transactions[0].Running_Balance)
+//         : Number(account.Opening_Balance);
 
 //     res.status(200).json({
 //       success: true,
@@ -307,7 +333,6 @@ ORDER BY ba.Account_Display_Name;
 //       totalPages: Math.ceil(totalCount / limit),
 //       totalCount,
 //     });
-
 //   } catch (err) {
 //     console.error("❌ Get bank account details error:", err);
 //     next(err);
@@ -316,114 +341,139 @@ ORDER BY ba.Account_Display_Name;
 const getBankAccountById = async (req, res, next) => {
   try {
     const { Bank_Account_Id } = req.params;
-    const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
+
+    // 🔹 decode cursor
+    let cursorId = null;
+    const cursorRaw = req.query.cursor || null;
+
+    if (cursorRaw) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(cursorRaw, "base64").toString("utf8")
+        );
+        cursorId = decoded.id ? Number(decoded.id) : null;
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor.",
+        });
+      }
+    }
 
     const [[account]] = await db.query(
       `SELECT
-      id AS Bank_Account_Id,
-      Account_Display_Name,
-      Bank_Name,
-      Account_Holder_Name,
-      Account_Number,
-      IFSC_Code,
-      UPI_Id,
-      Opening_Balance,
-      As_Of_Date
-   FROM bank_accounts
-   WHERE id = ?`,
+         id AS Bank_Account_Id,
+         Account_Display_Name,
+         Bank_Name,
+         Account_Holder_Name,
+         Account_Number,
+         IFSC_Code,
+         UPI_Id,
+         Opening_Balance,
+         As_Of_Date
+       FROM bank_accounts
+       WHERE id = ?`,
       [Bank_Account_Id]
     );
+
     if (!account) {
-      return res.status(404).json({ success: false, message: "Bank account not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Bank account not found",
+      });
     }
 
-    const [[{ totalCount }]] = await db.query(
-      `SELECT COUNT(*) AS totalCount FROM bank_transactions WHERE Bank_Account_Id = ?`,
+    // 🔹 cursor condition — fetch rows with id < cursorId
+    const cursorSQL = cursorId ? `AND bt.id < ?` : "";
+    const queryParams = cursorId
+      ? [Bank_Account_Id, cursorId, limit + 1]
+      : [Bank_Account_Id, limit + 1];
+
+    const [transactions] = await db.query(
+      `WITH txn AS (
+         SELECT
+           bt.*,
+           ps.Source_Type,
+           ps.Source_Id
+         FROM bank_transactions bt
+         LEFT JOIN payment_splits ps
+           ON bt.Reference_Id = ps.id
+           AND bt.Txn_Type IN (
+             'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
+             'Payment_In', 'Payment_Out'
+           )
+         WHERE bt.Bank_Account_Id = ?
+           ${cursorSQL}
+       )
+       SELECT
+         txn.*,
+         CASE txn.Txn_Type
+           WHEN 'Sale'            THEN s.Sale_Id
+           WHEN 'Purchase'        THEN p.Purchase_Id
+           WHEN 'Sale_Return'     THEN sr.id
+           WHEN 'Purchase_Return' THEN pr.id
+           WHEN 'Payment_In'      THEN pi.id
+           WHEN 'Payment_Out'     THEN po.id
+         END AS Formatted_Reference_Id
+       FROM txn
+       LEFT JOIN add_sale s
+         ON txn.Txn_Type = 'Sale' AND txn.Source_Id = s.id
+       LEFT JOIN add_purchase p
+         ON txn.Txn_Type = 'Purchase' AND txn.Source_Id = p.id
+       LEFT JOIN sale_return sr
+         ON txn.Txn_Type = 'Sale_Return' AND txn.Source_Id = sr.id
+       LEFT JOIN purchase_return pr
+         ON txn.Txn_Type = 'Purchase_Return' AND txn.Source_Id = pr.id
+       LEFT JOIN payment_in pi
+         ON txn.Txn_Type = 'Payment_In' AND txn.Source_Id = pi.Id
+       LEFT JOIN payment_out po
+         ON txn.Txn_Type = 'Payment_Out' AND txn.Source_Id = po.id
+       ORDER BY txn.id DESC
+       LIMIT ?`,
+      queryParams
+    );
+
+    // 🔹 detect hasMore by fetching limit+1
+    const hasMore = transactions.length > limit;
+    const pageRows = hasMore ? transactions.slice(0, limit) : transactions;
+
+    // 🔹 build next cursor from last row
+    let nextCursor = null;
+    if (hasMore && pageRows.length > 0) {
+      const last = pageRows[pageRows.length - 1];
+      nextCursor = Buffer.from(
+        JSON.stringify({ id: last.id })
+      ).toString("base64");
+    }
+
+    // current balance — always from the latest row regardless of cursor
+    const [[latestRow]] = await db.query(
+      `SELECT Running_Balance
+       FROM bank_transactions
+       WHERE Bank_Account_Id = ?
+       ORDER BY id DESC LIMIT 1`,
       [Bank_Account_Id]
     );
 
-    const [transactions] = await db.query(
-      // `SELECT 
-      //    bt.*,
-      //    CASE bt.Txn_Type
-      //      WHEN 'Sale'             THEN s.Sale_Id
-      //      WHEN 'Purchase'         THEN p.Purchase_Id
-      //      WHEN 'Payment_In'       THEN bt.Reference_Id   -- these use raw numeric id in your routes already
-      //      WHEN 'Payment_Out'      THEN bt.Reference_Id
-      //      WHEN 'Sale_Return'      THEN sr.id
-      //      WHEN 'Purchase_Return'  THEN pr.id
-      //    END AS Formatted_Reference_Id
-      //  FROM bank_transactions bt
-      //  LEFT JOIN add_sale         s  ON bt.Txn_Type = 'Sale'             AND bt.Reference_Id = s.id
-      //  LEFT JOIN add_purchase     p  ON bt.Txn_Type = 'Purchase'         AND bt.Reference_Id = p.id
-      //  LEFT JOIN sale_return      sr ON bt.Txn_Type = 'Sale_Return'      AND bt.Reference_Id = sr.id
-      //  LEFT JOIN purchase_return  pr ON bt.Txn_Type = 'Purchase_Return'  AND bt.Reference_Id = pr.id
-      //  WHERE bt.Bank_Account_Id = ?
-      //  ORDER BY  bt.id DESC
-      //  LIMIT ? OFFSET ?`,
-      `WITH txn AS (
-  SELECT
-    bt.*,
-    ps.Source_Type,
-    ps.Source_Id
-  FROM bank_transactions bt
-  LEFT JOIN payment_splits ps
-    ON bt.Reference_Id = ps.id
-    AND bt.Txn_Type IN (
-      'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
-      'Payment_In', 'Payment_Out'
-    )
-  WHERE bt.Bank_Account_Id = ?
-)
-SELECT
-  txn.*,
-  CASE txn.Txn_Type
-    WHEN 'Sale'            THEN s.Sale_Id
-    WHEN 'Purchase'        THEN p.Purchase_Id
-    WHEN 'Sale_Return'     THEN sr.id
-    WHEN 'Purchase_Return' THEN pr.id
-    WHEN 'Payment_In'      THEN pi.id
-    WHEN 'Payment_Out'     THEN po.id
-  END AS Formatted_Reference_Id
-FROM txn
-LEFT JOIN add_sale s
-  ON txn.Txn_Type = 'Sale' AND txn.Source_Id = s.id
-LEFT JOIN add_purchase p
-  ON txn.Txn_Type = 'Purchase' AND txn.Source_Id = p.id
-LEFT JOIN sale_return sr
-  ON txn.Txn_Type = 'Sale_Return' AND txn.Source_Id = sr.id
-LEFT JOIN purchase_return pr
-  ON txn.Txn_Type = 'Purchase_Return' AND txn.Source_Id = pr.id
-LEFT JOIN payment_in pi
-  ON txn.Txn_Type = 'Payment_In' AND txn.Source_Id = pi.Id
-LEFT JOIN payment_out po
-  ON txn.Txn_Type = 'Payment_Out' AND txn.Source_Id = po.id
-ORDER BY txn.id DESC
-LIMIT ? OFFSET ?`,
-      [Bank_Account_Id, limit, offset]
-    );
-
-    const currentBalance =
-      transactions.length > 0
-        ? Number(transactions[0].Running_Balance)
-        : Number(account.Opening_Balance);
+    const currentBalance = latestRow
+      ? Number(latestRow.Running_Balance)
+      : Number(account.Opening_Balance);
 
     res.status(200).json({
-      success: true,
-      bankAccount: account,
+      success:        true,
+      bankAccount:    account,
       currentBalance,
-      transactions,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
+      transactions:   pageRows,
+      hasMore,
+      nextCursor,
     });
   } catch (err) {
     console.error("❌ Get bank account details error:", err);
     next(err);
   }
 };
+
 /* ═══════════════════════════════════════
    DELETE BANK ACCOUNT (optional, guard against existing txns)
 ═══════════════════════════════════════ */

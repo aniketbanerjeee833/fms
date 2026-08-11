@@ -185,7 +185,7 @@ export default function ExpensesByItems() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-   
+
 
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
@@ -606,6 +606,21 @@ export default function ExpensesByItems() {
                                           },
                                         });
                                       }
+                                      if (key === "print") {
+                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
+                                        window.open(url, "_blank");
+                                      }
+                                      // if (key === "print") {
+                                      //   navigate(`/expense/preview/${txn.id}`, {
+                                      //     state: {
+                                      //       from: location.pathname,
+                                      //       itemId: selectedItemId,
+                                      //       txnSearch,
+                                      //       itemSearch,
+                                      //       autoPrint: true,
+                                      //     },
+                                      //   });
+                                      // }
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}

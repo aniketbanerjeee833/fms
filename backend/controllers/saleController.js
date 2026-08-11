@@ -3021,6 +3021,7 @@ const getSingleSale = async (req, res, next) => {
     -- CURRENT ITEM MASTER
     i.Primary_Unit AS Current_Primary_Unit,
     i.Secondary_Unit AS Current_Secondary_Unit,
+     i.Conversion_Rate,
 
     si.Quantity,
 
@@ -3194,12 +3195,12 @@ const getSingleSale = async (req, res, next) => {
         Secondary_Unit:
           it.Secondary_Unit_Snapshot,
 
-        Selected_Unit:
-          it.Selected_Unit,
-
+        Selected_Unit:it.Selected_Unit,
+      Conversion_Rate:it.Conversion_Rate !== null
+    ? Number(it.Conversion_Rate)
+    : 0,
         // What Edit Sale dropdown should display
-        Available_Units:
-          availableUnits,
+        Available_Units:availableUnits,
 
 
         // ================================================
@@ -5705,7 +5706,7 @@ const deleteSale = async (req, res, next) => {
         Sale_Id,
         Party_Id,
         Invoice_Number,
-        Bill_Date
+        Invoice_Date
       FROM add_sale
       WHERE Sale_Id = ?
       LIMIT 1

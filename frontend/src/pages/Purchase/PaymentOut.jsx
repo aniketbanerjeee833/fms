@@ -310,7 +310,7 @@ export default function PaymentOut() {
                         {/* Total Sales */}
                         <div className="mb-2 text-left">
                             <p className="text-sm font-medium text-black">Total Amount</p>
-                            <h4 className="text-3xl font-bold text-black">₹  {paymentOutData?.totals?.totalAmount}</h4>
+                            <h4 className="text-3xl font-bold text-black">₹  {paymentOutData?.totals?.totalPaid}</h4>
                         </div>
 
                         {/* Divider */}
@@ -323,10 +323,10 @@ export default function PaymentOut() {
                                 <span className="text-sm font-semibold text-black">₹ {paymentOutData?.totals?.totalPaid}</span>
                             </div>
 
-                            <div className="flex">
+                            {/* <div className="flex">
                                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
                                 <span className="text-sm font-semibold text-black">₹{paymentOutData?.totals?.totalUnpaid}</span>
-                            </div>
+                            </div> */}
                         </div>
 
                     </div>

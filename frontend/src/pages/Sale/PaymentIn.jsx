@@ -294,7 +294,7 @@ export default function PaymentIn() {
                         {/* Total Sales */}
                         <div className="mb-2 text-left">
                             <p className="text-sm font-medium text-black">Total Amount</p>
-                            <h4 className="text-3xl font-bold text-black">₹  {paymentInData?.totals?.totalAmount}</h4>
+                            <h4 className="text-3xl font-bold text-black">₹  {paymentInData?.totals?.totalReceived}</h4>
                         </div>
 
                         {/* Divider */}
@@ -304,13 +304,13 @@ export default function PaymentIn() {
                         <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
                             <div className="flex  ">
                                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                                <span className="text-sm font-semibold text-black">₹ {paymentInData?.totals?.totalPaid}</span>
+                                <span className="text-sm font-semibold text-black">₹ {paymentInData?.totals?.totalReceived}</span>
                             </div>
 
-                            <div className="flex">
+                            {/* <div className="flex">
                                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
                                 <span className="text-sm font-semibold text-black">₹{paymentInData?.totals?.totalUnpaid}</span>
-                            </div>
+                            </div> */}
                         </div>
 
                     </div>

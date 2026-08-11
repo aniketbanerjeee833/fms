@@ -253,6 +253,7 @@ const getSaleReturnById = async (req, res, next) => {
       -- CURRENT MASTER
       i.Primary_Unit AS Current_Primary_Unit,
       i.Secondary_Unit AS Current_Secondary_Unit,
+      i.Conversion_Rate,
 
       sri.Quantity,
 
@@ -408,7 +409,9 @@ const getSaleReturnById = async (req, res, next) => {
         Primary_Unit: oldPrimary,
         Secondary_Unit: oldSecondary,
         Selected_Unit: oldSelected,
-
+           Conversion_Rate:it.Conversion_Rate !== null
+    ? Number(it.Conversion_Rate)
+    : 0,
         // Dropdown
         Available_Units: availableUnits,
 
