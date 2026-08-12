@@ -123,8 +123,39 @@ export default function PaymentOutModal({
   };
 
   // splits.0 already holds whatever was picked in single mode — just add a blank row
-  const handleAddPaymentType = () => {
-    append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+  // const handleAddPaymentType = () => {
+  //   append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+  //   setShowSplitBox(true);
+  // };
+    const handleAddPaymentType = () => {
+    const newIndex = fields.length;
+  
+    const availableOptions = getAvailableOptions(newIndex);
+  
+    if (availableOptions.length === 0) {
+      toast.info("No more payment types are available.");
+      return;
+    }
+  
+    const firstOption = availableOptions[0];
+    console.log(firstOption);
+  
+    if (firstOption.value.startsWith("bank_")) {
+      append({
+        Payment_Type: "Bank",
+        Bank_Account_Id: Number(firstOption.value.replace("bank_", "")),
+        Reference_Number: "",
+        Amount: "",
+      });
+    } else {
+      append({
+        Payment_Type: firstOption.value,
+        Bank_Account_Id: null,
+        Reference_Number: "",
+        Amount: "",
+      });
+    }
+  
     setShowSplitBox(true);
   };
 
@@ -540,9 +571,10 @@ console.log(formValues)
                   {!isView && (
                     <button
                       type="button"
-                      onClick={() =>
-                        append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                      }
+                      // onClick={() =>
+                      //   append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                      // }
+                      onClick={handleAddPaymentType}
                       className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
                       style={{ background: "transparent", border: "none" }}
                     >

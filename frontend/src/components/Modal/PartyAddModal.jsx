@@ -6,6 +6,10 @@ import { toast } from "react-toastify";
 import { partyFormSchema } from "../../schema/partyFormSchema";
 import { useAddPartyMutation, useEditPartyMutation } from "../../redux/api/partyAPi";
 import { partyApi } from "../../redux/api/partyAPi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { saleApi } from "../../redux/api/saleApi";
+import { purchaseApi } from "../../redux/api/purchaseApi";
+import { itemApi } from "../../redux/api/itemApi";
 
 const ACCENT = "#4CA1AF";
 
@@ -173,6 +177,10 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
         //onSave(res?.Party_Name);
         onSave(res);
       }
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(saleApi.util.invalidateTags(["Sale"]));
+      dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
     } catch (err) {
       toast.error(err?.data?.message || err?.message || "Something went wrong");
     }

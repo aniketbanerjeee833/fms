@@ -879,8 +879,9 @@ export default function SaleEdit() {
         saleApi.util.invalidateTags(["Sale"])
       );
 
+      
       dispatch(
-        itemApi.util.invalidateTags(["Item"])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -2018,9 +2019,7 @@ export default function SaleEdit() {
                                               Secondary_Unit: it.Secondary_Unit || null,
                                               Conversion_Rate: it.Conversion_Rate || null,
 
-                                              Available_Units: Array.isArray(it.Available_Units)
-                                                ? it.Available_Units
-                                                : [],
+                                             
 
                                             };
                                             return updated;

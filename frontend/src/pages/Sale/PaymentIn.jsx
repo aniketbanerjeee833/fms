@@ -2,13 +2,13 @@
 import { NavLink, useSearchParams } from "react-router-dom";
 
 // import { useGetAllpaymentInDataQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2 } from "lucide-react";
 
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { toast } from "react-toastify";
-import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
@@ -16,6 +16,9 @@ import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bank
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { itemApi } from "../../redux/api/itemApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { useReactToPrint } from "react-to-print";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
+import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 
 
 export default function PaymentIn() {
@@ -80,7 +83,14 @@ export default function PaymentIn() {
         fromDate,
         toDate,
     });
-    console.log(paymentInData, fromDate, toDate);
+    const [printPaymentInId, setPrintPaymentInId] = useState(null);
+    const printRef = useRef(null);
+
+    /* fetch the full payment (with Party details) only when printing */
+    const { data: printData } = useGetPaymentInByIdQuery(printPaymentInId, {
+        skip: !printPaymentInId,
+    });
+    console.log(paymentInData, fromDate, toDate, printData);
     const handleExportExcel = () => {
         const params = new URLSearchParams();
         if (searchTerm) params.set("search", searchTerm);
@@ -99,8 +109,10 @@ export default function PaymentIn() {
         try {
             if (modal.mode === "edit") {
                 await updatePaymentIn({ id: modal.data.id, ...formData }).unwrap();
+                toast.success("Payment In updated");
             } else {
                 await addPaymentIn(formData).unwrap();
+                toast.success("New Payment In added");
             }
             dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
             dispatch(bankAccountApi.util.invalidateTags([
@@ -108,7 +120,7 @@ export default function PaymentIn() {
                 "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
             ]));
             setModal({ open: false, mode: "add", data: null });
-            toast.success("New Payment In added");
+            
         } catch (err) {
             console.error("Failed to save payment in:", err);
             toast.error(err?.data?.message || "Failed to save payment in. Please try again.");
@@ -148,6 +160,19 @@ export default function PaymentIn() {
             );
         }
     };
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: printPaymentInId ? `Receipt-${printPaymentInId}` : "Payment Receipt",
+        onAfterPrint: () => setPrintPaymentInId(null),
+    });
+
+    /* trigger print once data has loaded */
+    useEffect(() => {
+        if (printData?.paymentIn && printPaymentInId) {
+            handlePrint();
+        }
+    }, [printData, printPaymentInId])
     return (
         <>
 
@@ -351,7 +376,7 @@ export default function PaymentIn() {
                                         {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
                                         <th>Delete</th>
-                                        {/* <th>Edit</th> */}
+                                        <th>Print</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -434,6 +459,27 @@ export default function PaymentIn() {
                                                         }
                                                     />
                                                 </td>
+                                                <td>
+                                                    <Printer
+                                                        size={18}
+                                                        style={{
+                                                            cursor: "pointer",
+                                                            color: "#4CA1AF",
+                                                        }}
+                                                        onClick={() => setPrintPaymentInId(paymentIn?.id)}
+                                                    />
+                                                </td>
+                                                {/* <td>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPrintPaymentInId(paymentIn?.id)}
+                                                        className="p-1 rounded-md hover:bg-slate-100 transition-colors"
+                                                        style={{ background: "transparent", border: "none", cursor: "pointer" }}
+                                                        title="Print Receipt"
+                                                    >
+                                                        <Printer size={18} color="#4CA1AF" />
+                                                    </button>
+                                                </td> */}
                                             </tr>
                                         ))
                                     ) : (
@@ -600,6 +646,15 @@ export default function PaymentIn() {
                     isDeleting={isDeleting}
 
                 />
+            )}
+            {printData?.paymentIn && (
+                <div style={{ display: "none" }}>
+                    <PaymentInOutPrintTemplate
+                        ref={printRef}
+                        payment={printData?.paymentIn}
+                        type="in"
+                    />
+                </div>
             )}
 
 

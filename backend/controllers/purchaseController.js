@@ -3187,8 +3187,14 @@ const getSinglePurchase = async (req, res, next) => {
         pu.Terms_Conditions_Id,
         pu.Terms_Conditions_Description,
 
-        p.Party_Name,
-        p.GSTIN,
+       p.*,
+          (
+  SELECT pa.Address_Text
+  FROM add_party_addresses pa
+  WHERE pa.Party_Id = pu.Party_Id
+    AND pa.Address_Type = 'Billing'
+    AND pa.Is_Default = 1
+) AS Billing_Address,
 
         tc.Title AS Terms_Conditions_Title
 
@@ -3618,6 +3624,8 @@ availableUnits = unitCodes.map((unitCode) => {
 
         State_Of_Supply:
           purchaseHeader.State_Of_Supply,
+          State:
+          purchaseHeader.State,
 
         Bill_Number:
           purchaseHeader.Bill_Number,

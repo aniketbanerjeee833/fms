@@ -100,6 +100,7 @@ export default function SaleReturndEdit() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
   const baseSalePriceRef = useRef({});
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -543,7 +544,7 @@ export default function SaleReturndEdit() {
 
           // Store original/base price separately
           baseSalePriceRef.current[index] = baseSalePrice;
-
+          baseSaleUnitRef.current[index] = primaryUnit;
           return {
             ...item,
 
@@ -844,10 +845,9 @@ export default function SaleReturndEdit() {
         ])
       );
 
+      
       dispatch(
-        itemApi.util.invalidateTags([
-          "Item",
-        ])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -1589,6 +1589,7 @@ export default function SaleReturndEdit() {
                                     shouldDirty: true,
                                   });
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1685,7 +1686,14 @@ export default function SaleReturndEdit() {
                                               isExistingItem: true,   // lock category
                                               isHSNLocked: false,      // lock HSN
                                               isUnitLocked: false,     // lock unit
-                                              itemQuantity: it.Stock_Quantity || 0,
+                                              //itemQuantity: it.Stock_Quantity || 0,
+                                              Primary_Unit: it.Primary_Unit || null,
+                                              Secondary_Unit: it.Secondary_Unit || null,
+                                              Conversion_Rate: it.Conversion_Rate || null,
+                                              // ✅ VERY IMPORTANT
+                                              Available_Units: Array.isArray(it.Available_Units)
+                                                ? it.Available_Units
+                                                : [],
                                             };
                                             return updated;
                                           });
@@ -1708,6 +1716,7 @@ export default function SaleReturndEdit() {
                                             }
                                           );
                                           baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+                                           baseSaleUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2043,11 +2052,11 @@ export default function SaleReturndEdit() {
                                     //const roundedPrice = newPrice.toFixed(2);
                                     const basePrice = Number(baseSalePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2058,12 +2067,12 @@ export default function SaleReturndEdit() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2072,11 +2081,46 @@ export default function SaleReturndEdit() {
                                     // Restore original base price.
                                     // =====================================================
 
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
+
+                                    // else {
+                                    //   return;
+                                    // }
+
+                                    // const roundedPrice = newPrice.toFixed(2);
+
+                                      const baseUnit =baseSaleUnitRef.current[i];
+
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
+                                    }
+
+                                    let newPrice;
+
+                                    if (newUnit === baseUnit) {
+                                      // Back to the unit in which the price was entered
+                                      newPrice = basePrice;
+                                    }
+
                                     else if (
-                                      previousUnit === secondaryUnit &&
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+
+                                    else if (
+                                      baseUnit === secondaryUnit &&
                                       newUnit === primaryUnit
                                     ) {
-                                      newPrice = basePrice;
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
                                     }
 
                                     else {
@@ -2084,7 +2128,8 @@ export default function SaleReturndEdit() {
                                     }
 
                                     const roundedPrice = newPrice.toFixed(2);
-
+                                   
+                                   
 
 
 
@@ -2156,6 +2201,7 @@ export default function SaleReturndEdit() {
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
                               baseSalePriceRef.current[i] = Number(val) || 0;
+                               baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
                                 i,

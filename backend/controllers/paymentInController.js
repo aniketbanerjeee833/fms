@@ -863,13 +863,39 @@ const getPaymentInById = async (req, res, next) => {
     connection = await db.getConnection();
     const { id } = req.params;
 
+    // const [[row]] = await connection.query(
+    //   `SELECT pi.*, a.Party_Name
+    //    FROM payment_in pi
+    //    LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+    //    WHERE pi.Id = ?`,
+    //   [id]
+    // );
     const [[row]] = await connection.query(
-      `SELECT pi.*, a.Party_Name
-       FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
-       WHERE pi.Id = ?`,
-      [id]
-    );
+  `
+  SELECT
+    pi.*,
+
+    a.Party_Name,
+    a.GSTIN,
+    a.Phone_Number,
+    a.State,
+
+    pa.Address_Text AS Billing_Address
+
+  FROM payment_in pi
+
+  LEFT JOIN add_party a
+    ON a.Party_Id = pi.Party_Id
+
+  LEFT JOIN add_party_addresses pa
+    ON pa.Party_Id = pi.Party_Id
+    AND pa.Address_Type = 'Billing'
+    AND pa.Is_Default = 1
+
+  WHERE pi.id = ?
+  `,
+  [id]
+);
 
     if (!row) return res.status(404).json({ success: false, message: "Payment In not found" });
 

@@ -638,11 +638,12 @@ export default function AllPurchaseList() {
         <div style={{ display: "none" }}>
           <InvoicePrintTemplate
   ref={printRef}
+  type="purchase"
   invoice={{
     ...printData.billPurchaseDetails,
     items: printData.items || [],
     companyDetails: {},
-    type: "purchase",
+    
   }}
 />
         </div>

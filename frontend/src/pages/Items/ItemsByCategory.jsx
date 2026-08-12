@@ -418,10 +418,10 @@ export default function ItemsByCategory() {
                           key={item.Item_Id}
                           style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          onDoubleClick={() => {
-                            setEditingItem(item);
-                            setShowEditItemModal(true);
-                          }}
+                          // onDoubleClick={() => {
+                          //   setEditingItem(item);
+                          //   setShowEditItemModal(true);
+                          // }}
                         >
                           <td className="py-2 px-3 text-black">{item.Item_Name}</td>
                           <td className="py-2 px-3 text-black">{item.Unit || "—"}</td>

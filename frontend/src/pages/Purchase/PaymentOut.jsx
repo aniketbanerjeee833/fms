@@ -2,11 +2,11 @@
 import { NavLink, useSearchParams } from "react-router-dom";
 
 // import { useGetAllpaymentOutDataQuery } from "../../redux/api/purchaseApi";
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2 } from "lucide-react";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { useState } from "react";
-import { useAddPaymentOutMutation, useDeletePaymentOutMutation, useGetAllPaymentOutsQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useEffect, useRef, useState } from "react";
+import { useAddPaymentOutMutation, useDeletePaymentOutMutation, useGetAllPaymentOutsQuery, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
@@ -14,6 +14,8 @@ import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bank
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { itemApi } from "../../redux/api/itemApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { useReactToPrint } from "react-to-print";
+import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 
 
 export default function PaymentOut() {
@@ -87,6 +89,14 @@ export default function PaymentOut() {
         fromDate,
         toDate,
     });
+
+    const [printPaymentOutId, setPrintPaymentOutId] = useState(null);
+    const printRef = useRef(null);
+
+    /* fetch the full payment (with Party details) only when printing */
+    const { data: printData } = useGetPaymentOutByIdQuery(printPaymentOutId, {
+        skip: !printPaymentOutId,
+    });
     console.log(paymentOutData, fromDate, toDate);
     const handleExportExcel = () => {
         const params = new URLSearchParams();
@@ -126,11 +136,11 @@ export default function PaymentOut() {
 
         try {
             const res = await deletePaymentOut(
-              deleteTarget.Payment_Out_Id
+                deleteTarget.Payment_Out_Id
             ).unwrap();
 
             toast.success(
-              res?.message || "Purchase deleted successfully"
+                res?.message || "Purchase deleted successfully"
             );
 
             setDeleteTarget(null);
@@ -155,6 +165,20 @@ export default function PaymentOut() {
             );
         }
     };
+
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: printPaymentOutId ? `Receipt-${printPaymentOutId}` : "Payment In",
+        onAfterPrint: () => setPrintPaymentOutId(null),
+    });
+
+    /* trigger print once data has loaded */
+    useEffect(() => {
+        if (printData?.paymentOut && printPaymentOutId) {
+            handlePrint();
+        }
+    }, [printData, printPaymentOutId])
     return (
         <>
             {/* // <div className="container-fluid sb2  ">
@@ -367,7 +391,7 @@ export default function PaymentOut() {
                                         {/* <th className="text-left">Balance Due</th> */}
                                         <th>View/Edit</th>
                                         <th>Delete</th>
-                                        {/* <th>Edit</th> */}
+                                        <th>Print</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -483,6 +507,16 @@ export default function PaymentOut() {
 
                                                             })
                                                         }
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <Printer
+                                                        size={18}
+                                                        style={{
+                                                            cursor: "pointer",
+                                                            color: "#4CA1AF",
+                                                        }}
+                                                        onClick={() => setPrintPaymentOutId(paymentOut?.id)}
                                                     />
                                                 </td>
                                             </tr>
@@ -666,7 +700,16 @@ export default function PaymentOut() {
 
                 />
             )}
-        
+              {printData?.paymentOut && (
+                            <div style={{ display: "none" }}>
+                                <PaymentInOutPrintTemplate
+                                    ref={printRef}
+                                    payment={printData?.paymentOut}
+                                    type="out"
+                                />
+                            </div>
+                        )}
+
             {/* {modal.open && (
                 <PaymentOutModal
                     mode={modal.mode}

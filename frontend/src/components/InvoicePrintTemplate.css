@@ -106,8 +106,15 @@
   width: 48%;
 }
 
-.invoice-logo img {
+/* .invoice-logo img {
   width: 220px;
+  height: 75px;
+  object-fit: contain;
+  object-position: left center;
+} */
+
+.invoice-logo img {
+  width: 180px;
   height: 75px;
   object-fit: contain;
   object-position: left center;
@@ -120,7 +127,7 @@
 }
 
 .invoice-company-name {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: bold;
 }
 

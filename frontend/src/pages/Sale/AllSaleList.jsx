@@ -704,11 +704,12 @@ useEffect(() => {
   <div style={{ display: "none" }}>
     <InvoicePrintTemplate
       ref={printRef}
+      type="sale"
       invoice={{
         ...printData.invoicePartyDetails,   // ✅ matches backend response key
         items: printData.items || [],
         companyDetails: {},
-        type: "sale",
+        
       }}
     />
   </div>

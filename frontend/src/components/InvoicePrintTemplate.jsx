@@ -6,17 +6,22 @@ import { forwardRef } from "react";
 import "./InvoicePrintTemplate.css";
 
 // const InvoicePrintTemplate = forwardRef(({ purchase }, ref) => 
-   const InvoicePrintTemplate = forwardRef(({ invoice }, ref) => {
- 
-    
+const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
+
+
   if (!invoice) return null;
 
   const {
     Purchase_Id,
     Bill_Number,
     Bill_Date,
+
+    Sale_Id,
+    Invoice_Number,
+    Invoice_Date,
     Party_Name,
     GSTIN,
+    State,
     Billing_Address,
     State_Of_Supply,
     Total_Amount,
@@ -27,11 +32,32 @@ import "./InvoicePrintTemplate.css";
     items = [],
     companyDetails = {},
   } = invoice;
+  const documentNumber =
+    type === "sale"
+      ? Invoice_Number
+      : Bill_Number;
 
+  const documentDate =
+    type === "sale"
+      ? Invoice_Date
+      : Bill_Date;
   // =========================================================
   // HELPERS
   // =========================================================
+  console.log("invoice", invoice);
+  const stateCodeMap = {
+    "West Bengal": "19",
+    "Haryana": "06",
+    // add the remaining states here
+  };
 
+  const formatState = (state) => {
+    if (!state) return "-";
+
+    const code = stateCodeMap[state.trim()];
+
+    return code ? `${code} - ${state}` : state;
+  };
   const safe = (value, fallback = "") =>
     value !== null && value !== undefined && value !== ""
       ? value
@@ -45,25 +71,25 @@ import "./InvoicePrintTemplate.css";
 
   const formattedDate = Bill_Date
     ? new Date(Bill_Date).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
     : "-";
 
   // =========================================================
   // TAX
   // =========================================================
-const getGstRate = (taxType) => {
-  if (!taxType || taxType === "None") return 0;
-  const match = taxType.match(/GST([\d.]+)/i);
-  return match ? Number(match[1]) : 0;
-};
+  const getGstRate = (taxType) => {
+    if (!taxType || taxType === "None") return 0;
+    const match = taxType.match(/GST([\d.]+)/i);
+    return match ? Number(match[1]) : 0;
+  };
 
-const formatRate = (rate) => {
-  // Avoid "6.00%" — show "6%" for whole numbers, "0.125%" for fractional
-  return Number.isInteger(rate) ? `${rate}%` : `${rate}%`;
-};
+  const formatRate = (rate) => {
+    // Avoid "6.00%" — show "6%" for whole numbers, "0.125%" for fractional
+    return Number.isInteger(rate) ? `${rate}%` : `${rate}%`;
+  };
 
   const getTaxAmount = (item) => Number(item?.Tax_Amount || 0);
 
@@ -232,10 +258,12 @@ const formatRate = (rate) => {
           TITLE
       ===================================================== */}
 
-      <div className="invoice-title">
+      {/* <div className="invoice-title">
         Bill
+      </div> */}
+      <div className="invoice-title">
+        {type === "sale" ? "Tax Invoice" : "Bill"}
       </div>
-
 
       {/* =====================================================
           COMPANY HEADER
@@ -245,10 +273,10 @@ const formatRate = (rate) => {
 
         {/* LOGO */}
         <div className="invoice-logo">
-          {/* <img
-            src="/logo.png"
+          <img 
+            src="/assets/images/anco_logo.png"
             alt="ANCO Innovation"
-          /> */}
+          />
         </div>
 
         {/* COMPANY DETAILS */}
@@ -266,10 +294,12 @@ const formatRate = (rate) => {
             Phone no.: {companyPhone} Email: {companyEmail}
           </div>
 
-          <div>
+          {/* <div>
             GSTIN: {companyGSTIN}, State: 19-West Bengal
+          </div> */}
+          <div>
+            GSTIN: {companyGSTIN}
           </div>
-
         </div>
 
       </div>
@@ -283,13 +313,20 @@ const formatRate = (rate) => {
 
         <thead>
           <tr>
-
+            {/* 
             <th className="invoice-section-header">
               Bill From
             </th>
 
             <th className="invoice-section-header invoice-section-header-right">
               Bill Details
+            </th> */}
+            <th className="invoice-section-header">
+              {type === "sale" ? "Bill To" : "Bill From"}
+            </th>
+
+            <th className="invoice-section-header invoice-section-header-right">
+              {type === "sale" ? "Invoice Details" : "Bill Details"}
             </th>
 
           </tr>
@@ -302,43 +339,101 @@ const formatRate = (rate) => {
 
             <td className="invoice-cell invoice-party-cell">
 
-              <div className="invoice-bold">
-                {safe(Party_Name)}
-              </div>
+              {Party_Name && (
+                <div className="invoice-bold">
+                  {Party_Name}
+                </div>
+              )}
 
-              <div>
-                {safe(Billing_Address)}
-              </div>
+              {Billing_Address && (
+                <div>
+                  {Billing_Address}
+                </div>
+              )}
 
-              <div>
-                GSTIN : {safe(GSTIN)}
-              </div>
+              {GSTIN && (
+                <div>
+                  GSTIN : {GSTIN}
+                </div>
+              )}
 
-              <div>
-                State: {safe(State_Of_Supply, "19-West Bengal")}
-              </div>
+              {State && (
+                <div>
+                  State: {formatState(State)}
+                </div>
+              )}
 
             </td>
 
 
             {/* BILL DETAILS */}
 
-            <td className="invoice-cell invoice-cell-right">
+           <td className="invoice-cell invoice-cell-right">
 
-              <div>
+  {documentNumber && (
+    <div>
+      {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
+      {documentNumber}
+    </div>
+  )}
+
+  {documentDate && (
+    <div>
+      {type === "sale" ? "Invoice Date" : "Date"} :{" "}
+      {new Date(documentDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })}
+    </div>
+  )}
+
+  {State_Of_Supply && (
+    <div>
+      Place of Supply: {formatState(State_Of_Supply)}
+    </div>
+  )}
+
+</td>
+
+
+            {/* BILL DETAILS */}
+
+            {/* <td className="invoice-cell invoice-cell-right">
+
+              {/* <div>
                 Bill No. : {safe(Bill_Number, Purchase_Id)}
               </div>
 
               <div>
                 Date : {formattedDate}
+              </div> 
+              <div>
+                {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
+                {safe(documentNumber)}
               </div>
 
               <div>
-                Place of supply:{" "}
-                {safe(State_Of_Supply, "19-West Bengal")}
+                {type === "sale" ? "Date" : "Date"} :{" "}
+                {documentDate
+                  ? new Date(documentDate).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })
+                  : "-"}
               </div>
 
-            </td>
+              {/* <div>
+                Place of supply:{" "}
+                {safe(State_Of_Supply, "19-West Bengal")}
+              </div> 
+
+              <div>
+                Place of Supply: {formatState(State_Of_Supply)}
+              </div>
+
+            </td> */}
 
           </tr>
         </tbody>
@@ -512,59 +607,59 @@ const formatRate = (rate) => {
             );
           })} */}
           {items.map((item, idx) => {
-  const taxAmount = getTaxAmount(item);
-  const gstRate = getGstRate(item.Tax_Type);
-  const halfRate = gstRate / 2;
+            const taxAmount = getTaxAmount(item);
+            const gstRate = getGstRate(item.Tax_Type);
+            const halfRate = gstRate / 2;
 
-  const itemCgst = taxAmount / 2;
-  const itemSgst = taxAmount / 2;
+            const itemCgst = taxAmount / 2;
+            const itemSgst = taxAmount / 2;
 
-  const isTaxable = gstRate > 0 && taxAmount > 0;
+            const isTaxable = gstRate > 0 && taxAmount > 0;
 
-  return (
-    <tr key={item.Sale_Items_Id || item.Purchase_Items_Id || idx}>
-      <td className="invoice-item-center">{idx + 1}</td>
+            return (
+              <tr key={item.Sale_Items_Id || item.Purchase_Items_Id || idx}>
+                <td className="invoice-item-center">{idx + 1}</td>
 
-      <td className="invoice-item-cell invoice-bold">
-        {safe(item.Item_Name)}
-      </td>
+                <td className="invoice-item-cell invoice-bold">
+                  {safe(item.Item_Name)}
+                </td>
 
-      <td className="invoice-item-cell">
-        {safe(item.Item_HSN)}
-      </td>
+                <td className="invoice-item-cell">
+                  {safe(item.Item_HSN)}
+                </td>
 
-      {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
-      <td className="invoice-item-right">
-        {money(item.Quantity)}
-        {item.Selected_Unit ? ` ${item.Selected_Unit}` : item.Item_Unit ? ` ${item.Item_Unit}` : ""}
-      </td>
+                {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
+                <td className="invoice-item-right">
+                  {money(item.Quantity)}
+                  {item.Selected_Unit ? ` ${item.Selected_Unit}` : item.Item_Unit ? ` ${item.Item_Unit}` : ""}
+                </td>
 
-      <td className="invoice-item-right">
-        ₹ {money(item.Purchase_Price ?? item.Sale_Price)}
-      </td>
+                <td className="invoice-item-right">
+                  ₹ {money(item.Purchase_Price ?? item.Sale_Price)}
+                </td>
 
-      <td className="invoice-item-right">
-        ₹ {money(item.Amount)}
-      </td>
+                <td className="invoice-item-right">
+                  ₹ {money(item.Amount)}
+                </td>
 
-      {/* CGST — this item's own half-rate, not a shared 9% */}
-      <td className="invoice-item-right">
-        ₹ {money(itemCgst)}
-        {isTaxable ? ` (${formatRate(halfRate)})` : ""}
-      </td>
+                {/* CGST — this item's own half-rate, not a shared 9% */}
+                <td className="invoice-item-right">
+                  ₹ {money(itemCgst)}
+                  {isTaxable ? ` (${formatRate(halfRate)})` : ""}
+                </td>
 
-      {/* SGST */}
-      <td className="invoice-item-right">
-        ₹ {money(itemSgst)}
-        {isTaxable ? ` (${formatRate(halfRate)})` : ""}
-      </td>
+                {/* SGST */}
+                <td className="invoice-item-right">
+                  ₹ {money(itemSgst)}
+                  {isTaxable ? ` (${formatRate(halfRate)})` : ""}
+                </td>
 
-      <td className="invoice-item-right">
-        ₹ {money(item.Amount)}
-      </td>
-    </tr>
-  );
-})}
+                <td className="invoice-item-right">
+                  ₹ {money(item.Amount)}
+                </td>
+              </tr>
+            );
+          })}
 
 
           {/* =================================================
@@ -727,8 +822,8 @@ const formatRate = (rate) => {
 
               <tr>
 
-                <td className="invoice-summary-cell">
-                  Paid
+                  <td className="invoice-summary-cell">
+                  {type === "sale" ? "Received" : "Paid"}
                 </td>
 
                 <td className="invoice-summary-cell-right">
@@ -809,13 +904,13 @@ const formatRate = (rate) => {
             ) : (
 
               <>
-                <div>
+                {/* <div>
                   1. Goods once sold cannot be taken back or exchange.
                 </div>
 
                 <div>
                   2. All disputes are subject to Kolkata jurisdiction.
-                </div>
+                </div> */}
               </>
 
             )}

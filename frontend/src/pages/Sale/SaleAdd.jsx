@@ -649,8 +649,9 @@ export default function SaleAdd() {
       // CACHE INVALIDATION
       // =======================================================
 
+      
       dispatch(
-        itemApi.util.invalidateTags(["Item"])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(

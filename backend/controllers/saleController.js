@@ -2938,12 +2938,21 @@ const getSingleSale = async (req, res, next) => {
     if (!saleId) {
       return res.status(400).json({ success: false, message: "Sale ID is required." });
     }
-
+//  p.Party_Name,
+//      p.GSTIN,
+//    (
+    //   SELECT pa.Address_Text
+    //   FROM add_party_addresses pa
+    //   WHERE pa.Party_Id = s.Party_Id
+    //     AND pa.Address_Type = 'Billing'
+    //   ORDER BY pa.Is_Default DESC, pa.id ASC
+    //   LIMIT 1
+    // ) AS Billing_Address,
     const isSaleForItemSale = saleId.startsWith("SALS");
     // const salesTable    = isSaleForItemSale ? "add_new_sale"       : "add_sale";
     // const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
     // const itemTable     = isSaleForItemSale ? "add_item_sale"      : "add_item";
-
+ 
     const salesTable = isSaleForItemSale ? "add_sale" : "add_sale";
     const saleItemTable = isSaleForItemSale ? "add_sale_items" : "add_sale_items";
     const itemTable = isSaleForItemSale ? "add_item" : "add_item";
@@ -2968,8 +2977,16 @@ const getSingleSale = async (req, res, next) => {
      s.Terms_Conditions_Description,
 
      -- Party master
-     p.Party_Name,
-     p.GSTIN,
+        p.*,
+    
+    (
+  SELECT pa.Address_Text
+  FROM add_party_addresses pa
+  WHERE pa.Party_Id = s.Party_Id
+    AND pa.Address_Type = 'Billing'
+    AND pa.Is_Default = 1
+) AS Billing_Address,
+
 
      -- Title only exists when this invoice is linked
      -- to a master Terms & Conditions template
@@ -3260,6 +3277,7 @@ const getSingleSale = async (req, res, next) => {
         Billing_Address: saleHeader.Billing_Address,
         GSTIN: saleHeader.GSTIN,
         State_Of_Supply: saleHeader.State_Of_Supply,
+        State: saleHeader.State,
         //Reference_Number: saleHeader.Reference_Number,
         Payment_Type_Display,
         Invoice_Number: saleHeader.Invoice_Number,

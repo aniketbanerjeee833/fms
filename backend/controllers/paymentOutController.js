@@ -521,13 +521,39 @@ const getPaymentOutById = async (req, res, next) => {
     connection = await db.getConnection();
     const { id } = req.params;
 
-    const [[row]] = await connection.query(
-      `SELECT po.*, a.Party_Name
-       FROM payment_out po
-       LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
-       WHERE po.id = ?`,
-      [id]
-    );
+    // const [[row]] = await connection.query(
+    //   `SELECT po.*, a.Party_Name
+    //    FROM payment_out po
+    //    LEFT JOIN add_party a ON a.Party_Id = po.Party_Id
+    //    WHERE po.id = ?`,
+    //   [id]
+    // );
+        const [[row]] = await connection.query(
+  `
+  SELECT
+    po.*,
+
+    a.Party_Name,
+    a.GSTIN,
+    a.Phone_Number,
+    a.State,
+
+    pa.Address_Text AS Billing_Address
+
+  FROM payment_out po
+
+  LEFT JOIN add_party a
+    ON a.Party_Id = po.Party_Id
+
+  LEFT JOIN add_party_addresses pa
+    ON pa.Party_Id = po.Party_Id
+    AND pa.Address_Type = 'Billing'
+    AND pa.Is_Default = 1
+
+  WHERE po.id = ?
+  `,
+  [id]
+);
 
     if (!row) return res.status(404).json({ success: false, message: "Payment Out not found" });
 

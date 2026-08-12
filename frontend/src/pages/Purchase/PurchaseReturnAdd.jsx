@@ -55,6 +55,7 @@ export default function PurchaseReturnAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
   const basePurchasePriceRef = useRef({});
+  const basePurchaseUnitRef = useRef({});
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
@@ -525,7 +526,7 @@ export default function PurchaseReturnAdd() {
 
           // Store original/base price separately
           basePurchasePriceRef.current[index] = basePurchasePrice;
-
+            basePurchaseUnitRef.current[index] = primaryUnit;
           return {
             ...item,
 
@@ -970,10 +971,9 @@ export default function PurchaseReturnAdd() {
         ])
       );
 
+      
       dispatch(
-        itemApi.util.invalidateTags([
-          "Item",
-        ])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -1801,6 +1801,7 @@ export default function PurchaseReturnAdd() {
                                     }
                                   );
                                   basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
+                                  basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1922,6 +1923,7 @@ export default function PurchaseReturnAdd() {
                                             }
                                           );
                                           basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
+                                          basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2237,13 +2239,13 @@ export default function PurchaseReturnAdd() {
                                     // }
 
                                     //const roundedPrice = newPrice.toFixed(2);
-                                    const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
+                                     const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2254,12 +2256,12 @@ export default function PurchaseReturnAdd() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2268,11 +2270,47 @@ export default function PurchaseReturnAdd() {
                                     // Restore original base price.
                                     // =====================================================
 
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
+
+                                    // else {
+                                    //   return;
+                                    // }
+
+                                    // const roundedPrice = newPrice.toFixed(2);
+
+
+                                     const baseUnit =basePurchaseUnitRef.current[i];
+
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
+                                    }
+
+                                    let newPrice;
+
+                                    if (newUnit === baseUnit) {
+                                      // Back to the unit in which the price was entered
+                                      newPrice = basePrice;
+                                    }
+
                                     else if (
-                                      previousUnit === secondaryUnit &&
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+
+                                    else if (
+                                      baseUnit === secondaryUnit &&
                                       newUnit === primaryUnit
                                     ) {
-                                      newPrice = basePrice;
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
                                     }
 
                                     else {
@@ -2358,6 +2396,7 @@ export default function PurchaseReturnAdd() {
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
                               basePurchasePriceRef.current[i] = Number(val) || 0;
+                              basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
                               // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                               //   return;

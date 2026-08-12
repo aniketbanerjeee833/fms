@@ -127,10 +127,40 @@ export default function PaymentInModal({
   };
 
   // splits.0 already holds whatever was picked in single mode — just add a blank row
+  // const handleAddPaymentType = () => {
+  //   append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+  //   setShowSplitBox(true);
+  // };
   const handleAddPaymentType = () => {
-    append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
-    setShowSplitBox(true);
-  };
+  const newIndex = fields.length;
+
+  const availableOptions = getAvailableOptions(newIndex);
+
+  if (availableOptions.length === 0) {
+    toast.info("No more payment types are available.");
+    return;
+  }
+
+  const firstOption = availableOptions[0];
+
+  if (firstOption.value.startsWith("bank_")) {
+    append({
+      Payment_Type: "Bank",
+      Bank_Account_Id: Number(firstOption.value.replace("bank_", "")),
+      Reference_Number: "",
+      Amount: "",
+    });
+  } else {
+    append({
+      Payment_Type: firstOption.value,
+      Bank_Account_Id: null,
+      Reference_Number: "",
+      Amount: "",
+    });
+  }
+
+  setShowSplitBox(true);
+};
 
   const [showPartyModal, setShowPartyModal] = useState(false);
   const wrapperRef = useRef(null);
@@ -210,6 +240,8 @@ export default function PaymentInModal({
 
     onSave(payload);
   };
+const formValues=watch()  
+  console.log("Form values:", formValues);
   console.log("Form errors:", errors);
   return (
     <div
@@ -546,9 +578,10 @@ export default function PaymentInModal({
                   {!isView && (
                     <button
                       type="button"
-                      onClick={() =>
-                        append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                      }
+                      // onClick={() =>
+                      //   append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                      // }
+                       onClick={handleAddPaymentType}
                       className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
                       style={{ background: "transparent", border: "none" }}
                     >
