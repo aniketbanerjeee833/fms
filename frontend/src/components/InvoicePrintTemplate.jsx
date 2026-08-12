@@ -26,6 +26,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     State_Of_Supply,
     Total_Amount,
     Total_Paid,
+    Total_Received,
     Balance_Due,
     Payment_Type_Display,
     Terms_Conditions_Description,
@@ -69,13 +70,13 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       maximumFractionDigits: 2,
     });
 
-  const formattedDate = Bill_Date
-    ? new Date(Bill_Date).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-    : "-";
+  // const formattedDate = Bill_Date
+  //   ? new Date(Bill_Date).toLocaleDateString("en-IN", {
+  //     day: "2-digit",
+  //     month: "2-digit",
+  //     year: "numeric",
+  //   })
+  //   : "-";
 
   // =========================================================
   // TAX
@@ -94,11 +95,29 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const getTaxAmount = (item) => Number(item?.Tax_Amount || 0);
 
   console.log("items", items);
+  const taxGroups = {};
+  items.forEach((item) => {
+    const gstRate  = getGstRate(item.Tax_Type);
+    const taxAmt   = Number(item.Tax_Amount || 0);
+    const halfRate = gstRate / 2;
+    const key      = String(halfRate); // "2.5", "9", "6" etc.
 
-  const totalTax = items.reduce(
-    (sum, item) => sum + getTaxAmount(item),
-    0
-  );
+    if (!taxGroups[key]) {
+      taxGroups[key] = { halfRate, taxable: 0, cgst: 0, sgst: 0 };
+    }
+    taxGroups[key].taxable += Number(item.Amount || 0) - taxAmt;
+    taxGroups[key].cgst    += taxAmt / 2;
+    taxGroups[key].sgst    += taxAmt / 2;
+  });
+
+  const taxGroupList = Object.values(taxGroups).filter((g) => g.halfRate > 0);
+  const totalTax     = items.reduce((s, i) => s + Number(i.Tax_Amount || 0), 0);
+  const cgstTotal    = totalTax / 2;
+  const sgstTotal    = totalTax / 2;
+  // const totalTax = items.reduce(
+  //   (sum, item) => sum + getTaxAmount(item),
+  //   0
+  // );
 
   const cgst = totalTax / 2;
   const sgst = totalTax / 2;
@@ -273,7 +292,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
         {/* LOGO */}
         <div className="invoice-logo">
-          <img 
+          <img
             src="/assets/images/anco_logo.png"
             alt="ANCO Innovation"
           />
@@ -368,33 +387,33 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             {/* BILL DETAILS */}
 
-           <td className="invoice-cell invoice-cell-right">
+            <td className="invoice-cell invoice-cell-right">
 
-  {documentNumber && (
-    <div>
-      {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
-      {documentNumber}
-    </div>
-  )}
+              {documentNumber && (
+                <div>
+                  {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
+                  {documentNumber}
+                </div>
+              )}
 
-  {documentDate && (
-    <div>
-      {type === "sale" ? "Invoice Date" : "Date"} :{" "}
-      {new Date(documentDate).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })}
-    </div>
-  )}
+              {documentDate && (
+                <div>
+                  {type === "sale" ? "Invoice Date" : "Date"} :{" "}
+                  {new Date(documentDate).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </div>
+              )}
 
-  {State_Of_Supply && (
-    <div>
-      Place of Supply: {formatState(State_Of_Supply)}
-    </div>
-  )}
+              {State_Of_Supply && (
+                <div>
+                  Place of Supply: {formatState(State_Of_Supply)}
+                </div>
+              )}
 
-</td>
+            </td>
 
 
             {/* BILL DETAILS */}
@@ -721,219 +740,279 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       {/* =====================================================
           TAX DETAILS + AMOUNTS
       ===================================================== */}
+      <div className="grid grid-cols-2  invoice-bottom-grid  ">
+        <div className="invoice-bottom-left">
 
-      <div className="invoice-summary">
+          {/* <div className="invoice-summary"> */}
 
-        {/* ===================================================
-            TAX DETAILS
-        =================================================== */}
+      
 
-        <div className="invoice-summary-column">
+          <div className="invoice-summary-column w-full">
 
-          <div className="invoice-summary-header-row">
-
-            <div className="invoice-summary-header-title">
-              Tax details
-            </div>
-
-            <div className="invoice-summary-header-value">
-              {totalTax > 0 ? "9%" : ""}
-            </div>
-
-          </div>
+           
 
 
-          <table className="invoice-summary-table">
+            {/* <table className="invoice-summary-table">
 
-            <tbody>
+              <tbody>
+                <tr>
+                  <td className="invoice-summary-cell">
+                    Tax Details
+                  </td>
 
-              <tr>
+                  <td className="invoice-summary-cell-right">
+                    {totalTax > 0 ? "9%" : ""}
+                  </td>
 
-                <td className="invoice-summary-cell">
-                  CGST
-                </td>
-
-                <td className="invoice-summary-cell-right">
-                  ₹ {money(cgst)}
-                </td>
-
-              </tr>
-
-
-              <tr>
-
-                <td className="invoice-summary-cell">
-                  SGST
-                </td>
-
-                <td className="invoice-summary-cell-right">
-                  ₹ {money(sgst)}
-                </td>
-
-              </tr>
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-
-        {/* ===================================================
-            AMOUNTS
-        =================================================== */}
-
-        <div className="invoice-summary-column">
-
-          <div className="invoice-summary-header">
-            Amounts
-          </div>
-
-
-          <table className="invoice-summary-table">
-
-            <tbody>
-
-              <tr>
-
-                <td className="invoice-summary-cell">
-                  Sub Total
-                </td>
-
-                <td className="invoice-summary-cell-right">
-                  ₹ {money(Total_Amount)}
-                </td>
-
-              </tr>
-
-
-              <tr>
-
-                <td className="invoice-summary-cell invoice-bold">
-                  Total
-                </td>
-
-                <td className="invoice-summary-cell-right invoice-bold">
-                  ₹ {money(Total_Amount)}
-                </td>
-
-              </tr>
-
-
-              <tr>
+                </tr>
+                <tr>
 
                   <td className="invoice-summary-cell">
-                  {type === "sale" ? "Received" : "Paid"}
-                </td>
+                    CGST
+                  </td>
 
-                <td className="invoice-summary-cell-right">
-                  ₹ {money(Total_Paid)}
-                </td>
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(cgst)}
+                  </td>
 
-              </tr>
+                </tr>
 
 
+                <tr>
+
+                  <td className="invoice-summary-cell">
+                    SGST
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(sgst)}
+                  </td>
+
+                </tr>
+
+              </tbody>
+
+            </table> */}
+               <table className="invoice-summary-table" style={{ width: "100%" }}>
+            <thead>
               <tr>
-
-                <td className="invoice-summary-cell">
-                  Balance
-                </td>
-
-                <td className="invoice-summary-cell-right">
-                  ₹ {money(Balance_Due)}
-                </td>
-
+                <td className="invoice-summary-cell">Tax Details</td>
+                {taxGroupList.map((g) => (
+                  <td key={g.halfRate} className="invoice-summary-cell-right">
+                    {g.halfRate}%
+                  </td>
+                ))}
+                {/* overall total column when more than one rate */}
+                {/* {taxGroupList.length > 1 && (
+                  <td className="invoice-summary-cell-right invoice-bold">
+                  
+                  </td>
+                )} */}
               </tr>
-
+            </thead>
+            <tbody>
+              <tr>
+                <td className="invoice-summary-cell">CGST</td>
+                {taxGroupList.map((g) => (
+                  <td key={g.halfRate} className="invoice-summary-cell-right">
+                    ₹ {money(g.cgst)}
+                  </td>
+                ))}
+                {/* {taxGroupList.length > 1 && (
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(cgstTotal)}
+                  </td>
+                )} */}
+              </tr>
+              <tr>
+                <td className="invoice-summary-cell">SGST</td>
+                {taxGroupList.map((g) => (
+                  <td key={g.halfRate} className="invoice-summary-cell-right">
+                    ₹ {money(g.sgst)}
+                  </td>
+                ))}
+                {/* {taxGroupList.length > 1 && (
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(sgstTotal)}
+                  </td>
+                )} */}
+              </tr>
             </tbody>
-
           </table>
 
-        </div>
-
-      </div>
+            {/* </div> */}
 
 
-      {/* =====================================================
-          BILL AMOUNT IN WORDS
-      ===================================================== */}
-
-      <div>
-
-        <div className="invoice-words-header">
-          Bill Amount In Words
-        </div>
-
-        <div className="invoice-words">
-          {amountInWords}
-        </div>
-
-      </div>
 
 
-      {/* =====================================================
-          TERMS + SIGNATURE
-      ===================================================== */}
-
-      <div className="invoice-bottom">
-
-        {/* ===================================================
-            TERMS
-        =================================================== */}
-
-        <div>
-
-          <div className="invoice-terms-header">
-            Terms and Conditions
           </div>
 
 
-          <div className="invoice-terms-body">
 
-            {terms.length > 0 ? (
+          <div>
 
-              terms.map((term, index) => (
+            <div className="invoice-words-header">
+              Bill Amount In Words
+            </div>
 
-                <div key={index}>
-                  {index + 1}.{" "}
-                  {term.replace(/^\d+\.\s*/, "")}
-                </div>
+            <div className="invoice-words">
+              {amountInWords}
+            </div>
 
-              ))
+          </div>
 
-            ) : (
 
-              <>
-                {/* <div>
+          
+
+
+          <div>
+
+            <div className="invoice-terms-header">
+              Terms and Conditions
+            </div>
+
+
+            <div className="invoice-terms-body">
+
+              {terms.length > 0 ? (
+
+                terms.map((term, index) => (
+
+                  <div key={index}>
+                    {index + 1}.{" "}
+                    {term.replace(/^\d+\.\s*/, "")}
+                  </div>
+
+                ))
+
+              ) : (
+
+                <>
+                  {/* <div>
                   1. Goods once sold cannot be taken back or exchange.
                 </div>
 
                 <div>
                   2. All disputes are subject to Kolkata jurisdiction.
                 </div> */}
-              </>
+                </>
 
-            )}
+              )}
+
+            </div>
 
           </div>
-
+      
         </div>
 
-
-        {/* ===================================================
-            SIGNATURE
+       
+       <div className="invoice-bottom-right">
+          {/* ===================================================
+            AMOUNTS
         =================================================== */}
 
-        <div className="invoice-signature">
+          <div className="invoice-summary-column">
 
-          <div className="invoice-signature-company">
-            For : {companyName}
+            <div className="invoice-summary-header">
+              Amounts
+            </div>
+
+
+            <table className="invoice-summary-table">
+
+              <tbody>
+
+                <tr>
+
+                  <td className="invoice-summary-cell">
+                    Sub Total
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(Total_Amount)}
+                  </td>
+
+                </tr>
+
+
+                {/* <tr>
+
+                  <td className="invoice-summary-cell invoice-bold">
+                    Total
+                  </td>
+
+                  <td className="invoice-summary-cell-right invoice-bold">
+                    ₹ {money(Total_Amount)}
+                  </td>
+
+                </tr>
+
+
+                <tr>
+
+                  <td className="invoice-summary-cell">
+                    {type === "sale" ? "Received" : "Paid"}
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(Total_Paid)}
+                  </td>
+
+                </tr> */}
+                <tr>
+                  <td className="invoice-summary-cell">
+                    <div className="invoice-bold">
+                      Total
+                    </div>
+                    <div>
+                      {type === "sale" ? "Received" : "Paid"}
+                    </div>
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    <div className="invoice-bold">
+                      ₹ {money(Total_Amount)}
+                    </div>
+                    {/* <div>
+                      ₹ {money(Total_Paid)}
+                    </div> */}
+                     <div>
+                      {type === "sale" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
+                    </div>
+                  </td>
+                </tr>
+
+                <tr>
+
+                  <td className="invoice-summary-cell">
+                    Balance
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    ₹ {money(Balance_Due)}
+                  </td>
+
+                </tr>
+
+              </tbody>
+
+            </table>
+
           </div>
+           {/* ===================================================
+            SIGNATURE
+        =================================================== */}
+          <div className="invoice-signature">
 
-          <div className="invoice-signature-authorized">
-            Authorized Signatory
+            <div className="invoice-signature-company">
+              For : {companyName}
+            </div>
+
+            <div className="invoice-signature-authorized">
+              Authorized Signatory
+            </div>
+
           </div>
-
         </div>
 
       </div>

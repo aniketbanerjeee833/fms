@@ -1529,6 +1529,10 @@ const addSale = async (req, res, next) => {
     // so payment_splits/bank_transactions/cash_transactions stay
     // consistent with add_sale.Total_Received.
     // =========================================================
+console.log("🔍 BEFORE INSERT PAYMENT SPLITS");
+console.log("saleIdNumber:", saleIdNumber);
+console.log("newSaleId:", newSaleId);
+console.log("validSplits:", JSON.stringify(validSplits, null, 2));
 
     if (validSplits.length > 0) {
       await insertPaymentSplits({
@@ -3255,7 +3259,10 @@ const getSingleSale = async (req, res, next) => {
        ORDER BY ps.id ASC`,
       [saleHeader.id]   // numeric id — add to SELECT if not already there
     );
-
+console.log("🔍 SALE SPLIT DEBUG");
+console.log("saleId param:", saleId);
+console.log("saleHeader.id:", saleHeader.id);
+console.log("splits:", splits);
     // build a display summary for the header (e.g. "Cash + HDFC")
     const splitLabels = splits.map((s) =>
       s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type

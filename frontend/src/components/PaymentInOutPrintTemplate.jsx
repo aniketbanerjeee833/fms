@@ -278,15 +278,15 @@ const PaymentInOutPrintTemplate = forwardRef(({ payment, type = "in" }, ref) => 
     console.log("companyDetails", companyDetails);
     const companyName = companyDetails?.name || "ANCO Innovation";
     const companyAddress = companyDetails?.address || "348/103/1, Netaji Subhas Chandra Bose Road, Naktala, Kolkata 700047.";
-       const companyPhone   = companyDetails?.phone   || "9831166989";
-     const companyEmail   = companyDetails?.email   || "sales@ancoinnovation.com";
+    const companyPhone = companyDetails?.phone || "9831166989";
+    const companyEmail = companyDetails?.email || "sales@ancoinnovation.com";
     //   const companyGSTIN   = companyDetails?.gstin   || "";
     //   const companyState=   companyDetails?.state   || "";
 
     //const companyPhone = companyDetails?.phone || "";
     //const companyEmail = companyDetails?.email || "";
     const companyGSTIN = companyDetails?.gstin || "19AOQPG1954B1ZY";
-    const companyState = companyDetails?.state || "19-West Bengal";
+    //const companyState = companyDetails?.state || "19-West Bengal";
 
 
     /* ── payment method label ── */
@@ -385,7 +385,28 @@ const PaymentInOutPrintTemplate = forwardRef(({ payment, type = "in" }, ref) => 
             </table>
 
             {/* AMOUNTS */}
-            <table className="receipt-table">
+            <div className="receipt-bottom-grid">
+                <div className="receipt-bottom-left">
+
+                    <table className="receipt-table">
+                        <thead>
+                            <tr>
+                                <th className="receipt-section-header receipt-text-center">
+                                    Amount in words
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td className="receipt-words-body">{amountInWords}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* AMOUNT IN WORDS */}
+                <div className="receipt-bottom-right">
+                    {/* <table className="receipt-table">
                 <thead>
                     <tr>
                         <th className="receipt-section-header receipt-w70">Amounts</th>
@@ -402,8 +423,64 @@ const PaymentInOutPrintTemplate = forwardRef(({ payment, type = "in" }, ref) => 
                         </td>
                     </tr>
 
-                    {/* show split breakdown if multiple payment methods */}
-                    {/* {splits?.length > 1 && splits.map((s, i) => (
+               
+                </tbody>
+            </table> */}
+                    <div className="receipt-amounts">
+
+                        <div className="receipt-amounts-header">
+                            <div>Amounts</div>
+                        </div>
+
+                        <div className="receipt-amount-row">
+                            <div className="receipt-amount-label">
+                                {type === "in" ? "Received" : "Paid"}
+                            </div>
+
+                            <div className="receipt-amount-value">
+                                ₹ {money(amount)}
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+            {/* SIGNATURE — left blank, right authorized signatory */}
+            {/* <table className="receipt-table">
+                <tbody>
+                    <tr>
+                        <td className="receipt-sig-left receipt-w50"></td>
+                        <td className="receipt-sig-right receipt-w50">
+                            <div>For : {companyName}</div>
+                            <div className="receipt-sig-space" />
+                            <div className="receipt-bold">Authorized Signatory</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table> */}
+
+            <div className="receipt-signature-row">
+                <div className="receipt-signature-left"></div>
+
+                <div className="receipt-signature-right">
+                    <div>For : {companyName}</div>
+
+                    <div className="receipt-signature-authorized">
+                        Authorized Signatory
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    );
+});
+
+export default PaymentInOutPrintTemplate;
+
+{/* show split breakdown if multiple payment methods */ }
+{/* {splits?.length > 1 && splits.map((s, i) => (
             <tr key={i}>
               <td className="receipt-cell receipt-indent">
                 {s.Payment_Type === "Bank"
@@ -416,41 +493,3 @@ const PaymentInOutPrintTemplate = forwardRef(({ payment, type = "in" }, ref) => 
               </td>
             </tr>
           ))} */}
-                </tbody>
-            </table>
-
-            {/* AMOUNT IN WORDS */}
-            <table className="receipt-table">
-                <thead>
-                    <tr>
-                        <th className="receipt-section-header receipt-text-center">
-                            Amount in words
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td className="receipt-words-body">{amountInWords}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            {/* SIGNATURE — left blank, right authorized signatory */}
-            <table className="receipt-table">
-                <tbody>
-                    <tr>
-                        <td className="receipt-sig-left receipt-w50"></td>
-                        <td className="receipt-sig-right receipt-w50">
-                            <div>For : {companyName}</div>
-                            <div className="receipt-sig-space" />
-                            <div className="receipt-bold">Authorized Signatory</div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-
-        </div>
-    );
-});
-
-export default PaymentInOutPrintTemplate;

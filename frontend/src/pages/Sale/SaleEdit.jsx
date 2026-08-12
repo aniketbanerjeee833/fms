@@ -113,7 +113,7 @@ export default function SaleEdit() {
     });
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+  //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
   const [activeItemRow, setActiveItemRow] = useState(null);
   // find this line in your code and add refetch:
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
@@ -609,6 +609,7 @@ export default function SaleEdit() {
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
+  console.log(totalReceived)
   const paymentType = watch("splits.0.Payment_Type");
 
   useEffect(() => {
@@ -3420,11 +3421,11 @@ export default function SaleEdit() {
 
             await refetchItems();
 
-            setNewlyAddedItem(savedItem);
+            // setNewlyAddedItem(savedItem);
 
-            setTimeout(() => {
-              setNewlyAddedItem(null);
-            }, 8000);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
             setShowItemAddModal(false);
 

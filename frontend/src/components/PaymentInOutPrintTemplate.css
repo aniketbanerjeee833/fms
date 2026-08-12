@@ -120,57 +120,172 @@
   border: 1px solid #777;
   border-top: none;
 }
+/* =========================================================
+   BOTTOM LEFT + RIGHT
+========================================================= */
 
-/* ── SIGNATURE ── */
-.receipt-sig-left {
-  padding: 16px 10px 20px;
-  border: 1px solid #777;
-  border-top: none;
-  min-height: 80px;
-  vertical-align: bottom;
+.receipt-bottom-grid {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  align-items: stretch;
+  width: 100%;
 }
 
-.receipt-sig-right {
-  padding: 16px 10px 12px;
+.receipt-bottom-left,
+.receipt-bottom-right {
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.receipt-bottom-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.receipt-bottom-right {
+  display: flex;
+  flex-direction: column;
+}
+.receipt-amounts {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.receipt-print .receipt-amounts .receipt-amounts-header {
+  background-color: #0b7fa3 !important;
+  color: #ffffff !important;
+
+  padding: 6px;
+  border: 1px solid #777;
+
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.receipt-print .receipt-amounts .receipt-amounts-header > div {
+  color: #ffffff !important;
+}
+
+
+.receipt-amount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 6px;
+  margin: 0;
+
   border: 1px solid #777;
   border-top: none;
-  border-left: none;
+
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* .receipt-amount-label {
+  text-align: left;
+}
+
+.receipt-amount-value {
   text-align: right;
-  vertical-align: bottom;
-  min-height: 80px;
+} */
+ 
+.receipt-amount-label,
+.receipt-amount-value {
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+.receipt-signature-row {
+  width: 100%;
+  display: flex;
+  border: 1px solid #777;
+  min-height: 150px;
+  box-sizing: border-box;
 }
 
-.receipt-sig-space {
-  height: 50px;
+.receipt-signature-left {
+  width: 50%;
 }
 
+.receipt-signature-right {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.receipt-signature-authorized {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
 /* ── PRINT ── */
 @media print {
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  html, body {
+  html,
+  body {
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
   }
 
   .receipt-print {
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    padding: 8mm;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 8mm !important;
+    box-sizing: border-box !important;
     background: white !important;
+
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
+  /* BLUE HEADERS */
+
   .receipt-section-header,
-  .receipt-section-header-right {
+  .receipt-section-header-right,
+  .receipt-amounts-header {
+    background-color: #0b7fa3 !important;
+    color: #ffffff !important;
+
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* AMOUNTS TEXT */
+
+  .receipt-amounts-header,
+  .receipt-amounts-header > div {
+    color: #ffffff !important;
+  }
+
+  /* BOTTOM GRID */
+
+  .receipt-bottom-grid {
+    display: grid !important;
+    grid-template-columns: 50% 50% !important;
+    align-items: stretch !important;
+  }
+
+  .receipt-bottom-left,
+  .receipt-bottom-right {
+    height: 100% !important;
+  }
+
+  /* SIGNATURE */
+
+  .receipt-signature-row {
+    display: flex !important;
   }
 
   @page {
