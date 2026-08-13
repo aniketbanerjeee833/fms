@@ -953,7 +953,8 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   flex: 1,
                   //minHeight: "100%",
                   //height: "65px",
-                  height: "90px"
+                  //height: "90px"
+                  height: "100%"
                 }}
               />
             )}
@@ -1070,7 +1071,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
         </div>
 
       </div>
-      <div className="grid grid-cols-2 w-full">
+      <div className="grid grid-cols-2">
 
         {terms.length > 0 && (
           <div>
@@ -1092,6 +1093,13 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
           className={`invoice-signature ${terms.length === 0 ? "col-span-2" : ""
             }`}
         >
+          <div className="invoice-signature-company">
+            For : {companyName}
+          </div>
+
+          <div className="invoice-signature-authorized">
+            Authorized Signatory
+          </div>
           <div className="invoice-signature-company">
             For : {companyName}
           </div>

@@ -402,10 +402,10 @@
    TERMS + SIGNATURE
 ========================================================= */
 
-.invoice-bottom {
+/* .invoice-bottom {
   display: grid;
   grid-template-columns: 50% 50%;
-}
+} */
 
 .invoice-terms-header {
   background-color: #0b7fa3 !important;

@@ -1216,18 +1216,18 @@ export default function SaleEdit() {
                               );
                               setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
                               setCurrentPartyDetails(matchedParty);
-                              setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
                               setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
                             } else {
                               // typed value doesn't match any known party — treat as new, clear stale data
-                              setValue("Phone_Number", "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
 
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
                               setValue("Billing_Address", "", { shouldValidate: true, shouldDirty: true });
@@ -1248,10 +1248,10 @@ export default function SaleEdit() {
 
                               if (matchedParty) {
                                 setPartySearch(matchedParty.Party_Name);
-                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
@@ -1296,7 +1296,7 @@ export default function SaleEdit() {
                                 key={i}
                                 onClick={() => {
                                   setPartySearch(party.Party_Name);
-                                  setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
+                                  //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
                                   setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
                                   setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
                                   const defaultBilling = party.addresses?.find(
@@ -1401,7 +1401,7 @@ export default function SaleEdit() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                   {/* Phone Number — compact inline label+input */}
 
-                  <div className="flex flex-col gap-2">
+                  {/* <div className="flex flex-col gap-2">
 
                     <span className="whitespace-nowrap active">Phone Number</span>
                     <input
@@ -1417,7 +1417,7 @@ export default function SaleEdit() {
                     {errors?.Phone_Number && (
                       <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
                     )}
-                  </div>
+                  </div> */}
 
                   {/* GSTIN — compact inline label+input, pinned to top */}
                   {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
@@ -1434,12 +1434,8 @@ export default function SaleEdit() {
                       readOnly
                     />
                   </div>)}
-                  {/* {errors?.GSTIN && (
-                                  <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
-                                )} */}
-                </div>
-
-                {/* ── ROW 2: Billing Address + GSTIN ── */}
+                 
+                                  {/* ── ROW 2: Billing Address + GSTIN ── */}
                 {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
@@ -1516,6 +1512,9 @@ export default function SaleEdit() {
 
                   </div>
                 )}
+                </div>
+
+              
 
                 {showEditPartyModal && (
                   <PartyAddModal

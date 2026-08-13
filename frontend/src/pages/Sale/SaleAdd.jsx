@@ -277,7 +277,7 @@ export default function SaleAdd() {
       Party_Name: "",
       Billing_Name: "",
       GSTIN: "",
-      Phone_Number: "",
+      //Phone_Number: "",
       Billing_Address: "",
       Invoice_Number: "",
       Invoice_Date: today,
@@ -939,18 +939,18 @@ export default function SaleAdd() {
                               );
                               setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
                               setCurrentPartyDetails(matchedParty);
-                              setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
                               setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
                             } else {
                               // typed value doesn't match any known party — treat as new, clear stale data
-                              setValue("Phone_Number", "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
 
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
                               setValue("Billing_Address", "", { shouldValidate: true, shouldDirty: true });
@@ -971,10 +971,10 @@ export default function SaleAdd() {
 
                               if (matchedParty) {
                                 setPartySearch(matchedParty.Party_Name);
-                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
@@ -1019,7 +1019,7 @@ export default function SaleAdd() {
                                 key={i}
                                 onClick={() => {
                                   setPartySearch(party.Party_Name);
-                                  setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
+                                  //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
                                   setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
                                   setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
                                   const defaultBilling = party.addresses?.find(
@@ -1139,9 +1139,9 @@ export default function SaleAdd() {
                   </div>)}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                  {/* Phone Number — compact inline label+input */}
+                  
 
-                  <div className="flex flex-col gap-2">
+                  {/* <div className="flex flex-col gap-2">
 
                     <span className="whitespace-nowrap active">Phone Number</span>
                     <input
@@ -1157,7 +1157,7 @@ export default function SaleAdd() {
                     {errors?.Phone_Number && (
                       <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
                     )}
-                  </div>
+                  </div> */}
 
                   {/* GSTIN — compact inline label+input, pinned to top */}
                   {currentPartyDetails?.Party_Name !== "Cash Sale" && (<div className="flex flex-col gap-2 self-start">
@@ -1177,11 +1177,9 @@ export default function SaleAdd() {
                   {/* {errors?.GSTIN && (
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}
-                </div>
-
-                {/* ── ROW 2: Billing Address + GSTIN ── */}
+                   {/* ── ROW 2: Billing Address + GSTIN ── */}
                 {currentPartyDetails?.Party_Name !== "Cash Sale" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                  <div >
 
                     {/* Billing Address */}
                     <div className="flex flex-col gap-2">
@@ -1256,6 +1254,9 @@ export default function SaleAdd() {
 
                   </div>
                 )}
+                </div>
+
+               
 
 
 
