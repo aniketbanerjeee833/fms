@@ -1,12 +1,12 @@
 
 
-// components/InvoicePrintTemplate.jsx
+// components/CreditDebitNotePrintTemplate.jsx
 
 import { forwardRef } from "react";
-import "./InvoicePrintTemplate.css";
+import "./CreditDebitNotePrintTemplate.css";
 
-// const InvoicePrintTemplate = forwardRef(({ purchase }, ref) => 
-const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
+// const CreditDebitNotePrintTemplate = forwardRef(({ purchase }, ref) => 
+const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
   if (!invoice) return null;
@@ -29,19 +29,32 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     Total_Received,
     Balance_Due,
     Payment_Type_Display,
-    Terms_Conditions_Description,
+
     items = [],
     companyDetails = {},
   } = invoice;
-  const documentNumber =
-    type === "sale"
-      ? Invoice_Number
-      : Bill_Number;
+  // const documentNumber =
+  //   type === "sale"
+  //     ? Invoice_Number
+  //     : Bill_Number;
 
-  const documentDate =
-    type === "sale"
-      ? Invoice_Date
-      : Bill_Date;
+  // const documentDate =
+  //   type === "sale"
+  //     ? Invoice_Date
+  //     : Bill_Date;
+  // at the top of the component, after destructuring invoice
+  const documentNumber = type === "debit"
+    ? invoice.Return_Number   // purchase return
+    : invoice.Return_Number;  // sale return — same field name, both use Return_Number
+
+  const documentDate = type === "debit"
+    ? invoice.Return_Date
+    : invoice.Return_Date;
+
+  // original bill reference
+  const originalBillRef = type === "debit"
+    ? invoice.Bill_Number     // the purchase bill this return is against
+    : invoice.Invoice_Number; // the sale invoice this return is against
   // =========================================================
   // HELPERS
   // =========================================================
@@ -255,13 +268,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const companyGSTIN =
     companyDetails?.gstin || "19AOQPG1954B1ZY";
 
-  // =========================================================
-  // TERMS
-  // =========================================================
 
-  const terms = Terms_Conditions_Description
-    ? Terms_Conditions_Description.split("\n").filter(Boolean)
-    : [];
 
   // =========================================================
   // RENDER
@@ -270,16 +277,20 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const showUnitColumn = items.some(
     (item) => item.Selected_Unit?.trim()
   );
+  // after building taxGroups / taxGroupList
+  //const hasTax = taxGroupList.length > 0;  // true if ANY item has GST
   const showTaxColumns = items.some(
     (item) => Number(item.Tax_Amount || 0) > 0
   );
-  const hasItems = items.length > 0;
-  //const MIN_ROWS = 10;
-  //const emptyRows = Math.max(0, MIN_ROWS - items.length);
-  // const showTaxColumns = items.some(
-  //   (item) => Number(getTaxAmount(item)) > 0
-  // );
-  //const hasTax = taxGroupList.length > 0;  // true if ANY item has GST
+  console.log(
+    items.map(i => ({
+      name: i.Item_Name,
+      taxType: i.Tax_Type,
+      taxAmount: i.Tax_Amount
+    }))
+  );
+
+  console.log("showTaxColumns =", showTaxColumns);
   return (
     <div
       ref={ref}
@@ -294,8 +305,11 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
         Bill
       </div> */}
       <div className="invoice-title">
-        {type === "sale" ? "Tax Invoice" : "Bill"}
+        {type === "debit" ? "Debit Note" : "Credit Note"}
       </div>
+      {/* <div className="invoice-title">
+        {type === "sale" ? "Tax Invoice" : "Bill"}
+      </div> */}
 
       {/* =====================================================
           COMPANY HEADER
@@ -343,16 +357,9 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
       <table className="invoice-table">
 
-        <thead>
+        {/* <thead>
           <tr>
-            {/* 
-            <th className="invoice-section-header">
-              Bill From
-            </th>
 
-            <th className="invoice-section-header invoice-section-header-right">
-              Bill Details
-            </th> */}
             <th className="invoice-section-header">
               {type === "sale" ? "Bill To" : "Bill From"}
             </th>
@@ -361,6 +368,16 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               {type === "sale" ? "Invoice Details" : "Bill Details"}
             </th>
 
+          </tr>
+        </thead> */}
+        <thead>
+          <tr>
+            <th className="invoice-section-header">
+              {type === "debit" ? "Return To" : "Return From"}
+            </th>
+            <th className="invoice-section-header invoice-section-header-right">
+              {type === "debit" ? "Return Details" : "Return Details"}
+            </th>
           </tr>
         </thead>
 
@@ -404,14 +421,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
               {documentNumber && (
                 <div>
-                  {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
-                  {documentNumber}
+                  {type === "debit" ? "Return No." : "Return No."}: {documentNumber}
+                  {/* {type === "sale" ? "Invoice No." : "Bill No."} :{" "} */}
+                  {/* {documentNumber} */}
                 </div>
               )}
 
               {documentDate && (
                 <div>
-                  {type === "sale" ? "Invoice Date" : "Date"} :{" "}
+                  {type === "debit" ? " Date" : "Date"} :{" "}
                   {new Date(documentDate).toLocaleDateString("en-IN", {
                     day: "2-digit",
                     month: "2-digit",
@@ -509,6 +527,14 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             >
               Quantity
             </th>
+
+
+            {/* <th
+              className="invoice-table-header"
+              style={{ width: "9%" }}
+            >
+              Unit
+            </th> */}
             {showUnitColumn && (
               <th
                 className="invoice-table-header"
@@ -517,12 +543,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 Unit
               </th>
             )}
-            {/* <th
-              className="invoice-table-header"
-              style={{ width: "9%" }}
-            >
-              Unit
-            </th> */}
+
 
             <th
               className="invoice-table-header"
@@ -584,93 +605,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
         <tbody>
 
-          {/* {items.map((item, idx) => {
 
-            const taxAmount = getTaxAmount(item);
-
-            const itemCgst = taxAmount / 2;
-
-            const itemSgst = taxAmount / 2;
-
-            const isTaxable =
-              item?.Tax_Type &&
-              item.Tax_Type !== "None" &&
-              taxAmount > 0;
-
-            return (
-              <tr
-                key={item.Purchase_Items_Id || idx}
-              >
-
-               
-
-                <td className="invoice-item-center">
-                  {idx + 1}
-                </td>
-
-
-
-                <td className="invoice-item-cell invoice-bold">
-                  {safe(item.Item_Name)}
-                </td>
-
-
-              
-
-                <td className="invoice-item-cell">
-                  {safe(item.Item_HSN)}
-                </td>
-
-
-                
-
-                <td className="invoice-item-right">
-                  {money(item.Quantity)}
-                  {item.Item_Unit
-                    ? ` ${item.Item_Unit}`
-                    : ""}
-                </td>
-
-
-              
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Purchase_Price)}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Amount)}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(itemCgst)}
-                  {isTaxable ? " (9%)" : ""}
-                </td>
-
-
-              
-
-                <td className="invoice-item-right">
-                  ₹ {money(itemSgst)}
-                  {isTaxable ? " (9%)" : ""}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Amount)}
-                </td>
-
-              </tr>
-            );
-          })} */}
           {items.map((item, idx) => {
             const taxAmount = getTaxAmount(item);
             const gstRate = getGstRate(item.Tax_Type);
@@ -702,11 +637,11 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   {item.Quantity}
                   {/* {item.Selected_Unit ? ` ${item.Selected_Unit}` : ""} */}
                 </td>
-
                 {showUnitColumn && (<td className="invoice-item-right">
 
                   {item.Selected_Unit ? ` ${item.Selected_Unit}` : ""}
                 </td>)}
+
 
                 <td className="invoice-item-right">
                   ₹ {money(
@@ -717,7 +652,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </td>
 
                 {/* <td className="invoice-item-right">
-                  ₹ {money(item.Tax_Amount)}
+                  ₹ {money(item.Amount)}
                 </td> */}
                 {showTaxColumns && (
                   <td className="invoice-item-right">
@@ -730,15 +665,18 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   ₹ {money(itemCgst)}
                   {isTaxable ? ` (${formatRate(halfRate)})` : ""}
                 </td> */}
-
-
                 {/* <td className="invoice-item-right">
                   {itemCgst > 0
                     ? `₹ ${money(itemCgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
                     : ""}
-                </td>
+                </td> */}
 
-                <td className="invoice-item-right">
+                {/* SGST */}
+                {/* <td className="invoice-item-right">
+                  ₹ {money(itemSgst)}
+                  {isTaxable ? ` (${formatRate(halfRate)})` : ""}
+                </td> */}
+                {/* <td className="invoice-item-right">
                   {itemSgst > 0
                     ? `₹ ${money(itemSgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
                     : ""}
@@ -759,32 +697,12 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   </>
                 )}
 
-
-                {/* <td className="invoice-item-right">
-                  {itemCgst > 0
-                    ? `₹ ${money(itemCgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                    : ""}
-                </td>
-
-               
-                <td className="invoice-item-right">
-                  {itemSgst > 0
-                    ? `₹ ${money(itemSgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                    : ""}
-                </td> */}
-                {/* <td className="invoice-item-right">
-                  ₹ {money(itemSgst)}
-                  {isTaxable ? ` (${formatRate(halfRate)})` : ""}
-                </td> */}
-
                 <td className="invoice-item-right">
                   ₹ {money(item.Amount)}
                 </td>
               </tr>
             );
           })}
-
-
 
 
           {/* =================================================
@@ -811,18 +729,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             <td className="invoice-total-cell"></td>
 
             {/* Item Name column */}
-            <td className="invoice-total-cell "  style={{ textAlign: "left" }}>
+          <td className="invoice-total-cell "  style={{ textAlign: "left" }}>
               Total
             </td>
 
             {/* HSN column */}
             <td className="invoice-total-cell"></td>
             <td className="invoice-total-cell">
-              {hasItems ? money(totalQuantity) : ""}
-            </td>
-            {/* <td className="invoice-total-cell">
               {money(totalQuantity)}
-            </td> */}
+            </td>
             {showUnitColumn && (
               <td className="invoice-total-cell"></td>
             )}
@@ -849,6 +764,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               )}
             </td> */}
 
+
+            {/* <td className="invoice-total-cell">
+              ₹ {money(cgst)}
+            </td>
+
+
+            <td className="invoice-total-cell">
+              ₹ {money(sgst)}
+            </td> */}
             {showTaxColumns && (
               <>
                 <td className="invoice-total-cell">
@@ -860,22 +784,12 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </td>
               </>
             )}
-            {/* <td className="invoice-total-cell">
-              ₹ {money(cgst)}
-            </td>
+
 
 
             <td className="invoice-total-cell">
-              ₹ {money(sgst)}
-            </td> */}
-
-
-            <td className="invoice-total-cell">
-              {hasItems ? `₹ ${money(Total_Amount)}` : ""}
-            </td>
-            {/* <td className="invoice-total-cell">
               ₹ {money(Total_Amount)}
-            </td> */}
+            </td>
 
           </tr>
 
@@ -888,79 +802,79 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
           TAX DETAILS + AMOUNTS
       ===================================================== */}
       <div className="grid grid-cols-2  invoice-bottom-grid">
-
         <div className="invoice-bottom-left">
+
+          {/* <div className="invoice-summary"> */}
+
 
 
           <div className="invoice-summary-column">
-            {hasTaxDetails ? (
-              <table
-                className="invoice-summary-table"
-                style={{ width: "100%" }}
-              >
-                <thead>
-                  <tr>
-                    <td className="invoice-summary-cell">
-                      Tax Details
+            {hasTaxDetails ? (<table
+              className="invoice-summary-table"
+              style={{ width: "100%" }}
+            >
+              <thead>
+                <tr>
+                  <td className="invoice-summary-cell">
+                    Tax Details
+                  </td>
+
+                  {taxGroupList.map((g) => (
+                    <td
+                      key={g.halfRate}
+                      className="invoice-summary-cell-right"
+                    >
+                      {g.halfRate}%
                     </td>
+                  ))}
+                </tr>
+              </thead>
 
-                    {taxGroupList.map((g) => (
-                      <td
-                        key={g.halfRate}
-                        className="invoice-summary-cell-right"
-                      >
-                        {g.halfRate}%
-                      </td>
-                    ))}
-                  </tr>
-                </thead>
+              <tbody>
+                <tr>
+                  <td className="invoice-summary-cell">
+                    CGST
+                  </td>
 
-                <tbody>
-                  <tr>
-                    <td className="invoice-summary-cell">
-                      CGST
+                  {taxGroupList.map((g) => (
+                    <td
+                      key={g.halfRate}
+                      className="invoice-summary-cell-right"
+                    >
+                      ₹ {money(g.cgst)}
                     </td>
+                  ))}
+                </tr>
 
-                    {taxGroupList.map((g) => (
-                      <td
-                        key={g.halfRate}
-                        className="invoice-summary-cell-right"
-                      >
-                        ₹ {money(g.cgst)}
-                      </td>
-                    ))}
-                  </tr>
+                <tr>
+                  <td className="invoice-summary-cell">
+                    SGST
+                  </td>
 
-                  <tr>
-                    <td className="invoice-summary-cell">
-                      SGST
+                  {taxGroupList.map((g) => (
+                    <td
+                      key={g.halfRate}
+                      className="invoice-summary-cell-right"
+                    >
+                      ₹ {money(g.sgst)}
                     </td>
-
-                    {taxGroupList.map((g) => (
-                      <td
-                        key={g.halfRate}
-                        className="invoice-summary-cell-right"
-                      >
-                        ₹ {money(g.sgst)}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>) : (
+                  ))}
+                </tr>
+              </tbody>
+            </table>) : (
               <div
                 style={{
                   border: "1px solid #777",
-                  flex: 1,
-                  //minHeight: "100%",
-                  //height: "65px",
-                  height: "90px"
+                  height: "65px",
                 }}
               />
             )}
           </div>
 
 
+
           <div>
+
             <div className="invoice-words-header">
               Bill Amount In Words
             </div>
@@ -968,17 +882,23 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             <div className="invoice-words">
               {amountInWords}
             </div>
+
           </div>
 
-        </div>
 
+
+
+
+
+
+        </div>
 
         <div className="invoice-bottom-right">
           {/* ===================================================
             AMOUNTS
         =================================================== */}
 
-          <div className="invoice-summary-column">
+          <div className="invoice-summary-column ">
 
             <div className="invoice-summary-header">
               Amounts
@@ -1002,37 +922,14 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </tr>
 
 
-                {/* <tr>
 
-                  <td className="invoice-summary-cell invoice-bold">
-                    Total
-                  </td>
-
-                  <td className="invoice-summary-cell-right invoice-bold">
-                    ₹ {money(Total_Amount)}
-                  </td>
-
-                </tr>
-
-
-                <tr>
-
-                  <td className="invoice-summary-cell">
-                    {type === "sale" ? "Received" : "Paid"}
-                  </td>
-
-                  <td className="invoice-summary-cell-right">
-                    ₹ {money(Total_Paid)}
-                  </td>
-
-                </tr> */}
                 <tr>
                   <td className="invoice-summary-cell">
                     <div className="invoice-bold">
                       Total
                     </div>
                     <div>
-                      {type === "sale" ? "Received" : "Paid"}
+                      {type === "debit" ? "Received" : "Paid"}
                     </div>
                   </td>
 
@@ -1044,7 +941,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                       ₹ {money(Total_Paid)}
                     </div> */}
                     <div>
-                      {type === "sale" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
+                      {type === "debit" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
                     </div>
                   </td>
                 </tr>
@@ -1066,121 +963,34 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             </table>
 
           </div>
+          {/* ===================================================
+            SIGNATURE
+        =================================================== */}
 
         </div>
 
+
       </div>
-      <div className="grid grid-cols-2 w-full">
 
-        {terms.length > 0 && (
-          <div>
-            <div className="invoice-terms-header">
-              Terms and Conditions
-            </div>
 
-            <div className="invoice-terms-body">
-              {terms.map((term, index) => (
-                <div key={index}>
-                  {index + 1}. {term.replace(/^\d+\.\s*/, "")}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* ===================================================
+            SIGNATURE
+        =================================================== */}
+      <div className="invoice-signature">
 
-        <div
-          className={`invoice-signature ${terms.length === 0 ? "col-span-2" : ""
-            }`}
-        >
-          <div className="invoice-signature-company">
-            For : {companyName}
-          </div>
+        <div className="invoice-signature-company">
+          For : {companyName}
+        </div>
 
-          <div className="invoice-signature-authorized">
-            Authorized Signatory
-          </div>
+        <div className="invoice-signature-authorized">
+          Authorized Signatory
         </div>
 
       </div>
-
     </div>
+
+
   );
 });
 
-export default InvoicePrintTemplate;
-
-
-
-{/* <div className="invoice-bottom-left">
-
-         
-
-
-
-          <div className="invoice-summary-column">
-
-
-
-
-            
-            <table className="invoice-summary-table" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <td className="invoice-summary-cell">Tax Details</td>
-                  {taxGroupList.map((g) => (
-                    <td key={g.halfRate} className="invoice-summary-cell-right">
-                      {g.halfRate}%
-                    </td>
-                  ))}
-               
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="invoice-summary-cell">CGST</td>
-                  {taxGroupList.map((g) => (
-                    <td key={g.halfRate} className="invoice-summary-cell-right">
-                      ₹ {money(g.cgst)}
-                    </td>
-                  ))}
-                 
-                </tr>
-                <tr>
-                  <td className="invoice-summary-cell">SGST</td>
-                  {taxGroupList.map((g) => (
-                    <td key={g.halfRate} className="invoice-summary-cell-right">
-                      ₹ {money(g.sgst)}
-                    </td>
-                  ))}
-                
-                </tr>
-              </tbody>
-            </table>
-
-           
-
-
-
-
-          </div>
-
-
-
-          <div>
-
-            <div className="invoice-words-header">
-              Bill Amount In Words
-            </div>
-
-            <div className="invoice-words">
-              {amountInWords}
-            </div>
-
-          </div>
-
-
-
-
-
-
-        </div> */}
+export default CreditDebitNotePrintTemplate;

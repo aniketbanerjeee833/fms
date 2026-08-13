@@ -3028,6 +3028,8 @@ const getItemBills = async (req, res, next) => {
          Primary_Unit,
          Secondary_Unit,
          Conversion_Rate,
+         Sale_Price,
+         Purchase_Price,
          Stock_Quantity
        FROM add_item
        WHERE Item_Id = ?

@@ -3187,7 +3187,9 @@ const getSinglePurchase = async (req, res, next) => {
         pu.Terms_Conditions_Id,
         pu.Terms_Conditions_Description,
 
-       p.*,
+         p.Party_Name,
+    p.GSTIN,
+    p.State,
           (
   SELECT pa.Address_Text
   FROM add_party_addresses pa

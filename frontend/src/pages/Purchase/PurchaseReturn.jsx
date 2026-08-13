@@ -2,13 +2,17 @@
 import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 
 
-import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
-import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery } from "../../redux/api/purchaseReturnApi";
-import { useState } from "react";
+import { Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2 } from "lucide-react";
+import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery, useGetPurchaseReturnByIdQuery } from "../../redux/api/purchaseReturnApi";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
+
+import { useReactToPrint } from "react-to-print";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
+import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 
 
 export default function PurchaseReturn() {
@@ -29,6 +33,12 @@ export default function PurchaseReturn() {
   const toDate = searchParams.get("toDate") || "";
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
   const [deletePurchaseReturn, { isLoading: isDeleting }] = useDeletePurchaseReturnMutation();
+  const [printPurchaseReturnId, setPrintPurchaseReturnId] = useState(null);
+  const printRef = useRef(null);
+  // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetPurchaseReturnByIdQuery(printPurchaseReturnId, {
+    skip: !printPurchaseReturnId,
+  });
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -89,18 +99,30 @@ export default function PurchaseReturn() {
       const res = await deletePurchaseReturn(deleteTarget.Purchase_Return_Id).unwrap();
       toast.success(res?.message || "Debit Note deleted successfully");
       setDeleteTarget(null);
-    
-           dispatch(
-          itemApi.util.invalidateTags([
-            "Item",
-            "ItemLedger",
-          ])
-        );
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+          "ItemLedger",
+        ])
+      );
     } catch (err) {
       console.log(err);
       toast.error(err?.data?.message || "Failed to delete debit note");
     }
   };
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printPurchaseReturnId ? `Purchase-${printPurchaseReturnId}` : "Purchase",
+    onAfterPrint: () => setPrintPurchaseReturnId(null),
+  });
+
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printPurchaseReturnId) {
+      handlePrint();
+    }
+  }, [printData, printPurchaseReturnId]);
   return (
     <>
       {/* // <div className="container-fluid sb2  ">
@@ -310,10 +332,10 @@ export default function PurchaseReturn() {
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
                     <th className="text-left">Received </th>
-                    <th className="text-left">Balance Due</th>
+                    <th className="text-left">Balance</th>
                     <th>View/Edit</th>
                     <th>Delete</th>
-                    {/* <th>Edit</th> */}
+                    <th>Print</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -390,6 +412,13 @@ export default function PurchaseReturn() {
 
                               })
                             }
+                          />
+                        </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{ cursor: "pointer", color: "#4CA1AF" }}
+                            onClick={() => setPrintPurchaseReturnId(purchaseReturn.id)}
                           />
                         </td>
                       </tr>
@@ -572,18 +601,32 @@ export default function PurchaseReturn() {
               </div> */}
       </div>
 
-   {deleteTarget && (
+      {deleteTarget && (
         <DeleteConfirmModal
           title="Delete Debit Note"
           message={`Are you sure you want to delete this Debit Note ? This action cannot be undone.`}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
-          //isDeleting={false}
+        //isDeleting={false}
         />
       )}
+      {printData?.purchaseReturn && (
+        <div style={{ display: "none" }}>
+          <CreditDebitNotePrintTemplate
+            ref={printRef}
+            type="debit"
+            invoice={{
+              ...printData.purchaseReturn,
+              items: printData.purchaseReturn.items || [],
+              companyDetails: {},
+
+            }}
+          />
+        </div>
+      )}
     </>
-    
+
 
 
   )

@@ -217,7 +217,17 @@ const getSaleReturnById = async (req, res, next) => {
      sr.Balance_Due,
      sr.Party_Id,
      a.Party_Name,
-     a.GSTIN
+     a.GSTIN,
+      
+         a.GSTIN,
+         a.State,
+            (
+  SELECT pa.Address_Text
+  FROM add_party_addresses pa
+  WHERE pa.Party_Id = sr.Party_Id
+    AND pa.Address_Type = 'Billing'
+    AND pa.Is_Default = 1
+) AS Billing_Address
    FROM sale_return sr
    LEFT JOIN add_party a
      ON a.Party_Id = sr.Party_Id

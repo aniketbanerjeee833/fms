@@ -2,17 +2,19 @@
 import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 
 
-import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2 } from "lucide-react";
-import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery } from "../../redux/api/saleReturnApi";
-import { useState } from "react";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2 } from "lucide-react";
+import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
+import { useReactToPrint } from "react-to-print";
+import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 
 // import { SiMicrosoftexcel } from "react-icons/si";
 export default function SaleReturn() {
-  const dispatch =useDispatch();
+  const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
@@ -36,6 +38,12 @@ export default function SaleReturn() {
     search: searchTerm,
     fromDate,
     toDate,
+  });
+  const [printSaleReturnId, setPrintSaleReturnId] = useState(null);
+  const printRef = useRef(null);
+  // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetSaleReturnByIdQuery(printSaleReturnId, {
+    skip: !printSaleReturnId,
   });
   //console.log(saleReturns);
 
@@ -95,19 +103,30 @@ export default function SaleReturn() {
       toast.success(res?.message || "Credit Note deleted successfully");
       setDeleteTarget(null);
 
-           dispatch(
-          itemApi.util.invalidateTags([
-            "Item",
-            "ItemLedger",
-          ])
-        );
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+          "ItemLedger",
+        ])
+      );
     } catch (err) {
       console.log(err);
       toast.error(err?.data?.message || "Failed to delete credit note");
     }
   };
   // console.log(saleReturns?.saleReturns);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printSaleReturnId ? `Purchase-${printSaleReturnId}` : "Purchase",
+    onAfterPrint: () => setPrintSaleReturnId(null),
+  });
 
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printSaleReturnId) {
+      handlePrint();
+    }
+  }, [printData, printSaleReturnId]);
   return (
     <>
       {/* // <div className="container-fluid sb2  ">
@@ -334,6 +353,7 @@ export default function SaleReturn() {
                     {/* <th>View</th> */}
                     <th>View/Edit</th>
                     <th>Delete</th>
+                    <th>Print</th>
 
                   </tr>
                 </thead>
@@ -419,6 +439,13 @@ export default function SaleReturn() {
 
                               })
                             }
+                          />
+                        </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{ cursor: "pointer", color: "#4CA1AF" }}
+                            onClick={() => setPrintSaleReturnId(saleReturn.id)}
                           />
                         </td>
                       </tr>
@@ -622,9 +649,24 @@ export default function SaleReturn() {
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
-         
+
         />
       )}
+      {printData?.saleReturn && (
+        <div style={{ display: "none" }}>
+          <CreditDebitNotePrintTemplate
+            ref={printRef}
+            type="credit"
+            invoice={{
+              ...printData.saleReturn,
+              items: printData.saleReturn.items || [],
+              companyDetails: {},
+
+            }}
+          />
+        </div>
+      )}
+    
 
     </>
 

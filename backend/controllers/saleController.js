@@ -2938,6 +2938,7 @@ const getSingleSale = async (req, res, next) => {
   try {
     connection = await db.getConnection();
     const { Sale_Id: saleId } = req.params;
+    console.log("🔍 Params =>", { saleId });
 
     if (!saleId) {
       return res.status(400).json({ success: false, message: "Sale ID is required." });
@@ -2952,7 +2953,7 @@ const getSingleSale = async (req, res, next) => {
     //   ORDER BY pa.Is_Default DESC, pa.id ASC
     //   LIMIT 1
     // ) AS Billing_Address,
-    const isSaleForItemSale = saleId.startsWith("SALS");
+    const isSaleForItemSale = saleId.startsWith("SAL");
     // const salesTable    = isSaleForItemSale ? "add_new_sale"       : "add_sale";
     // const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
     // const itemTable     = isSaleForItemSale ? "add_item_sale"      : "add_item";
@@ -2981,7 +2982,9 @@ const getSingleSale = async (req, res, next) => {
      s.Terms_Conditions_Description,
 
      -- Party master
-        p.*,
+         p.Party_Name,
+    p.GSTIN,
+    p.State,
     
     (
   SELECT pa.Address_Text
@@ -3013,6 +3016,7 @@ const getSingleSale = async (req, res, next) => {
     }
 
     const saleHeader = saleData[0];
+    console.log(saleHeader)
 
     // const [items] = await connection.query(
     //   `SELECT

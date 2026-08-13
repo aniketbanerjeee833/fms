@@ -269,14 +269,13 @@
 
 .invoice-bottom-left,
 .invoice-bottom-right {
+    
+      display: flex;
+  flex-direction: column;
   min-width: 0;
   height: 100%;
   box-sizing: border-box;
-}
-
-.invoice-bottom-left {
-  display: flex;
-  flex-direction: column;
+  margin-bottom: 0px;
 }
 .invoice-summary-column {
   flex: 1;
@@ -285,13 +284,18 @@
 .invoice-words-container {
   flex: 1;
 }
+/* .invoice-bottom-left {
+  display: flex;
+  flex-direction: column;
+}
+
 
  .invoice-bottom-right {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
+} */
 /* =========================================================
    TAX + AMOUNTS
 ========================================================= */
@@ -307,7 +311,9 @@
 /* .invoice-summary-column {
   min-width: 0;
 } */
-
+/* .invoice-summary-column {
+  flex: 0;    
+} */
 .invoice-summary-header {
   background-color: #0b7fa3 !important;
   color: #fff !important;
@@ -422,28 +428,28 @@
 }
 
 
+/* 1. Remove gap below balance — kill the min-height forcing the empty space */
 .invoice-signature {
   border: 1px solid #777;
-
   flex: 1;
-  min-height: 150px;
-    text-align: right;
+  /* min-height: 150px; ← remove this */
+  text-align: right;
   box-sizing: border-box;
   padding: 8px 12px;   /* 🔹 add padding so text doesn't stick to the border */
-/* 
-  text-align: center;
-  box-sizing: border-box; */
+  
 }
+
+/* 2. Text aligned right with breathing room from the right edge */
 .invoice-signature-company {
   margin-top: 55px;
   font-weight: bold;
+  padding-right: 16px;   /* 🔹 space between text and right border */
 }
 
 .invoice-signature-authorized {
   margin-top: 45px;
-  font-weight: bold;
+  padding-right: 16px;   /* 🔹 same spacing */
 }
-
 
 /* =========================================================
    PRINT
