@@ -1,40 +1,50 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  MoreVertical,
-  Eye,
-  FileSpreadsheet,
-  LayoutDashboard,
-  Trash2,
-  Printer
-} from "lucide-react";
 
-import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery } from "../../redux/api/purchaseReturnApi";
-import { useEffect, useState } from "react";
+import { useDeletePurchaseMutation, useGetAllPurchasesQuery, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
+import { Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2, Printer } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
-import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
+import { partyApi } from "../../redux/api/partyAPi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
+import { bankAccountApi } from "../../redux/api/bankAccountApi";
+import { itemApi } from "../../redux/api/itemApi";
+import { useReactToPrint } from "react-to-print";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 
 
 
+export default function AllPurchaseList() {
 
-export default function PurchaseReturn() {
-
+  // const [page, setPage] = useState(1);
 
   const dispatch = useDispatch();
+  // const [selectedPurchase, setSelectedPurchases] = useState(null);
+  // const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const page = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || "";
-
+  // const [page, setPage] = useState(1);
+  //const [searchTerm, setSearchTerm] = useState("");
   const fromDate = searchParams.get("fromDate") || "";
   const toDate = searchParams.get("toDate") || "";
+  // const [fromDate, setFromDate] = useState('');
+  // const [toDate, setToDate] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
-  const [rowMenuOpen, setRowMenuOpen] = useState(null);
-  const [deletePurchaseReturn, { isLoading: isDeleting }] = useDeletePurchaseReturnMutation();
+  const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
+  const [printPurchaseId, setPrintPurchaseId] = useState(null);
+  const printRef = useRef(null);
+  // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetSinglePurchaseQuery(printPurchaseId, {
+    skip: !printPurchaseId,
+  });
 
+
+
+  const navigate = useNavigate();
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -43,7 +53,9 @@ export default function PurchaseReturn() {
       toDate,
     });
   };
-
+  // const handlePageChange = (newPage) => {
+  //   setPage(newPage);
+  // }
   const handleNextPage = () => {
     setSearchParams({
       page: page + 1,
@@ -64,26 +76,13 @@ export default function PurchaseReturn() {
   // const [searchTerm, setSearchTerm] = useState("");
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
-  const { data: purchaseReturns, isLoading } = useGetAllPurchaseReturnsQuery({
+  const { data: purchases, isLoading } = useGetAllPurchasesQuery({
     page,
     search: searchTerm,
     fromDate,
     toDate,
   });
-  console.log(purchaseReturns, fromDate, toDate);
-
-  useEffect(() => {
-    const closeRowMenu = () => {
-      setRowMenuOpen(null);
-    };
-
-    document.addEventListener("click", closeRowMenu);
-
-    return () => {
-      document.removeEventListener("click", closeRowMenu);
-    };
-  }, []);
-
+  console.log(purchases, fromDate, toDate);
   const handleExportExcel = () => {
     const params = new URLSearchParams();
     if (searchTerm) params.set("search", searchTerm);
@@ -91,21 +90,32 @@ export default function PurchaseReturn() {
     if (toDate) params.set("toDate", toDate);
 
     const a = document.createElement("a");
-    a.href = `http://localhost:4000/api/purchaseReturn/export-purchaseReturn-excel?${params.toString()}`;
+    a.href = `http://localhost:4000/api/purchase/export-purchase-excel?${params.toString()}`;
     a.download = "";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
 
+
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
     try {
-      console.log(deleteTarget);
-      const res = await deletePurchaseReturn(deleteTarget.Purchase_Return_Id).unwrap();
-      toast.success(res?.message || "Debit Note deleted successfully");
+      const res = await deletePurchase(
+        deleteTarget.Purchase_Id
+      ).unwrap();
+
+      toast.success(
+        res?.message || "Purchase deleted successfully"
+      );
+
       setDeleteTarget(null);
+      dispatch(partyApi.util.invalidateTags(["Party"]));
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(
+        bankAccountApi.util.invalidateTags(["BankAccount"])
+      );
 
       dispatch(
         itemApi.util.invalidateTags([
@@ -115,28 +125,84 @@ export default function PurchaseReturn() {
       );
     } catch (err) {
       console.log(err);
-      toast.error(err?.data?.message || "Failed to delete debit note");
+
+      toast.error(
+        err?.data?.message ||
+        "Failed to delete purchase"
+      );
     }
   };
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printPurchaseId ? `Purchase-${printPurchaseId}` : "Purchase",
+    onAfterPrint: () => setPrintPurchaseId(null),
+  });
 
-
-
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printPurchaseId) {
+      handlePrint();
+    }
+  }, [printData, printPurchaseId]);
   return (
     <>
+      {/* // <div className="container-fluid sb2  ">
+        //     <div className="row">
+               
+        //         <div className="sb2-1">
+
+        //             <SideMenu/>
+        //         </div>
+
+               
+        //         <div className="sb2-2"> */}
+      {/* <div className="sb2-2-2">
+        <ul >
+          <li>
+           
+            <NavLink style={{ display: "flex", flexDirection: "row" }}
+              to="/home"
+
+            >
+              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
+              
+              Dashboard
+            </NavLink>
+          </li>
+
+        </ul>
+      </div> */}
+      {/* <div className="sb2-2-3 ">
+        <div className="row">
+          <div className="col-md-12">
+            <div className="box-inn-sp"> */}
 
       <div className="flex flex-col bg-white">
+
 
         <div className="inn-title">
           <div className="flex flex-col sm:flex-col lg:flex-row justify-between lg:items-center">
 
             <div className="flex flex-row justify-between items-center mb-4 sm:mb-4">
               <div>
-                <h4 className="text-2xl font-bold mb-1">Debit Notes</h4>
+                <h4 className="text-2xl font-bold mb-1">All Purchases</h4>
                 <p className="text-gray-500 text-sm sm:text-base">
-                  All Debit Note Details
+                  All Purchase Details
                 </p>
               </div>
 
+
+              <button
+                style={{
+                  outline: "none",
+                  boxShadow: "none",
+                  backgroundColor: "#4CA1AF",
+                }}
+                className="text-white px-4 py-2 rounded-md sm:hidden"
+                onClick={() => navigate("/purchase/add")}
+              >
+                Add Purchase
+              </button>
             </div>
 
 
@@ -208,6 +274,20 @@ export default function PurchaseReturn() {
                 />
               </div>
 
+
+              <div className="hidden sm:block">
+                <button
+                  style={{
+                    outline: "none",
+                    boxShadow: "none",
+                    backgroundColor: "#4CA1AF",
+                  }}
+                  className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
+                  onClick={() => navigate("/purchase/add")}
+                >
+                  Add  Purchase
+                </button>
+              </div>
             </div>
           </div>
 
@@ -217,8 +297,8 @@ export default function PurchaseReturn() {
 
             {/* Total Sales */}
             <div className="mb-2 text-left">
-              <p className="text-sm font-medium text-black">Total Amount</p>
-              <h4 className="text-3xl font-bold text-black">₹  {purchaseReturns?.totals?.totalAmount}</h4>
+              <p className="text-sm font-medium text-black">Total Purchase Amount</p>
+              <h4 className="text-3xl font-bold text-black">₹  {purchases?.totals?.totalAmount}</h4>
             </div>
 
             {/* Divider */}
@@ -228,12 +308,12 @@ export default function PurchaseReturn() {
             <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
               <div className="flex  ">
                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {purchaseReturns?.totals?.totalReceived}</span>
+                <span className="text-sm font-semibold text-black">₹ {purchases?.totals?.totalPaid}</span>
               </div>
 
               <div className="flex">
                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹{purchaseReturns?.totals?.totalBalance}</span>
+                <span className="text-sm font-semibold text-black">₹{purchases?.totals?.totalUnpaid}</span>
               </div>
             </div>
 
@@ -255,9 +335,9 @@ export default function PurchaseReturn() {
         <div className="tab-inn">
           <div className="table-responsive table-desi">
             {isLoading ? (
-              <p className="text-center mt-4">Fetching purchaseReturns...</p>
-            ) : purchaseReturns?.length === 0 ? (
-              <p className="text-center mt-4">No purchaseReturns found.</p>
+              <p className="text-center mt-4">Fetching purchases...</p>
+            ) : purchases?.length === 0 ? (
+              <p className="text-center mt-4">No purchases found.</p>
             ) : (
 
 
@@ -268,187 +348,152 @@ export default function PurchaseReturn() {
                 <thead>
                   <tr>
                     <th className="text-left">Sl.No</th>
-                    <th className="text-left ">Bill Date</th>
+                    <th className="text-left ">Date</th>
+                    <th className="text-left ">Bill No.</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
-                    <th className="text-left">Received </th>
-                    <th className="text-left">Balance Due</th>
-                    <th></th>
+
+                    <th className="text-left">Balance</th>
+                    {/* <th>View</th> */}
+                    <th>View/Edit</th>
+
+                    <th>Return</th>
+                    <th>Delete</th>
+                    <th>Print</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {purchaseReturns && purchaseReturns?.purchaseReturns?.length > 0 ? (
-                    purchaseReturns?.purchaseReturns?.map((purchaseReturn, idx) => (
-                      <tr
-                        key={purchaseReturn?.id}
-                        onDoubleClick={() => {
-                          navigate(
-                            `/purchase/return/edit/${purchaseReturn?.id}${location.search}`,
-                            {
-                              state: {
-                                from: "all-purchase-return-list"
-                              }
-                            }
-                          );
-                        }}
-                        style={{ cursor: "pointer" }}
-                      >
+                  {purchases && purchases?.purchases?.length > 0 ? (
+                    purchases?.purchases?.map((purchase, idx) => (
+                      <tr key={purchase?.Purchase_Id}>
                         <td>
-                          {(purchaseReturns?.currentPage - 1) * 10 + (idx + 1)}.
+                          {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
+
                         <td>
-                          {purchaseReturn?.Bill_Date
-                            ? new Date(purchaseReturn?.Bill_Date).toLocaleDateString("en-IN", {
+                          {purchase?.Bill_Date
+                            ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
                               day: "numeric",
                               month: "numeric",
                               year: "numeric",
                             })
                             : "N/A"}
                         </td>
-                        <td>{purchaseReturn?.Party_Name || "N/A"}</td>
+                        <td>
+                          {purchase?.Bill_Number
+                            ? purchase.Bill_Number.split("T")[0]
+                            : "N/A"}
+                        </td>
+                        <td>{purchase?.Party_Name || "N/A"}</td>
+                        <td>{purchase?.Payment_Type_Display || "N/A"}</td>
+                        {/* <td>
+                          {purchase?.Payment_Type
+                            ? purchase.Payment_Type === "Bank"
+                              ? `Bank (${purchase?.Bank_Display_Name || "N/A"})`
+                              : purchase.Payment_Type
+                            : "N/A"}
+                        </td> */}
+                        {/* <td>{purchase?.Payment_Type  || "N/A"}</td> */}
+                        <td>{purchase?.Total_Amount || "N/A"}</td>
+                        <td>{purchase?.Balance_Due || "N/A"}</td>
 
-                        <td>{purchaseReturn?.Payment_Type_Display || "N/A"}</td>
-                        <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
-                        <td>{purchaseReturn?.Total_Received || "N/A"}</td>
-                        <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
+                        {/* <td >
+
+                          <NavLink to={`/purchase/view/${purchase?.Purchase_Id}${location.search}`}
+                            state={{ from: "all-purchase-list" }}>
+                            <Eye
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
+                        </td> */}
 
                         <td
-                          className="py-2 px-2"
-                          style={{
-                            position: "relative",
-                            width: 50,
-                            textAlign: "center"
-                          }}
                         >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          <NavLink
+                            to={`/purchase/edit/${purchase?.Purchase_Id}${location.search}`}
+                            state={{ from: "all-purchase-list" }}
 
-                              setRowMenuOpen(
-                                rowMenuOpen === purchaseReturn.id
-                                  ? null
-                                  : purchaseReturn.id
-                              );
-                            }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                            style={{
-                              backgroundColor: "transparent",
-                              border: "none",
-                              cursor: "pointer"
-                            }}
-                            title="More"
                           >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
 
-                          {/* ROW MENU */}
-                          {rowMenuOpen === purchaseReturn.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute bg-white shadow-lg rounded-md"
+                            <SquarePen
                               style={{
-                                right: 0,
-                                top: 32,
-                                width: 150,
-                                zIndex: 100,
-                                border: "1px solid #e2e8f0",
-                                overflow: "hidden"
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
+                        </td>
+                        <td>
+                          <NavLink
+                            to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
+                            state={{ from: "purchase-return-list" }}
+                          >
+                            <Undo2
+                              size={18}
+                              style={{
+                                cursor: "pointer",
+                                color: "#4CA1AF",
                               }}
-                            >
+                            />
+                          </NavLink>
 
-                              {/* VIEW / EDIT */}
-                              <NavLink
-                                to={`/purchase/return/edit/${purchaseReturn?.id}${location.search}`}
-                                state={{
-                                  from: "all-purchase-return-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Eye
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-                                View / Edit
-                              </NavLink>
 
-                              {/* PRINT */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  backgroundColor: "transparent",
-                                  border: "none",
-                                  cursor: "pointer"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
+                        </td>
+                        <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Purchase_Id: purchase.Purchase_Id,
 
-                                  console.log(
-                                    "Print purchase return:",
-                                    purchaseReturn
-                                  );
-                                }}
-                              >
-                                <Printer
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-                                Print
-                              </button>
-
-                              {/* DELETE */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                title="Delete purchase return"
-                                style={{
-                                  cursor: "pointer",
-                                  color: "#dc2626",
-                                  backgroundColor: "transparent",
-                                  border: "none"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-
-                                  setDeleteTarget({
-                                    Purchase_Return_Id: purchaseReturn.id
-                                  });
-                                }}
-                              >
-                                <Trash2
-                                  size={13}
-                                  style={{ color: "#dc2626" }}
-                                />
-                                Delete
-                              </button>
-
-                            </div>
-                          )}
+                              })
+                            }
+                          />
+                        </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{ cursor: "pointer", color: "#4CA1AF" }}
+                            onClick={() => setPrintPurchaseId(purchase.Purchase_Id)}
+                          />
                         </td>
 
+                        {/* hidden printable content — off-screen, only used by react-to-print */}
+                        {/* <div style={{ display: "none" }}>
+                          <InvoicePrintTemplate
+                            ref={printRef}
+                            purchase={printData?.billPurchaseDetails ? {
+                              ...printData.billPurchaseDetails,
+                              items: printData.items,
+                              companyDetails: { /* your business info — hardcode or fetch from settings ,
+                            } : null}
+                          />
+                        </div> */}
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td className="mx-auto text-center" colSpan={10}>
-                        No purchaseReturn found
+                        No purchase found
                       </td>
                     </tr>
                   )}
                 </tbody>
 
               </table>
+
+
+
+
+
+
+
+
 
             )}
           </div>
@@ -471,9 +516,23 @@ export default function PurchaseReturn() {
             {/* PAGE NUMBERS — DESKTOP / TABLET */}
             <div style={{ marginRight: "0px" }}
               className="hidden sm:flex space-x-2">
-
+              {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
+        <button
+          key={index}
+          onClick={() => handlePageChange(index + 1)}
+          className={
+            `px-3 py-1 rounded ${
+              page === index + 1
+                ? 'bg-[#ff0000] text-white'
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`
+          }
+        >
+          {index + 1}
+        </button>
+      ))} */}
               {(() => {
-                const totalPages = purchaseReturns?.totalPages || 1;
+                const totalPages = purchases?.totalPages || 1;
                 const maxVisible = 5; // how many pages around current
                 const pages = [];
 
@@ -550,18 +609,18 @@ export default function PurchaseReturn() {
 
             {/* CURRENT PAGE — MOBILE ONLY */}
             <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-              Page {page} / {purchaseReturns?.totalPages || 1}
+              Page {page} / {purchases?.totalPages || 1}
             </div>
 
             {/* NEXT */}
             <button
               type="button"
               onClick={() => handleNextPage()}
-              disabled={page === purchaseReturns?.totalPages ||
-                purchaseReturns?.totalPages === 0}
+              disabled={page === purchases?.totalPages ||
+                purchases?.totalPages === 0}
               className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === purchaseReturns?.totalPages ||
-                  purchaseReturns?.totalPages === 0
+        ${page === purchases?.totalPages ||
+                  purchases?.totalPages === 0
                   ? 'opacity-50 '
                   : ''
                 }
@@ -572,18 +631,35 @@ export default function PurchaseReturn() {
 
           </div>
         </div>
-      </div>
 
+      </div>
+      {/* // After the closing </table>, outside the map: */}
+      {printData?.billPurchaseDetails && (
+        <div style={{ display: "none" }}>
+          <InvoicePrintTemplate
+  ref={printRef}
+  type="purchase"
+  invoice={{
+    ...printData.billPurchaseDetails,
+    items: printData.items || [],
+    companyDetails: {},
+    
+  }}
+/>
+        </div>
+      )}
       {deleteTarget && (
         <DeleteConfirmModal
-          title="Delete Debit Note"
-          message={`Are you sure you want to delete this Debit Note ? This action cannot be undone.`}
+          title="Delete Purchase"
+          message={`Are you sure you want to delete this purchase bill ? This action cannot be undone.`}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
+
         />
       )}
     </>
+
 
   )
 }

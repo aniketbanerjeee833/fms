@@ -845,7 +845,7 @@ export default function SaleReturndEdit() {
         ])
       );
 
-      
+
       dispatch(
         itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
@@ -865,9 +865,7 @@ export default function SaleReturndEdit() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags([
-          "Party",
-        ])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       // =======================================================
@@ -1716,7 +1714,7 @@ export default function SaleReturndEdit() {
                                             }
                                           );
                                           baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-                                           baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+                                          baseSaleUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2094,7 +2092,7 @@ export default function SaleReturndEdit() {
 
                                     // const roundedPrice = newPrice.toFixed(2);
 
-                                      const baseUnit =baseSaleUnitRef.current[i];
+                                    const baseUnit = baseSaleUnitRef.current[i];
 
                                     if (basePrice <= 0 || !baseUnit) {
                                       return;
@@ -2128,8 +2126,8 @@ export default function SaleReturndEdit() {
                                     }
 
                                     const roundedPrice = newPrice.toFixed(2);
-                                   
-                                   
+
+
 
 
 
@@ -2201,7 +2199,7 @@ export default function SaleReturndEdit() {
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
                               baseSalePriceRef.current[i] = Number(val) || 0;
-                               baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+                              baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
                                 i,

@@ -882,7 +882,7 @@ export default function PurchaseReturndEdit() {
         ])
       );
 
-     
+
       dispatch(
         itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
@@ -904,6 +904,7 @@ export default function PurchaseReturndEdit() {
       dispatch(
         partyApi.util.invalidateTags([
           "Party",
+          "PartyLedger",
         ])
       );
 
@@ -1030,7 +1031,7 @@ export default function PurchaseReturndEdit() {
               <button
                 type="button"
                 onClick={() => {
-                   if (from === "items-by-item") {
+                  if (from === "items-by-item") {
                     navigate({
                       pathname: "/items/all-items",
                       search: `?itemId=${Item_Id}`,
@@ -2141,7 +2142,7 @@ export default function PurchaseReturndEdit() {
 
                                     // const roundedPrice = newPrice.toFixed(2);
 
-                                    const baseUnit =basePurchaseUnitRef.current[i];
+                                    const baseUnit = basePurchaseUnitRef.current[i];
 
                                     if (basePrice <= 0 || !baseUnit) {
                                       return;

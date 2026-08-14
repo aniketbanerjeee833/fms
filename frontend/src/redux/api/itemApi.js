@@ -282,25 +282,64 @@ deleteItem: builder.mutation({
   }),
 }),
 
+// addStockAdjustment: builder.mutation({
+//   query: (body) => ({
+//     url: "/item/stock-adjustment/add",
+//     method: "POST",
+//     body,
+//   }),
+//   invalidatesTags: ["Item","ItemLedger"],
+// }),
+// editStockAdjustment: builder.mutation({
+//   query: ({ id, ...body }) => ({
+//     url: `/item/stock-adjustment/${id}`,
+//     method: "PUT",
+//     body,
+//   }),
+//   invalidatesTags: ["Item","ItemLedger"],
+// }),
+
+//   deleteStockAdjustment: builder.mutation({
+//   query: (id) => ({
+//     url: `/item/stock-adjustment/${id}`,
+//     method: "DELETE",
+//   }),
+//   invalidatesTags: ["Item", "ItemLedger"],
+// }),
 addStockAdjustment: builder.mutation({
   query: (body) => ({
     url: "/item/stock-adjustment/add",
     method: "POST",
     body,
   }),
-  invalidatesTags: ["Item","ItemLedger"],
+  invalidatesTags: (result, error, arg) => [
+    "Item",
+    { type: "ItemLedger", id: arg.Item_Id },
+  ],
 }),
+
 editStockAdjustment: builder.mutation({
   query: ({ id, ...body }) => ({
-    url: `/item/stock-adjustment/edit/${id}`,
+    url: `/item/stock-adjustment/${id}`,
     method: "PUT",
     body,
   }),
-  invalidatesTags: ["Item","ItemLedger"],
+  invalidatesTags: (result, error, arg) => [
+    "Item",
+    { type: "ItemLedger", id: arg.Item_Id },
+  ],
 }),
 
-  
-
+deleteStockAdjustment: builder.mutation({
+  query: (id) => ({
+    url: `/item/stock-adjustment/${id}`,
+    method: "DELETE",
+  }),
+  invalidatesTags: (result, error, payload) => [
+    "Item",
+    { type: "ItemLedger", id: payload.Item_Id },
+  ],
+}),
   
    
    
@@ -326,6 +365,7 @@ editStockAdjustment: builder.mutation({
     useGetItemBillsQuery,
     useGetAllItemsForLedgerQuery,
     useAddStockAdjustmentMutation,
-    useEditStockAdjustmentMutation
+    useEditStockAdjustmentMutation,
+    useDeleteStockAdjustmentMutation,
  }=itemApi
    

@@ -904,7 +904,7 @@ export default function SaleEdit() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags(["Party"])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       toast.success("Sale updated successfully!");
@@ -1437,7 +1437,7 @@ export default function SaleEdit() {
                  
                                   {/* ── ROW 2: Billing Address + GSTIN ── */}
                 {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                  <div>
 
                     {/* Billing Address */}
                     <div className="flex flex-col gap-2">

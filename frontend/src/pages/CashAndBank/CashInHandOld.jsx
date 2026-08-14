@@ -1,19 +1,11 @@
 
-import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
-import {
-    Download,
-    Eye,
-    FileSpreadsheet,
-    LayoutDashboard,
-    MoreVertical,
-    Printer,
-    SquarePen,
-    Trash2,
-    Undo2
-} from "lucide-react";
 
+import { NavLink, useSearchParams } from "react-router-dom";
+
+;
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, SquarePen, Trash2, Undo2 } from "lucide-react";
 import { cashInHandApi, useGetCashBalanceQuery, useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import CashAdjustmentModal from "../../components/Modal/CashAdjustmentModal";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
@@ -87,36 +79,34 @@ export default function CashInHand() {
     };
     const MODAL_TXN_TYPES = ["Payment_In", "Payment_Out"];
     const DELETE_CONFIG = {
-        Sale: {
-            title: "Delete Sale",
-            label: "sale invoice",
-        },
-        Purchase: {
-            title: "Delete Purchase",
-            label: "purchase bill",
-        },
-        Sale_Return: {
-            title: "Delete Credit Note",
-            label: "credit note",
-        },
-        Purchase_Return: {
-            title: "Delete Debit Note",
-            label: "debit note",
-        },
-        Payment_In: {
-            title: "Delete Payment In",
-            label: "payment in entry",
-        },
-        Payment_Out: {
-            title: "Delete Payment Out",
-            label: "payment out entry",
-        },
-    };
+  Sale: {
+    title: "Delete Sale",
+    label: "sale invoice",
+  },
+  Purchase: {
+    title: "Delete Purchase",
+    label: "purchase bill",
+  },
+  Sale_Return: {
+    title: "Delete Credit Note",
+    label: "credit note",
+  },
+  Purchase_Return: {
+    title: "Delete Debit Note",
+    label: "debit note",
+  },
+  Payment_In: {
+    title: "Delete Payment In",
+    label: "payment in entry",
+  },
+  Payment_Out: {
+    title: "Delete Payment Out",
+    label: "payment out entry",
+  },
+};
     const [modalState, setModalState] = useState({ open: false, type: null, id: null });
     const openModal = (type, id) => setModalState({ open: true, type, id });
     const closeModal = () => setModalState({ open: false, type: null, id: null });
-    const [rowMenuOpen, setRowMenuOpen] = useState(null);
-    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     //const location = useLocation();
     const page = Number(searchParams.get("page")) || 1;
@@ -127,7 +117,14 @@ export default function CashInHand() {
     const fromDate = searchParams.get("fromDate") || "";
     const toDate = searchParams.get("toDate") || "";
     const [cashAdjustmentModal, setCashAdjustmentModal] = useState({ open: false, mode: "add", data: null })
-
+    // const [fromDate, setFromDate] = useState('');
+    // const [toDate, setToDate] = useState('');
+    //   const { data: cashInHand, isLoading } = useGetAllSalesQuery({
+    //     page,
+    //     search: searchTerm,
+    //     fromDate,
+    //     toDate,
+    //   });
     const { data: cashBalance } = useGetCashBalanceQuery();
     const { data: cashInHand, isLoading } = useGetCashInHandQuery({ fromDate, toDate, page, search: searchTerm });
     console.log(cashInHand, "cashInHand", cashBalance, "cashBalance");
@@ -135,20 +132,10 @@ export default function CashInHand() {
     const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
     const { data: banks = [] } = useGetAllBankAccountsQuery();
     const { data: partiesList } = useGetAllPartiesQuery();
+    // const[selecedSales,setSelectedSales]= useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
-
-    useEffect(() => {
-        const closeRowMenu = () => {
-            setRowMenuOpen(null);
-        };
-
-        document.addEventListener("click", closeRowMenu);
-
-        return () => {
-            document.removeEventListener("click", closeRowMenu);
-        };
-    }, []);
-
+    //const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
+    //const navigate = useNavigate();
     const handlePageChange = (newPage) => {
         setSearchParams({
             page: newPage,
@@ -157,34 +144,9 @@ export default function CashInHand() {
             toDate,
         });
     };
-
-    const handleTransactionEdit = (row) => {
-        if (!row?.Formatted_Reference_Id) return;
-
-        // Payment In / Payment Out open their edit modals
-        if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-            openModal(
-                row.Txn_Type,
-                row.Formatted_Reference_Id
-            );
-            return;
-        }
-
-        // Other transactions open their edit page
-        const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-
-        if (!route) return;
-
-        navigate(
-            `/${route}/edit/${row.Formatted_Reference_Id}`,
-            {
-                state: {
-                    from: "cash-in-hand"
-                }
-            }
-        );
-    };
-
+    // const handlePageChange = (newPage) => {
+    //   setPage(newPage);
+    // }
     const handleNextPage = () => {
         setSearchParams({
             page: page + 1,
@@ -202,8 +164,24 @@ export default function CashInHand() {
             toDate,
         });
     };
+    //   const handleExportExcel = () => {
+    //     const params = new URLSearchParams();
+    //     if (searchTerm) params.set("search", searchTerm);
+    //     if (fromDate) params.set("fromDate", fromDate);
+    //     if (toDate) params.set("toDate", toDate);
+
+    //     // anchor download 
+    //     const url = `http://localhost:4000/api/sale/export-sale-excel?${params.toString()}`;
+    //     const a = document.createElement("a");
+    //     a.href = url;
+    //     a.download = "";          // filename comes from Content-Disposition header
+    //     document.body.appendChild(a);
+    //     a.click();
+    //     document.body.removeChild(a);
+    //   };
 
 
+    //console.log(cashInHand?.cashInHand);
     const handleSavePaymentIn = async (formData) => {
         try {
             await updatePaymentIn({ id: modalState.id, ...formData }).unwrap();
@@ -237,100 +215,127 @@ export default function CashInHand() {
             toast.error(err?.data?.message || "Failed to save payment out.");
         }
     };
-    const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
-    const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
-    const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
-    const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
-    const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
-    const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
-
-    const isDeleting =
-        isDeletingSale ||
-        isDeletingPurchase ||
+      const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
+   const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
+      const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
+       const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
+      const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
+       const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
+    
+       const isDeleting =
+      isDeletingSale ||
+         isDeletingPurchase ||
         isDeletingSaleReturn ||
-        isDeletingPurchaseReturn ||
+         isDeletingPurchaseReturn ||
         isDeletingPaymentIn ||
-        isDeletingPaymentOut;
-
+       isDeletingPaymentOut;
     const handleConfirmDelete = async () => {
-        if (!deleteTarget) return;
-
-        try {
-            let res;
-
-            switch (deleteTarget.Txn_Type) {
-                case "Sale":
-                    res = await deleteSale(deleteTarget.Id).unwrap();
-                    break;
-
-                case "Purchase":
-                    res = await deletePurchase(
-                        deleteTarget.Id
-                    ).unwrap();
-                    break;
-
-                case "Sale_Return":
-                    res = await deleteSaleReturn(deleteTarget.Id).unwrap();
-                    break;
-
-                case "Purchase_Return":
-                    res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
-                    break;
-
-                case "Payment_In":
-                    res = await deletePaymentIn(deleteTarget.Id).unwrap();
-                    break;
-
-                case "Payment_Out":
-                    res = await deletePaymentOut(deleteTarget.Id).unwrap();
-                    break;
-
-                default:
-                    toast.error(
-                        "Unknown transaction type — cannot delete"
-                    );
-                    return;
-            }
-
-            toast.success(res?.message || "Deleted successfully");
-
-            setDeleteTarget(null);
-            dispatch(partyApi.util.invalidateTags(["Party"]));
-            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-            dispatch(
-                bankAccountApi.util.invalidateTags(["BankAccount"])
-            );
-            dispatch(saleApi.util.invalidateTags(["Sale"]));
-            dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-            dispatch(
-                itemApi.util.invalidateTags([
-                    "Item",
-                    "ItemLedger",
-                ])
-            );
-
-        } catch (err) {
-
-            console.error(
-                "❌ Delete error:",
-                err
-            );
-
+      if (!deleteTarget) return;
+    
+      try {
+        let res;
+    
+        switch (deleteTarget.Txn_Type) {
+          case "Sale":
+            res = await deleteSale(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Purchase":
+            res = await deletePurchase(
+              deleteTarget.Id
+            ).unwrap();
+            break;
+    
+          case "Sale_Return":
+            res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Purchase_Return":
+             res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Payment_In":
+            res = await deletePaymentIn(deleteTarget.Id).unwrap();
+            break;
+    
+          case "Payment_Out":
+            res = await deletePaymentOut(deleteTarget.Id).unwrap();
+            break;
+    
+          default:
             toast.error(
-                err?.data?.message ||
-                "Failed to delete"
+              "Unknown transaction type — cannot delete"
             );
-            setDeleteTarget(null);
-
-            // IMPORTANT:
-            // Don't close modal here.
-            // User should see the error and can close it manually.
+            return;
         }
+    
+        toast.success(res?.message || "Deleted successfully");
+    
+        setDeleteTarget(null);
+        dispatch(partyApi.util.invalidateTags(["Party"]));
+         dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+       dispatch(
+    bankAccountApi.util.invalidateTags(["BankAccount"])
+  );
+  dispatch(saleApi.util.invalidateTags(["Sale"]));
+  dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+     dispatch(
+    itemApi.util.invalidateTags([
+      "Item",
+      "ItemLedger",
+    ])
+  );
+    
+      } catch (err) {
+    
+        console.error(
+          "❌ Delete error:",
+          err
+        );
+    
+        toast.error(
+          err?.data?.message ||
+          "Failed to delete"
+        );
+        setDeleteTarget(null);
+    
+        // IMPORTANT:
+        // Don't close modal here.
+        // User should see the error and can close it manually.
+      }
     }
-
-
     return (
         <>
+            {/* // <div className="container-fluid sb2  ">
+        //     <div className="sale">
+               
+        //         <div className="sb2-1">
+
+        //             <SideMenu/>
+        //         </div>
+
+               
+        //         <div className="sb2-2"> */}
+            {/* <div className="sb2-2-2">
+                <ul >
+                    <li>
+
+                        <NavLink style={{ display: "flex", flexDirection: "row" }}
+                            to="/home"
+
+                        >
+                            <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
+                            
+                            Dashboard
+                        </NavLink>
+                    </li>
+
+                </ul>
+            </div> */}
+            {/* <div className="sb2-2-3 ">
+        <div className="row">
+          <div className="col-md-12">
+            <div className="box-inn-sp"> */}
 
             <div className="flex flex-col bg-white ">
 
@@ -450,9 +455,43 @@ export default function CashInHand() {
 
                     </div>
 
+                    {/* <div className="flex flex-col bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
+
+            
+            <div className="mb-2 text-left">
+              <p className="text-sm font-medium text-black">Total Sales Amount</p>
+              <h4 className="text-3xl font-bold text-black">₹ {cashInHand?.totals?.totalAmount}</h4>
+            </div>
+
+           
+            <div className="border-t border-gray-300 mb-2"></div>
+
+           
+            <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
+              <div className="flex  ">
+                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
+                <span className="text-sm font-semibold text-black">₹ {cashInHand?.totals?.totalReceived}</span>
+              </div>
+
+              <div className="flex">
+                <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
+                <span className="text-sm font-semibold text-black">₹ {cashInHand?.totals?.totalBalance}</span>
+              </div>
+            </div>
+
+          </div> */}
 
                     <div className="bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
+                        {/* <p className="text-sm font-medium text-gray-500 mb-2">
+                            Cash In Hand
+                        </p> */}
 
+                        {/* <h4
+                            className={`text-3xl font-bold ${Number(cashInHand?.cashInHand) < 0 ? "text-red-600" : "text-green-600"
+                                }`}
+                        >
+                            ₹ {Number(cashInHand?.cashInHand ?? 0).toLocaleString("en-IN")}
+                        </h4> */}
                         <h4
                             style={{
                                 fontSize: "26px",
@@ -471,6 +510,9 @@ export default function CashInHand() {
                 </div>
 
 
+
+
+
                 <div className="tab-inn">
                     <div className="table-responsive table-desi">
                         {isLoading ? (
@@ -485,16 +527,18 @@ export default function CashInHand() {
 
                             <table className="w-full min-w-[500px]">
                                 <thead>
-
                                     <tr>
                                         <th className="text-left">Sl.No</th>
                                         <th className="text-left ">Type</th>
                                         <th className="text-left ">Name</th>
                                         <th className="text-left">Date</th>
                                         <th className="text-left">Amount </th>
-                                        <th></th>
-                                    </tr>
+                                        {/* <th className="text-left">Balance Due</th> */}
+                                        <th>View/Edit</th>
+                                        <th>Delete</th>
+                                        {/* <th>Return</th> */}
 
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {cashInHand && cashInHand?.ledger?.length > 0 ? (
@@ -505,13 +549,8 @@ export default function CashInHand() {
                                                     color: "#6b7280",
                                                     dir: row.Direction === "Credit" ? "in" : "out",
                                                 };
-
                                             return (
-                                                <tr
-                                                    key={idx}
-                                                    onDoubleClick={() => handleTransactionEdit(row)}
-                                                    className="cursor-pointer"
-                                                >
+                                                <tr key={idx}>
                                                     <td>
                                                         {(cashInHand?.currentPage - 1) * 10 + (idx + 1)}.
                                                     </td>
@@ -530,141 +569,50 @@ export default function CashInHand() {
                                                     </td>
                                                     <td style={{ color: meta.color, fontWeight: 600 }}>
                                                         {row?.Amount || "N/A"}</td>
+                                                    {/* //<td>{row?.Balance_Due || "N/A"}</td> */}
 
-                                                    {/* THREE DOT MENU */}
-                                                    <td
-                                                        className="py-2 px-2"
-                                                        style={{
-                                                            position: "relative",
-                                                            width: 50,
-                                                            textAlign: "center",
-                                                        }}
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-
-                                                                const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
-
-                                                                setRowMenuOpen(
-                                                                    rowMenuOpen === menuId ? null : menuId
-                                                                );
-                                                            }}
-                                                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                                                            style={{
-                                                                backgroundColor: "transparent",
-                                                                border: "none",
-                                                                cursor: "pointer",
-                                                            }}
-                                                            title="More"
-                                                        >
-                                                            <MoreVertical
-                                                                size={16}
-                                                                style={{ color: "#374151" }}
-                                                            />
-                                                        </button>
-
-                                                        {/* ROW MENU */}
-                                                        {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
-                                                            <div
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="absolute bg-white shadow-lg rounded-md"
-                                                                style={{
-                                                                    right: 0,
-                                                                    top: 32,
-                                                                    width: 150,
-                                                                    zIndex: 100,
-                                                                    border: "1px solid #e2e8f0",
-                                                                    overflow: "hidden",
-                                                                }}
-                                                            >
-
-                                                                {/* VIEW / EDIT */}
-                                                                {row.Formatted_Reference_Id && (
-                                                                    MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                            style={{ color: "#374151" }}
-                                                                            onClick={() => {
-                                                                                setRowMenuOpen(null);
-                                                                                openModal(
-                                                                                    row.Txn_Type,
-                                                                                    row.Formatted_Reference_Id
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            <Eye
-                                                                                size={13}
-                                                                                style={{ color: "#4CA1AF" }}
-                                                                            />
-                                                                            View / Edit
-                                                                        </button>
-                                                                    ) : (
-                                                                        <NavLink
-                                                                            to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
-                                                                            state={{ from: "cash-in-hand" }}
-                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                            style={{
-                                                                                color: "#374151",
-                                                                                textDecoration: "none",
-                                                                            }}
-                                                                            onClick={() => setRowMenuOpen(null)}
-                                                                        >
-                                                                            <Eye
-                                                                                size={13}
-                                                                                style={{ color: "#4CA1AF" }}
-                                                                            />
-                                                                            View / Edit
-                                                                        </NavLink>
-                                                                    )
-                                                                )}
-
-                                                                {/* PRINT */}
-                                                                <button
-                                                                    type="button"
-                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                    style={{ color: "#374151" }}
-                                                                    onClick={() => {
-                                                                        setRowMenuOpen(null);
-                                                                        console.log("Print transaction:", row);
-                                                                    }}
+                                                    {/* <td >
+                       
+                          <NavLink to={`/row/view/${row?.Sale_Id}${location.search}`}
+                            state={{ from: "all-row-list" }}>
+                            <Eye
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
+                      
+                        </td> */}
+                                                    <td>
+                                                        {row.Formatted_Reference_Id && (
+                                                            MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                                                                <Eye
+                                                                    style={{ cursor: "pointer", color: "#4CA1AF" }}
+                                                                    onClick={() => openModal(row.Txn_Type, row.Formatted_Reference_Id)}
+                                                                />
+                                                            ) : (
+                                                                <NavLink
+                                                                    to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
+                                                                    state={{ from: "cash-in-hand" }}
                                                                 >
-                                                                    <Printer
-                                                                        size={13}
-                                                                        style={{ color: "#4CA1AF" }}
-                                                                    />
-                                                                    Print
-                                                                </button>
-
-                                                                {/* DELETE */}
-                                                                <button
-                                                                    type="button"
-                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                                                    title="Delete transaction"
-                                                                    style={{
-                                                                        cursor: "pointer",
-                                                                        color: "#dc2626",
-                                                                    }}
-                                                                    onClick={() => {
-                                                                        setRowMenuOpen(null);
-
-                                                                        setDeleteTarget({
-                                                                            Id: row.Formatted_Reference_Id,
-                                                                            Txn_Type: row.Txn_Type,
-                                                                        });
-                                                                    }}
-                                                                >
-                                                                    <Trash2
-                                                                        size={13}
-                                                                        style={{ color: "#dc2626" }}
-                                                                    />
-                                                                    Delete
-                                                                </button>
-
-                                                            </div>
+                                                                    <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
+                                                                </NavLink>
+                                                            )
                                                         )}
+                                                    </td>
+                                                    <td>
+                                                        <Trash2
+                                                            size={18}
+                                                            style={{ cursor: "pointer", color: "#ef4444" }}
+                                                            onClick={() =>
+                                                                setDeleteTarget({
+                                                                    Id: row.Formatted_Reference_Id,
+                                                                    Txn_Type: row.Txn_Type,   // ✅ must be here
+                                                                    //Doc_Number: row.Doc_Number,
+                                                                })
+                                                            }
+                                                        />
                                                     </td>
 
                                                 </tr>
@@ -672,7 +620,7 @@ export default function CashInHand() {
                                         })
                                     ) : (
                                         <tr>
-                                            <td className="mx-auto text-center" colSpan={6}>
+                                            <td className="mx-auto text-center" colSpan={10}>
                                                 No cash in hand found
                                             </td>
                                         </tr>
@@ -864,7 +812,7 @@ export default function CashInHand() {
                     onClose={() => setDeleteTarget(null)}
                     onConfirm={handleConfirmDelete}
                     isDeleting={isDeleting}
-                //isDeleting={false}
+                    //isDeleting={false}
                 />
             )}
         </>

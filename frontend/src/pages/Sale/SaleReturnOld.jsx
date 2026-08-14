@@ -1,63 +1,54 @@
 
-import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useDeleteSaleMutation, useGetAllSalesQuery, useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { NavLink, useLocation, useSearchParams } from "react-router-dom";
 
-import {
-  Download,
-  Eye,
-  FileSpreadsheet,
-  LayoutDashboard,
-  MoreVertical,
-  Printer,
-  Trash2,
-  Undo2
-} from "lucide-react";
 
-import { useState, useEffect, useRef } from "react";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2 } from "lucide-react";
+import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
-import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import { useReactToPrint } from "react-to-print";
+import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 
-export default function AllSaleList() {
-  const dispatch = useDispatch()
+// import { SiMicrosoftexcel } from "react-icons/si";
+export default function SaleReturn() {
+  const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || "";
+  // const [page, setPage] = useState(1);
+  //const [searchTerm, setSearchTerm] = useState("");
   const fromDate = searchParams.get("fromDate") || "";
   const toDate = searchParams.get("toDate") || "";
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [rowMenuOpen, setRowMenuOpen] = useState(null);
-  const [deleteSale, { isLoading: isDeleting }] = useDeleteSaleMutation();
-const [printSaleId, setPrintSaleId] = useState(null);
-
-const printRef = useRef(null);
-
-const { data: printData } = useGetSingleSaleQuery(printSaleId, {
-  skip: !printSaleId,
-});
-  const { data: sales, isLoading } = useGetAllSalesQuery({
+  // const [fromDate, setFromDate] = useState('');
+  // const [toDate, setToDate] = useState('');
+  // const { data: saleReturns, isLoading } = useGetAllSalesQuery({
+  //   page,
+  //   search: searchTerm,
+  //   fromDate,
+  //   toDate,
+  // });
+  const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
+  const [deleteSaleReturn, { isLoading: isDeleting }] = useDeleteSaleReturnMutation();
+  const { data: saleReturns, isLoading } = useGetAllSaleReturnsQuery({
     page,
     search: searchTerm,
     fromDate,
     toDate,
   });
-  console.log(sales);
+  const [printSaleReturnId, setPrintSaleReturnId] = useState(null);
+  const printRef = useRef(null);
+  // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetSaleReturnByIdQuery(printSaleReturnId, {
+    skip: !printSaleReturnId,
+  });
+  //console.log(saleReturns);
 
-  const navigate = useNavigate();
+  // const[selecedSales,setSelectedSales]= useState(null);
 
-  useEffect(() => {
-    const closeRowMenu = () => {
-      setRowMenuOpen(null);
-    };
-    document.addEventListener("click", closeRowMenu);
-    return () => {
-      document.removeEventListener("click", closeRowMenu);
-    };
-  }, []);
 
   const handlePageChange = (newPage) => {
     setSearchParams({
@@ -67,7 +58,9 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       toDate,
     });
   };
-
+  // const handlePageChange = (newPage) => {
+  //   setPage(newPage);
+  // }
   const handleNextPage = () => {
     setSearchParams({
       page: page + 1,
@@ -85,7 +78,6 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       toDate,
     });
   };
-
   const handleExportExcel = () => {
     const params = new URLSearchParams();
     if (searchTerm) params.set("search", searchTerm);
@@ -102,18 +94,15 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
     document.body.removeChild(a);
   };
 
-  // const handlePrint = (sale) => {
-  //   console.log("Print sale:", sale);
-  // };
-
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
     try {
       console.log(deleteTarget);
-      const res = await deleteSale(deleteTarget.Sale_Id).unwrap();
-      toast.success(res?.message || "Purchase deleted successfully");
+      const res = await deleteSaleReturn(deleteTarget.Sale_Return_Id).unwrap();
+      toast.success(res?.message || "Credit Note deleted successfully");
       setDeleteTarget(null);
+
       dispatch(
         itemApi.util.invalidateTags([
           "Item",
@@ -122,25 +111,54 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       );
     } catch (err) {
       console.log(err);
-      toast.error(err?.data?.message || "Failed to delete purchase");
+      toast.error(err?.data?.message || "Failed to delete credit note");
     }
   };
-const handlePrint = useReactToPrint({
-  contentRef: printRef,
-  documentTitle: printSaleId
-    ? `Sale-${printSaleId}`
-    : "Sale",
-  onAfterPrint: () => setPrintSaleId(null),
-});
-useEffect(() => {
-  if (printData && printSaleId) {
-    handlePrint();
-  }
-}, [printData, printSaleId]);
-  console.log(sales?.sales);
+  // console.log(saleReturns?.saleReturns);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printSaleReturnId ? `Purchase-${printSaleReturnId}` : "Purchase",
+    onAfterPrint: () => setPrintSaleReturnId(null),
+  });
 
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printSaleReturnId) {
+      handlePrint();
+    }
+  }, [printData, printSaleReturnId]);
   return (
     <>
+      {/* // <div className="container-fluid sb2  ">
+        //     <div className="row">
+               
+        //         <div className="sb2-1">
+
+        //             <SideMenu/>
+        //         </div>
+
+               
+        //         <div className="sb2-2"> */}
+      {/* <div className="sb2-2-2">
+        <ul >
+          <li>
+
+            <NavLink style={{ display: "flex", flexDirection: "row" }}
+              to="/home"
+
+            >
+              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
+           
+              Dashboard
+            </NavLink>
+          </li>
+
+        </ul>
+      </div> */}
+      {/* <div className="sb2-2-3 ">
+        <div className="row">
+          <div className="col-md-12">
+            <div className="box-inn-sp"> */}
 
       <div className="flex flex-col bg-white ">
 
@@ -149,14 +167,14 @@ useEffect(() => {
 
             <div className="flex flex-row justify-between items-center mb-4 sm:mb-4">
               <div>
-                <h4 className="text-2xl font-bold mb-1">All Sales</h4>
+                <h4 className="text-2xl font-bold mb-1">Credit Notes</h4>
                 <p className="text-gray-500 text-sm sm:text-base">
-                  All Sale Details
+                  All Credit Note Details
                 </p>
               </div>
 
 
-              <button
+              {/* <button
                 style={{
                   outline: "none",
                   boxShadow: "none",
@@ -166,8 +184,9 @@ useEffect(() => {
                 onClick={() => navigate("/sale/add")}
               >
                 Add Sale
-              </button>
+              </button> */}
             </div>
+
 
             <div
 
@@ -193,6 +212,7 @@ useEffect(() => {
                       toDate,
                     });
                   }}
+                  // onChange={(e) => setFromDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
                   title="Search from date"
                 />
@@ -212,6 +232,7 @@ useEffect(() => {
                       toDate: e.target.value,
                     });
                   }}
+                  // onChange={(e) => setToDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
                   title="Search to date"
                 />
@@ -231,12 +252,13 @@ useEffect(() => {
                       toDate,
                     });
                   }}
+                  // onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-56"
                 />
               </div>
 
 
-              <div className="hidden sm:block">
+              {/* <div className="hidden sm:block">
                 <button
                   style={{
                     outline: "none",
@@ -248,8 +270,9 @@ useEffect(() => {
                 >
                   Add Sale
                 </button>
-              </div>
+              </div> */}
             </div>
+
 
           </div>
 
@@ -257,8 +280,8 @@ useEffect(() => {
 
             {/* Total Sales */}
             <div className="mb-2 text-left">
-              <p className="text-sm font-medium text-black">Total Sales Amount</p>
-              <h4 className="text-3xl font-bold text-black">₹ {sales?.totals?.totalAmount}</h4>
+              <p className="text-sm font-medium text-black">Total  Amount</p>
+              <h4 className="text-3xl font-bold text-black">₹ {saleReturns?.totals?.totalAmount}</h4>
             </div>
 
             {/* Divider */}
@@ -267,19 +290,26 @@ useEffect(() => {
             {/* Received & Balance */}
             <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
               <div className="flex  ">
-                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {sales?.totals?.totalReceived}</span>
+                <span className="text-sm font-medium text-gray-500">Total Paid &nbsp; &nbsp;</span>
+                <span className="text-sm font-semibold text-black">₹ {saleReturns?.totals?.totalPaid}</span>
               </div>
 
               <div className="flex">
                 <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {sales?.totals?.totalBalance}</span>
+                <span className="text-sm font-semibold text-black">₹ {saleReturns?.totals?.totalBalance}</span>
               </div>
             </div>
 
           </div>
           <div className="flex justify-end sm: mt-4">
-
+            {/* <button
+  type="button"
+  onClick={handleExportExcel}
+  className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#217346] text-white shadow-md transition-all hover:scale-105 hover:shadow-lg active:scale-95"
+  title="Export to Excel"
+>
+  <SiMicrosoftexcel size={22} />
+</button> */}
             <button
               type="button"
               onClick={handleExportExcel}
@@ -294,219 +324,135 @@ useEffect(() => {
           </div>
         </div>
 
+
+
+
+
         <div className="tab-inn">
           <div className="table-responsive table-desi">
             {isLoading ? (
-              <p className="text-center mt-4">Fetching sales...</p>
-            ) : sales?.length === 0 ? (
-              <p className="text-center mt-4">No sales found.</p>
+              <p className="text-center mt-4">Fetching saleReturns...</p>
+            ) : saleReturns?.length === 0 ? (
+              <p className="text-center mt-4">No saleReturns found.</p>
             ) : (
+
+
+
+
 
               <table className="w-full min-w-[500px]">
                 <thead>
                   <tr>
                     <th className="text-left">Sl.No</th>
-                    <th className="text-left ">Date</th>
-                    <th className="text-left ">Invoice No.</th>
+                    <th className="text-left ">Invoice Date</th>
                     <th className="text-left ">Party Name</th>
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
-                    <th className="text-left">Balance </th>
-                    <th></th>
+                    <th className="text-left">Paid</th>
+                    <th className="text-left">Balance Due</th>
+                    {/* <th>View</th> */}
+                    <th>View/Edit</th>
+                    <th>Delete</th>
+                    <th>Print</th>
+
                   </tr>
                 </thead>
                 <tbody>
-                  {sales && sales?.sales?.length > 0 ? (
-                    sales?.sales?.map((sale, idx) => (
-                      <tr
-                        key={sale?.Sale_Id}
-                        onDoubleClick={() => {
-                          navigate(
-                            `/sale/edit/${sale?.Sale_Id}${location.search}`,
-                            {
-                              state: {
-                                from: "all-sale-list"
-                              }
-                            }
-                          );
-                        }}
-                        style={{ cursor: "pointer" }}
-                      >
+                  {saleReturns && saleReturns?.saleReturns?.length > 0 ? (
+                    saleReturns?.saleReturns?.map((saleReturn, idx) => (
+                      <tr key={saleReturn?.id}>
                         <td>
-                          {(sales?.currentPage - 1) * 10 + (idx + 1)}.
+                          {(saleReturns?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
                         <td >
-                          {sale?.Invoice_Date
-                            ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
+                          {saleReturn?.Invoice_Date
+                            ? new Date(saleReturn?.Invoice_Date).toLocaleDateString("en-IN", {
                               day: "numeric",
                               month: "numeric",
                               year: "numeric",
                             })
                             : "N/A"}
                         </td>
-                        <td>
-                          {sale?.Invoice_Number
-                            ? sale?.Invoice_Number
+
+                        <td>{saleReturn?.Party_Name || "N/A"}</td>
+                        {/* <td>
+                          {saleReturn?.Payment_Type
+                            ? saleReturn.Payment_Type === "Bank"
+                              ? `Bank (${saleReturn?.Bank_Display_Name || "N/A"})`
+                              : saleReturn.Payment_Type
                             : "N/A"}
-                        </td>
-                        <td >{sale?.Party_Name || "N/A"}</td>
-                        <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
+                        </td> */}
+                        <td>{saleReturn?.Payment_Type_Display || "N/A"}</td>
+                        <td>{saleReturn?.Total_Amount || "N/A"}</td>
+                        <td>{saleReturn?.Total_Paid || "N/A"}</td>
+                        <td>{saleReturn?.Balance_Due || "N/A"}</td>
 
-                        <td>{sale?.Total_Amount || "N/A"}</td>
-                        <td>{sale?.Balance_Due || "N/A"}</td>
+                        {/* <td > */}
+                        {/* <NavLink
+                                  to={`/saleReturn/edit/${saleReturn.Sale_Id}${location.search}`}
 
-                        <td
-                          className="py-2 px-2"
-                          style={{
-                            position: "relative",
-                            width: 50,
-                            textAlign: "center"
-                          }}
-                        >
-                          {/* THREE DOT BUTTON */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              setRowMenuOpen(
-                                rowMenuOpen === sale?.Sale_Id
-                                  ? null
-                                  : sale?.Sale_Id
-                              );
-                            }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                            style={{
-                              backgroundColor: "transparent",
-                              border: "none",
-                              cursor: "pointer"
-                            }}
-                            title="More"
-                          >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
-
-                          {/* THREE DOT MENU */}
-                          {rowMenuOpen === sale?.Sale_Id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute bg-white shadow-lg rounded-md"
+                                > */}
+                        {/* <NavLink to={`/saleReturn/view/${saleReturn?.Sale_Id}`}
+                                  state={{ from: "all-saleReturn-list" }}> */}
+                        {/* <NavLink to={`/saleReturn/view/${saleReturn?.Sale_Id}${location.search}`}
+                            state={{ from: "all-saleReturn-list" }}>
+                            <Eye
                               style={{
-                                right: 0,
-                                top: 32,
-                                width: 150,
-                                zIndex: 100,
-                                border: "1px solid #e2e8f0",
-                                overflow: "hidden"
-                              }}
-                            >
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink> */}
+                        {/* <i
+                                                                    style={{
+                                                                        cursor: "pointer",
+                                                                        backgroundColor: "transparent",
+                                                                        color: "#7346ff"
+                                                                    }}
+                                                                    className="fa fa-eye mr-o" aria-hidden="true"></i> */}
+                        {/* //</td> */}
+                        <td>
+                          {/* <NavLink to={`/sale/edit/${saleReturn?.Sale_Id}`}
+                                                                state={{from:"all-sale-list"}}>               */}
+                          <NavLink
+                            to={`/sale/return/edit/${saleReturn.id}${location.search}`}
+                            state={{ from: "all-sale-return-list" }}
 
-                              {/* VIEW / EDIT */}
-                              <NavLink
-                                to={`/sale/edit/${sale?.Sale_Id}${location.search}`}
-                                state={{
-                                  from: "all-sale-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Eye
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
+                          >
 
-                                View / Edit
-                              </NavLink>
+                            <SquarePen
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
 
-
-                              {/* RETURN */}
-                              <NavLink
-                                to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
-                                state={{
-                                  from: "sale-return-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Undo2
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Return
-                              </NavLink>
-
-
-                              {/* PRINT */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  backgroundColor: "transparent",
-                                  border: "none",
-                                  cursor: "pointer"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-                                 setPrintSaleId(sale.Sale_Id)
-                                }}
-                              >
-                                <Printer
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Print
-                              </button>
-
-
-                              {/* DELETE */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                style={{
-                                  cursor: "pointer",
-                                  color: "#dc2626",
-                                  backgroundColor: "transparent",
-                                  border: "none"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-
-                                  setDeleteTarget({
-                                    Sale_Id: sale?.Sale_Id
-                                  });
-                                }}
-                              >
-                                <Trash2
-                                  size={13}
-                                  style={{ color: "#dc2626" }}
-                                />
-
-                                Delete
-                              </button>
-
-                            </div>
-                          )}
                         </td>
+                        <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Sale_Return_Id: saleReturn.id,
 
+                              })
+                            }
+                          />
+                        </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{ cursor: "pointer", color: "#4CA1AF" }}
+                            onClick={() => setPrintSaleReturnId(saleReturn.id)}
+                          />
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td className="mx-auto text-center" colSpan={8}>
+                      <td className="mx-auto text-center" colSpan={10}>
                         No sale found
                       </td>
                     </tr>
@@ -514,6 +460,14 @@ useEffect(() => {
                 </tbody>
 
               </table>
+
+
+
+
+
+
+
+
 
             )}
           </div>
@@ -536,9 +490,23 @@ useEffect(() => {
             {/* PAGE NUMBERS — DESKTOP / TABLET */}
             <div style={{ marginRight: "0px" }}
               className="hidden sm:flex space-x-2">
-
+              {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
+        <button
+          key={index}
+          onClick={() => handlePageChange(index + 1)}
+          className={
+            `px-3 py-1 rounded ${
+              page === index + 1
+                ? 'bg-[#ff0000] text-white'
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`
+          }
+        >
+          {index + 1}
+        </button>
+      ))} */}
               {(() => {
-                const totalPages = sales?.totalPages || 1;
+                const totalPages = saleReturns?.totalPages || 1;
                 const maxVisible = 5; // how many pages around current
                 const pages = [];
 
@@ -615,18 +583,18 @@ useEffect(() => {
 
             {/* CURRENT PAGE — MOBILE ONLY */}
             <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-              Page {page} / {sales?.totalPages || 1}
+              Page {page} / {saleReturns?.totalPages || 1}
             </div>
 
             {/* NEXT */}
             <button
               type="button"
               onClick={() => handleNextPage()}
-              disabled={page === sales?.totalPages ||
-                sales?.totalPages === 0}
+              disabled={page === saleReturns?.totalPages ||
+                saleReturns?.totalPages === 0}
               className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === sales?.totalPages ||
-                  sales?.totalPages === 0
+        ${page === saleReturns?.totalPages ||
+                  saleReturns?.totalPages === 0
                   ? 'opacity-50 '
                   : ''
                 }
@@ -637,33 +605,71 @@ useEffect(() => {
 
           </div>
         </div>
+        {/* <div className="flex justify-center align-center space-x-2 p-4">
+                <button type="button"
+                  onClick={() => handlePreviousPage()}
+                  disabled={page === 1}
+                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+                ${page === 1 ? 'opacity-50 ' : ''}
+                `}
+                >
+                  ← Previous
+                </button>
+                {[...Array(saleReturns?.totalPages).keys()].map((index) => (
+                  <button
+                    key={index}
+                    onClick={() => handlePageChange(index + 1)}
+                    // className={`px-3 py-1 rounded ${page === index + 1 ? 'bg-[#7346ff] text-white' : 'bg-gray-200 hover:bg-gray-300'
+                    //   }`}
+                    className={
+                      `px-3 py-1 rounded ${page === index + 1 ? 'bg-[#4CA1AF] text-white' :
+                        'bg-gray-200 hover:bg-gray-300'
+                      }`}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
 
+                <button type="button"
+                  onClick={() => handleNextPage()}
+                  disabled={page === saleReturns?.totalPages || saleReturns?.totalPages === 0}
+                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+                ${page === saleReturns?.totalPages || saleReturns?.totalPages === 0 ? 'opacity-50 ' : ''}
+                `}
+                >
+                  Next →
+                </button>
+              </div> */}
       </div>
-
       {deleteTarget && (
         <DeleteConfirmModal
-          title="Delete Sale"
-          message={`Are you sure you want to delete this sale invoice ? This action cannot be undone.`}
+          title="Delete Credit Note"
+          //message={`Are you sure you want to delete purchase bill "${deleteTarget.Bill_Number || deleteTarget.Purchase_Id}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete this credit note ? This action cannot be undone.`}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
+
         />
       )}
-       {printData?.invoicePartyDetails && (
+      {printData?.saleReturn && (
         <div style={{ display: "none" }}>
-          <InvoicePrintTemplate
+          <CreditDebitNotePrintTemplate
             ref={printRef}
-            type="sale"
+            type="credit"
             invoice={{
-              ...printData.invoicePartyDetails,   // ✅ matches backend response key
-              items: printData.items || [],
+              ...printData.saleReturn,
+              items: printData.saleReturn.items || [],
               companyDetails: {},
-              
+
             }}
           />
         </div>
       )}
+    
+
     </>
+
 
   )
 }

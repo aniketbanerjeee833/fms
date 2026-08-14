@@ -1249,6 +1249,7 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
     const limit = 10;
     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
     const searchDate = req.query.date || null;
+    const normalizedSearch = search.replace(/-/g, "/");
     //const cursor = req.query.cursor ? Number(req.query.cursor) : null;
     const cursor = req.query.cursor || null;
     if (!Party_Id) {
@@ -1369,23 +1370,44 @@ if (cursor) {
     });
   }
 }
-
 if (searchDate) {
-  where += ` AND pl.Txn_Date = ?`;
+  where += ` AND DATE(pl.Txn_Date) = ?`;
   params.push(searchDate);
 }
 
+// if (searchDate) {
+//   where += ` AND pl.Txn_Date = ?`;
+//   params.push(searchDate);
+// }
+
+// if (search) {
+//   where += ` AND (
+//     pl.Doc_Number LIKE ?
+//     OR CAST(pl.Amount AS CHAR) LIKE ?
+//     OR CAST(pl.Balance_Due AS CHAR) LIKE ?
+//   )`;
+
+//   params.push(
+//     `%${search}%`,
+//     `%${search}%`,
+//     `%${search}%`
+//   );
+// }
 if (search) {
   where += ` AND (
     pl.Doc_Number LIKE ?
     OR CAST(pl.Amount AS CHAR) LIKE ?
     OR CAST(pl.Balance_Due AS CHAR) LIKE ?
+    OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
+    OR DATE_FORMAT(pl.Txn_Date,'%e/%c/%Y') LIKE ?
   )`;
 
   params.push(
     `%${search}%`,
     `%${search}%`,
-    `%${search}%`
+    `%${search}%`,
+    `%${normalizedSearch}%`,
+    `%${normalizedSearch}%`
   );
 }
 
@@ -1853,7 +1875,154 @@ const getAllPartiesPayablesLeft = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+// const getAllPartiesPayablesLeft = async (req, res, next) => {
+//   let connection;
 
+//   try {
+//     connection = await db.getConnection();
+
+//     const limit = parseInt(req.query.limit, 10) || 10;
+//     const search = req.query.search?.trim().toLowerCase() || "";
+//     const normalizedSearch = search.replace(/-/g, "/");
+//     const cursor = req.query.cursor || null;
+
+//     const whereClauses = [`pl.Running_Balance < 0`];
+//     const params = [];
+
+//     // =====================================
+//     // SEARCH
+//     // =====================================
+//     if (search) {
+//       whereClauses.push(`
+//         (
+//           LOWER(a.Party_Name) LIKE ?
+//           OR a.Phone_Number LIKE ?
+//           OR a.Party_Id LIKE ?
+//           OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
+//           OR DATE_FORMAT(pl.Txn_Date,'%e/%c/%Y') LIKE ?
+//           OR CAST(ABS(pl.Running_Balance) AS CHAR) LIKE ?
+//         )
+//       `);
+
+//       params.push(
+//         `%${search}%`,
+//         `%${search}%`,
+//         `%${search}%`,
+//         `%${normalizedSearch}%`,
+//         `%${normalizedSearch}%`,
+//         `%${search}%`
+//       );
+//     }
+
+//     // =====================================
+//     // CURSOR PAGINATION
+//     // =====================================
+//     if (cursor) {
+//       try {
+//         const decoded = JSON.parse(
+//           Buffer.from(cursor, "base64").toString("utf8")
+//         );
+
+//         if (!decoded.date || !decoded.id) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid cursor",
+//           });
+//         }
+
+//         whereClauses.push(`
+//           (
+//             pl.Txn_Date < ?
+//             OR (
+//               pl.Txn_Date = ?
+//               AND a.id < ?
+//             )
+//           )
+//         `);
+
+//         params.push(
+//           decoded.date,
+//           decoded.date,
+//           Number(decoded.id)
+//         );
+//       } catch {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid cursor",
+//         });
+//       }
+//     }
+
+//     const whereSQL = `WHERE ${whereClauses.join(" AND ")}`;
+
+//     const [rows] = await connection.query(
+//       `
+//       SELECT
+//           a.id AS party_row_id,
+//           a.Party_Id,
+//           a.Party_Name,
+//           a.Phone_Number,
+//           a.GSTIN,
+
+//           ABS(pl.Running_Balance) AS Balance,
+
+//           pl.Txn_Date AS Last_Txn_Date,
+//           pl.id AS Ledger_Id
+
+//       FROM add_party a
+
+//       INNER JOIN party_ledger pl
+//         ON pl.Party_Id = a.Party_Id
+//        AND pl.id = (
+//             SELECT MAX(id)
+//             FROM party_ledger
+//             WHERE Party_Id = a.Party_Id
+//        )
+
+//       ${whereSQL}
+
+//       ORDER BY
+//           pl.Txn_Date DESC,
+//           a.id DESC
+
+//       LIMIT ?
+//       `,
+//       [...params, limit + 1]
+//     );
+
+//     const hasMore = rows.length > limit;
+
+//     const pageRows = hasMore
+//       ? rows.slice(0, limit)
+//       : rows;
+
+//     let nextCursor = null;
+
+//     if (hasMore && pageRows.length > 0) {
+//       const last = pageRows[pageRows.length - 1];
+
+//       nextCursor = Buffer.from(
+//         JSON.stringify({
+//           date: last.Last_Txn_Date,
+//           id: last.party_row_id,
+//         })
+//       ).toString("base64");
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       parties: pageRows,
+//       hasMore,
+//       nextCursor,
+//     });
+
+//   } catch (err) {
+//     console.error("❌ getAllPartiesPayablesLeft:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 
 //  GET ALL PARTIES WITH RECEIVABLES FROM  SALES
 const getAllPartiesReceivablesLeft = async (req, res, next) => {
@@ -1967,8 +2136,169 @@ const getAllPartiesReceivablesLeft = async (req, res, next) => {
   }
 };
 
+const getAllPayableParties = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const search = req.query.search?.trim() || "";
+
+    let whereClause = `
+      WHERE pl.Running_Balance < 0
+    `;
+
+    const params = [];
+
+    if (search) {
+      whereClause += `
+        AND (
+          p.Party_Name LIKE ?
+          OR p.Phone_Number LIKE ?
+          OR p.GSTIN LIKE ?
+          OR p.Party_Id LIKE ?
+          OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
+          OR CAST(ABS(pl.Running_Balance) AS CHAR) LIKE ?
+        )
+      `;
+
+      const like = `%${search}%`;
+
+      params.push(
+        like,
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    const [parties] = await connection.query(
+      `
+      SELECT
+        p.Party_Id,
+        p.Party_Name,
+        p.Phone_Number,
+        p.GSTIN,
+        ABS(pl.Running_Balance) AS Balance,
+        pl.Txn_Date AS Last_Txn_Date
+
+      FROM add_party p
+
+      INNER JOIN party_ledger pl
+        ON pl.Party_Id = p.Party_Id
+       AND pl.id = (
+          SELECT MAX(id)
+          FROM party_ledger
+          WHERE Party_Id = p.Party_Id
+       )
+
+      ${whereClause}
+
+      ORDER BY p.Party_Name ASC
+      `,
+      params
+    );
+
+    return res.status(200).json({
+      success: true,
+      totalParties: parties.length,
+      parties
+    });
+
+  } catch (err) {
+    console.error(err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+const getAllReceivableParties = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const search = req.query.search?.trim() || "";
+
+    let whereClause = `
+      WHERE pl.Running_Balance > 0
+    `;
+
+    const params = [];
+
+    if (search) {
+      whereClause += `
+        AND (
+          p.Party_Name LIKE ?
+          OR p.Phone_Number LIKE ?
+          OR p.GSTIN LIKE ?
+          OR p.Party_Id LIKE ?
+          OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
+          OR CAST(pl.Running_Balance AS CHAR) LIKE ?
+        )
+      `;
+
+      const like = `%${search}%`;
+
+      params.push(
+        like,
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    const [parties] = await connection.query(
+      `
+      SELECT
+        p.Party_Id,
+        p.Party_Name,
+        p.Phone_Number,
+        p.GSTIN,
+
+        pl.Running_Balance AS Balance,
+
+        pl.Txn_Date AS Last_Txn_Date
+
+      FROM add_party p
+
+      INNER JOIN party_ledger pl
+        ON pl.Party_Id = p.Party_Id
+       AND pl.id = (
+          SELECT MAX(id)
+          FROM party_ledger
+          WHERE Party_Id = p.Party_Id
+       )
+
+      ${whereClause}
+
+      ORDER BY p.Party_Name ASC
+      `,
+      params
+    );
+
+    return res.status(200).json({
+      success: true,
+      totalParties: parties.length,
+      parties,
+    });
+
+  } catch (err) {
+    console.error(err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 export { addParty,editParty,getAllParties,getSinglePartyDetailsSalesPurchases,
-  printSinglePartyDetailsSalesPurchasesReport,getAllPartiesPayablesLeft,getAllPartiesReceivablesLeft
+  printSinglePartyDetailsSalesPurchasesReport,getAllPartiesPayablesLeft,getAllPartiesReceivablesLeft,
+  getAllPayableParties,getAllReceivableParties
  };  // ✅ for ESM
 // const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
 //   let connection;

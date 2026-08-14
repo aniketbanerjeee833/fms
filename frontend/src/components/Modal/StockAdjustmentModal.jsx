@@ -102,7 +102,7 @@ console.log(editingAdjustment)
       } else {
         res = await addStockAdjustment(payload).unwrap();
       }
-      dispatch(itemApi.util.invalidateTags(["Item"]));
+      dispatch(itemApi.util.invalidateTags(["Item","ItemLedger"]));
       toast.success(res?.message || `Stock ${isEditMode ? "adjustment updated" : "adjusted"} successfully`);
       onSave?.(res?.adjustment || payload);
       onClose();

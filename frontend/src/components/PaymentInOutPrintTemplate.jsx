@@ -388,7 +388,7 @@ const PaymentInOutPrintTemplate = forwardRef(({ payment, type = "in" }, ref) => 
             <div className="receipt-bottom-grid">
                 <div className="receipt-bottom-left">
 
-                    <table className="receipt-table">
+                    {/* <table className="receipt-table">
                         <thead>
                             <tr>
                                 <th className="receipt-section-header receipt-text-center">
@@ -401,31 +401,22 @@ const PaymentInOutPrintTemplate = forwardRef(({ payment, type = "in" }, ref) => 
                                 <td className="receipt-words-body">{amountInWords}</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table> */}
+                     <div>
+            <div className="receipt-section-header ">
+              Bill Amount In Words
+            </div>
+
+            <div className="receipt-words-body">
+              {amountInWords}
+            </div>
+          </div>
+
                 </div>
 
                 {/* AMOUNT IN WORDS */}
                 <div className="receipt-bottom-right">
-                    {/* <table className="receipt-table">
-                <thead>
-                    <tr>
-                        <th className="receipt-section-header receipt-w70">Amounts</th>
-                        <th className="receipt-section-header receipt-section-header-right receipt-w30"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td className="receipt-cell">
-                            {type === "in" ? "Received" : "Paid"}
-                        </td>
-                        <td className="receipt-cell receipt-cell-right receipt-bold">
-                            ₹ {money(amount)}
-                        </td>
-                    </tr>
-
-               
-                </tbody>
-            </table> */}
+                    
                     <div className="receipt-amounts">
 
                         <div className="receipt-amounts-header">

@@ -621,6 +621,7 @@ export default function PurchaseAdd() {
       dispatch(
         partyApi.util.invalidateTags([
           "Party",
+          "PartyLedger",
         ])
       );
 
@@ -2228,13 +2229,13 @@ export default function PurchaseAdd() {
                                       // }
 
                                       // const roundedPrice = newPrice.toFixed(2);
-//                                       If going to the original unit
-//         ↓
-// Restore basePrice
+                                      //                                       If going to the original unit
+                                      //         ↓
+                                      // Restore basePrice
 
-// Otherwise
-//         ↓
-// Convert basePrice
+                                      // Otherwise
+                                      //         ↓
+                                      // Convert basePrice
                                       const basePrice =
                                         Number(basePurchasePriceRef.current[i]) || 0;
 

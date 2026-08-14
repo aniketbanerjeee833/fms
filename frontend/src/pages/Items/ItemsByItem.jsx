@@ -5,11 +5,16 @@ import {
     Search,
     MoreVertical,
     ChevronRight,
-    Package
+    Package,
+    Eye,
+    SquarePen,
+    Trash2,
+    Printer
 } from "lucide-react";
 
 import {
     itemApi,
+    useDeleteStockAdjustmentMutation,
     useGetAllItemsForLedgerQuery,
     useGetItemBillsQuery,
 } from "../../redux/api/itemApi";
@@ -19,16 +24,20 @@ import ItemModal from "../../components/Modal/ItemModal";
 import StockAdjustmentModal from "../../components/Modal/StockAdjustmentModal";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
-import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
-import { purchaseApi, useDeletePurchaseMutation } from "../../redux/api/purchaseApi";
-import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
-import { useDeletePaymentInMutation } from "../../redux/api/paymentInApi";
-import { useDeletePaymentOutMutation } from "../../redux/api/paymentOutApi";
-import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
+import { saleApi, useDeleteSaleMutation, useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { purchaseApi, useDeletePurchaseMutation, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
+import { useDeleteSaleReturnMutation, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
+import { useDeletePaymentInMutation, useGetPaymentInByIdQuery } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery } from "../../redux/api/paymentOutApi";
+import { useDeletePurchaseReturnMutation, useGetPurchaseReturnByIdQuery } from "../../redux/api/purchaseReturnApi";
 import { partyApi } from "../../redux/api/partyAPi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi } from "../../redux/api/bankAccountApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { useReactToPrint } from "react-to-print";
+import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
+import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 
 
 const fmt = (n) =>
@@ -367,15 +376,17 @@ export default function ItemsByItem() {
     const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
     const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
     const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
-
+    const [deleteStockAdjustment, { isLoading: isDeletingStockAdjustment }] = useDeleteStockAdjustmentMutation();
     const isDeleting =
         isDeletingSale ||
         isDeletingPurchase ||
         isDeletingSaleReturn ||
         isDeletingPurchaseReturn ||
         isDeletingPaymentIn ||
-        isDeletingPaymentOut;
+        isDeletingPaymentOut ||
+        isDeletingStockAdjustment;
     const handleConfirmDelete = async () => {
+        console.log("Deleting:", deleteTarget);
         if (!deleteTarget) return;
 
         try {
@@ -406,6 +417,10 @@ export default function ItemsByItem() {
 
                 case "Payment_Out":
                     res = await deletePaymentOut(deleteTarget.Id).unwrap();
+                    break;
+                case "Add_Adjustment":
+                case "Reduce_Adjustment":
+                    res = await deleteStockAdjustment(deleteTarget.Id).unwrap();
                     break;
 
                 default:
@@ -450,7 +465,59 @@ export default function ItemsByItem() {
             // User should see the error and can close it manually.
         }
     };
+    const printRef = useRef(null);
+    // const[selecedSales,setSelectedSales]= useState(null);
+    const [printTarget, setPrintTarget] = useState({ type: null, id: null });
 
+
+    /* fire the correct query hook — only ONE will actually run at a time
+       because of the `skip` condition on each                              */
+    const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
+        skip: printTarget.type !== "Sale" || !printTarget.id,
+    });
+
+    const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
+        skip: printTarget.type !== "Purchase" || !printTarget.id,
+    });
+
+    const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
+        skip: printTarget.type !== "Sale_Return" || !printTarget.id,
+    });
+
+    const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
+        skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
+    });
+    const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
+        skip: printTarget.type !== "Payment_In" || !printTarget.id,
+    });
+
+    const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
+        skip: printTarget.type !== "Payment_Out" || !printTarget.id,
+    })
+    const printReady =
+        (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
+        (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
+        (printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn) ||
+        (printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn) ||
+        (printTarget.type === "Payment_In" && printPaymentInData?.paymentIn) ||
+        (printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut);
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
+        onAfterPrint: () => setPrintTarget({ type: null, id: null }),
+    });
+
+    /* fire print automatically once the right data has arrived */
+    useEffect(() => {
+        if (printReady && printTarget.id) {
+            handlePrint();
+        }
+    }, [printReady, printTarget.id]);
+    const handlePrintClick = (row, transactionId) => {
+        console.log(row, "row", transactionId, "transactionId");
+        setPrintTarget({ type: row.Txn_Type, id: transactionId });
+    };
     return (
         <>
             {/* ── BREADCRUMB ── */}
@@ -520,7 +587,7 @@ export default function ItemsByItem() {
                                         height: 34,
                                         paddingLeft: 30,
                                         paddingRight: 8,
-                                        borderColor: "#dbe3ea",
+                                        borderColor: "#000000",
                                         boxSizing: "border-box",
                                     }}
                                 />
@@ -607,41 +674,45 @@ export default function ItemsByItem() {
                                                 style={{ backgroundColor: "transparent" }}
                                                 title="More"
                                             >
-                                                <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+                                                <MoreVertical size={14} style={{ color: "#374151" }} />
                                             </button>
 
-                                            <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }} />
+                                            <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
                                         </div>
 
                                         {menuOpen === item.Item_Id && (
                                             <div
                                                 onClick={(e) => e.stopPropagation()}
                                                 className="absolute bg-white shadow-lg rounded-md"
-                                                style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0" }}
+                                                style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0", overflow: "hidden" }}
                                             >
                                                 <button
-                                                    className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                    style={{ color: "#374151" }}
                                                     onClick={() => {
                                                         setEditingItem(item);
                                                         setShowEditItemModal(true);
                                                         setMenuOpen(null);
                                                     }}
                                                 >
-                                                    View/Edit
+                                                    <SquarePen size={13} style={{ color: "#4CA1AF" }} />
+                                                    Edit
                                                 </button>
                                                 <button
-                                                    className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
                                                     title="Delete item"
-                                                    style={{ cursor: "pointer" }}
+                                                    style={{ cursor: "pointer", color: "#dc2626" }}
                                                     onClick={() => {
                                                         console.log("Delete item:", item.Item_Id);
                                                     }}
-                                                   
+
                                                 >
+                                                    <Trash2 size={13} style={{ color: "#dc2626" }} />
                                                     Delete
                                                 </button>
                                             </div>
                                         )}
+
                                     </div>
                                 );
                             })
@@ -650,37 +721,64 @@ export default function ItemsByItem() {
 
                     {/* ══ RIGHT — 70% — detail panel ══ */}
                     <div
-                        className="w-full lg:w-[70%] p-1 overflow-y-auto"
-                        style={{ maxHeight: "calc(100vh - 180px)" }}
+                        className="w-full lg:w-[70%] p-1 overflow-y-auto overflow-x-hidden"
+                        style={{
+                            maxHeight: "calc(100vh - 180px)",
+                            minWidth: 0
+                        }}
                     >
                         <div className="flex flex-col h-full">
 
                             {/* ── ITEM SUMMARY CARD ── */}
                             {selectedItemMeta && (
                                 <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
-                                    {/* Row 1: icon + name/category on left, Adjust Item button on right */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
+
+                                    {/* ── ROW 1: ITEM + STOCK + ADJUST BUTTON ── */}
+                                    <div className="flex items-center justify-between gap-4 min-w-0">
+
+                                        {/* LEFT: ICON + ITEM NAME + CATEGORY */}
                                         <div className="flex items-center gap-4 flex-1 min-w-0">
+
                                             <div
                                                 className="flex items-center justify-center rounded-xl flex-shrink-0"
-                                                style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
+                                                style={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    backgroundColor: "#4CA1AF22"
+                                                }}
                                             >
-                                                <Package size={22} style={{ color: "#4CA1AF" }} />
+                                                <Package
+                                                    size={22}
+                                                    style={{ color: "#4CA1AF" }}
+                                                />
                                             </div>
+
                                             <div className="min-w-0">
+
                                                 <h6
                                                     className="font-bold text-black truncate"
-                                                    style={{ fontSize: 18, margin: 0 }}
-                                                    title={liveItem?.Item_Name || selectedItemMeta.Item_Name}
+                                                    style={{
+                                                        fontSize: 15,
+                                                        margin: 0
+                                                    }}
+                                                    title={
+                                                        liveItem?.Item_Name ||
+                                                        selectedItemMeta.Item_Name
+                                                    }
                                                 >
-                                                    {liveItem?.Item_Name || selectedItemMeta.Item_Name}
+                                                    {liveItem?.Item_Name ||
+                                                        selectedItemMeta.Item_Name}
                                                 </h6>
+
                                                 <p className="text-gray-600 text-sm mt-0.5">
                                                     {selectedItemMeta.Item_Category || "N/A"}
                                                 </p>
+
                                             </div>
+
                                         </div>
 
+                                        {/* ── ADJUST ITEM BUTTON ── */}
                                         <button
                                             type="button"
                                             onClick={handleAdjustItem}
@@ -689,16 +787,60 @@ export default function ItemsByItem() {
                                                 backgroundColor: "#4CA1AF",
                                                 outline: "none",
                                                 boxShadow: "none",
-                                                whiteSpace: "nowrap",
+                                                whiteSpace: "nowrap"
                                             }}
                                         >
                                             + Adjust Item
                                         </button>
+
                                     </div>
 
-                                    {/* Row 2: search bar (rendered below) aligns with Stock/HSN on the right */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                        <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
+                                    {/* ── ROW 2: PRICES (left) + STOCK + SEARCH (right) ── */}
+                                    <div className="flex items-center justify-between">
+
+                                        <div>
+                                            <p className="text-xs text-black mb-0.5" style={{ fontSize: 13 }}>
+                                                SALE PRICE: ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta.Sale_Price)}
+                                            </p>
+                                            <p className="text-xs text-black" style={{ fontSize: 13 }}>
+                                                PURCHASE PRICE: ₹ {fmt(liveItem?.Purchase_Price ?? selectedItemMeta.Purchase_Price)}
+                                            </p>
+                                        </div>
+
+                                        <div className="text-left">
+                                            <p className="text-xs uppercase text-black mb-1">
+                                                Stock
+                                            </p>
+                                            <p
+                                                className="font-bold"
+                                                style={{
+                                                    color:
+                                                        (liveItem?.Stock_Quantity ??
+                                                            selectedItemMeta.Stock_Quantity) < 0
+                                                            ? "#dc2626"
+                                                            : "#4CA1AF",
+                                                    fontSize: 15
+                                                }}
+                                            >
+                                                {liveItem?.Stock_Quantity ??
+                                                    selectedItemMeta.Stock_Quantity}
+                                                {" "}
+                                                {selectedItemMeta.Primary_Unit ||
+                                                    selectedItemMeta.Item_Unit ||
+                                                    ""}
+                                            </p>
+                                        </div>
+
+                                        <div
+                                            className="relative"
+                                            style={{
+                                                width: 220,
+                                                minWidth: 0,
+                                                maxWidth: 220,
+                                                height: 36
+                                            }}
+                                        >
+
                                             <Search
                                                 size={16}
                                                 style={{
@@ -706,61 +848,58 @@ export default function ItemsByItem() {
                                                     left: 10,
                                                     top: 10,
                                                     color: "#94a3b8",
-                                                    pointerEvents: "none",
+                                                    pointerEvents: "none"
                                                 }}
                                             />
+
                                             <input
                                                 type="text"
                                                 value={txnSearch}
                                                 onChange={(e) => {
                                                     const value = e.target.value;
-                                                    const next = new URLSearchParams(searchParams);
+
+                                                    const next = new URLSearchParams(
+                                                        searchParams
+                                                    );
+
                                                     if (value) {
                                                         next.set("txnSearch", value);
                                                     } else {
                                                         next.delete("txnSearch");
                                                     }
-                                                    setSearchParams(next, { replace: true });
+
+                                                    setSearchParams(next, {
+                                                        replace: true
+                                                    });
                                                 }}
                                                 placeholder="Search"
                                                 className="w-full h-full border rounded-md text-sm outline-none"
                                                 style={{
+                                                    width: "100%",
                                                     height: 36,
                                                     paddingLeft: 34,
                                                     paddingRight: 10,
-                                                    borderColor: "#dbe3ea",
+                                                    borderColor: "#000000",
+                                                    boxSizing: "border-box"
                                                 }}
                                             />
-                                        </div>
-
-                                        <div className="flex items-center ">
-                                            <div className="text-right">
-                                                <p className="text-xs uppercase text-gray-600 mb-1">Stock</p>
-                                                <p
-                                                    className="font-bold"
-                                                    style={{
-                                                        color: (liveItem?.Stock_Quantity ?? selectedItemMeta.Stock_Quantity) < 0
-                                                            ? "#dc2626"
-                                                            : "#4CA1AF",
-                                                        fontSize: 18,
-                                                    }}
-                                                >
-                                                    {liveItem?.Stock_Quantity ?? selectedItemMeta.Stock_Quantity}
-                                                    {" "}
-                                                    {selectedItemMeta.Primary_Unit || selectedItemMeta.Item_Unit || ""}
-                                                </p>
-                                            </div>
 
                                         </div>
+
                                     </div>
+
                                 </div>
                             )}
 
                             {/* ── ITEM LEDGER TABLE ── */}
-                            <div className="flex-1 overflow-x-auto">
-                                <table className="w-full min-w-[700px]" style={{ fontSize: 13, borderCollapse: "collapse" }}>
+                            <div className="table-responsive table-desi">
+                                <table className="w-full min-w-[700px]"
+                                //style={{ fontSize: 13, borderCollapse: "collapse" }}
+                                >
                                     <thead>
-                                        <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
+                                        <tr
+                                        // style={{ borderBottom: "2px solid #e2e8f0" }}
+                                        >
                                             {[
                                                 "Date",
                                                 "Bill No.",
@@ -772,12 +911,12 @@ export default function ItemsByItem() {
                                             ].map((h, index) => (
                                                 <th
                                                     key={index}
-                                                    className="text-left py-2 px-3 font-semibold text-black"
+                                                    //className="text-left py-2 px-3 font-semibold text-black"
                                                     style={{
-                                                        fontSize: 11,
+                                                        //fontSize: 11,
                                                         textTransform: "uppercase",
                                                         letterSpacing: "0.05em",
-                                                        width: index === 7 ? 50 : "auto"
+                                                        //width: index === 7 ? 50 : "auto"
                                                     }}
                                                 >
                                                     {h}
@@ -812,25 +951,30 @@ export default function ItemsByItem() {
                                                 >
                                                     {/* DATE */}
                                                     <td
-                                                        className="py-2 px-3 text-black"
+                                                        // className="py-2 px-3 text-black"
                                                         style={{ whiteSpace: "nowrap" }}
                                                     >
                                                         {fmtDate(txn.Txn_Date)}
                                                     </td>
 
                                                     {/* BILL NUMBER */}
-                                                    <td className="py-2 px-3 text-black">
+                                                    <td
+                                                    // className="py-2 px-3 text-black"
+                                                    >
                                                         {txn.Bill_Number || "—"}
                                                     </td>
 
                                                     {/* PARTY */}
-                                                    <td className="py-2 px-3 text-black">
+                                                    <td
+                                                    //  className="py-2 px-3 text-black"
+
+                                                    >
                                                         {txn.Party_Name || "—"}
                                                     </td>
 
                                                     {/* TYPE */}
                                                     <td
-                                                        className="py-2 px-3"
+                                                        // className="py-2 px-3"
                                                         style={{
                                                             color:
                                                                 txn.Direction === "In"
@@ -842,12 +986,17 @@ export default function ItemsByItem() {
                                                     </td>
 
                                                     {/* QTY */}
-                                                    <td className="py-2 px-3 text-black">
+                                                    <td
+                                                    // className="py-2 px-3 text-black"
+
+                                                    >
                                                         {fmt(txn.Quantity)}
                                                     </td>
 
                                                     {/* RATE */}
-                                                    <td className="py-2 px-3 text-black">
+                                                    <td
+                                                    // className="py-2 px-3 text-black"
+                                                    >
                                                         {txn.Rate !== null
                                                             ? `₹ ${fmt(txn.Rate)}`
                                                             : "—"}
@@ -857,7 +1006,7 @@ export default function ItemsByItem() {
                                                     {/* THREE DOT MENU */}
                                                     {txn.Txn_Type !== "Opening_Stock" && (
                                                         <td
-                                                            className="py-2 px-2"
+                                                            //className="py-2 px-2"
                                                             style={{
                                                                 position: "relative",
                                                                 width: 50,
@@ -885,11 +1034,12 @@ export default function ItemsByItem() {
                                                             >
                                                                 <MoreVertical
                                                                     size={16}
-                                                                    style={{ color: "#94a3b8" }}
+                                                                    style={{ color: "#374151" }}
                                                                 />
                                                             </button>
 
                                                             {/* ROW MENU */}
+
                                                             {rowMenuOpen === txn.Ledger_Id && (
                                                                 <div
                                                                     onClick={(e) => e.stopPropagation()}
@@ -900,36 +1050,65 @@ export default function ItemsByItem() {
                                                                         width: 150,
                                                                         zIndex: 100,
                                                                         border: "1px solid #e2e8f0",
+                                                                        overflow: "hidden",
                                                                     }}
                                                                 >
                                                                     <button
                                                                         type="button"
-                                                                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        style={{ color: "#374151" }}
                                                                         onClick={() => handleTransactionEdit(txn)}
                                                                     >
+                                                                        <Eye size={13} style={{ color: "#4CA1AF" }} />
                                                                         View / Edit
                                                                     </button>
 
+                                                                    {![
+                                                                        "Add_Adjustment",
+                                                                        "Reduce_Adjustment",
+                                                                        "Opening Stock"
+                                                                    ].includes(txn.Txn_Type) && (<button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        style={{ color: "#374151" }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(null);
+                                                                            //handlePrintClick(row, transactionId);
+                                                                            handlePrintClick(txn, txn.Document_Id);
+                                                                        }}
+                                                                    >
+                                                                        <Printer size={13} style={{ color: "#4CA1AF" }} />
+                                                                        Print
+                                                                    </button>)}
+
                                                                     <button
                                                                         type="button"
-                                                                        className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
                                                                         title="Delete transaction"
-                                                                        style={{ cursor: "pointer" }}
-                                                                        // onClick={() => {
-                                                                        //     console.log("Delete transaction:", txn);
-                                                                        // }}
-                                                                         onClick={() =>
-                                                        setDeleteTarget({
-                                                            Id: txn.Document_Id,
-                                                            Txn_Type: txn.Txn_Type,   // ✅ must be here
-                                                            //Doc_Number: row.Doc_Number,
-                                                        })
-                                                    }
+                                                                        style={{ cursor: "pointer", color: "#dc2626" }}
+                                                                        // onClick={() =>
+                                                                        //     setDeleteTarget({
+                                                                        //         Id: txn.Document_Id,
+                                                                        //         Txn_Type: txn.Txn_Type,
+                                                                        //     })
+                                                                        // }
+                                                                        onClick={() =>
+                                                                            setDeleteTarget({
+                                                                                Id:
+                                                                                    txn.Txn_Type === "Add_Adjustment" ||
+                                                                                        txn.Txn_Type === "Reduce_Adjustment"
+                                                                                        ? txn.Source_Id
+                                                                                        : txn.Document_Id,
+                                                                                Txn_Type: txn.Txn_Type,
+                                                                            })
+                                                                        }
                                                                     >
+                                                                        <Trash2 size={13} style={{ color: "#dc2626" }} />
                                                                         Delete
                                                                     </button>
                                                                 </div>
                                                             )}
+
                                                         </td>
                                                     )}
                                                 </tr>
@@ -1010,6 +1189,78 @@ export default function ItemsByItem() {
                 //isDeleting={false}
                 />
             )}
+            <div style={{ display: "none" }}>
+
+                {/* SALE — Tax Invoice */}
+                {printTarget.type === "Sale" && printSaleData?.invoicePartyDetails && (
+                    <InvoicePrintTemplate
+                        ref={printRef}
+                        type="sale"
+                        invoice={{
+                            ...printSaleData.invoicePartyDetails,
+                            items: printSaleData.items || [],
+                            companyDetails: {},
+                        }}
+                    />
+                )}
+
+                {/* PURCHASE — Bill */}
+                {printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails && (
+                    <InvoicePrintTemplate
+                        ref={printRef}
+                        type="purchase"
+                        invoice={{
+                            ...printPurchaseData.billPurchaseDetails,
+                            items: printPurchaseData.items || [],
+                            companyDetails: {},
+                        }}
+                    />
+                )}
+
+                {/* SALE RETURN — Credit Note */}
+                {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (
+                    <CreditDebitNotePrintTemplate
+                        ref={printRef}
+                        type="credit"
+                        invoice={{
+                            ...printSaleReturnData.saleReturn,
+                            items: printSaleReturnData.saleReturn.items || [],
+                            companyDetails: {},
+                        }}
+                    />
+                )}
+
+                {/* PURCHASE RETURN — Debit Note */}
+                {printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn && (
+                    <CreditDebitNotePrintTemplate
+                        ref={printRef}
+                        type="debit"
+                        invoice={{
+                            ...printPurchaseReturnData.purchaseReturn,
+                            items: printPurchaseReturnData.purchaseReturn.items || [],
+                            companyDetails: {},
+                        }}
+                    />
+                )}
+                {/* ✅ PAYMENT IN — Receipt */}
+                {printTarget.type === "Payment_In" && printPaymentInData?.paymentIn && (
+                    <PaymentInOutPrintTemplate
+                        ref={printRef}
+                        payment={printPaymentInData.paymentIn}
+                        type="in"
+                    />
+                )}
+
+                {/* ✅ PAYMENT OUT — Receipt */}
+                {printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut && (
+                    <PaymentInOutPrintTemplate
+                        ref={printRef}
+                        payment={printPaymentOutData.paymentOut}
+                        type="out"
+                    />
+                )}
+
+            </div>
         </>
     );
 }

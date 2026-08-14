@@ -31,7 +31,8 @@ const currentPath = location.pathname;
     
 
  
-    if(currentPath.startsWith("/party/add") || currentPath.startsWith("/party/all-parties") )
+    if(currentPath.startsWith("/party/add") || currentPath.startsWith("/party/all-parties") ||
+    currentPath.startsWith("/party/payables") || currentPath.startsWith("/party/receivables") )
      {
       setOpenMenu("Parties");
       
@@ -112,7 +113,9 @@ const isLinkActive = (linkTo) => {
   // 🔹 Parties Section
   if (
     (cleanLink === "/party/add" && current.startsWith("/party/add")) ||
-    (cleanLink === "/party/parties" && current.startsWith("/party/parties"))
+    (cleanLink === "/party/parties" && current.startsWith("/party/parties")||
+    (cleanLink === "/party/payables" && current.startsWith("/party/payables")) ||
+    (cleanLink === "/party/receivables" && current.startsWith("/party/receivables")))
   )
     return true;
 

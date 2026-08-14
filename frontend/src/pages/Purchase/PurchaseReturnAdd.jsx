@@ -526,7 +526,7 @@ export default function PurchaseReturnAdd() {
 
           // Store original/base price separately
           basePurchasePriceRef.current[index] = basePurchasePrice;
-            basePurchaseUnitRef.current[index] = primaryUnit;
+          basePurchaseUnitRef.current[index] = primaryUnit;
           return {
             ...item,
 
@@ -971,7 +971,7 @@ export default function PurchaseReturnAdd() {
         ])
       );
 
-      
+
       dispatch(
         itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
@@ -991,6 +991,7 @@ export default function PurchaseReturnAdd() {
       dispatch(
         partyApi.util.invalidateTags([
           "Party",
+          "PartyLedger",
         ])
       );
 
@@ -2239,7 +2240,7 @@ export default function PurchaseReturnAdd() {
                                     // }
 
                                     //const roundedPrice = newPrice.toFixed(2);
-                                     const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
+                                    const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
 
                                     // if (basePrice <= 0) {
                                     //   return;
@@ -2284,7 +2285,7 @@ export default function PurchaseReturnAdd() {
                                     // const roundedPrice = newPrice.toFixed(2);
 
 
-                                     const baseUnit =basePurchaseUnitRef.current[i];
+                                    const baseUnit = basePurchaseUnitRef.current[i];
 
                                     if (basePrice <= 0 || !baseUnit) {
                                       return;

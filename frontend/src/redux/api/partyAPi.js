@@ -11,7 +11,7 @@ export const partyApi = createApi({
     baseUrl: "http://localhost:4000/api/",
     credentials: "include",
   }),
-  tagTypes: ["Party" ],
+ tagTypes: ["Party", "PartyLedger"],
   endpoints: (builder) => ({
 
 
@@ -127,7 +127,13 @@ export const partyApi = createApi({
   },
   forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
 
-  providesTags: ["Party"],
+  //providesTags: ["Party"],
+  providesTags: (result, error, arg) => [
+ {
+      type: "PartyLedger",
+      id: arg.Party_Id,
+    },
+],
 }),
 //     getSinglePartyDetailsSalesPurchases: builder.query({
 //   query: ({
@@ -217,8 +223,32 @@ export const partyApi = createApi({
 // }),
     
 
-  
+  getAllPayableParties: builder.query({
+   query: ({ search = "" } = {}) => {
+    const params = new URLSearchParams();
 
+    if (search) {
+      params.set("search", search);
+    }
+
+    return `/party/payables?${params.toString()}`;
+  },
+
+    providesTags: ["Party"],
+}),
+getAllReceivableParties: builder.query({
+   query: ({ search = "" } = {}) => {
+    const params = new URLSearchParams();
+
+    if (search) {
+      params.set("search", search);
+    }
+
+    return `party/receivables?${params.toString()}`;
+  },
+
+  providesTags: ["Party"],
+}),
   
    
    
@@ -232,7 +262,9 @@ export const partyApi = createApi({
     useEditPartyMutation,
     useGetSinglePartyDetailsSalesPurchasesQuery,
     usePrintSinglePartyDetailsSalesPurchasesReportMutation,
-    useGetAllPartiesReceivablesLeftQuery,useGetAllPartiesPayablesLeftQuery
+    useGetAllPartiesReceivablesLeftQuery,useGetAllPartiesPayablesLeftQuery,
+    useGetAllPayablePartiesQuery,
+    useGetAllReceivablePartiesQuery
 
  }=partyApi
    

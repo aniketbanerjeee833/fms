@@ -98,7 +98,7 @@ export default function SaleReturnAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
   const baseSalePriceRef = useRef({});
-   const baseSaleUnitRef = useRef({});
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -836,7 +836,7 @@ export default function SaleReturnAdd() {
         ])
       );
 
-      
+
       dispatch(
         itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
@@ -854,9 +854,7 @@ export default function SaleReturnAdd() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags([
-          "Party",
-        ])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       toast.success(
@@ -1658,7 +1656,7 @@ export default function SaleReturnAdd() {
                                     }
                                   );
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                                    baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1785,7 +1783,7 @@ export default function SaleReturnAdd() {
                                             }
                                           );
                                           baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-                                           baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+                                          baseSaleUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2162,7 +2160,7 @@ export default function SaleReturnAdd() {
                                     // }
 
                                     // const roundedPrice = newPrice.toFixed(2);
-                                    const baseUnit =baseSaleUnitRef.current[i];
+                                    const baseUnit = baseSaleUnitRef.current[i];
 
                                     if (basePrice <= 0 || !baseUnit) {
                                       return;
@@ -2196,7 +2194,7 @@ export default function SaleReturnAdd() {
                                     }
 
                                     const roundedPrice = newPrice.toFixed(2);
-                                   
+
 
 
 

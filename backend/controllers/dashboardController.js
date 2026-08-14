@@ -1326,74 +1326,175 @@ const itemsProfitRankWise = async (req, res, next) => {
   }
 };
 
-//SUM OF ALL PAYABLES LEFT
+// //SUM OF ALL PAYABLES LEFT
+// const getTotalPayablesLeft = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     connection = await db.getConnection();
+
+//     // total payable amount
+//     const [totalPayablesLeft] = await connection.query(`
+//       SELECT COALESCE(SUM(Balance_Due),0) AS total_payables_left
+//       FROM add_purchase
+//       WHERE Balance_Due > 0
+//     `);
+
+//     // number of parties with payable
+//     const [totalParties] = await connection.query(`
+//       SELECT COUNT(DISTINCT Party_Id) AS total_parties
+//       FROM add_purchase
+//       WHERE Balance_Due > 0
+//     `);
+
+//     return res.status(200).json({
+//       success: true,
+//       total_payables_left: totalPayablesLeft[0].total_payables_left,
+//       total_parties: totalParties[0].total_parties
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Error:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+// //SUM OF ALL RECEIVABLES LEFT
+// const getTotalReceivablesLeft = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     connection = await db.getConnection();
+
+//     // total receivable amount
+//     const [totalReceivablesLeft] = await connection.query(`
+//       SELECT COALESCE(SUM(Balance_Due),0) AS total_receivables_left
+//       FROM add_sale
+//       WHERE Balance_Due > 0
+//     `);
+
+//     // number of parties with receivables
+//     const [totalParties] = await connection.query(`
+//       SELECT COUNT(DISTINCT Party_Id) AS total_parties
+//       FROM add_sale
+//       WHERE Balance_Due > 0
+//     `);
+
+//     return res.status(200).json({
+//       success: true,
+//       total_receivables_left: totalReceivablesLeft[0].total_receivables_left,
+//       total_parties: totalParties[0].total_parties
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Error:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+
+/* ══════════════════════════════════════════════════
+   TOTAL PAYABLES LEFT
+   Source of truth: party_ledger Running_Balance
+   Negative balance = you owe the party (payable)
+══════════════════════════════════════════════════ */
 const getTotalPayablesLeft = async (req, res, next) => {
   let connection;
-
   try {
     connection = await db.getConnection();
 
-    // total payable amount
-    const [totalPayablesLeft] = await connection.query(`
-      SELECT COALESCE(SUM(Balance_Due),0) AS total_payables_left
-      FROM add_purchase
-      WHERE Balance_Due > 0
-    `);
-
-    // number of parties with payable
-    const [totalParties] = await connection.query(`
-      SELECT COUNT(DISTINCT Party_Id) AS total_parties
-      FROM add_purchase
-      WHERE Balance_Due > 0
+    const [[result]] = await connection.query(`
+      SELECT
+        COALESCE(SUM(ABS(latest.Running_Balance)), 0) AS total_payables_left,
+        COUNT(*)                                       AS total_parties
+      FROM (
+        SELECT pl.Party_Id, pl.Running_Balance
+        FROM party_ledger pl
+        INNER JOIN (
+          SELECT Party_Id, MAX(id) AS max_id
+          FROM party_ledger
+          GROUP BY Party_Id
+        ) last ON pl.Party_Id = last.Party_Id AND pl.id = last.max_id
+        WHERE pl.Running_Balance < 0
+      ) latest
     `);
 
     return res.status(200).json({
-      success: true,
-      total_payables_left: totalPayablesLeft[0].total_payables_left,
-      total_parties: totalParties[0].total_parties
+      success:             true,
+      total_payables_left: Number(result.total_payables_left).toFixed(2),
+      total_parties:       Number(result.total_parties),
     });
-
   } catch (err) {
-    console.error("❌ Error:", err);
+    console.error("❌ getTotalPayablesLeft:", err);
     next(err);
   } finally {
     if (connection) connection.release();
   }
 };
-//SUM OF ALL RECEIVABLES LEFT
+
+/* ══════════════════════════════════════════════════
+   TOTAL RECEIVABLES LEFT
+   Source of truth: party_ledger Running_Balance
+   Positive balance = party owes you (receivable)
+══════════════════════════════════════════════════ */
 const getTotalReceivablesLeft = async (req, res, next) => {
   let connection;
-
   try {
     connection = await db.getConnection();
 
-    // total receivable amount
-    const [totalReceivablesLeft] = await connection.query(`
-      SELECT COALESCE(SUM(Balance_Due),0) AS total_receivables_left
-      FROM add_sale
-      WHERE Balance_Due > 0
-    `);
-
-    // number of parties with receivables
-    const [totalParties] = await connection.query(`
-      SELECT COUNT(DISTINCT Party_Id) AS total_parties
-      FROM add_sale
-      WHERE Balance_Due > 0
+    const [[result]] = await connection.query(`
+      SELECT
+        COALESCE(SUM(latest.Running_Balance), 0) AS total_receivables_left,
+        COUNT(*)                                  AS total_parties
+      FROM (
+        SELECT pl.Party_Id, pl.Running_Balance
+        FROM party_ledger pl
+        INNER JOIN (
+          SELECT Party_Id, MAX(id) AS max_id
+          FROM party_ledger
+          GROUP BY Party_Id
+        ) last ON pl.Party_Id = last.Party_Id AND pl.id = last.max_id
+        WHERE pl.Running_Balance > 0
+      ) latest
     `);
 
     return res.status(200).json({
-      success: true,
-      total_receivables_left: totalReceivablesLeft[0].total_receivables_left,
-      total_parties: totalParties[0].total_parties
+      success:                true,
+      total_receivables_left: Number(result.total_receivables_left).toFixed(2),
+      total_parties:          Number(result.total_parties),
     });
-
   } catch (err) {
-    console.error("❌ Error:", err);
+    console.error("❌ getTotalReceivablesLeft:", err);
     next(err);
   } finally {
     if (connection) connection.release();
   }
 };
+
+
+export { getAllSalesAndPurchasesYearWise ,
+  getCategoriesWiseItemCount,
+  getTotalSalesPurchasesReceivablesPayablesProfit,
+  getPartyWiseSalesAndPurchases,eachItemHistory,
+
+  getItemsSoldCount,
+  getPartyWiseItemsSoldAndPurchased,
+  itemsProfitRankWise,
+  getTotalPayablesLeft,
+  getTotalReceivablesLeft};
+
+
+//   First — the table explaining where each transaction type goes
+// Transaction	Affects	Direction	Receivables	Payables
+// Sale	Customer owes you	You → Customer	➕ Increases receivables	—
+// Sale Return (Credit Note)	Customer returned goods — you owe them back	Customer → You	➖ Decreases receivables	—
+// Payment In	Customer paid you	Cash/Bank → You	➖ Decreases receivables	—
+// Purchase	You owe supplier	Supplier → You	—	➕ Increases payables
+// Purchase Return (Debit Note)	Supplier returned your money / you returned goods	You → Supplier	—	➖ Decreases payables
+// Payment Out	You paid supplier	You → Cash/Bank	—	➖ Decreases payables
+
 
 // const rankPartyWiseSalesAndPurchases = async (req, res, next) => {
 //   let connection;
@@ -1453,13 +1554,3 @@ const getTotalReceivablesLeft = async (req, res, next) => {
 //     if (connection) connection.release();
 //   }
 // };
-export { getAllSalesAndPurchasesYearWise ,
-  getCategoriesWiseItemCount,
-  getTotalSalesPurchasesReceivablesPayablesProfit,
-  getPartyWiseSalesAndPurchases,eachItemHistory,
-
-  getItemsSoldCount,
-  getPartyWiseItemsSoldAndPurchased,
-  itemsProfitRankWise,
-  getTotalPayablesLeft,
-  getTotalReceivablesLeft};

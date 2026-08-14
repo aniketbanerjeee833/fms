@@ -1,7 +1,7 @@
 import express from "express";
 const router = express.Router();
 
-import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,eachItemBillAndInvoiceNumbers,
+import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,deleteStockAdjustment,eachItemBillAndInvoiceNumbers,
     eachItemSalesPurchaseDetails,editItem,editStockAdjustment,getAllCategories,getAllItems, getAllItemsForLedger, getItemBills, getItemConversions, getItemsByCategory, printEachItemSalesPurchasesReport} from "../controllers/itemController.js"
 import userAuth from "../middleware/userAuth.js";
 
@@ -26,5 +26,7 @@ router.get("/:Item_Id/bills",userAuth, getItemBills);
 
 router.get("/item-conversions/:Item_Id",userAuth, getItemConversions);
 router.post("/stock-adjustment/add",userAuth, addStockAdjustment);
-router.put("/stock-adjustment/edit/:id", editStockAdjustment);
+router.put("/stock-adjustment/:id", userAuth,editStockAdjustment);
+router.delete("/stock-adjustment/:id",userAuth, deleteStockAdjustment);
+
 export default router;

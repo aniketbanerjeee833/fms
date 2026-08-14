@@ -963,7 +963,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
           <div>
             <div className="invoice-words-header">
-              Bill Amount In Words
+              {type==="sale" ? "Invoice Amount In Words" : "Bill Amount In Words"}
             </div>
 
             <div className="invoice-words">
@@ -1100,13 +1100,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
           <div className="invoice-signature-authorized">
             Authorized Signatory
           </div>
-          <div className="invoice-signature-company">
-            For : {companyName}
-          </div>
-
-          <div className="invoice-signature-authorized">
-            Authorized Signatory
-          </div>
+          
         </div>
 
       </div>

@@ -92,7 +92,7 @@ export default function SaleAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
   const baseSalePriceRef = useRef({});
-    const baseSaleUnitRef = useRef({});
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -649,7 +649,7 @@ export default function SaleAdd() {
       // CACHE INVALIDATION
       // =======================================================
 
-      
+
       dispatch(
         itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
@@ -671,7 +671,7 @@ export default function SaleAdd() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags(["Party"])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       toast.success(
@@ -748,7 +748,7 @@ export default function SaleAdd() {
       }
     );
     baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-     baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+    baseSaleUnitRef.current[i] = it.Primary_Unit || "";
     setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
     handleRowChange(i, "itemOpen", false);
 
@@ -1139,7 +1139,7 @@ export default function SaleAdd() {
                   </div>)}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                  
+
 
                   {/* <div className="flex flex-col gap-2">
 
@@ -1177,86 +1177,86 @@ export default function SaleAdd() {
                   {/* {errors?.GSTIN && (
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}
-                   {/* ── ROW 2: Billing Address + GSTIN ── */}
-                {currentPartyDetails?.Party_Name !== "Cash Sale" && (
-                  <div >
+                  {/* ── ROW 2: Billing Address + GSTIN ── */}
+                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (
+                    <div >
 
-                    {/* Billing Address */}
-                    <div className="flex flex-col gap-2">
-                      <span className="active">Billing Address</span>
-                      <textarea
-                        {...register("Billing_Address")}
-                        rows={5}
-                        placeholder="Billing Address"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
-                        style={{ minHeight: "80px" }}
-                      />
+                      {/* Billing Address */}
+                      <div className="flex flex-col gap-2">
+                        <span className="active">Billing Address</span>
+                        <textarea
+                          {...register("Billing_Address")}
+                          rows={5}
+                          placeholder="Billing Address"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                          style={{ minHeight: "80px" }}
+                        />
 
-                      {/* Address has content — show Remove / Change */}
-                      {watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end gap-3 mt-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setValue("Billing_Address", "", {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              })
-                            }
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#ef4444",
-                              cursor: "pointer",
-                              fontSize: 13,
-                            }}
-                          >
-                            Remove
-                          </button>
+                        {/* Address has content — show Remove / Change */}
+                        {watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setValue("Billing_Address", "", {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                              }
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#ef4444",
+                                cursor: "pointer",
+                                fontSize: 13,
+                              }}
+                            >
+                              Remove
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
+                        )}
 
-                      {/* Address was just removed — offer to pick one from the party instead */}
-                      {!watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end mt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Select Billing Address
-                          </button>
-                        </div>
-                      )}
+                        {/* Address was just removed — offer to pick one from the party instead */}
+                        {!watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Select Billing Address
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                     </div>
-
-                  </div>
-                )}
+                  )}
                 </div>
 
-               
+
 
 
 
@@ -1553,7 +1553,7 @@ export default function SaleAdd() {
                                     }
                                   );
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                                   baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -2121,39 +2121,39 @@ export default function SaleAdd() {
                                     // const roundedPrice = newPrice.toFixed(2);
 
 
-                                  const basePrice =Number(baseSalePriceRef.current[i]) || 0;
+                                    const basePrice = Number(baseSalePriceRef.current[i]) || 0;
 
-                                      const baseUnit =baseSaleUnitRef.current[i];
+                                    const baseUnit = baseSaleUnitRef.current[i];
 
-                                      if (basePrice <= 0 || !baseUnit) {
-                                        return;
-                                      }
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
+                                    }
 
-                                      let newPrice;
+                                    let newPrice;
 
-                                      if (newUnit === baseUnit) {
-                                        // Restore original entered price
-                                        newPrice = basePrice;
-                                      }
-                                      else if (
-                                        baseUnit === primaryUnit &&
-                                        newUnit === secondaryUnit
-                                      ) {
-                                        // Primary → Secondary
-                                        newPrice = basePrice / conversionRate;
-                                      }
-                                      else if (
-                                        baseUnit === secondaryUnit &&
-                                        newUnit === primaryUnit
-                                      ) {
-                                        // Secondary → Primary
-                                        newPrice = basePrice * conversionRate;
-                                      }
-                                      else {
-                                        return;
-                                      }
+                                    if (newUnit === baseUnit) {
+                                      // Restore original entered price
+                                      newPrice = basePrice;
+                                    }
+                                    else if (
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+                                    else if (
+                                      baseUnit === secondaryUnit &&
+                                      newUnit === primaryUnit
+                                    ) {
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
+                                    }
+                                    else {
+                                      return;
+                                    }
 
-                                      const roundedPrice = newPrice.toFixed(2);
+                                    const roundedPrice = newPrice.toFixed(2);
 
 
                                     setValue(`items.${i}.Sale_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
@@ -2258,8 +2258,8 @@ export default function SaleAdd() {
 
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true, shouldDirty: true });
-                                baseSalePriceRef.current[i] = Number(val) || 0;
-                                baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+                              baseSalePriceRef.current[i] = Number(val) || 0;
+                              baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
                                 i,

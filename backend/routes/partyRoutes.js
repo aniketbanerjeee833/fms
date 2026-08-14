@@ -1,7 +1,8 @@
 import express from "express";
 const router = express.Router();
 
-import {addParty, editParty, getAllParties, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft, getSinglePartyDetailsSalesPurchases, printSinglePartyDetailsSalesPurchasesReport} from "../controllers/partyController.js"
+import {addParty, editParty, getAllParties, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft,
+     getAllPayableParties, getAllReceivableParties, getSinglePartyDetailsSalesPurchases, printSinglePartyDetailsSalesPurchasesReport} from "../controllers/partyController.js"
 import userAuth from "../middleware/userAuth.js";
 
 
@@ -11,6 +12,9 @@ router.get("/get-all-parties",userAuth,getAllParties)
 
 router.get("/get-single-party-details-sales-purchases/:Party_Id",userAuth,getSinglePartyDetailsSalesPurchases)
 router.post("/print-single-party-details-sales-purchases-report",userAuth,printSinglePartyDetailsSalesPurchasesReport)
+router.get("/payables",userAuth,getAllPayableParties);
+router.get("/receivables",userAuth,getAllReceivableParties);
+
 router.get("/all-parties-payables-left",userAuth,getAllPartiesPayablesLeft)
 router.get("/all-parties-receivables-left",userAuth,getAllPartiesReceivablesLeft)
 

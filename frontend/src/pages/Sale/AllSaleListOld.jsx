@@ -1,44 +1,31 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
 import { useDeleteSaleMutation, useGetAllSalesQuery, useGetSingleSaleQuery } from "../../redux/api/saleApi";
-
-import {
-  Download,
-  Eye,
-  FileSpreadsheet,
-  LayoutDashboard,
-  MoreVertical,
-  Printer,
-  Trash2,
-  Undo2
-} from "lucide-react";
-
-import { useState, useEffect, useRef } from "react";
+import { Download, Eye, FileSpreadsheet, LayoutDashboard, Printer, SquarePen, Trash2, Undo2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
-import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import { useReactToPrint } from "react-to-print";
+import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 
+// import { SiMicrosoftexcel } from "react-icons/si";
 export default function AllSaleList() {
   const dispatch = useDispatch()
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const page = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || "";
+  // const [page, setPage] = useState(1);
+  //const [searchTerm, setSearchTerm] = useState("");
   const fromDate = searchParams.get("fromDate") || "";
   const toDate = searchParams.get("toDate") || "";
+  // const [fromDate, setFromDate] = useState('');
+  // const [toDate, setToDate] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [deleteSale, { isLoading: isDeleting }] = useDeleteSaleMutation();
-const [printSaleId, setPrintSaleId] = useState(null);
-
-const printRef = useRef(null);
-
-const { data: printData } = useGetSingleSaleQuery(printSaleId, {
-  skip: !printSaleId,
-});
   const { data: sales, isLoading } = useGetAllSalesQuery({
     page,
     search: searchTerm,
@@ -47,18 +34,15 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
   });
   console.log(sales);
 
+  // const[selecedSales,setSelectedSales]= useState(null);
+const [printSaleId, setPrintSaleId] = useState(null);
+
+const printRef = useRef(null);
+
+const { data: printData } = useGetSingleSaleQuery(printSaleId, {
+  skip: !printSaleId,
+});
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const closeRowMenu = () => {
-      setRowMenuOpen(null);
-    };
-    document.addEventListener("click", closeRowMenu);
-    return () => {
-      document.removeEventListener("click", closeRowMenu);
-    };
-  }, []);
-
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -67,7 +51,9 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       toDate,
     });
   };
-
+  // const handlePageChange = (newPage) => {
+  //   setPage(newPage);
+  // }
   const handleNextPage = () => {
     setSearchParams({
       page: page + 1,
@@ -85,7 +71,6 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       toDate,
     });
   };
-
   const handleExportExcel = () => {
     const params = new URLSearchParams();
     if (searchTerm) params.set("search", searchTerm);
@@ -101,11 +86,6 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
     a.click();
     document.body.removeChild(a);
   };
-
-  // const handlePrint = (sale) => {
-  //   console.log("Print sale:", sale);
-  // };
-
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
@@ -114,6 +94,8 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       const res = await deleteSale(deleteTarget.Sale_Id).unwrap();
       toast.success(res?.message || "Purchase deleted successfully");
       setDeleteTarget(null);
+
+
       dispatch(
         itemApi.util.invalidateTags([
           "Item",
@@ -141,6 +123,36 @@ useEffect(() => {
 
   return (
     <>
+      {/* // <div className="container-fluid sb2  ">
+        //     <div className="row">
+               
+        //         <div className="sb2-1">
+
+        //             <SideMenu/>
+        //         </div>
+
+               
+        //         <div className="sb2-2"> */}
+      {/* <div className="sb2-2-2">
+        <ul >
+          <li>
+
+            <NavLink style={{ display: "flex", flexDirection: "row" }}
+              to="/home"
+
+            >
+              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
+             
+              Dashboard
+            </NavLink>
+          </li>
+
+        </ul>
+      </div> */}
+      {/* <div className="sb2-2-3 ">
+        <div className="row">
+          <div className="col-md-12">
+            <div className="box-inn-sp"> */}
 
       <div className="flex flex-col bg-white ">
 
@@ -169,6 +181,7 @@ useEffect(() => {
               </button>
             </div>
 
+
             <div
 
               className="
@@ -193,6 +206,7 @@ useEffect(() => {
                       toDate,
                     });
                   }}
+                  // onChange={(e) => setFromDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
                   title="Search from date"
                 />
@@ -212,6 +226,7 @@ useEffect(() => {
                       toDate: e.target.value,
                     });
                   }}
+                  // onChange={(e) => setToDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
                   title="Search to date"
                 />
@@ -231,6 +246,7 @@ useEffect(() => {
                       toDate,
                     });
                   }}
+                  // onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-56"
                 />
               </div>
@@ -250,6 +266,7 @@ useEffect(() => {
                 </button>
               </div>
             </div>
+
 
           </div>
 
@@ -279,7 +296,14 @@ useEffect(() => {
 
           </div>
           <div className="flex justify-end sm: mt-4">
-
+            {/* <button
+  type="button"
+  onClick={handleExportExcel}
+  className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#217346] text-white shadow-md transition-all hover:scale-105 hover:shadow-lg active:scale-95"
+  title="Export to Excel"
+>
+  <SiMicrosoftexcel size={22} />
+</button> */}
             <button
               type="button"
               onClick={handleExportExcel}
@@ -294,6 +318,10 @@ useEffect(() => {
           </div>
         </div>
 
+
+
+
+
         <div className="tab-inn">
           <div className="table-responsive table-desi">
             {isLoading ? (
@@ -301,6 +329,10 @@ useEffect(() => {
             ) : sales?.length === 0 ? (
               <p className="text-center mt-4">No sales found.</p>
             ) : (
+
+
+
+
 
               <table className="w-full min-w-[500px]">
                 <thead>
@@ -312,26 +344,18 @@ useEffect(() => {
                     <th className="text-left">Payment Type</th>
                     <th className="text-left">Amount </th>
                     <th className="text-left">Balance </th>
-                    <th></th>
+
+                    <th>View/Edit</th>
+                    <th>Return</th>
+                    <th>Delete</th>
+                    <th>Print</th>
+
                   </tr>
                 </thead>
                 <tbody>
                   {sales && sales?.sales?.length > 0 ? (
                     sales?.sales?.map((sale, idx) => (
-                      <tr
-                        key={sale?.Sale_Id}
-                        onDoubleClick={() => {
-                          navigate(
-                            `/sale/edit/${sale?.Sale_Id}${location.search}`,
-                            {
-                              state: {
-                                from: "all-sale-list"
-                              }
-                            }
-                          );
-                        }}
-                        style={{ cursor: "pointer" }}
-                      >
+                      <tr key={sale?.Sale_Id}>
                         <td>
                           {(sales?.currentPage - 1) * 10 + (idx + 1)}.
                         </td>
@@ -351,162 +375,143 @@ useEffect(() => {
                         </td>
                         <td >{sale?.Party_Name || "N/A"}</td>
                         <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
-
+                        {/* <td>
+                          {sale?.Payment_Type
+                            ? sale.Payment_Type === "Bank"
+                              ? `Bank (${sale?.Bank_Display_Name || "N/A"})`
+                              : sale.Payment_Type
+                            : "N/A"}
+                        </td> */}
                         <td>{sale?.Total_Amount || "N/A"}</td>
                         <td>{sale?.Balance_Due || "N/A"}</td>
 
-                        <td
-                          className="py-2 px-2"
-                          style={{
-                            position: "relative",
-                            width: 50,
-                            textAlign: "center"
-                          }}
-                        >
-                          {/* THREE DOT BUTTON */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              setRowMenuOpen(
-                                rowMenuOpen === sale?.Sale_Id
-                                  ? null
-                                  : sale?.Sale_Id
-                              );
-                            }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                            style={{
-                              backgroundColor: "transparent",
-                              border: "none",
-                              cursor: "pointer"
-                            }}
-                            title="More"
-                          >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
-
-                          {/* THREE DOT MENU */}
-                          {rowMenuOpen === sale?.Sale_Id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute bg-white shadow-lg rounded-md"
+                        {/* <td >
+                         
+                          <NavLink to={`/sale/view/${sale?.Sale_Id}${location.search}`}
+                            state={{ from: "all-sale-list" }}>
+                            <Eye
                               style={{
-                                right: 0,
-                                top: 32,
-                                width: 150,
-                                zIndex: 100,
-                                border: "1px solid #e2e8f0",
-                                overflow: "hidden"
-                              }}
-                            >
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
+                        
+                        </td> */}
+                        <td>
+                          {/* <NavLink to={`/sale/edit/${sale?.Sale_Id}`}
+                                                                state={{from:"all-sale-list"}}>               */}
+                          <NavLink
+                            to={`/sale/edit/${sale.Sale_Id}${location.search}`}
+                            state={{ from: "all-sale-list" }}
 
-                              {/* VIEW / EDIT */}
-                              <NavLink
-                                to={`/sale/edit/${sale?.Sale_Id}${location.search}`}
-                                state={{
-                                  from: "all-sale-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Eye
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
+                          >
 
-                                View / Edit
-                              </NavLink>
+                            <SquarePen
+                              style={{
+                                cursor: "pointer",
+                                backgroundColor: "transparent",
+                                color: "#4CA1AF"
+                              }} />
+                          </NavLink>
 
-
-                              {/* RETURN */}
-                              <NavLink
-                                to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
-                                state={{
-                                  from: "sale-return-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Undo2
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Return
-                              </NavLink>
-
-
-                              {/* PRINT */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  backgroundColor: "transparent",
-                                  border: "none",
-                                  cursor: "pointer"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-                                 setPrintSaleId(sale.Sale_Id)
-                                }}
-                              >
-                                <Printer
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Print
-                              </button>
-
-
-                              {/* DELETE */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                style={{
-                                  cursor: "pointer",
-                                  color: "#dc2626",
-                                  backgroundColor: "transparent",
-                                  border: "none"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-
-                                  setDeleteTarget({
-                                    Sale_Id: sale?.Sale_Id
-                                  });
-                                }}
-                              >
-                                <Trash2
-                                  size={13}
-                                  style={{ color: "#dc2626" }}
-                                />
-
-                                Delete
-                              </button>
-
-                            </div>
-                          )}
                         </td>
+                        <td>
+                          <NavLink
+                            to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
+                            state={{ from: "sale-return-list" }}
+                          >
+                            <Undo2
+                              size={18}
+                              style={{
+                                cursor: "pointer",
+                                color: "#4CA1AF",
+                              }}
+                            />
+                          </NavLink>
 
+
+                        </td>
+                        <td>
+                          <Trash2
+                            size={18}
+                            style={{ cursor: "pointer", color: "#ef4444" }}
+                            onClick={() =>
+                              setDeleteTarget({
+                                Sale_Id: sale?.Sale_Id,
+
+                              })
+                            }
+                          />
+                        </td>
+                        <td>
+                          <Printer
+                            size={18}
+                            style={{
+                              cursor: "pointer",
+                              color: "#4CA1AF",
+                            }}
+                            onClick={() => setPrintSaleId(sale.Sale_Id)}
+                          />
+                        </td>
+                          {/* <div style={{ display: "none" }}>
+      <InvoicePrintTemplate
+        ref={printRef}
+        invoice={
+          printData?.billSaleDetails
+            ? {
+                invoiceId:
+                  printData.billSaleDetails.Sale_Id,
+
+                billNumber:
+                  printData.billSaleDetails.Invoice_Number,
+
+                billDate:
+                  printData.billSaleDetails.Invoice_Date,
+
+                partyName:
+                  printData.billSaleDetails.Party_Name,
+
+                gstin:
+                  printData.billSaleDetails.GSTIN,
+
+                billingAddress:
+                  printData.billSaleDetails.Billing_Address,
+
+                stateOfSupply:
+                  printData.billSaleDetails.State_Of_Supply,
+
+                totalAmount:
+                  printData.billSaleDetails.Total_Amount,
+
+                totalPaid:
+                  printData.billSaleDetails.Total_Received,
+
+                balanceDue:
+                  printData.billSaleDetails.Balance_Due,
+
+                paymentType:
+                  printData.billSaleDetails.Payment_Type_Display,
+
+                terms:
+                  printData.billSaleDetails
+                    .Terms_Conditions_Description,
+
+                items: printData.items || [],
+
+                type: "sale",
+
+                companyDetails: {},
+              }
+            : null
+        }
+      />
+    </div> */}
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td className="mx-auto text-center" colSpan={8}>
+                      <td className="mx-auto text-center" colSpan={10}>
                         No sale found
                       </td>
                     </tr>
@@ -514,6 +519,14 @@ useEffect(() => {
                 </tbody>
 
               </table>
+
+
+
+
+
+
+
+
 
             )}
           </div>
@@ -536,7 +549,21 @@ useEffect(() => {
             {/* PAGE NUMBERS — DESKTOP / TABLET */}
             <div style={{ marginRight: "0px" }}
               className="hidden sm:flex space-x-2">
-
+              {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
+        <button
+          key={index}
+          onClick={() => handlePageChange(index + 1)}
+          className={
+            `px-3 py-1 rounded ${
+              page === index + 1
+                ? 'bg-[#ff0000] text-white'
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`
+          }
+        >
+          {index + 1}
+        </button>
+      ))} */}
               {(() => {
                 const totalPages = sales?.totalPages || 1;
                 const maxVisible = 5; // how many pages around current
@@ -637,33 +664,70 @@ useEffect(() => {
 
           </div>
         </div>
+        {/* <div className="flex justify-center align-center space-x-2 p-4">
+                <button type="button"
+                  onClick={() => handlePreviousPage()}
+                  disabled={page === 1}
+                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+                ${page === 1 ? 'opacity-50 ' : ''}
+                `}
+                >
+                  ← Previous
+                </button>
+                {[...Array(sales?.totalPages).keys()].map((index) => (
+                  <button
+                    key={index}
+                    onClick={() => handlePageChange(index + 1)}
+                    // className={`px-3 py-1 rounded ${page === index + 1 ? 'bg-[#7346ff] text-white' : 'bg-gray-200 hover:bg-gray-300'
+                    //   }`}
+                    className={
+                      `px-3 py-1 rounded ${page === index + 1 ? 'bg-[#4CA1AF] text-white' :
+                        'bg-gray-200 hover:bg-gray-300'
+                      }`}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
 
+                <button type="button"
+                  onClick={() => handleNextPage()}
+                  disabled={page === sales?.totalPages || sales?.totalPages === 0}
+                  className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+                ${page === sales?.totalPages || sales?.totalPages === 0 ? 'opacity-50 ' : ''}
+                `}
+                >
+                  Next →
+                </button>
+              </div> */}
       </div>
-
+ {printData?.invoicePartyDetails && (
+  <div style={{ display: "none" }}>
+    <InvoicePrintTemplate
+      ref={printRef}
+      type="sale"
+      invoice={{
+        ...printData.invoicePartyDetails,   // ✅ matches backend response key
+        items: printData.items || [],
+        companyDetails: {},
+        
+      }}
+    />
+  </div>
+)}
       {deleteTarget && (
         <DeleteConfirmModal
           title="Delete Sale"
+          //message={`Are you sure you want to delete purchase bill "${deleteTarget.Bill_Number || deleteTarget.Purchase_Id}"? This action cannot be undone.`}
           message={`Are you sure you want to delete this sale invoice ? This action cannot be undone.`}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
+        //isDeleting={false}
         />
       )}
-       {printData?.invoicePartyDetails && (
-        <div style={{ display: "none" }}>
-          <InvoicePrintTemplate
-            ref={printRef}
-            type="sale"
-            invoice={{
-              ...printData.invoicePartyDetails,   // ✅ matches backend response key
-              items: printData.items || [],
-              companyDetails: {},
-              
-            }}
-          />
-        </div>
-      )}
+    
     </>
+
 
   )
 }

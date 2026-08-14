@@ -858,7 +858,10 @@ export default function PurchaseEdit() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags(["Party"])
+        partyApi.util.invalidateTags([
+          "Party",
+          "PartyLedger",
+        ])
       );
 
       // =======================================================

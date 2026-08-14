@@ -7,7 +7,7 @@ import {
   ChevronRight,
   Package,
   Tags,
-  
+
 } from "lucide-react";
 
 import {
@@ -130,7 +130,7 @@ export default function ItemsByCategory() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-     
+
 
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
@@ -212,7 +212,7 @@ export default function ItemsByCategory() {
               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
             >
               <Tags size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-black uppercase tracking-wider">
                 Categories ({filteredCategories.length})
               </span>
             </div>
@@ -278,11 +278,11 @@ export default function ItemsByCategory() {
                           style={{ backgroundColor: "transparent" }}
                           title="More"
                         >
-                          <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+                          <MoreVertical size={14} style={{ color: "#374151" }} />
                         </button>
                       )}
 
-                      <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }} />
+                      <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
                     </div>
 
                     {menuOpen === category.Category_Id && (
@@ -325,41 +325,56 @@ export default function ItemsByCategory() {
             <div className="flex flex-col h-full">
 
               {/* ── CATEGORY SUMMARY CARD ── */}
-              <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="rounded-xl p-2 mb-2 flex items-center justify-between gap-4">
+
+                {/* LEFT — All Items + item count */}
                 <div className="flex items-center gap-4">
+
                   <div
                     className="flex items-center justify-center rounded-xl"
-                    style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      backgroundColor: "#4CA1AF22",
+                    }}
                   >
                     <Package size={22} style={{ color: "#4CA1AF" }} />
                   </div>
+
                   <div>
-                    <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
+                    <h6
+                      className="font-bold text-gray-900"
+                      style={{ fontSize: 18, margin: 0 }}
+                    >
                       {selectedCategory?.Item_Category}
                     </h6>
+
                     <p className="text-gray-500 text-sm mt-0.5">
                       {items.length} item{items.length !== 1 ? "s" : ""}
                     </p>
                   </div>
+
                 </div>
 
-                {/* <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <p className="text-xs uppercase text-gray-400 mb-1">Stock Value</p>
-                    <p className="font-bold" style={{ color: "#4CA1AF", fontSize: 18 }}>
-                      ₹ {fmt(totalStockValue)}
-                    </p>
-                  </div>
-                </div> */}
-              </div>
-
-              {/* ── SEARCH ITEMS ── */}
-              <div className="px-1 py-2" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
+                {/* RIGHT — Search */}
+                <div
+                  className="relative flex-shrink-0"
+                  style={{
+                    width: 220,
+                    height: 36,
+                  }}
+                >
                   <Search
                     size={16}
-                    style={{ position: "absolute", left: 10, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: 10,
+                      color: "#94a3b8",
+                      pointerEvents: "none",
+                    }}
                   />
+
                   <input
                     type="text"
                     value={itemSearch}
@@ -378,31 +393,66 @@ export default function ItemsByCategory() {
                     }}
                     placeholder="Search"
                     className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{ height: 36, paddingLeft: 34, paddingRight: 10, borderColor: "#dbe3ea" }}
+                    style={{
+                      height: 36,
+                      paddingLeft: 34,
+                      paddingRight: 10,
+                      borderColor: "#dbe3ea",
+                      boxSizing: "border-box",
+                    }}
                   />
                 </div>
+
               </div>
 
               {/* ── ITEMS TABLE ── */}
-              <div className="flex-1 overflow-x-auto">
-                <table className="w-full min-w-[600px]" style={{ fontSize: 13, borderCollapse: "collapse" }}>
+              <div className="table-responsive table-desi">
+                <table
+                  className="w-full min-w-[700px]"
+                  //style={{ fontSize: 13, borderCollapse: "collapse" }}
+                >
                   <thead>
-                    <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
-                      {["Item Name", "Unit", "Stock", "Stock Value", ""].map((h, index) => (
-                        <th
-                          key={index}
-                          className="text-left py-2 px-3 font-semibold text-black"
-                          style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}
-                        >
-                          {h}
-                        </th>
-                      ))}
+                    <tr 
+                    //style={{ borderBottom: "2px solid #e2e8f0" }}
+                    >
+                      <th
+                        //className="text-left py-2 px-3 font-semibold text-black"
+                        style={{
+                          //fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        Item Name
+                      </th>
+
+                      <th
+                        className="text-left py-2 px-3 font-semibold text-black"
+                        style={{
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        Stock
+                      </th>
+
+                      <th
+                        className="text-right py-2 px-3 font-semibold text-black"
+                        style={{
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        Stock Value
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {isItemsLoading ? (
                       <tr>
-                        <td colSpan={5} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+                        <td colSpan={3} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
                           Loading...
                         </td>
                       </tr>
@@ -418,70 +468,34 @@ export default function ItemsByCategory() {
                           key={item.Item_Id}
                           style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          // onDoubleClick={() => {
-                          //   setEditingItem(item);
-                          //   setShowEditItemModal(true);
-                          // }}
+                          onDoubleClick={() => {
+                            setEditingItem(item);
+                            setShowEditItemModal(true);
+                          }}
                         >
-                          <td className="py-2 px-3 text-black">{item.Item_Name}</td>
-                          <td className="py-2 px-3 text-black">{item.Unit || "—"}</td>
-                          <td
-                            className="py-2 px-3"
-                            style={{ color: item.Stock_Quantity < 0 ? "#dc2626" : "#000000" }}
-                          >
-                            {item.Stock_Quantity}
+                          <td className="py-2 px-3 text-black">
+                            {item.Item_Name}
                           </td>
-                          <td className="py-2 px-3 font-semibold" style={{ color: "#000000", whiteSpace: "nowrap" }}>
+
+                          <td
+                            //className="py-2 px-3"
+                            style={{
+                              color: item.Stock_Quantity < 0 ? "#dc2626" : "#000000",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.Stock_Quantity} {item.Unit || ""}
+                          </td>
+
+                          <td
+                            className=" text-right"
+                            style={{
+                              color: "#000000",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
                             ₹ {fmt(item.Stock_Value)}
                           </td>
-                          {/* <td className="py-2 px-3">
-                            <div className="relative">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setItemRowMenu(itemRowMenu === item.Item_Id ? null : item.Item_Id);
-                                }}
-                                className="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none"
-                                style={{ background: "transparent", boxShadow: "none" }}
-                              >
-                                <MoreVertical size={14} style={{ color: "#94a3b8" }} />
-                              </button>
-
-                              {itemRowMenu === item.Item_Id && (
-                                <div
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
-                                  style={{ width: 160, zIndex: 999, borderColor: "#e5e7eb" }}
-                                >
-                                  <button
-                                    type="button"
-                                    className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
-                                    style={{ color: "#374151" }}
-                                    onClick={() => {
-                                      setItemRowMenu(null);
-                                      setEditingItem(item);
-                                      setShowEditItemModal(true);
-                                    }}
-                                  >
-                                    <Eye size={13} style={{ color: "#4CA1AF" }} />
-                                    View/Edit
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    disabled
-                                    title="Delete item — coming soon"
-                                    className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
-                                    style={{ color: "#dc2626", opacity: 0.5, cursor: "not-allowed" }}
-                                  >
-                                    <Trash2 size={13} style={{ color: "#dc2626" }} />
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </td> */}
                         </tr>
                       ))
                     )}
@@ -501,17 +515,6 @@ export default function ItemsByCategory() {
           onSave={handleCategoryAdded}
         />
       )}
-
-      {/* {showEditItemModal && (
-        <ItemModal
-          itemDetails={editingItem}
-          editingItem={true}
-          onClose={() => {
-            setShowEditItemModal(false);
-            setEditingItem(null);
-          }}
-        />
-      )} */}
 
     </>
   );
