@@ -53,11 +53,12 @@ export default function PurchaseAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
   const basePurchasePriceRef = useRef({});
+  const basePurchaseUnitRef = useRef({});
 
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+  //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
   const [activeItemRow, setActiveItemRow] = useState(null);
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   // const { data: items, } = useGetAllItemsQuery();
@@ -157,7 +158,7 @@ export default function PurchaseAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false,unitOpen:false
     }
   ]);
 
@@ -271,7 +272,8 @@ export default function PurchaseAdd() {
         ...row,
         CategoryOpen: false,
         itemOpen: false, // also close item dropdown if open,
-        addUnitModalOpen: false
+        addUnitModalOpen: false,
+        unitOpen:false
       })),
       {
         itemSearch: "",
@@ -281,7 +283,8 @@ export default function PurchaseAdd() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
-        addUnitModalOpen: false
+        addUnitModalOpen: false,
+        unitOpen:false
       },
     ]);
 
@@ -605,8 +608,7 @@ export default function PurchaseAdd() {
       // =======================================================
       // 8. Invalidate RTK Query caches
       // =======================================================
-      dispatch(itemApi.util.invalidateTags(["Item"])
-      );
+      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
 
       dispatch(
         cashInHandApi.util.invalidateTags(["CashInHand",])
@@ -621,6 +623,7 @@ export default function PurchaseAdd() {
       dispatch(
         partyApi.util.invalidateTags([
           "Party",
+          "PartyLedger",
         ])
       );
 
@@ -830,7 +833,20 @@ export default function PurchaseAdd() {
       alert("Upload failed");
     }
   };
+  // per-row search + open state
+  const [unitSearch, setUnitSearch] = useState("");
+  const [unitOpen, setUnitOpen] = useState(false);
+  const unitRef = useRef(null);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (unitRef.current && !unitRef.current.contains(e.target)) {
+        setUnitOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   //console.log("Invoice Data:", invoiceData);
   return (
     <>
@@ -1111,7 +1127,7 @@ export default function PurchaseAdd() {
                               setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
                               setCurrentPartyDetails(matchedParty);
 
-                              setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                              //setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
                             } else {
                               // setValue("Phone_Number", "", { shouldValidate: true, shouldDirty: true });
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
@@ -1137,9 +1153,9 @@ export default function PurchaseAdd() {
 
                                 //setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
                                 setCurrentPartyDetails(matchedParty);
-                                setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                //setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
                               } else {
-                                setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
+                                //setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
                               }
 
                               setOpen(false);
@@ -1162,7 +1178,7 @@ export default function PurchaseAdd() {
                             + Add Party
                           </span>
 
-                          {parties?.parties
+                          {/* {parties?.parties
                             ?.filter(
                               (party) =>
                                 party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1182,11 +1198,58 @@ export default function PurchaseAdd() {
                                   setCurrentPartyDetails(party);
                                   setOpen(false);
                                 }}
-                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                 className="flex justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                //className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                               >
-                                {party.Party_Name} ({party.Phone_Number})
+                                
+                                <span>{party.Party_Name} ({party.Phone_Number})</span>
+                                <span className="text-gray-400 text-xs">Bal: {party.Current_Balance ?? 0}</span>
                               </div>
-                            ))}
+                            ))} */}
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                    setCurrentPartyDetails(party);
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  {/* Left — name + phone */}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Right — balance */}
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
 
                           {parties?.parties?.filter((party) =>
                             party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1231,14 +1294,14 @@ export default function PurchaseAdd() {
                             }
                           );
 
-                          setValue(
-                            "Billing_Name",
-                            newParty.Billing_Name || "",
-                            {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            }
-                          );
+                          // setValue(
+                          //   "Billing_Name",
+                          //   newParty.Billing_Name || "",
+                          //   {
+                          //     shouldValidate: true,
+                          //     shouldDirty: true,
+                          //   }
+                          // );
 
                           setCurrentPartyDetails(newParty);
 
@@ -1736,6 +1799,7 @@ export default function PurchaseAdd() {
                                     //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                     setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                     basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
+                                    basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                     const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                       {
                                         ...itemsValues[i],
@@ -1768,125 +1832,7 @@ export default function PurchaseAdd() {
                               </p>
                             )}
                             {/* Dropdown List */}
-                            {/* {rows[i]?.itemOpen && (
-                              <div
-                                style={{ width: "40rem" }}
-                                className="absolute z-20  w-full bg-white border
-                                border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                              >
-                                <table className="w-full text-sm border-collapse">
-                                  <thead className="bg-gray-100 border-b">
-                                    <tr>
-                                      <th>Sl.No</th>
-                                      <th className="text-left px-3 py-2">Item Name</th>
-                                      <th className="text-left px-3 py-2">Sale Price</th>
-                                      <th className="text-left px-3 py-2">Purchase Price</th>
-                                      <th className="text-left px-3 py-2">Stock</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {items?.items
-                                      ?.filter((it) =>
-                                        it.Item_Name.toLowerCase().includes(
-                                          (rows[i]?.itemSearch || "").toLowerCase()
-                                        )
-                                      )
-                                      .map((it, idx) => (
-                                        <tr
-                                          key={idx}
-                                          onClick={() => {
 
-                                            setRows((prev) => {
-                                              const updated = [...prev];
-                                              updated[i] = {
-                                                ...updated[i],
-                                                Item_Category: it.Item_Category || "",
-                                                Item_HSN: it.Item_HSN || "",
-                                                categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                                isExistingItem: true,   // lock category
-                                                isHSNLocked: false,      // lock HSN
-                                                isUnitLocked: false,     // lock unit
-                                                Primary_Unit: it.Primary_Unit || null,      // 🔹 add this
-                                                Secondary_Unit: it.Secondary_Unit || null,  // 🔹 add this
-                                                //Available_Units: item.Available_Units || [],
-                                                Conversion_Rate: it.Conversion_Rate || null,
-                                                Available_Units: Array.isArray(it.Available_Units)
-                                                  ? it.Available_Units
-                                                  : [],
-                                              };
-                                              return updated;
-                                            });
-                                            handleRowChange(i, "itemSearch", it.Item_Name);
-                                            handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                            handleRowChange(i, "CategoryOpen", false);
-                                            setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-
-                                            setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
-                                            //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-
-                                            handleRowChange(i, "itemOpen", false);
-
-
-                                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                              {
-                                                ...itemsValues[i],
-                                                Item_Name: it.Item_Name,
-                                                Purchase_Price: it.Purchase_Price || 0,
-                                                Quantity: itemsValues[i]?.Quantity || 0,
-                                                Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
-                                                Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
-                                                Tax_Type: itemsValues[i]?.Tax_Type
-                                              },
-                                              i,
-                                              itemsValues
-                                            );
-
-                                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                          }}
-
-                                          className="hover:bg-gray-100 cursor-pointer border-b"
-                                        >
-                                          <td>{idx + 1}</td>
-                                          <td className="px-3 py-2">{it.Item_Name}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                          {/* <td style={{color:"transparent"}}
-              className={`px-3 py-2 ${it.Stock_Quantity <= 0 ? "text-red-500" : "text-green-500"}`}>
-                {it.Stock_Quantity || 0}</td> 
-                                          <td
-                                            style={{
-                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                              fontWeight: "500", // optional: matches Tailwind's medium weight
-                                            }}
-                                          >
-                                            {it.Stock_Quantity || 0}
-                                          </td>
-                                        </tr>
-                                      ))}
-
-                                    {items?.items?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    ).length === 0 && (
-                                        <tr>
-                                          <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                            No Item found
-                                          </td>
-                                        </tr>
-                                      )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )} */}
                             {rows[i]?.itemOpen && (
                               <div
                                 style={{ width: "45rem" }}
@@ -1970,10 +1916,11 @@ export default function PurchaseAdd() {
                                             setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
+                                            setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                             //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                             basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
+                                            basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
                                             handleRowChange(i, "itemOpen", false);
 
 
@@ -2121,7 +2068,7 @@ export default function PurchaseAdd() {
                         </td>
 
 
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        {/* <td style={{ padding: "0px", width: "12%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Item_Unit`}
@@ -2181,52 +2128,95 @@ export default function PurchaseAdd() {
                                       // }
 
                                       //const roundedPrice = newPrice.toFixed(2);
+                                      // const basePrice =
+                                      //   Number(basePurchasePriceRef.current[i]) || 0;
+
+                                      // if (basePrice <= 0) {
+                                      //   return;
+                                      // }
+
+                                      // let newPrice = basePrice;
+
+                                      // // =====================================================
+                                      // // PRIMARY → SECONDARY
+                                      // // Example:
+                                      // // ₹45 / Kg
+                                      // // 1 Kg = 1000 Gm
+                                      // // ₹45 / 1000 = ₹0.045
+                                      // // UI allows only 2 decimals → ₹0.05
+                                      // // =====================================================
+
+                                      // if (
+                                      //   previousUnit === primaryUnit &&
+                                      //   newUnit === secondaryUnit
+                                      // ) {
+                                      //   newPrice = basePrice / conversionRate;
+                                      // }
+
+                                      // // =====================================================
+                                      // // SECONDARY → PRIMARY
+                                      // // IMPORTANT:
+                                      // // Do NOT use current displayed price.
+                                      // // Restore original base price.
+                                      // // =====================================================
+
+                                      // else if (
+                                      //   previousUnit === secondaryUnit &&
+                                      //   newUnit === primaryUnit
+                                      // ) {
+                                      //   //newPrice = basePrice;
+                                      //    newPrice = basePrice * conversionRate;
+                                      // }
+
+                                      // else {
+                                      //   return;
+                                      // }
+
+                                      // const roundedPrice = newPrice.toFixed(2);
+                                      //                                       If going to the original unit
+                                      //         ↓
+                                      // Restore basePrice
+
+                                      // Otherwise
+                                      //         ↓
+                                      // Convert basePrice
                                       const basePrice =
                                         Number(basePurchasePriceRef.current[i]) || 0;
 
-                                      if (basePrice <= 0) {
+                                      const baseUnit =
+                                        basePurchaseUnitRef.current[i];
+
+                                      if (basePrice <= 0 || !baseUnit) {
                                         return;
                                       }
 
-                                      let newPrice = basePrice;
+                                      let newPrice;
 
-                                      // =====================================================
-                                      // PRIMARY → SECONDARY
-                                      // Example:
-                                      // ₹45 / Kg
-                                      // 1 Kg = 1000 Gm
-                                      // ₹45 / 1000 = ₹0.045
-                                      // UI allows only 2 decimals → ₹0.05
-                                      // =====================================================
-
-                                      if (
-                                        previousUnit === primaryUnit &&
-                                        newUnit === secondaryUnit
-                                      ) {
-                                        newPrice = basePrice / conversionRate;
-                                      }
-
-                                      // =====================================================
-                                      // SECONDARY → PRIMARY
-                                      // IMPORTANT:
-                                      // Do NOT use current displayed price.
-                                      // Restore original base price.
-                                      // =====================================================
-
-                                      else if (
-                                        previousUnit === secondaryUnit &&
-                                        newUnit === primaryUnit
-                                      ) {
+                                      if (newUnit === baseUnit) {
+                                        // Restore original entered price
                                         newPrice = basePrice;
                                       }
-
+                                      else if (
+                                        baseUnit === primaryUnit &&
+                                        newUnit === secondaryUnit
+                                      ) {
+                                        // Primary → Secondary
+                                        newPrice = basePrice / conversionRate;
+                                      }
+                                      else if (
+                                        baseUnit === secondaryUnit &&
+                                        newUnit === primaryUnit
+                                      ) {
+                                        // Secondary → Primary
+                                        newPrice = basePrice * conversionRate;
+                                      }
                                       else {
                                         return;
                                       }
 
                                       const roundedPrice = newPrice.toFixed(2);
 
-                                      
+
 
 
                                       setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
@@ -2271,90 +2261,150 @@ export default function PurchaseAdd() {
                           {errors?.items?.[i]?.Item_Unit && (
                             <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
                           )}
-                        </td>
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
+                        </td> */}
+                        <td style={{ padding: "0px", width: "10%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Item_Unit`}
                             render={({ field }) => {
                               const row = rows[i];
+                              const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
+                              const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
 
-                              const availableUnits = Array.isArray(row?.Available_Units)
-                                ? row.Available_Units
-                                : [];
+
+
+                              const filtered = allUnits.filter((u) =>
+                                u.Unit_Name?.toLowerCase().includes(unitSearch.toLowerCase()) ||
+                                u.Unit_Shorthand?.toLowerCase().includes(unitSearch.toLowerCase())
+                              );
+
+                              const selectedLabel = allUnits.find(u => u.Unit_Shorthand === field.value);
 
                               return (
-                                <select
-                                  {...field}
-                                  value={field.value || ""}
-                                  className="form-select"
-                                  style={{
-                                    width: "100%",
-                                    fontSize: "12px",
-                                    marginLeft: "0px",
-                                  }}
-                                  //disabled={row?.isUnitLocked}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-
-                                    if (value === "__ADD_UNIT__") {
-                                      setActiveUnitRow(i);
-                                      setShowAddUnitModal(true);
-                                      return;
-                                    }
-
-                                    field.onChange(value);
-
-                                    handleRowChange(i, "Item_Unit", value);
-
-                                    setValue(`items.${i}.Item_Unit`, value, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    });
-                                  }}
-                                >
-                                 
-                                  {availableUnits.length > 0 ? (
-                                    availableUnits.map((unit) => (
-                                      <option
-                                        key={unit.Unit_Shorthand}
-                                        value={unit.Unit_Shorthand}
-                                      >
-                                        {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                      </option>
-                                    ))
-                                  ) : (
-                                    <>
-                                      <option value="">NONE</option>
-
+                                <div ref={unitRef} style={{ position: "relative", width: "100%" }}>
+                                  {/* trigger input */}
+                                  <input
+                                    type="text"
+                                    readOnly={!unitOpen}
                                     
-                                      {Array.isArray(itemUnits) &&
-                                        itemUnits.map((unit) => (
-                                          <option
-                                            key={unit.Unit_Shorthand}
-                                            value={unit.Unit_Shorthand}
-                                          >
-                                            {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                          </option>
-                                        ))}
+                                    value={unitOpen ? unitSearch : (selectedLabel ? `${selectedLabel.Unit_Name} (${selectedLabel.Unit_Shorthand})` : "")}
+                                    placeholder="Select unit"
+                                    onClick={() => handleRowChange(i, "unitOpen", !rows[i]?.unitOpen)}
+                                    //onClick={() => { setUnitOpen(true); setUnitSearch(""); }}
+                                    onChange={(e) => { setUnitSearch(e.target.value); setUnitOpen(true); }}
+                                    style={{
+                                      width: "100%",
+                                      fontSize: 12,
+                                      //border: "1px solid #d1d5db",
+                                      //borderRadius: 4,
+                                      //padding: "3px 6px",
+                                      cursor: "pointer",
+                                      backgroundColor: "white",
+                                      outline: "none",
+                                      marginBottom: 0
+                                    }}
+                                  />
 
-                                      <option value="__ADD_UNIT__">
+                                  {rows[i]?.unitOpen && (
+                                    <div style={{
+                                      position: "absolute",
+                                      top: "100%",
+                                      left: 0,
+                                      zIndex: 30,
+                                      width: "180px",
+                                      background: "white",
+                                      border: "1px solid #e5e7eb",
+                                      borderRadius: 6,
+                                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                      marginTop: 2,
+                                      maxHeight: 180,
+                                      overflowY: "auto",
+                                    }}>
+                                      {/* Add Unit */}
+                                      {/* <div
+                                        onClick={() => { setActiveUnitRow(i); setShowAddUnitModal(true); setUnitOpen(false); }}
+                                        style={{ padding: "6px 10px", fontSize: 12, color: "#4CA1AF", cursor: "pointer", fontWeight: 500, borderBottom: "1px solid #f3f4f6" }}
+                                      >
                                         ➕ Add Unit
-                                      </option>
-                                    </>
+                                      </div> */}
+
+                                      {filtered.length === 0 ? (
+                                        <div style={{ padding: "6px 10px", fontSize: 12, color: "#9ca3af" }}>No units found</div>
+                                      ) : (
+                                        filtered.map((unit) => {
+                                          const isSelected = field.value === unit.Unit_Shorthand;
+                                          return (
+                                            <div
+                                              key={unit.Unit_Shorthand}
+                                              onClick={() => {
+                                                const newUnit = unit.Unit_Shorthand;
+                                                const previousUnit = field.value;
+                                                field.onChange(newUnit);
+                                                handleRowChange(i, "Item_Unit", newUnit);
+                                                setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
+                                                setUnitOpen(false);
+                                                setUnitSearch("");
+
+                                                // ── price auto-scale logic — unchanged from your original ──
+                                                const primaryUnit = row?.Primary_Unit;
+                                                const secondaryUnit = row?.Secondary_Unit;
+                                                const conversionRate = Number(row?.Conversion_Rate) || 0;
+
+                                                if (previousUnit && newUnit && previousUnit !== newUnit && primaryUnit && secondaryUnit && conversionRate > 0) {
+                                                  const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
+                                                  const baseUnit = basePurchaseUnitRef.current[i];
+                                                  if (basePrice <= 0 || !baseUnit) return;
+
+                                                  let newPrice;
+                                                  if (newUnit === baseUnit) {
+                                                    newPrice = basePrice;
+                                                  } else if (baseUnit === primaryUnit && newUnit === secondaryUnit) {
+                                                    newPrice = basePrice / conversionRate;
+                                                  } else if (baseUnit === secondaryUnit && newUnit === primaryUnit) {
+                                                    newPrice = basePrice * conversionRate;
+                                                  } else {
+                                                    return;
+                                                  }
+
+                                                  const roundedPrice = newPrice.toFixed(2);
+                                                  setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
+
+                                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                                    { ...itemsValues[i], Purchase_Price: roundedPrice }, i, itemsValues
+                                                  );
+                                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                                }
+                                              }}
+                                              style={{
+                                                padding: "6px 10px",
+                                                fontSize: 12,
+                                                cursor: "pointer",
+                                                backgroundColor: isSelected ? "#eaf6f7" : "transparent",
+                                                color: isSelected ? "#4CA1AF" : "#374151",
+                                                fontWeight: isSelected ? 500 : 400,
+                                              }}
+                                              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb"; }}
+                                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                                            >
+                                              {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                            </div>
+                                          );
+                                        })
+                                      )}
+                                    </div>
                                   )}
-                                </select>
+                                </div>
                               );
                             }}
                           />
 
                           {errors?.items?.[i]?.Item_Unit && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].Item_Unit.message}
-                            </p>
+                            <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
                           )}
-                        </td> */}
-
+                        </td>
 
 
 
@@ -2394,6 +2444,8 @@ export default function PurchaseAdd() {
                                 //   return;
                                 // }
                                 basePurchasePriceRef.current[i] = Number(val) || 0;
+                                basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+
 
                                 const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                   { ...itemsValues[i], Purchase_Price: val },
@@ -2655,7 +2707,7 @@ export default function PurchaseAdd() {
 
 
                 <div className="flex flex-col px-2">
-               
+
 
 
                   <div className="flex flex-col mt-3 gap-2 w-full">
@@ -2688,7 +2740,7 @@ export default function PurchaseAdd() {
                               }
                             }}
                           >
-                         
+
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Neft">Neft</option>
@@ -2710,7 +2762,7 @@ export default function PurchaseAdd() {
                             <label className="text-sm">Reference Number</label>
                             <input
                               type="text"
-                            
+
                               style={{ marginBottom: "0px" }}
                               {...register("splits.0.Reference_Number")}
                             />
@@ -3106,11 +3158,11 @@ export default function PurchaseAdd() {
 
             await refetchItems();
 
-            setNewlyAddedItem(savedItem);
+            //setNewlyAddedItem(savedItem);
 
-            setTimeout(() => {
-              setNewlyAddedItem(null);
-            }, 8000);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
             setShowItemAddModal(false);
 

@@ -434,15 +434,52 @@ const handlePrintClick = (row, transactionId) => {
           >
             <Users size={26} style={{ color: "#4CA1AF" }} />
           </div>
-          <div>
+          {/* <div>
             <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
               {party?.Party_Name}
             </h6>
             <p className="text-gray-500 text-sm mt-0.5">
-              GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span>
+             
               {" • "}
               State: <span className="font-medium">{party?.State || "—"}</span>
             </p>
+          </div> */}
+               <div>
+            <h6
+              className="font-bold text-gray-900"
+              style={{ fontSize: 18, margin: 0 }}
+            >
+              {party?.Party_Name}
+            </h6>
+
+            {/* Contact Info */}
+            <div className="mt-1 text-sm text-gray-600">
+              {party?.Phone_Number && (
+                <p className="m-0">
+                  📞 {party.Phone_Number}
+                </p>
+              )}
+
+             
+
+              {party?.addresses?.[0]?.Address_Text && (
+                <p className="m-0 truncate">
+                  📍 {party.addresses[0].Address_Text}
+                </p>
+              )}
+            </div>
+
+            {/* Financial Info */}
+            <div className="flex flex-wrap gap-4 mt-2 text-xs">
+              {party?.Credit_Limit_Type !== "No_Limit" &&
+                party?.Credit_Limit && (
+                  <span className="text-gray-600">
+                    Credit Limit: ₹{Number(party.Credit_Limit).toFixed(2)}
+                  </span>
+                )}
+
+             
+            </div>
           </div>
         </div>
 
@@ -861,8 +898,13 @@ export default function PartyReceivablesLeft() {
   };
 
   const handleEdit = (party) => {
-    console.log("Editing party:", party,);
-    setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
+    console.log("Editing party:", party);
+     setPartyModal({
+    open: true,
+    mode: "edit",
+    data: party,   // <-- use clicked party
+  });
+    //setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
     setOpenMenuId(null);
   };
 
@@ -1009,12 +1051,32 @@ export default function PartyReceivablesLeft() {
                       >
                         <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                       </div>
-                      <div className="min-w-0">
+                      {/* <div className="min-w-0">
                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
                           {party.Party_Name}
                         </p>
                         <p className="text-xs truncate text-gray-400">
                           {party.GSTIN || party.State || "—"}
+                        </p>
+                      </div> */}
+                       <div className="min-w-0">
+                        <p
+                          className="font-semibold text-gray-800 truncate text-sm"
+                          style={{ margin: 0 }}
+                        >
+                          {party.Party_Name}
+                        </p>
+
+                        <p
+                          className="text-xs truncate font-medium"
+                          style={{
+                            color:
+                              Number(party.Current_Balance) < 0
+                                ? "#dc2626" // red
+                                : "#16a34a", // green
+                          }}
+                        >
+                       ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
@@ -1052,8 +1114,8 @@ export default function PartyReceivablesLeft() {
                           >
                             <button
                               type="button"
-                              onClick={handleEdit}
-                              // onClick={() => handleEdit(party)}
+                              //onClick={handleEdit}
+                              onClick={() => handleEdit(party)}
                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
                               style={{ backgroundColor: "transparent" }}
                             >
@@ -1091,7 +1153,11 @@ export default function PartyReceivablesLeft() {
         <PartyAddModal
           partyDetails={partyModal.data || {}}
           editingParty={partyModal.mode === "edit"}
-          onClose={() => setPartyModal({ open: false, mode: "add", data: null })}
+           onClose={() => {
+            setPartyModal({ open: false, mode: "add", data: null })
+         //setSelectedPartyDetails(null);   // 🔹 add this}
+         }}
+          //onClose={() => setPartyModal({ open: false, mode: "add", data: null })}
         />
       )}
     </>

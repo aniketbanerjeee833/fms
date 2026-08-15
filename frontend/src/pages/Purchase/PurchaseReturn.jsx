@@ -9,12 +9,14 @@ import {
   Printer
 } from "lucide-react";
 
-import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery } from "../../redux/api/purchaseReturnApi";
-import { useEffect, useState } from "react";
+import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery, useGetPurchaseReturnByIdQuery } from "../../redux/api/purchaseReturnApi";
+import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
+import { useReactToPrint } from "react-to-print";
+import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 
 
 
@@ -34,7 +36,12 @@ export default function PurchaseReturn() {
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [deletePurchaseReturn, { isLoading: isDeleting }] = useDeletePurchaseReturnMutation();
-
+  const [printPurchaseReturnId, setPrintPurchaseReturnId] = useState(null);
+  const printRef = useRef(null);
+  // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetPurchaseReturnByIdQuery(printPurchaseReturnId, {
+    skip: !printPurchaseReturnId,
+  });
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -119,7 +126,18 @@ export default function PurchaseReturn() {
     }
   };
 
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printPurchaseReturnId ? `Purchase-${printPurchaseReturnId}` : "Purchase",
+    onAfterPrint: () => setPrintPurchaseReturnId(null),
+  });
 
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printPurchaseReturnId) {
+      handlePrint();
+    }
+  }, [printData, printPurchaseReturnId]);
 
   return (
     <>
@@ -309,9 +327,9 @@ export default function PurchaseReturn() {
                         <td>{purchaseReturn?.Party_Name || "N/A"}</td>
 
                         <td>{purchaseReturn?.Payment_Type_Display || "N/A"}</td>
-                        <td>{purchaseReturn?.Total_Amount || "N/A"}</td>
-                        <td>{purchaseReturn?.Total_Received || "N/A"}</td>
-                        <td>{purchaseReturn?.Balance_Due || "N/A"}</td>
+                        <td>₹{purchaseReturn?.Total_Amount || "N/A"}</td>
+                        <td>₹{purchaseReturn?.Total_Received || "N/A"}</td>
+                        <td>₹{purchaseReturn?.Balance_Due || "N/A"}</td>
 
                         <td
                           className="py-2 px-2"
@@ -394,10 +412,7 @@ export default function PurchaseReturn() {
                                 onClick={() => {
                                   setRowMenuOpen(null);
 
-                                  console.log(
-                                    "Print purchase return:",
-                                    purchaseReturn
-                                  );
+                                  setPrintPurchaseReturnId(purchaseReturn.id)
                                 }}
                               >
                                 <Printer
@@ -582,6 +597,20 @@ export default function PurchaseReturn() {
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
         />
+      )}
+      {printData?.purchaseReturn && (
+        <div style={{ display: "none" }}>
+          <CreditDebitNotePrintTemplate
+            ref={printRef}
+            type="debit"
+            invoice={{
+              ...printData.purchaseReturn,
+              items: printData.purchaseReturn.items || [],
+              companyDetails: {},
+
+            }}
+          />
+        </div>
       )}
     </>
 

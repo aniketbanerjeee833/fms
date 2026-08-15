@@ -640,152 +640,9 @@ const editParty = async (req, res, next) => {
     }
   }
 };
-// const editParty = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
 
-//     const cleanData = sanitizeObject(req.body);
-//     const validation = partySchema.safeParse(cleanData);
-//     if (!validation.success) {
-//       await connection.rollback();
-//       return res.status(400).json({ errors: validation.error.errors });
-//     }
-
-//     const {
-//       Party_Name,
-//       GSTIN,
-//       Phone_Number,
-//       State,
-//       Email_Id,
-//       Billing_Address,
-//       Shipping_Address,
-//       Opening_Balance,
-//       Opening_Balance_Type,
-//       Opening_Balance_Date,
-//       Credit_Limit_Type,
-//       Credit_Limit,
-//     } = validation.data;
-
-//     if (!Party_Name) {
-//       await connection.rollback();
-//       return res.status(400).json({ message: "Party name is required" });
-//     }
-
-//     const { Party_Id: partyId } = req.params;
-
-//     // 🔥 fetch the party's numeric PK — needed as referenceId for the ledger
-//     const [[partyRow]] = await connection.query(
-//       `SELECT id FROM add_party WHERE Party_Id = ?`,
-//       [partyId]
-//     );
-
-//     if (!partyRow) {
-//       await connection.rollback();
-//       return res.status(404).json({ message: "Party not found" });
-//     }
-
-//     // 🔥 Duplicate party name check (excluding this party itself)
-//     const [existingName] = await connection.query(
-//       `SELECT Party_Id FROM add_party 
-//        WHERE TRIM(Party_Name) = TRIM(?) AND Party_Id != ?
-//        LIMIT 1`,
-//       [Party_Name, partyId]
-//     );
-
-//     if (existingName.length > 0) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         message: "Party name already exists",
-//       });
-//     }
-
-//     const cleanValue = (val) =>
-//       val !== undefined && val !== null && String(val).trim() !== "" ? val : null;
-
-//     const hasOpeningBalance = Opening_Balance !== null;
-//     const todayDate = new Date().toISOString().slice(0, 10);
-
-//     await connection.execute(
-//       `UPDATE add_party 
-//        SET Party_Name = ?, GSTIN = ?, Phone_Number = ?, State = ?, Email_Id = ?,
-//            Billing_Address = ?, Shipping_Address = ?,
-//            Opening_Balance = ?, Opening_Balance_Type = ?, Opening_Balance_Date = ?,
-//            Credit_Limit_Type = ?, Credit_Limit = ?
-//        WHERE Party_Id = ?`,
-//       [
-//         Party_Name,
-//         cleanValue(GSTIN),
-//         cleanValue(Phone_Number),
-//         cleanValue(State),
-//         cleanValue(Email_Id),
-//         cleanValue(Billing_Address),
-//         cleanValue(Shipping_Address),
-
-//         hasOpeningBalance ? Opening_Balance : null,
-//         hasOpeningBalance ? Opening_Balance_Type : null,
-//         hasOpeningBalance ? (Opening_Balance_Date || todayDate) : null,
-
-//         Credit_Limit_Type || "No_Limit",
-//         Credit_Limit_Type === "Custom" ? Credit_Limit : null,
-
-//         partyId,
-//       ]
-//     );
-
-//     // 🔹 sync the ledger to match the new state
-//     if (hasOpeningBalance) {
-//       await recordPartyLedger({
-//         connection,
-//         partyId,
-//         txnType: "Opening_Balance",
-//         referenceId: partyRow.id,
-//         amount: Opening_Balance,
-//         txnDate: Opening_Balance_Date || todayDate,
-//         directionOverride: Opening_Balance_Type === "To_Receive" ? "Credit" : "Debit",
-//       });
-//     } else {
-//       // 🔹 user cleared the opening balance entirely — remove the ledger row if one existed
-//       await reversePartyLedger({
-//         connection,
-//         partyId,
-//         txnType: "Opening_Balance",
-//         referenceId: partyRow.id,
-//       });
-//     }
-
-//     await connection.commit();
-//     return res.status(200).json({
-//       message: "Party updated successfully",
-//       success: true,
-//       id: partyId,
-//       Party_Name,
-//       GSTIN,
-//       Phone_Number,
-//       State,
-//       Email_Id,
-//       Billing_Address,
-//       Shipping_Address,
-//       Opening_Balance,
-//       Opening_Balance_Type,
-//       Opening_Balance_Date,
-//       Credit_Limit_Type,
-//       Credit_Limit,
-//     });
-//   } catch (err) {
-//     if (connection) {
-//       await connection.rollback();
-//     }
-//     console.error("❌ Error updating party:", err);
-//     next(err);
-//   } finally {
-//     if (connection) {
-//       connection.release();
-//     }
-//   }
-// };
-
+  // OR p.State LIKE ?
+  //         OR p.Email_Id LIKE ?
 const getAllParties = async (req, res, next) => {
   let connection;
 
@@ -814,9 +671,8 @@ const getAllParties = async (req, res, next) => {
         WHERE (
           p.Party_Name LIKE ?
           OR p.GSTIN LIKE ?
-          OR p.Phone_Number LIKE ?
-          OR p.State LIKE ?
-          OR p.Email_Id LIKE ?
+          OR p.Phone_Number LIKE ? OR
+         CAST(ABS(Current_Balance) AS CHAR) LIKE ?
 
           OR EXISTS (
             SELECT 1
@@ -834,8 +690,8 @@ const getAllParties = async (req, res, next) => {
         like,
         like,
         like,
-        like,
         like
+        
       );
     }
 
@@ -1829,6 +1685,7 @@ const getAllPartiesPayablesLeft = async (req, res, next) => {
         p.Party_Name,
         p.Phone_Number,
         p.GSTIN,
+        p.
         pu.Purchase_Id,
         pu.Bill_Number,
         pu.Total_Amount,
@@ -2136,6 +1993,84 @@ const getAllPartiesReceivablesLeft = async (req, res, next) => {
   }
 };
 
+// const getAllPayableParties = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     connection = await db.getConnection();
+
+//     const search = req.query.search?.trim() || "";
+
+//     let whereClause = `
+//       WHERE pl.Running_Balance < 0
+//     `;
+
+//     const params = [];
+
+//     if (search) {
+//       whereClause += `
+//         AND (
+//           p.Party_Name LIKE ?
+//           OR p.Phone_Number LIKE ?
+//           OR p.GSTIN LIKE ?
+//           OR p.Party_Id LIKE ?
+//           OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
+//           OR CAST(ABS(pl.Running_Balance) AS CHAR) LIKE ?
+//         )
+//       `;
+
+//       const like = `%${search}%`;
+
+//       params.push(
+//         like,
+//         like,
+//         like,
+//         like,
+//         like,
+//         like
+//       );
+//     }
+
+//     const [parties] = await connection.query(
+//       `
+//       SELECT
+//         p.Party_Id,
+//         p.Party_Name,
+//         p.Phone_Number,
+//         p.GSTIN,
+//         ABS(pl.Running_Balance) AS Balance,
+//         pl.Txn_Date AS Last_Txn_Date
+
+//       FROM add_party p
+
+//       INNER JOIN party_ledger pl
+//         ON pl.Party_Id = p.Party_Id
+//        AND pl.id = (
+//           SELECT MAX(id)
+//           FROM party_ledger
+//           WHERE Party_Id = p.Party_Id
+//        )
+
+//       ${whereClause}
+
+//       ORDER BY p.Party_Name ASC
+//       `,
+//       params
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       totalParties: parties.length,
+//       parties
+//     });
+
+//   } catch (err) {
+//     console.error(err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getAllPayableParties = async (req, res, next) => {
   let connection;
 
@@ -2144,77 +2079,150 @@ const getAllPayableParties = async (req, res, next) => {
 
     const search = req.query.search?.trim() || "";
 
-    let whereClause = `
-      WHERE pl.Running_Balance < 0
-    `;
-
+    const whereClauses = [`Current_Balance <= 0`];
     const params = [];
 
     if (search) {
-      whereClause += `
-        AND (
-          p.Party_Name LIKE ?
-          OR p.Phone_Number LIKE ?
-          OR p.GSTIN LIKE ?
-          OR p.Party_Id LIKE ?
-          OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
-          OR CAST(ABS(pl.Running_Balance) AS CHAR) LIKE ?
-        )
-      `;
+      whereClauses.push(`(
+        Party_Name LIKE ? OR
+        Phone_Number LIKE ? OR
+        
+        
+        CAST(ABS(Current_Balance) AS CHAR) LIKE ?
+      )`);
 
       const like = `%${search}%`;
-
-      params.push(
-        like,
-        like,
-        like,
-        like,
-        like,
-        like
-      );
+      params.push(like, like, like);
     }
+
+    const whereSQL = `WHERE ${whereClauses.join(" AND ")}`;
+
+    // =====================================================
+    // GET PARTIES
+    // =====================================================
 
     const [parties] = await connection.query(
       `
       SELECT
-        p.Party_Id,
-        p.Party_Name,
-        p.Phone_Number,
-        p.GSTIN,
-        ABS(pl.Running_Balance) AS Balance,
-        pl.Txn_Date AS Last_Txn_Date
-
-      FROM add_party p
-
-      INNER JOIN party_ledger pl
-        ON pl.Party_Id = p.Party_Id
-       AND pl.id = (
-          SELECT MAX(id)
-          FROM party_ledger
-          WHERE Party_Id = p.Party_Id
-       )
-
-      ${whereClause}
-
-      ORDER BY p.Party_Name ASC
+        Party_Id,
+        Party_Name,
+        Phone_Number,
+        GSTIN,
+        State,
+        Billing_Name,
+        Email_Id,
+        Opening_Balance,
+        Opening_Balance_Type,
+        Opening_Balance_Date,
+        Credit_Limit,
+        Credit_Limit_Type,
+        Current_Balance,
+        updated_at AS Last_Txn_Date
+      FROM add_party
+      ${whereSQL}
+      ORDER BY Party_Name ASC
       `,
       params
     );
 
+    // =====================================================
+    // ATTACH ADDRESSES
+    // =====================================================
+
+    const partyIds = parties.map((p) => p.Party_Id);
+
+    if (partyIds.length > 0) {
+      const [allAddresses] = await connection.query(
+        `
+        SELECT *
+        FROM add_party_addresses
+        WHERE Party_Id IN (?)
+        ORDER BY Is_Default DESC, id ASC
+        `,
+        [partyIds]
+      );
+
+      const addressMap = {};
+
+      allAddresses.forEach((addr) => {
+        if (!addressMap[addr.Party_Id]) {
+          addressMap[addr.Party_Id] = [];
+        }
+
+        addressMap[addr.Party_Id].push(addr);
+      });
+
+      parties.forEach((party) => {
+        party.addresses = addressMap[party.Party_Id] || [];
+      });
+    }
+
     return res.status(200).json({
       success: true,
       totalParties: parties.length,
-      parties
+      parties,
     });
-
   } catch (err) {
-    console.error(err);
+    console.error("❌ getAllPayableParties:", err);
     next(err);
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
+// const getAllReceivableParties = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     const search = req.query.search?.trim() || "";
+
+//     const whereClauses = [`Current_Balance >= 0`];
+//     const params       = [];
+
+//     if (search) {
+//       whereClauses.push(`(
+//         Party_Name   LIKE ? OR
+//         Phone_Number LIKE ? OR
+//         GSTIN        LIKE ? OR
+//         Party_Id     LIKE ? OR
+//         CAST(Current_Balance AS CHAR) LIKE ?
+//       )`);
+//       const like = `%${search}%`;
+//       params.push(like, like, like, like, like);
+//     }
+
+//     const whereSQL = `WHERE ${whereClauses.join(" AND ")}`;
+
+//     const [parties] = await connection.query(
+//       `SELECT
+//          Party_Id,
+//          Party_Name,
+//          Phone_Number,
+//          GSTIN,
+//          State,
+//          Current_Balance,
+//          updated_at AS Last_Txn_Date
+//        FROM add_party
+//        ${whereSQL}
+//        ORDER BY Party_Name ASC`,
+//       params
+//     );
+
+//     return res.status(200).json({
+//       success:      true,
+//       totalParties: parties.length,
+//       parties,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getAllReceivableParties = async (req, res, next) => {
   let connection;
 
@@ -2223,79 +2231,96 @@ const getAllReceivableParties = async (req, res, next) => {
 
     const search = req.query.search?.trim() || "";
 
-    let whereClause = `
-      WHERE pl.Running_Balance > 0
-    `;
-
+    const whereClauses = [`Current_Balance >= 0`];
     const params = [];
 
     if (search) {
-      whereClause += `
-        AND (
-          p.Party_Name LIKE ?
-          OR p.Phone_Number LIKE ?
-          OR p.GSTIN LIKE ?
-          OR p.Party_Id LIKE ?
-          OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
-          OR CAST(pl.Running_Balance AS CHAR) LIKE ?
-        )
-      `;
+      whereClauses.push(`(
+        Party_Name LIKE ? OR
+        Phone_Number LIKE ? OR
+        CAST(Current_Balance AS CHAR) LIKE ?
+      )`);
 
       const like = `%${search}%`;
-
-      params.push(
-        like,
-        like,
-        like,
-        like,
-        like,
-        like
-      );
+      params.push(like, like, like);
     }
+
+    const whereSQL = `WHERE ${whereClauses.join(" AND ")}`;
+
+    // =====================================================
+    // GET PARTIES
+    // =====================================================
 
     const [parties] = await connection.query(
       `
       SELECT
-        p.Party_Id,
-        p.Party_Name,
-        p.Phone_Number,
-        p.GSTIN,
-
-        pl.Running_Balance AS Balance,
-
-        pl.Txn_Date AS Last_Txn_Date
-
-      FROM add_party p
-
-      INNER JOIN party_ledger pl
-        ON pl.Party_Id = p.Party_Id
-       AND pl.id = (
-          SELECT MAX(id)
-          FROM party_ledger
-          WHERE Party_Id = p.Party_Id
-       )
-
-      ${whereClause}
-
-      ORDER BY p.Party_Name ASC
+        Party_Id,
+        Party_Name,
+        Phone_Number,
+        GSTIN,
+        State,
+        Billing_Name,
+        Email_Id,
+        Opening_Balance,
+        Opening_Balance_Type,
+        Opening_Balance_Date,
+        Credit_Limit,
+        Credit_Limit_Type,
+        Current_Balance,
+        updated_at AS Last_Txn_Date
+      FROM add_party
+      ${whereSQL}
+      ORDER BY Party_Name ASC
       `,
       params
     );
+
+    // =====================================================
+    // ATTACH ADDRESSES
+    // =====================================================
+
+    const partyIds = parties.map((p) => p.Party_Id);
+
+    if (partyIds.length > 0) {
+      const [allAddresses] = await connection.query(
+        `
+        SELECT *
+        FROM add_party_addresses
+        WHERE Party_Id IN (?)
+        ORDER BY Is_Default DESC, id ASC
+        `,
+        [partyIds]
+      );
+
+      const addressMap = {};
+
+      allAddresses.forEach((addr) => {
+        if (!addressMap[addr.Party_Id]) {
+          addressMap[addr.Party_Id] = [];
+        }
+
+        addressMap[addr.Party_Id].push(addr);
+      });
+
+      parties.forEach((party) => {
+        party.addresses = addressMap[party.Party_Id] || [];
+      });
+    }
 
     return res.status(200).json({
       success: true,
       totalParties: parties.length,
       parties,
     });
-
   } catch (err) {
-    console.error(err);
+    console.error("❌ getAllReceivableParties:", err);
     next(err);
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
-
 export { addParty,editParty,getAllParties,getSinglePartyDetailsSalesPurchases,
   printSinglePartyDetailsSalesPurchasesReport,getAllPartiesPayablesLeft,getAllPartiesReceivablesLeft,
   getAllPayableParties,getAllReceivableParties

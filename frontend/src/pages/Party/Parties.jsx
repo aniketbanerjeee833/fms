@@ -137,56 +137,56 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     { skip: !partyId }
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
-  
+
   const printRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
- const [printTarget, setPrintTarget] = useState({ type: null, id: null });
+  const [printTarget, setPrintTarget] = useState({ type: null, id: null });
 
- 
-/* fire the correct query hook — only ONE will actually run at a time
-   because of the `skip` condition on each                              */
-const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
-  skip: printTarget.type !== "Sale" || !printTarget.id,
-});
- 
-const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
-  skip: printTarget.type !== "Purchase" || !printTarget.id,
-});
- 
-const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Sale_Return" || !printTarget.id,
-});
- 
-const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
-});
-const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Payment_In" || !printTarget.id,
-});
- 
-const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Payment_Out" || !printTarget.id,
-})
-const printReady =
-  (printTarget.type === "Sale"             && printSaleData?.invoicePartyDetails) ||
-  (printTarget.type === "Purchase"         && printPurchaseData?.billPurchaseDetails) ||
-  (printTarget.type === "Sale_Return"      && printSaleReturnData?.saleReturn) ||
-  (printTarget.type === "Purchase_Return"  && printPurchaseReturnData?.purchaseReturn) ||
-  (printTarget.type === "Payment_In"       && printPaymentInData?.paymentIn) ||
-  (printTarget.type === "Payment_Out"      && printPaymentOutData?.paymentOut);
- 
-const handlePrint = useReactToPrint({
-  contentRef: printRef,
-  documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
-  onAfterPrint: () => setPrintTarget({ type: null, id: null }),
-});
- 
-/* fire print automatically once the right data has arrived */
-useEffect(() => {
-  if (printReady && printTarget.id) {
-    handlePrint();
-  }
-}, [printReady, printTarget.id]);
+
+  /* fire the correct query hook — only ONE will actually run at a time
+     because of the `skip` condition on each                              */
+  const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
+    skip: printTarget.type !== "Sale" || !printTarget.id,
+  });
+
+  const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
+    skip: printTarget.type !== "Purchase" || !printTarget.id,
+  });
+
+  const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Sale_Return" || !printTarget.id,
+  });
+
+  const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
+  });
+  const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Payment_In" || !printTarget.id,
+  });
+
+  const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Payment_Out" || !printTarget.id,
+  })
+  const printReady =
+    (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
+    (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
+    (printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn) ||
+    (printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn) ||
+    (printTarget.type === "Payment_In" && printPaymentInData?.paymentIn) ||
+    (printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
+    onAfterPrint: () => setPrintTarget({ type: null, id: null }),
+  });
+
+  /* fire print automatically once the right data has arrived */
+  useEffect(() => {
+    if (printReady && printTarget.id) {
+      handlePrint();
+    }
+  }, [printReady, printTarget.id]);
   useEffect(() => {
     if (data?.partyDetails) {
       setSelectedPartyDetails(data.partyDetails);
@@ -422,15 +422,15 @@ useEffect(() => {
     );
   }
 
- 
-/* resolve which dataset is "ready" right now */
 
- 
-/* central trigger — call this from any Print button/menu-item */
-const handlePrintClick = (row, transactionId) => {
-  console.log(row, "row", transactionId, "transactionId");
-  setPrintTarget({ type: row.Txn_Type, id: transactionId });
-};
+  /* resolve which dataset is "ready" right now */
+
+
+  /* central trigger — call this from any Print button/menu-item */
+  const handlePrintClick = (row, transactionId) => {
+    console.log(row, "row", transactionId, "transactionId");
+    setPrintTarget({ type: row.Txn_Type, id: transactionId });
+  };
   return (
     <div className="flex flex-col h-full">
       {/* ── PARTY SUMMARY CARD ── */}
@@ -442,15 +442,53 @@ const handlePrintClick = (row, transactionId) => {
           >
             <Users size={26} style={{ color: "#4CA1AF" }} />
           </div>
-          <div>
+          {/* GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span> */}
+          {/* <div>
             <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
               {party?.Party_Name}
             </h6>
             <p className="text-gray-500 text-sm mt-0.5">
-              GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span>
+        
               {" • "}
               State: <span className="font-medium">{party?.State || "—"}</span>
             </p>
+          </div> */}
+          <div>
+            <h6
+              className="font-bold text-gray-900"
+              style={{ fontSize: 18, margin: 0 }}
+            >
+              {party?.Party_Name}
+            </h6>
+
+            {/* Contact Info */}
+            <div className="mt-1 text-sm text-gray-600">
+              {party?.Phone_Number && (
+                <p className="m-0">
+                  📞 {party.Phone_Number}
+                </p>
+              )}
+
+             
+
+              {party?.addresses?.[0]?.Address_Text && (
+                <p className="m-0 truncate">
+                  📍 {party.addresses[0].Address_Text}
+                </p>
+              )}
+            </div>
+
+            {/* Financial Info */}
+            <div className="flex flex-wrap gap-4 mt-2 text-xs">
+              {party?.Credit_Limit_Type !== "No_Limit" &&
+                party?.Credit_Limit && (
+                  <span className="text-gray-600">
+                    Credit Limit: ₹{Number(party.Credit_Limit).toFixed(2)}
+                  </span>
+                )}
+
+             
+            </div>
           </div>
         </div>
 
@@ -743,77 +781,77 @@ const handlePrintClick = (row, transactionId) => {
         />
       )}
       <div style={{ display: "none" }}>
- 
-  {/* SALE — Tax Invoice */}
-  {printTarget.type === "Sale" && printSaleData?.invoicePartyDetails && (
-    <InvoicePrintTemplate
-      ref={printRef}
-      type="sale"
-      invoice={{
-        ...printSaleData.invoicePartyDetails,
-        items: printSaleData.items || [],
-        companyDetails: {},
-      }}
-    />
-  )}
- 
-  {/* PURCHASE — Bill */}
-  {printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails && (
-    <InvoicePrintTemplate
-      ref={printRef}
-      type="purchase"
-      invoice={{
-        ...printPurchaseData.billPurchaseDetails,
-        items: printPurchaseData.items || [],
-        companyDetails: {},
-      }}
-    />
-  )}
- 
-  {/* SALE RETURN — Credit Note */}
-  {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (
-    <CreditDebitNotePrintTemplate
-      ref={printRef}
-      type="credit"
-      invoice={{
-        ...printSaleReturnData.saleReturn,
-        items: printSaleReturnData.saleReturn.items || [],
-        companyDetails: {},
-      }}
-    />
-  )}
- 
-  {/* PURCHASE RETURN — Debit Note */}
-  {printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn && (
-    <CreditDebitNotePrintTemplate
-      ref={printRef}
-      type="debit"
-      invoice={{
-        ...printPurchaseReturnData.purchaseReturn,
-        items: printPurchaseReturnData.purchaseReturn.items || [],
-        companyDetails: {},
-      }}
-    />
-  )}
-    {/* ✅ PAYMENT IN — Receipt */}
-  {printTarget.type === "Payment_In" && printPaymentInData?.paymentIn && (
-    <PaymentInOutPrintTemplate
-      ref={printRef}
-      payment={printPaymentInData.paymentIn}
-      type="in"
-    />
-  )}
- 
-  {/* ✅ PAYMENT OUT — Receipt */}
-  {printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut && (
-    <PaymentInOutPrintTemplate
-      ref={printRef}
-      payment={printPaymentOutData.paymentOut}
-      type="out"
-    />
-  )}
- 
-</div>
+
+        {/* SALE — Tax Invoice */}
+        {printTarget.type === "Sale" && printSaleData?.invoicePartyDetails && (
+          <InvoicePrintTemplate
+            ref={printRef}
+            type="sale"
+            invoice={{
+              ...printSaleData.invoicePartyDetails,
+              items: printSaleData.items || [],
+              companyDetails: {},
+            }}
+          />
+        )}
+
+        {/* PURCHASE — Bill */}
+        {printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails && (
+          <InvoicePrintTemplate
+            ref={printRef}
+            type="purchase"
+            invoice={{
+              ...printPurchaseData.billPurchaseDetails,
+              items: printPurchaseData.items || [],
+              companyDetails: {},
+            }}
+          />
+        )}
+
+        {/* SALE RETURN — Credit Note */}
+        {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (
+          <CreditDebitNotePrintTemplate
+            ref={printRef}
+            type="credit"
+            invoice={{
+              ...printSaleReturnData.saleReturn,
+              items: printSaleReturnData.saleReturn.items || [],
+              companyDetails: {},
+            }}
+          />
+        )}
+
+        {/* PURCHASE RETURN — Debit Note */}
+        {printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn && (
+          <CreditDebitNotePrintTemplate
+            ref={printRef}
+            type="debit"
+            invoice={{
+              ...printPurchaseReturnData.purchaseReturn,
+              items: printPurchaseReturnData.purchaseReturn.items || [],
+              companyDetails: {},
+            }}
+          />
+        )}
+        {/* ✅ PAYMENT IN — Receipt */}
+        {printTarget.type === "Payment_In" && printPaymentInData?.paymentIn && (
+          <PaymentInOutPrintTemplate
+            ref={printRef}
+            payment={printPaymentInData.paymentIn}
+            type="in"
+          />
+        )}
+
+        {/* ✅ PAYMENT OUT — Receipt */}
+        {printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut && (
+          <PaymentInOutPrintTemplate
+            ref={printRef}
+            payment={printPaymentOutData.paymentOut}
+            type="out"
+          />
+        )}
+
+      </div>
 
     </div>
   );
@@ -869,7 +907,12 @@ export default function Parties() {
 
   const handleEdit = (party) => {
     console.log("Editing party:", party,);
-    setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
+    setPartyModal({
+    open: true,
+    mode: "edit",
+    data: party,   // <-- use clicked party
+  });
+    //setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
     setOpenMenuId(null);
   };
 
@@ -1016,12 +1059,32 @@ export default function Parties() {
                       >
                         <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                       </div>
-                      <div className="min-w-0">
+                      {/* <div className="min-w-0">
                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
                           {party.Party_Name}
                         </p>
                         <p className="text-xs truncate text-gray-400">
                           {party.GSTIN || party.State || "—"}
+                        </p>
+                      </div> */}
+                      <div className="min-w-0">
+                        <p
+                          className="font-semibold text-gray-800 truncate text-sm"
+                          style={{ margin: 0 }}
+                        >
+                          {party.Party_Name}
+                        </p>
+
+                        <p
+                          className="text-xs truncate font-medium"
+                          style={{
+                            color:
+                              Number(party.Current_Balance) < 0
+                                ? "#dc2626" // red
+                                : "#16a34a", // green
+                          }}
+                        >
+                            ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
@@ -1059,8 +1122,8 @@ export default function Parties() {
                           >
                             <button
                               type="button"
-                              onClick={handleEdit}
-                              // onClick={() => handleEdit(party)}
+                             // onClick={handleEdit}
+                              onClick={() => handleEdit(party)}
                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
                               style={{ backgroundColor: "transparent" }}
                             >
@@ -1098,7 +1161,11 @@ export default function Parties() {
         <PartyAddModal
           partyDetails={partyModal.data || {}}
           editingParty={partyModal.mode === "edit"}
-          onClose={() => setPartyModal({ open: false, mode: "add", data: null })}
+           onClose={() => {
+            setPartyModal({ open: false, mode: "add", data: null })
+         //setSelectedPartyDetails(null);   // 🔹 add this}
+         }}
+          //onClose={() => setPartyModal({ open: false, mode: "add", data: null })}
         />
       )}
     </>

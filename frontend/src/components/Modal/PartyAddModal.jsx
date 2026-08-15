@@ -164,7 +164,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
         const res = await updateParty({ Party_Id: partyDetails.Party_Id, body: data }).unwrap();
         if (!res?.success) { toast.error("Failed to update party"); return; }
         toast.success("Party updated successfully!");
-        dispatch(partyApi.util.invalidateTags(["Party"]));
+        dispatch(partyApi.util.invalidateTags(["Party","PartyLedger"]));
         onSave?.(res);      // ⭐ ADD THIS
         onClose();
 
@@ -173,7 +173,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
         console.log("addParty res", res);
         if (!res?.success) { toast.error("Failed to add party"); return; }
         toast.success("Party added successfully!");
-        dispatch(partyApi.util.invalidateTags(["Party"]));
+         dispatch(partyApi.util.invalidateTags(["Party","PartyLedger"]));
         //onSave(res?.Party_Name);
         onSave(res);
       }

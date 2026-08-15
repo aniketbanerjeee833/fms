@@ -103,7 +103,7 @@ export default function SaleEdit() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
   const baseSalePriceRef = useRef({});
-
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -113,7 +113,7 @@ export default function SaleEdit() {
     });
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+  //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
   const [activeItemRow, setActiveItemRow] = useState(null);
   // find this line in your code and add refetch:
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
@@ -128,11 +128,11 @@ export default function SaleEdit() {
   const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
-  // const [confirmModal, setConfirmModal] = useState({
-  //   open: false,
-  //   item: null,
-  //   rowIndex: null
-  // });
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    item: null,
+    rowIndex: null
+  });
   const [showGSTIN, setShowGSTIN] = useState("");
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
@@ -297,9 +297,30 @@ export default function SaleEdit() {
     });
   };
 
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
   const handleDeleteRow = (i) => {
-    setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-    remove(i); // remove from form
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;                    // skip deleted row
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+    const newBalanceDue = newTotal - currentTotalReceived;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
   };
   // const handleSelect = (rowIndex, categoryName) => {
   //   setRows((prev) => {
@@ -351,6 +372,72 @@ export default function SaleEdit() {
         console.error("❌ Error adding category:", err);
       }
     }
+  };
+   const handleItemSelect = (it, i) => {
+    console.log("Selected Item:", it, "at row", i);
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[i] = {
+        ...updated[i],
+        Item_Category: it.Item_Category || "",
+        Item_HSN: it.Item_HSN || "",
+        categorySearch: it.Item_Category || "",
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
+        // CURRENT MASTER CONFIG
+        Primary_Unit: it.Primary_Unit || null,
+        Secondary_Unit: it.Secondary_Unit || null,
+        Conversion_Rate: it.Conversion_Rate || null,
+
+        // CURRENT PRIMARY + SECONDARY ONLY
+        Available_Units: Array.isArray(it.Available_Units)
+          ? it.Available_Units
+          : [],
+      };
+      return updated;
+    });
+
+    handleRowChange(i, "itemSearch", it.Item_Name);
+    handleRowChange(i, "isExistingItem", true);
+    handleRowChange(i, "CategoryOpen", false);
+
+    setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
+    setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+    setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
+    setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.0, { shouldValidate: true, shouldDirty: true });
+    //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+    setValue(
+      `items.${i}.Item_Unit`,
+      it.Primary_Unit || "",
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+    baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+    baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+    setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
+    handleRowChange(i, "itemOpen", false);
+
+    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+      {
+        ...itemsValues[i],
+        Item_Name: it.Item_Name,
+        Sale_Price: it.Sale_Price,
+        Quantity: itemsValues[i]?.Quantity || 0,
+        Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
+        Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
+        Tax_Type: itemsValues[i]?.Tax_Type,
+      },
+      i,
+      itemsValues
+    );
+
+    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+    setValue(`items.${i}.Amount`, Amount);
+    setValue(`Total_Amount`, Total_Amount);
+    setValue(`Balance_Due`, Balance_Due);
   };
   const itemsValues = watch("items");   // watch all item rows
   const totalReceived = watch("Total_Received"); // watch Total_Received
@@ -518,7 +605,7 @@ export default function SaleEdit() {
 
           // Store original/base price separately
           baseSalePriceRef.current[index] = baseSalePrice;
-
+          baseSaleUnitRef.current[index] = primaryUnit;
           return {
             ...item,
 
@@ -609,6 +696,7 @@ export default function SaleEdit() {
   console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
+  console.log(totalReceived)
   const paymentType = watch("splits.0.Payment_Type");
 
   useEffect(() => {
@@ -830,7 +918,9 @@ export default function SaleEdit() {
     // 5. BALANCE DUE
     // =========================================================
 
-    const balanceDue = totalAmount - totalReceived;
+   const balanceDue = Number(
+  (totalAmount - totalReceived).toFixed(2)
+);
 
     // =========================================================
     // 6. BUILD PAYLOAD
@@ -841,9 +931,12 @@ export default function SaleEdit() {
 
       items: itemsWithDefaults,
 
-      Total_Amount: totalAmount,
-      Total_Received: totalReceived,
-      Balance_Due: balanceDue,
+      //Total_Amount: totalAmount,
+      //Total_Received: totalReceived,
+     //Balance_Due: Number(balanceDue.toFixed(2)),
+         Total_Amount: Number(totalAmount.toFixed(2)),
+  Total_Received: Number(totalReceived.toFixed(2)),
+  Balance_Due: Number(balanceDue.toFixed(2)),
 
       // IMPORTANT:
       // Send filtered splits, not data.splits
@@ -879,8 +972,9 @@ export default function SaleEdit() {
         saleApi.util.invalidateTags(["Sale"])
       );
 
+
       dispatch(
-        itemApi.util.invalidateTags(["Item"])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -902,7 +996,7 @@ export default function SaleEdit() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags(["Party"])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       toast.success("Sale updated successfully!");
@@ -990,34 +1084,7 @@ export default function SaleEdit() {
       );
     }
   };
-  // const handleItemSelect = (it, i) => {
-  //   console.log("Selected Item:", it, "at row", i);
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[i] = {
-  //       ...updated[i],
-  //       Item_Category: it.Item_Category || "",
-  //       Item_HSN: it.Item_HSN || "",
-  //       categorySearch: it.Item_Category || "",
-  //       isExistingItem: true,
-  //       isHSNLocked: false,
-  //       isUnitLocked: false,
-  //     };
-  //     return updated;
-  //   });
-
-  //   handleRowChange(i, "itemSearch", it.Item_Name);
-  //   handleRowChange(i, "isExistingItem", true);
-  //   handleRowChange(i, "CategoryOpen", false);
-
-  //   setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.0, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
-  //   handleRowChange(i, "itemOpen", false);
-
+  
 
   const showSalePayment = totalAmountWatch > 0;
 
@@ -1214,18 +1281,18 @@ export default function SaleEdit() {
                               );
                               setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
                               setCurrentPartyDetails(matchedParty);
-                              setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
                               setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
                             } else {
                               // typed value doesn't match any known party — treat as new, clear stale data
-                              setValue("Phone_Number", "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
 
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
                               setValue("Billing_Address", "", { shouldValidate: true, shouldDirty: true });
@@ -1246,10 +1313,10 @@ export default function SaleEdit() {
 
                               if (matchedParty) {
                                 setPartySearch(matchedParty.Party_Name);
-                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
@@ -1283,7 +1350,7 @@ export default function SaleEdit() {
                             + Add Party
                           </span>
 
-                          {parties?.parties
+                          {/* {parties?.parties
                             ?.filter(
                               (party) =>
                                 party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1294,7 +1361,7 @@ export default function SaleEdit() {
                                 key={i}
                                 onClick={() => {
                                   setPartySearch(party.Party_Name);
-                                  setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
+                                  //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
                                   setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
                                   setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
                                   const defaultBilling = party.addresses?.find(
@@ -1311,7 +1378,55 @@ export default function SaleEdit() {
                               >
                                 {party.Party_Name} ({party.Phone_Number})
                               </div>
-                            ))}
+                            ))} */}
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    const defaultBilling = party.addresses?.find(
+                                      (a) => a.Address_Type === "Billing" && a.Is_Default
+                                    );
+                                    setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                    setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                    setCurrentPartyDetails(party);
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  {/* Left — name + phone */}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Right — balance */}
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
 
                           {parties?.parties?.filter((party) =>
                             party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1399,7 +1514,7 @@ export default function SaleEdit() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                   {/* Phone Number — compact inline label+input */}
 
-                  <div className="flex flex-col gap-2">
+                  {/* <div className="flex flex-col gap-2">
 
                     <span className="whitespace-nowrap active">Phone Number</span>
                     <input
@@ -1415,7 +1530,7 @@ export default function SaleEdit() {
                     {errors?.Phone_Number && (
                       <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
                     )}
-                  </div>
+                  </div> */}
 
                   {/* GSTIN — compact inline label+input, pinned to top */}
                   {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
@@ -1432,88 +1547,87 @@ export default function SaleEdit() {
                       readOnly
                     />
                   </div>)}
-                  {/* {errors?.GSTIN && (
-                                  <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
-                                )} */}
+
+                  {/* ── ROW 2: Billing Address + GSTIN ── */}
+                  {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
+                    <div>
+
+                      {/* Billing Address */}
+                      <div className="flex flex-col gap-2">
+                        <span className="active">Billing Address</span>
+                        <textarea
+                          {...register("Billing_Address")}
+                          rows={5}
+                          placeholder="Billing Address"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                          style={{ minHeight: "80px" }}
+                        />
+
+                        {/* Address has content — show Remove / Change */}
+                        {watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setValue("Billing_Address", "", {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                              }
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#ef4444",
+                                cursor: "pointer",
+                                fontSize: 13,
+                              }}
+                            >
+                              Remove
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Address was just removed — offer to pick one from the party instead */}
+                        {!watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Select Billing Address
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
                 </div>
 
-                {/* ── ROW 2: Billing Address + GSTIN ── */}
-                {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
-                    {/* Billing Address */}
-                    <div className="flex flex-col gap-2">
-                      <span className="active">Billing Address</span>
-                      <textarea
-                        {...register("Billing_Address")}
-                        rows={5}
-                        placeholder="Billing Address"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
-                        style={{ minHeight: "80px" }}
-                      />
-
-                      {/* Address has content — show Remove / Change */}
-                      {watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end gap-3 mt-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setValue("Billing_Address", "", {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              })
-                            }
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#ef4444",
-                              cursor: "pointer",
-                              fontSize: 13,
-                            }}
-                          >
-                            Remove
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Address was just removed — offer to pick one from the party instead */}
-                      {!watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end mt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Select Billing Address
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                )}
 
                 {showEditPartyModal && (
                   <PartyAddModal
@@ -1939,6 +2053,7 @@ export default function SaleEdit() {
                                   //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1974,131 +2089,7 @@ export default function SaleEdit() {
 
 
                           {/* Dropdown List */}
-                          {/* {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "40rem" }}
-                              className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                            >
-                              <table className="w-full text-sm border-collapse">
-                                <thead className="bg-gray-100 border-b">
-                                  <tr>
-                                    <th>Sl.No</th>
-                                    <th className="text-left px-3 py-2">Item Name</th>
-                                    <th className="text-left px-3 py-2">Sale Price</th>
-                                    <th className="text-left px-3 py-2">Purchase Price</th>
-                                    <th className="text-left px-3 py-2">Stock</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items?.items
-                                    ?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    )
-                                    .map((it, idx) => (
-                                      <tr
-                                        key={idx}
-                                        onClick={() => {
-                                      
-                                          setRows((prev) => {
-                                            const updated = [...prev];
-                                            updated[i] = {
-                                              ...updated[i],
-                                              Item_Category: it.Item_Category || "",
-                                              Item_HSN: it.Item_HSN || "",
-                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                              isExistingItem: true,   // lock category
-                                              isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: false,     // lock unit
-                                              itemQuantity: it.Stock_Quantity || 0,
-                                              Primary_Unit: it.Primary_Unit || null,
-                                              Secondary_Unit: it.Secondary_Unit || null,
-                                              Conversion_Rate: it.Conversion_Rate || null,
 
-                                              Available_Units: Array.isArray(it.Available_Units)
-                                                ? it.Available_Units
-                                                : [],
-
-                                            };
-                                            return updated;
-                                          });
-                                          handleRowChange(i, "itemSearch", it.Item_Name);
-                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                          handleRowChange(i, "CategoryOpen", false);
-                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
-                                          setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
-                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
-                                          setValue(
-                                            `items.${i}.Item_Unit`,
-                                            it.Primary_Unit || "",
-                                            {
-                                              shouldValidate: true,
-                                              shouldDirty: true,
-                                            }
-                                          );
-                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
-                                          
-                                          handleRowChange(i, "itemOpen", false);
-
-
-                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                            {
-                                              ...itemsValues[i],
-                                              Item_Name: it.Item_Name,
-                                              Sale_Price: it.Sale_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 0,
-                                              Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
-                                              Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
-                                              Tax_Type: itemsValues[i]?.Tax_Type
-                                            },
-                                            i,
-                                            itemsValues
-                                          );
-
-                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                          setValue(`items.${i}.Amount`, Amount);
-                                          setValue(`Total_Amount`, Total_Amount);
-                                          setValue(`Balance_Due`, Balance_Due);
-                                        }}
-
-                                        className="hover:bg-gray-100 cursor-pointer border-b"
-                                      >
-                                        <td>{idx + 1}</td>
-                                        <td className="px-3 py-2">{it.Item_Name}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        
-                                        <td
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}
-                                        </td>
-                                      </tr>
-                                    ))}
-
-                                  {items?.items?.filter((it) =>
-                                    it.Item_Name.toLowerCase().includes(
-                                      (rows[i]?.itemSearch || "").toLowerCase()
-                                    )
-                                  ).length === 0 && (
-                                      <tr>
-                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                          No Item found
-                                        </td>
-                                      </tr>
-                                    )}
-                                </tbody>
-                              </table>
-                            </div>
-                          )} */}
                           {rows[i]?.itemOpen && (
                             <div
                               style={{ width: "40rem" }}
@@ -2153,7 +2144,11 @@ export default function SaleEdit() {
                                       <tr
                                         key={idx}
                                         onClick={() => {
-
+                                          if (it.Stock_Quantity <= 0) {
+                                            // show confirmation modal instead of directly adding
+                                            setConfirmModal({ open: true, item: it, rowIndex: i });
+                                            return;
+                                          }
                                           setRows((prev) => {
                                             const updated = [...prev];
                                             updated[i] = {
@@ -2182,10 +2177,11 @@ export default function SaleEdit() {
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                           //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                           baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+                                          baseSaleUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2242,7 +2238,7 @@ export default function SaleEdit() {
                               </table>
                             </div>
                           )}
-                          {/* {confirmModal.open && (
+                          {confirmModal.open && (
                             <div
                               className="fixed inset-0 flex items-center justify-center bg-white z-50 bg-opacity-50"
                             >
@@ -2251,7 +2247,11 @@ export default function SaleEdit() {
                                   ⚠ Item Out of Stock
                                 </h3>
                                 <p className="text-gray-700 text-center mb-6">
-                                  The item <b>{confirmModal.item?.Item_Name}</b> has 0 stock.<br />
+                                  The item <b>{confirmModal.item?.Item_Name}</b> has{" "}
+                                  <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                                    {confirmModal.item?.Stock_Quantity} {confirmModal.item?.Primary_Unit}
+                                  </span>{" "}
+                                  stock.<br />
                                   Do you still want to add it?
                                 </p>
                                 <div className="flex justify-center gap-4">
@@ -2272,14 +2272,14 @@ export default function SaleEdit() {
                                     }
                                     style={{ outline: "none", backgroundColor: "gray" }}
                                     className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300
-           text-gray-700 "
+                                               text-gray-700 "
                                   >
                                     Cancel
                                   </button>
                                 </div>
                               </div>
                             </div>
-                          )} */}
+                          )}
 
 
                           {/* RHF error */}
@@ -2553,11 +2553,11 @@ export default function SaleEdit() {
                                     //const roundedPrice = newPrice.toFixed(2);
                                     const basePrice = Number(baseSalePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2568,12 +2568,12 @@ export default function SaleEdit() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2582,11 +2582,43 @@ export default function SaleEdit() {
                                     // Restore original base price.
                                     // =====================================================
 
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
+
+                                    // else {
+                                    //   return;
+                                    // }
+                                    const baseUnit = baseSaleUnitRef.current[i];
+
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
+                                    }
+
+                                    let newPrice;
+
+                                    if (newUnit === baseUnit) {
+                                      // Back to the unit in which the price was entered
+                                      newPrice = basePrice;
+                                    }
+
                                     else if (
-                                      previousUnit === secondaryUnit &&
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+
+                                    else if (
+                                      baseUnit === secondaryUnit &&
                                       newUnit === primaryUnit
                                     ) {
-                                      newPrice = basePrice;
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
                                     }
 
                                     else {
@@ -2594,6 +2626,7 @@ export default function SaleEdit() {
                                     }
 
                                     const roundedPrice = newPrice.toFixed(2);
+
 
 
 
@@ -2663,6 +2696,7 @@ export default function SaleEdit() {
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
                               baseSalePriceRef.current[i] = Number(val) || 0;
+                              baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
@@ -3385,11 +3419,11 @@ export default function SaleEdit() {
 
             await refetchItems();
 
-            setNewlyAddedItem(savedItem);
+            // setNewlyAddedItem(savedItem);
 
-            setTimeout(() => {
-              setNewlyAddedItem(null);
-            }, 8000);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
             setShowItemAddModal(false);
 

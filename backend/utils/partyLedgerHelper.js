@@ -52,18 +52,19 @@ const DEBIT_TYPES = [
   "Sale_Return",
 ];
 
+
 // export const recordPartyLedger = async ({
 //   connection,
 //   partyId,
-//   txnType,        // 'Sale' | 'Purchase' | 'Payment_In' | 'Payment_Out' | 'Sale_Return' | 'Purchase_Return' | 'Opening_Balance'
-//   referenceId,    // numeric source row id
-//   //formattedId,    // e.g. 'PUR001', 'SAL001' — shown in ledger view
-//   amount,         // positive number — the transaction amount
-//   txnDate,        // 'YYYY-MM-DD'
-//   remarks = null,
-//   directionOverride = null,  // used for Opening_Balance ('Credit' | 'Debit')
+//   txnType,
+//   referenceId,
+//   amount,
+//   txnDate,
+//   docNumber = null,     // 🔹 Bill_Number / Invoice_Number / Receipt_No / Return_Number
+//   balanceDue = null,    // 🔹 current balance due on the source doc, for display
+  
+//   directionOverride = null,
 // }) => {
-//   /* ── find existing ledger row for this transaction ── */
 //   const [[existingRow]] = await connection.query(
 //     `SELECT * FROM party_ledger
 //      WHERE Party_Id = ? AND Txn_Type = ? AND Source_Id = ?
@@ -74,22 +75,36 @@ const DEBIT_TYPES = [
 //   const direction = directionOverride ||
 //     (CREDIT_TYPES.includes(txnType) ? "Credit" : "Debit");
 
-//   /* ══════════════════════════════════════════
-//      CASE 1 — edit: existing row found
-//   ══════════════════════════════════════════ */
 //   if (existingRow) {
 //     const oldAmount  = Number(existingRow.Amount);
 //     const amountDiff = Number(amount) - oldAmount;
 
-//     // always update the row's metadata
+//     // await connection.query(
+//     //   `UPDATE party_ledger
+//     //    SET Amount = ?, Txn_Date = ?, Doc_Number = ?, Balance_Due = ? , updated_at = NOW()
+//     //    WHERE id = ?`,
+//     //   [amount, txnDate, docNumber, balanceDue,  existingRow.id]
+//     // );
 //     await connection.query(
-//       `UPDATE party_ledger
-//        SET Amount = ?, Txn_Date = ?, Remarks = ?, updated_at = NOW()
-//        WHERE id = ?`,
-//       [amount, txnDate, remarks, existingRow.id]
-//     );
+//   `UPDATE party_ledger
+//    SET
+//       Direction = ?,
+//       Amount = ?,
+//       Txn_Date = ?,
+//       Doc_Number = ?,
+//       Balance_Due = ?,
+//       updated_at = NOW()
+//    WHERE id = ?`,
+//   [
+//     direction,
+//     amount,
+//     txnDate,
+//     docNumber,
+//     balanceDue,
+//     existingRow.id,
+//   ]
+// );
 
-//     // shift running balance only if amount changed
 //     if (amountDiff !== 0) {
 //       const shift = direction === "Credit" ? amountDiff : -amountDiff;
 //       await connection.query(
@@ -107,9 +122,6 @@ const DEBIT_TYPES = [
 //     return Number(updated.Running_Balance);
 //   }
 
-//   /* ══════════════════════════════════════════
-//      CASE 2 — insert: no existing row
-//   ══════════════════════════════════════════ */
 //   const [[lastRow]] = await connection.query(
 //     `SELECT Running_Balance FROM party_ledger
 //      WHERE Party_Id = ? ORDER BY id DESC LIMIT 1`,
@@ -123,13 +135,47 @@ const DEBIT_TYPES = [
 
 //   await connection.query(
 //     `INSERT INTO party_ledger
-//      (Party_Id, Txn_Type, Source_Id,  Direction, Amount, Running_Balance, Txn_Date, Remarks)
-//      VALUES (?, ?, ?, ?, ?, ?, ? ?, ?)`,
-//     [partyId, txnType, referenceId,  direction, amount, newBalance, txnDate, remarks]
+//      (Party_Id, Txn_Type, Source_Id, Direction, Amount, Doc_Number, Balance_Due, Running_Balance, Txn_Date)
+//      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+//     [partyId, txnType, referenceId, direction, amount, docNumber, balanceDue, newBalance, txnDate]
 //   );
 
 //   return newBalance;
 // };
+/* ── delete ledger row + re-shift subsequent rows ── */
+// export const reversePartyLedger = async ({
+//   connection,
+//   partyId,
+//   txnType,
+//   referenceId,
+// }) => {
+//   const [[existingRow]] = await connection.query(
+//     `SELECT * FROM party_ledger
+//      WHERE Party_Id = ? AND Txn_Type = ? AND Source_Id = ?
+//      LIMIT 1`,
+//     [partyId, txnType, referenceId]
+//   );
+
+//   if (!existingRow) return;  // nothing to reverse
+
+//   const removedAmount = Number(existingRow.Amount);
+//   const reverseShift  = existingRow.Direction === "Credit"
+//     ? -removedAmount
+//     : removedAmount;
+
+//   await connection.query(
+//     `DELETE FROM party_ledger WHERE id = ?`,
+//     [existingRow.id]
+//   );
+
+//   await connection.query(
+//     `UPDATE party_ledger
+//      SET Running_Balance = Running_Balance + ?
+//      WHERE Party_Id = ? AND id > ?`,
+//     [reverseShift, partyId, existingRow.id]
+//   );
+// };
+
 export const recordPartyLedger = async ({
   connection,
   partyId,
@@ -137,9 +183,8 @@ export const recordPartyLedger = async ({
   referenceId,
   amount,
   txnDate,
-  docNumber = null,     // 🔹 Bill_Number / Invoice_Number / Receipt_No / Return_Number
-  balanceDue = null,    // 🔹 current balance due on the source doc, for display
-  
+  docNumber        = null,
+  balanceDue       = null,
   directionOverride = null,
 }) => {
   const [[existingRow]] = await connection.query(
@@ -152,35 +197,19 @@ export const recordPartyLedger = async ({
   const direction = directionOverride ||
     (CREDIT_TYPES.includes(txnType) ? "Credit" : "Debit");
 
+  let finalBalance;
+
   if (existingRow) {
     const oldAmount  = Number(existingRow.Amount);
     const amountDiff = Number(amount) - oldAmount;
 
-    // await connection.query(
-    //   `UPDATE party_ledger
-    //    SET Amount = ?, Txn_Date = ?, Doc_Number = ?, Balance_Due = ? , updated_at = NOW()
-    //    WHERE id = ?`,
-    //   [amount, txnDate, docNumber, balanceDue,  existingRow.id]
-    // );
     await connection.query(
-  `UPDATE party_ledger
-   SET
-      Direction = ?,
-      Amount = ?,
-      Txn_Date = ?,
-      Doc_Number = ?,
-      Balance_Due = ?,
-      updated_at = NOW()
-   WHERE id = ?`,
-  [
-    direction,
-    amount,
-    txnDate,
-    docNumber,
-    balanceDue,
-    existingRow.id,
-  ]
-);
+      `UPDATE party_ledger
+       SET Direction = ?, Amount = ?, Txn_Date = ?,
+           Doc_Number = ?, Balance_Due = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [direction, amount, txnDate, docNumber, balanceDue, existingRow.id]
+    );
 
     if (amountDiff !== 0) {
       const shift = direction === "Credit" ? amountDiff : -amountDiff;
@@ -196,30 +225,51 @@ export const recordPartyLedger = async ({
       `SELECT Running_Balance FROM party_ledger WHERE id = ?`,
       [existingRow.id]
     );
-    return Number(updated.Running_Balance);
+    finalBalance = Number(updated.Running_Balance);
+
+  } else {
+    const [[lastRow]] = await connection.query(
+      `SELECT Running_Balance FROM party_ledger
+       WHERE Party_Id = ? ORDER BY id DESC LIMIT 1`,
+      [partyId]
+    );
+
+    const baseBalance = lastRow ? Number(lastRow.Running_Balance) : 0;
+    const newBalance  = direction === "Credit"
+      ? baseBalance + Number(amount)
+      : baseBalance - Number(amount);
+
+    await connection.query(
+      `INSERT INTO party_ledger
+       (Party_Id, Txn_Type, Source_Id, Direction, Amount,
+        Doc_Number, Balance_Due, Running_Balance, Txn_Date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [partyId, txnType, referenceId, direction, amount,
+       docNumber, balanceDue, newBalance, txnDate]
+    );
+
+    finalBalance = newBalance;
   }
 
-  const [[lastRow]] = await connection.query(
+  // 🔹 always sync Current_Balance on add_party
+  // this is the latest Running_Balance from the last ledger row
+  const [[latestRow]] = await connection.query(
     `SELECT Running_Balance FROM party_ledger
      WHERE Party_Id = ? ORDER BY id DESC LIMIT 1`,
     [partyId]
   );
 
-  const baseBalance = lastRow ? Number(lastRow.Running_Balance) : 0;
-  const newBalance  = direction === "Credit"
-    ? baseBalance + Number(amount)
-    : baseBalance - Number(amount);
-
   await connection.query(
-    `INSERT INTO party_ledger
-     (Party_Id, Txn_Type, Source_Id, Direction, Amount, Doc_Number, Balance_Due, Running_Balance, Txn_Date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [partyId, txnType, referenceId, direction, amount, docNumber, balanceDue, newBalance, txnDate]
+    `UPDATE add_party
+     SET Current_Balance = ?, updated_at = NOW()
+     WHERE Party_Id = ?`,
+    [latestRow ? Number(latestRow.Running_Balance) : 0, partyId]
   );
 
-  return newBalance;
+  return finalBalance;
 };
-/* ── delete ledger row + re-shift subsequent rows ── */
+
+/* ── reverse ── */
 export const reversePartyLedger = async ({
   connection,
   partyId,
@@ -233,7 +283,7 @@ export const reversePartyLedger = async ({
     [partyId, txnType, referenceId]
   );
 
-  if (!existingRow) return;  // nothing to reverse
+  if (!existingRow) return;
 
   const removedAmount = Number(existingRow.Amount);
   const reverseShift  = existingRow.Direction === "Credit"
@@ -250,6 +300,20 @@ export const reversePartyLedger = async ({
      SET Running_Balance = Running_Balance + ?
      WHERE Party_Id = ? AND id > ?`,
     [reverseShift, partyId, existingRow.id]
+  );
+
+  // 🔹 sync Current_Balance after reversal
+  const [[latestRow]] = await connection.query(
+    `SELECT Running_Balance FROM party_ledger
+     WHERE Party_Id = ? ORDER BY id DESC LIMIT 1`,
+    [partyId]
+  );
+
+  await connection.query(
+    `UPDATE add_party
+     SET Current_Balance = ?, updated_at = NOW()
+     WHERE Party_Id = ?`,
+    [latestRow ? Number(latestRow.Running_Balance) : 0, partyId]
   );
 };
 // Controller	txnType	Source_Id (referenceId)	Reference_Id (formattedId)

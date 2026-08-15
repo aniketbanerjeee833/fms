@@ -528,12 +528,12 @@ const updatePaymentIn = async (req, res, next) => {
       }
     );
 
-    if (validSplits.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one valid payment method is required",
-      });
-    }
+    // if (validSplits.length === 0) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "At least one valid payment method is required",
+    //   });
+    // }
 
     // =====================================================
     // 4. TOTAL RECEIVED

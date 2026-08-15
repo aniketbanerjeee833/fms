@@ -26,7 +26,7 @@ import {
    )}
 ═══════════════════════════════════════════════════════════════════ */
 
-export default function BankAccountModal({ mode = "add", data = null, onClose }) {
+export default function BankAccountModal({ mode = "add", data = null, onClose,onSave }) {
   const isEdit = mode === "edit";
  
   const [createBankAccount, { isLoading: isCreating }] = useCreateBankAccountMutation();
@@ -68,21 +68,38 @@ export default function BankAccountModal({ mode = "add", data = null, onClose })
     }
   }, [isEdit, data, reset]);
  
-  const onSubmit = async (formData) => {
-    try {
-      if (isEdit) {
-        await editBankAccount({   Bank_Account_Id: data.Bank_Account_Id, ...formData }).unwrap();
-        toast.success("Bank account updated!");
-      } else {
-        await createBankAccount(formData).unwrap();
-        toast.success("Bank account created!");
-      }
+  // const onSubmit = async (formData) => {
+  //   try {
+  //     if (isEdit) {
+  //       await editBankAccount({   Bank_Account_Id: data.Bank_Account_Id, ...formData }).unwrap();
+  //       toast.success("Bank account updated!");
+  //     } else {
+  //       await createBankAccount(formData).unwrap();
+  //       toast.success("Bank account created!");
+  //     }
+  //     onClose();
+  //     onSave?.();    // 🔹 notify parent to refetch
+  //   } catch (err) {
+  //     toast.error(err?.data?.message || err?.message || "Something went wrong");
+  //   }
+  // };
+ const onSubmit = async (formData) => {
+  try {
+    if (isEdit) {
+      await editBankAccount({ Bank_Account_Id: data.Bank_Account_Id, ...formData }).unwrap();
+      toast.success("Bank account updated!");
+      onSave?.();        // edit — no need to auto-select
       onClose();
-    } catch (err) {
-      toast.error(err?.data?.message || err?.message || "Something went wrong");
+    } else {
+      const res = await createBankAccount(formData).unwrap();
+      toast.success("Bank account created!");
+      onSave?.(res);     // 🔹 pass response BEFORE closing
+      onClose();
     }
-  };
- 
+  } catch (err) {
+    toast.error(err?.data?.message || err?.message || "Something went wrong");
+  }
+};
   /* digits + 2 decimal places */
   const numericInput = (e) => {
     let val = e.target.value.replace(/[^0-9.]/g, "");
@@ -98,7 +115,7 @@ export default function BankAccountModal({ mode = "add", data = null, onClose })
   return (
     <div
       style={{
-        marginTop:       "50px",
+         //marginTop: "4rem",
         position:        "fixed",
         inset:           0,
         display:         "flex",
@@ -106,7 +123,7 @@ export default function BankAccountModal({ mode = "add", data = null, onClose })
         justifyContent:  "center",
         backgroundColor: "rgba(0,0,0,0.3)",
         backdropFilter:  "blur(4px)",
-        zIndex:          50,
+        zIndex:          100,
         padding:         "1rem",
       }}
     >

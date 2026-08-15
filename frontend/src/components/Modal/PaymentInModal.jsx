@@ -3,6 +3,10 @@ import { useState, useEffect, useRef } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
+import { bankAccountApi } from "../../redux/api/bankAccountApi";
+import { useDispatch } from "react-redux";
+import BankAccountModal from "./BankAccountModal";
+import PaymentTypeSelect from "../PaymentTypeSelect";
 
 /**
  * PaymentInModal
@@ -39,7 +43,7 @@ export default function PaymentInModal({
   const isView = mode === "view";
   // Normalize parties prop - accepts either an array or { parties: [...] }
   const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
-
+  const dispatch = useDispatch();
   const formatDateForInput = (date) => {
     if (!date) return "";
 
@@ -87,7 +91,7 @@ export default function PaymentInModal({
   const [showSplitBox, setShowSplitBox] = useState(
     isView ? (initialData?.splits?.length > 0) : (initialData?.splits?.length > 1)
   );
-
+  const [showBankModal, setShowBankModal] = useState(false);
   // Single-payment mode watches splits.0 directly — it's the same data, not a copy
   const paymentType = watch("splits.0.Payment_Type");
 
@@ -97,7 +101,7 @@ export default function PaymentInModal({
   const buildPaymentTypeOptions = () => [
     { value: "Cash", label: "Cash", repeatable: false },
     { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
+    //{ value: "Neft", label: "Neft", repeatable: true },
     ...(banks || []).map((bank) => ({
       value: `bank_${bank.Bank_Account_Id}`,
       label: bank.Account_Display_Name,
@@ -133,7 +137,6 @@ export default function PaymentInModal({
   // };
   const handleAddPaymentType = () => {
   const newIndex = fields.length;
-
   const availableOptions = getAvailableOptions(newIndex);
 
   if (availableOptions.length === 0) {
@@ -141,26 +144,42 @@ export default function PaymentInModal({
     return;
   }
 
-  const firstOption = availableOptions[0];
-
-  if (firstOption.value.startsWith("bank_")) {
-    append({
-      Payment_Type: "Bank",
-      Bank_Account_Id: Number(firstOption.value.replace("bank_", "")),
-      Reference_Number: "",
-      Amount: "",
-    });
-  } else {
-    append({
-      Payment_Type: firstOption.value,
-      Bank_Account_Id: null,
-      Reference_Number: "",
-      Amount: "",
-    });
-  }
+  // Just append a blank row — don't auto-pick a type.
+  append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
 
   setShowSplitBox(true);
 };
+  // const handleAddPaymentType = () => {
+  //   const newIndex = fields.length;
+
+  //   const availableOptions = getAvailableOptions(newIndex);
+
+  //   if (availableOptions.length === 0) {
+  //     toast.info("No more payment types are available.");
+  //     return;
+  //   }
+
+  //   const firstOption = availableOptions[0];
+
+  //   if (firstOption.value.startsWith("bank_")) {
+  //     append({
+  //       Payment_Type: "Bank",
+  //       Bank_Account_Id: Number(firstOption.value.replace("bank_", "")),
+  //       Reference_Number: "",
+  //       Amount: "",
+  //     });
+  //   } else {
+  //     append({
+  //       Payment_Type: firstOption.value,
+  //       //Payment_Type: firstOption.value,
+  //       Bank_Account_Id: null,
+  //       Reference_Number: "",
+  //       Amount: "",
+  //     });
+  //   }
+
+  //   setShowSplitBox(true);
+  // };
 
   const [showPartyModal, setShowPartyModal] = useState(false);
   const wrapperRef = useRef(null);
@@ -207,40 +226,76 @@ export default function PaymentInModal({
     (sum, s) => sum + (parseFloat(s.Amount) || 0),
     0
   );
+const onSubmit = (data) => {
+  if (isView) return;
 
-  const onSubmit = (data) => {
-    if (isView) return;
+  if (!data.Payment_Date) {
+    return;
+  }
 
-    if (!data.Payment_Date) {
-      // shouldn't happen since register has required, but safety net
-      return;
-    }
+  const rawSplits = data.splits || [];
 
-    const splits = data.splits || [];
-    const total = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
+  // Discard any split row that has no Payment_Type selected —
+  // even if the user typed an Amount into it, an unselected
+  // payment type means the row is incomplete and shouldn't be saved.
+  const splits = rawSplits.filter((s) => !!s.Payment_Type);
 
-    if (total < 0) {
-      toast.error("Received amount must be greater than zero");
-      return;
-    }
+  const total = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
 
-    const payload = {
-      Party_Id: data.Party_Id,
-      Party_Name: data.Party_Name,
-      Receipt_No: data.Receipt_No,
-      Payment_Date: data.Payment_Date,
-      Received: total || 0,
-      splits: splits.map((s) => ({
-        Payment_Type: s.Payment_Type,
-        Bank_Account_Id: s.Bank_Account_Id || null,
-        Reference_Number: s.Reference_Number || null,
-        Amount: Number(s.Amount) || 0,
-      })),
-    };
+  // if (total < 0) {
+  //   toast.error("Received amount must be greater than zero");
+  //   return;
+  // }
 
-    onSave(payload);
+  const payload = {
+    Party_Id: data.Party_Id,
+    Party_Name: data.Party_Name,
+    Receipt_No: data.Receipt_No,
+    Payment_Date: data.Payment_Date,
+    Received: total || 0,
+    splits: splits.map((s) => ({
+      Payment_Type: s.Payment_Type,
+      Bank_Account_Id: s.Bank_Account_Id || null,
+      Reference_Number: s.Reference_Number || null,
+      Amount: Number(s.Amount) || 0,
+    })),
   };
-const formValues=watch()  
+
+  onSave(payload);
+};
+  // const onSubmit = (data) => {
+  //   if (isView) return;
+
+  //   if (!data.Payment_Date) {
+  //     // shouldn't happen since register has required, but safety net
+  //     return;
+  //   }
+
+  //   const splits = data.splits || [];
+  //   const total = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
+
+  //   if (total < 0) {
+  //     toast.error("Received amount must be greater than zero");
+  //     return;
+  //   }
+
+  //   const payload = {
+  //     Party_Id: data.Party_Id,
+  //     Party_Name: data.Party_Name,
+  //     Receipt_No: data.Receipt_No,
+  //     Payment_Date: data.Payment_Date,
+  //     Received: total || 0,
+  //     splits: splits.map((s) => ({
+  //       Payment_Type: s.Payment_Type,
+  //       Bank_Account_Id: s.Bank_Account_Id || null,
+  //       Reference_Number: s.Reference_Number || null,
+  //       Amount: Number(s.Amount) || 0,
+  //     })),
+  //   };
+
+  //   onSave(payload);
+  // };
+  const formValues = watch()
   console.log("Form values:", formValues);
   console.log("Form errors:", errors);
   return (
@@ -256,9 +311,10 @@ const formValues=watch()
         backdropFilter: "blur(4px)",
         zIndex: 50,
         padding: "1rem",
+        marginBottom: "1rem",
       }}
     >
-      <div className="bg-white w-full max-w-2xl rounded-lg shadow-lg p-6 overflow-hidden max-h-[90vh]">
+      <div className="bg-white w-full max-w-4xl rounded-lg shadow-lg p-6 overflow-y-auto max-h-[90vh]">
         {/* Header */}
         <div
           className="flex justify-between items-center mb-6"
@@ -342,15 +398,44 @@ const formValues=watch()
                       + Add Party
                     </span>
 
-                    {filteredParties.map((party, i) => (
-                      <div
-                        key={party.Party_Id ?? i}
-                        onClick={() => selectParty(party)}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                      >
-                        {party.Party_Name} {party.Phone_Number ? `(${party.Phone_Number})` : ""}
-                      </div>
-                    ))}
+                    {filteredParties.map((party, i) => {
+                      const bal = Number(party.Current_Balance ?? 0);
+                      const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                      return (
+                        <div
+                          key={party.Party_Id ?? i}
+                          onClick={() => selectParty(party)}
+                          className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                          style={{ borderBottom: "1px solid #f3f4f6" }}
+                        >
+                          {/* Left — name + phone */}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm text-gray-800 font-medium truncate">
+                              {party.Party_Name}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {party.Phone_Number || "—"}
+                            </span>
+                          </div>
+
+                          {/* Right — balance */}
+                          <div className="flex flex-col items-end flex-shrink-0">
+                            <span className="text-xs text-gray-400">Balance</span>
+                            <span
+                              className="text-xs font-semibold"
+                              style={{ color: balColor }}
+                            >
+                              ₹
+                              {bal.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
 
                     {filteredParties.length === 0 && (
                       <p className="px-3 py-2 text-gray-500">No Party found</p>
@@ -400,7 +485,7 @@ const formValues=watch()
                     {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                   /> */}
 
-                  <select
+                  {/* <select
                     id="Payment_Type"
                     disabled={isView}
                     value={
@@ -420,7 +505,7 @@ const formValues=watch()
                       }
                     }}
                   >
-                    {/* <option value="">Select Payment Type</option> */}
+                    
                     <option value="Cash">Cash</option>
                     <option value="Cheque">Cheque</option>
                     <option value="Neft">Neft</option>
@@ -429,13 +514,32 @@ const formValues=watch()
                         {bank.Account_Display_Name}
                       </option>
                     ))}
-                  </select>
+                  </select> */}
+                  <PaymentTypeSelect
+                    value={
+                      paymentType === "Bank"
+                        ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                        : paymentType || ""
+                    }
+                    banks={banks}
+                    onAddBank={() => setShowBankModal(true)}
+                    onChange={(val) => {
+                      if (val.startsWith("bank_")) {
+                        const bankId = val.replace("bank_", "");
+                        setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                        setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                      } else {
+                        setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                        setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                      }
+                    }}
+                  />
 
                   {errors?.splits?.[0]?.Payment_Type && (
                     <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
                   )}
 
-                  {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                  {(paymentType === "Bank" || paymentType === "Cheque") && (
                     <div className="mt-3 flex flex-col">
                       <label className="text-sm">Reference Number</label>
                       <input
@@ -464,9 +568,9 @@ const formValues=watch()
                     const rowType = watch(`splits.${index}.Payment_Type`);
                     const needsRef =
                       rowType === "Cheque" ||
-                      rowType === "Neft" ||
+                      //rowType === "Neft" ||
                       rowType === "Bank";
-                    const rowOptions = getAvailableOptions(index);
+                    //const rowOptions = getAvailableOptions(index);
                     const currentIdentifier = getRowIdentifier(
                       rowType,
                       watch(`splits.${index}.Bank_Account_Id`)
@@ -498,6 +602,14 @@ const formValues=watch()
                     //   required: "Required",
                     //   validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                     // });
+                    const usedValues = splitsWatch
+                      .map((s, idx) => {
+                        if (idx === index) return null; // exclude current row
+                        return s.Payment_Type === "Bank"
+                          ? `bank_${s.Bank_Account_Id}`
+                          : s.Payment_Type || null;
+                      })
+                      .filter(Boolean);
 
                     return (
                       <div key={field.id} className="flex flex-col gap-2">
@@ -505,7 +617,7 @@ const formValues=watch()
                         <div className="flex items-end gap-2">
                           <div className="flex flex-col flex-1">
                             <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                            <select
+                            {/* <select
                               disabled={isView}
                               value={currentIdentifier || ""}
                               onChange={(e) => {
@@ -520,13 +632,28 @@ const formValues=watch()
                               }}
                               className="border rounded-md px-2 py-1.5"
                             >
-                              {/* <option value="">Select Type</option> */}
+                              
                               {rowOptions.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </option>
                               ))}
-                            </select>
+                            </select> */}
+                            <PaymentTypeSelect
+                              value={currentIdentifier || ""}
+                              banks={banks}
+                              onAddBank={() => setShowBankModal(true)}
+                              usedValues={usedValues}
+                              onChange={(val) => {
+                                if (val.startsWith("bank_")) {
+                                  setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                  setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                } else {
+                                  setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                  setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                }
+                              }}
+                            />
                           </div>
 
                           <div className="flex flex-col flex-1">
@@ -581,7 +708,7 @@ const formValues=watch()
                       // onClick={() =>
                       //   append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
                       // }
-                       onClick={handleAddPaymentType}
+                      onClick={handleAddPaymentType}
                       className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
                       style={{ background: "transparent", border: "none" }}
                     >
@@ -692,6 +819,20 @@ const formValues=watch()
           )}
         </form>
       </div>
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            //refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
+          }}
+        />
+      )}
     </div>
   );
 }

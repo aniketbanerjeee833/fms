@@ -55,7 +55,8 @@ export default function PurchaseReturnAdd() {
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
   const basePurchasePriceRef = useRef({});
-
+  const basePurchaseUnitRef = useRef({});
+    const unitRefs = useRef([]);
   const navigate = useNavigate();
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
@@ -183,7 +184,8 @@ export default function PurchaseReturnAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: ""
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "",
+      unitOpen: false, unitSearch: ""
     }
   ]);
 
@@ -207,15 +209,27 @@ export default function PurchaseReturnAdd() {
         prev.map((row, idx) => {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
+          const unitRef = unitRefs.current[idx];
 
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
+            const clickedInsideUnit =
+            unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
 
           return row;
@@ -293,6 +307,7 @@ export default function PurchaseReturnAdd() {
         ...row,
         CategoryOpen: false,
         itemOpen: false,
+        unitOpen: false
       })),
       {
         itemSearch: "",
@@ -302,6 +317,8 @@ export default function PurchaseReturnAdd() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
       },
     ]);
 
@@ -447,6 +464,8 @@ export default function PurchaseReturnAdd() {
     Amount: "",
     itemOpen: false,
     CategoryOpen: false,
+    unitOpen: false,
+    unitSearch: "",
     isHSNLocked: false,
     isUnitLocked: false,
     isExistingItem: false,
@@ -525,7 +544,7 @@ export default function PurchaseReturnAdd() {
 
           // Store original/base price separately
           basePurchasePriceRef.current[index] = basePurchasePrice;
-
+          basePurchaseUnitRef.current[index] = primaryUnit;
           return {
             ...item,
 
@@ -534,6 +553,8 @@ export default function PurchaseReturnAdd() {
             itemSearch: item.Item_Name,
             itemOpen: false,
             CategoryOpen: false,
+             unitOpen: false,
+            unitSearch: "",
 
             isHSNLocked: false,
             isUnitLocked: false,
@@ -690,93 +711,7 @@ export default function PurchaseReturnAdd() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
-  //   const onSubmit = async (data) => {
-  //     console.log("Form Data (from RHF):", data);
-
-  //     const payload = { ...data };
-
-  //     // ── validate items ──
-  //     // const seenItems = new Set();
-  //     // for (const item of payload.items) {
-  //     //   const name = item.Item_Name?.trim().toLowerCase();
-  //     //   const category = item.Item_Category?.trim().toLowerCase();
-  //     //   const itemHSN = item.Item_HSN?.trim().toLowerCase();
-  //     //   const Quantity = item.Quantity;
-
-  //     //   if (!name || !category || !itemHSN || !Quantity) {
-  //     //     toast.error("Each item must have a valid name, category, HSN and quantity.");
-  //     //     return;
-  //     //   }
-
-  //     //   if (seenItems.has(name)) {
-  //     //     toast.error(
-  //     //       `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`
-  //     //     );
-  //     //     return;
-  //     //   }
-  //     //   seenItems.add(name);
-  //     // }
-
-  //     // ── validate items ──
-  // for (const item of payload.items) {
-  //   const name = item.Item_Name?.trim();
-  //   const category = item.Item_Category?.trim();
-  //   const itemHSN = item.Item_HSN?.trim();
-  //   const quantity = Number(item.Quantity);
-
-  //   if (!name || !category || !itemHSN || quantity <= 0) {
-  //     toast.error("Each item must have a valid name, category, HSN and quantity.");
-  //     return;
-  //   }
-  // }
-
-  //     console.log("payload:", payload);
-
-  //     try {
-  //       const res = await createPurchaseReturn({
-  //         Purchase_Id: Purchase_Id,   // ← from useParams() or props
-  //         ...payload,                 // ← everything else (Party_Name, items, etc.)
-  //       }).unwrap();
-  //       //console.log("Created successfully:", res);
-
-  //       // invalidate so list refetches
-  //       dispatch(purchaseReturnApi.util.invalidateTags(["PurchaseReturn"]));
-  //       dispatch(itemApi.util.invalidateTags(["Item"]));
-  //       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-  //       dispatch(bankAccountApi.util.invalidateTags([
-  //         { type: "BankAccount", id: payload.Bank_Account_Id },
-  //         "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-  //       ]));
-  //       if (!res?.success) {
-  //         toast.error("Failed to add debit note");
-  //         return;
-  //       }
-
-  //       toast.success("Debit Note added  successfull!");
-
-  //       // ── navigate back based on where user came from ──
-  //       if (from === "purchase-return-list") {
-  //         navigate({
-  //           pathname: "/purchase/return",
-  //           search: location.search,
-  //         });
-  //       } else {
-  //         navigate({
-  //           pathname: "/purchase/return",
-  //           search: location.search,
-  //         });
-  //       }
-
-  //     } catch (error) {
-  //       const errorMessage =
-  //         error?.data?.message || error?.message || "Failed to add new debit note.";
-  //       toast.error(errorMessage);
-  //       //console.error("Submission failed", error);
-  //     }
-  //   };
-
-
-  // console.log("showGSTIN:", showGSTIN, purchase);
+ 
   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
@@ -970,10 +905,9 @@ export default function PurchaseReturnAdd() {
         ])
       );
 
+
       dispatch(
-        itemApi.util.invalidateTags([
-          "Item",
-        ])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -991,6 +925,7 @@ export default function PurchaseReturnAdd() {
       dispatch(
         partyApi.util.invalidateTags([
           "Party",
+          "PartyLedger",
         ])
       );
 
@@ -1215,7 +1150,7 @@ export default function PurchaseReturnAdd() {
                           + Add Party
                         </span>
 
-                        {parties?.parties
+                        {/* {parties?.parties
                           ?.filter(
                             (party) =>
                               party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1234,7 +1169,51 @@ export default function PurchaseReturnAdd() {
                             >
                               {party.Party_Name} ({party.Phone_Number})
                             </div>
-                          ))}
+                          ))} */}
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                    
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  {/* Left — name + phone */}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Right — balance */}
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
 
                         {parties?.parties?.filter((party) =>
                           party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1280,14 +1259,14 @@ export default function PurchaseReturnAdd() {
                           }
                         );
 
-                        setValue(
-                          "Billing_Name",
-                          newParty.Billing_Name || "",
-                          {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          }
-                        );
+                        // setValue(
+                        //   "Billing_Name",
+                        //   newParty.Billing_Name || "",
+                        //   {
+                        //     shouldValidate: true,
+                        //     shouldDirty: true,
+                        //   }
+                        // );
 
                         //setCurrentPartyDetails(newParty);
 
@@ -1727,6 +1706,7 @@ export default function PurchaseReturnAdd() {
                               const typedValue = e.target.value;
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
+                              handleRowChange(i, "unitOpen", false);
                               setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
@@ -1801,6 +1781,7 @@ export default function PurchaseReturnAdd() {
                                     }
                                   );
                                   basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
+                                  basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1822,7 +1803,12 @@ export default function PurchaseReturnAdd() {
                                 }
                               }, 150); // small delay so click-from-dropdown fires first
                             }}
-                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            onClick={() => {
+                              handleRowChange(i, "itemOpen", true);
+                              handleRowChange(i, "unitOpen", false);
+                              handleRowChange(i, "CategoryOpen", false);
+                            }}
+                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
@@ -1906,12 +1892,13 @@ export default function PurchaseReturnAdd() {
                                           handleRowChange(i, "itemSearch", it.Item_Name);
                                           handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
                                           handleRowChange(i, "CategoryOpen", false);
+                                          handleRowChange(i, "unitOpen", false);
                                           setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
 
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                           ///setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                           setValue(
                                             `items.${i}.Item_Unit`,
@@ -1922,6 +1909,7 @@ export default function PurchaseReturnAdd() {
                                             }
                                           );
                                           basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
+                                          basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2059,89 +2047,8 @@ export default function PurchaseReturnAdd() {
 
 
 
+                     
                       {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => {
-                            const row = rows[i];
-
-                            const availableUnits = Array.isArray(row?.Available_Units)
-                              ? row.Available_Units
-                              : [];
-
-                            return (
-                              <select
-                                {...field}
-                                value={field.value || ""}
-                                className="form-select"
-                                style={{
-                                  width: "100%",
-                                  fontSize: "12px",
-                                  marginLeft: "0px",
-                                }}
-                                //disabled={row?.isUnitLocked}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-
-                                  if (value === "__ADD_UNIT__") {
-                                    setActiveUnitRow(i);
-                                    setShowAddUnitModal(true);
-                                    return;
-                                  }
-
-                                  field.onChange(value);
-
-                                  handleRowChange(i, "Item_Unit", value);
-
-                                  setValue(`items.${i}.Item_Unit`, value, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
-                                }}
-                              >
-                                
-                                {availableUnits.length > 0 ? (
-                                  availableUnits.map((unit) => (
-                                    <option
-                                      key={unit.Unit_Shorthand}
-                                      value={unit.Unit_Shorthand}
-                                    >
-                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                    </option>
-                                  ))
-                                ) : (
-                                  <>
-                                    <option value="">NONE</option>
-
-                                 
-                                    {Array.isArray(itemUnits) &&
-                                      itemUnits.map((unit) => (
-                                        <option
-                                          key={unit.Unit_Shorthand}
-                                          value={unit.Unit_Shorthand}
-                                        >
-                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                        </option>
-                                      ))}
-
-                                    <option value="__ADD_UNIT__">
-                                      ➕ Add Unit
-                                    </option>
-                                  </>
-                                )}
-                              </select>
-                            );
-                          }}
-                        />
-
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Item_Unit.message}
-                          </p>
-                        )}
-                      </td> */}
-                      <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -2239,11 +2146,11 @@ export default function PurchaseReturnAdd() {
                                     //const roundedPrice = newPrice.toFixed(2);
                                     const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2254,12 +2161,12 @@ export default function PurchaseReturnAdd() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2268,11 +2175,47 @@ export default function PurchaseReturnAdd() {
                                     // Restore original base price.
                                     // =====================================================
 
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
+
+                                    // else {
+                                    //   return;
+                                    // }
+
+                                    // const roundedPrice = newPrice.toFixed(2);
+
+
+                                    const baseUnit = basePurchaseUnitRef.current[i];
+
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
+                                    }
+
+                                    let newPrice;
+
+                                    if (newUnit === baseUnit) {
+                                      // Back to the unit in which the price was entered
+                                      newPrice = basePrice;
+                                    }
+
                                     else if (
-                                      previousUnit === secondaryUnit &&
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+
+                                    else if (
+                                      baseUnit === secondaryUnit &&
                                       newUnit === primaryUnit
                                     ) {
-                                      newPrice = basePrice;
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
                                     }
 
                                     else {
@@ -2326,7 +2269,7 @@ export default function PurchaseReturnAdd() {
                         {errors?.items?.[i]?.Item_Unit && (
                           <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
                         )}
-                      </td>
+                      </td> */}
 
 
                       {/* Price/Unit */}
@@ -2358,6 +2301,7 @@ export default function PurchaseReturnAdd() {
                               e.target.value = val;
                               setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
                               basePurchasePriceRef.current[i] = Number(val) || 0;
+                              basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
                               // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                               //   return;

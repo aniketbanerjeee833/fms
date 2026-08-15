@@ -91,7 +91,9 @@ export default function SaleAdd() {
   ];
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
+  const unitRefs = useRef([]);
   const baseSalePriceRef = useRef({});
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -160,7 +162,8 @@ export default function SaleAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: ""
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "",
+      unitOpen: false, unitSearch: "",
     }
   ]);
 
@@ -233,19 +236,31 @@ export default function SaleAdd() {
         prev.map((row, idx) => {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
-
+          const unitRef = unitRefs.current[idx];
 
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
-
-
+          const clickedInsideUnit =
+            unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
+          // if (!clickedInsideCategory && !clickedInsideItem) {
+          //   return { ...row, CategoryOpen: false, itemOpen: false };
+          // }
 
           return row;
         })
@@ -257,7 +272,6 @@ export default function SaleAdd() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
 
 
 
@@ -276,7 +290,7 @@ export default function SaleAdd() {
       Party_Name: "",
       Billing_Name: "",
       GSTIN: "",
-      Phone_Number: "",
+      //Phone_Number: "",
       Billing_Address: "",
       Invoice_Number: "",
       Invoice_Date: today,
@@ -331,6 +345,7 @@ export default function SaleAdd() {
         ...row,
         CategoryOpen: false,
         itemOpen: false, // also close item dropdown if open
+        unitOpen: false
       })),
       {
         itemSearch: "",
@@ -340,6 +355,8 @@ export default function SaleAdd() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
       },
     ]);
 
@@ -648,8 +665,9 @@ export default function SaleAdd() {
       // CACHE INVALIDATION
       // =======================================================
 
+
       dispatch(
-        itemApi.util.invalidateTags(["Item"])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -669,7 +687,7 @@ export default function SaleAdd() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags(["Party"])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       toast.success(
@@ -731,6 +749,7 @@ export default function SaleAdd() {
     handleRowChange(i, "itemSearch", it.Item_Name);
     handleRowChange(i, "isExistingItem", true);
     handleRowChange(i, "CategoryOpen", false);
+    handleRowChange(i, "unitOpen", false);
 
     setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
     setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
@@ -745,8 +764,9 @@ export default function SaleAdd() {
         shouldDirty: true,
       }
     );
+    setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
     baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-
+    baseSaleUnitRef.current[i] = it.Primary_Unit || "";
     setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
     handleRowChange(i, "itemOpen", false);
 
@@ -937,18 +957,18 @@ export default function SaleAdd() {
                               );
                               setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
                               setCurrentPartyDetails(matchedParty);
-                              setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
                               setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
                             } else {
                               // typed value doesn't match any known party — treat as new, clear stale data
-                              setValue("Phone_Number", "", {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
+                              // setValue("Phone_Number", "", {
+                              //   shouldValidate: true,
+                              //   shouldDirty: true,
+                              // });
 
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
                               setValue("Billing_Address", "", { shouldValidate: true, shouldDirty: true });
@@ -969,10 +989,10 @@ export default function SaleAdd() {
 
                               if (matchedParty) {
                                 setPartySearch(matchedParty.Party_Name);
-                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
@@ -1006,7 +1026,7 @@ export default function SaleAdd() {
                             + Add Party
                           </span>
 
-                          {parties?.parties
+                          {/* {parties?.parties
                             ?.filter(
                               (party) =>
                                 party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1017,7 +1037,7 @@ export default function SaleAdd() {
                                 key={i}
                                 onClick={() => {
                                   setPartySearch(party.Party_Name);
-                                  setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
+                                  //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
                                   setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
                                   setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
                                   const defaultBilling = party.addresses?.find(
@@ -1034,7 +1054,55 @@ export default function SaleAdd() {
                               >
                                 {party.Party_Name} ({party.Phone_Number})
                               </div>
-                            ))}
+                            ))} */}
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    const defaultBilling = party.addresses?.find(
+                                      (a) => a.Address_Type === "Billing" && a.Is_Default
+                                    );
+                                    setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                    setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                    setCurrentPartyDetails(party);
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  {/* Left — name + phone */}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Right — balance */}
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
 
                           {parties?.parties?.filter((party) =>
                             party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1137,9 +1205,9 @@ export default function SaleAdd() {
                   </div>)}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                  {/* Phone Number — compact inline label+input */}
 
-                  <div className="flex flex-col gap-2">
+
+                  {/* <div className="flex flex-col gap-2">
 
                     <span className="whitespace-nowrap active">Phone Number</span>
                     <input
@@ -1155,7 +1223,7 @@ export default function SaleAdd() {
                     {errors?.Phone_Number && (
                       <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
                     )}
-                  </div>
+                  </div> */}
 
                   {/* GSTIN — compact inline label+input, pinned to top */}
                   {currentPartyDetails?.Party_Name !== "Cash Sale" && (<div className="flex flex-col gap-2 self-start">
@@ -1175,85 +1243,86 @@ export default function SaleAdd() {
                   {/* {errors?.GSTIN && (
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}
+                  {/* ── ROW 2: Billing Address + GSTIN ── */}
+                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (
+                    <div >
+
+                      {/* Billing Address */}
+                      <div className="flex flex-col gap-2">
+                        <span className="active">Billing Address</span>
+                        <textarea
+                          {...register("Billing_Address")}
+                          rows={5}
+                          placeholder="Billing Address"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                          style={{ minHeight: "80px" }}
+                        />
+
+                        {/* Address has content — show Remove / Change */}
+                        {watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setValue("Billing_Address", "", {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                              }
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#ef4444",
+                                cursor: "pointer",
+                                fontSize: 13,
+                              }}
+                            >
+                              Remove
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Address was just removed — offer to pick one from the party instead */}
+                        {!watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Select Billing Address
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  )}
                 </div>
 
-                {/* ── ROW 2: Billing Address + GSTIN ── */}
-                {currentPartyDetails?.Party_Name !== "Cash Sale" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
-                    {/* Billing Address */}
-                    <div className="flex flex-col gap-2">
-                      <span className="active">Billing Address</span>
-                      <textarea
-                        {...register("Billing_Address")}
-                        rows={5}
-                        placeholder="Billing Address"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
-                        style={{ minHeight: "80px" }}
-                      />
-
-                      {/* Address has content — show Remove / Change */}
-                      {watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end gap-3 mt-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setValue("Billing_Address", "", {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              })
-                            }
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#ef4444",
-                              cursor: "pointer",
-                              fontSize: 13,
-                            }}
-                          >
-                            Remove
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Address was just removed — offer to pick one from the party instead */}
-                      {!watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end mt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Select Billing Address
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                )}
 
 
 
@@ -1475,6 +1544,7 @@ export default function SaleAdd() {
                               const typedValue = e.target.value;
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
+                              handleRowChange(i, "unitOpen", false);
                               // setValue(`items.${i}.Item_Name`, typedValue);
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
@@ -1550,6 +1620,7 @@ export default function SaleAdd() {
                                     }
                                   );
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1571,8 +1642,12 @@ export default function SaleAdd() {
                                 }
                               }, 150); // small delay so click-from-dropdown fires first
                             }}
-
-                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            onClick={() => {
+                              handleRowChange(i, "itemOpen", true);
+                              handleRowChange(i, "unitOpen", false);
+                              handleRowChange(i, "CategoryOpen", false);
+                            }}
+                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
@@ -1681,116 +1756,25 @@ export default function SaleAdd() {
                               </table>
                             </div>
                           )}
-                          {/* {rows[i]?.itemOpen && (
-                              <div
-                                style={{ width: "40rem" }}
-                                className="absolute z-20  w-full bg-white border
-                      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                              >
-                               
-                                <div
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    handleRowChange(i, "itemOpen", true);
-                                    setActiveItemRow(i);
-                                    setShowItemAddModal(true);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
-                                  style={{
-                                    borderBottom: "1px solid #e5e7eb",
-                                    color: "#4CA1AF",
-                                    fontWeight: 600,
-                                    fontSize: 13,
-                                    position: "sticky",
-                                    top: 0,
-                                    backgroundColor: "#fff",
-                                    zIndex: 1,
-                                  }}
-                                >
-                                  <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
-                                  Add Item
-                                </div>
 
-                             
-                                <table className="w-full text-sm border-collapse">
-                                  <thead className="bg-gray-100 border-b">
-                                    <tr>
-                                      <th>Sl.No</th>
-                                      <th className="text-left px-3 py-2">Item Name</th>
-                                      <th className="text-left px-3 py-2">Sale Price</th>
-                                      <th className="text-left px-3 py-2">Purchase Price</th>
-                                      <th className="text-left px-3 py-2">Stock</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {items?.items
-                                      ?.filter((it) =>
-                                        it.Item_Name.toLowerCase().includes(
-                                          (rows[i]?.itemSearch || "").toLowerCase()
-                                        )
-                                      )
-                                      .map((it, idx) => (
-                                        <tr
-                                          key={idx}
-                                          onClick={() => {
-                                             if (it.Stock_Quantity <= 0) {
-                                            // show confirmation modal instead of directly adding
-                                            setConfirmModal({ open: true, item: it, rowIndex: i });
-                                            return;
-                                          }
-
-                                          // ✅ proceed directly if stock > 0
-                                          handleItemSelect(it, i);
-                                            
-                                          }}
-
-                                          className="hover:bg-gray-100 cursor-pointer border-b"
-                                        >
-                                          <td>{idx + 1}</td>
-                                          <td className="px-3 py-2">{it.Item_Name}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                          <td
-                                            style={{
-                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                              fontWeight: "500", // optional: matches Tailwind's medium weight
-                                            }}
-                                          >
-                                            {it.Stock_Quantity || 0}
-                                          </td>
-                                        </tr>
-                                      ))}
-
-                                    {items?.items?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    ).length === 0 && (
-                                        <tr>
-                                          <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                            No Item found
-                                          </td>
-                                        </tr>
-                                      )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )} */}
                           {confirmModal.open && (
                             <div
                               className="fixed inset-0 
-    flex items-center justify-center 
-    bg-white z-50 bg-opacity-50"
+                                        flex items-center justify-center 
+                                       bg-white z-50 bg-opacity-50"
                             >
                               <div className="bg-white p-6 rounded-lg shadow-lg
-     w-96 relative">
+                                            w-96 relative">
                                 <h3 style={{ color: "red" }} className="text-lg font-semibold mb-4
-       text-center ">
+                                  text-center ">
                                   ⚠ Item Out of Stock
                                 </h3>
                                 <p className="text-gray-700 text-center mb-6">
-                                  The item <b>{confirmModal.item?.Item_Name}</b> has 0 stock.<br />
+                                  The item <b>{confirmModal.item?.Item_Name}</b> has{" "}
+                                  <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                                    {confirmModal.item?.Stock_Quantity} {confirmModal.item?.Primary_Unit}
+                                  </span>{" "}
+                                  stock.<br />
                                   Do you still want to add it?
                                 </p>
                                 <div className="flex justify-center gap-4">
@@ -2072,13 +2056,13 @@ export default function SaleAdd() {
                                     // }
 
                                     //const roundedPrice = newPrice.toFixed(2);
-                                    const basePrice =Number(baseSalePriceRef.current[i]) || 0;
+                                    //const basePrice =Number(baseSalePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2089,12 +2073,12 @@ export default function SaleAdd() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2103,20 +2087,53 @@ export default function SaleAdd() {
                                     // Restore original base price.
                                     // =====================================================
 
-                                    else if (
-                                      previousUnit === secondaryUnit &&
-                                      newUnit === primaryUnit
-                                    ) {
-                                      newPrice = basePrice;
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
+
+                                    // else {
+                                    //   return;
+                                    // }
+
+                                    // const roundedPrice = newPrice.toFixed(2);
+
+
+                                    const basePrice = Number(baseSalePriceRef.current[i]) || 0;
+
+                                    const baseUnit = baseSaleUnitRef.current[i];
+
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
                                     }
 
+                                    let newPrice;
+
+                                    if (newUnit === baseUnit) {
+                                      // Restore original entered price
+                                      newPrice = basePrice;
+                                    }
+                                    else if (
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+                                    else if (
+                                      baseUnit === secondaryUnit &&
+                                      newUnit === primaryUnit
+                                    ) {
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
+                                    }
                                     else {
                                       return;
                                     }
 
                                     const roundedPrice = newPrice.toFixed(2);
-
-
 
 
                                     setValue(`items.${i}.Sale_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
@@ -2221,7 +2238,8 @@ export default function SaleAdd() {
 
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true, shouldDirty: true });
-                                baseSalePriceRef.current[i] = Number(val) || 0;
+                              baseSalePriceRef.current[i] = Number(val) || 0;
+                              baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
                                 i,

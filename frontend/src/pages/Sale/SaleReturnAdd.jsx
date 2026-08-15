@@ -26,6 +26,8 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 import { Trash2 } from "lucide-react";
 import AddItemModal from "../../components/Modal/AddItemModal";
+import PaymentTypeSelect from "../../components/PaymentTypeSelect";
+import BankAccountModal from "../../components/Modal/BankAccountModal";
 
 
 
@@ -97,6 +99,7 @@ export default function SaleReturnAdd() {
   ];
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
+  const unitRefs = useRef([]);
   const baseSalePriceRef = useRef({});
   const baseSaleUnitRef = useRef({});
 
@@ -108,11 +111,11 @@ export default function SaleReturnAdd() {
     });
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+  
   const [activeItemRow, setActiveItemRow] = useState(null);
   // find this line in your code and add refetch:
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
-  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   const [addCategory] = useAddCategoryMutation();
   const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
@@ -124,7 +127,8 @@ export default function SaleReturnAdd() {
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
 
-  const [showGSTIN, setShowGSTIN] = useState("");
+  const [showGSTIN, setShowGSTIN] = useState("")
+  const [showBankModal, setShowBankModal] = useState(false);;
   //console.log(latestInvoiceNumber,"latestInvoiceNumber");
 
   // const itemUnits = {
@@ -250,7 +254,8 @@ export default function SaleReturnAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: ""
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: "",
+      unitOpen: false, unitSearch: ""
     },
   ]);
 
@@ -286,18 +291,27 @@ export default function SaleReturnAdd() {
         prev.map((row, idx) => {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
-
+          const unitRef = unitRefs.current[idx];
 
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
-
-
+          const clickedInsideUnit =
+            unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
 
           return row;
@@ -325,6 +339,7 @@ export default function SaleReturnAdd() {
         ...row,
         CategoryOpen: false,
         itemOpen: false, // also close item dropdown if open
+        unitOpen: false
       })),
       {
         itemSearch: "",
@@ -334,6 +349,8 @@ export default function SaleReturnAdd() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
       },
     ]);
 
@@ -465,6 +482,8 @@ export default function SaleReturnAdd() {
     Amount: "",
     itemOpen: false,
     CategoryOpen: false,
+    unitOpen: false,
+    unitSearch: "",
     isHSNLocked: false,
     isUnitLocked: false,
     isExistingItem: false,
@@ -553,6 +572,8 @@ export default function SaleReturnAdd() {
             itemSearch: item.Item_Name,
             itemOpen: false,
             CategoryOpen: false,
+            unitOpen: false,
+            unitSearch: "",
 
             isHSNLocked: false,
             isUnitLocked: false,
@@ -652,37 +673,37 @@ export default function SaleReturnAdd() {
 
   // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
   // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
+  // const buildPaymentTypeOptions = (banks) => [
+  //   { value: "Cash", label: "Cash", repeatable: false },
+  //   { value: "Cheque", label: "Cheque", repeatable: true },
+  //   { value: "Neft", label: "Neft", repeatable: true },
+  //   ...(banks || []).map((bank) => ({
+  //     value: `bank_${bank.Bank_Account_Id}`,
+  //     label: bank.Account_Display_Name,
+  //     repeatable: false,
+  //   })),
+  // ];
 
   const getRowIdentifier = (type, bankId) =>
     type === "Bank" ? `bank_${bankId ?? ""}` : type;
 
   //Inside the component:
 
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
+  // const getUsedIdentifiers = (excludeIndex) => {
+  //   const splitValues = watch("splits") || [];
+  //   return splitValues
+  //     .map((s, i) =>
+  //       i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+  //     )
+  //     .filter(Boolean);
+  // };
 
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
+  // const getAvailableOptions = (excludeIndex) => {
+  //   const used = getUsedIdentifiers(excludeIndex);
+  //   return buildPaymentTypeOptions(banks).filter(
+  //     (opt) => opt.repeatable || !used.includes(opt.value)
+  //   );
+  // };
 
   const handleAddPaymentType = () => {
     appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
@@ -1071,7 +1092,7 @@ export default function SaleReturnAdd() {
                           + Add Party
                         </span>
 
-                        {parties?.parties
+                        {/* {parties?.parties
                           ?.filter(
                             (party) =>
                               party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1090,7 +1111,51 @@ export default function SaleReturnAdd() {
                             >
                               {party.Party_Name} ({party.Phone_Number})
                             </div>
-                          ))}
+                          ))} */}
+                        {parties?.parties
+                          ?.filter(
+                            (party) =>
+                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                              party?.Phone_Number?.includes(partySearch)
+                          )
+                          .map((party, i) => {
+                            const bal = Number(party.Current_Balance ?? 0);
+                            const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                            return (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  setPartySearch(party.Party_Name);
+                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                  //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+
+                                  setOpen(false);
+                                }}
+                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                style={{ borderBottom: "1px solid #f3f4f6" }}
+                              >
+                                {/* Left — name + phone */}
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm text-gray-800 font-medium truncate">
+                                    {party.Party_Name}
+                                  </span>
+                                  <span className="text-xs text-gray-400">
+                                    {party.Phone_Number || "—"}
+                                  </span>
+                                </div>
+
+                                {/* Right — balance */}
+                                <div className="flex flex-col items-end flex-shrink-0">
+                                  <span className="text-xs text-gray-400">Balance</span>
+                                  <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                    ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
 
                         {parties?.parties?.filter((party) =>
                           party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1585,6 +1650,7 @@ export default function SaleReturnAdd() {
                               const typedValue = e.target.value;
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
+                              handleRowChange(i, "unitOpen", false);
                               // setValue(`items.${i}.Item_Name`, typedValue);
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
@@ -1678,8 +1744,12 @@ export default function SaleReturnAdd() {
                                 }
                               }, 150); // small delay so click-from-dropdown fires first
                             }}
-
-                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            onClick={() => {
+                              handleRowChange(i, "itemOpen", true);
+                              handleRowChange(i, "unitOpen", false);
+                              handleRowChange(i, "CategoryOpen", false);
+                            }}
+                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
@@ -1767,12 +1837,14 @@ export default function SaleReturnAdd() {
                                           handleRowChange(i, "itemSearch", it.Item_Name);
                                           handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
                                           handleRowChange(i, "CategoryOpen", false);
+                                          handleRowChange(i, "unitOpen", false);
                                           setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
                                           //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
-                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
+                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                          //setValue(`items.${i}.Quantity`,1, it.Stock_Quantity || 0, { shouldValidate: true });
                                           setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
                                           setValue(
                                             `items.${i}.Item_Unit`,
@@ -1939,89 +2011,8 @@ export default function SaleReturnAdd() {
 
 
 
+
                       {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => {
-                            const row = rows[i];
-
-                            const availableUnits = Array.isArray(row?.Available_Units)
-                              ? row.Available_Units
-                              : [];
-
-                            return (
-                              <select
-                                {...field}
-                                value={field.value || ""}
-                                className="form-select"
-                                style={{
-                                  width: "100%",
-                                  fontSize: "12px",
-                                  marginLeft: "0px",
-                                }}
-                                disabled={row?.isUnitLocked}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-
-                                  if (value === "__ADD_UNIT__") {
-                                    setActiveUnitRow(i);
-                                    setShowAddUnitModal(true);
-                                    return;
-                                  }
-
-                                  field.onChange(value);
-
-                                  handleRowChange(i, "Item_Unit", value);
-
-                                  setValue(`items.${i}.Item_Unit`, value, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
-                                }}
-                              >
-                              
-                                {availableUnits.length > 0 ? (
-                                  availableUnits.map((unit) => (
-                                    <option
-                                      key={unit.Unit_Shorthand}
-                                      value={unit.Unit_Shorthand}
-                                    >
-                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                    </option>
-                                  ))
-                                ) : (
-                                  <>
-                                    <option value="">NONE</option>
-
-                                    
-                                    {Array.isArray(itemUnits) &&
-                                      itemUnits.map((unit) => (
-                                        <option
-                                          key={unit.Unit_Shorthand}
-                                          value={unit.Unit_Shorthand}
-                                        >
-                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                        </option>
-                                      ))}
-
-                                    <option value="__ADD_UNIT__">
-                                      ➕ Add Unit
-                                    </option>
-                                  </>
-                                )}
-                              </select>
-                            );
-                          }}
-                        />
-
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Item_Unit.message}
-                          </p>
-                        )}
-                      </td> */}
-                      <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -2233,6 +2224,326 @@ export default function SaleReturnAdd() {
                                   </>
                                 )}
                               </select>
+                            );
+                          }}
+                        />
+
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
+                        )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+                            const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
+                            //const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
+                            const allUnits =
+                              availableUnits.length > 0
+                                ? availableUnits
+                                : (Array.isArray(itemUnits) ? itemUnits : []);
+
+
+                            const hasPrimary = !!row?.Primary_Unit;
+                            const hasSecondary = !!row?.Secondary_Unit;
+
+                            let unitsWithNone = [];
+
+                            if (!hasPrimary && !hasSecondary) {
+                              // No units configured → show None + all master units
+                              unitsWithNone = [
+                                {
+                                  Unit_Name: "None",
+                                  Unit_Shorthand: "",
+                                },
+                                ...(Array.isArray(itemUnits) ? itemUnits : []),
+                              ];
+                            } else {
+                              // Item has its own units
+                              unitsWithNone = allUnits;
+                            }
+
+
+
+                            const selectedLabel = unitsWithNone.find(
+                              u => u.Unit_Shorthand === field.value
+                            );
+
+                            const getUnitLabel = (unit) =>
+                              unit?.Unit_Shorthand
+                                ? `${unit.Unit_Name} (${unit.Unit_Shorthand})`
+                                : unit.Unit_Name;
+                            const displayLabel = selectedLabel
+                              ? getUnitLabel(selectedLabel)
+                              : "";
+                            const filtered = unitsWithNone.filter((u) => {
+                              const label = getUnitLabel(u).toLowerCase();
+
+                              return label.includes(
+                                (rows[i]?.unitSearch || "").toLowerCase()
+                              );
+                            });
+                            return (
+                              <div
+                                //  ref={unitRef} 
+                                ref={(el) => (unitRefs.current[i] = el)}
+                                style={{ position: "relative", width: "100%" }}>
+
+
+                                <input
+                                  readOnly
+                                  value={displayLabel}
+                                  onClick={() => {
+                                    handleRowChange(i, "unitOpen", true);
+                                    handleRowChange(i, "itemOpen", false);
+                                    handleRowChange(i, "CategoryOpen", false);
+                                  }}
+                                />
+
+                                {rows[i]?.unitOpen && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: "100%",
+                                      left: 0,
+                                      zIndex: 30,
+                                      width: "180px",
+                                      background: "white",
+                                      border: "1px solid #e5e7eb",
+                                      borderRadius: 6,
+                                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                      marginTop: 2,
+                                      maxHeight: 180,
+                                      overflowY: "auto",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      placeholder="Search unit..."
+                                      value={rows[i]?.unitSearch || ""}
+                                      // value={unitSearch}
+                                      onChange={(e) =>
+                                        handleRowChange(i, "unitSearch", e.target.value)
+                                      }
+                                      //onChange={(e) => setUnitSearch(e.target.value)}
+                                      style={{
+                                        width: "100%",
+                                        marginBottom: 0,
+
+                                      }}
+                                    />
+                                    {filtered.length === 0 ? (
+                                      <div
+                                        onClick={() => {
+                                          field.onChange("");
+
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
+
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+
+                                          //setUnitSearch("");
+                                        }}
+                                        style={{
+                                          padding: "6px 10px",
+                                          fontSize: 12,
+                                          //color: "#9ca3af",
+                                          backgroundColor:
+                                            field.value === "" ? "#eaf6f7" : "transparent",
+                                          color:
+                                            field.value === "" ? "#4CA1AF" : "#374151",
+                                          fontWeight:
+                                            field.value === "" ? 500 : 400,
+                                        }}
+                                      >
+                                        None
+                                      </div>
+                                    ) : (
+                                      filtered.map((unit) => {
+                                        const isSelected =
+                                          field.value === unit.Unit_Shorthand;
+
+                                        return (
+                                          <div
+                                            key={unit.Unit_Shorthand}
+                                            onClick={() => {
+                                              const newUnit = unit.Unit_Shorthand;
+
+                                              const previousUnit = field.value;
+
+                                              field.onChange(newUnit);
+
+                                              handleRowChange(
+                                                i,
+                                                "Item_Unit",
+                                                newUnit
+                                              );
+
+                                              setValue(
+                                                `items.${i}.Item_Unit`,
+                                                newUnit,
+                                                {
+                                                  shouldValidate: true,
+                                                  shouldDirty: true,
+                                                }
+                                              );
+
+                                              // close dropdown
+                                              handleRowChange(i, "unitOpen", false);
+                                              handleRowChange(i, "unitSearch", "");
+
+                                              //setUnitSearch("");
+
+
+                                              const primaryUnit =
+                                                row?.Primary_Unit;
+
+                                              const secondaryUnit =
+                                                row?.Secondary_Unit;
+
+                                              const conversionRate =
+                                                Number(
+                                                  row?.Conversion_Rate
+                                                ) || 0;
+
+                                              if (
+                                                previousUnit &&
+                                                newUnit &&
+                                                previousUnit !== newUnit &&
+                                                primaryUnit &&
+                                                secondaryUnit &&
+                                                conversionRate > 0
+                                              ) {
+                                                const basePrice = Number(baseSalePriceRef.current[i]) || 0;
+
+                                                const baseUnit = baseSaleUnitRef.current[i];
+
+                                                if (
+                                                  basePrice <= 0 ||
+                                                  !baseUnit
+                                                )
+                                                  return;
+
+                                                let newPrice;
+
+                                                if (newUnit === baseUnit) {
+                                                  newPrice = basePrice;
+                                                } else if (
+                                                  baseUnit === primaryUnit &&
+                                                  newUnit === secondaryUnit
+                                                ) {
+                                                  newPrice =
+                                                    basePrice /
+                                                    conversionRate;
+                                                } else if (
+                                                  baseUnit === secondaryUnit &&
+                                                  newUnit === primaryUnit
+                                                ) {
+                                                  newPrice =
+                                                    basePrice *
+                                                    conversionRate;
+                                                } else {
+                                                  return;
+                                                }
+
+                                                const roundedPrice =
+                                                  newPrice.toFixed(2);
+
+                                                setValue(
+                                                  `items.${i}.Sale_Price`,
+                                                  roundedPrice,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                const {
+                                                  Tax_Amount,
+                                                  Amount,
+                                                  Total_Amount,
+                                                  Balance_Due,
+                                                } = calculateRowAmount(
+                                                  {
+                                                    ...itemsValues[i],
+                                                    Purchase_Price:
+                                                      roundedPrice,
+                                                  },
+                                                  i,
+                                                  itemsValues
+                                                );
+
+                                                setValue(
+                                                  `items.${i}.Tax_Amount`,
+                                                  Tax_Amount,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                setValue(
+                                                  `items.${i}.Amount`,
+                                                  Amount,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                setValue(
+                                                  "Total_Amount",
+                                                  Total_Amount,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                setValue(
+                                                  "Balance_Due",
+                                                  Balance_Due,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+                                              }
+                                            }}
+                                            style={{
+                                              padding: "6px 10px",
+                                              fontSize: 12,
+                                              cursor: "pointer",
+                                              backgroundColor: isSelected
+                                                ? "#eaf6f7"
+                                                : "transparent",
+                                              color: isSelected
+                                                ? "#4CA1AF"
+                                                : "#374151",
+                                              fontWeight: isSelected
+                                                ? 500
+                                                : 400,
+                                            }}
+                                          >
+                                            {getUnitLabel(unit)}
+                                            {/* {unit.Unit_Name} (
+                                                                                                              {unit.Unit_Shorthand}) */}
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             );
                           }}
                         />
@@ -2502,7 +2813,7 @@ export default function SaleReturnAdd() {
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
 
-                          <select
+                          {/* <select
                             id="Payment_Type"
                             value={
                               paymentType === "Bank"
@@ -2530,7 +2841,26 @@ export default function SaleReturnAdd() {
                                 {bank.Account_Display_Name}
                               </option>
                             ))}
-                          </select>
+                          </select> */}
+                          <PaymentTypeSelect
+                            value={
+                              paymentType === "Bank"
+                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                : paymentType || ""
+                            }
+                            banks={banks}
+                            onAddBank={() => setShowBankModal(true)}
+                            onChange={(val) => {
+                              if (val.startsWith("bank_")) {
+                                const bankId = val.replace("bank_", "");
+                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                              }
+                            }}
+                          />
 
                           {errors?.splits?.[0]?.Payment_Type && (
                             <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
@@ -2564,19 +2894,26 @@ export default function SaleReturnAdd() {
                         {splitFields.map((field, index) => {
                           const rowType = watch(`splits.${index}.Payment_Type`);
                           const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
+                          //const rowOptions = getAvailableOptions(index);
                           const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
                           const amountField = register(`splits.${index}.Amount`, {
                             required: "Required",
                             validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                           });
+                          const usedValues = splitsWatch
+                            .map((s, idx) => {
+                              if (idx === index) return null; // exclude current row
+                              return s.Payment_Type === "Bank"
+                                ? `bank_${s.Bank_Account_Id}`
+                                : s.Payment_Type || null;
+                            }).filter(Boolean);
 
                           return (
                             <div key={field.id} className="flex flex-col gap-2">
                               <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
                                 <div className="flex flex-col flex-1">
                                   <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
+                                  {/* <select
                                     value={currentIdentifier || ""}
                                     onChange={(e) => {
                                       const val = e.target.value;
@@ -2596,7 +2933,22 @@ export default function SaleReturnAdd() {
                                         {opt.label}
                                       </option>
                                     ))}
-                                  </select>
+                                  </select> */}
+                                  <PaymentTypeSelect
+                                    value={currentIdentifier || ""}
+                                    banks={banks}
+                                    onAddBank={() => setShowBankModal(true)}
+                                    usedValues={usedValues}
+                                    onChange={(val) => {
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                  />
                                 </div>
 
                                 <div className="flex flex-col flex-1">
@@ -2962,11 +3314,6 @@ export default function SaleReturnAdd() {
 
             await refetchItems();
 
-            setNewlyAddedItem(savedItem);
-
-            setTimeout(() => {
-              setNewlyAddedItem(null);
-            }, 8000);
 
             setShowItemAddModal(false);
 
@@ -2979,6 +3326,20 @@ export default function SaleReturnAdd() {
           }}
         />
       )}
+       {showBankModal && (
+                          <BankAccountModal
+                            mode="add"
+                            onClose={() => {
+                              setShowBankModal(false);
+                              dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+                            }}
+                             onSave={() => {
+                        refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+                        setShowBankModal(false);
+                        
+                      }}
+                          />
+                        )}
       <style>
         {`
   /*  screens between 1000px and 640px */

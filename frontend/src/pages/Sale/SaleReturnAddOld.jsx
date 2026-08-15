@@ -97,8 +97,9 @@ export default function SaleReturnAdd() {
   ];
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
+  const unitRefs = useRef([]);
   const baseSalePriceRef = useRef({});
-
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -250,7 +251,8 @@ export default function SaleReturnAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: ""
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: "",
+      unitOpen: false, unitSearch: ""
     },
   ]);
 
@@ -280,24 +282,33 @@ export default function SaleReturnAdd() {
 
   //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
   // };
-  useEffect(() => {
+ useEffect(() => {
     const handleClickOutside = (event) => {
       setRows((prev) =>
         prev.map((row, idx) => {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
-
+          const unitRef = unitRefs.current[idx];
 
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
-
-
+          const clickedInsideUnit =
+            unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
 
           return row;
@@ -325,6 +336,7 @@ export default function SaleReturnAdd() {
         ...row,
         CategoryOpen: false,
         itemOpen: false, // also close item dropdown if open
+      unitOpen: false
       })),
       {
         itemSearch: "",
@@ -334,6 +346,8 @@ export default function SaleReturnAdd() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
       },
     ]);
 
@@ -465,6 +479,8 @@ export default function SaleReturnAdd() {
     Amount: "",
     itemOpen: false,
     CategoryOpen: false,
+    unitOpen: false,
+    unitSearch: "",
     isHSNLocked: false,
     isUnitLocked: false,
     isExistingItem: false,
@@ -543,6 +559,7 @@ export default function SaleReturnAdd() {
 
           // Store original/base price separately
           baseSalePriceRef.current[index] = baseSalePrice;
+          baseSaleUnitRef.current[index] = primaryUnit;
 
           return {
             ...item,
@@ -552,6 +569,8 @@ export default function SaleReturnAdd() {
             itemSearch: item.Item_Name,
             itemOpen: false,
             CategoryOpen: false,
+             unitOpen: false,
+            unitSearch: "",
 
             isHSNLocked: false,
             isUnitLocked: false,
@@ -835,10 +854,9 @@ export default function SaleReturnAdd() {
         ])
       );
 
+
       dispatch(
-        itemApi.util.invalidateTags([
-          "Item",
-        ])
+        itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
 
       dispatch(
@@ -854,9 +872,7 @@ export default function SaleReturnAdd() {
       );
 
       dispatch(
-        partyApi.util.invalidateTags([
-          "Party",
-        ])
+        partyApi.util.invalidateTags(["Party", "PartyLedger"])
       );
 
       toast.success(
@@ -1073,7 +1089,7 @@ export default function SaleReturnAdd() {
                           + Add Party
                         </span>
 
-                        {parties?.parties
+                        {/* {parties?.parties
                           ?.filter(
                             (party) =>
                               party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1092,7 +1108,51 @@ export default function SaleReturnAdd() {
                             >
                               {party.Party_Name} ({party.Phone_Number})
                             </div>
-                          ))}
+                          ))} */}
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                    
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  {/* Left — name + phone */}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Right — balance */}
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
 
                         {parties?.parties?.filter((party) =>
                           party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1587,6 +1647,7 @@ export default function SaleReturnAdd() {
                               const typedValue = e.target.value;
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
+                               handleRowChange(i, "unitOpen", false);
                               // setValue(`items.${i}.Item_Name`, typedValue);
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
@@ -1658,6 +1719,7 @@ export default function SaleReturnAdd() {
                                     }
                                   );
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1679,8 +1741,12 @@ export default function SaleReturnAdd() {
                                 }
                               }, 150); // small delay so click-from-dropdown fires first
                             }}
-
-                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            onClick={() => {
+                              handleRowChange(i, "itemOpen", true);
+                              handleRowChange(i, "unitOpen", false);
+                              handleRowChange(i, "CategoryOpen", false);
+                            }}
+                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
@@ -1768,12 +1834,14 @@ export default function SaleReturnAdd() {
                                           handleRowChange(i, "itemSearch", it.Item_Name);
                                           handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
                                           handleRowChange(i, "CategoryOpen", false);
+                                          handleRowChange(i, "unitOpen", false);
                                           setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
                                           //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
-                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
+                                            setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                          //setValue(`items.${i}.Quantity`,1, it.Stock_Quantity || 0, { shouldValidate: true });
                                           setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
                                           setValue(
                                             `items.${i}.Item_Unit`,
@@ -1784,6 +1852,7 @@ export default function SaleReturnAdd() {
                                             }
                                           );
                                           baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+                                          baseSaleUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2119,11 +2188,11 @@ export default function SaleReturnAdd() {
                                     //const roundedPrice = newPrice.toFixed(2);
                                     const basePrice = Number(baseSalePriceRef.current[i]) || 0;
 
-                                    if (basePrice <= 0) {
-                                      return;
-                                    }
+                                    // if (basePrice <= 0) {
+                                    //   return;
+                                    // }
 
-                                    let newPrice = basePrice;
+                                    // let newPrice = basePrice;
 
                                     // =====================================================
                                     // PRIMARY → SECONDARY
@@ -2134,12 +2203,12 @@ export default function SaleReturnAdd() {
                                     // UI allows only 2 decimals → ₹0.05
                                     // =====================================================
 
-                                    if (
-                                      previousUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      newPrice = basePrice / conversionRate;
-                                    }
+                                    // if (
+                                    //   previousUnit === primaryUnit &&
+                                    //   newUnit === secondaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice / conversionRate;
+                                    // }
 
                                     // =====================================================
                                     // SECONDARY → PRIMARY
@@ -2148,11 +2217,45 @@ export default function SaleReturnAdd() {
                                     // Restore original base price.
                                     // =====================================================
 
+                                    // else if (
+                                    //   previousUnit === secondaryUnit &&
+                                    //   newUnit === primaryUnit
+                                    // ) {
+                                    //   newPrice = basePrice;
+                                    // }
+
+                                    // else {
+                                    //   return;
+                                    // }
+
+                                    // const roundedPrice = newPrice.toFixed(2);
+                                    const baseUnit = baseSaleUnitRef.current[i];
+
+                                    if (basePrice <= 0 || !baseUnit) {
+                                      return;
+                                    }
+
+                                    let newPrice;
+
+                                    if (newUnit === baseUnit) {
+                                      // Back to the unit in which the price was entered
+                                      newPrice = basePrice;
+                                    }
+
                                     else if (
-                                      previousUnit === secondaryUnit &&
+                                      baseUnit === primaryUnit &&
+                                      newUnit === secondaryUnit
+                                    ) {
+                                      // Primary → Secondary
+                                      newPrice = basePrice / conversionRate;
+                                    }
+
+                                    else if (
+                                      baseUnit === secondaryUnit &&
                                       newUnit === primaryUnit
                                     ) {
-                                      newPrice = basePrice;
+                                      // Secondary → Primary
+                                      newPrice = basePrice * conversionRate;
                                     }
 
                                     else {
@@ -2232,6 +2335,7 @@ export default function SaleReturnAdd() {
                               // 🟩 Update RHF internal state FOR VALIDATION
                               setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
                               baseSalePriceRef.current[i] = Number(val) || 0;
+                              baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                 { ...itemsValues[i], Sale_Price: val },
                                 i,

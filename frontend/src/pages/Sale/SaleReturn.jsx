@@ -10,12 +10,14 @@ import {
   Trash2
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
-import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery } from "../../redux/api/saleReturnApi";
+import { useEffect, useRef, useState } from "react";
+import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
+import { useReactToPrint } from "react-to-print";
+import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 
 
 
@@ -39,7 +41,12 @@ export default function SaleReturn() {
     toDate,
   });
   //console.log(saleReturns);
-
+  const [printSaleReturnId, setPrintSaleReturnId] = useState(null);
+  const printRef = useRef(null);
+  // const[selecedSales,setSelectedSales]= useState(null);
+  const { data: printData } = useGetSaleReturnByIdQuery(printSaleReturnId, {
+    skip: !printSaleReturnId,
+  });
 
   useEffect(() => {
     const closeRowMenu = () => {
@@ -95,9 +102,9 @@ export default function SaleReturn() {
     document.body.removeChild(a);
   };
 
-  const handlePrint = (saleReturn) => {
-    console.log("Print sale return:", saleReturn);
-  };
+  // const handlePrint = (saleReturn) => {
+  //   console.log("Print sale return:", saleReturn);
+  // };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -121,7 +128,18 @@ export default function SaleReturn() {
   };
   // console.log(saleReturns?.saleReturns);
 
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printSaleReturnId ? `Sale-${printSaleReturnId}` : "Sale",
+    onAfterPrint: () => setPrintSaleReturnId(null),
+  });
 
+  // once printData arrives, trigger the print dialog
+  useEffect(() => {
+    if (printData && printSaleReturnId) {
+      handlePrint();
+    }
+  }, [printData, printSaleReturnId]);
 
 
   return (
@@ -313,9 +331,9 @@ export default function SaleReturn() {
                         <td>{saleReturn?.Party_Name || "N/A"}</td>
 
                         <td>{saleReturn?.Payment_Type_Display || "N/A"}</td>
-                        <td>{saleReturn?.Total_Amount || "N/A"}</td>
-                        <td>{saleReturn?.Total_Paid || "N/A"}</td>
-                        <td>{saleReturn?.Balance_Due || "N/A"}</td>
+                        <td>₹{saleReturn?.Total_Amount || "N/A"}</td>
+                        <td>₹{saleReturn?.Total_Paid || "N/A"}</td>
+                        <td>₹{saleReturn?.Balance_Due || "N/A"}</td>
 
                         <td
                           className="py-2 px-2"
@@ -399,7 +417,7 @@ export default function SaleReturn() {
                                 }}
                                 onClick={() => {
                                   setRowMenuOpen(null);
-                                  handlePrint(saleReturn);
+                                  setPrintSaleReturnId(saleReturn.id);
                                 }}
                               >
                                 <Printer
@@ -586,6 +604,20 @@ export default function SaleReturn() {
           isDeleting={isDeleting}
 
         />
+      )}
+      {printData?.saleReturn && (
+        <div style={{ display: "none" }}>
+          <CreditDebitNotePrintTemplate
+            ref={printRef}
+            type="credit"
+            invoice={{
+              ...printData.saleReturn,
+              items: printData.saleReturn.items || [],
+              companyDetails: {},
+
+            }}
+          />
+        </div>
       )}
 
     </>

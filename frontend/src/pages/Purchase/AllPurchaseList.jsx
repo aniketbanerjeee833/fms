@@ -377,8 +377,8 @@ export default function AllPurchaseList() {
                         <td>{purchase?.Party_Name || "N/A"}</td>
                         <td>{purchase?.Payment_Type_Display || "N/A"}</td>
 
-                        <td>{purchase?.Total_Amount || "N/A"}</td>
-                        <td>{purchase?.Balance_Due || "N/A"}</td>
+                        <td>₹ {purchase?.Total_Amount || "N/A"}</td>
+                        <td>₹ {purchase?.Balance_Due || "N/A"}</td>
 
 
                         <td

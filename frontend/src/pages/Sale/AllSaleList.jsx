@@ -352,8 +352,8 @@ useEffect(() => {
                         <td >{sale?.Party_Name || "N/A"}</td>
                         <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
 
-                        <td>{sale?.Total_Amount || "N/A"}</td>
-                        <td>{sale?.Balance_Due || "N/A"}</td>
+                        <td>₹{sale?.Total_Amount || "N/A"}</td>
+                        <td>₹{sale?.Balance_Due || "N/A"}</td>
 
                         <td
                           className="py-2 px-2"

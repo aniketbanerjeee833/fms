@@ -27,6 +27,8 @@ import { saleEditFormSchema } from "../../schema/saleEditFormSchema";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 import AddItemModal from "../../components/Modal/AddItemModal";
+import PaymentTypeSelect from "../../components/PaymentTypeSelect";
+import BankAccountModal from "../../components/Modal/BankAccountModal";
 
 
 
@@ -39,7 +41,7 @@ export default function SaleEdit() {
   const bankId = location.state?.bankId;
   //console.log("Edit page query:", bankId);
   const { id: Sale_Id } = useParams();
-  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
   //const partyId = location.state?.partyId;
   const dispatch = useDispatch();
@@ -102,8 +104,9 @@ export default function SaleEdit() {
   ];
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);
+  const unitRefs = useRef([]);
   const baseSalePriceRef = useRef({});
- const baseSaleUnitRef = useRef({});
+  const baseSaleUnitRef = useRef({});
 
 
   const navigate = useNavigate();
@@ -128,11 +131,12 @@ export default function SaleEdit() {
   const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [originalTotal, setOriginalTotal] = useState(null);
-  // const [confirmModal, setConfirmModal] = useState({
-  //   open: false,
-  //   item: null,
-  //   rowIndex: null
-  // });
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    item: null,
+    rowIndex: null
+  });
   const [showGSTIN, setShowGSTIN] = useState("");
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
@@ -202,7 +206,8 @@ export default function SaleEdit() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: ""
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: "",
+      unitOpen: false, unitSearch: ""
     },
   ]);
 
@@ -224,18 +229,27 @@ export default function SaleEdit() {
         prev.map((row, idx) => {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
-
+          const unitRef = unitRefs.current[idx];
 
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
-
-
+          const clickedInsideUnit =
+            unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
 
           return row;
@@ -270,6 +284,7 @@ export default function SaleEdit() {
         ...row,
         CategoryOpen: false,
         itemOpen: false, // also close item dropdown if open
+        unitOpen: false
       })),
       {
         itemSearch: "",
@@ -279,6 +294,8 @@ export default function SaleEdit() {
         isUnitLocked: false,
         isExistingItem: false,
         categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
       },
     ]);
 
@@ -297,9 +314,30 @@ export default function SaleEdit() {
     });
   };
 
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
   const handleDeleteRow = (i) => {
-    setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-    remove(i); // remove from form
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;                    // skip deleted row
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+    const newBalanceDue = newTotal - currentTotalReceived;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
   };
   // const handleSelect = (rowIndex, categoryName) => {
   //   setRows((prev) => {
@@ -351,6 +389,72 @@ export default function SaleEdit() {
         console.error("❌ Error adding category:", err);
       }
     }
+  };
+  const handleItemSelect = (it, i) => {
+    console.log("Selected Item:", it, "at row", i);
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[i] = {
+        ...updated[i],
+        Item_Category: it.Item_Category || "",
+        Item_HSN: it.Item_HSN || "",
+        categorySearch: it.Item_Category || "",
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
+        // CURRENT MASTER CONFIG
+        Primary_Unit: it.Primary_Unit || null,
+        Secondary_Unit: it.Secondary_Unit || null,
+        Conversion_Rate: it.Conversion_Rate || null,
+
+        // CURRENT PRIMARY + SECONDARY ONLY
+        Available_Units: Array.isArray(it.Available_Units)
+          ? it.Available_Units
+          : [],
+      };
+      return updated;
+    });
+
+    handleRowChange(i, "itemSearch", it.Item_Name);
+    handleRowChange(i, "isExistingItem", true);
+    handleRowChange(i, "CategoryOpen", false);
+
+    setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
+    setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+    setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
+    setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.0, { shouldValidate: true, shouldDirty: true });
+    //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
+    setValue(
+      `items.${i}.Item_Unit`,
+      it.Primary_Unit || "",
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+    baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+    baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+    setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
+    handleRowChange(i, "itemOpen", false);
+
+    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+      {
+        ...itemsValues[i],
+        Item_Name: it.Item_Name,
+        Sale_Price: it.Sale_Price,
+        Quantity: itemsValues[i]?.Quantity || 0,
+        Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
+        Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
+        Tax_Type: itemsValues[i]?.Tax_Type,
+      },
+      i,
+      itemsValues
+    );
+
+    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+    setValue(`items.${i}.Amount`, Amount);
+    setValue(`Total_Amount`, Total_Amount);
+    setValue(`Balance_Due`, Balance_Due);
   };
   const itemsValues = watch("items");   // watch all item rows
   const totalReceived = watch("Total_Received"); // watch Total_Received
@@ -440,6 +544,8 @@ export default function SaleEdit() {
     Amount: "",
     itemOpen: false,
     CategoryOpen: false,
+    unitOpen: false,
+    unitSearch: "",
     isHSNLocked: false,
     isUnitLocked: false,
     isExistingItem: false,
@@ -518,7 +624,7 @@ export default function SaleEdit() {
 
           // Store original/base price separately
           baseSalePriceRef.current[index] = baseSalePrice;
-           baseSaleUnitRef.current[index] = primaryUnit;
+          baseSaleUnitRef.current[index] = primaryUnit;
           return {
             ...item,
 
@@ -527,6 +633,8 @@ export default function SaleEdit() {
             itemSearch: item.Item_Name,
             itemOpen: false,
             CategoryOpen: false,
+            unitOpen: false,
+            unitSearch: "",
 
             isHSNLocked: false,
             isUnitLocked: false,
@@ -649,37 +757,37 @@ export default function SaleEdit() {
 
   // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
   // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
+  // const buildPaymentTypeOptions = (banks) => [
+  //   { value: "Cash", label: "Cash", repeatable: false },
+  //   { value: "Cheque", label: "Cheque", repeatable: true },
+  //   { value: "Neft", label: "Neft", repeatable: true },
+  //   ...(banks || []).map((bank) => ({
+  //     value: `bank_${bank.Bank_Account_Id}`,
+  //     label: bank.Account_Display_Name,
+  //     repeatable: false,
+  //   })),
+  // ];
 
   const getRowIdentifier = (type, bankId) =>
     type === "Bank" ? `bank_${bankId ?? ""}` : type;
 
   //Inside the component:
 
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
+  // const getUsedIdentifiers = (excludeIndex) => {
+  //   const splitValues = watch("splits") || [];
+  //   return splitValues
+  //     .map((s, i) =>
+  //       i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+  //     )
+  //     .filter(Boolean);
+  // };
 
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
+  // const getAvailableOptions = (excludeIndex) => {
+  //   const used = getUsedIdentifiers(excludeIndex);
+  //   return buildPaymentTypeOptions(banks).filter(
+  //     (opt) => opt.repeatable || !used.includes(opt.value)
+  //   );
+  // };
 
   const handleAddPaymentType = () => {
     appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
@@ -831,7 +939,9 @@ export default function SaleEdit() {
     // 5. BALANCE DUE
     // =========================================================
 
-    const balanceDue = totalAmount - totalReceived;
+    const balanceDue = Number(
+      (totalAmount - totalReceived).toFixed(2)
+    );
 
     // =========================================================
     // 6. BUILD PAYLOAD
@@ -842,9 +952,12 @@ export default function SaleEdit() {
 
       items: itemsWithDefaults,
 
-      Total_Amount: totalAmount,
-      Total_Received: totalReceived,
-      Balance_Due: balanceDue,
+      //Total_Amount: totalAmount,
+      //Total_Received: totalReceived,
+      //Balance_Due: Number(balanceDue.toFixed(2)),
+      Total_Amount: Number(totalAmount.toFixed(2)),
+      Total_Received: Number(totalReceived.toFixed(2)),
+      Balance_Due: Number(balanceDue.toFixed(2)),
 
       // IMPORTANT:
       // Send filtered splits, not data.splits
@@ -880,7 +993,7 @@ export default function SaleEdit() {
         saleApi.util.invalidateTags(["Sale"])
       );
 
-      
+
       dispatch(
         itemApi.util.invalidateTags(["Item", "ItemLedger"])
       );
@@ -992,33 +1105,6 @@ export default function SaleEdit() {
       );
     }
   };
-  // const handleItemSelect = (it, i) => {
-  //   console.log("Selected Item:", it, "at row", i);
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[i] = {
-  //       ...updated[i],
-  //       Item_Category: it.Item_Category || "",
-  //       Item_HSN: it.Item_HSN || "",
-  //       categorySearch: it.Item_Category || "",
-  //       isExistingItem: true,
-  //       isHSNLocked: false,
-  //       isUnitLocked: false,
-  //     };
-  //     return updated;
-  //   });
-
-  //   handleRowChange(i, "itemSearch", it.Item_Name);
-  //   handleRowChange(i, "isExistingItem", true);
-  //   handleRowChange(i, "CategoryOpen", false);
-
-  //   setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.0, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-  //   setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
-  //   handleRowChange(i, "itemOpen", false);
 
 
   const showSalePayment = totalAmountWatch > 0;
@@ -1285,7 +1371,7 @@ export default function SaleEdit() {
                             + Add Party
                           </span>
 
-                          {parties?.parties
+                          {/* {parties?.parties
                             ?.filter(
                               (party) =>
                                 party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
@@ -1313,7 +1399,55 @@ export default function SaleEdit() {
                               >
                                 {party.Party_Name} ({party.Phone_Number})
                               </div>
-                            ))}
+                            ))} */}
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    const defaultBilling = party.addresses?.find(
+                                      (a) => a.Address_Type === "Billing" && a.Is_Default
+                                    );
+                                    setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+                                    setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                                    setCurrentPartyDetails(party);
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  {/* Left — name + phone */}
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                  {/* Right — balance */}
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
 
                           {parties?.parties?.filter((party) =>
                             party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
@@ -1434,87 +1568,87 @@ export default function SaleEdit() {
                       readOnly
                     />
                   </div>)}
-                 
-                                  {/* ── ROW 2: Billing Address + GSTIN ── */}
-                {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
-                  <div>
 
-                    {/* Billing Address */}
-                    <div className="flex flex-col gap-2">
-                      <span className="active">Billing Address</span>
-                      <textarea
-                        {...register("Billing_Address")}
-                        rows={5}
-                        placeholder="Billing Address"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
-                        style={{ minHeight: "80px" }}
-                      />
+                  {/* ── ROW 2: Billing Address + GSTIN ── */}
+                  {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
+                    <div>
 
-                      {/* Address has content — show Remove / Change */}
-                      {watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end gap-3 mt-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setValue("Billing_Address", "", {
-                                shouldDirty: true,
-                                shouldValidate: true,
-                              })
-                            }
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#ef4444",
-                              cursor: "pointer",
-                              fontSize: 13,
-                            }}
-                          >
-                            Remove
-                          </button>
+                      {/* Billing Address */}
+                      <div className="flex flex-col gap-2">
+                        <span className="active">Billing Address</span>
+                        <textarea
+                          {...register("Billing_Address")}
+                          rows={5}
+                          placeholder="Billing Address"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none focus:border-blue-500"
+                          style={{ minHeight: "80px" }}
+                        />
 
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      )}
+                        {/* Address has content — show Remove / Change */}
+                        {watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setValue("Billing_Address", "", {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                              }
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#ef4444",
+                                cursor: "pointer",
+                                fontSize: 13,
+                              }}
+                            >
+                              Remove
+                            </button>
 
-                      {/* Address was just removed — offer to pick one from the party instead */}
-                      {!watch("Billing_Address") && currentPartyDetails && (
-                        <div className="flex justify-end mt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPartyModal(true)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#4CA1AF",
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 500,
-                            }}
-                          >
-                            Select Billing Address
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Address was just removed — offer to pick one from the party instead */}
+                        {!watch("Billing_Address") && currentPartyDetails && (
+                          <div className="flex justify-end mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPartyModal(true)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#4CA1AF",
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              Select Billing Address
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                     </div>
-
-                  </div>
-                )}
+                  )}
                 </div>
 
-              
+
 
                 {showEditPartyModal && (
                   <PartyAddModal
@@ -1866,6 +2000,7 @@ export default function SaleEdit() {
                               const typedValue = e.target.value;
                               handleRowChange(i, "itemSearch", typedValue);
                               handleRowChange(i, "CategoryOpen", false);
+                              handleRowChange(i, "unitOpen", false);
                               // setValue(`items.${i}.Item_Name`, typedValue);
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
@@ -1940,7 +2075,7 @@ export default function SaleEdit() {
                                   //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                   baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                                     baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
+                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
@@ -1962,7 +2097,12 @@ export default function SaleEdit() {
                                 }
                               }, 150); // small delay so click-from-dropdown fires first
                             }}
-                            onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                            onClick={() => {
+                              handleRowChange(i, "itemOpen", true);
+                              handleRowChange(i, "unitOpen", false);
+                              handleRowChange(i, "CategoryOpen", false);
+                            }}
+                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
@@ -1976,129 +2116,7 @@ export default function SaleEdit() {
 
 
                           {/* Dropdown List */}
-                          {/* {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "40rem" }}
-                              className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                            >
-                              <table className="w-full text-sm border-collapse">
-                                <thead className="bg-gray-100 border-b">
-                                  <tr>
-                                    <th>Sl.No</th>
-                                    <th className="text-left px-3 py-2">Item Name</th>
-                                    <th className="text-left px-3 py-2">Sale Price</th>
-                                    <th className="text-left px-3 py-2">Purchase Price</th>
-                                    <th className="text-left px-3 py-2">Stock</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items?.items
-                                    ?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    )
-                                    .map((it, idx) => (
-                                      <tr
-                                        key={idx}
-                                        onClick={() => {
-                                      
-                                          setRows((prev) => {
-                                            const updated = [...prev];
-                                            updated[i] = {
-                                              ...updated[i],
-                                              Item_Category: it.Item_Category || "",
-                                              Item_HSN: it.Item_HSN || "",
-                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                              isExistingItem: true,   // lock category
-                                              isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: false,     // lock unit
-                                              itemQuantity: it.Stock_Quantity || 0,
-                                              Primary_Unit: it.Primary_Unit || null,
-                                              Secondary_Unit: it.Secondary_Unit || null,
-                                              Conversion_Rate: it.Conversion_Rate || null,
 
-                                             
-
-                                            };
-                                            return updated;
-                                          });
-                                          handleRowChange(i, "itemSearch", it.Item_Name);
-                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                          handleRowChange(i, "CategoryOpen", false);
-                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
-                                          setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.00, { shouldValidate: true });
-                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
-                                          setValue(
-                                            `items.${i}.Item_Unit`,
-                                            it.Primary_Unit || "",
-                                            {
-                                              shouldValidate: true,
-                                              shouldDirty: true,
-                                            }
-                                          );
-                                          setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
-                                          
-                                          handleRowChange(i, "itemOpen", false);
-
-
-                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                            {
-                                              ...itemsValues[i],
-                                              Item_Name: it.Item_Name,
-                                              Sale_Price: it.Sale_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 0,
-                                              Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
-                                              Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
-                                              Tax_Type: itemsValues[i]?.Tax_Type
-                                            },
-                                            i,
-                                            itemsValues
-                                          );
-
-                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                          setValue(`items.${i}.Amount`, Amount);
-                                          setValue(`Total_Amount`, Total_Amount);
-                                          setValue(`Balance_Due`, Balance_Due);
-                                        }}
-
-                                        className="hover:bg-gray-100 cursor-pointer border-b"
-                                      >
-                                        <td>{idx + 1}</td>
-                                        <td className="px-3 py-2">{it.Item_Name}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        
-                                        <td
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}
-                                        </td>
-                                      </tr>
-                                    ))}
-
-                                  {items?.items?.filter((it) =>
-                                    it.Item_Name.toLowerCase().includes(
-                                      (rows[i]?.itemSearch || "").toLowerCase()
-                                    )
-                                  ).length === 0 && (
-                                      <tr>
-                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                          No Item found
-                                        </td>
-                                      </tr>
-                                    )}
-                                </tbody>
-                              </table>
-                            </div>
-                          )} */}
                           {rows[i]?.itemOpen && (
                             <div
                               style={{ width: "40rem" }}
@@ -2153,7 +2171,11 @@ export default function SaleEdit() {
                                       <tr
                                         key={idx}
                                         onClick={() => {
-
+                                          if (it.Stock_Quantity <= 0) {
+                                            // show confirmation modal instead of directly adding
+                                            setConfirmModal({ open: true, item: it, rowIndex: i });
+                                            return;
+                                          }
                                           setRows((prev) => {
                                             const updated = [...prev];
                                             updated[i] = {
@@ -2177,16 +2199,17 @@ export default function SaleEdit() {
                                           handleRowChange(i, "itemSearch", it.Item_Name);
                                           handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
                                           handleRowChange(i, "CategoryOpen", false);
+                                          handleRowChange(i, "unitOpen", false);
                                           setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
 
                                           setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 0, { shouldValidate: true, shouldDirty: true });
+                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                           //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
                                           baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-                                           baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+                                          baseSaleUnitRef.current[i] = it.Primary_Unit || "";
                                           handleRowChange(i, "itemOpen", false);
 
 
@@ -2243,7 +2266,7 @@ export default function SaleEdit() {
                               </table>
                             </div>
                           )}
-                          {/* {confirmModal.open && (
+                          {confirmModal.open && (
                             <div
                               className="fixed inset-0 flex items-center justify-center bg-white z-50 bg-opacity-50"
                             >
@@ -2252,7 +2275,11 @@ export default function SaleEdit() {
                                   ⚠ Item Out of Stock
                                 </h3>
                                 <p className="text-gray-700 text-center mb-6">
-                                  The item <b>{confirmModal.item?.Item_Name}</b> has 0 stock.<br />
+                                  The item <b>{confirmModal.item?.Item_Name}</b> has{" "}
+                                  <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                                    {confirmModal.item?.Stock_Quantity} {confirmModal.item?.Primary_Unit}
+                                  </span>{" "}
+                                  stock.<br />
                                   Do you still want to add it?
                                 </p>
                                 <div className="flex justify-center gap-4">
@@ -2273,14 +2300,14 @@ export default function SaleEdit() {
                                     }
                                     style={{ outline: "none", backgroundColor: "gray" }}
                                     className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300
-           text-gray-700 "
+                                               text-gray-700 "
                                   >
                                     Cancel
                                   </button>
                                 </div>
                               </div>
                             </div>
-                          )} */}
+                          )}
 
 
                           {/* RHF error */}
@@ -2373,90 +2400,9 @@ export default function SaleEdit() {
 
 
 
+
+
                       {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => {
-                            const row = rows[i];
-
-                            const availableUnits = Array.isArray(row?.Available_Units)
-                              ? row.Available_Units
-                              : [];
-
-                            return (
-                              <select
-                                {...field}
-                                value={field.value || ""}
-                                className="form-select"
-                                style={{
-                                  width: "100%",
-                                  fontSize: "12px",
-                                  marginLeft: "0px",
-                                }}
-                                disabled={row?.isUnitLocked}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-
-                                  if (value === "__ADD_UNIT__") {
-                                    setActiveUnitRow(i);
-                                    setShowAddUnitModal(true);
-                                    return;
-                                  }
-
-                                  field.onChange(value);
-
-                                  handleRowChange(i, "Item_Unit", value);
-
-                                  setValue(`items.${i}.Item_Unit`, value, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
-                                }}
-                              >
-                                
-                                {availableUnits.length > 0 ? (
-                                  availableUnits.map((unit) => (
-                                    <option
-                                      key={unit.Unit_Shorthand}
-                                      value={unit.Unit_Shorthand}
-                                    >
-                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                    </option>
-                                  ))
-                                ) : (
-                                  <>
-                                    <option value="">NONE</option>
-
-                               
-                                    {Array.isArray(itemUnits) &&
-                                      itemUnits.map((unit) => (
-                                        <option
-                                          key={unit.Unit_Shorthand}
-                                          value={unit.Unit_Shorthand}
-                                        >
-                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                        </option>
-                                      ))}
-
-                                    <option value="__ADD_UNIT__">
-                                      ➕ Add Unit
-                                    </option>
-                                  </>
-                                )}
-                              </select>
-                            );
-                          }}
-                        />
-
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Item_Unit.message}
-                          </p>
-                        )}
-                      </td> */}
-
-                      <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Item_Unit`}
@@ -2593,7 +2539,7 @@ export default function SaleEdit() {
                                     // else {
                                     //   return;
                                     // }
-                                   const baseUnit =baseSaleUnitRef.current[i];
+                                    const baseUnit = baseSaleUnitRef.current[i];
 
                                     if (basePrice <= 0 || !baseUnit) {
                                       return;
@@ -2627,7 +2573,7 @@ export default function SaleEdit() {
                                     }
 
                                     const roundedPrice = newPrice.toFixed(2);
-                                   
+
 
 
 
@@ -2667,6 +2613,325 @@ export default function SaleEdit() {
                                   </>
                                 )}
                               </select>
+                            );
+                          }}
+                        />
+
+                        {errors?.items?.[i]?.Item_Unit && (
+                          <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
+                        )}
+                      </td> */}
+                      <td style={{ padding: "0px", width: "10%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Item_Unit`}
+                          render={({ field }) => {
+                            const row = rows[i];
+                            const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
+                            //const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
+                            const allUnits =
+                              availableUnits.length > 0
+                                ? availableUnits
+                                : (Array.isArray(itemUnits) ? itemUnits : []);
+
+
+                            const hasPrimary = !!row?.Primary_Unit;
+                            const hasSecondary = !!row?.Secondary_Unit;
+
+                            let unitsWithNone = [];
+
+                            if (!hasPrimary && !hasSecondary) {
+                              // No units configured → show None + all master units
+                              unitsWithNone = [
+                                {
+                                  Unit_Name: "None",
+                                  Unit_Shorthand: "",
+                                },
+                                ...(Array.isArray(itemUnits) ? itemUnits : []),
+                              ];
+                            } else {
+                              // Item has its own units
+                              unitsWithNone = allUnits;
+                            }
+
+
+
+                            const selectedLabel = unitsWithNone.find(
+                              u => u.Unit_Shorthand === field.value
+                            );
+
+                            const getUnitLabel = (unit) =>
+                              unit?.Unit_Shorthand
+                                ? `${unit.Unit_Name} (${unit.Unit_Shorthand})`
+                                : unit.Unit_Name;
+                            const displayLabel = selectedLabel
+                              ? getUnitLabel(selectedLabel)
+                              : "";
+                            const filtered = unitsWithNone.filter((u) => {
+                              const label = getUnitLabel(u).toLowerCase();
+
+                              return label.includes(
+                                (rows[i]?.unitSearch || "").toLowerCase()
+                              );
+                            });
+                            return (
+                              <div
+                                //  ref={unitRef} 
+                                ref={(el) => (unitRefs.current[i] = el)}
+                                style={{ position: "relative", width: "100%" }}>
+
+
+                                <input
+                                  readOnly
+                                  value={displayLabel}
+                                  onClick={() => {
+                                    handleRowChange(i, "unitOpen", true);
+                                    handleRowChange(i, "itemOpen", false);
+                                    handleRowChange(i, "CategoryOpen", false);
+                                  }}
+                                />
+
+                                {rows[i]?.unitOpen && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: "100%",
+                                      left: 0,
+                                      zIndex: 30,
+                                      width: "180px",
+                                      background: "white",
+                                      border: "1px solid #e5e7eb",
+                                      borderRadius: 6,
+                                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                      marginTop: 2,
+                                      maxHeight: 180,
+                                      overflowY: "auto",
+                                    }}
+                                  >
+                                    <input
+                                      type="text"
+                                      placeholder="Search unit..."
+                                      value={rows[i]?.unitSearch || ""}
+                                      // value={unitSearch}
+                                      onChange={(e) =>
+                                        handleRowChange(i, "unitSearch", e.target.value)
+                                      }
+                                      //onChange={(e) => setUnitSearch(e.target.value)}
+                                      style={{
+                                        width: "100%",
+                                        marginBottom: 0,
+
+                                      }}
+                                    />
+                                    {filtered.length === 0 ? (
+                                      <div
+                                        onClick={() => {
+                                          field.onChange("");
+
+                                          setValue(
+                                            `items.${i}.Item_Unit`,
+                                            "",
+                                            {
+                                              shouldValidate: true,
+                                              shouldDirty: true,
+                                            }
+                                          );
+
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+
+                                          //setUnitSearch("");
+                                        }}
+                                        style={{
+                                          padding: "6px 10px",
+                                          fontSize: 12,
+                                          //color: "#9ca3af",
+                                          backgroundColor:
+                                            field.value === "" ? "#eaf6f7" : "transparent",
+                                          color:
+                                            field.value === "" ? "#4CA1AF" : "#374151",
+                                          fontWeight:
+                                            field.value === "" ? 500 : 400,
+                                        }}
+                                      >
+                                        None
+                                      </div>
+                                    ) : (
+                                      filtered.map((unit) => {
+                                        const isSelected =
+                                          field.value === unit.Unit_Shorthand;
+
+                                        return (
+                                          <div
+                                            key={unit.Unit_Shorthand}
+                                            onClick={() => {
+                                              const newUnit = unit.Unit_Shorthand;
+
+                                              const previousUnit = field.value;
+
+                                              field.onChange(newUnit);
+
+                                              handleRowChange(
+                                                i,
+                                                "Item_Unit",
+                                                newUnit
+                                              );
+
+                                              setValue(
+                                                `items.${i}.Item_Unit`,
+                                                newUnit,
+                                                {
+                                                  shouldValidate: true,
+                                                  shouldDirty: true,
+                                                }
+                                              );
+
+                                              // close dropdown
+                                              handleRowChange(i, "unitOpen", false);
+                                              handleRowChange(i, "unitSearch", "");
+
+                                              //setUnitSearch("");
+
+
+                                              const primaryUnit =
+                                                row?.Primary_Unit;
+
+                                              const secondaryUnit =
+                                                row?.Secondary_Unit;
+
+                                              const conversionRate =
+                                                Number(
+                                                  row?.Conversion_Rate
+                                                ) || 0;
+
+                                              if (
+                                                previousUnit &&
+                                                newUnit &&
+                                                previousUnit !== newUnit &&
+                                                primaryUnit &&
+                                                secondaryUnit &&
+                                                conversionRate > 0
+                                              ) {
+                                                const basePrice = Number(baseSalePriceRef.current[i]) || 0;
+
+                                                const baseUnit = baseSaleUnitRef.current[i];
+
+                                                if (
+                                                  basePrice <= 0 ||
+                                                  !baseUnit
+                                                )
+                                                  return;
+
+                                                let newPrice;
+
+                                                if (newUnit === baseUnit) {
+                                                  newPrice = basePrice;
+                                                } else if (
+                                                  baseUnit === primaryUnit &&
+                                                  newUnit === secondaryUnit
+                                                ) {
+                                                  newPrice =
+                                                    basePrice /
+                                                    conversionRate;
+                                                } else if (
+                                                  baseUnit === secondaryUnit &&
+                                                  newUnit === primaryUnit
+                                                ) {
+                                                  newPrice =
+                                                    basePrice *
+                                                    conversionRate;
+                                                } else {
+                                                  return;
+                                                }
+
+                                                const roundedPrice =
+                                                  newPrice.toFixed(2);
+
+                                                setValue(
+                                                  `items.${i}.Sale_Price`,
+                                                  roundedPrice,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                const {
+                                                  Tax_Amount,
+                                                  Amount,
+                                                  Total_Amount,
+                                                  Balance_Due,
+                                                } = calculateRowAmount(
+                                                  {
+                                                    ...itemsValues[i],
+                                                    Sale_Price: roundedPrice,
+                                                  },
+                                                  i,
+                                                  itemsValues
+                                                );
+
+                                                setValue(
+                                                  `items.${i}.Tax_Amount`,
+                                                  Tax_Amount,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                setValue(
+                                                  `items.${i}.Amount`,
+                                                  Amount,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                setValue(
+                                                  "Total_Amount",
+                                                  Total_Amount,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                setValue(
+                                                  "Balance_Due",
+                                                  Balance_Due,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+                                              }
+                                            }}
+                                            style={{
+                                              padding: "6px 10px",
+                                              fontSize: 12,
+                                              cursor: "pointer",
+                                              backgroundColor: isSelected
+                                                ? "#eaf6f7"
+                                                : "transparent",
+                                              color: isSelected
+                                                ? "#4CA1AF"
+                                                : "#374151",
+                                              fontWeight: isSelected
+                                                ? 500
+                                                : 400,
+                                            }}
+                                          >
+                                            {getUnitLabel(unit)}
+                                            {/* {unit.Unit_Name} (
+                                                                                          {unit.Unit_Shorthand}) */}
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             );
                           }}
                         />
@@ -2957,7 +3222,7 @@ export default function SaleEdit() {
                               {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                             />
 
-                            <select
+                            {/* <select
                               id="Payment_Type"
                               value={
                                 paymentType === "Bank"
@@ -2976,7 +3241,7 @@ export default function SaleEdit() {
                                 }
                               }}
                             >
-                              {/* <option value="">Select Payment Type</option> */}
+                     
                               <option value="Cash">Cash</option>
                               <option value="Cheque">Cheque</option>
                               <option value="Neft">Neft</option>
@@ -2985,7 +3250,26 @@ export default function SaleEdit() {
                                   {bank.Account_Display_Name}
                                 </option>
                               ))}
-                            </select>
+                            </select> */}
+                            <PaymentTypeSelect
+                              value={
+                                paymentType === "Bank"
+                                  ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                  : paymentType || ""
+                              }
+                              banks={banks}
+                              onAddBank={() => setShowBankModal(true)}
+                              onChange={(val) => {
+                                if (val.startsWith("bank_")) {
+                                  const bankId = val.replace("bank_", "");
+                                  setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                  setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                  setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                                }
+                              }}
+                            />
 
                             {errors?.splits?.[0]?.Payment_Type && (
                               <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
@@ -3019,19 +3303,26 @@ export default function SaleEdit() {
                           {splitFields.map((field, index) => {
                             const rowType = watch(`splits.${index}.Payment_Type`);
                             const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                            const rowOptions = getAvailableOptions(index);
+                            //const rowOptions = getAvailableOptions(index);
                             const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
                             const amountField = register(`splits.${index}.Amount`, {
                               required: "Required",
                               validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                             });
+                            const usedValues = splitsWatch
+                              .map((s, idx) => {
+                                if (idx === index) return null; // exclude current row
+                                return s.Payment_Type === "Bank"
+                                  ? `bank_${s.Bank_Account_Id}`
+                                  : s.Payment_Type || null;
+                              }).filter(Boolean);
 
                             return (
                               <div key={field.id} className="flex flex-col gap-2">
                                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
                                   <div className="flex flex-col flex-1">
                                     <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                    <select
+                                    {/* <select
                                       value={currentIdentifier || ""}
                                       onChange={(e) => {
                                         const val = e.target.value;
@@ -3051,7 +3342,22 @@ export default function SaleEdit() {
                                           {opt.label}
                                         </option>
                                       ))}
-                                    </select>
+                                    </select> */}
+                                    <PaymentTypeSelect
+                                      value={currentIdentifier || ""}
+                                      banks={banks}
+                                      onAddBank={() => setShowBankModal(true)}
+                                      usedValues={usedValues}
+                                      onChange={(val) => {
+                                        if (val.startsWith("bank_")) {
+                                          setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                          setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                        } else {
+                                          setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                          setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                        }
+                                      }}
+                                    />
                                   </div>
 
                                   <div className="flex flex-col flex-1">
@@ -3434,6 +3740,20 @@ export default function SaleEdit() {
             }
 
             setActiveItemRow(null);
+          }}
+        />
+      )}
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
           }}
         />
       )}
