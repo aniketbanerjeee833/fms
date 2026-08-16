@@ -279,23 +279,51 @@ export default function PaymentIn() {
                     {/* Paid + Unpaid = Total */}
                     <div className="flex flex-col bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
 
-                        {/* Total Sales */}
-                        <div className="mb-2 text-left">
+                        
+                        {/* <div className="mb-2 text-left">
                             <p className="text-sm font-medium text-black">Total Amount</p>
                             <h4 className="text-3xl font-bold text-black">₹  {paymentInData?.totals?.totalReceived}</h4>
                         </div>
 
-                        {/* Divider */}
+                  
                         <div className="border-t border-gray-300 mb-2"></div>
 
-                        {/* Received & Balance */}
+                       
                         <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
                             <div className="flex  ">
                                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
                                 <span className="text-sm font-semibold text-black">₹ {paymentInData?.totals?.totalReceived}</span>
                             </div>
 
-                        </div>
+                        </div> */}
+                        {/* Total Sales */}
+<div className="mb-2 text-left">
+  <p className="text-sm font-medium text-black">Total Amount</p>
+  <h4 className="text-3xl font-bold text-black">
+    ₹{(Number(paymentInData?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}
+  </h4>
+</div>
+
+{/* Divider */}
+<div className="border-t border-gray-300 mb-2"></div>
+
+{/* Received & Balance */}
+<div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+  <div className="flex">
+    <span className="text-sm font-medium text-gray-500">
+      Received&nbsp;&nbsp;
+    </span>
+    <span className="text-sm font-semibold text-black">
+      ₹{(Number(paymentInData?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}
+    </span>
+  </div>
+</div>
 
                     </div>
                     <div className="flex justify-end">
@@ -343,7 +371,7 @@ export default function PaymentIn() {
                                                         data: paymentIn,
                                                     });
                                                 }}
-                                                style={{ cursor: "pointer" }}
+                                             style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
                                             >
                                                 <td>
                                                     {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.

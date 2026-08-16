@@ -32,13 +32,13 @@ export default function AllSaleList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [deleteSale, { isLoading: isDeleting }] = useDeleteSaleMutation();
-const [printSaleId, setPrintSaleId] = useState(null);
+  const [printSaleId, setPrintSaleId] = useState(null);
 
-const printRef = useRef(null);
+  const printRef = useRef(null);
 
-const { data: printData } = useGetSingleSaleQuery(printSaleId, {
-  skip: !printSaleId,
-});
+  const { data: printData } = useGetSingleSaleQuery(printSaleId, {
+    skip: !printSaleId,
+  });
   const { data: sales, isLoading } = useGetAllSalesQuery({
     page,
     search: searchTerm,
@@ -125,18 +125,18 @@ const { data: printData } = useGetSingleSaleQuery(printSaleId, {
       toast.error(err?.data?.message || "Failed to delete purchase");
     }
   };
-const handlePrint = useReactToPrint({
-  contentRef: printRef,
-  documentTitle: printSaleId
-    ? `Sale-${printSaleId}`
-    : "Sale",
-  onAfterPrint: () => setPrintSaleId(null),
-});
-useEffect(() => {
-  if (printData && printSaleId) {
-    handlePrint();
-  }
-}, [printData, printSaleId]);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printSaleId
+      ? `Sale-${printSaleId}`
+      : "Sale",
+    onAfterPrint: () => setPrintSaleId(null),
+  });
+  useEffect(() => {
+    if (printData && printSaleId) {
+      handlePrint();
+    }
+  }, [printData, printSaleId]);
   console.log(sales?.sales);
 
   return (
@@ -258,22 +258,42 @@ useEffect(() => {
             {/* Total Sales */}
             <div className="mb-2 text-left">
               <p className="text-sm font-medium text-black">Total Sales Amount</p>
-              <h4 className="text-3xl font-bold text-black">₹ {sales?.totals?.totalAmount}</h4>
+              <h4 className="text-3xl font-bold text-black">
+                {/* ₹{sales?.totals?.totalAmount} */}
+                ₹{(Number(sales?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </h4>
             </div>
 
             {/* Divider */}
             <div className="border-t border-gray-300 mb-2"></div>
 
             {/* Received & Balance */}
-            <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
-              <div className="flex  ">
-                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {sales?.totals?.totalReceived}</span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+              <div className="flex">
+                <span className="text-sm font-medium text-gray-500">
+                  Received&nbsp;&nbsp;
+                </span>
+                <span className="text-sm font-semibold text-black">
+                  ₹{(Number(sales?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
               </div>
 
               <div className="flex">
-                <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {sales?.totals?.totalBalance}</span>
+                <span className="text-sm font-medium text-gray-500">
+                  Balance Due&nbsp;&nbsp;
+                </span>
+                <span className="text-sm font-semibold text-black">
+                  ₹{(Number(sales?.totals?.totalBalance) || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
               </div>
             </div>
 
@@ -330,7 +350,7 @@ useEffect(() => {
                             }
                           );
                         }}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
                       >
                         <td>
                           {(sales?.currentPage - 1) * 10 + (idx + 1)}.
@@ -460,7 +480,7 @@ useEffect(() => {
                                 }}
                                 onClick={() => {
                                   setRowMenuOpen(null);
-                                 setPrintSaleId(sale.Sale_Id)
+                                  setPrintSaleId(sale.Sale_Id)
                                 }}
                               >
                                 <Printer
@@ -649,7 +669,7 @@ useEffect(() => {
           isDeleting={isDeleting}
         />
       )}
-       {printData?.invoicePartyDetails && (
+      {printData?.invoicePartyDetails && (
         <div style={{ display: "none" }}>
           <InvoicePrintTemplate
             ref={printRef}
@@ -658,7 +678,7 @@ useEffect(() => {
               ...printData.invoicePartyDetails,   // ✅ matches backend response key
               items: printData.items || [],
               companyDetails: {},
-              
+
             }}
           />
         </div>

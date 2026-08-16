@@ -57,6 +57,42 @@ export const partyApi = createApi({
   providesTags: ["Party"],
 }),
 
+getAllPartiesCursor: builder.query({
+      query: ({ cursor = null, search = "", limit = 10 } = {}) => {
+        const params = new URLSearchParams();
+        if (cursor)        params.append("cursor", cursor);
+        if (search?.trim()) params.append("search", search.trim());
+        params.append("limit", limit);
+        return `party/cursor?${params.toString()}`;  // adjust route to match yours
+      },
+ 
+      // Cache key = search term only — different cursors for the SAME search
+      // merge into the same cache entry
+      serializeQueryArgs: ({ queryArgs }) => ({
+        search: queryArgs.search ?? "",
+      }),
+ 
+      // Merge incoming page into existing cache
+      merge: (currentCache, newData, { arg }) => {
+        if (!arg.cursor) {
+          // First page (no cursor) — replace entirely
+          return newData;
+        }
+        // Subsequent pages — append
+        currentCache.parties.push(...newData.parties);
+        currentCache.hasMore    = newData.hasMore;
+        currentCache.nextCursor = newData.nextCursor;
+      },
+ 
+      // Re-fetch when cursor or search changes
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.cursor !== previousArg?.cursor ||
+        currentArg?.search !== previousArg?.search,
+ 
+      providesTags: ["Party"],
+    }),
+ 
+
     // ✅ Add a party
     addParty: builder.mutation({
       query: ({ body }) => ({
@@ -125,8 +161,15 @@ export const partyApi = createApi({
     currentCache.nextCursor = newData.nextCursor;
     currentCache.hasMore = newData.hasMore;
   },
-  forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
-
+  //forceRefetch: ({ currentArg, previousArg }) => currentArg?.cursor !== previousArg?.cursor,
+forceRefetch: ({
+  currentArg,
+  previousArg,
+}) =>
+  currentArg?.cursor !== previousArg?.cursor ||
+  currentArg?.search !== previousArg?.search ||
+  currentArg?.date !== previousArg?.date ||
+  currentArg?.Party_Id !== previousArg?.Party_Id,
   //providesTags: ["Party"],
   providesTags: (result, error, arg) => [
  {
@@ -135,30 +178,6 @@ export const partyApi = createApi({
     },
 ],
 }),
-//     getSinglePartyDetailsSalesPurchases: builder.query({
-//   query: ({
-//     Party_Id,
-//     page = 1,
-//     search = "",
-//     date = "",
-//   }) => {
-//     const params = new URLSearchParams();
-
-//     params.set("page", page);
-
-//     if (search?.trim()) {
-//       params.set("search", search.trim());
-//     }
-
-//     if (date) {
-//       params.set("date", date);
-//     }
-
-//     return `party/get-single-party-details-sales-purchases/${Party_Id}?${params.toString()}`;
-//   },
-
-//   providesTags: ["Party"],
-// }),
 
   printSinglePartyDetailsSalesPurchasesReport: builder.mutation({
   query: (payload) => ({
@@ -223,29 +242,149 @@ export const partyApi = createApi({
 // }),
     
 
-  getAllPayableParties: builder.query({
-   query: ({ search = "" } = {}) => {
+//   getAllPayableParties: builder.query({
+//    query: ({ search = "" } = {}) => {
+//     const params = new URLSearchParams();
+
+//     if (search) {
+//       params.set("search", search);
+//     }
+
+//     return `/party/payables?${params.toString()}`;
+//   },
+
+//     providesTags: ["Party"],
+// }),
+getAllPayableParties: builder.query({
+  query: ({
+    cursor = null,
+    search = "",
+    limit = 10,
+  } = {}) => {
     const params = new URLSearchParams();
 
-    if (search) {
-      params.set("search", search);
+    if (cursor) {
+      params.append("cursor", cursor);
     }
 
-    return `/party/payables?${params.toString()}`;
+    if (search?.trim()) {
+      params.append(
+        "search",
+        search.trim()
+      );
+    }
+
+    params.append("limit", limit);
+
+    return `party/payables?${params.toString()}`;
   },
 
-    providesTags: ["Party"],
+  serializeQueryArgs: ({
+    queryArgs,
+  }) => ({
+    search: queryArgs.search ?? "",
+  }),
+
+  merge: (
+    currentCache,
+    newData,
+    { arg }
+  ) => {
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    currentCache.parties.push(
+      ...newData.parties
+    );
+
+    currentCache.hasMore =
+      newData.hasMore;
+
+    currentCache.nextCursor =
+      newData.nextCursor;
+
+    currentCache.totalParties =
+      newData.totalParties;
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !==
+      previousArg?.cursor ||
+    currentArg?.search !==
+      previousArg?.search,
+  providesTags: ["Party"],
+  // providesTags: [
+  //   {
+  //     type: "Party",
+  //     id: "PAYABLE_LIST",
+  //   },
+  // ],
 }),
 getAllReceivableParties: builder.query({
-   query: ({ search = "" } = {}) => {
+  query: ({
+    cursor = null,
+    search = "",
+    limit = 10,
+  } = {}) => {
     const params = new URLSearchParams();
 
-    if (search) {
-      params.set("search", search);
+    if (cursor) {
+      params.append("cursor", cursor);
     }
+
+    if (search?.trim()) {
+      params.append(
+        "search",
+        search.trim()
+      );
+    }
+
+    params.append("limit", limit);
 
     return `party/receivables?${params.toString()}`;
   },
+
+  serializeQueryArgs: ({
+    queryArgs,
+  }) => ({
+    search: queryArgs.search ?? "",
+  }),
+
+  merge: (
+    currentCache,
+    newData,
+    { arg }
+  ) => {
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    currentCache.parties.push(
+      ...newData.parties
+    );
+
+    currentCache.hasMore =
+      newData.hasMore;
+
+    currentCache.nextCursor =
+      newData.nextCursor;
+
+    currentCache.totalParties =
+      newData.totalParties;
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !==
+      previousArg?.cursor ||
+    currentArg?.search !==
+      previousArg?.search,
 
   providesTags: ["Party"],
 }),
@@ -264,7 +403,8 @@ getAllReceivableParties: builder.query({
     usePrintSinglePartyDetailsSalesPurchasesReportMutation,
     useGetAllPartiesReceivablesLeftQuery,useGetAllPartiesPayablesLeftQuery,
     useGetAllPayablePartiesQuery,
-    useGetAllReceivablePartiesQuery
+    useGetAllReceivablePartiesQuery,
+    useGetAllPartiesCursorQuery
 
  }=partyApi
    

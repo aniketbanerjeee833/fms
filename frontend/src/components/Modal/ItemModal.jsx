@@ -196,7 +196,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
         setEachItemBillAndInvoiceNumbersModalOpen(false);
         onClose();
 
-        dispatch(itemApi.util.invalidateTags(["Item"]));
+        dispatch(itemApi.util.invalidateTags(["Item","ItemLedger"]));
         dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
         dispatch(saleApi.util.invalidateTags(["Sale"]));
       }

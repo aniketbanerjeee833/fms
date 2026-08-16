@@ -10,69 +10,69 @@ export const itemApi = createApi({
     credentials: "include",
   }),
   tagTypes: [
-  "Item",
-  "ItemConversion",
-  "ItemLedger",
-  "ItemConversions",
-  "ItemsByCategory",
-  "Items",
-  "Category",
-],
+    "Item",
+    "ItemConversion",
+    "ItemLedger",
+    "ItemConversions",
+    "ItemsByCategory",
+    "Items",
+    "Category",
+  ],
 
   endpoints: (builder) => ({
 
 
 
-getAllItems: builder.query({
-  query: ({ page, search = "", fromDate = "", toDate = "" } = {}) => {
-    const params = new URLSearchParams();
+    getAllItems: builder.query({
+      query: ({ page, search = "", fromDate = "", toDate = "" } = {}) => {
+        const params = new URLSearchParams();
 
-    // ✅ Append only when defined
-    if (page) params.append("page", page);
-    if (search) params.append("search", search);
-    if (fromDate) params.append("fromDate", fromDate);
-    if (toDate) params.append("toDate", toDate);
+        // ✅ Append only when defined
+        if (page) params.append("page", page);
+        if (search) params.append("search", search);
+        if (fromDate) params.append("fromDate", fromDate);
+        if (toDate) params.append("toDate", toDate);
 
-    const queryString = params.toString();
-    return queryString
-      ? `item/get-all-items?${queryString}`
-      : `item/get-all-items`;
-  },
-  providesTags: ["Item"],
-}),
+        const queryString = params.toString();
+        return queryString
+          ? `item/get-all-items?${queryString}`
+          : `item/get-all-items`;
+      },
+      providesTags: ["Item"],
+    }),
 
     // ✅ Add a party
     addItem: builder.mutation({
-    
+
       query: ({ body }) => ({
-        
+
         url: `item/add-item`,
         method: "POST",
         body,
       }),
       invalidatesTags: [
         { type: "Item", id: "LIST" },
-      
+
       ],
     }),
 
-editItem: builder.mutation({
-  query: ({ body, Item_Id }) => ({
-    url: `item/edit-item/${Item_Id}`,
-    method: "PATCH",
-    body,
-  }),
-  invalidatesTags: ["Item"],
-}),
+    editItem: builder.mutation({
+      query: ({ body, Item_Id }) => ({
+        url: `item/edit-item/${Item_Id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["Item"],
+    }),
 
-deleteItem: builder.mutation({
-  query: (Item_Id) => ({
-    url: `item/delete-item/${Item_Id}`,
-    method: "DELETE",
-  }),
-  invalidatesTags: ["Item"],
-}),
-   getItemConversions: builder.query({
+    deleteItem: builder.mutation({
+      query: (Item_Id) => ({
+        url: `item/delete-item/${Item_Id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Item"],
+    }),
+    getItemConversions: builder.query({
       query: (Item_Id) => `/item/item-conversions/${Item_Id}`,
       transformResponse: (res) => res.conversions,
       providesTags: ["ItemConversions"],
@@ -87,7 +87,7 @@ deleteItem: builder.mutation({
       invalidatesTags: ["ItemConversions"],
     }),
 
-   
+
     getEachItemBillAndInvoiceNumbers: builder.query({
       query: (Item_Id) => `item/each-item-bill-and-invoice-numbers/${Item_Id}`,
       providesTags: ["Item"],
@@ -99,22 +99,22 @@ deleteItem: builder.mutation({
         method: "POST",
         body,
       }),
-     invalidatesTags:["Category"],
+      invalidatesTags: ["Category"],
     }),
 
     getAllCategories: builder.query({
-        query: () => `item/get-all-categories`,
-        providesTags: ["Category"],
+      query: () => `item/get-all-categories`,
+      providesTags: ["Category"],
     }),
     getEachItemSalesPurchasesDetails: builder.query({
       query: (Item_Id) => `item/each-item-sales-purchase-details/${Item_Id}`,
       providesTags: ["Item"],
     }),
 
-     /* ═══════════════════════════════════════
-       ITEMS BY CATEGORY — right side, cursor paginated
-       categoryId: "all" for the "All" bucket
-    ═══════════════════════════════════════ */
+    /* ═══════════════════════════════════════
+      ITEMS BY CATEGORY — right side, cursor paginated
+      categoryId: "all" for the "All" bucket
+   ═══════════════════════════════════════ */
     getItemsByCategory: builder.query({
       query: ({ categoryId, cursor = null, search = "" }) => {
         const params = new URLSearchParams();
@@ -144,228 +144,266 @@ deleteItem: builder.mutation({
       ],
     }),
 
-  
 
-    getAllItemsForLedger: builder.query({
-      query: ({ search = "" } = {}) => ({
-        url: "/item/ledger",
-        method: "GET",
-        params: {
-          ...(search && { search }),
-        },
-      }),
 
-      providesTags: ["Item"],
-    }),
+    // getAllItemsForLedger: builder.query({
+    //   query: ({ search = "" } = {}) => ({
+    //     url: "/item/ledger",
+    //     method: "GET",
+    //     params: {
+    //       ...(search && { search }),
+    //     },
+    //   }),
+
+    //   providesTags: ["Item"],
+    // }),
 
     // =====================================================
     // RIGHT SIDE
     // Bills containing selected item
     // =====================================================
+    getAllItemsForLedger: builder.query({
+      query: ({ cursor = null, search = "", limit = 10 }) => {
+        const params = new URLSearchParams();
 
-  getItemBills: builder.query({
-  query: ({
-    Item_Id,
-    cursor = null,
-    search = "",
-    date = "",
-  }) => {
+        if (cursor) params.append("cursor", cursor);
+        if (search?.trim()) params.append("search", search.trim());
+        params.append("limit", limit);
 
-    const params =
-      new URLSearchParams();
+        return `item/ledger?${params.toString()}`;
+      },
 
-    if (cursor) {
-      params.set(
-        "cursor",
-        cursor
-      );
-    }
+      serializeQueryArgs: ({ queryArgs }) => ({
+        search: queryArgs.search,
+      }),
 
-    if (search?.trim()) {
-      params.set(
-        "search",
-        search.trim()
-      );
-    }
+      merge: (currentCache, newData, { arg }) => {
+        if (!arg.cursor) {
+          return newData;
+        }
 
-    if (date) {
-      params.set("date",date);
-    }
+        currentCache.items.push(...newData.items);
+        currentCache.hasMore = newData.hasMore;
+        currentCache.nextCursor = newData.nextCursor;
+      },
 
-    return (
-      `item/${Item_Id}/bills` +
-      `?${params.toString()}`
-    );
-  },
+      forceRefetch: ({ currentArg, previousArg }) =>
+        currentArg?.cursor !== previousArg?.cursor ||
+        currentArg?.search !== previousArg?.search,
 
-  // =====================================================
-  // Same item + same filters = same cache.
-  //
-  // cursor is intentionally excluded.
-  // =====================================================
+      providesTags: ["ItemLedger"],
+    }),
+    getItemBills: builder.query({
+      query: ({
+        Item_Id,
+        cursor = null,
+        search = "",
+        date = "",
+      }) => {
 
-  serializeQueryArgs: ({
-    queryArgs,
-  }) => {
+        const params =
+          new URLSearchParams();
 
-    const {
-      Item_Id,
-      search,
-      date,
-    } = queryArgs;
+        if (cursor) {
+          params.set(
+            "cursor",
+            cursor
+          );
+        }
 
-    return {
-      Item_Id,
-      search,
-      date,
-    };
-  },
+        if (search?.trim()) {
+          params.set(
+            "search",
+            search.trim()
+          );
+        }
 
-  // =====================================================
-  // INFINITE SCROLL MERGE
-  // =====================================================
+        if (date) {
+          params.set("date", date);
+        }
 
-  merge: (
-    currentCache,
-    newData,
-    { arg }
-  ) => {
+        return (
+          `item/${Item_Id}/bills` +
+          `?${params.toString()}`
+        );
+      },
 
-    // First request / changed filter
-    if (!arg.cursor) {
-      return newData;
-    }
+      // =====================================================
+      // Same item + same filters = same cache.
+      //
+      // cursor is intentionally excluded.
+      // =====================================================
 
-    // Next page
-    currentCache.transactions.push(
-      ...newData.transactions
-    );
+      serializeQueryArgs: ({
+        queryArgs,
+      }) => {
 
-    currentCache.nextCursor =newData.nextCursor;
+        const {
+          Item_Id,
+          search,
+          date,
+        } = queryArgs;
 
-    currentCache.hasMore =newData.hasMore;
+        return {
+          Item_Id,
+          search,
+          date,
+        };
+      },
 
-    // Item master doesn't normally change
-    // between pages, but keep latest response.
-    if (newData.item) {
-      currentCache.item =newData.item;
-    }
-  },
+      // =====================================================
+      // INFINITE SCROLL MERGE
+      // =====================================================
 
-  // Cursor changed → fetch next page
-  forceRefetch: ({
-    currentArg,
-    previousArg,
-  }) =>
-    currentArg?.cursor !==previousArg?.cursor,
+      merge: (
+        currentCache,
+        newData,
+        { arg }
+      ) => {
 
-  providesTags: (
-    result,
-    error,
-    arg
-  ) => [
-    {
-      type: "ItemLedger",
-      id: arg.Item_Id,
-    },
-  ],
-}),
-      printEachItemSalesPurchasesDetailsReport: builder.mutation({
-  query: (payload) => ({
-    url: "item/print-each-item-sales-purchases-report",
-    method: "POST",
-    body: JSON.stringify(payload),   // IMPORTANT
-    headers: {
-      "Content-Type": "application/json",
-    },
-    responseHandler: (response) => response.blob(), 
-  }),
-}),
+        // First request / changed filter
+        if (!arg.cursor) {
+          return newData;
+        }
 
-// addStockAdjustment: builder.mutation({
-//   query: (body) => ({
-//     url: "/item/stock-adjustment/add",
-//     method: "POST",
-//     body,
-//   }),
-//   invalidatesTags: ["Item","ItemLedger"],
-// }),
-// editStockAdjustment: builder.mutation({
-//   query: ({ id, ...body }) => ({
-//     url: `/item/stock-adjustment/${id}`,
-//     method: "PUT",
-//     body,
-//   }),
-//   invalidatesTags: ["Item","ItemLedger"],
-// }),
+        // Next page
+        currentCache.transactions.push(
+          ...newData.transactions
+        );
 
-//   deleteStockAdjustment: builder.mutation({
-//   query: (id) => ({
-//     url: `/item/stock-adjustment/${id}`,
-//     method: "DELETE",
-//   }),
-//   invalidatesTags: ["Item", "ItemLedger"],
-// }),
-addStockAdjustment: builder.mutation({
-  query: (body) => ({
-    url: "/item/stock-adjustment/add",
-    method: "POST",
-    body,
-  }),
-  invalidatesTags: (result, error, arg) => [
-    "Item",
-    { type: "ItemLedger", id: arg.Item_Id },
-  ],
-}),
+        currentCache.nextCursor = newData.nextCursor;
 
-editStockAdjustment: builder.mutation({
-  query: ({ id, ...body }) => ({
-    url: `/item/stock-adjustment/${id}`,
-    method: "PUT",
-    body,
-  }),
-  invalidatesTags: (result, error, arg) => [
-    "Item",
-    { type: "ItemLedger", id: arg.Item_Id },
-  ],
-}),
+        currentCache.hasMore = newData.hasMore;
 
-deleteStockAdjustment: builder.mutation({
-  query: (id) => ({
-    url: `/item/stock-adjustment/${id}`,
-    method: "DELETE",
-  }),
-  invalidatesTags: (result, error, payload) => [
-    "Item",
-    { type: "ItemLedger", id: payload.Item_Id },
-  ],
-}),
-  
-   
-   
-  
+        // Item master doesn't normally change
+        // between pages, but keep latest response.
+        if (newData.item) {
+          currentCache.item = newData.item;
+        }
+      },
+
+      // Cursor changed → fetch next page
+      // forceRefetch: ({
+      //   currentArg,
+      //   previousArg,
+      // }) =>
+      //   currentArg?.cursor !== previousArg?.cursor,
+      forceRefetch: ({
+  currentArg,
+  previousArg,
+}) =>
+  currentArg?.cursor !== previousArg?.cursor ||
+  currentArg?.search !== previousArg?.search ||
+  currentArg?.date !== previousArg?.date ||
+  currentArg?.Item_Id !== previousArg?.Item_Id,
+
+      providesTags: (
+        result,
+        error,
+        arg
+      ) => [
+          {
+            type: "ItemLedger",
+            id: arg.Item_Id,
+          },
+        ],
+    }),
+    printEachItemSalesPurchasesDetailsReport: builder.mutation({
+      query: (payload) => ({
+        url: "item/print-each-item-sales-purchases-report",
+        method: "POST",
+        body: JSON.stringify(payload),   // IMPORTANT
+        headers: {
+          "Content-Type": "application/json",
+        },
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
+
+    // addStockAdjustment: builder.mutation({
+    //   query: (body) => ({
+    //     url: "/item/stock-adjustment/add",
+    //     method: "POST",
+    //     body,
+    //   }),
+    //   invalidatesTags: ["Item","ItemLedger"],
+    // }),
+    // editStockAdjustment: builder.mutation({
+    //   query: ({ id, ...body }) => ({
+    //     url: `/item/stock-adjustment/${id}`,
+    //     method: "PUT",
+    //     body,
+    //   }),
+    //   invalidatesTags: ["Item","ItemLedger"],
+    // }),
+
+    //   deleteStockAdjustment: builder.mutation({
+    //   query: (id) => ({
+    //     url: `/item/stock-adjustment/${id}`,
+    //     method: "DELETE",
+    //   }),
+    //   invalidatesTags: ["Item", "ItemLedger"],
+    // }),
+    addStockAdjustment: builder.mutation({
+      query: (body) => ({
+        url: "/item/stock-adjustment/add",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (result, error, arg) => [
+        "Item",
+        { type: "ItemLedger", id: arg.Item_Id },
+      ],
+    }),
+
+    editStockAdjustment: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/item/stock-adjustment/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (result, error, arg) => [
+        "Item",
+        { type: "ItemLedger", id: arg.Item_Id },
+      ],
+    }),
+
+    deleteStockAdjustment: builder.mutation({
+      query: (id) => ({
+        url: `/item/stock-adjustment/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, payload) => [
+        "Item",
+        { type: "ItemLedger", id: payload.Item_Id },
+      ],
+    }),
+
+
+
+
   }),
 });
 
- export const {
-    useGetAllItemsQuery,
-   
-    useAddItemMutation,
-    useEditItemMutation,
-    useDeleteItemMutation,
-    useGetEachItemBillAndInvoiceNumbersQuery,
-    
-    useAddCategoryMutation,
-    useGetAllCategoriesQuery,
-    useGetEachItemSalesPurchasesDetailsQuery,
-    usePrintEachItemSalesPurchasesDetailsReportMutation,
-    useGetItemConversionsQuery,
-    useAddItemConversionMutation,
-    useGetItemsByCategoryQuery,
-    useGetItemBillsQuery,
-    useGetAllItemsForLedgerQuery,
-    useAddStockAdjustmentMutation,
-    useEditStockAdjustmentMutation,
-    useDeleteStockAdjustmentMutation,
- }=itemApi
-   
+export const {
+  useGetAllItemsQuery,
+
+  useAddItemMutation,
+  useEditItemMutation,
+  useDeleteItemMutation,
+  useGetEachItemBillAndInvoiceNumbersQuery,
+
+  useAddCategoryMutation,
+  useGetAllCategoriesQuery,
+  useGetEachItemSalesPurchasesDetailsQuery,
+  usePrintEachItemSalesPurchasesDetailsReportMutation,
+  useGetItemConversionsQuery,
+  useAddItemConversionMutation,
+  useGetItemsByCategoryQuery,
+  useGetItemBillsQuery,
+  useGetAllItemsForLedgerQuery,
+  useAddStockAdjustmentMutation,
+  useEditStockAdjustmentMutation,
+  useDeleteStockAdjustmentMutation,
+} = itemApi
+

@@ -139,53 +139,53 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
   const printRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
- const [printTarget, setPrintTarget] = useState({ type: null, id: null });
+  const [printTarget, setPrintTarget] = useState({ type: null, id: null });
 
- 
-/* fire the correct query hook — only ONE will actually run at a time
-   because of the `skip` condition on each                              */
-const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
-  skip: printTarget.type !== "Sale" || !printTarget.id,
-});
- 
-const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
-  skip: printTarget.type !== "Purchase" || !printTarget.id,
-});
- 
-const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Sale_Return" || !printTarget.id,
-});
- 
-const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
-});
-const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Payment_In" || !printTarget.id,
-});
- 
-const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Payment_Out" || !printTarget.id,
-})
-const printReady =
-  (printTarget.type === "Sale"             && printSaleData?.invoicePartyDetails) ||
-  (printTarget.type === "Purchase"         && printPurchaseData?.billPurchaseDetails) ||
-  (printTarget.type === "Sale_Return"      && printSaleReturnData?.saleReturn) ||
-  (printTarget.type === "Purchase_Return"  && printPurchaseReturnData?.purchaseReturn) ||
-  (printTarget.type === "Payment_In"       && printPaymentInData?.paymentIn) ||
-  (printTarget.type === "Payment_Out"      && printPaymentOutData?.paymentOut);
- 
-const handlePrint = useReactToPrint({
-  contentRef: printRef,
-  documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
-  onAfterPrint: () => setPrintTarget({ type: null, id: null }),
-});
- 
-/* fire print automatically once the right data has arrived */
-useEffect(() => {
-  if (printReady && printTarget.id) {
-    handlePrint();
-  }
-}, [printReady, printTarget.id]);
+
+  /* fire the correct query hook — only ONE will actually run at a time
+     because of the `skip` condition on each                              */
+  const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
+    skip: printTarget.type !== "Sale" || !printTarget.id,
+  });
+
+  const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
+    skip: printTarget.type !== "Purchase" || !printTarget.id,
+  });
+
+  const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Sale_Return" || !printTarget.id,
+  });
+
+  const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
+  });
+  const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Payment_In" || !printTarget.id,
+  });
+
+  const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Payment_Out" || !printTarget.id,
+  })
+  const printReady =
+    (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
+    (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
+    (printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn) ||
+    (printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn) ||
+    (printTarget.type === "Payment_In" && printPaymentInData?.paymentIn) ||
+    (printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
+    onAfterPrint: () => setPrintTarget({ type: null, id: null }),
+  });
+
+  /* fire print automatically once the right data has arrived */
+  useEffect(() => {
+    if (printReady && printTarget.id) {
+      handlePrint();
+    }
+  }, [printReady, printTarget.id]);
   useEffect(() => {
     if (data?.partyDetails) {
       setSelectedPartyDetails(data.partyDetails);
@@ -396,7 +396,7 @@ useEffect(() => {
       // User should see the error and can close it manually.
     }
   };
-  
+
 
   if (!partyId) {
     return (
@@ -420,10 +420,10 @@ useEffect(() => {
       </div>
     );
   }
-const handlePrintClick = (row, transactionId) => {
-  console.log(row, "row", transactionId, "transactionId");
-  setPrintTarget({ type: row.Txn_Type, id: transactionId });
-};
+  const handlePrintClick = (row, transactionId) => {
+    console.log(row, "row", transactionId, "transactionId");
+    setPrintTarget({ type: row.Txn_Type, id: transactionId });
+  };
   return (
     <div className="flex flex-col h-full">
       {/* ── PARTY SUMMARY CARD ── */}
@@ -435,7 +435,7 @@ const handlePrintClick = (row, transactionId) => {
           >
             <Users size={26} style={{ color: "#4CA1AF" }} />
           </div>
-           {/* GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span> */}
+          {/* GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span> */}
           {/* <div>
             <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
               {party?.Party_Name}
@@ -446,7 +446,7 @@ const handlePrintClick = (row, transactionId) => {
               State: <span className="font-medium">{party?.State || "—"}</span>
             </p>
           </div> */}
-           <div>
+          <div>
             <h6
               className="font-bold text-gray-900"
               style={{ fontSize: 18, margin: 0 }}
@@ -462,7 +462,7 @@ const handlePrintClick = (row, transactionId) => {
                 </p>
               )}
 
-             
+
 
               {party?.addresses?.[0]?.Address_Text && (
                 <p className="m-0 truncate">
@@ -480,7 +480,7 @@ const handlePrintClick = (row, transactionId) => {
                   </span>
                 )}
 
-             
+
             </div>
           </div>
         </div>
@@ -689,10 +689,10 @@ const handlePrintClick = (row, transactionId) => {
                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                             style={{ color: "#374151" }}
                             onClick={() => {
-                              
+
                               setRowMenuOpen(null);
                               handlePrintClick(row, transactionId);
-                            
+
                             }}
                           >
                             <Printer size={13} style={{ color: "#4CA1AF" }} />
@@ -775,8 +775,8 @@ const handlePrintClick = (row, transactionId) => {
         //isDeleting={false}
         />
       )}
-           <div style={{ display: "none" }}>
-       
+      <div style={{ display: "none" }}>
+
         {/* SALE — Tax Invoice */}
         {printTarget.type === "Sale" && printSaleData?.invoicePartyDetails && (
           <InvoicePrintTemplate
@@ -789,7 +789,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-       
+
         {/* PURCHASE — Bill */}
         {printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails && (
           <InvoicePrintTemplate
@@ -802,7 +802,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-       
+
         {/* SALE RETURN — Credit Note */}
         {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (
           <CreditDebitNotePrintTemplate
@@ -815,7 +815,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-       
+
         {/* PURCHASE RETURN — Debit Note */}
         {printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn && (
           <CreditDebitNotePrintTemplate
@@ -828,7 +828,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-          {/* ✅ PAYMENT IN — Receipt */}
+        {/* ✅ PAYMENT IN — Receipt */}
         {printTarget.type === "Payment_In" && printPaymentInData?.paymentIn && (
           <PaymentInOutPrintTemplate
             ref={printRef}
@@ -836,7 +836,7 @@ const handlePrintClick = (row, transactionId) => {
             type="in"
           />
         )}
-       
+
         {/* ✅ PAYMENT OUT — Receipt */}
         {printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut && (
           <PaymentInOutPrintTemplate
@@ -845,7 +845,7 @@ const handlePrintClick = (row, transactionId) => {
             type="out"
           />
         )}
-       
+
       </div>
 
     </div>
@@ -868,9 +868,19 @@ export default function PartyPayablesLeft() {
   const [selectedPartyDetails, setSelectedPartyDetails] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
-
-  const { data: partiesData, isLoading } = useGetAllPayablePartiesQuery({ search: leftSearch });
+  const [leftCursor, setLeftCursor] = useState(null);
+  const leftSentinelRef = useRef(null);
+  const leftObserverRef = useRef(null);
+  const { data: partiesData, isLoading: isLoading,
+    isFetching: isPartiesFetching
+  } =
+    useGetAllPayablePartiesQuery({
+      cursor: leftCursor,
+      search: leftSearch,
+      limit: 10
+    });
   const parties = partiesData?.parties || [];
+  const totalParties = partiesData?.totalParties || 0;
   console.log("parties", parties);
   const menuRef = useRef(null);
   // auto-select the first party only if nothing is selected yet
@@ -898,14 +908,53 @@ export default function PartyPayablesLeft() {
     }
     setSearchParams(next, { replace: true });
   };
+  const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
 
+  /* reset left cursor when item search changes */
+  useEffect(() => {
+    setLeftCursor(null);
+  }, [leftSearch]);
+
+  const handleLeftObserver = useCallback(
+    (entries) => {
+      if (
+        entries[0].isIntersecting &&
+        partiesHasMore &&
+        partiesNextCursor &&
+        !isPartiesFetching &&
+        !isLoading
+      ) {
+        setLeftCursor(partiesNextCursor);
+      }
+    },
+    [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
+  );
+
+  useEffect(() => {
+    if (leftObserverRef.current) {
+      leftObserverRef.current.disconnect();
+    }
+
+    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 0.1,
+    });
+
+    if (leftSentinelRef.current) {
+      leftObserverRef.current.observe(leftSentinelRef.current);
+    }
+
+    return () => leftObserverRef.current?.disconnect();
+  }, [handleLeftObserver]);
   const handleEdit = (party) => {
     console.log("Editing party:", party);
-     setPartyModal({
-    open: true,
-    mode: "edit",
-    data: party,   // <-- use clicked party
-  });
+    setPartyModal({
+      open: true,
+      mode: "edit",
+      data: party,   // <-- use clicked party
+    });
     //setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
     setOpenMenuId(null);
   };
@@ -1011,7 +1060,7 @@ export default function PartyPayablesLeft() {
               <Users size={15} style={{ color: "#4CA1AF" }} />
 
               <span className="text-xs font-semibold text-black uppercase tracking-wider">
-                Parties ({parties.length})
+                Parties ({totalParties})
               </span>
             </div>
 
@@ -1061,7 +1110,7 @@ export default function PartyPayablesLeft() {
                           {party.GSTIN || party.State || "—"}
                         </p>
                       </div> */}
-                       <div className="min-w-0">
+                      <div className="min-w-0">
                         <p
                           className="font-semibold text-gray-800 truncate text-sm"
                           style={{ margin: 0 }}
@@ -1142,6 +1191,19 @@ export default function PartyPayablesLeft() {
                 );
               })
             )}
+            <div ref={leftSentinelRef} style={{ height: "1px" }} />
+
+            {isPartiesFetching && leftCursor && (
+              <div className="flex justify-center py-3">
+                <span className="text-sm text-gray-400">Loading more...</span>
+              </div>
+            )}
+
+            {!partiesHasMore && parties.length > 0 && (
+              <div className="flex justify-center py-3">
+                <span className="text-xs text-gray-300">— End of parties —</span>
+              </div>
+            )}
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
@@ -1157,8 +1219,8 @@ export default function PartyPayablesLeft() {
           editingParty={partyModal.mode === "edit"}
           onClose={() => {
             setPartyModal({ open: false, mode: "add", data: null })
-         //setSelectedPartyDetails(null);   // 🔹 add this}
-         }}
+            //setSelectedPartyDetails(null);   // 🔹 add this}
+          }}
         />
       )}
     </>

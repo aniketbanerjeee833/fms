@@ -2200,36 +2200,65 @@ const getAllItemsForLedger = async (req, res, next) => {
     const search = req.query.search
       ? req.query.search.trim().toLowerCase()
       : "";
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const cursorId = req.query.cursor ? Number(req.query.cursor) : null;
 
+    // const params = [];
+
+    // let whereSQL = "";
+
+    // if (search) {
+    //   const like = `%${search}%`;
+
+    //   whereSQL = `
+    //     WHERE (
+    //       LOWER(Item_Name) LIKE ?
+    //       OR LOWER(Item_Category) LIKE ?
+    //       OR LOWER(Item_HSN) LIKE ?
+    //       OR LOWER(Item_Id) LIKE ?
+    //       OR LOWER(Item_Unit) LIKE ?
+    //       OR LOWER(Primary_Unit) LIKE ?
+    //       OR LOWER(Secondary_Unit) LIKE ?
+    //     )
+    //   `;
+
+    //   params.push(
+    //     like,
+    //     like,
+    //     like,
+    //     like,
+    //     like,
+    //     like,
+    //     like
+    //   );
+    // }
+    // if (cursorId) {
+    //   whereClauses.push(`id < ?`);
+    //   params.push(cursorId);
+    // }
+    const whereParts = [];
     const params = [];
-
-    let whereSQL = "";
 
     if (search) {
       const like = `%${search}%`;
-
-      whereSQL = `
-        WHERE (
-          LOWER(Item_Name) LIKE ?
-          OR LOWER(Item_Category) LIKE ?
-          OR LOWER(Item_HSN) LIKE ?
-          OR LOWER(Item_Id) LIKE ?
-          OR LOWER(Item_Unit) LIKE ?
-          OR LOWER(Primary_Unit) LIKE ?
-          OR LOWER(Secondary_Unit) LIKE ?
-        )
-      `;
-
-      params.push(
-        like,
-        like,
-        like,
-        like,
-        like,
-        like,
-        like
-      );
+      whereParts.push(`(
+        LOWER(Item_Name) LIKE ?
+        OR LOWER(Item_Category) LIKE ?
+        OR LOWER(Item_HSN) LIKE ?
+        OR LOWER(Item_Id) LIKE ?
+        OR LOWER(Item_Unit) LIKE ?
+        OR LOWER(Primary_Unit) LIKE ?
+        OR LOWER(Secondary_Unit) LIKE ?
+      )`);
+      params.push(like, like, like, like, like, like, like);
     }
+
+    if (cursorId) {
+      whereParts.push(`id < ?`);
+      params.push(cursorId);
+    }
+
+    const whereSQL = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
     // =========================================================
     // 2. GET ALL ITEMS
@@ -2237,38 +2266,38 @@ const getAllItemsForLedger = async (req, res, next) => {
     // Same important fields as getAllItems
     // =========================================================
 
-    const [items] = await connection.query(
-      `
-      SELECT
-        id,
-        Item_Id,
-        Item_Name,
-        Item_HSN,
-        Item_Category,
-        Item_Unit,
+    // const [items] = await connection.query(
+    //   `
+    //   SELECT
+    //     id,
+    //     Item_Id,
+    //     Item_Name,
+    //     Item_HSN,
+    //     Item_Category,
+    //     Item_Unit,
 
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate,
 
-        Stock_Quantity,
-        Opening_Quantity,
-        At_Price,
-        As_Of_Date,
-        Min_Stock,
-        Location,
+    //     Stock_Quantity,
+    //     Opening_Quantity,
+    //     At_Price,
+    //     As_Of_Date,
+    //     Min_Stock,
+    //     Location,
 
-        created_at,
-        updated_at
+    //     created_at,
+    //     updated_at
 
-      FROM add_item
+    //   FROM add_item
 
-      ${whereSQL}
+    //   ${whereSQL}
 
-     ORDER BY created_at DESC
-      `,
-      params
-    );
+    // ORDER BY id DESC
+    //   `,
+    //   [...params, limit + 1]
+    // );
 
     // =========================================================
     // 3. PURCHASE HISTORY
@@ -2485,11 +2514,32 @@ const getAllItemsForLedger = async (req, res, next) => {
         unit.Unit_Name;
     });
 
-    // =========================================================
-    // 11. MERGE EVERYTHING
-    // =========================================================
+  
+    const [[{ totalItems }]] = await db.query(
+  `
+  SELECT COUNT(*) AS totalItems
+  FROM add_item
+  ${whereSQL}
+  `,
+  params
+);
 
-    const result = items.map((item) => {
+const [rows] = await db.query(
+  `
+  SELECT *
+  FROM add_item
+  ${whereSQL}
+  ORDER BY id DESC
+  LIMIT ?
+  `,
+  [...params, limit + 1]
+);
+
+const hasMore = rows.length > limit;
+const pageItems = hasMore ? rows.slice(0, limit) : rows;
+    // const hasMore = items.length > limit;
+    // const pageItems = hasMore ? items.slice(0, limit) : items;
+    const result = pageItems.map((item) => {
 
       // -------------------------------------------------------
       // CURRENT AVAILABLE UNITS
@@ -2634,11 +2684,12 @@ const getAllItemsForLedger = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-
-      totalItems:
-        result.length,
+      totalItems,
+      //totalItems: result.length,
 
       items: result,
+      hasMore,
+      nextCursor: hasMore ? pageItems[pageItems.length - 1].id : null,
     });
 
   } catch (err) {
@@ -3277,217 +3328,7 @@ const getItemsByCategory = async (req, res, next) => {
   }
 };
 
-// const eachItemSalesPurchaseDetails = async (req, res, next) => {
-//   let connection;
 
-//   try {
-//     connection = await db.getConnection();
-//     const { Item_Id } = req.params;
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-
-//     // 1️⃣ Fetch full lists
-//     const [itemsPurchaseList] = await connection.query(
-//       `SELECT * FROM add_purchase_items WHERE Item_Id = ?`,
-//       [Item_Id]
-//     );
-
-//     const [itemsSalesList] = await connection.query(
-//       `SELECT * FROM add_sale_items WHERE Item_Id = ?`,
-//       [Item_Id]
-//     );
-
-
-//     const purchaseIds = itemsPurchaseList.map((i) => i.Purchase_Id);
-//     const saleIds = itemsSalesList.map((i) => i.Sale_Id);
-
-//     const[purchases] = await connection.query(
-//       `SELECT * FROM add_purchase WHERE Purchase_Id IN (?) `,
-//       [purchaseIds]
-//     );
-
-//     const[sales] = await connection.query(
-//       `SELECT * FROM add_sale WHERE Sale_Id IN (?) `,
-//       [saleIds]
-//     )
-//     // 📌 Identify parties involved
-//     const combinedPartyIds = [
-//       ...new Set([
-//         ...itemsPurchaseList.map((i) => i.Party_Id),
-//         ...itemsSalesList.map((i) => i.Party_Id),
-//       ])
-//     ];
-
-//     let partyDetails = [];
-//     if (combinedPartyIds.length > 0) {
-//       [partyDetails] = await connection.query(
-//         `SELECT Party_Id, Party_Name FROM add_party WHERE Party_Id IN (?)`,
-//         [combinedPartyIds]
-//       );
-//     }
-
-//     // 2️⃣ Pagination Logic
-//     let pagedPurchases = [];
-//     let pagedSales = [];
-
-//     if (offset < itemsPurchaseList.length) {
-//       pagedPurchases = itemsPurchaseList.slice(offset, offset + limit);
-//     } else {
-//       const salesOffset = offset - itemsPurchaseList.length;
-//       pagedSales = itemsSalesList.slice(salesOffset, salesOffset + limit);
-//     }
-
-//     const totalRecords = itemsPurchaseList.length + itemsSalesList.length;
-//     const totalPages = Math.ceil(totalRecords / limit);
-
-//     // 3️⃣ Add party names + Type
-//     pagedPurchases = pagedPurchases.map((item) => ({
-//       Type: "Purchase",
-//        Party_Name: partyDetails.find((p) => p.Party_Id === item.Party_Id)?.Party_Name,
-//       ...item,
-
-//       // Purchase_Price_Unit: item.Purchase_Price,
-//       // Purchase_Id: item.Purchase_Id,
-//       // Quantity: item.Quantity,
-//       // Bill_Date: item.Bill_Date,
-//     }));
-
-//     pagedSales = pagedSales.map((item) => ({
-//       Type: "Sale",
-//       Party_Name: partyDetails.find((p) => p.Party_Id === item.Party_Id)?.Party_Name,
-//       ...item,
-//       // Sale_Price_Unit: item.Sale_Price,
-//       // Sale_Id: item.Sale_Id,
-//       // Quantity: item.Quantity,
-//       // Invoice_Date: item.Invoice_Date,
-//     }));
-
-//     return res.status(200).json({
-//       success: true,
-//       Item_Id,
-//       totalRecords,
-//       totalPages,
-//       page,
-//       limit,
-//       purchases: pagedPurchases,
-//       sales: pagedSales,
-//     });
-
-//   } catch (err) {
-//     console.error("❌ Error getting item history:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-
-// const eachItemSalesPurchaseDetails = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     connection = await db.getConnection();
-//     const { Item_Id } = req.params;
-
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-
-//     const[items]= await connection.query(
-//       `SELECT Item_Id, Item_Name FROM add_item WHERE Item_Id = ?`,
-//       [Item_Id]
-//     )
-//     // Fetch full purchase item rows
-//     const [purchaseItemsList] = await connection.query(
-//       `SELECT * FROM add_purchase_items WHERE Item_Id = ? ORDER BY created_at DESC`,
-//       [Item_Id]
-//     );
-
-//     // Fetch full sale item rows
-//     const [salesItemsList] = await connection.query(
-//       `SELECT * FROM add_sale_items WHERE Item_Id = ? ORDER BY created_at DESC`,
-//       [Item_Id]
-//     );
-
-//     const totalRecords = purchaseItemsList.length + salesItemsList.length;
-//     const totalPages = Math.ceil(totalRecords / limit);
-
-//     // Pagination logic
-//     let pagedPurchaseItemRows = [];
-//     let pagedSalesItemRows = [];
-
-//     if (offset < purchaseItemsList.length) {
-//       pagedPurchaseItemRows = purchaseItemsList.slice(offset, offset + limit);
-//     } else {
-//       const salesOffset = offset - purchaseItemsList.length;
-//       pagedSalesItemRows = salesItemsList.slice(salesOffset, salesOffset + limit);
-//     }
-
-//     // Extract Purchase & Sale IDs
-//     const purchaseIds = pagedPurchaseItemRows.map((item) => item.Purchase_Id);
-//     const saleIds = pagedSalesItemRows.map((item) => item.Sale_Id);
-
-//     // Full bill details
-//     const [purchases] = purchaseIds.length
-//       ? await connection.query(`SELECT * FROM add_purchase WHERE Purchase_Id IN (?)`, [purchaseIds])
-//       : [[]];
-
-//     const [sales] = saleIds.length
-//       ? await connection.query(`SELECT * FROM add_sale WHERE Sale_Id IN (?)`, [saleIds])
-//       : [[]];
-
-//     // Fetch ALL items inside those bills
-//     const [purchaseItemsAll] = purchaseIds.length ? await connection.query(
-//           `SELECT pi.*, it.Item_Name, it.Item_HSN, it.Item_Category
-//            FROM add_purchase_items pi
-//            LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
-//            WHERE pi.Purchase_Id IN (?)`,
-//           [purchaseIds]
-//         )
-//       : [[]];
-
-//     const [saleItemsAll] = saleIds.length ? await connection.query(
-//           `SELECT si.*, it.Item_Name, it.Item_HSN, it.Item_Category
-//            FROM add_sale_items si
-//            LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
-//            WHERE si.Sale_Id IN (?)`,
-//           [saleIds]
-//         )
-//       : [[]];
-
-//     // Map purchase items by bill
-//     const purchaseBills = purchases.map((bill) => ({
-//       Type: "Purchase",
-//       ...bill,
-//       items: purchaseItemsAll.filter((it) => it.Purchase_Id === bill.Purchase_Id),
-//     }));
-
-//     // Map sales items by invoice
-//     const saleBills = sales.map((bill) => ({
-//       Type: "Sale",
-//       ...bill,
-//       items: saleItemsAll.filter((it) => it.Sale_Id === bill.Sale_Id),
-//     }));
-
-//     return res.status(200).json({
-//       success: true,
-//       Item_Id,
-//       Item_Name: items[0].Item_Name,
-//       page,
-//       limit,
-//       totalRecords,
-//       totalPages,
-//       purchases: purchaseBills,
-//       sales: saleBills,
-//     });
-
-//   } catch (err) {
-//     console.error("❌ Error:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const eachItemSalesPurchaseDetails = async (req, res, next) => {
   let connection;
 

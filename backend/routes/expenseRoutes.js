@@ -17,6 +17,7 @@ import {
   getExpenseById,
   getExpensesByCategory,
   getExpenseItemUsage,
+  getAllExpenseItemMastersCursor,
 } from "../controllers/expenseController.js";
 
 const expenseCategoryRouter = express.Router();
@@ -40,6 +41,7 @@ expenseItemRouter.post("/", userAuth, createExpenseItemMaster);
 expenseItemRouter.put("/:id", userAuth, editExpenseItemMaster);
 expenseItemRouter.delete("/:id", userAuth, deleteExpenseItemMaster);
 expenseItemRouter.get("/", userAuth, getAllExpenseItemMasters);
+expenseItemRouter.get("/cursor",userAuth,getAllExpenseItemMastersCursor);
 
 /* ==========================
    Expense Routes

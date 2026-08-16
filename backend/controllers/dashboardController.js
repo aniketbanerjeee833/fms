@@ -1405,22 +1405,26 @@ const getTotalPayablesLeft = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
-    const [[result]] = await connection.query(`
-      SELECT
-        COALESCE(SUM(ABS(latest.Running_Balance)), 0) AS total_payables_left,
-        COUNT(*)                                       AS total_parties
-      FROM (
-        SELECT pl.Party_Id, pl.Running_Balance
-        FROM party_ledger pl
-        INNER JOIN (
-          SELECT Party_Id, MAX(id) AS max_id
-          FROM party_ledger
-          GROUP BY Party_Id
-        ) last ON pl.Party_Id = last.Party_Id AND pl.id = last.max_id
-        WHERE pl.Running_Balance < 0
-      ) latest
-    `);
-
+    // const [[result]] = await connection.query(`
+    //   SELECT
+    //     COALESCE(SUM(ABS(latest.Running_Balance)), 0) AS total_payables_left,
+    //     COUNT(*)                                       AS total_parties
+    //   FROM (
+    //     SELECT pl.Party_Id, pl.Running_Balance
+    //     FROM party_ledger pl
+    //     INNER JOIN (
+    //       SELECT Party_Id, MAX(id) AS max_id
+    //       FROM party_ledger
+    //       GROUP BY Party_Id
+    //     ) last ON pl.Party_Id = last.Party_Id AND pl.id = last.max_id
+    //     WHERE pl.Running_Balance < 0
+    //   ) latest
+    // `);
+    const [[result]] = await connection.query(`SELECT
+  COALESCE(SUM(ABS(Current_Balance)), 0) AS total_payables_left,
+  COUNT(*) AS total_parties
+FROM add_party
+WHERE Current_Balance < 0;`);
     return res.status(200).json({
       success:             true,
       total_payables_left: Number(result.total_payables_left).toFixed(2),
@@ -1444,22 +1448,26 @@ const getTotalReceivablesLeft = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
-    const [[result]] = await connection.query(`
-      SELECT
-        COALESCE(SUM(latest.Running_Balance), 0) AS total_receivables_left,
-        COUNT(*)                                  AS total_parties
-      FROM (
-        SELECT pl.Party_Id, pl.Running_Balance
-        FROM party_ledger pl
-        INNER JOIN (
-          SELECT Party_Id, MAX(id) AS max_id
-          FROM party_ledger
-          GROUP BY Party_Id
-        ) last ON pl.Party_Id = last.Party_Id AND pl.id = last.max_id
-        WHERE pl.Running_Balance > 0
-      ) latest
-    `);
-
+    // const [[result]] = await connection.query(`
+    //   SELECT
+    //     COALESCE(SUM(latest.Running_Balance), 0) AS total_receivables_left,
+    //     COUNT(*)                                  AS total_parties
+    //   FROM (
+    //     SELECT pl.Party_Id, pl.Running_Balance
+    //     FROM party_ledger pl
+    //     INNER JOIN (
+    //       SELECT Party_Id, MAX(id) AS max_id
+    //       FROM party_ledger
+    //       GROUP BY Party_Id
+    //     ) last ON pl.Party_Id = last.Party_Id AND pl.id = last.max_id
+    //     WHERE pl.Running_Balance > 0
+    //   ) latest
+    // `);
+    const [[result]] = await connection.query(`SELECT
+  COALESCE(SUM(Current_Balance), 0) AS total_receivables_left,
+  COUNT(*) AS total_parties
+FROM add_party
+WHERE Current_Balance > 0;`);
     return res.status(200).json({
       success:                true,
       total_receivables_left: Number(result.total_receivables_left).toFixed(2),

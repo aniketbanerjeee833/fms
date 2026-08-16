@@ -236,22 +236,45 @@ export default function PurchaseReturn() {
             {/* Total Sales */}
             <div className="mb-2 text-left">
               <p className="text-sm font-medium text-black">Total Amount</p>
-              <h4 className="text-3xl font-bold text-black">₹  {purchaseReturns?.totals?.totalAmount}</h4>
+              <h4 className="text-3xl font-bold text-black">
+                {/* ₹ {purchaseReturns?.totals?.totalAmount} */}
+                ₹{(Number(purchaseReturns?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                
+                </h4>
             </div>
 
             {/* Divider */}
             <div className="border-t border-gray-300 mb-2"></div>
 
             {/* Received & Balance */}
-            <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
-              <div className="flex  ">
-                <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹ {purchaseReturns?.totals?.totalReceived}</span>
+            
+
+             <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+              <div className="flex">
+                <span className="text-sm font-medium text-gray-500">
+                  Received&nbsp;&nbsp;
+                </span>
+                <span className="text-sm font-semibold text-black">
+                  ₹{(Number(purchaseReturns?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
               </div>
 
               <div className="flex">
-                <span className="text-sm font-medium text-gray-500">Balance Due &nbsp; &nbsp;</span>
-                <span className="text-sm font-semibold text-black">₹{purchaseReturns?.totals?.totalBalance}</span>
+                <span className="text-sm font-medium text-gray-500">
+                  Balance Due&nbsp;&nbsp;
+                </span>
+                <span className="text-sm font-semibold text-black">
+                  ₹{(Number(purchaseReturns?.totals?.totalBalance) || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
               </div>
             </div>
 
@@ -310,7 +333,7 @@ export default function PurchaseReturn() {
                             }
                           );
                         }}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
                       >
                         <td>
                           {(purchaseReturns?.currentPage - 1) * 10 + (idx + 1)}.

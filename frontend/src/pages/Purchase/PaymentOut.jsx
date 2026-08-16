@@ -282,21 +282,49 @@ export default function PaymentOut() {
                     <div className="flex flex-col bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
 
                         {/* Total Sales */}
-                        <div className="mb-2 text-left">
+                        {/* <div className="mb-2 text-left">
                             <p className="text-sm font-medium text-black">Total Amount</p>
                             <h4 className="text-3xl font-bold text-black">₹  {paymentOutData?.totals?.totalPaid}</h4>
                         </div>
 
-                        {/* Divider */}
+                      
                         <div className="border-t border-gray-300 mb-2"></div>
 
-                        {/* Received & Balance */}
+                       
                         <div className=" flex flex-col gap-2 sm:flex-row sm:-gap-4">
                             <div className="flex  ">
                                 <span className="text-sm font-medium text-gray-500">Received &nbsp; &nbsp;</span>
                                 <span className="text-sm font-semibold text-black">₹ {paymentOutData?.totals?.totalPaid}</span>
                             </div>
 
+                        </div> */}
+                        {/* Total Sales */}
+                        <div className="mb-2 text-left">
+                            <p className="text-sm font-medium text-black">Total Amount</p>
+                            <h4 className="text-3xl font-bold text-black">
+                                ₹{(Number(paymentOutData?.totals?.totalPaid) || 0).toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
+                            </h4>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="border-t border-gray-300 mb-2"></div>
+
+                        {/* Received & Balance */}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+                            <div className="flex">
+                                <span className="text-sm font-medium text-gray-500">
+                                    Paid&nbsp;&nbsp;
+                                </span>
+                                <span className="text-sm font-semibold text-black">
+                                    ₹{(Number(paymentOutData?.totals?.totalPaid) || 0).toLocaleString("en-IN", {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </div>
                         </div>
 
                     </div>
@@ -345,7 +373,7 @@ export default function PaymentOut() {
                                                         data: paymentOut,
                                                     });
                                                 }}
-                                                style={{ cursor: "pointer" }}
+                                                style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
                                             >
                                                 <td>
                                                     {(paymentOutData?.currentPage - 1) * 10 + (idx + 1)}.

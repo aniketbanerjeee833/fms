@@ -37,7 +37,7 @@ export default function PaymentOutModal({
   isSaving = false,
 }) {
   const isView = mode === "view";
-  const dispatch=useDispatch();
+  const dispatch = useDispatch();
   // Normalize parties prop - accepts either an array or { parties: [...] }
   const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
 
@@ -163,18 +163,18 @@ export default function PaymentOutModal({
 
   //   setShowSplitBox(true);
   // };
-   const handleAddPaymentType = () => {
+  const handleAddPaymentType = () => {
     const newIndex = fields.length;
     const availableOptions = getAvailableOptions(newIndex);
-  
+
     if (availableOptions.length === 0) {
       toast.info("No more payment types are available.");
       return;
     }
-  
+
     // Just append a blank row — don't auto-pick a type.
     append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
-  
+
     setShowSplitBox(true);
   };
 
@@ -233,10 +233,10 @@ export default function PaymentOutModal({
     }
 
     const rawSplits = data.splits || [];
-      // Discard any split row that has no Payment_Type selected —
-  // even if the user typed an Amount into it, an unselected
-  // payment type means the row is incomplete and shouldn't be saved.
-  const splits = rawSplits.filter((s) => !!s.Payment_Type);
+    // Discard any split row that has no Payment_Type selected —
+    // even if the user typed an Amount into it, an unselected
+    // payment type means the row is incomplete and shouldn't be saved.
+    const splits = rawSplits.filter((s) => !!s.Payment_Type);
 
     const total = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
 
@@ -541,7 +541,7 @@ export default function PaymentOutModal({
                     const rowType = watch(`splits.${index}.Payment_Type`);
                     const needsRef =
                       rowType === "Cheque" ||
-                      
+
                       rowType === "Bank";
                     //const rowOptions = getAvailableOptions(index);
                     const currentIdentifier = getRowIdentifier(
@@ -571,7 +571,7 @@ export default function PaymentOutModal({
 
                       })
                     }
-                     const usedValues = splitsWatch
+                    const usedValues = splitsWatch
                       .map((s, idx) => {
                         if (idx === index) return null; // exclude current row
                         return s.Payment_Type === "Bank"
@@ -785,20 +785,20 @@ export default function PaymentOutModal({
           )}
         </form>
       </div>
-           {showBankModal && (
-              <BankAccountModal
-                mode="add"
-                onClose={() => {
-                  setShowBankModal(false);
-                  dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
-                }}
-                onSave={() => {
-                  //refetchBanks();   // 🔹 refetch so new bank appears in dropdown
-                  setShowBankModal(false);
-      
-                }}
-              />
-            )}
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            //refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
+          }}
+        />
+      )}
     </div>
   );
 }

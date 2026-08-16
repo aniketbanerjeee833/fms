@@ -276,19 +276,20 @@ if (
              {renderMenu("Purchase", <ShoppingCart size={20} />, [
            
             //{ to: "/purchase/add", text: "Add Purchase" },
+             { to: "/purchase/all-purchases", text: "  Purchase Bills " },
               { to: "/purchase/return", text: "Purchase Return" },
             { to: "/purchase/payment-out", text: "Payment Out" },
-            { to: "/purchase/all-purchases", text: " All Purchases " },
+           
           ])}
 
          
                {renderMenu("Sales", <DollarSign size={20} />, [
-           
+            { to: "/sale/all-sales", text: "  Sale Invoices" },
            {to: "/sale/invoice", text: " Invoice" },
             //{ to: "/sale/add", text: "Add Sale" },
               { to: "/sale/return", text: "Sale Return" },
              { to: "/sale/payment-in", text: "Payment In" },
-             { to: "/sale/all-sales", text: " All Sales" },
+            
           
           ])}
 

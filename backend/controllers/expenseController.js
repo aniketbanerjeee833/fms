@@ -222,6 +222,105 @@ const getAllExpenseItemMasters = async (req, res, next) => {
   }
 };
 
+const getAllExpenseItemMastersCursor = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const cursor = req.query.cursor
+      ? parseInt(req.query.cursor, 10)
+      : null;
+
+    const limit = req.query.limit
+      ? Math.min(parseInt(req.query.limit, 10), 100)
+      : 10;
+
+    const search = req.query.search?.trim() || "";
+
+    const conditions = [];
+    const params = [];
+
+    if (search) {
+      conditions.push(`LOWER(Item_Name) LIKE ?`);
+      params.push(`%${search.toLowerCase()}%`);
+    }
+
+    if (cursor) {
+      conditions.push(`id < ?`);
+      params.push(cursor);
+    }
+
+    const whereSQL =
+      conditions.length > 0
+        ? `WHERE ${conditions.join(" AND ")}`
+        : "";
+
+    // Total count (without cursor)
+    const countConditions = [];
+
+    if (search) {
+      countConditions.push(`LOWER(Item_Name) LIKE ?`);
+    }
+
+    const countWhere =
+      countConditions.length > 0
+        ? `WHERE ${countConditions.join(" AND ")}`
+        : "";
+
+    const countParams = search
+      ? [`%${search.toLowerCase()}%`]
+      : [];
+
+    const [[countRow]] = await connection.query(
+      `
+      SELECT COUNT(*) AS totalItems
+      FROM expense_item_master
+      ${countWhere}
+      `,
+      countParams
+    );
+
+    const [rows] = await connection.query(
+      `
+      SELECT *
+      FROM expense_item_master
+      ${whereSQL}
+      ORDER BY id DESC
+      LIMIT ?
+      `,
+      [...params, limit + 1]
+    );
+
+    const hasMore = rows.length > limit;
+
+    const pageRows = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    const nextCursor =
+      pageRows.length > 0
+        ? pageRows[pageRows.length - 1].id
+        : null;
+
+    return res.status(200).json({
+      success: true,
+      items: pageRows,
+      totalItems: countRow.totalItems,
+      hasMore,
+      nextCursor,
+    });
+  } catch (err) {
+    console.error(
+      "getAllExpenseItemMastersCursor:",
+      err
+    );
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 /* ═══════════════════════════════════════
    CREATE EXPENSE
 ═══════════════════════════════════════ */
@@ -1326,159 +1425,474 @@ const deleteExpense = async (req, res, next) => {
 
 
 //Category
+// const getExpensesByCategory = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     const { categoryId } = req.params;
+//     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
+//     const search = req.query.search?.trim().toLowerCase() || "";
+//     const date = req.query.date || null;
+
+//     const whereClauses = [`e.Category_Id = ?`];
+//     const params = [categoryId];
+
+//     if (lastId) { whereClauses.push(`e.id < ?`); params.push(lastId); }
+//     if (search) {
+//       whereClauses.push(`(LOWER(e.Expense_Number) LIKE ? OR LOWER(a.Party_Name) LIKE ?)`);
+//       params.push(`%${search}%`, `%${search}%`);
+//     }
+//     if (date) {
+//       whereClauses.push(`DATE(e.Expense_Date) = ?`);
+//       params.push(date);
+//     }
+
+//     const [rows] = await connection.query(
+//       `SELECT e.id, e.Expense_Number, e.Expense_Date, e.With_GST,
+//               e.Total_Amount, e.Total_Paid, e.Balance_Due, a.Party_Name
+//        FROM expenses e
+//        LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
+//        WHERE ${whereClauses.join(" AND ")}
+//        ORDER BY e.id DESC LIMIT ?`,
+//       [...params, PAGE_SIZE + 1]
+//     );
+
+//     const hasMore = rows.length > PAGE_SIZE;
+//     const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+//     // 🔹 attach Payment_Type_Display from payment_splits
+//     const expenseIds = pageRows.map((r) => r.id);
+//     if (expenseIds.length > 0) {
+//       const [splits] = await connection.query(
+//         `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
+//          FROM payment_splits ps
+//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+//          WHERE ps.Source_Type = 'Expense'
+//            AND ps.Source_Id IN (${expenseIds.map(() => "?").join(",")})`,
+//         expenseIds
+//       );
+
+//       const splitMap = {};
+//       for (const s of splits) {
+//         if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
+//         splitMap[s.Source_Id].push(
+//           s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+//         );
+//       }
+
+//       for (const row of pageRows) {
+//         const labels = splitMap[row.id] || [];
+//         const counts = {};
+//         labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
+//         row.Payment_Type_Display = Object.entries(counts)
+//           .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
+//           .join(" , ") || "—";
+//       }
+//     }
+
+//     const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
+
+//     return res.status(200).json({ success: true, expenses: pageRows, hasMore, nextCursor });
+//   } catch (err) {
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getExpensesByCategory = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
     const { categoryId } = req.params;
-    const lastId = req.query.lastId ? Number(req.query.lastId) : null;
-    const search = req.query.search?.trim().toLowerCase() || "";
-    const date = req.query.date || null;
 
-    const whereClauses = [`e.Category_Id = ?`];
+    const cursor = req.query.cursor
+      ? Number(req.query.cursor)
+      : null;
+
+    const search =
+      req.query.search?.trim().toLowerCase() || "";
+
+    const date = req.query.date || "";
+
+    const whereClauses = [
+      `e.Category_Id = ?`,
+    ];
+
     const params = [categoryId];
 
-    if (lastId) { whereClauses.push(`e.id < ?`); params.push(lastId); }
-    if (search) {
-      whereClauses.push(`(LOWER(e.Expense_Number) LIKE ? OR LOWER(a.Party_Name) LIKE ?)`);
-      params.push(`%${search}%`, `%${search}%`);
+    // Cursor pagination
+    if (cursor) {
+      whereClauses.push(`e.id < ?`);
+      params.push(cursor);
     }
+
+    // Search
+   if (search) {
+  whereClauses.push(`
+    (
+      LOWER(e.Expense_Number) LIKE ?
+      OR LOWER(a.Party_Name) LIKE ?
+      OR CAST(e.Total_Amount AS CHAR) LIKE ?
+      OR CAST(e.Balance_Due AS CHAR) LIKE ?
+      OR DATE_FORMAT(
+            e.Expense_Date,
+            '%d-%m-%Y'
+         ) LIKE ?
+    )
+  `);
+
+  const like = `%${search}%`;
+
+  params.push(
+    like, // Expense Number
+    like, // Party Name
+    like, // Total Amount
+    like, // Balance Due
+    like  // Date
+  );
+}
+
+    // Date filter
     if (date) {
-      whereClauses.push(`DATE(e.Expense_Date) = ?`);
+      whereClauses.push(
+        `DATE(e.Expense_Date) = ?`
+      );
+
       params.push(date);
     }
 
     const [rows] = await connection.query(
-      `SELECT e.id, e.Expense_Number, e.Expense_Date, e.With_GST,
-              e.Total_Amount, e.Total_Paid, e.Balance_Due, a.Party_Name
-       FROM expenses e
-       LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
-       WHERE ${whereClauses.join(" AND ")}
-       ORDER BY e.id DESC LIMIT ?`,
+      `
+      SELECT
+        e.id,
+        e.Expense_Number,
+        e.Expense_Date,
+        e.With_GST,
+        e.Total_Amount,
+        e.Total_Paid,
+        e.Balance_Due,
+        a.Party_Name
+
+      FROM expenses e
+
+      LEFT JOIN add_party a
+        ON e.Party_Id = a.Party_Id
+
+      WHERE ${whereClauses.join(" AND ")}
+
+      ORDER BY e.id DESC
+
+      LIMIT ?
+      `,
       [...params, PAGE_SIZE + 1]
     );
 
-    const hasMore = rows.length > PAGE_SIZE;
-    const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+    const hasMore =
+      rows.length > PAGE_SIZE;
 
-    // 🔹 attach Payment_Type_Display from payment_splits
-    const expenseIds = pageRows.map((r) => r.id);
+    const pageRows = hasMore
+      ? rows.slice(0, PAGE_SIZE)
+      : rows;
+
+    // Payment Type Display
+    const expenseIds =
+      pageRows.map((row) => row.id);
+
     if (expenseIds.length > 0) {
-      const [splits] = await connection.query(
-        `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
-         FROM payment_splits ps
-         LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-         WHERE ps.Source_Type = 'Expense'
-           AND ps.Source_Id IN (${expenseIds.map(() => "?").join(",")})`,
-        expenseIds
-      );
+      const [splits] =
+        await connection.query(
+          `
+          SELECT
+            ps.Source_Id,
+            ps.Payment_Type,
+            ba.Account_Display_Name
+
+          FROM payment_splits ps
+
+          LEFT JOIN bank_accounts ba
+            ON ba.id = ps.Bank_Account_Id
+
+          WHERE ps.Source_Type = 'Expense'
+            AND ps.Source_Id IN (
+              ${expenseIds
+                .map(() => "?")
+                .join(",")}
+            )
+          `,
+          expenseIds
+        );
 
       const splitMap = {};
-      for (const s of splits) {
-        if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
-        splitMap[s.Source_Id].push(
-          s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
+        }
+
+        splitMap[split.Source_Id].push(
+          split.Payment_Type === "Bank"
+            ? split.Account_Display_Name
+            : split.Payment_Type
         );
       }
 
       for (const row of pageRows) {
-        const labels = splitMap[row.id] || [];
+        const labels =
+          splitMap[row.id] || [];
+
         const counts = {};
-        labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
-        row.Payment_Type_Display = Object.entries(counts)
-          .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
-          .join(" , ") || "—";
+
+        labels.forEach((label) => {
+          counts[label] =
+            (counts[label] || 0) + 1;
+        });
+
+        row.Payment_Type_Display =
+          Object.entries(counts)
+            .map(([label, count]) =>
+              count > 1
+                ? `${label} (x${count})`
+                : label
+            )
+            .join(" , ") || "—";
       }
     }
 
-    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
+    const nextCursor =
+  hasMore && pageRows.length > 0
+    ? pageRows[pageRows.length - 1].id
+    : null;
 
-    return res.status(200).json({ success: true, expenses: pageRows, hasMore, nextCursor });
+    return res.status(200).json({
+      success: true,
+      expenses: pageRows,
+      hasMore,
+      nextCursor,
+    });
+
   } catch (err) {
+    console.error(
+      "getExpensesByCategory error:",
+      err
+    );
+
     next(err);
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
 //by items
 const getExpenseItemUsage = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
-    const masterItemId = req.query.masterItemId ? Number(req.query.masterItemId) : null;
+    const masterItemId = req.query.masterItemId
+      ? Number(req.query.masterItemId)
+      : null;
+
     if (!masterItemId) {
-      return res.status(400).json({ success: false, message: "masterItemId is required" });
+      return res.status(400).json({
+        success: false,
+        message: "masterItemId is required",
+      });
     }
 
-    const lastId = req.query.lastId ? Number(req.query.lastId) : null;
-    const date = req.query.date || null;
+    const lastId = req.query.lastId
+      ? Number(req.query.lastId)
+      : null;
 
-    const whereClauses = [`ei.Expense_Item_Master_Id = ?`];
+    const date = req.query.date || null;
+    const search = req.query.search?.trim() || "";
+
+    const whereClauses = [
+      `ei.Expense_Item_Master_Id = ?`,
+    ];
+
     const params = [masterItemId];
 
-    if (lastId) { whereClauses.push(`ei.id < ?`); params.push(lastId); }
+    // Cursor pagination
+    if (lastId) {
+      whereClauses.push(`ei.id < ?`);
+      params.push(lastId);
+    }
+
+    // Exact date filter
     if (date) {
-      whereClauses.push(`DATE(e.Expense_Date) = ?`);
+      whereClauses.push(
+        `DATE(e.Expense_Date) = ?`
+      );
       params.push(date);
     }
 
+    // Search
+    if (search) {
+      whereClauses.push(`
+        (
+          e.Expense_Number LIKE ?
+          OR a.Party_Name LIKE ?
+          OR CAST(ei.Amount AS CHAR) LIKE ?
+          OR DATE_FORMAT(
+                e.Expense_Date,
+                '%d-%m-%Y'
+             ) LIKE ?
+        )
+      `);
+
+      const like = `%${search}%`;
+
+      params.push(
+        like, // Expense Number
+        like, // Party Name
+        like, // Amount
+        like  // Expense Date
+      );
+    }
+
     const [rows] = await connection.query(
-      `SELECT ei.id, ei.Quantity, ei.Price, ei.Amount,
-              eim.Item_Name, eim.Item_HSN,
-              e.id AS Expense_Id, e.Expense_Number, e.Expense_Date,
-              ec.Category_Name, a.Party_Name
-       FROM expense_items ei
-       LEFT JOIN expense_item_master eim ON eim.id = ei.Expense_Item_Master_Id
-       JOIN expenses e ON ei.Expense_Id = e.id
-       LEFT JOIN expense_categories ec ON e.Category_Id = ec.id
-       LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
-       WHERE ${whereClauses.join(" AND ")}
-       ORDER BY ei.id DESC LIMIT ?`,
+      `
+      SELECT
+        ei.id,
+        ei.Quantity,
+        ei.Price,
+        ei.Amount,
+
+        eim.Item_Name,
+        eim.Item_HSN,
+
+        e.id AS Expense_Id,
+        e.Expense_Number,
+        e.Expense_Date,
+
+        ec.Category_Name,
+
+        a.Party_Name
+
+      FROM expense_items ei
+
+      LEFT JOIN expense_item_master eim
+        ON eim.id = ei.Expense_Item_Master_Id
+
+      JOIN expenses e
+        ON ei.Expense_Id = e.id
+
+      LEFT JOIN expense_categories ec
+        ON e.Category_Id = ec.id
+
+      LEFT JOIN add_party a
+        ON e.Party_Id = a.Party_Id
+
+      WHERE ${whereClauses.join(" AND ")}
+
+      ORDER BY ei.id DESC
+
+      LIMIT ?
+      `,
       [...params, PAGE_SIZE + 1]
     );
 
     const hasMore = rows.length > PAGE_SIZE;
-    const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
-    // 🔹 attach Payment_Type_Display — key off e.Expense_Id (parent expense)
-    const expenseIds = [...new Set(pageRows.map((r) => r.Expense_Id))];
+    const pageRows = hasMore
+      ? rows.slice(0, PAGE_SIZE)
+      : rows;
+
+    // Attach Payment_Type_Display
+    const expenseIds = [
+      ...new Set(
+        pageRows.map(
+          (row) => row.Expense_Id
+        )
+      ),
+    ];
+
     if (expenseIds.length > 0) {
-      const [splits] = await connection.query(
-        `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
-         FROM payment_splits ps
-         LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-         WHERE ps.Source_Type = 'Expense'
-           AND ps.Source_Id IN (${expenseIds.map(() => "?").join(",")})`,
-        expenseIds
-      );
+      const [splits] =
+        await connection.query(
+          `
+          SELECT
+            ps.Source_Id,
+            ps.Payment_Type,
+            ba.Account_Display_Name
+
+          FROM payment_splits ps
+
+          LEFT JOIN bank_accounts ba
+            ON ba.id = ps.Bank_Account_Id
+
+          WHERE ps.Source_Type = 'Expense'
+            AND ps.Source_Id IN (
+              ${expenseIds
+                .map(() => "?")
+                .join(",")}
+            )
+          `,
+          expenseIds
+        );
 
       const splitMap = {};
-      for (const s of splits) {
-        if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
-        splitMap[s.Source_Id].push(
-          s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
+        }
+
+        splitMap[split.Source_Id].push(
+          split.Payment_Type === "Bank"
+            ? split.Account_Display_Name
+            : split.Payment_Type
         );
       }
 
       for (const row of pageRows) {
-        const labels = splitMap[row.Expense_Id] || [];
+        const labels =
+          splitMap[row.Expense_Id] || [];
+
         const counts = {};
-        labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
-        row.Payment_Type_Display = Object.entries(counts)
-          .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
-          .join(" , ") || "—";
+
+        labels.forEach((label) => {
+          counts[label] =
+            (counts[label] || 0) + 1;
+        });
+
+        row.Payment_Type_Display =
+          Object.entries(counts)
+            .map(([label, count]) =>
+              count > 1
+                ? `${label} (x${count})`
+                : label
+            )
+            .join(" , ") || "—";
       }
     }
 
-    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
+    const nextCursor =
+      hasMore && pageRows.length
+        ? pageRows[pageRows.length - 1].id
+        : null;
 
-    return res.status(200).json({ success: true, usage: pageRows, hasMore, nextCursor });
+    return res.status(200).json({
+      success: true,
+      usage: pageRows,
+      hasMore,
+      nextCursor,
+    });
   } catch (err) {
+    console.error(
+      "getExpenseItemUsage error:",
+      err
+    );
     next(err);
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
@@ -1499,6 +1913,7 @@ export {
   deleteExpenseItemMaster,
 
   getAllExpenseItemMasters,
+  getAllExpenseItemMastersCursor
 };
 //WITH GST
 // {

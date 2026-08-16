@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
+  LayoutDashboard,
   Search,
   MoreVertical,
   ChevronRight,
@@ -13,23 +14,27 @@ import {
   History,
 } from "lucide-react";
 
-import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
 import {
-  useGetAllExpenseItemMastersCursorQuery,
-  useGetExpenseItemUsageQuery,
+  useGetAllExpenseItemMastersQuery,
+  useGetExpenseItemUsageQuery
 } from "../../redux/api/expenseApi";
+
+import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
+
+
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/* row-action menu options, mapped to icons */
 const ROW_ACTIONS = [
   { key: "view", label: "View/Edit", icon: Eye },
   { key: "delete", label: "Delete", icon: Trash2, danger: true },
-  //{ key: "duplicate", label: "Duplicate", icon: Copy },
-  //{ key: "pdf", label: "Open PDF", icon: FileText },
-  //{ key: "preview", label: "Preview", icon: Eye },
+  { key: "duplicate", label: "Duplicate", icon: Copy },
+  { key: "pdf", label: "Open PDF", icon: FileText },
+  { key: "preview", label: "Preview", icon: Eye },
   { key: "print", label: "Print", icon: Printer },
-  //{ key: "history", label: "View History", icon: History },
+  { key: "history", label: "View History", icon: History },
 ];
 
 /* ════════════════════════════════════════════════════════════
@@ -39,185 +44,41 @@ export default function ExpensesByItems() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // ── state now lives in the URL ──
-  const selectedItemId = searchParams.get("itemId") || null;
-  const itemSearch = searchParams.get("q") || "";
-  const txnSearch = searchParams.get("txnSearch") || "";
-
-  const [menuOpen, setMenuOpen] = useState(null);
-  const [rowMenuOpen, setRowMenuOpen] = useState(null);
-  const [showEditItemModal, setShowEditItemModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
-
-  /* ── helpers for merging into existing search params ── */
-  const setSelectedItemId = (id) => {
-    const next = new URLSearchParams(searchParams);
-    if (id === null) {
-      next.delete("itemId");
-    } else {
-      next.set("itemId", id);
-    }
-    setSearchParams(next);
-  };
-
-  const handleItemSearchChange = (value) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) {
-      next.set("q", value);
-    } else {
-      next.delete("q");
-    }
-    setSearchParams(next, { replace: true });
-  };
-
-  const handleTxnSearchChange = (value) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) {
-      next.set("txnSearch", value);
-    } else {
-      next.delete("txnSearch");
-    }
-    setSearchParams(next, { replace: true });
-  };
-
-  /* ── LEFT SIDE — cursor-based infinite scroll (item list) ── */
-  const [leftCursor, setLeftCursor] = useState(null);
-  const leftSentinelRef = useRef(null);
-  const leftObserverRef = useRef(null);
 
   const {
     data: itemResponse,
-    isLoading: isItemsLoading,
-    isFetching: isItemsFetching,
-  } = useGetAllExpenseItemMastersCursorQuery({
-    cursor: leftCursor,
-    search: itemSearch,
-    limit: 10,
-  });
+    //isLoading,
+    //error,
+  } = useGetAllExpenseItemMastersQuery();
+
+  // console.log("itemResponse:", itemResponse);
+  // console.log("itemError:", error);
 
   const items = itemResponse?.items || [];
-  const totalItems = itemResponse?.totalItems || 0;
-  const itemsHasMore = itemResponse?.hasMore ?? false;
-  const itemsNextCursor = itemResponse?.nextCursor ?? null;
-
-  /* reset left cursor when item search changes */
-  useEffect(() => {
-    setLeftCursor(null);
-  }, [itemSearch]);
-
-  const handleLeftObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        itemsHasMore &&
-        itemsNextCursor &&
-        !isItemsFetching &&
-        !isItemsLoading
-      ) {
-        setLeftCursor(itemsNextCursor);
-      }
-    },
-    [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]
-  );
-
-  useEffect(() => {
-    if (leftObserverRef.current) {
-      leftObserverRef.current.disconnect();
-    }
-
-    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
-
-    if (leftSentinelRef.current) {
-      leftObserverRef.current.observe(leftSentinelRef.current);
-    }
-
-    return () => leftObserverRef.current?.disconnect();
-  }, [handleLeftObserver]);
-
-  /* ── RIGHT SIDE — cursor-based infinite scroll (transactions/usage) ── */
-  const [rightCursor, setRightCursor] = useState(null);
-  const rightSentinelRef = useRef(null);
-  const rightObserverRef = useRef(null);
-
-  // const {
-  //   data: usageResponse,
-  //   isLoading: isUsageLoading,
-  //   isFetching: isUsageFetching,
-  // } = useGetExpenseItemUsageQuery(
-  //   { masterItemId: selectedItemId, cursor: rightCursor },
-  //   { skip: !selectedItemId }
-  // );
+  const [selectedItemId, setSelectedItemId] = useState(null);
   const {
-  data: usageResponse,
-  isLoading: isUsageLoading,
-  isFetching: isUsageFetching,
-} = useGetExpenseItemUsageQuery(
-  {
-    masterItemId: selectedItemId,
-    cursor: rightCursor,
-    search: txnSearch, // ← add
-  },
-  {
-    skip: !selectedItemId,
-  }
-);
+    data: usageResponse,
+    //isLoading: isUsageLoading,
+  } = useGetExpenseItemUsageQuery(
+    { masterItemId: selectedItemId },
+    { skip: !selectedItemId }
+  );
 
   const itemUsage = usageResponse?.usage || [];
-  const usageHasMore = usageResponse?.hasMore ?? false;
-  const usageNextCursor = usageResponse?.nextCursor ?? null;
 
-  /* reset right cursor when selected item changes */
-useEffect(() => {
-  setRightCursor(null);
-}, [selectedItemId, txnSearch]);
+  // console.log("usageResponse:", usageResponse);
+  // console.log("itemUsage", itemUsage);
 
-  const handleRightObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        usageHasMore &&
-        usageNextCursor &&
-        !isUsageFetching &&
-        !isUsageLoading
-      ) {
-        setRightCursor(usageNextCursor);
-      }
-    },
-    [usageHasMore, usageNextCursor, isUsageFetching, isUsageLoading]
-  );
-
-  useEffect(() => {
-    if (rightObserverRef.current) {
-      rightObserverRef.current.disconnect();
-    }
-
-    rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
-
-    if (rightSentinelRef.current) {
-      rightObserverRef.current.observe(rightSentinelRef.current);
-    }
-
-    return () => rightObserverRef.current?.disconnect();
-  }, [handleRightObserver]);
-
-  /* ── auto-select first item / restore from navigation state ── */
   useEffect(() => {
     if (!items.length) return;
 
-    if (!selectedItemId && location.state?.itemId) {
+    if (
+      selectedItemId === null &&
+      location.state?.itemId
+    ) {
       setSelectedItemId(location.state.itemId);
 
-      navigate(location.pathname + location.search, {
+      navigate(location.pathname, {
         replace: true,
         state: null,
       });
@@ -225,13 +86,26 @@ useEffect(() => {
       return;
     }
 
-    if (!selectedItemId) {
+    if (selectedItemId === null) {
       setSelectedItemId(items[0].id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, selectedItemId, navigate, location.pathname, location.state]);
+  }, [
+    items,
+    selectedItemId,
+    navigate,
+    location.pathname,
+    location.state,
+  ]);
+
+  const [itemSearch, setItemSearch] = useState("");
+  const [txnSearch, setTxnSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [rowMenuOpen, setRowMenuOpen] = useState(null);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
+
     const closeMenus = () => {
       setMenuOpen(null);
       setRowMenuOpen(null);
@@ -242,13 +116,13 @@ useEffect(() => {
     return () => {
       document.removeEventListener("click", closeMenus);
     };
+
   }, []);
 
-  /* items no longer need client-side name filtering — search now
-     happens server-side via the cursor query's `search` param */
+
   const itemsWithTotals = useMemo(() => {
     return items.map((item) => {
-      const isSelected = String(item.id) === String(selectedItemId);
+      const isSelected = item.id === selectedItemId;
       const usageForThisItem = isSelected ? itemUsage : [];
 
       return {
@@ -276,45 +150,43 @@ useEffect(() => {
     });
   }, [items, itemUsage, selectedItemId]);
 
-  const selectedItem =
-    itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
 
-  /* transaction search still client-side filters the currently-loaded
-     page(s) of usage rows — server-side date filter is separate (date param) */
-  // const filteredTransactions = useMemo(() => {
-  //   if (!selectedItem) return [];
-  //   return selectedItem.transactions.filter(
-  //     (t) =>
-  //       (t.party || "").toLowerCase().includes(txnSearch.toLowerCase()) ||
-  //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
-  //   );
-  // }, [selectedItem, txnSearch]);
-  const filteredTransactions =
-  selectedItem?.transactions || [];
+  const selectedItem =
+    itemsWithTotals.find((it) => it.id === selectedItemId) || itemsWithTotals[0];
+
+  const filteredItems = useMemo(() => {
+    return itemsWithTotals.filter((it) =>
+      it.name.toLowerCase().includes(itemSearch.toLowerCase())
+    );
+  }, [itemsWithTotals, itemSearch]);
+
+  const filteredTransactions = useMemo(() => {
+    if (!selectedItem) return [];
+    return selectedItem.transactions.filter(
+      (t) =>
+        (t.party || "").toLowerCase().includes(txnSearch.toLowerCase()) ||
+        (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
+    );
+  }, [selectedItem, txnSearch]);
 
   const fmtDate = (d) =>
     d
       ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
       : "—";
 
-  // const handleSelectItem = (item) => {
-  //   setSelectedItemId(item.id);
-  //   handleTxnSearchChange("");
-  //   setMenuOpen(null);
-  //   setRowMenuOpen(null);
-  // };
   const handleSelectItem = (item) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("itemId", item.id);
-    next.delete("txnSearch");
-    setSearchParams(next);
-
+    setSelectedItemId(item.id);
+    setTxnSearch("");
     setMenuOpen(null);
     setRowMenuOpen(null);
   };
 
+
   return (
     <>
+      {/* ── BREADCRUMB ── */}
+
+
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
         {/* ── PAGE HEADER ── */}
@@ -378,7 +250,7 @@ useEffect(() => {
                 <input
                   type="text"
                   value={itemSearch}
-                  onChange={(e) => handleItemSearchChange(e.target.value)}
+                  onChange={(e) => setItemSearch(e.target.value)}
                   placeholder="Search Item"
                   className="border rounded-md text-sm outline-none"
                   style={{
@@ -400,151 +272,143 @@ useEffect(() => {
             >
               <Package size={15} style={{ color: "#4CA1AF" }} />
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Items ({totalItems})
+                Items ({filteredItems.length})
               </span>
             </div>
 
-            {isItemsLoading ? (
-              <div className="p-4 text-gray-400 text-sm">Loading items...</div>
-            ) : itemsWithTotals.length === 0 ? (
+            {filteredItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
                 <Package size={36} strokeWidth={1.2} />
                 <p className="text-sm">No items found</p>
               </div>
             ) : (
-              <>
-                {itemsWithTotals.map((item) => {
-                  const isSelected = String(selectedItemId) === String(item.id);
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => handleSelectItem(item)}
+              filteredItems.map((item) => {
+                const isSelected =
+                  selectedItemId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectItem(item)}
 
-                      onDoubleClick={() => {
+                    onDoubleClick={() => {
 
-                        handleSelectItem(item);
+                      // Select the item
+                      handleSelectItem(item);
 
-                        const originalItem = items.find(
-                          (i) => i.id === item.id
-                        );
+                      // Get original object from API response
+                      const originalItem = items.find(
+                        (i) => i.id === item.id
+                      );
 
-                        setEditingItem(originalItem);
+                      setEditingItem(originalItem);
 
-                        setShowEditItemModal(true);
+                      setShowEditItemModal(true);
 
-                        setMenuOpen(null);
+                      setMenuOpen(null);
 
-                      }}
+                    }}
 
-                      className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
-                      style={{
-                        backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                        borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                        borderBottom: "1px solid #f1f5f9",
-                      }}
-                    >
-                      {/* left: icon + name */}
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div
-                          className="flex items-center justify-center rounded-lg flex-shrink-0"
-                          style={{
-                            width: 36,
-                            height: 36,
-                            backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
-                          }}
-                        >
-                          <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-                            {item.name}
-                          </p>
-                        </div>
+                    className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+                      borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+                      borderBottom: "1px solid #f1f5f9",
+                    }}
+                  >
+                    {/* left: icon + name */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div
+                        className="flex items-center justify-center rounded-lg flex-shrink-0"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+                        }}
+                      >
+                        <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                       </div>
-
-                      {/* right: actions */}
-                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-
-                            const next = new URLSearchParams(searchParams);
-                            next.set("itemId", item.id);
-                            next.delete("txnSearch");
-                            setSearchParams(next);
-
-                            setMenuOpen(
-                              menuOpen === item.id ? null : item.id
-                            );
-                          }}
-                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                          style={{ backgroundColor: "transparent" }}
-                          title="More"
-                        >
-                          <MoreVertical size={14} style={{ color: "#94a3b8" }} />
-                        </button>
-
-                        <ChevronRight
-                          size={14}
-                          style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
-                        />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+                          {item.name}
+                        </p>
                       </div>
-
-                      {menuOpen === item.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute bg-white shadow-lg rounded-md"
-                          style={{
-                            right: 10,
-                            top: 48,
-                            width: 140,
-                            zIndex: 50,
-                            border: "1px solid #e2e8f0",
-                          }}
-                        >
-                          <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
-                            onClick={() => {
-
-                              const originalItem = items.find(
-                                (i) => i.id === item.id
-                              );
-
-                              setEditingItem(originalItem);
-
-                              setShowEditItemModal(true);
-
-                              setMenuOpen(null);
-
-                            }}
-                          >
-                            View/Edit
-                          </button>
-                          <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500">
-                            Delete
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
 
-                {/* ── SENTINEL + LOADING INDICATOR (LEFT) ── */}
-                <div ref={leftSentinelRef} style={{ height: "1px" }} />
+                    {/* right: amount + actions */}
+                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                      {/* <span className="text-sm text-gray-600 mr-1">
+                        ₹ {fmt(item.amount)}
+                      </span> */}
 
-                {isItemsFetching && leftCursor && (
-                  <div className="flex justify-center py-3">
-                    <span className="text-xs text-gray-400">Loading more...</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+
+                          e.stopPropagation();
+
+                          // Select immediately (Vyapar behaviour)
+                          setSelectedItemId(item.id);
+
+                          setTxnSearch("");
+
+                          setMenuOpen(
+                            menuOpen === item.id
+                              ? null
+                              : item.id
+                          );
+
+                        }}
+                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                        style={{ backgroundColor: "transparent" }}
+                        title="More"
+                      >
+                        <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+                      </button>
+
+                      <ChevronRight
+                        size={14}
+                        style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
+                      />
+                    </div>
+
+                    {menuOpen === item.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute bg-white shadow-lg rounded-md"
+                        style={{
+                          right: 10,
+                          top: 48,
+                          width: 140,
+                          zIndex: 50,
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        <button
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                          onClick={() => {
+
+                            const originalItem = items.find(
+                              (i) => i.id === item.id
+                            );
+
+                            setEditingItem(originalItem);
+
+                            setShowEditItemModal(true);
+
+                            setMenuOpen(null);
+
+                          }}
+                        >
+                          View/Edit
+                        </button>
+                        <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500">
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {!itemsHasMore && itemsWithTotals.length > 0 && (
-                  <div className="flex justify-center py-3">
-                    <span className="text-xs text-gray-300">— End of items —</span>
-                  </div>
-                )}
-              </>
+                );
+              })
             )}
           </div>
 
@@ -615,7 +479,7 @@ useEffect(() => {
                   <input
                     type="text"
                     value={txnSearch}
-                    onChange={(e) => handleTxnSearchChange(e.target.value)}
+                    onChange={(e) => setTxnSearch(e.target.value)}
                     placeholder="Search"
                     className="w-full h-full border rounded-md text-sm outline-none"
                     style={{
@@ -629,15 +493,15 @@ useEffect(() => {
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div className="table-responsive table-desi">
-                <table className="w-full h-full min-w-[700px]" >
+              <div className="flex-1 overflow-x-auto" style={{ position: "relative" }}>
+                <table className="w-full min-w-[600px]" style={{ fontSize: 13, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr >
+                    <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
                       {["Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
                         <th
                           key={h}
-                          //className="text-left py-2 px-3 "
-                          style={{  textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          className="text-left py-2 px-3 font-semibold text-gray-500"
+                          style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}
                         >
                           {h}
                         </th>
@@ -645,15 +509,9 @@ useEffect(() => {
                     </tr>
                   </thead>
                   <tbody>
-                    {isUsageLoading && !rightCursor ? (
+                    {filteredTransactions.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : filteredTransactions.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
+                        <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
                           No transactions to show
                         </td>
                       </tr>
@@ -661,12 +519,7 @@ useEffect(() => {
                       filteredTransactions.map((txn) => (
                         <tr
                           key={txn.id}
-                          style={{
-                            borderBottom: "1px solid #f1f5f9",
-                            position: "relative",
-                            cursor: "pointer",
-                          }}
-                          //style={{ borderBottom: "1px solid #f1f5f9" }}
+                          style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                           onDoubleClick={() => {
                             navigate(`/expense/edit/${txn.id}`, {
@@ -679,19 +532,19 @@ useEffect(() => {
                             });
                           }}
                         >
-                          <td  style={{ whiteSpace: "nowrap" }}>
+                          <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
-                          <td >{txn.expNo || "—"}</td>
-                          <td >{txn.party || "—"}</td>
-                          <td >{txn.paymentType || "—"}</td>
-                          <td  style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                          <td className="py-2 px-3 text-gray-700">{txn.expNo || "—"}</td>
+                          <td className="py-2 px-3 text-gray-700">{txn.party || "—"}</td>
+                          <td className="py-2 px-3 text-gray-500">{txn.paymentType || "—"}</td>
+                          <td className="py-2 px-3 font-semibold" style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.amount)}
                           </td>
-                          <td  style={{ whiteSpace: "nowrap" }}>
+                          <td className="py-2 px-3" style={{ whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.balance)}
                           </td>
-                          <td  style={{ position: "relative" }}>
+                          <td className="py-2 px-3" style={{ position: "relative" }}>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -717,7 +570,7 @@ useEffect(() => {
                                 className="absolute bg-white shadow-lg rounded-md"
                                 style={{
                                   right: 10,
-                                  top: 66,
+                                  top: 36,
                                   width: 160,
                                   zIndex: 50,
                                   border: "1px solid #e2e8f0",
@@ -743,20 +596,31 @@ useEffect(() => {
                                           },
                                         });
                                       }
-                                      // if (key === "preview") {
+                                      if (key === "preview") {
+                                        navigate(`/expense/preview/${txn.id}`, {
+                                          state: {
+                                            from: location.pathname,
+                                            itemId: selectedItemId,
+                                            txnSearch,
+                                            itemSearch,
+                                          },
+                                        });
+                                      }
+                                      if (key === "print") {
+                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
+                                        window.open(url, "_blank");
+                                      }
+                                      // if (key === "print") {
                                       //   navigate(`/expense/preview/${txn.id}`, {
                                       //     state: {
                                       //       from: location.pathname,
                                       //       itemId: selectedItemId,
                                       //       txnSearch,
                                       //       itemSearch,
+                                      //       autoPrint: true,
                                       //     },
                                       //   });
                                       // }
-                                      if (key === "print") {
-                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
-                                        window.open(url, "_blank");
-                                      }
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
@@ -773,21 +637,6 @@ useEffect(() => {
                     )}
                   </tbody>
                 </table>
-
-                {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
-                <div ref={rightSentinelRef} style={{ height: "1px" }} />
-
-                {isUsageFetching && rightCursor && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-sm text-gray-400">Loading more...</span>
-                  </div>
-                )}
-
-                {!usageHasMore && itemUsage.length > 0 && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-xs text-gray-300">— End of transactions —</span>
-                  </div>
-                )}
               </div>
 
             </div>

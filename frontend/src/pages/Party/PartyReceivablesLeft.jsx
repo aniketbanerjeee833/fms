@@ -866,9 +866,18 @@ export default function PartyReceivablesLeft() {
   const [selectedPartyDetails, setSelectedPartyDetails] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
-
-  const { data: partiesData, isLoading } = useGetAllReceivablePartiesQuery({ search: leftSearch });
+   const [leftCursor, setLeftCursor] = useState(null);
+    const leftSentinelRef = useRef(null);
+    const leftObserverRef = useRef(null);
+  const { data: partiesData, isLoading: isLoading,
+    isFetching: isPartiesFetching } = 
+  useGetAllReceivablePartiesQuery({ 
+     cursor: leftCursor,
+      search: leftSearch,
+      limit: 10
+   });
   const parties = partiesData?.parties || [];
+  const totalParties = partiesData?.totalParties || 0;
   console.log("parties", parties);
   const menuRef = useRef(null);
   // auto-select the first party only if nothing is selected yet
@@ -896,7 +905,45 @@ export default function PartyReceivablesLeft() {
     }
     setSearchParams(next, { replace: true });
   };
+    const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
 
+  useEffect(() => {
+    setLeftCursor(null);
+  }, [leftSearch]);
+
+  const handleLeftObserver = useCallback(
+    (entries) => {
+      if (
+        entries[0].isIntersecting &&
+        partiesHasMore &&
+        partiesNextCursor &&
+        !isPartiesFetching &&
+        !isLoading
+      ) {
+        setLeftCursor(partiesNextCursor);
+      }
+    },
+    [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
+  );
+
+  useEffect(() => {
+    if (leftObserverRef.current) {
+      leftObserverRef.current.disconnect();
+    }
+
+    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 0.1,
+    });
+
+    if (leftSentinelRef.current) {
+      leftObserverRef.current.observe(leftSentinelRef.current);
+    }
+
+    return () => leftObserverRef.current?.disconnect();
+  }, [handleLeftObserver]);
   const handleEdit = (party) => {
     console.log("Editing party:", party);
      setPartyModal({
@@ -1009,7 +1056,7 @@ export default function PartyReceivablesLeft() {
               <Users size={15} style={{ color: "#4CA1AF" }} />
 
               <span className="text-xs font-semibold text-black uppercase tracking-wider">
-                Parties ({parties.length})
+                Parties ({totalParties})
               </span>
             </div>
 
@@ -1140,14 +1187,28 @@ export default function PartyReceivablesLeft() {
                 );
               })
             )}
+            <div ref={leftSentinelRef} style={{ height: "1px" }} />
+
+            {isPartiesFetching && leftCursor && (
+              <div className="flex justify-center py-3">
+                <span className="text-sm text-gray-400">Loading more...</span>
+              </div>
+            )}
+
+            {!partiesHasMore && parties.length > 0 && (
+              <div className="flex justify-center py-3">
+                <span className="text-xs text-gray-300">— End of parties —</span>
+              </div>
+            )}
           </div>
+        
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
             <PartyDetailPanel partyId={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div>
         </div>
-      </div>
+     </div>
 
       {partyModal.open && (
         <PartyAddModal

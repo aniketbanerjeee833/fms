@@ -14,6 +14,8 @@ import {
 } from "../../redux/api/itemApi";
 import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
 import SelectUnitModal from "./SelectUnitModal";
+import { purchaseApi } from "../../redux/api/purchaseApi";
+import { saleApi } from "../../redux/api/saleApi";
 
 export default function AddItemModal({ onClose, onSave }) {
     const dispatch = useDispatch();
@@ -109,6 +111,9 @@ export default function AddItemModal({ onClose, onSave }) {
             if (onClose) {
                 onClose();
             }
+            dispatch(itemApi.util.invalidateTags(["Item","ItemLedger"]));
+                    dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+                    dispatch(saleApi.util.invalidateTags(["Sale"]));
         } catch (error) {
             console.error("Submission failed:", error);
             toast.error(error?.data?.message || "Failed to add new item");

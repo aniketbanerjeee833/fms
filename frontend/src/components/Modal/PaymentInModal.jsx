@@ -311,7 +311,7 @@ const onSubmit = (data) => {
         backdropFilter: "blur(4px)",
         zIndex: 50,
         padding: "1rem",
-        marginBottom: "1rem",
+        //marginBottom: "1rem",
       }}
     >
       <div className="bg-white w-full max-w-4xl rounded-lg shadow-lg p-6 overflow-y-auto max-h-[90vh]">

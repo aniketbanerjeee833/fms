@@ -153,7 +153,7 @@ const getLabel = () => {
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
-                        overflow: "hidden",        // clips the rounded corners
+                        //overflow: "hidden",        // clips the rounded corners
                     }}>
 
                         {/* + Add Bank A/C — sticky at top, never scrolls away */}
