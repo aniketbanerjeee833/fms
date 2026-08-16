@@ -136,57 +136,14 @@ const getAllSaleReturns = async (req, res, next) => {
 };
 
 /* ── GET SINGLE ───────────────────────────────────────────── */
-// const getSaleReturnById = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const { Sale_Return_Id } = req.params;
 
-//     const [[header]] = await connection.query(
-//       `SELECT sr.*, p.Party_Name
-//        FROM sale_return sr
-//        LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
-//        WHERE sr.id = ?`,
-//       [Sale_Return_Id]
-//     );
-
-//     if (!header) {
-//       return res.status(404).json({ success: false, message: "Sale Return not found" });
-//     }
-
-//     const [items] = await connection.query(
-//       `SELECT sri.*,
-//               ai.Item_Name AS Item_Name,
-//               ai.Item_HSN  AS Item_HSN,
-//               ai.Item_Unit AS Item_Unit,
-//                ai.Item_Category AS Item_Category
-//        FROM sale_return_items sri
-//        LEFT JOIN add_item ai ON ai.Item_Id = sri.Item_Id
-//        WHERE sri.Sale_Return_Id = ?`,
-//       [Sale_Return_Id]
-//     );
-
-//     // 🔹 fetch splits
-//     const [splits] = await connection.query(
-//       `SELECT ps.*, ba.Account_Display_Name
-//        FROM payment_splits ps
-//        LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//        WHERE ps.Source_Type = 'Sale_Return' AND ps.Source_Id = ?
-//        ORDER BY ps.id ASC`,
-//       [Sale_Return_Id]
-//     );
-
-//     return res.status(200).json({
-//       success: true,
-//       saleReturn: { ...header, items, splits },
-//     });
-//   } catch (err) {
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-
+//    (
+//   SELECT pa.Address_Text
+//   FROM add_party_addresses pa
+//   WHERE pa.Party_Id = sr.Party_Id
+//     AND pa.Address_Type = 'Billing'
+//     AND pa.Is_Default = 1
+// ) AS Billing_Address
 const getSaleReturnById = async (req, res, next) => {
   let connection;
   try {
@@ -220,14 +177,8 @@ const getSaleReturnById = async (req, res, next) => {
      a.GSTIN,
       
          a.GSTIN,
-         a.State,
-            (
-  SELECT pa.Address_Text
-  FROM add_party_addresses pa
-  WHERE pa.Party_Id = sr.Party_Id
-    AND pa.Address_Type = 'Billing'
-    AND pa.Is_Default = 1
-) AS Billing_Address
+         a.State
+         
    FROM sale_return sr
    LEFT JOIN add_party a
      ON a.Party_Id = sr.Party_Id

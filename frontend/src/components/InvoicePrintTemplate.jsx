@@ -584,93 +584,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
         <tbody>
 
-          {/* {items.map((item, idx) => {
 
-            const taxAmount = getTaxAmount(item);
-
-            const itemCgst = taxAmount / 2;
-
-            const itemSgst = taxAmount / 2;
-
-            const isTaxable =
-              item?.Tax_Type &&
-              item.Tax_Type !== "None" &&
-              taxAmount > 0;
-
-            return (
-              <tr
-                key={item.Purchase_Items_Id || idx}
-              >
-
-               
-
-                <td className="invoice-item-center">
-                  {idx + 1}
-                </td>
-
-
-
-                <td className="invoice-item-cell invoice-bold">
-                  {safe(item.Item_Name)}
-                </td>
-
-
-              
-
-                <td className="invoice-item-cell">
-                  {safe(item.Item_HSN)}
-                </td>
-
-
-                
-
-                <td className="invoice-item-right">
-                  {money(item.Quantity)}
-                  {item.Item_Unit
-                    ? ` ${item.Item_Unit}`
-                    : ""}
-                </td>
-
-
-              
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Purchase_Price)}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Amount)}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(itemCgst)}
-                  {isTaxable ? " (9%)" : ""}
-                </td>
-
-
-              
-
-                <td className="invoice-item-right">
-                  ₹ {money(itemSgst)}
-                  {isTaxable ? " (9%)" : ""}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Amount)}
-                </td>
-
-              </tr>
-            );
-          })} */}
           {items.map((item, idx) => {
             const taxAmount = getTaxAmount(item);
             const gstRate = getGstRate(item.Tax_Type);
@@ -811,7 +725,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             <td className="invoice-total-cell"></td>
 
             {/* Item Name column */}
-            <td className="invoice-total-cell "  style={{ textAlign: "left" }}>
+            <td className="invoice-total-cell " style={{ textAlign: "left" }}>
               Total
             </td>
 
@@ -889,11 +803,12 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       ===================================================== */}
       <div className="grid grid-cols-2  invoice-bottom-grid">
 
-        <div className="invoice-bottom-left">
+        {/* <div className="invoice-bottom-left"> */}
 
 
-          <div className="invoice-summary-column">
-            {hasTaxDetails ? (
+          {/* <div className="invoice-summary-column"> */}
+          <div className="invoice-bottom-left">
+            {hasTaxDetails && (
               <table
                 className="invoice-summary-table"
                 style={{ width: "100%" }}
@@ -946,32 +861,33 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                     ))}
                   </tr>
                 </tbody>
-              </table>) : (
-              <div
-                style={{
-                  border: "1px solid #777",
-                  flex: 1,
-                  //minHeight: "100%",
-                  //height: "65px",
-                  //height: "90px"
-                  height: "100%"
-                }}
-              />
-            )}
+              </table>)} 
+            {/* //   : (
+            //   <div
+            //     style={{
+            //       border: "1px solid #777",
+            //       flex: 1,
+            //       //minHeight: "100%",
+            //       //height: "65px",
+            //       //height: "90px"
+            //       height: "100%"
+            //     }}
+            //   />
+            // )} */}
           </div>
 
 
-          <div>
+          {/* <div>
             <div className="invoice-words-header">
-              {type==="sale" ? "Invoice Amount In Words" : "Bill Amount In Words"}
+              {type === "sale" ? "Invoice Amount In Words" : "Bill Amount In Words"}
             </div>
 
             <div className="invoice-words">
               {amountInWords}
             </div>
-          </div>
-
-        </div>
+          </div> */}
+{/* 
+        </div> */}
 
 
         <div className="invoice-bottom-right">
@@ -979,7 +895,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             AMOUNTS
         =================================================== */}
 
-          <div className="invoice-summary-column">
+          {/* <div className="invoice-summary-column"> */}
 
             <div className="invoice-summary-header">
               Amounts
@@ -1003,30 +919,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </tr>
 
 
-                {/* <tr>
 
-                  <td className="invoice-summary-cell invoice-bold">
-                    Total
-                  </td>
-
-                  <td className="invoice-summary-cell-right invoice-bold">
-                    ₹ {money(Total_Amount)}
-                  </td>
-
-                </tr>
-
-
-                <tr>
-
-                  <td className="invoice-summary-cell">
-                    {type === "sale" ? "Received" : "Paid"}
-                  </td>
-
-                  <td className="invoice-summary-cell-right">
-                    ₹ {money(Total_Paid)}
-                  </td>
-
-                </tr> */}
                 <tr>
                   <td className="invoice-summary-cell">
                     <div className="invoice-bold">
@@ -1066,8 +959,28 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             </table>
 
+          {/* </div> */}
+
+
+        </div>
+
+
+      </div>
+
+      <div className="grid grid-cols-2 invoice-bottom-grid">
+
+        <div className="invoice-bottom-left">
+          <div className="invoice-words-header">
+            {type === "sale" ? "Invoice Amount In Words" : "Bill Amount In Words"}
           </div>
 
+          <div className="invoice-words">
+            {amountInWords}
+          </div>
+        </div>
+
+        <div className="invoice-bottom-right">
+          ...
         </div>
 
       </div>
@@ -1100,7 +1013,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
           <div className="invoice-signature-authorized">
             Authorized Signatory
           </div>
-          
+
         </div>
 
       </div>
@@ -1111,7 +1024,93 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 export default InvoicePrintTemplate;
 
+{/* {items.map((item, idx) => {
 
+            const taxAmount = getTaxAmount(item);
+
+            const itemCgst = taxAmount / 2;
+
+            const itemSgst = taxAmount / 2;
+
+            const isTaxable =
+              item?.Tax_Type &&
+              item.Tax_Type !== "None" &&
+              taxAmount > 0;
+
+            return (
+              <tr
+                key={item.Purchase_Items_Id || idx}
+              >
+
+               
+
+                <td className="invoice-item-center">
+                  {idx + 1}
+                </td>
+
+
+
+                <td className="invoice-item-cell invoice-bold">
+                  {safe(item.Item_Name)}
+                </td>
+
+
+              
+
+                <td className="invoice-item-cell">
+                  {safe(item.Item_HSN)}
+                </td>
+
+
+                
+
+                <td className="invoice-item-right">
+                  {money(item.Quantity)}
+                  {item.Item_Unit
+                    ? ` ${item.Item_Unit}`
+                    : ""}
+                </td>
+
+
+              
+
+                <td className="invoice-item-right">
+                  ₹ {money(item.Purchase_Price)}
+                </td>
+
+
+               
+
+                <td className="invoice-item-right">
+                  ₹ {money(item.Amount)}
+                </td>
+
+
+               
+
+                <td className="invoice-item-right">
+                  ₹ {money(itemCgst)}
+                  {isTaxable ? " (9%)" : ""}
+                </td>
+
+
+              
+
+                <td className="invoice-item-right">
+                  ₹ {money(itemSgst)}
+                  {isTaxable ? " (9%)" : ""}
+                </td>
+
+
+               
+
+                <td className="invoice-item-right">
+                  ₹ {money(item.Amount)}
+                </td>
+
+              </tr>
+            );
+          })} */}
 
 {/* <div className="invoice-bottom-left">
 

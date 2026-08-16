@@ -10,10 +10,10 @@ import {
     Trash2
 } from "lucide-react";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { toast } from "react-toastify";
-import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
@@ -21,6 +21,8 @@ import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bank
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { itemApi } from "../../redux/api/itemApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { useReactToPrint } from "react-to-print";
+import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 
 
 
@@ -42,6 +44,13 @@ export default function PaymentIn() {
     const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
     const [rowMenuOpen, setRowMenuOpen] = useState(null);
     const [deletePaymentIn, { isLoading: isDeleting }] = useDeletePaymentInMutation();
+    const [printPaymentInId, setPrintPaymentInId] = useState(null);
+    const printRef = useRef(null);
+
+    /* fetch the full payment (with Party details) only when printing */
+    const { data: printData } = useGetPaymentInByIdQuery(printPaymentInId, {
+        skip: !printPaymentInId,
+    });
     const handlePageChange = (newPage) => {
         setSearchParams({
             page: newPage,
@@ -121,9 +130,7 @@ export default function PaymentIn() {
         }
     };
 
-    const handlePrint = (paymentIn) => {
-        console.log("Print payment in:", paymentIn);
-    };
+
 
     const handleConfirmDelete = async () => {
         if (!deleteTarget) return;
@@ -160,7 +167,18 @@ export default function PaymentIn() {
         }
     };
 
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: printPaymentInId ? `Receipt-${printPaymentInId}` : "Payment Receipt",
+        onAfterPrint: () => setPrintPaymentInId(null),
+    });
 
+    /* trigger print once data has loaded */
+    useEffect(() => {
+        if (printData?.paymentIn && printPaymentInId) {
+            handlePrint();
+        }
+    }, [printData, printPaymentInId])
 
     return (
         <>
@@ -279,7 +297,7 @@ export default function PaymentIn() {
                     {/* Paid + Unpaid = Total */}
                     <div className="flex flex-col bg-white p-6 rounded-xl shadow-md w-full max-w-sm">
 
-                        
+
                         {/* <div className="mb-2 text-left">
                             <p className="text-sm font-medium text-black">Total Amount</p>
                             <h4 className="text-3xl font-bold text-black">₹  {paymentInData?.totals?.totalReceived}</h4>
@@ -297,33 +315,33 @@ export default function PaymentIn() {
 
                         </div> */}
                         {/* Total Sales */}
-<div className="mb-2 text-left">
-  <p className="text-sm font-medium text-black">Total Amount</p>
-  <h4 className="text-3xl font-bold text-black">
-    ₹{(Number(paymentInData?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}
-  </h4>
-</div>
+                        <div className="mb-2 text-left">
+                            <p className="text-sm font-medium text-black">Total Amount</p>
+                            <h4 className="text-3xl font-bold text-black">
+                                ₹{(Number(paymentInData?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
+                            </h4>
+                        </div>
 
-{/* Divider */}
-<div className="border-t border-gray-300 mb-2"></div>
+                        {/* Divider */}
+                        <div className="border-t border-gray-300 mb-2"></div>
 
-{/* Received & Balance */}
-<div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
-  <div className="flex">
-    <span className="text-sm font-medium text-gray-500">
-      Received&nbsp;&nbsp;
-    </span>
-    <span className="text-sm font-semibold text-black">
-      ₹{(Number(paymentInData?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}
-    </span>
-  </div>
-</div>
+                        {/* Received & Balance */}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+                            <div className="flex">
+                                <span className="text-sm font-medium text-gray-500">
+                                    Received&nbsp;&nbsp;
+                                </span>
+                                <span className="text-sm font-semibold text-black">
+                                    ₹{(Number(paymentInData?.totals?.totalReceived) || 0).toLocaleString("en-IN", {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    })}
+                                </span>
+                            </div>
+                        </div>
 
                     </div>
                     <div className="flex justify-end">
@@ -371,7 +389,7 @@ export default function PaymentIn() {
                                                         data: paymentIn,
                                                     });
                                                 }}
-                                             style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
+                                                style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
                                             >
                                                 <td>
                                                     {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.
@@ -482,8 +500,13 @@ export default function PaymentIn() {
                                                                 }}
                                                                 onClick={() => {
                                                                     setRowMenuOpen(null);
-                                                                    handlePrint(paymentIn);
+                                                                    setPrintPaymentInId(paymentIn?.id)
+                                                                    //handlePrint(purchase);
                                                                 }}
+                                                            // onClick={() => {
+                                                            //     setRowMenuOpen(null);
+                                                            //     handlePrint(paymentIn);
+                                                            // }}
                                                             >
                                                                 <Printer
                                                                     size={13}
@@ -681,6 +704,15 @@ export default function PaymentIn() {
 
                 />
             )}
+              {printData?.paymentIn && (
+                            <div style={{ display: "none" }}>
+                                <PaymentInOutPrintTemplate
+                                    ref={printRef}
+                                    payment={printData?.paymentIn}
+                                    type="in"
+                                />
+                            </div>
+                        )}
 
         </>
 

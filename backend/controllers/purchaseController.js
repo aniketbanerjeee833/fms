@@ -3148,6 +3148,13 @@ if (purchaseReturn) {
 };
 
 //TRYING
+//      (
+//   SELECT pa.Address_Text
+//   FROM add_party_addresses pa
+//   WHERE pa.Party_Id = pu.Party_Id
+//     AND pa.Address_Type = 'Billing'
+//     AND pa.Is_Default = 1
+// ) AS Billing_Address,
 const getSinglePurchase = async (req, res, next) => {
   let connection;
 
@@ -3190,13 +3197,7 @@ const getSinglePurchase = async (req, res, next) => {
          p.Party_Name,
     p.GSTIN,
     p.State,
-          (
-  SELECT pa.Address_Text
-  FROM add_party_addresses pa
-  WHERE pa.Party_Id = pu.Party_Id
-    AND pa.Address_Type = 'Billing'
-    AND pa.Is_Default = 1
-) AS Billing_Address,
+     
 
         tc.Title AS Terms_Conditions_Title
 

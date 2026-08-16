@@ -808,8 +808,8 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
 
-          <div className="invoice-summary-column">
-            {hasTaxDetails ? (<table
+          {/* <div className="invoice-summary-column"> */}
+            {hasTaxDetails && (<table
               className="invoice-summary-table"
               style={{ width: "100%" }}
             >
@@ -861,29 +861,20 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   ))}
                 </tr>
               </tbody>
-            </table>) : (
-              <div
-                style={{
-                  border: "1px solid #777",
-                  height: "65px",
-                }}
-              />
-            )}
-          </div>
+            </table>)}
+            {/* // : (
+            //   <div
+            //     style={{
+            //       border: "1px solid #777",
+            //       height: "65px",
+            //     }}
+            //   /> */}
+            
+          {/* </div> */}
 
 
 
-          <div>
-
-            <div className="invoice-words-header">
-              Bill Amount In Words
-            </div>
-
-            <div className="invoice-words">
-              {amountInWords}
-            </div>
-
-          </div>
+          
 
 
 
@@ -898,7 +889,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             AMOUNTS
         =================================================== */}
 
-          <div className="invoice-summary-column ">
+          {/* <div className="invoice-summary-column "> */}
 
             <div className="invoice-summary-header">
               Amounts
@@ -962,13 +953,31 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             </table>
 
-          </div>
+          {/* </div> */}
           {/* ===================================================
             SIGNATURE
         =================================================== */}
 
         </div>
 
+
+      </div>
+        <div className="grid grid-cols-2 invoice-bottom-grid">
+
+        <div className="invoice-bottom-left">
+          <div className="invoice-words-header">
+              Bill Amount In Words
+            </div>
+
+            <div className="invoice-words">
+              {amountInWords}
+            </div>
+
+        </div>
+
+        <div className="invoice-bottom-right">
+          ...
+        </div>
 
       </div>
 

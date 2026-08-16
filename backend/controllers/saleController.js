@@ -2933,6 +2933,13 @@ const getAllNewSales = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+//     (
+//   SELECT pa.Address_Text
+//   FROM add_party_addresses pa
+//   WHERE pa.Party_Id = s.Party_Id
+//     AND pa.Address_Type = 'Billing'
+//     AND pa.Is_Default = 1
+// ) AS Billing_Address,
 const getSingleSale = async (req, res, next) => {
   let connection;
   try {
@@ -2986,13 +2993,7 @@ const getSingleSale = async (req, res, next) => {
     p.GSTIN,
     p.State,
     
-    (
-  SELECT pa.Address_Text
-  FROM add_party_addresses pa
-  WHERE pa.Party_Id = s.Party_Id
-    AND pa.Address_Type = 'Billing'
-    AND pa.Is_Default = 1
-) AS Billing_Address,
+
 
 
      -- Title only exists when this invoice is linked
