@@ -589,6 +589,15 @@ export const itemApi = createApi({
       invalidatesTags: ["Category"],
     }),
 
+    editCategory: builder.mutation({
+      query: ({ categoryId, body }) => ({
+         url: `item/edit-category/${categoryId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["Category"],
+    }),
+
     getAllCategories: builder.query({
       query: () => `item/get-all-categories`,
       providesTags: ["Category"],
@@ -787,6 +796,7 @@ export const {
   useDeleteItemMutation,
   useGetEachItemBillAndInvoiceNumbersQuery,
   useAddCategoryMutation,
+  useEditCategoryMutation,
   useGetAllCategoriesQuery,
   useGetAllCategoriesCursorQuery,
   useGetEachItemSalesPurchasesDetailsQuery,

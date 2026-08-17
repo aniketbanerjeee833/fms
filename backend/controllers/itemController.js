@@ -3146,6 +3146,112 @@ const addCategory = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+const editCategory = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { categoryId } = req.params;
+    const { Item_Category } = req.body;
+
+    if (!categoryId) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Category ID is required.",
+      });
+    }
+
+    if (!Item_Category?.trim()) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Item Category is required.",
+      });
+    }
+
+    const normalizedCategory = Item_Category.trim().replace(/\s+/g, " ");
+
+    // Get existing category
+    const [[existingCategory]] = await connection.query(
+      `
+      SELECT Category_Id, Item_Category
+      FROM add_category
+      WHERE Category_Id = ?
+      LIMIT 1
+      `,
+      [categoryId]
+    );
+
+    if (!existingCategory) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Category not found.",
+      });
+    }
+
+    const oldCategoryName = existingCategory.Item_Category;
+
+    // Duplicate check
+    const [duplicate] = await connection.query(
+      `
+      SELECT Category_Id
+      FROM add_category
+      WHERE LOWER(TRIM(Item_Category)) = ?
+      AND Category_Id <> ?
+      `,
+      [normalizedCategory.toLowerCase(), categoryId]
+    );
+
+    if (duplicate.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Category already exists.",
+      });
+    }
+
+    // Update category master
+    await connection.query(
+      `
+      UPDATE add_category
+      SET
+        Item_Category = ?,
+        updated_at = NOW()
+      WHERE Category_Id = ?
+      `,
+      [normalizedCategory, categoryId]
+    );
+
+    // Update all items using old category name
+    await connection.query(
+      `
+      UPDATE add_item
+      SET Item_Category = ?
+      WHERE TRIM(Item_Category) = TRIM(?)
+      `,
+      [normalizedCategory, oldCategoryName]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Category updated successfully.",
+      Category_Id: categoryId,
+      Item_Category: normalizedCategory,
+    });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("❌ Error updating category:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
 const getAllCategories = async (req, res, next) => {
   let connection;
   try {
@@ -5047,7 +5153,7 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
 
 
 export {
-  addItem, editItem, deleteItem, addCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
+  addItem, editItem, deleteItem, addCategory,editCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
   eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers, addItemConversion, getItemConversions,
   getAllItemsForLedger, getItemBills, getItemsByCategory, addStockAdjustment, editStockAdjustment,
