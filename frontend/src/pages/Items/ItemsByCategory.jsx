@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { NavLink,  useSearchParams } from "react-router-dom";
+import { NavLink, useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   Search,
@@ -40,7 +40,8 @@ export default function ItemsByCategory() {
   const itemSearch = searchParams.get("itemSearch") || "";
   const [menuOpen, setMenuOpen] = useState(null);
   //const [itemRowMenu, setItemRowMenu] = useState(null);
-  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  //const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [categoryModal, setCategoryModal] = useState({ open: false, mode: "add", data: null });
   //const [showEditItemModal, setShowEditItemModal] = useState(false);
   //const [editingItem, setEditingItem] = useState(null);
   const [leftCursor, setLeftCursor] = useState(null);
@@ -91,14 +92,14 @@ export default function ItemsByCategory() {
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
 
-    const {
+  const {
     data: itemsResponse,
     isLoading: isItemsLoading,
     isFetching: isItemsFetching,
   } = useGetItemsByCategoryQuery({ categoryId: selectedCategoryId, cursor: rightCursor, search: itemSearch });
 
   const items = itemsResponse?.items || [];
-  const totalItems= itemsResponse?.totalItems || 0;
+  const totalItems = itemsResponse?.totalItems || 0;
   //const categoryInfo = itemsResponse?.category;
   const itemsHasMore = itemsResponse?.hasMore ?? false;
   const itemsNextCursor = itemsResponse?.nextCursor ?? null;
@@ -122,7 +123,7 @@ export default function ItemsByCategory() {
   //   // "All" and "Uncategorized" are always pinned at the top, unaffected by cursor pagination
   //   return categories.filter((c) => c.Item_Category?.toLowerCase().includes(categorySearch.toLowerCase()));
   // }, [categories, categorySearch]);
- 
+
 
   // default to "all" bucket on first load
   useEffect(() => {
@@ -158,9 +159,9 @@ export default function ItemsByCategory() {
   //     c.Item_Category.toLowerCase().includes(categorySearch.toLowerCase())
   //   );
   // }, [sidebarCategories, categorySearch]);
-const filteredCategories=categories
-console.log("filteredCategories",filteredCategories)
-const totalCategories=categoryResponse?.totalCategories||0
+  const filteredCategories = categories
+  console.log("filteredCategories", filteredCategories)
+  const totalCategories = categoryResponse?.totalCategories || 0
   const selectedCategory =
     filteredCategories.find((c) => c.Category_Id === selectedCategoryId) || null;
 
@@ -177,19 +178,19 @@ const totalCategories=categoryResponse?.totalCategories||0
     setMenuOpen(null);
   };
 
-  const handleCategoryAdded = (savedCategory) => {
-    setShowAddCategoryModal(false);
+  // const handleCategoryAdded = (savedCategory) => {
+  //   setShowAddCategoryModal(false);
 
-    if (savedCategory?.Category_Id) {
-      const next = new URLSearchParams(searchParams);
+  //   if (savedCategory?.Category_Id) {
+  //     const next = new URLSearchParams(searchParams);
 
-      next.set("categoryId", savedCategory.Category_Id);
+  //     next.set("categoryId", savedCategory.Category_Id);
 
-      next.delete("itemSearch");
+  //     next.delete("itemSearch");
 
-      setSearchParams(next);
-    }
-  };
+  //     setSearchParams(next);
+  //   }
+  // };
 
 
 
@@ -208,9 +209,17 @@ const totalCategories=categoryResponse?.totalCategories||0
               <p className="text-gray-500 text-sm">Manage your item categories and stock</p>
             </div>
 
-            <button
+            {/* <button
               type="button"
               onClick={() => setShowAddCategoryModal(true)}
+              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
+            >
+              + Add Category
+            </button> */}
+            <button
+              type="button"
+              onClick={() => setCategoryModal({ open: true, mode: "add", data: null })}
               className="text-white px-4 py-2 rounded-md text-sm font-medium"
               style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
             >
@@ -294,12 +303,21 @@ const totalCategories=categoryResponse?.totalCategories||0
               filteredCategories.map((category) => {
                 const isSelected = selectedCategoryId === category.Category_Id;
                 //const isAllBucket = category.Category_Id === "all";
-                const isUncategorized =category.Category_Id === "uncategorized";
+                const isUncategorized = category.Category_Id === "uncategorized";
 
                 return (
                   <div
                     key={category.Category_Id}
                     onClick={() => handleSelectCategory(category)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (category.Category_Id === "uncategorized") return; // can't edit the virtual bucket
+                      setCategoryModal({
+                        open: true,
+                        mode: "edit",
+                        data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+                      });
+                    }}
                     className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                     style={{
                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
@@ -348,7 +366,7 @@ const totalCategories=categoryResponse?.totalCategories||0
                           <MoreVertical size={14} style={{ color: "#374151" }} />
                         </button>
                       )} */}
-                       {!isUncategorized && (
+                      {!isUncategorized && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -387,9 +405,18 @@ const totalCategories=categoryResponse?.totalCategories||0
                         <button
                           type="button"
                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
-                          disabled
-                          title="Edit category — coming soon"
-                          style={{ color: "#9ca3af", cursor: "not-allowed" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCategoryModal({
+                              open: true,
+                              mode: "edit",
+                              data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+                            });
+                            setMenuOpen(null);
+                          }}
+                          //disabled
+                          title="Edit category"
+                         style={{ color: "#374151", cursor: "pointer" }}
                         >
                           View/Edit
                         </button>
@@ -408,8 +435,8 @@ const totalCategories=categoryResponse?.totalCategories||0
                 );
               })
             )}
-             <div ref={leftSentinelRef} style={{ height: 1 }} />
-        {isCategoriesFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+            <div ref={leftSentinelRef} style={{ height: 1 }} />
+            {isCategoriesFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
@@ -504,10 +531,10 @@ const totalCategories=categoryResponse?.totalCategories||0
               <div className="table-responsive table-desi">
                 <table
                   className="w-full min-w-[700px]"
-                  //style={{ fontSize: 13, borderCollapse: "collapse" }}
+                //style={{ fontSize: 13, borderCollapse: "collapse" }}
                 >
                   <thead>
-                    <tr 
+                    <tr
                     //style={{ borderBottom: "2px solid #e2e8f0" }}
                     >
                       <th
@@ -599,18 +626,36 @@ const totalCategories=categoryResponse?.totalCategories||0
               </div>
 
             </div>
-             <div ref={rightSentinelRef} style={{ height: 1 }} />
-        {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
-        {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>}
+            <div ref={rightSentinelRef} style={{ height: 1 }} />
+            {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+            {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>}
           </div>
 
         </div>
       </div>
 
-      {showAddCategoryModal && (
+      {/* {showAddCategoryModal && (
         <AddItemCategoryModal
           onClose={() => setShowAddCategoryModal(false)}
           onSave={handleCategoryAdded}
+        />
+
+      )} */}
+      {categoryModal.open && (
+        <AddItemCategoryModal
+          mode={categoryModal.mode}
+          categoryData={categoryModal.data}
+          onClose={() => setCategoryModal({ open: false, mode: "add", data: null })}
+          onSave={(savedCategory) => {
+            setCategoryModal({ open: false, mode: "add", data: null });
+
+            if (savedCategory?.Category_Id) {
+              const next = new URLSearchParams(searchParams);
+              next.set("categoryId", savedCategory.Category_Id);
+              next.delete("itemSearch");
+              setSearchParams(next);
+            }
+          }}
         />
       )}
 

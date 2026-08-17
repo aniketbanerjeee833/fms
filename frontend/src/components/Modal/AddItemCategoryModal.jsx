@@ -126,7 +126,8 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { toast } from "react-toastify";
-import { useAddCategoryMutation, useEditCategoryMutation } from "../redux/api/itemCategoryApi"; // adjust path
+import { useAddCategoryMutation, useEditCategoryMutation } from "../../redux/api/itemApi";
+
 
 export default function AddItemCategoryModal({
   mode = "add",          // "add" | "edit"
@@ -217,7 +218,8 @@ export default function AddItemCategoryModal({
         className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center px-6 py-4 border-b">
+        <div className="flex justify-between items-center px-6 py-4"
+        style={{ marginBottom: "20px", paddingBottom: "10px", borderBottom: "1px solid #e5e7eb" }}>
           <h4 className="text-lg font-bold">
             {isEdit ? "Edit Category" : "Add New Category"}
           </h4>
