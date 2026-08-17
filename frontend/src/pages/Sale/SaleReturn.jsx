@@ -86,26 +86,24 @@ export default function SaleReturn() {
     });
   };
 
-  const handleExportExcel = () => {
-    const params = new URLSearchParams();
-    if (searchTerm) params.set("search", searchTerm);
-    if (fromDate) params.set("fromDate", fromDate);
-    if (toDate) params.set("toDate", toDate);
+ const handleExportSaleReturnExcel = () => {
+  const params = new URLSearchParams();
 
-    // anchor download 
-    const url = `http://localhost:4000/api/sale/export-sale-excel?${params.toString()}`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "";          // filename comes from Content-Disposition header
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  if (searchTerm) params.set("search", searchTerm);
+  if (fromDate) params.set("fromDate", fromDate);
+  if (toDate) params.set("toDate", toDate);
 
-  // const handlePrint = (saleReturn) => {
-  //   console.log("Print sale return:", saleReturn);
-  // };
+  const a = document.createElement("a");
 
+  a.href =
+    `http://localhost:4000/api/sale-return/export-sale-return-excel?${params.toString()}`;
+
+  a.download = "";
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
@@ -282,16 +280,19 @@ export default function SaleReturn() {
           </div>
           <div className="flex justify-end sm: mt-4">
 
-            <button
+                    <button
               type="button"
-              onClick={handleExportExcel}
-              className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
+              onClick={handleExportSaleReturnExcel}
+              className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                                                                            text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
               title="Export to Excel"
             >
               <FileSpreadsheet
-                size={22}
-                className="transition-transform duration-200 group-hover:scale-110"
+                size={16}
+                strokeWidth={2.2}
+                className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
               />
+              {/* Export Excel */}
             </button>
           </div>
         </div>

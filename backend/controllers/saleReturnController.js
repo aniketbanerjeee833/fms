@@ -5,6 +5,7 @@ import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.j
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
+import ExcelJS from "exceljs";
 const cleanValue = (value) => {
   if (value === undefined || value === null || value === "" || value === " ") {
     return null; // store as NULL in DB
@@ -3052,10 +3053,306 @@ const editSaleReturn = async (req, res, next) => {
     }
   }
 };
+const exportSaleReturnReportToExcel = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const search = req.query.search?.trim() || "";
+    const fromDate = req.query.fromDate || null;
+    const toDate = req.query.toDate || null;
+
+    const whereClauses = [];
+    const params = [];
+
+    if (search) {
+      const like = `%${search}%`;
+
+      whereClauses.push(`
+        (
+          p.Party_Name LIKE ?
+          OR sr.Return_Number LIKE ?
+          OR sr.Invoice_Number LIKE ?
+          OR CAST(sr.Total_Amount AS CHAR) LIKE ?
+          OR CAST(sr.Total_Paid AS CHAR) LIKE ?
+          OR CAST(sr.Balance_Due AS CHAR) LIKE ?
+        )
+      `);
+
+      params.push(
+        like,
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    if (fromDate && toDate) {
+      whereClauses.push(
+        `DATE(sr.Return_Date) BETWEEN ? AND ?`
+      );
+      params.push(fromDate, toDate);
+    } else if (fromDate) {
+      whereClauses.push(
+        `DATE(sr.Return_Date) >= ?`
+      );
+      params.push(fromDate);
+    } else if (toDate) {
+      whereClauses.push(
+        `DATE(sr.Return_Date) <= ?`
+      );
+      params.push(toDate);
+    }
+
+    const whereSQL =
+      whereClauses.length
+        ? `WHERE ${whereClauses.join(" AND ")}`
+        : "";
+
+    const [rows] = await connection.query(
+      `
+      SELECT
+        sr.*,
+        p.Party_Name
+      FROM sale_return sr
+      LEFT JOIN add_party p
+        ON p.Party_Id = sr.Party_Id
+      ${whereSQL}
+      ORDER BY sr.Return_Date DESC
+      `,
+      params
+    );
+
+    const returnIds = rows.map((r) => r.id);
+
+    if (returnIds.length) {
+      const placeholders = returnIds
+        .map(() => "?")
+        .join(",");
+
+      const [splits] = await connection.query(
+        `
+        SELECT
+          ps.Source_Id,
+          ps.Payment_Type,
+          ba.Account_Display_Name
+        FROM payment_splits ps
+        LEFT JOIN bank_accounts ba
+          ON ba.id = ps.Bank_Account_Id
+        WHERE ps.Source_Type = 'Sale_Return'
+          AND ps.Source_Id IN (${placeholders})
+        `,
+        returnIds
+      );
+
+      const splitMap = {};
+
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
+        }
+
+        splitMap[split.Source_Id].push(
+          split.Payment_Type === "Bank"
+            ? split.Account_Display_Name
+            : split.Payment_Type
+        );
+      }
+
+      rows.forEach((row) => {
+        row.Payment_Type_Display =
+          splitMap[row.id]?.join(", ") || "—";
+      });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet(
+      "Sale Return Report"
+    );
+
+    sheet.columns = [
+      { width: 15 }, // Date
+      { width: 18 }, // Return No
+      { width: 18 }, // Invoice No
+      { width: 35 }, // Party
+      { width: 25 }, // Payment Type
+      { width: 18 }, // Amount
+      { width: 18 }, // Paid
+      { width: 18 }, // Balance
+    ];
+
+    const LAST_COL = "H";
+
+    sheet.mergeCells(`A1:${LAST_COL}1`);
+
+    const titleCell = sheet.getCell("A1");
+    titleCell.value = "SALE RETURN REPORT";
+    titleCell.font = {
+      bold: true,
+      size: 14,
+    };
+    titleCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+    };
+
+    sheet.mergeCells(`A2:${LAST_COL}2`);
+
+    sheet.getCell("A2").value =
+      `Generated on ${new Date().toLocaleString("en-IN")}`;
+
+    sheet.getCell("A2").font = {
+      italic: true,
+      size: 10,
+    };
+
+    sheet.addRow([]);
+
+    const headerRow = sheet.addRow([
+      "Return Date",
+      "Return No",
+      "Invoice No",
+      "Party Name",
+      "Payment Type",
+      "Total Amount",
+      "Total Paid",
+      "Balance Due",
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+      };
+
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+
+      cell.border = {
+        top: { style: "thin" },
+        bottom: { style: "medium" },
+        left: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    const FIRST_DATA_ROW = 5;
+
+    rows.forEach((row) => {
+      const excelRow = sheet.addRow([
+        row.Return_Date
+          ? new Date(
+              row.Return_Date
+            ).toLocaleDateString("en-IN")
+          : "",
+        row.Return_Number || "",
+        row.Invoice_Number || "",
+        row.Party_Name || "",
+        row.Payment_Type_Display || "",
+        Number(row.Total_Amount || 0),
+        Number(row.Total_Paid || 0),
+        Number(row.Balance_Due || 0),
+      ]);
+
+      excelRow.eachCell(
+        { includeEmpty: true },
+        (cell, colNumber) => {
+          cell.border = {
+            top: { style: "hair" },
+            bottom: { style: "hair" },
+            left: { style: "hair" },
+            right: { style: "hair" },
+          };
+
+          if ([6, 7, 8].includes(colNumber)) {
+            cell.numFmt = "#,##0.00";
+            cell.alignment = {
+              horizontal: "right",
+            };
+          }
+        }
+      );
+    });
+
+    const lastDataRow = sheet.rowCount;
+
+    const totalRow = sheet.addRow([
+      "",
+      "",
+      "",
+      "",
+      "TOTAL",
+      {
+        formula: `SUM(F${FIRST_DATA_ROW}:F${lastDataRow})`,
+      },
+      {
+        formula: `SUM(G${FIRST_DATA_ROW}:G${lastDataRow})`,
+      },
+      {
+        formula: `SUM(H${FIRST_DATA_ROW}:H${lastDataRow})`,
+      },
+    ]);
+
+    totalRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+      };
+
+      cell.border = {
+        top: { style: "medium" },
+        bottom: { style: "medium" },
+        left: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    sheet.views = [
+      {
+        state: "frozen",
+        ySplit: 4,
+      },
+    ];
+
+    const fileName =
+      fromDate && toDate
+        ? `SaleReturnReport_${fromDate}_to_${toDate}`
+        : `SaleReturnReport_${new Date()
+            .toISOString()
+            .slice(0, 10)}`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName}.xlsx"`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(
+      "❌ Sale Return Excel export error:",
+      err
+    );
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 export {
   getAllSaleReturns,
   getSaleReturnById,
   createSaleReturn,
   editSaleReturn,
   deleteSaleReturn,
+  exportSaleReturnReportToExcel
 };

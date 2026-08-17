@@ -6,10 +6,11 @@ import {
   createPaymentIn,
   updatePaymentIn,
   deletePaymentIn,
+  exportPaymentInsReportToExcel,
  
 } from "../controllers/paymentInController.js";
 import userAuth from "../middleware/userAuth.js";
-
+router.get("/export-payment-in-excel",userAuth,exportPaymentInsReportToExcel);
 router.get("/",userAuth,  getAllPaymentIns);
 router.get("/:id", userAuth,getPaymentInById);
 router.post("/", userAuth,createPaymentIn);

@@ -1372,7 +1372,9 @@ export default function ItemsByItem() {
     const [cursor, setCursor] = useState(null);
     const sentinelRef = useRef(null);
     const observerRef = useRef(null);
+const itemRef = useRef(selectedItemId);
 
+const effectiveCursor =itemRef.current === selectedItemId? cursor: null;
 
     const {
         data: billsResponse,
@@ -1381,7 +1383,7 @@ export default function ItemsByItem() {
     } = useGetItemBillsQuery(
         {
             Item_Id: selectedItemId,
-            cursor,
+           cursor: effectiveCursor,
             search: txnSearch,
         },
         {
@@ -1395,22 +1397,7 @@ export default function ItemsByItem() {
     const nextCursor = billsResponse?.nextCursor ?? null;
 
 
-    // useEffect(() => {
-    //     if (!items.length || selectedItemId) return;
-    //     const firstItem = items[0];
-
-    //     setSelectedItemMeta(firstItem);
-
-    //     const next = new URLSearchParams(searchParams);
-    //     next.set("itemId", items[0].Item_Id);
-
-    //     setSearchParams(next, { replace: true });
-    // }, [
-    //     items,
-    //     selectedItemId,
-    //     searchParams,
-    //     setSearchParams,
-    // ]);
+   
     const selectedItemMeta =
   items.find(
     (it) => String(it.Item_Id) === String(selectedItemId)
@@ -1423,9 +1410,14 @@ useEffect(() => {
 
   setSearchParams(next, { replace: true });
 }, [items, selectedItemId]);
+
+    // useEffect(() => {
+    //     setCursor(null);
+    // }, [selectedItemId, txnSearch]);
     useEffect(() => {
-        setCursor(null);
-    }, [selectedItemId, txnSearch]);
+  itemRef.current = selectedItemId;
+  setCursor(null);
+}, [selectedItemId, txnSearch]);
 
     const handleObserver = useCallback(
         (entries) => {

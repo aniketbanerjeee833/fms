@@ -380,7 +380,7 @@ import { recordCashTransaction }  from "../utils/cashTransactionHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 import { validateDateRange } from "../utils/validateDate.js";
-
+import ExcelJS from "exceljs";
 /* ── GET ALL ─────────────────────────────────────────────── */
 const getAllPaymentOuts = async (req, res, next) => {
   let connection;
@@ -1247,4 +1247,290 @@ const updatePaymentOut = async (req, res, next) => {
     }
   }
 };
-export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut, deletePaymentOut };
+
+
+
+const exportPaymentOutsReportToExcel = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const search = req.query.search?.trim() || "";
+    const fromDate = req.query.fromDate || null;
+    const toDate = req.query.toDate || null;
+
+    const whereClauses = [];
+    const params = [];
+
+    if (search) {
+      const like = `%${search}%`;
+
+      whereClauses.push(`
+        (
+          a.Party_Name LIKE ?
+          OR po.Receipt_No LIKE ?
+          OR CAST(po.Paid AS CHAR) LIKE ?
+        )
+      `);
+
+      params.push(like, like, like);
+    }
+
+    if (fromDate && toDate) {
+      whereClauses.push(`DATE(po.Payment_Date) BETWEEN ? AND ?`);
+      params.push(fromDate, toDate);
+    } else if (fromDate) {
+      whereClauses.push(`DATE(po.Payment_Date) >= ?`);
+      params.push(fromDate);
+    } else if (toDate) {
+      whereClauses.push(`DATE(po.Payment_Date) <= ?`);
+      params.push(toDate);
+    }
+
+    const whereSQL =
+      whereClauses.length > 0
+        ? `WHERE ${whereClauses.join(" AND ")}`
+        : "";
+
+    const [rows] = await connection.query(
+      `
+      SELECT
+        po.*,
+        a.Party_Name
+      FROM payment_out po
+      LEFT JOIN add_party a
+        ON a.Party_Id = po.Party_Id
+      ${whereSQL}
+      ORDER BY po.Payment_Date DESC
+      `,
+      params
+    );
+
+    /* =========================
+       Load Payment Types
+    ========================= */
+
+    const paymentIds = rows.map((r) => r.id);
+
+    if (paymentIds.length) {
+      const placeholders = paymentIds.map(() => "?").join(",");
+
+      const [splits] = await connection.query(
+        `
+        SELECT
+          ps.Source_Id,
+          ps.Payment_Type,
+          ba.Account_Display_Name
+        FROM payment_splits ps
+        LEFT JOIN bank_accounts ba
+          ON ba.id = ps.Bank_Account_Id
+        WHERE ps.Source_Type = 'Payment_Out'
+        AND ps.Source_Id IN (${placeholders})
+        `,
+        paymentIds
+      );
+
+      const splitMap = {};
+
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
+        }
+
+        splitMap[split.Source_Id].push(
+          split.Payment_Type === "Bank"
+            ? split.Account_Display_Name
+            : split.Payment_Type
+        );
+      }
+
+      rows.forEach((row) => {
+        row.Payment_Type_Display =
+          splitMap[row.id]?.join(", ") || "—";
+      });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Payment Out Report");
+
+    sheet.columns = [
+      { width: 15 }, // Date
+      { width: 20 }, // Receipt No
+      { width: 35 }, // Party Name
+      { width: 25 }, // Payment Type
+      { width: 18 }, // Paid Amount
+    ];
+
+    /* =========================
+       TITLE
+    ========================= */
+
+    sheet.mergeCells("A1:E1");
+
+    const titleCell = sheet.getCell("A1");
+    titleCell.value = "PAYMENT OUT REPORT";
+    titleCell.font = {
+      bold: true,
+      size: 14,
+    };
+    titleCell.alignment = {
+      horizontal: "center",
+      vertical: "middle",
+    };
+
+    sheet.mergeCells("A2:E2");
+
+    const generatedOn = new Date().toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    sheet.getCell("A2").value = `Generated On ${generatedOn}`;
+
+    sheet.getCell("A2").font = {
+      italic: true,
+      size: 10,
+    };
+
+    sheet.addRow([]);
+
+    /* =========================
+       HEADER
+    ========================= */
+
+    const headerRow = sheet.addRow([
+      "Date",
+      "Receipt No",
+      "Party Name",
+      "Payment Type",
+      "Paid Amount",
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+      };
+
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "medium" },
+        right: { style: "thin" },
+      };
+    });
+
+    const FIRST_DATA_ROW = 5;
+
+    /* =========================
+       DATA
+    ========================= */
+
+    rows.forEach((payment) => {
+      const row = sheet.addRow([
+        payment.Payment_Date
+          ? new Date(payment.Payment_Date).toLocaleDateString("en-IN")
+          : "",
+
+        payment.Receipt_No || "",
+
+        payment.Party_Name || "",
+
+        payment.Payment_Type_Display || "",
+
+        Number(payment.Paid || 0),
+      ]);
+
+      row.eachCell((cell, colNumber) => {
+        cell.border = {
+          top: { style: "hair" },
+          left: { style: "hair" },
+          bottom: { style: "hair" },
+          right: { style: "hair" },
+        };
+
+        if (colNumber === 5) {
+          cell.numFmt = "#,##0.00";
+          cell.alignment = {
+            horizontal: "right",
+          };
+        }
+      });
+    });
+
+    /* =========================
+       TOTAL ROW
+    ========================= */
+
+    const lastDataRow = sheet.rowCount;
+
+    const totalRow = sheet.addRow([
+      "",
+      "",
+      "",
+      "TOTAL",
+      {
+        formula: `SUM(E${FIRST_DATA_ROW}:E${lastDataRow})`,
+      },
+    ]);
+
+    totalRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+      };
+
+      cell.border = {
+        top: { style: "medium" },
+        bottom: { style: "medium" },
+      };
+    });
+
+    /* =========================
+       FREEZE HEADER
+    ========================= */
+
+    sheet.views = [
+      {
+        state: "frozen",
+        ySplit: 4,
+      },
+    ];
+
+    const fileName =
+      fromDate && toDate
+        ? `PaymentOutReport_${fromDate}_to_${toDate}.xlsx`
+        : `PaymentOutReport_${new Date()
+            .toISOString()
+            .slice(0, 10)}.xlsx`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName}"`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error("Export Payment Out Excel Error:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+
+export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut, deletePaymentOut, exportPaymentOutsReportToExcel };

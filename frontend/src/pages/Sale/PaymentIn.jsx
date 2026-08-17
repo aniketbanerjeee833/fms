@@ -96,20 +96,7 @@ export default function PaymentIn() {
     }, []);
 
 
-    const handleExportExcel = () => {
-        const params = new URLSearchParams();
-        if (searchTerm) params.set("search", searchTerm);
-        if (fromDate) params.set("fromDate", fromDate);
-        if (toDate) params.set("toDate", toDate);
-
-        const a = document.createElement("a");
-        a.href = `http://localhost:4000/api/paymentIn/export-paymentIn-excel?${params.toString()}`;
-        a.download = "";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    };
-
+   
     const handleSavePaymentIn = async (formData) => {
         try {
             if (modal.mode === "edit") {
@@ -179,6 +166,23 @@ export default function PaymentIn() {
             handlePrint();
         }
     }, [printData, printPaymentInId])
+    const handleExportPaymentInReportExcel = () => {
+        const params = new URLSearchParams();
+
+        if (searchTerm) params.set("search", searchTerm);
+        if (fromDate) params.set("fromDate", fromDate);
+        if (toDate) params.set("toDate", toDate);
+
+        const a = document.createElement("a");
+
+        a.href = `http://localhost:4000/api/payment-in/export-payment-in-excel?${params.toString()}`;
+
+        a.download = "";
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
 
     return (
         <>
@@ -345,13 +349,27 @@ export default function PaymentIn() {
 
                     </div>
                     <div className="flex justify-end">
-                        <button
+                        {/* <button
                             type="button"
-                            onClick={handleExportExcel}
+                            onClick={handleExportPaymentInReportExcel}
                             className="flex items-center justify-center rounded-xl bg-emerald-600 p-2.5 text-white shadow-md transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
                             title="Export to Excel"
                         >
                             <FileSpreadsheet size={22} strokeWidth={2} />
+                        </button> */}
+                        <button
+                            type="button"
+                            onClick={handleExportPaymentInReportExcel}
+                            className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                            text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+                            title="Export to Excel"
+                        >
+                            <FileSpreadsheet
+                                size={16}
+                                strokeWidth={2.2}
+                                className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+                            />
+                            {/* Export Excel */}
                         </button>
 
 
@@ -704,15 +722,15 @@ export default function PaymentIn() {
 
                 />
             )}
-              {printData?.paymentIn && (
-                            <div style={{ display: "none" }}>
-                                <PaymentInOutPrintTemplate
-                                    ref={printRef}
-                                    payment={printData?.paymentIn}
-                                    type="in"
-                                />
-                            </div>
-                        )}
+            {printData?.paymentIn && (
+                <div style={{ display: "none" }}>
+                    <PaymentInOutPrintTemplate
+                        ref={printRef}
+                        payment={printData?.paymentIn}
+                        type="in"
+                    />
+                </div>
+            )}
 
         </>
 

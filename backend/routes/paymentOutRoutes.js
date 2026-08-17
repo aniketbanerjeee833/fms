@@ -5,10 +5,14 @@ import {
     getPaymentOutById,
     createPaymentOut,
     updatePaymentOut,
-    deletePaymentOut} from "../controllers/paymentOutController.js";
+    deletePaymentOut,
+    exportPaymentOutsReportToExcel} from "../controllers/paymentOutController.js";
 import userAuth from "../middleware/userAuth.js";
 
+
+router.get("/export-payment-out-excel", userAuth, exportPaymentOutsReportToExcel);
 router.get("/",    userAuth,      getAllPaymentOuts);
+
 router.get("/:id",  userAuth,     getPaymentOutById);
 router.post("/",   userAuth,      createPaymentOut);
 router.put("/:id",  userAuth,     updatePaymentOut);

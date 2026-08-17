@@ -91,19 +91,7 @@ export default function PurchaseReturn() {
     };
   }, []);
 
-  const handleExportExcel = () => {
-    const params = new URLSearchParams();
-    if (searchTerm) params.set("search", searchTerm);
-    if (fromDate) params.set("fromDate", fromDate);
-    if (toDate) params.set("toDate", toDate);
 
-    const a = document.createElement("a");
-    a.href = `http://localhost:4000/api/purchaseReturn/export-purchaseReturn-excel?${params.toString()}`;
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -138,7 +126,24 @@ export default function PurchaseReturn() {
       handlePrint();
     }
   }, [printData, printPurchaseReturnId]);
+const handleExportPurchaseReturnExcel = () => {
+  const params = new URLSearchParams();
 
+  if (searchTerm) params.set("search", searchTerm);
+  if (fromDate) params.set("fromDate", fromDate);
+  if (toDate) params.set("toDate", toDate);
+
+  const a = document.createElement("a");
+
+  a.href =
+    `http://localhost:4000/api/purchase-return/export-purchase-return-excel?${params.toString()}`;
+
+  a.download = "";
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
   return (
     <>
 
@@ -280,13 +285,20 @@ export default function PurchaseReturn() {
 
           </div>
           <div className="flex justify-end sm: mt-4">
-            <button
+           
+                    <button
               type="button"
-              onClick={handleExportExcel}
-              className="flex items-center justify-center rounded-xl bg-emerald-600 p-2.5 text-white shadow-md transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
+              onClick={handleExportPurchaseReturnExcel}
+              className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                                                                            text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
               title="Export to Excel"
             >
-              <FileSpreadsheet size={22} strokeWidth={2} />
+              <FileSpreadsheet
+                size={16}
+                strokeWidth={2.2}
+                className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+              />
+              {/* Export Excel */}
             </button>
 
 

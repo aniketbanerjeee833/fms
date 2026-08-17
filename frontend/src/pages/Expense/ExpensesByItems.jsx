@@ -144,7 +144,11 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
+ const rightCategoryRef = useRef(selectedItemId);
 
+// If the category just changed (ref hasn't caught up yet), force cursor to null
+// on THIS render — don't wait for the effect below to run on the next tick.
+const effectiveRightCursor =rightCategoryRef.current === selectedItemId ? rightCursor : null;
   // const {
   //   data: usageResponse,
   //   isLoading: isUsageLoading,
@@ -160,7 +164,7 @@ export default function ExpensesByItems() {
 } = useGetExpenseItemUsageQuery(
   {
     masterItemId: selectedItemId,
-    cursor: rightCursor,
+    cursor: effectiveRightCursor,
     search: txnSearch, // ← add
   },
   {
@@ -174,6 +178,7 @@ export default function ExpensesByItems() {
 
   /* reset right cursor when selected item changes */
 useEffect(() => {
+  rightCategoryRef.current = selectedItemId;
   setRightCursor(null);
 }, [selectedItemId, txnSearch]);
 

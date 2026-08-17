@@ -92,7 +92,7 @@ export default function AllPurchaseList() {
     };
   }, []);
 
-  const handleExportExcel = () => {
+  const handleExportPurchaseReportExcel = () => {
     const params = new URLSearchParams();
     if (searchTerm) params.set("search", searchTerm);
     if (fromDate) params.set("fromDate", fromDate);
@@ -282,11 +282,11 @@ export default function AllPurchaseList() {
               <p className="text-sm font-medium text-black">Total Purchase Amount</p>
               <h4 className="text-3xl font-bold text-black">
                 {/* ₹ {purchases?.totals?.totalAmount} */}
-                 ₹{(Number(purchases?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </h4>
+                ₹{(Number(purchases?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </h4>
             </div>
 
             {/* Divider */}
@@ -321,13 +321,27 @@ export default function AllPurchaseList() {
 
           </div>
           <div className="flex justify-end sm: mt-4">
-            <button
+            {/* <button
               type="button"
-              onClick={handleExportExcel}
+              onClick={handleExportPurchaseReportExcel}
               className="flex items-center justify-center rounded-xl bg-emerald-600 p-2.5 text-white shadow-md transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
               title="Export to Excel"
             >
               <FileSpreadsheet size={22} strokeWidth={2} />
+            </button> */}
+            <button
+              type="button"
+               onClick={handleExportPurchaseReportExcel}
+              className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                                                                text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet
+                size={16}
+                strokeWidth={2.2}
+                className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+              />
+              {/* Export Excel */}
             </button>
 
 
@@ -363,7 +377,7 @@ export default function AllPurchaseList() {
                   {purchases && purchases?.purchases?.length > 0 ? (
                     purchases?.purchases?.map((purchase, idx) => (
                       <tr
-                      
+
                         key={purchase?.Purchase_Id}
                         onDoubleClick={() => {
                           navigate(
@@ -375,7 +389,7 @@ export default function AllPurchaseList() {
                             }
                           );
                         }}
-                        style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
+                        style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
                       >
                         <td>
                           {(purchases?.currentPage - 1) * 10 + (idx + 1)}.

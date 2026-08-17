@@ -86,7 +86,7 @@ export default function AllSaleList() {
     });
   };
 
-  const handleExportExcel = () => {
+  const handleExportSaleReportExcel = () => {
     const params = new URLSearchParams();
     if (searchTerm) params.set("search", searchTerm);
     if (fromDate) params.set("fromDate", fromDate);
@@ -300,9 +300,9 @@ export default function AllSaleList() {
           </div>
           <div className="flex justify-end sm: mt-4">
 
-            <button
+            {/* <button
               type="button"
-              onClick={handleExportExcel}
+              onClick={handleExportSaleReportExcel}
               className="group flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
               title="Export to Excel"
             >
@@ -310,7 +310,22 @@ export default function AllSaleList() {
                 size={22}
                 className="transition-transform duration-200 group-hover:scale-110"
               />
+            </button> */}
+            <button
+              type="button"
+              onClick={handleExportSaleReportExcel}
+              className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                                                                            text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+              title="Export to Excel"
+            >
+              <FileSpreadsheet
+                size={16}
+                strokeWidth={2.2}
+                className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+              />
+              {/* Export Excel */}
             </button>
+
           </div>
         </div>
 
@@ -350,7 +365,7 @@ export default function AllSaleList() {
                             }
                           );
                         }}
-                        style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
+                        style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
                       >
                         <td>
                           {(sales?.currentPage - 1) * 10 + (idx + 1)}.

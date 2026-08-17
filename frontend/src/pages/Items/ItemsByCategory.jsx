@@ -49,7 +49,7 @@ export default function ItemsByCategory() {
   const [leftCursor, setLeftCursor] = useState(null);
   const leftSentinelRef = useRef(null);
   const leftObserverRef = useRef(null);
-
+  
   const {
     data: categoryResponse,
     isLoading: isCategoriesLoading,
@@ -90,16 +90,21 @@ export default function ItemsByCategory() {
 
   // const items = itemsResponse?.items || [];
   /* ── RIGHT — items under selected category, cursor infinite scroll ── */
+ 
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
+ const rightCategoryRef = useRef(selectedCategoryId);
 
+// If the category just changed (ref hasn't caught up yet), force cursor to null
+// on THIS render — don't wait for the effect below to run on the next tick.
+const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId ? rightCursor : null;
   const {
     data: itemsResponse,
     isLoading: isItemsLoading,
     isFetching: isItemsFetching,
     refetch: refetchItems,
-  } = useGetItemsByCategoryQuery({ categoryId: selectedCategoryId, cursor: rightCursor, search: itemSearch });
+  } = useGetItemsByCategoryQuery({ categoryId: selectedCategoryId, cursor: effectiveRightCursor, search: itemSearch });
 
   const items = itemsResponse?.items || [];
   const totalItems = itemsResponse?.totalItems || 0;
@@ -107,7 +112,11 @@ export default function ItemsByCategory() {
   const itemsHasMore = itemsResponse?.hasMore ?? false;
   const itemsNextCursor = itemsResponse?.nextCursor ?? null;
 
-  useEffect(() => { setRightCursor(null); }, [selectedCategoryId, itemSearch]);
+  //useEffect(() => { setRightCursor(null); }, [selectedCategoryId, itemSearch]);
+  useEffect(() => {
+  rightCategoryRef.current = selectedCategoryId;
+  setRightCursor(null);
+}, [selectedCategoryId, itemSearch]);
 
   const handleRightObserver = useCallback((entries) => {
     if (entries[0].isIntersecting && itemsHasMore && itemsNextCursor && !isItemsFetching && !isItemsLoading) {
@@ -555,6 +564,7 @@ console.log(selectedCategory)
                     <tr
                     //style={{ borderBottom: "2px solid #e2e8f0" }}
                     >
+                      <th>Sl.No</th>
                       <th
                         //className="text-left py-2 px-3 font-semibold text-black"
                         style={{
@@ -603,16 +613,17 @@ console.log(selectedCategory)
                         </td>
                       </tr>
                     ) : (
-                      items.map((item) => (
+                      items.map((item,idx) => (
                         <tr
                           key={item.Item_Id}
                           style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          onDoubleClick={() => {
-                            setEditingItem(item);
-                            setShowEditItemModal(true);
-                          }}
+                          // onDoubleClick={() => {
+                          //   setEditingItem(item);
+                          //   setShowEditItemModal(true);
+                          // }}
                         >
+                          <td>{idx+1}.</td>
                           <td className="py-2 px-3 text-black">
                             {item.Item_Name}
                           </td>
@@ -683,7 +694,7 @@ console.log(selectedCategory)
     onClose={() => setShowMoveModal(false)}
     onMoved={() => {
       setShowMoveModal(false);
-
+      setRightCursor(null); // reset pagination
       // refetch category items if needed
       refetchItems?.();
     }}
