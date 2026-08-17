@@ -196,7 +196,13 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
         setEachItemBillAndInvoiceNumbersModalOpen(false);
         onClose();
 
-        dispatch(itemApi.util.invalidateTags(["Item","ItemLedger"]));
+        dispatch(
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);
         dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
         dispatch(saleApi.util.invalidateTags(["Sale"]));
       }

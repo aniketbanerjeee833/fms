@@ -38,39 +38,7 @@ export default function AddUnitModal({onClose,onSave}) {
     toast.error(err?.data?.message || "Adding Item Unit Failed!");
   }
 };
-    //          const handleSave = async () => {
-    //        try {
-    //         const payload={
-    //           Unit_Name:itemUnitName,
-    //           Unit_Shorthand:itemUnitShortHand
-    //         }
-    //         console.log(payload);
-    //         if(!payload.Unit_Name){
-    //           toast.error("Unit Name cannot be empty!");
-    //           return;
-    //         }
-    //          const res = await addItemUnit(payload).unwrap();
-    //        console.log(" successfully:", res);
-    //         //  const resData = res?.data || res;
-    //           const resData = res;
-    //          console.log(resData);
-    //          if(!resData?.success) {
-    //            toast.error("Adding Item Unit Failed!");
-    //            return;
-    //          }else{
-    //            toast.success("Item Unit added Successfully!");
-    //              onClose();  // close modal
-    //                onSave({
-    //   Unit_Name: payload.Unit_Name,
-    //   Unit_Shorthand: payload.Unit_Shorthand
-    // });
-    //          }
-           
-    //        } catch (err) {
-    //          toast.error(err?.data?.message || "Adding Item Unit Failed!");
-    //          console.error("Add Item Unit error:", err);
-    //        }
-    //      };
+   
   return (
  <div
   style={{

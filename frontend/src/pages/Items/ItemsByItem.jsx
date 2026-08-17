@@ -2162,6 +2162,7 @@ useEffect(() => {
                                                     style={{
                                                         textTransform: "uppercase",
                                                         letterSpacing: "0.05em",
+                                                        whiteSpace:"nowrap"
                                                     }}
                                                 >
                                                     {h}
@@ -2199,8 +2200,8 @@ useEffect(() => {
                                                         {fmtDate(txn.Txn_Date)}
                                                     </td>
 
-                                                    <td>
-                                                        {txn.Bill_Number || "—"}
+                                                    <td style={{ whiteSpace: "nowrap" }}>
+                                                        {txn.Number || "—"}
                                                     </td>
 
                                                     <td>
@@ -2219,7 +2220,7 @@ useEffect(() => {
                                                     </td>
 
                                                     <td>
-                                                        {fmt(txn.Quantity)}
+                                                        {fmt(txn.Quantity)}({txn.Selected_Unit})
                                                     </td>
 
                                                     <td>

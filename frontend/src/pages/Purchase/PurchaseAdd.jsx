@@ -634,7 +634,13 @@ export default function PurchaseAdd() {
       // =======================================================
       // 8. Invalidate RTK Query caches
       // =======================================================
-      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
+      dispatch(
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);;
 
       dispatch(
         cashInHandApi.util.invalidateTags(["CashInHand",])

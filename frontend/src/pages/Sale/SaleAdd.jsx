@@ -700,8 +700,12 @@ export default function SaleAdd() {
 
 
       dispatch(
-        itemApi.util.invalidateTags(["Item", "ItemLedger"])
-      );
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);;
 
       dispatch(
         saleApi.util.invalidateTags(["Sale"])

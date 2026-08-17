@@ -18,6 +18,7 @@ import {
 
 import AddItemCategoryModal from "../../components/Modal/AddItemCategoryModal";
 import ItemModal from "../../components/Modal/ItemModal";
+import MoveToCategoryModal from "../../components/Modal/MoveToCategoryModal";
 
 
 
@@ -42,6 +43,7 @@ export default function ItemsByCategory() {
   //const [itemRowMenu, setItemRowMenu] = useState(null);
   //const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [categoryModal, setCategoryModal] = useState({ open: false, mode: "add", data: null });
+  const [showMoveModal, setShowMoveModal] = useState(false);
   //const [showEditItemModal, setShowEditItemModal] = useState(false);
   //const [editingItem, setEditingItem] = useState(null);
   const [leftCursor, setLeftCursor] = useState(null);
@@ -96,6 +98,7 @@ export default function ItemsByCategory() {
     data: itemsResponse,
     isLoading: isItemsLoading,
     isFetching: isItemsFetching,
+    refetch: refetchItems,
   } = useGetItemsByCategoryQuery({ categoryId: selectedCategoryId, cursor: rightCursor, search: itemSearch });
 
   const items = itemsResponse?.items || [];
@@ -192,7 +195,7 @@ export default function ItemsByCategory() {
   //   }
   // };
 
-
+console.log(selectedCategory)
 
   return (
     <>
@@ -416,7 +419,7 @@ export default function ItemsByCategory() {
                           }}
                           //disabled
                           title="Edit category"
-                         style={{ color: "#374151", cursor: "pointer" }}
+                          style={{ color: "#374151", cursor: "pointer" }}
                         >
                           View/Edit
                         </button>
@@ -447,8 +450,8 @@ export default function ItemsByCategory() {
             <div className="flex flex-col h-full">
 
               {/* ── CATEGORY SUMMARY CARD ── */}
-              <div className="rounded-xl p-2 mb-2 flex items-center justify-between gap-4">
-
+              {/* <div className="rounded-xl p-2 mb-2 flex items-center justify-between gap-4"> */}
+              <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 {/* LEFT — All Items + item count */}
                 <div className="flex items-center gap-4">
 
@@ -479,51 +482,66 @@ export default function ItemsByCategory() {
                 </div>
 
                 {/* RIGHT — Search */}
-                <div
-                  className="relative flex-shrink-0"
-                  style={{
-                    width: 220,
-                    height: 36,
-                  }}
-                >
-                  <Search
-                    size={16}
+                <div className="flex flex-col gap-2 w-full sm:w-auto">
+                  <div
+                    className="relative flex-shrink-0 w-full sm:w-auto"
                     style={{
-                      position: "absolute",
-                      left: 10,
-                      top: 10,
-                      color: "#94a3b8",
-                      pointerEvents: "none",
-                    }}
-                  />
-
-                  <input
-                    type="text"
-                    value={itemSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-
-                      const next = new URLSearchParams(searchParams);
-
-                      if (value) {
-                        next.set("itemSearch", value);
-                      } else {
-                        next.delete("itemSearch");
-                      }
-
-                      setSearchParams(next, { replace: true });
-                    }}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{
+                      width: 220,
                       height: 36,
-                      paddingLeft: 34,
-                      paddingRight: 10,
-                      borderColor: "#dbe3ea",
-                      boxSizing: "border-box",
                     }}
-                  />
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={itemSearch}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        const next = new URLSearchParams(searchParams);
+
+                        if (value) {
+                          next.set("itemSearch", value);
+                        } else {
+                          next.delete("itemSearch");
+                        }
+
+                        setSearchParams(next, { replace: true });
+                      }}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                  {selectedCategory?.Category_Id !== "uncategorized" && (<button
+                    type="button"
+                     onClick={() => setShowMoveModal(true)}
+                    className="w-full sm:w-auto text-white px-4 py-2 rounded-md text-sm font-medium"
+                    style={{
+                      backgroundColor: "#4CA1AF",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    Move to this category
+                  </button>)}
                 </div>
+
 
               </div>
 
@@ -658,6 +676,19 @@ export default function ItemsByCategory() {
           }}
         />
       )}
+
+      {showMoveModal && (
+  <MoveToCategoryModal
+    targetCategory={selectedCategory}
+    onClose={() => setShowMoveModal(false)}
+    onMoved={() => {
+      setShowMoveModal(false);
+
+      // refetch category items if needed
+      refetchItems?.();
+    }}
+  />
+)} 
 
     </>
   );

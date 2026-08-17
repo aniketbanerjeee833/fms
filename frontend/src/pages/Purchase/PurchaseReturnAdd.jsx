@@ -915,8 +915,12 @@ export default function PurchaseReturnAdd() {
 
 
       dispatch(
-        itemApi.util.invalidateTags(["Item", "ItemLedger"])
-      );
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);;
 
       dispatch(
         cashInHandApi.util.invalidateTags([

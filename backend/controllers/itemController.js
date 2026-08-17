@@ -3387,7 +3387,104 @@ const getAllCategoriesCursor = async (req, res, next) => {
     }
   }
 };
+const getItemsNotInCategory = async (req, res, next) => {
+  let connection;
 
+  try {
+    const { Category_Id } = req.params;
+
+
+    connection = await db.getConnection();
+    const [[category]] = await connection.query(
+  `
+  SELECT Item_Category
+  FROM add_category
+  WHERE Category_Id = ?
+  `,
+  [Category_Id]
+);
+
+if (!category) {
+  return res.status(404).json({
+    success: false,
+    message: "Category not found",
+  });
+}
+
+    const [items] = await connection.query(
+  `
+  SELECT
+    Item_Id,
+    Item_Name,
+    Item_Category
+  FROM add_item
+  WHERE Item_Category IS NULL
+     OR TRIM(Item_Category) = ''
+     OR LOWER(TRIM(Item_Category)) <> LOWER(TRIM(?))
+  ORDER BY Item_Name ASC
+  `,
+  [category.Item_Category]
+);
+
+    return res.status(200).json({
+      success: true,
+      data: items,
+    });
+  } catch (err) {
+    console.error(err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+const moveItemsToCategory = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { Item_Category, itemIds } = req.body;
+
+    if (!Item_Category) {
+      return res.status(400).json({
+        success: false,
+        message: "Item Category is required",
+      });
+    }
+
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No items selected",
+      });
+    }
+
+    const placeholders = itemIds.map(() => "?").join(",");
+
+    const [result] = await connection.query(
+      `
+      UPDATE add_item
+      SET Item_Category = ?,
+          updated_at = NOW()
+      WHERE Item_Id IN (${placeholders})
+      `,
+      [Item_Category, ...itemIds]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: `${result.affectedRows} item(s) moved successfully`,
+    });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
 /* ═══════════════════════════════════════
    ITEMS BY CATEGORY (cursor paginated, mirrors getItemBills)
    categoryId = "all" → every item, regardless of category
@@ -5154,6 +5251,7 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
 
 export {
   addItem, editItem, deleteItem, addCategory,editCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
+  getItemsNotInCategory,moveItemsToCategory,
   eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers, addItemConversion, getItemConversions,
   getAllItemsForLedger, getItemBills, getItemsByCategory, addStockAdjustment, editStockAdjustment,

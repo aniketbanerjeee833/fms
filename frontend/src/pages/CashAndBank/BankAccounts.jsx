@@ -308,7 +308,13 @@ function BankDetailPanel({ bankId }) {
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
       dispatch(saleApi.util.invalidateTags(["Sale"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
+      dispatch(
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);;
       resetLedger();   // 🔹 reload bank ledger from top
     } catch (err) {
       console.error("❌ Delete error:", err);
@@ -339,7 +345,11 @@ function BankDetailPanel({ bankId }) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col overflow-y-auto"
+     style={{
+        maxHeight: "calc(100vh - 180px)",
+        minWidth: 0
+      }}>
 
       {/* bank summary card */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

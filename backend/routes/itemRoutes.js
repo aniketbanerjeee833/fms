@@ -2,7 +2,7 @@ import express from "express";
 const router = express.Router();
 
 import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,deleteStockAdjustment,eachItemBillAndInvoiceNumbers,
-    eachItemSalesPurchaseDetails,editCategory,editItem,editStockAdjustment,getAllCategories,getAllCategoriesCursor,getAllItems, getAllItemsForLedger, getItemBills, getItemConversions, getItemsByCategory, printEachItemSalesPurchasesReport} from "../controllers/itemController.js"
+    eachItemSalesPurchaseDetails,editCategory,editItem,editStockAdjustment,getAllCategories,getAllCategoriesCursor,getAllItems, getAllItemsForLedger, getItemBills, getItemConversions, getItemsByCategory, getItemsNotInCategory, moveItemsToCategory, printEachItemSalesPurchasesReport} from "../controllers/itemController.js"
 import userAuth from "../middleware/userAuth.js";
 
 router.post("/add-item",userAuth,addItem)
@@ -15,6 +15,8 @@ router.post("/add-category",userAuth,addCategory)
 router.patch("/edit-category/:categoryId", editCategory);
 router.get("/get-all-categories",userAuth,getAllCategories)
 router.get("/get-all-categories/cursor",userAuth,getAllCategoriesCursor);
+router.get("/available-items/:Category_Id",getItemsNotInCategory);
+router.put("/move-items-to-category",moveItemsToCategory);
 router.get("/items-by-category/:categoryId", getItemsByCategory);
 
 router.get("/each-item-sales-purchase-details/:Item_Id",userAuth,eachItemSalesPurchaseDetails)

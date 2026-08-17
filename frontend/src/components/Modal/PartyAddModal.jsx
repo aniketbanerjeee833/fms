@@ -180,7 +180,13 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
       dispatch(saleApi.util.invalidateTags(["Sale"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
+      dispatch(
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);;
     } catch (err) {
       toast.error(err?.data?.message || err?.message || "Something went wrong");
     }

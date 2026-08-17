@@ -648,7 +648,13 @@ function BankDetailPanel({ bankId }) {
       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
       dispatch(saleApi.util.invalidateTags(["Sale"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-      dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
+      dispatch(
+  itemApi.util.invalidateTags([
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ])
+);;
       resetLedger();   // 🔹 reload bank ledger from top
     } catch (err) {
       console.error("❌ Delete error:", err);

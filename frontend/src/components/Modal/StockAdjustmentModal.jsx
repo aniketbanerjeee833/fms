@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { useEffect } from "react";
 import { toast } from "react-toastify";
 import {
-    itemApi,
+  itemApi,
   useAddStockAdjustmentMutation,
   useEditStockAdjustmentMutation,
 } from "../../redux/api/itemApi";
@@ -16,7 +16,7 @@ export default function StockAdjustmentModal({
   onClose,
   onSave,
 }) {
-const dispatch = useDispatch();
+  const dispatch = useDispatch();
   const isEditMode = !!editingAdjustment;
 
   const hasPrimary = !!itemDetails?.Primary_Unit;
@@ -26,8 +26,8 @@ const dispatch = useDispatch();
   const unitOptions = hasSecondary
     ? [itemDetails.Primary_Unit, itemDetails.Secondary_Unit]
     : hasPrimary
-    ? [itemDetails.Primary_Unit]
-    : [];
+      ? [itemDetails.Primary_Unit]
+      : [];
 
   const {
     register,
@@ -35,7 +35,7 @@ const dispatch = useDispatch();
     watch,
     setValue,
     reset
-    
+
   } = useForm({
     defaultValues: {
       Adjustment_Type: editingAdjustment?.Adjustment_Type || "Add",
@@ -48,7 +48,7 @@ const dispatch = useDispatch();
       Adjustment_Date: editingAdjustment?.Adjustment_Date || new Date().toISOString().slice(0, 10),
     },
   });
-console.log(editingAdjustment)
+  console.log(editingAdjustment)
   useEffect(() => {
     if (editingAdjustment) {
       reset({
@@ -102,7 +102,13 @@ console.log(editingAdjustment)
       } else {
         res = await addStockAdjustment(payload).unwrap();
       }
-      dispatch(itemApi.util.invalidateTags(["Item","ItemLedger"]));
+      dispatch(
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );
       toast.success(res?.message || `Stock ${isEditMode ? "adjustment updated" : "adjusted"} successfully`);
       onSave?.(res?.adjustment || payload);
       onClose();
@@ -215,7 +221,7 @@ console.log(editingAdjustment)
               type="date"
               {...register("Adjustment_Date", { required: true })}
               className="w-full outline-none border-b-2 text-gray-900"
-             // style={{ borderColor: "#d1d5db" }}
+            // style={{ borderColor: "#d1d5db" }}
             />
           </div>
         </div>

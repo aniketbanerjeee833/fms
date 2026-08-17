@@ -252,24 +252,24 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
   const party = data?.partyDetails;
 
-  const handleTransactionDoubleClick = (row, transactionId) => {
-    if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-      openModal(row.Txn_Type, transactionId);
-      return;
-    }
+  // const handleTransactionDoubleClick = (row, transactionId) => {
+  //   if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+  //     openModal(row.Txn_Type, transactionId);
+  //     return;
+  //   }
 
-    const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+  //   const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
 
-    if (route) {
-      navigate(
-        {
-          pathname: `/${route}/edit/${transactionId}`,
-          search: searchParams.toString(),
-        },
-        { state: { from: "party-details", partyId } }
-      );
-    }
-  };
+  //   if (route) {
+  //     navigate(
+  //       {
+  //         pathname: `/${route}/edit/${transactionId}`,
+  //         search: searchParams.toString(),
+  //       },
+  //       { state: { from: "party-details", partyId } }
+  //     );
+  //   }
+  // };
 
   const handleSavePaymentIn = async (formData) => {
     try {
@@ -602,7 +602,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                         : meta.label}
                     </td>
                     {/* <td>{meta.label}</td> */}
-                    <td>{row.Doc_Number}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{row.Doc_Number}</td>
                     <td>
                       {row.Txn_Date
                         ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {

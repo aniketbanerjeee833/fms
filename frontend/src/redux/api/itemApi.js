@@ -634,9 +634,26 @@ export const itemApi = createApi({
       providesTags: ["Category"],
     }),
 
-    /* =====================================================
-       RIGHT SIDE — items filtered by category, cursor paginated
-    ===================================================== */
+  // categoryApi.js
+
+getItemsNotInCategory: builder.query({
+  query: (Category_Id) => ({
+    url: `/item/available-items/${Category_Id}`,
+    method: "GET",
+  }),
+  providesTags: ["Item"],
+}),
+moveItemsToCategory: builder.mutation({
+  query: (body) => ({
+    url: "/item/move-items-to-category",
+    method: "PUT",
+    body,
+  }),
+    invalidatesTags: [
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" }
+  ],
+}),
     getItemsByCategory: builder.query({
       query: ({ categoryId, cursor = null, search = "" }) => {
         const params = new URLSearchParams();
@@ -798,6 +815,8 @@ export const {
   useAddCategoryMutation,
   useEditCategoryMutation,
   useGetAllCategoriesQuery,
+  useGetItemsNotInCategoryQuery,
+  useMoveItemsToCategoryMutation,
   useGetAllCategoriesCursorQuery,
   useGetEachItemSalesPurchasesDetailsQuery,
   usePrintEachItemSalesPurchasesDetailsReportMutation,

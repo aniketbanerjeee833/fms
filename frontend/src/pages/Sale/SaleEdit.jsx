@@ -809,12 +809,12 @@ export default function SaleEdit() {
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalReceived;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-     if (splitsWatch.length > 1) {
-    setValue("Total_Received", computedTotalReceived.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+    if (splitsWatch.length > 1) {
+      setValue("Total_Received", computedTotalReceived.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived])
 
@@ -997,9 +997,12 @@ export default function SaleEdit() {
 
 
       dispatch(
-        itemApi.util.invalidateTags(["Item", "ItemLedger"])
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
       );
-
       dispatch(
         dashboardApi.util.invalidateTags([
           "Dashboard",
