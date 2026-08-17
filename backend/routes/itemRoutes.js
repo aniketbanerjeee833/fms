@@ -2,7 +2,7 @@ import express from "express";
 const router = express.Router();
 
 import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,deleteStockAdjustment,eachItemBillAndInvoiceNumbers,
-    eachItemSalesPurchaseDetails,editItem,editStockAdjustment,getAllCategories,getAllItems, getAllItemsForLedger, getItemBills, getItemConversions, getItemsByCategory, printEachItemSalesPurchasesReport} from "../controllers/itemController.js"
+    eachItemSalesPurchaseDetails,editItem,editStockAdjustment,getAllCategories,getAllCategoriesCursor,getAllItems, getAllItemsForLedger, getItemBills, getItemConversions, getItemsByCategory, printEachItemSalesPurchasesReport} from "../controllers/itemController.js"
 import userAuth from "../middleware/userAuth.js";
 
 router.post("/add-item",userAuth,addItem)
@@ -13,6 +13,7 @@ router.get("/get-all-items",userAuth,getAllItems)
 router.get("/each-item-bill-and-invoice-numbers/:Item_Id",userAuth,eachItemBillAndInvoiceNumbers)
 router.post("/add-category",userAuth,addCategory)
 router.get("/get-all-categories",userAuth,getAllCategories)
+router.get("/get-all-categories/cursor",userAuth,getAllCategoriesCursor);
 router.get("/items-by-category/:categoryId", getItemsByCategory);
 
 router.get("/each-item-sales-purchase-details/:Item_Id",userAuth,eachItemSalesPurchaseDetails)

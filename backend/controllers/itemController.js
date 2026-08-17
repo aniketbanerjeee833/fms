@@ -2514,29 +2514,29 @@ const getAllItemsForLedger = async (req, res, next) => {
         unit.Unit_Name;
     });
 
-  
+
     const [[{ totalItems }]] = await db.query(
-  `
+      `
   SELECT COUNT(*) AS totalItems
   FROM add_item
   ${whereSQL}
   `,
-  params
-);
+      params
+    );
 
-const [rows] = await db.query(
-  `
+    const [rows] = await db.query(
+      `
   SELECT *
   FROM add_item
   ${whereSQL}
   ORDER BY id DESC
   LIMIT ?
   `,
-  [...params, limit + 1]
-);
+      [...params, limit + 1]
+    );
 
-const hasMore = rows.length > limit;
-const pageItems = hasMore ? rows.slice(0, limit) : rows;
+    const hasMore = rows.length > limit;
+    const pageItems = hasMore ? rows.slice(0, limit) : rows;
     // const hasMore = items.length > limit;
     // const pageItems = hasMore ? items.slice(0, limit) : items;
     const result = pageItems.map((item) => {
@@ -3161,13 +3161,291 @@ const getAllCategories = async (req, res, next) => {
     if (connection) connection.release();
   }
 }
+const getAllCategoriesCursor = async (req, res, next) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
 
+    const cursor = req.query.cursor
+      ? Number(req.query.cursor)
+      : null;
+
+    const search = req.query.search
+      ? req.query.search.trim()
+      : "";
+
+    const limit = parseInt(req.query.limit, 10) || 10;
+
+    const where = [];
+    const params = [];
+
+    // =========================================================
+    // SEARCH FILTER
+    // =========================================================
+
+    if (search) {
+      where.push(`Item_Category LIKE ?`);
+      params.push(`%${search}%`);
+    }
+
+    // =========================================================
+    // CURSOR FILTER
+    // =========================================================
+
+    if (cursor) {
+      where.push(`id < ?`);
+      params.push(cursor);
+    }
+
+    const whereSQL =
+      where.length > 0
+        ? `WHERE ${where.join(" AND ")}`
+        : "";
+
+    // =========================================================
+    // TOTAL CATEGORY COUNT
+    // =========================================================
+
+    const [[countResult]] = await connection.query(`
+      SELECT COUNT(*) AS totalCategories
+      FROM add_category
+    `);
+
+    // +1 because we show
+    // "Items Not In Any Category"
+    const totalCategories = Number(countResult.totalCategories || 0);
+
+    // =========================================================
+    // FETCH CATEGORIES
+    // =========================================================
+
+    const [rows] = await connection.query(
+      `
+      SELECT *
+      FROM add_category
+      ${whereSQL}
+      ORDER BY id DESC
+      LIMIT ?
+      `,
+      [...params, limit + 1]
+    );
+
+    // =========================================================
+    // PAGINATION
+    // =========================================================
+
+    const hasMore = rows.length > limit;
+
+    const pageRows = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    const nextCursor = hasMore
+      ? pageRows[pageRows.length - 1].id
+      : null;
+
+    // =========================================================
+    // ADD SPECIAL CATEGORY
+    // =========================================================
+
+    let categories = [...pageRows];
+
+    if (!cursor && !search) {
+      categories.unshift({
+        Category_Id: "uncategorized",
+        Item_Category: "Items Not In Any Category",
+      });
+    }
+
+    // =========================================================
+    // RESPONSE
+    // =========================================================
+
+    return res.status(200).json({
+      success: true,
+      categories,
+      totalCategories,
+      hasMore,
+      nextCursor,
+    });
+  } catch (err) {
+    console.error(
+      "❌ Error getting categories (cursor):",
+      err
+    );
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 
 /* ═══════════════════════════════════════
    ITEMS BY CATEGORY (cursor paginated, mirrors getItemBills)
    categoryId = "all" → every item, regardless of category
 ═══════════════════════════════════════ */
+//OLD
+// const getItemsByCategory = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     connection = await db.getConnection();
+
+//     const { categoryId } = req.params;
+//     const { cursor = null, search = "" } = req.query;
+
+//     const limit = 10;
+
+//     if (!categoryId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Category ID is required.",
+//       });
+//     }
+
+//     // =========================================================
+//     // 1. VALIDATE CATEGORY (skip if "all")
+//     // =========================================================
+
+//     let categoryName = null;
+
+//     if (categoryId !== "all") {
+//       const [[category]] = await connection.query(
+//         `SELECT Category_Id, Item_Category FROM add_category WHERE Category_Id = ? LIMIT 1`,
+//         [categoryId]
+//       );
+
+//       if (!category) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "Category not found.",
+//         });
+//       }
+
+//       categoryName = category.Item_Category;
+//     }
+
+//     // =========================================================
+//     // 2. BUILD FILTER
+//     // =========================================================
+
+//     const where = [];
+//     const params = [];
+
+//     if (categoryName !== null) {
+//       where.push(`TRIM(Item_Category) = TRIM(?)`);
+//       params.push(categoryName);
+//     }
+
+//     if (search?.trim()) {
+//       const like = `%${search.trim().toLowerCase()}%`;
+//       where.push(`(LOWER(Item_Name) LIKE ? OR LOWER(Item_Id) LIKE ?)`);
+//       params.push(like, like);
+//     }
+
+//     // =========================================================
+//     // 3. CURSOR
+//     //
+//     // cursor format: base64(JSON.stringify({ id: 100 }))
+//     // simple numeric cursor since items are ordered by id, not date
+//     // =========================================================
+
+//     if (cursor) {
+//       try {
+//         const decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf8"));
+
+//         if (!decoded.id) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid cursor.",
+//           });
+//         }
+
+//         where.push(`id < ?`);
+//         params.push(Number(decoded.id));
+//       } catch (error) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid cursor.",
+//         });
+//       }
+//     }
+
+//     const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+//     // =========================================================
+//     // 4. FETCH LIMIT + 1
+//     // =========================================================
+
+//     const [rows] = await connection.query(
+//       `SELECT
+//          id,
+//          Item_Id,
+//          Item_Name,
+//          Item_Category,
+//          Stock_Quantity,
+//          At_Price,
+//          Item_Unit,
+//          Primary_Unit,
+//          Secondary_Unit,
+//          (Stock_Quantity * COALESCE(At_Price, 0)) AS Stock_Value
+//        FROM add_item
+//        ${whereSQL}
+//        ORDER BY id DESC
+//        LIMIT ?`,
+//       [...params, limit + 1]
+//     );
+
+//     // =========================================================
+//     // 5. HAS MORE?
+//     // =========================================================
+
+//     const hasMore = rows.length > limit;
+//     const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+//     // =========================================================
+//     // 6. NEXT CURSOR
+//     // =========================================================
+
+//     let nextCursor = null;
+//     if (hasMore && pageRows.length > 0) {
+//       const last = pageRows[pageRows.length - 1];
+//       nextCursor = Buffer.from(JSON.stringify({ id: last.id })).toString("base64");
+//     }
+
+//     // =========================================================
+//     // 7. RESPONSE
+//     // =========================================================
+
+//     return res.status(200).json({
+//       success: true,
+
+//       category: categoryId === "all"
+//         ? { Category_Id: null, Item_Category: "All" }
+//         : { Category_Id: categoryId, Item_Category: categoryName },
+
+//       items: pageRows.map((row) => ({
+//         Item_Id: row.Item_Id,
+//         Item_Name: row.Item_Name,
+//         Item_Category: row.Item_Category,
+//         Stock_Quantity: Number(row.Stock_Quantity || 0),
+//         Unit: row.Primary_Unit || row.Item_Unit || null,
+//         Stock_Value: Number(row.Stock_Value || 0),
+//       })),
+
+//       nextCursor,
+//       hasMore,
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Error fetching items by category:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getItemsByCategory = async (req, res, next) => {
   let connection;
 
@@ -3186,15 +3464,50 @@ const getItemsByCategory = async (req, res, next) => {
       });
     }
 
+    const where = [];
+    const params = [];
+
+    // For total count (without cursor)
+    const countWhere = [];
+    const countParams = [];
+
+    let categoryResponse;
+
     // =========================================================
-    // 1. VALIDATE CATEGORY (skip if "all")
+    // ITEMS NOT IN ANY CATEGORY
     // =========================================================
 
-    let categoryName = null;
+    if (categoryId === "uncategorized") {
+      const uncategorizedCondition = `
+        (
+          Item_Category IS NULL
+          OR TRIM(Item_Category) = ''
+        )
+      `;
 
-    if (categoryId !== "all") {
+      where.push(uncategorizedCondition);
+      countWhere.push(uncategorizedCondition);
+
+      categoryResponse = {
+        Category_Id: "uncategorized",
+        Item_Category: "Items Not In Any Category",
+      };
+    }
+
+    // =========================================================
+    // NORMAL CATEGORY
+    // =========================================================
+
+    else {
       const [[category]] = await connection.query(
-        `SELECT Category_Id, Item_Category FROM add_category WHERE Category_Id = ? LIMIT 1`,
+        `
+        SELECT
+          Category_Id,
+          Item_Category
+        FROM add_category
+        WHERE Category_Id = ?
+        LIMIT 1
+        `,
         [categoryId]
       );
 
@@ -3205,37 +3518,48 @@ const getItemsByCategory = async (req, res, next) => {
         });
       }
 
-      categoryName = category.Item_Category;
-    }
-
-    // =========================================================
-    // 2. BUILD FILTER
-    // =========================================================
-
-    const where = [];
-    const params = [];
-
-    if (categoryName !== null) {
       where.push(`TRIM(Item_Category) = TRIM(?)`);
-      params.push(categoryName);
+      params.push(category.Item_Category);
+
+      countWhere.push(`TRIM(Item_Category) = TRIM(?)`);
+      countParams.push(category.Item_Category);
+
+      categoryResponse = {
+        Category_Id: category.Category_Id,
+        Item_Category: category.Item_Category,
+      };
     }
+
+    // =========================================================
+    // SEARCH
+    // =========================================================
 
     if (search?.trim()) {
-      const like = `%${search.trim().toLowerCase()}%`;
-      where.push(`(LOWER(Item_Name) LIKE ? OR LOWER(Item_Id) LIKE ?)`);
+      const like = `%${search.trim()}%`;
+
+      const searchCondition = `
+        (
+          LOWER(Item_Name) LIKE LOWER(?)
+          OR CAST(Stock_Quantity AS CHAR) LIKE ?
+        )
+      `;
+
+      where.push(searchCondition);
       params.push(like, like);
+
+      countWhere.push(searchCondition);
+      countParams.push(like, like);
     }
 
     // =========================================================
-    // 3. CURSOR
-    //
-    // cursor format: base64(JSON.stringify({ id: 100 }))
-    // simple numeric cursor since items are ordered by id, not date
+    // CURSOR PAGINATION
     // =========================================================
 
     if (cursor) {
       try {
-        const decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf8"));
+        const decoded = JSON.parse(
+          Buffer.from(cursor, "base64").toString("utf8")
+        );
 
         if (!decoded.id) {
           return res.status(400).json({
@@ -3254,58 +3578,86 @@ const getItemsByCategory = async (req, res, next) => {
       }
     }
 
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereSQL =
+      where.length > 0
+        ? `WHERE ${where.join(" AND ")}`
+        : "";
+
+    const countWhereSQL =
+      countWhere.length > 0
+        ? `WHERE ${countWhere.join(" AND ")}`
+        : "";
 
     // =========================================================
-    // 4. FETCH LIMIT + 1
+    // TOTAL ITEMS COUNT (NO CURSOR)
+    // =========================================================
+
+    const [countRows] = await connection.query(
+      `
+      SELECT COUNT(*) AS totalItems
+      FROM add_item
+      ${countWhereSQL}
+      `,
+      countParams
+    );
+
+    const totalItems = Number(countRows[0].totalItems || 0);
+
+    // =========================================================
+    // FETCH ITEMS
     // =========================================================
 
     const [rows] = await connection.query(
-      `SELECT
-         id,
-         Item_Id,
-         Item_Name,
-         Item_Category,
-         Stock_Quantity,
-         At_Price,
-         Item_Unit,
-         Primary_Unit,
-         Secondary_Unit,
-         (Stock_Quantity * COALESCE(At_Price, 0)) AS Stock_Value
-       FROM add_item
-       ${whereSQL}
-       ORDER BY id DESC
-       LIMIT ?`,
+      `
+      SELECT
+        id,
+        Item_Id,
+        Item_Name,
+        Item_Category,
+        Stock_Quantity,
+        At_Price,
+        Item_Unit,
+        Primary_Unit,
+        Secondary_Unit,
+        (Stock_Quantity * COALESCE(At_Price, 0)) AS Stock_Value
+      FROM add_item
+      ${whereSQL}
+      ORDER BY id DESC
+      LIMIT ?
+      `,
       [...params, limit + 1]
     );
 
     // =========================================================
-    // 5. HAS MORE?
+    // PAGINATION
     // =========================================================
 
     const hasMore = rows.length > limit;
-    const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
-    // =========================================================
-    // 6. NEXT CURSOR
-    // =========================================================
+    const pageRows = hasMore
+      ? rows.slice(0, limit)
+      : rows;
 
     let nextCursor = null;
+
     if (hasMore && pageRows.length > 0) {
-      const last = pageRows[pageRows.length - 1];
-      nextCursor = Buffer.from(JSON.stringify({ id: last.id })).toString("base64");
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          id: pageRows[pageRows.length - 1].id,
+        })
+      ).toString("base64");
     }
 
     // =========================================================
-    // 7. RESPONSE
+    // RESPONSE
     // =========================================================
 
     return res.status(200).json({
       success: true,
 
-      category: categoryId === "all"
-        ? { Category_Id: null, Item_Category: "All" }
-        : { Category_Id: categoryId, Item_Category: categoryName },
+      category: categoryResponse,
+
+      totalItems,
 
       items: pageRows.map((row) => ({
         Item_Id: row.Item_Id,
@@ -3316,10 +3668,9 @@ const getItemsByCategory = async (req, res, next) => {
         Stock_Value: Number(row.Stock_Value || 0),
       })),
 
-      nextCursor,
       hasMore,
+      nextCursor,
     });
-
   } catch (err) {
     console.error("❌ Error fetching items by category:", err);
     next(err);
@@ -3327,7 +3678,6 @@ const getItemsByCategory = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-
 
 const eachItemSalesPurchaseDetails = async (req, res, next) => {
   let connection;
@@ -4697,7 +5047,8 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
 
 
 export {
-  addItem, editItem, deleteItem, addCategory, getAllItems, getAllCategories, eachItemSalesPurchaseDetails,
+  addItem, editItem, deleteItem, addCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
+  eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers, addItemConversion, getItemConversions,
   getAllItemsForLedger, getItemBills, getItemsByCategory, addStockAdjustment, editStockAdjustment,
   deleteStockAdjustment

@@ -479,10 +479,16 @@ export default function PurchaseAdd() {
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
+    // setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+    //   shouldValidate: false,
+    //   shouldDirty: true,
+    // });
+      if (splitsWatch.length > 1) {
     setValue("Total_Paid", computedTotalPaid.toFixed(2), {
       shouldValidate: false,
       shouldDirty: true,
     });
+  }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 

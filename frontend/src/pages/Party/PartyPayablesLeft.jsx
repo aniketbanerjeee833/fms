@@ -425,7 +425,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     setPrintTarget({ type: row.Txn_Type, id: transactionId });
   };
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col  overflow-y-auto"
+      style={{
+        maxHeight: "calc(100vh - 180px)",
+        minWidth: 0
+      }}
+      >
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -1207,8 +1212,11 @@ export default function PartyPayablesLeft() {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
-            <PartyDetailPanel partyId={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
+          {/* <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
+            <PartyDetailPanel partyId={selectedId}  key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
+          </div> */}
+          <div className="w-full lg:w-[70%] p-1" >
+            <PartyDetailPanel partyId={selectedId}  key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div>
         </div>
       </div>

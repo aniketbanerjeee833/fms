@@ -2148,6 +2148,7 @@ useEffect(() => {
                                     <thead>
                                         <tr>
                                             {[
+                                                "Sl No.",
                                                 "Date",
                                                 "Bill No.",
                                                 "Party",
@@ -2182,7 +2183,7 @@ useEffect(() => {
                                                 </td>
                                             </tr>
                                         ) : (
-                                            transactions.map((txn) => (
+                                            transactions.map((txn,idx) => (
                                                 <tr
                                                     key={txn.Ledger_Id}
                                                     onDoubleClick={() => handleTransactionEdit(txn)}
@@ -2193,6 +2194,7 @@ useEffect(() => {
                                                     }}
                                                     className="hover:bg-gray-50 transition-colors"
                                                 >
+                                                    <td>{idx + 1}.</td>
                                                     <td style={{ whiteSpace: "nowrap" }}>
                                                         {fmtDate(txn.Txn_Date)}
                                                     </td>

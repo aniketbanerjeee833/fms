@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { NavLink,  useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   Search,
@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 
 import {
-  useGetAllCategoriesQuery,
+  useGetAllCategoriesCursorQuery,
+
   useGetItemsByCategoryQuery,
 } from "../../redux/api/itemApi";
 
@@ -27,45 +28,108 @@ const fmt = (n) =>
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ItemsByCategory() {
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // controller's getAllCategories returns the raw array directly
-  const { data: categoriesRaw, isLoading } = useGetAllCategoriesQuery();
-  const categories = categoriesRaw || [];
+  //const { data: categoriesRaw, isLoading } = useGetAllCategoriesQuery();
+  // const categories = categoriesRaw || [];
 
   const selectedCategoryId = searchParams.get("categoryId") || null;
   const categorySearch = searchParams.get("q") || "";
   const itemSearch = searchParams.get("itemSearch") || "";
   const [menuOpen, setMenuOpen] = useState(null);
-  const [itemRowMenu, setItemRowMenu] = useState(null);
+  //const [itemRowMenu, setItemRowMenu] = useState(null);
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   //const [showEditItemModal, setShowEditItemModal] = useState(false);
   //const [editingItem, setEditingItem] = useState(null);
-
+  const [leftCursor, setLeftCursor] = useState(null);
+  const leftSentinelRef = useRef(null);
+  const leftObserverRef = useRef(null);
 
   const {
+    data: categoryResponse,
+    isLoading: isCategoriesLoading,
+    isFetching: isCategoriesFetching,
+  } = useGetAllCategoriesCursorQuery({ cursor: leftCursor, search: categorySearch, limit: 10 });
+
+  const categories = categoryResponse?.categories || [];
+  const categoriesHasMore = categoryResponse?.hasMore ?? false;
+  const categoriesNextCursor = categoryResponse?.nextCursor ?? null;
+
+  useEffect(() => { setLeftCursor(null); }, [categorySearch]);
+
+  const handleLeftObserver = useCallback((entries) => {
+    if (entries[0].isIntersecting && categoriesHasMore && categoriesNextCursor && !isCategoriesFetching && !isCategoriesLoading) {
+      setLeftCursor(categoriesNextCursor);
+    }
+  }, [categoriesHasMore, categoriesNextCursor, isCategoriesFetching, isCategoriesLoading]);
+
+  useEffect(() => {
+    if (leftObserverRef.current) leftObserverRef.current.disconnect();
+    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, { threshold: 0.1 });
+    if (leftSentinelRef.current) leftObserverRef.current.observe(leftSentinelRef.current);
+    return () => leftObserverRef.current?.disconnect();
+  }, [handleLeftObserver]);
+
+  // const {
+  //   data: itemsResponse,
+  //   isLoading: isItemsLoading,
+  // } = useGetItemsByCategoryQuery(
+  //   {
+  //     categoryId: selectedCategoryId || "all",
+  //     search: itemSearch,
+  //   },
+  //   {
+  //     skip: !selectedCategoryId,
+  //   }
+  // );
+
+  // const items = itemsResponse?.items || [];
+  /* ── RIGHT — items under selected category, cursor infinite scroll ── */
+  const [rightCursor, setRightCursor] = useState(null);
+  const rightSentinelRef = useRef(null);
+  const rightObserverRef = useRef(null);
+
+    const {
     data: itemsResponse,
     isLoading: isItemsLoading,
-  } = useGetItemsByCategoryQuery(
-    {
-      categoryId: selectedCategoryId || "all",
-      search: itemSearch,
-    },
-    {
-      skip: !selectedCategoryId,
-    }
-  );
+    isFetching: isItemsFetching,
+  } = useGetItemsByCategoryQuery({ categoryId: selectedCategoryId, cursor: rightCursor, search: itemSearch });
 
   const items = itemsResponse?.items || [];
-  // console.log("category items",items)
+  const totalItems= itemsResponse?.totalItems || 0;
+  //const categoryInfo = itemsResponse?.category;
+  const itemsHasMore = itemsResponse?.hasMore ?? false;
+  const itemsNextCursor = itemsResponse?.nextCursor ?? null;
+
+  useEffect(() => { setRightCursor(null); }, [selectedCategoryId, itemSearch]);
+
+  const handleRightObserver = useCallback((entries) => {
+    if (entries[0].isIntersecting && itemsHasMore && itemsNextCursor && !isItemsFetching && !isItemsLoading) {
+      setRightCursor(itemsNextCursor);
+    }
+  }, [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]);
+
+  useEffect(() => {
+    if (rightObserverRef.current) rightObserverRef.current.disconnect();
+    rightObserverRef.current = new IntersectionObserver(handleRightObserver, { threshold: 0.1 });
+    if (rightSentinelRef.current) rightObserverRef.current.observe(rightSentinelRef.current);
+    return () => rightObserverRef.current?.disconnect();
+  }, [handleRightObserver]);
+
+  // const filteredCategories = useMemo(() => {
+  //   // "All" and "Uncategorized" are always pinned at the top, unaffected by cursor pagination
+  //   return categories.filter((c) => c.Item_Category?.toLowerCase().includes(categorySearch.toLowerCase()));
+  // }, [categories, categorySearch]);
+ 
 
   // default to "all" bucket on first load
   useEffect(() => {
     if (!categories.length || selectedCategoryId) return;
 
     const next = new URLSearchParams(searchParams);
-    next.set("categoryId", "all");
+    next.set("categoryId", "uncategorized");
 
     setSearchParams(next, { replace: true });
   }, [
@@ -78,25 +142,27 @@ export default function ItemsByCategory() {
   useEffect(() => {
     const closeMenu = () => {
       setMenuOpen(null);
-      setItemRowMenu(null);
+      //setItemRowMenu(null);
     };
     document.addEventListener("click", closeMenu);
     return () => document.removeEventListener("click", closeMenu);
   }, []);
 
-  const sidebarCategories = useMemo(() => {
-    const all = { Category_Id: "all", Item_Category: "All Items" };
-    return [all, ...categories];
-  }, [categories]);
+  // const sidebarCategories = useMemo(() => {
+  //   const all = { Category_Id: "all", Item_Category: "All Items" };
+  //   return [all, ...categories];
+  // }, [categories]);
 
-  const filteredCategories = useMemo(() => {
-    return sidebarCategories.filter((c) =>
-      c.Item_Category.toLowerCase().includes(categorySearch.toLowerCase())
-    );
-  }, [sidebarCategories, categorySearch]);
-
+  // const filteredCategories = useMemo(() => {
+  //   return sidebarCategories.filter((c) =>
+  //     c.Item_Category.toLowerCase().includes(categorySearch.toLowerCase())
+  //   );
+  // }, [sidebarCategories, categorySearch]);
+const filteredCategories=categories
+console.log("filteredCategories",filteredCategories)
+const totalCategories=categoryResponse?.totalCategories||0
   const selectedCategory =
-    sidebarCategories.find((c) => c.Category_Id === selectedCategoryId) || null;
+    filteredCategories.find((c) => c.Category_Id === selectedCategoryId) || null;
 
   // const totalStockValue = useMemo(
   //   () => items.reduce((sum, it) => sum + Number(it.Stock_Value || 0), 0),
@@ -213,11 +279,11 @@ export default function ItemsByCategory() {
             >
               <Tags size={15} style={{ color: "#4CA1AF" }} />
               <span className="text-xs font-semibold text-black uppercase tracking-wider">
-                Categories ({filteredCategories.length})
+                Categories ({totalCategories})
               </span>
             </div>
 
-            {isLoading ? (
+            {isCategoriesLoading ? (
               <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
             ) : filteredCategories.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
@@ -227,7 +293,8 @@ export default function ItemsByCategory() {
             ) : (
               filteredCategories.map((category) => {
                 const isSelected = selectedCategoryId === category.Category_Id;
-                const isAllBucket = category.Category_Id === "all";
+                //const isAllBucket = category.Category_Id === "all";
+                const isUncategorized =category.Category_Id === "uncategorized";
 
                 return (
                   <div
@@ -255,7 +322,33 @@ export default function ItemsByCategory() {
                     </div>
 
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      {!isAllBucket && (
+                      {/* {!isAllBucket && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            const next = new URLSearchParams(searchParams);
+
+                            next.set("categoryId", category.Category_Id);
+                            next.delete("itemSearch");
+
+                            setSearchParams(next);
+
+                            setMenuOpen(
+                              menuOpen === category.Category_Id
+                                ? null
+                                : category.Category_Id
+                            );
+                          }}
+                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          style={{ backgroundColor: "transparent" }}
+                          title="More"
+                        >
+                          <MoreVertical size={14} style={{ color: "#374151" }} />
+                        </button>
+                      )} */}
+                       {!isUncategorized && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -315,6 +408,8 @@ export default function ItemsByCategory() {
                 );
               })
             )}
+             <div ref={leftSentinelRef} style={{ height: 1 }} />
+        {isCategoriesFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
@@ -350,7 +445,7 @@ export default function ItemsByCategory() {
                     </h6>
 
                     <p className="text-gray-500 text-sm mt-0.5">
-                      {items.length} item{items.length !== 1 ? "s" : ""}
+                      {totalItems} item{totalItems !== 1 ? "s" : ""}
                     </p>
                   </div>
 
@@ -504,6 +599,9 @@ export default function ItemsByCategory() {
               </div>
 
             </div>
+             <div ref={rightSentinelRef} style={{ height: 1 }} />
+        {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+        {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>}
           </div>
 
         </div>

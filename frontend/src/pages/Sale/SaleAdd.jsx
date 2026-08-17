@@ -518,10 +518,16 @@ export default function SaleAdd() {
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalReceived;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
+    // setValue("Total_Received", computedTotalReceived.toFixed(2), {
+    //   shouldValidate: false,
+    //   shouldDirty: true,
+    // });
+       if (splitsWatch.length > 1) {
     setValue("Total_Received", computedTotalReceived.toFixed(2), {
       shouldValidate: false,
       shouldDirty: true,
     });
+  }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
 
@@ -2700,7 +2706,7 @@ export default function SaleAdd() {
                   {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
 
 
-                  {showSalePayment && (<div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
+                  {showSalePayment && (<div className="flex flex-col mt-3 gap-2 w-full">
                     {!showSplitBox ? (
                       <>
                         <div className="flex flex-col w-full">
