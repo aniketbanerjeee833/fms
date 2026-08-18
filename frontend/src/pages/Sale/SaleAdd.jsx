@@ -18,7 +18,7 @@ import { saleFormSchema } from "../../schema/saleFormSchema";
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
@@ -106,7 +106,7 @@ export default function SaleAdd() {
   // find this line in your code and add refetch:
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   //console.log(items,parties);
-  const { data: banks = [],refetch: refetchBanks } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
   const [showEditPartyModal, setShowEditPartyModal] = useState(false);
@@ -522,12 +522,12 @@ export default function SaleAdd() {
     //   shouldValidate: false,
     //   shouldDirty: true,
     // });
-       if (splitsWatch.length > 1) {
-    setValue("Total_Received", computedTotalReceived.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+    if (splitsWatch.length > 1) {
+      setValue("Total_Received", computedTotalReceived.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
 
@@ -652,9 +652,9 @@ export default function SaleAdd() {
     // 5. BALANCE DUE
     // =========================================================
 
-  const balanceDue = Number(
-  (totalAmount - totalReceived).toFixed(2)
-);
+    const balanceDue = Number(
+      (totalAmount - totalReceived).toFixed(2)
+    );
 
     // =========================================================
     // 6. BUILD PAYLOAD
@@ -667,10 +667,10 @@ export default function SaleAdd() {
 
       //Total_Amount: totalAmount,
       //Total_Received: totalReceived,
-       Total_Amount: Number(totalAmount.toFixed(2)),
-  Total_Received: Number(totalReceived.toFixed(2)),
-  Balance_Due: Number(balanceDue.toFixed(2)),
-     
+      Total_Amount: Number(totalAmount.toFixed(2)),
+      Total_Received: Number(totalReceived.toFixed(2)),
+      Balance_Due: Number(balanceDue.toFixed(2)),
+
       splits: validSplits,
     };
 
@@ -700,12 +700,12 @@ export default function SaleAdd() {
 
 
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         saleApi.util.invalidateTags(["Sale"])
@@ -2213,6 +2213,28 @@ export default function SaleAdd() {
 
                                       }}
                                     />
+                                    {!hasPrimary && !hasSecondary && (
+                                      <div
+                                        onClick={() => {
+                                          setActiveUnitRow(i);
+                                          setShowAddUnitModal(true);
+
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+                                        }}
+                                        style={{
+                                          padding: "8px 10px",
+                                          borderBottom: "1px solid #e5e7eb",
+                                          cursor: "pointer",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#4CA1AF",
+                                          background: "#f8fafc",
+                                        }}
+                                      >
+                                        + Add Unit
+                                      </div>
+                                    )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -2810,7 +2832,7 @@ export default function SaleAdd() {
                             required: "Required",
                             validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                           });
-                            const usedValues = splitsWatch
+                          const usedValues = splitsWatch
                             .map((s, idx) => {
                               if (idx === index) return null; // exclude current row
                               return s.Payment_Type === "Bank"
@@ -3220,19 +3242,19 @@ export default function SaleAdd() {
         />
       )}
       {showBankModal && (
-              <BankAccountModal
-                mode="add"
-                onClose={() => {
-                  setShowBankModal(false);
-                  dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
-                }}
-                 onSave={() => {
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
             refetchBanks();   // 🔹 refetch so new bank appears in dropdown
             setShowBankModal(false);
-            
+
           }}
-              />
-            )}
+        />
+      )}
       <style>
         {`
   /*  screens between 1000px and 640px */

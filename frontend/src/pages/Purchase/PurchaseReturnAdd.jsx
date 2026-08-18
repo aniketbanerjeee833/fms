@@ -15,7 +15,7 @@ import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 
 import { purchaseReturnApi, useCreatePurchaseReturnMutation } from "../../redux/api/purchaseReturnApi";
 import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
@@ -711,12 +711,12 @@ export default function PurchaseReturnAdd() {
     //   shouldValidate: false,
     //   shouldDirty: true,
     // });
-      if (splitsWatch.length > 1) {
-    setValue("Total_Received", computedTotalReceived.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+    if (splitsWatch.length > 1) {
+      setValue("Total_Received", computedTotalReceived.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
 
@@ -915,12 +915,12 @@ export default function PurchaseReturnAdd() {
 
 
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         cashInHandApi.util.invalidateTags([
@@ -2385,6 +2385,28 @@ export default function PurchaseReturnAdd() {
 
                                       }}
                                     />
+                                    {!hasPrimary && !hasSecondary && (
+                                        <div
+                                          onClick={() => {
+                                            setActiveUnitRow(i);
+                                            setShowAddUnitModal(true);
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+                                          }}
+                                          style={{
+                                            padding: "8px 10px",
+                                            borderBottom: "1px solid #e5e7eb",
+                                            cursor: "pointer",
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "#4CA1AF",
+                                            background: "#f8fafc",
+                                          }}
+                                        >
+                                          + Add Unit
+                                        </div>
+                                      )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -3014,7 +3036,7 @@ export default function PurchaseReturnAdd() {
                             required: "Required",
                             validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                           });
-                            const usedValues = splitsWatch
+                          const usedValues = splitsWatch
                             .map((s, idx) => {
                               if (idx === index) return null; // exclude current row
                               return s.Payment_Type === "Bank"
@@ -3446,20 +3468,20 @@ export default function PurchaseReturnAdd() {
           }}
         />
       )}
-       {showBankModal && (
-                    <BankAccountModal
-                      mode="add"
-                      onClose={() => {
-                        setShowBankModal(false);
-                        dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
-                      }}
-                       onSave={() => {
-                  refetchBanks();   // 🔹 refetch so new bank appears in dropdown
-                  setShowBankModal(false);
-                  
-                }}
-                    />
-                  )}
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
+          }}
+        />
+      )}
       <style>
         {`
   /*  screens between 1000px and 640px */

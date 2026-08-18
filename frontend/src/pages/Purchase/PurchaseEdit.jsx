@@ -15,7 +15,7 @@ import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
@@ -73,7 +73,7 @@ export default function PurchaseEdit() {
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
   console.log(termsTemplates, "termsTemplates");
- const { data: banks = [],refetch: refetchBanks } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   const { data: purchase }
     = useGetSinglePurchaseQuery(Purchase_Id)
   const [open, setOpen] = useState(false);
@@ -178,7 +178,7 @@ export default function PurchaseEdit() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, 
+      isUnitLocked: false, CategoryOpen: false,
       categorySearch: "", unitOpen: false, unitSearch: "",
     }
   ]);
@@ -498,11 +498,11 @@ export default function PurchaseEdit() {
     //   shouldDirty: true,
     // });
     if (splitsWatch.length > 1) {
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+      setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 
@@ -2255,6 +2255,28 @@ export default function PurchaseEdit() {
 
                                       }}
                                     />
+                                    {!hasPrimary && !hasSecondary && (
+                                      <div
+                                        onClick={() => {
+                                          setActiveUnitRow(i);
+                                          setShowAddUnitModal(true);
+
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+                                        }}
+                                        style={{
+                                          padding: "8px 10px",
+                                          borderBottom: "1px solid #e5e7eb",
+                                          cursor: "pointer",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#4CA1AF",
+                                          background: "#f8fafc",
+                                        }}
+                                      >
+                                        + Add Unit
+                                      </div>
+                                    )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -2815,7 +2837,7 @@ export default function PurchaseEdit() {
                             required: "Required",
                             validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                           });
-                           const usedValues = splitsWatch
+                          const usedValues = splitsWatch
                             .map((s, idx) => {
                               if (idx === index) return null; // exclude current row
                               return s.Payment_Type === "Bank"
@@ -3216,54 +3238,54 @@ export default function PurchaseEdit() {
         />
       )
       }
-       {showBankModal && (
-              <BankAccountModal
-                mode="add"
-                onClose={() => {
-                  setShowBankModal(false);
-                  dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
-                }}
-                 onSave={() => {
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
             refetchBanks();   // 🔹 refetch so new bank appears in dropdown
             setShowBankModal(false);
-            
+
           }}
-              />
-            )}
+        />
+      )}
       {showItemAddModal && (
-          <AddItemModal
-            onClose={() => {
+        <AddItemModal
+          onClose={() => {
+            setShowItemAddModal(false);
+
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
+          }}
+          onSave={async (savedItem) => {
+            if (!savedItem || typeof savedItem !== "object") {
               setShowItemAddModal(false);
+              return;
+            }
 
-              if (activeItemRow !== null) {
-                handleRowChange(activeItemRow, "itemOpen", true);
-              }
-            }}
-            onSave={async (savedItem) => {
-              if (!savedItem || typeof savedItem !== "object") {
-                setShowItemAddModal(false);
-                return;
-              }
+            await refetchItems();
 
-              await refetchItems();
+            // setNewlyAddedItem(savedItem);
 
-              // setNewlyAddedItem(savedItem);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
-              // setTimeout(() => {
-              //   setNewlyAddedItem(null);
-              // }, 8000);
+            setShowItemAddModal(false);
 
-              setShowItemAddModal(false);
+            // Reopen the SAME row's dropdown
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
 
-              // Reopen the SAME row's dropdown
-              if (activeItemRow !== null) {
-                handleRowChange(activeItemRow, "itemOpen", true);
-              }
-
-              setActiveItemRow(null);
-            }}
-          />
-        )
+            setActiveItemRow(null);
+          }}
+        />
+      )
       }
       <style>
         {`

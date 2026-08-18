@@ -39,6 +39,7 @@ const AllItemsList = lazy(() => import('./pages/Items/AllItemsList'));
 const ItemSalesPurchasesDetails = lazy(() => import('./pages/Items/ItemsSalesPurchasesDetails'));
 const ItemsByCategory = lazy(() => import('./pages/Items/ItemsByCategory'));
 const ItemsByItem = lazy(() => import('./pages/Items/ItemsByItem'));
+const ItemUnits= lazy(() => import('./pages/Items/ItemUnits'));
 
 const PurchaseAdd = lazy(() => import('./pages/Purchase/PurchaseAdd'));
 const PaymentOut= lazy(() => import('./pages/Purchase/PaymentOut'));
@@ -206,6 +207,14 @@ function RouterWrapper() {
                           element={
                             <Layout>
                               <ItemsByItem />
+                            </Layout>
+                          }
+                        />
+                         <Route
+                          path="/items/units"
+                          element={
+                            <Layout>
+                              <ItemUnits/>
                             </Layout>
                           }
                         />

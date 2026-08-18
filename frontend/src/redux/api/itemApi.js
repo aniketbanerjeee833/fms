@@ -495,6 +495,7 @@ export const itemApi = createApi({
     "ItemsByCategory",
     "Items",
     "Category",
+    "Unit"
   ],
 
   endpoints: (builder) => ({
@@ -558,8 +559,13 @@ export const itemApi = createApi({
       ],
     }),
 
-    getItemConversions: builder.query({
-      query: (Item_Id) => `/item/item-conversions/${Item_Id}`,
+    // getItemConversions: builder.query({
+    //   query: (Item_Id) => `/item/item-conversions/${Item_Id}`,
+    //   transformResponse: (res) => res.conversions,
+    //   providesTags: ["ItemConversions"],
+    // }),
+     getItemConversions: builder.query({
+      query: () => `/item/item-conversions`,
       transformResponse: (res) => res.conversions,
       providesTags: ["ItemConversions"],
     }),
@@ -802,6 +808,116 @@ moveItemsToCategory: builder.mutation({
         { type: "ItemLedger", id: payload.Item_Id },
       ],
     }),
+    addItemUnit: builder.mutation({
+  query: (data) => ({
+    url: "/unit/add-unit",
+    method: "POST",
+    body: data,
+  }),
+
+  invalidatesTags: ["Unit"],
+}),
+editItemUnit: builder.mutation({
+  query: ({ Unit_Id, ...body }) => ({
+    url: `/unit/edit-unit/${Unit_Id}`,
+    method: "PATCH",
+    body,
+  }),
+
+  invalidatesTags: ["Unit"],
+}),
+getAllItemUnits: builder.query({
+ 
+  query: () => {
+    return `unit/get-all-units`;
+   
+  },
+  providesTags: ["Unit"],
+}),
+getAllItemUnitsCursor: builder.query({
+  query: ({
+    cursor = null,
+    search = "",
+    limit = 10,
+  }) => {
+    const params = new URLSearchParams();
+
+    if (cursor) params.set("cursor", cursor);
+    if (search) params.set("search", search);
+    params.set("limit", limit);
+
+    return `/unit/get-all-units/cursor?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => {
+    const { search } = queryArgs;
+    return { search };
+  },
+
+  merge: (currentCache, newData, { arg }) => {
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    currentCache.units.push(...newData.units);
+    currentCache.nextCursor = newData.nextCursor;
+    currentCache.hasMore = newData.hasMore;
+    currentCache.totalUnits = newData.totalUnits;
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.search !== previousArg?.search,
+
+  providesTags: ["Unit"],
+}),
+getUnitConversions: builder.query({
+  query: ({ unitId, cursor = null, search = "" }) => {
+    const params = new URLSearchParams();
+
+    if (cursor) params.set("cursor", cursor);
+    if (search?.trim()) params.set("search", search.trim());
+
+    return `unit/${unitId}/conversions?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => {
+    const { unitId, search } = queryArgs;
+
+    return {
+      unitId,
+      search,
+    };
+  },
+
+  merge: (currentCache, newData, { arg }) => {
+    // First load / search change / unit change
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    currentCache.conversions.push(
+      ...newData.conversions
+    );
+
+    currentCache.nextCursor = newData.nextCursor;
+    currentCache.hasMore = newData.hasMore;
+
+    if (newData.unit) {
+      currentCache.unit = newData.unit;
+    }
+  },
+
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.search !== previousArg?.search ||
+    currentArg?.unitId !== previousArg?.unitId,
+
+ providesTags: ["Unit"],
+}),
 
   }),
 });
@@ -828,4 +944,9 @@ export const {
   useAddStockAdjustmentMutation,
   useEditStockAdjustmentMutation,
   useDeleteStockAdjustmentMutation,
+  useAddItemUnitMutation,
+  useEditItemUnitMutation,
+  useGetAllItemUnitsQuery,
+  useGetAllItemUnitsCursorQuery,
+  useGetUnitConversionsQuery
 } = itemApi;

@@ -7,7 +7,18 @@ import db from "../config/db.js";
 
   Running_Stock = previous stock + (In ? +qty : -qty)
 */
+const markUnitAsUsed = async (connection, selectedUnit) => {
+  if (!selectedUnit || selectedUnit === "None") return;
 
+  await connection.query(
+    `
+    UPDATE units
+    SET Is_Used = 1
+    WHERE LOWER(TRIM(Unit_Shorthand)) = LOWER(TRIM(?))
+    `,
+    [selectedUnit]
+  );
+};
 const IN_TYPES  = ["Purchase", "Sale_Return", "Opening_Stock", "Add_Adjustment"];
 const OUT_TYPES = ["Sale", "Purchase_Return", "Reduce_Adjustment"];
 
@@ -87,6 +98,7 @@ export const recordItemLedger = async ({
       `SELECT Running_Stock FROM item_ledger WHERE id = ?`,
       [existingRow.id]
     );
+    await markUnitAsUsed(connection, selectedUnit);
     return Number(updated.Running_Stock);
   }
 
@@ -140,7 +152,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       txnDate,
     ]
   );
-
+await markUnitAsUsed(connection, selectedUnit);
   return newStock;
 };
 export const reverseItemLedger = async ({

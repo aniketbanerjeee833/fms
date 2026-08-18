@@ -1766,7 +1766,7 @@ useEffect(() => {
                         <button
                             type="button"
                             onClick={() => setShowAddItemModal(true)}
-                            className="text-white px-4 py-2 rounded-md text-sm font-medium"
+                            className="w-full sm:w-auto text-white px-4 py-2 rounded-md text-sm font-medium"
                             style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
                         >
                             + Add Item

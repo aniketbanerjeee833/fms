@@ -643,7 +643,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 {hasDiscountColumn && (
                   <td
                     className="invoice-item-right"
-                    style={{ whiteSpace: "nowrap" }}
+                    
                   >
                     {Number(item.Discount_Amount || 0) > 0 ? (
                       type === "sale" ? (

@@ -4,7 +4,7 @@ import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery, useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
 
@@ -17,7 +17,7 @@ import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { FileText, LayoutDashboard, Upload } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
@@ -67,7 +67,7 @@ export default function PurchaseAdd() {
   // const { data: items, } = useGetAllItemsQuery();
   console.log(items);
   const { data: categories } = useGetAllCategoriesQuery()
-  const { data: banks = [],refetch: refetchBanks } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   //console.log(banks, "banks");
   const [open, setOpen] = useState(false);
   //console.log(categories, "categories");
@@ -161,7 +161,7 @@ export default function PurchaseAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false, 
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false,
       unitOpen: false, unitSearch: "",
     }
   ]);
@@ -483,12 +483,12 @@ export default function PurchaseAdd() {
     //   shouldValidate: false,
     //   shouldDirty: true,
     // });
-      if (splitsWatch.length > 1) {
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+    if (splitsWatch.length > 1) {
+      setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 
@@ -635,12 +635,12 @@ export default function PurchaseAdd() {
       // 8. Invalidate RTK Query caches
       // =======================================================
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         cashInHandApi.util.invalidateTags(["CashInHand",])
@@ -2402,6 +2402,28 @@ export default function PurchaseAdd() {
 
                                         }}
                                       />
+                                      {!hasPrimary && !hasSecondary && (
+                                        <div
+                                          onClick={() => {
+                                            setActiveUnitRow(i);
+                                            setShowAddUnitModal(true);
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+                                          }}
+                                          style={{
+                                            padding: "8px 10px",
+                                            borderBottom: "1px solid #e5e7eb",
+                                            cursor: "pointer",
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "#4CA1AF",
+                                            background: "#f8fafc",
+                                          }}
+                                        >
+                                          + Add Unit
+                                        </div>
+                                      )}
                                       {filtered.length === 0 ? (
                                         <div
                                           onClick={() => {
@@ -3034,14 +3056,14 @@ export default function PurchaseAdd() {
                             })
                             .filter(Boolean);
 
-                         
 
-                        return (
-                        <div key={field.id} className="flex flex-col gap-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                            <div className="flex flex-col flex-1">
-                              <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                              {/* <select
+
+                          return (
+                            <div key={field.id} className="flex flex-col gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                  {/* <select
                                     value={currentIdentifier || ""}
                                     onChange={(e) => {
                                       const val = e.target.value;
@@ -3062,66 +3084,66 @@ export default function PurchaseAdd() {
                                       </option>
                                     ))}
                                   </select> */}
-                              <PaymentTypeSelect
-                                value={currentIdentifier || ""}
-                                banks={banks}
-                                onAddBank={() => setShowBankModal(true)}
-                                usedValues={usedValues} 
-                                onChange={(val) => {
-                                  if (val.startsWith("bank_")) {
-                                    setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                    setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                  } else {
-                                    setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                    setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                  }
-                                }}
-                              />
-                            </div>
+                                  <PaymentTypeSelect
+                                    value={currentIdentifier || ""}
+                                    banks={banks}
+                                    onAddBank={() => setShowBankModal(true)}
+                                    usedValues={usedValues}
+                                    onChange={(val) => {
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                  />
+                                </div>
 
-                            <div className="flex flex-col flex-1">
-                              <span className="text-xs text-gray-500 mb-1">Amount</span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="Amount"
-                                style={{ marginBottom: "0px", width: "80%" }}
-                                className="border rounded-md px-2 py-1.5"
-                                {...amountField}
-                                onChange={(e) => {
-                                  e.target.value = sanitizeAmount(e.target.value);
-                                  amountField.onChange(e);
-                                  clearErrors(`splits.${index}.Amount`);
-                                }}
-                              />
-                              {errors?.splits?.[index]?.Amount && (
-                                <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                <div className="flex flex-col flex-1">
+                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Amount"
+                                    style={{ marginBottom: "0px", width: "80%" }}
+                                    className="border rounded-md px-2 py-1.5"
+                                    {...amountField}
+                                    onChange={(e) => {
+                                      e.target.value = sanitizeAmount(e.target.value);
+                                      amountField.onChange(e);
+                                      clearErrors(`splits.${index}.Amount`);
+                                    }}
+                                  />
+                                  {errors?.splits?.[index]?.Amount && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                  )}
+                                </div>
+
+                                {splitFields.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSplit(index)}
+                                    className="text-gray-500 mb-2 mt-4"
+                                    style={{ background: "transparent", border: "none" }}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {needsRef && (
+                                <input
+                                  type="text"
+                                  placeholder="Reference Number"
+                                  style={{ width: "80%" }}
+                                  // className="border rounded-md px-2 py-1.5 w-full"
+                                  {...register(`splits.${index}.Reference_Number`)}
+                                />
                               )}
                             </div>
-
-                            {splitFields.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeSplit(index)}
-                                className="text-gray-500 mb-2 mt-4"
-                                style={{ background: "transparent", border: "none" }}
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            )}
-                          </div>
-
-                          {needsRef && (
-                            <input
-                              type="text"
-                              placeholder="Reference Number"
-                              style={{ width: "80%" }}
-                              // className="border rounded-md px-2 py-1.5 w-full"
-                              {...register(`splits.${index}.Reference_Number`)}
-                            />
-                          )}
-                        </div>
-                        );
+                          );
                         })}
 
                         <button
@@ -3399,9 +3421,8 @@ export default function PurchaseAdd() {
           }}
 
         />
-      )
+      )}
 
-      }
       {showItemAddModal && (
         <AddItemModal
           onClose={() => {
@@ -3443,11 +3464,11 @@ export default function PurchaseAdd() {
             setShowBankModal(false);
             dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
           }}
-           onSave={() => {
-      refetchBanks();   // 🔹 refetch so new bank appears in dropdown
-      setShowBankModal(false);
-      
-    }}
+          onSave={() => {
+            refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
+          }}
         />
       )}
       {/* {showTermsConditionsModal.open && (

@@ -2,7 +2,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { itemFormSchema } from "../../schema/itemFormSchema";
 import { useRef } from "react";
 import { useState } from "react";
-import { itemApi, useAddCategoryMutation, useEditItemMutation, useGetAllCategoriesQuery, useGetEachItemBillAndInvoiceNumbersQuery } from "../../redux/api/itemApi";
+import { itemApi, useAddCategoryMutation, useEditItemMutation, useGetAllCategoriesQuery, useGetAllItemUnitsQuery, 
+  useGetEachItemBillAndInvoiceNumbersQuery } from "../../redux/api/itemApi";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
@@ -10,7 +11,7 @@ import { toast } from "react-toastify";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
 import SelectUnitModal from "./SelectUnitModal";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+
 
 
 export default function ItemModal({ itemDetails, editingItem, onClose }) {

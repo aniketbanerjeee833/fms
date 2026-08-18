@@ -269,7 +269,7 @@ if (
             //{ to: "/items/add", text: "Add Items" },
             //{ to: "/items/all-items", text: "Item Details" },
                 { to: "/items/all-items", text: "Items" },
-                // { to: "/items/units", text: "Units" },
+                { to: "/items/units", text: "Units" },
          
           ])}
           

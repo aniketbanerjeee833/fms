@@ -12,7 +12,7 @@ import {
     useAddItemMutation,
     useGetAllCategoriesQuery,
 } from "../../redux/api/itemApi";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import SelectUnitModal from "./SelectUnitModal";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";

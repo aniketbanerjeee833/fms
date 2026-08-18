@@ -3,7 +3,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import userRoutes from "./routes/userRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import partyRoutes from "./routes/partyRoutes.js";
-import itemRoutes from "./routes/itemRoutes.js";
+ import { itemRouter,unitRouter } from "./routes/itemRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 
 import purchaseRoutes from "./routes/purchaseRoutes.js";
@@ -133,7 +133,8 @@ app.use("/api/user",userRoutes)
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/report", reportRoutes);
 app.use("/api/party", partyRoutes);
-app.use("/api/item", itemRoutes);
+// app.use("/api/item", itemRoutes);
+
 app.use("/api/purchase", purchaseRoutes);
  app.use("/api/purchase-return", purchaseReturnRoutes);
   app.use("/api/sale-return", saleReturnRoutes);
@@ -146,6 +147,9 @@ app.use("/api/daily-expense",dailyExpenseRoutes);
 app.use("/api/financial-year",financialYearRoutes)
 app.use("/api/misc",miscellaneousRoutes)
 
+//ITEM
+app.use("/api/item", itemRouter);
+app.use("/api/unit", unitRouter);
 //EXPENSE
 app.use("/api/expense-category", expenseCategoryRouter);
 app.use("/api/expense-item", expenseItemRouter);

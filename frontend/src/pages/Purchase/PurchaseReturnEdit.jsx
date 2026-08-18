@@ -17,7 +17,7 @@ import { toast } from "react-toastify";
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 // import { saleReturnApi } from "../../redux/api/saleReturnApi";
@@ -2325,6 +2325,28 @@ export default function PurchaseReturndEdit() {
 
                                       }}
                                     />
+                                     {!hasPrimary && !hasSecondary && (
+                                        <div
+                                          onClick={() => {
+                                            setActiveUnitRow(i);
+                                            setShowAddUnitModal(true);
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+                                          }}
+                                          style={{
+                                            padding: "8px 10px",
+                                            borderBottom: "1px solid #e5e7eb",
+                                            cursor: "pointer",
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "#4CA1AF",
+                                            background: "#f8fafc",
+                                          }}
+                                        >
+                                          + Add Unit
+                                        </div>
+                                      )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {

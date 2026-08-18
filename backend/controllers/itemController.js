@@ -579,26 +579,38 @@ const addItemConversion = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+
+// WHERE Item_Id = ?
 const getItemConversions = async (req, res, next) => {
   let connection;
 
   try {
     connection = await db.getConnection();
 
-    const { Item_Id } = req.params;
+    //const { Item_Id } = req.params;
 
+    // const [conversions] = await connection.query(
+    //   `
+    //   SELECT
+    //     id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate
+    //   FROM item_unit_conversions
+
+    //   ORDER BY id DESC
+    //   `,
+
+    // );
     const [conversions] = await connection.query(
       `
-      SELECT
-        id,
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate
-      FROM item_unit_conversions
-      WHERE Item_Id = ?
-      ORDER BY id DESC
-      `,
-      [Item_Id]
+  SELECT DISTINCT
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate
+  FROM item_unit_conversions
+  ORDER BY Primary_Unit, Secondary_Unit
+  `
     );
 
     return res.status(200).json({
@@ -3396,23 +3408,23 @@ const getItemsNotInCategory = async (req, res, next) => {
 
     connection = await db.getConnection();
     const [[category]] = await connection.query(
-  `
+      `
   SELECT Item_Category
   FROM add_category
   WHERE Category_Id = ?
   `,
-  [Category_Id]
-);
+      [Category_Id]
+    );
 
-if (!category) {
-  return res.status(404).json({
-    success: false,
-    message: "Category not found",
-  });
-}
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
 
     const [items] = await connection.query(
-  `
+      `
   SELECT
     Item_Id,
     Item_Name,
@@ -3423,8 +3435,8 @@ if (!category) {
      OR LOWER(TRIM(Item_Category)) <> LOWER(TRIM(?))
   ORDER BY Item_Name ASC
   `,
-  [category.Item_Category]
-);
+      [category.Item_Category]
+    );
 
     return res.status(200).json({
       success: true,
@@ -5088,16 +5100,566 @@ const printEachItemSalesPurchasesReport = async (req, res) => {
     res.status(500).json({ message: "PDF Print Error" });
   }
 };
+const addItemUnit = async (req, res, next) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
 
+    const Unit_Name = req.body.Unit_Name?.trim();
+    const Unit_Shorthand = req.body.Unit_Shorthand?.trim() || null;
+
+    if (!Unit_Name) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Unit name is required",
+      });
+    }
+
+    // Case-insensitive duplicate check
+    // const [existingUnit] = await connection.query(
+    //   `
+    //   SELECT id
+    //   FROM units
+    //   WHERE LOWER(TRIM(Unit_Name)) = LOWER(TRIM(?))
+    //   LIMIT 1
+    //   `,
+    //   [Unit_Name]
+    // );
+    const [existingUnit] = await connection.query(
+  `
+  SELECT id
+  FROM units
+  WHERE
+    LOWER(TRIM(Unit_Name)) = LOWER(TRIM(?))
+    OR (
+      ? IS NOT NULL
+      AND LOWER(TRIM(Unit_Shorthand)) = LOWER(TRIM(?))
+    )
+  LIMIT 1
+  `,
+  [
+    Unit_Name,
+    Unit_Shorthand,
+    Unit_Shorthand,
+  ]
+);
+
+    if (existingUnit.length > 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Unit name or shorthand already exists",
+      });
+    }
+
+    const [result] = await connection.query(
+      `
+      INSERT INTO units
+      (
+        Unit_Name,
+        Unit_Shorthand,
+        Is_System,
+        Is_Used
+      )
+      VALUES (?, ?, 0, 0)
+      `,
+      [Unit_Name, Unit_Shorthand]
+    );
+
+    await connection.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Unit added successfully",
+      data: {
+        id: result.insertId,
+        Unit_Name,
+        Unit_Shorthand,
+        Is_System: 0,
+        Is_Used: 0,
+      },
+    });
+
+  } catch (err) {
+    if (connection) await connection.rollback();
+
+    console.error("❌ Error adding unit:", err);
+
+    next(err)
+  } finally {
+    if (connection) connection.release();
+  }
+};
+const editItemUnit = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { id } = req.params;
+
+    const Unit_Name = req.body.Unit_Name?.trim();
+    const Unit_Shorthand =
+      req.body.Unit_Shorthand?.trim() || null;
+
+    if (!Unit_Name) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Unit name is required",
+      });
+    }
+
+    const [[existingUnit]] = await connection.query(
+      `
+      SELECT
+        id,
+        Unit_Name,
+        Unit_Shorthand,
+        Is_System,
+        Is_Used
+      FROM units
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (!existingUnit) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Unit not found",
+      });
+    }
+
+    // System units can never be edited
+    if (Number(existingUnit.Is_System) === 1) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "System units cannot be edited.",
+      });
+    }
+
+    if (Number(existingUnit.Is_Used) === 1) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "This unit has already been used in transactions and cannot be edited.",
+      });
+    }
+
+    // Duplicate check (case-insensitive)
+    // const [duplicate] = await connection.query(
+    //   `
+    //   SELECT id
+    //   FROM units
+    //   WHERE LOWER(TRIM(Unit_Name)) = LOWER(TRIM(?))
+    //     AND id <> ?
+    //   LIMIT 1
+    //   `,
+    //   [Unit_Name, id]
+    // );
+    const [duplicate] = await connection.query(
+  `
+  SELECT id
+  FROM units
+  WHERE (
+    LOWER(TRIM(Unit_Name)) = LOWER(TRIM(?))
+    OR (
+      ? IS NOT NULL
+      AND LOWER(TRIM(Unit_Shorthand)) = LOWER(TRIM(?))
+    )
+  )
+  AND id <> ?
+  LIMIT 1
+  `,
+  [
+    Unit_Name,
+    Unit_Shorthand,
+    Unit_Shorthand,
+    id,
+  ]
+);
+
+   if (duplicate.length > 0) {
+  await connection.rollback();
+
+  return res.status(400).json({
+    success: false,
+    message: "Unit name or shorthand already exists",
+  });
+}
+
+    await connection.query(
+      `
+      UPDATE units
+      SET
+        Unit_Name = ?,
+        Unit_Shorthand = ?
+      WHERE id = ?
+      `,
+      [
+        Unit_Name,
+        Unit_Shorthand,
+        id,
+      ]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Unit updated successfully",
+    });
+
+  } catch (err) {
+    if (connection) await connection.rollback();
+
+    console.error("❌ Error updating unit:", err);
+
+    next(err)
+  } finally {
+    if (connection) connection.release();
+  }
+};
+const getAllItemUnits = async (req, res, next) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
+    const [results] = await db.query(`SELECT Unit_Name ,Unit_Shorthand FROM units`);
+
+    const finalData = [];
+    results.forEach((item) => {
+      finalData.push({
+        Unit_Name: item.Unit_Name,
+        Unit_Shorthand: item.Unit_Shorthand,
+      });
+    })
+    return res.status(200).json(results);
+  } catch (err) {
+    console.error("❌ Error getting units:", err);
+    next(err);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+const getAllItemUnitsCursor = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const search = req.query.search?.trim() || "";
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const cursorId = req.query.cursor
+      ? Number(req.query.cursor)
+      : null;
+
+    const whereParts = [];
+    const params = [];
+
+    if (search) {
+      const like = `%${search}%`;
+
+      whereParts.push(`
+        (
+          LOWER(Unit_Name) LIKE ?
+          OR LOWER(Unit_Shorthand) LIKE ?
+        )
+      `);
+
+      params.push(
+        like.toLowerCase(),
+        like.toLowerCase()
+      );
+    }
+
+    if (cursorId) {
+      whereParts.push(`id < ?`);
+      params.push(cursorId);
+    }
+
+    const whereSQL =
+      whereParts.length > 0
+        ? `WHERE ${whereParts.join(" AND ")}`
+        : "";
+
+    const [[{ totalUnits }]] = await connection.query(
+      `
+      SELECT COUNT(*) AS totalUnits
+      FROM units
+      ${search ? whereSQL.replace(/AND id < \?/g, "") : ""}
+      `,
+      search
+        ? params.filter((_, i) => i < 2)
+        : []
+    );
+
+    const [rows] = await connection.query(
+      `
+      SELECT *
+      FROM units
+      ${whereSQL}
+      ORDER BY id ASC
+      LIMIT ?
+      `,
+      [...params, limit + 1]
+    );
+
+    const hasMore = rows.length > limit;
+
+    const pageUnits = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    return res.status(200).json({
+      success: true,
+      totalUnits,
+      units: pageUnits,
+      hasMore,
+      nextCursor: hasMore
+        ? pageUnits[pageUnits.length - 1].id
+        : null,
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+const getUnitConversions = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const { unitId } = req.params;
+    const { cursor = null, search = "" } = req.query;
+
+    const limit = 10;
+
+    if (!unitId) {
+      return res.status(400).json({
+        success: false,
+        message: "Unit Id is required",
+      });
+    }
+
+    // =========================================================
+    // 1. GET UNIT
+    // =========================================================
+
+    const [[unit]] = await connection.query(
+      `
+      SELECT
+        id,
+        Unit_Name,
+        Unit_Shorthand
+      FROM units
+      WHERE id = ?
+      LIMIT 1
+      `,
+      [unitId]
+    );
+
+    if (!unit) {
+      return res.status(404).json({
+        success: false,
+        message: "Unit not found",
+      });
+    }
+
+    // =========================================================
+    // 2. BUILD FILTERS
+    // =========================================================
+
+    // const where = [
+    //   `(Primary_Unit = ? OR Secondary_Unit = ?)`
+    // ];
+
+    // const params = [
+    //   unit.Unit_Shorthand,
+    //   unit.Unit_Shorthand,
+    // ];
+    const where = [
+      `Primary_Unit = ?`
+    ];
+
+    const params = [
+      unit.Unit_Shorthand,
+    ];
+
+    if (search?.trim()) {
+      const like = `%${search.trim().toLowerCase()}%`;
+
+      where.push(`(
+        LOWER(COALESCE(Primary_Unit, '')) LIKE ?
+        OR LOWER(COALESCE(Secondary_Unit, '')) LIKE ?
+        OR CAST(COALESCE(Conversion_Rate, 0) AS CHAR) LIKE ?
+      )`);
+
+      params.push(
+        like,
+        like,
+        like
+      );
+    }
+
+    const countWhere = [...where];
+    const countParams = [...params];
+
+    const [countRows] = await connection.query(
+      `
+  SELECT COUNT(*) AS total
+  FROM (
+    SELECT DISTINCT
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate
+    FROM item_unit_conversions
+    WHERE ${countWhere.join(" AND ")}
+  ) x
+  `,
+      countParams
+    );
+
+    const totalConversions = Number(countRows[0]?.total || 0);
+    // =========================================================
+    // 3. CURSOR PAGINATION
+    // =========================================================
+
+    if (cursor) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(cursor, "base64").toString("utf8")
+        );
+
+        if (!decoded.id) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor",
+          });
+        }
+
+        where.push(`id < ?`);
+        params.push(Number(decoded.id));
+
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor",
+        });
+      }
+    }
+
+    // =========================================================
+    // 4. FETCH LIMIT + 1
+    // =========================================================
+
+    // const [rows] = await connection.query(
+    //   `
+    //   SELECT
+    //     id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate
+    //   FROM item_unit_conversions
+    //   WHERE ${where.join(" AND ")}
+    //   ORDER BY id DESC
+    //   LIMIT ?
+    //   `,
+    //   [...params, limit + 1]
+    // );
+    const [rows] = await connection.query(
+      `
+  SELECT DISTINCT
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate
+  FROM item_unit_conversions
+  WHERE ${where.join(" AND ")}
+  LIMIT ?
+  `,
+      [...params, limit + 1]
+    );
+
+    const hasMore = rows.length > limit;
+
+    const conversions = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    // =========================================================
+    // 5. NEXT CURSOR
+    // =========================================================
+
+    let nextCursor = null;
+
+    if (hasMore && conversions.length > 0) {
+      const last = conversions[conversions.length - 1];
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          id: last.id,
+        })
+      ).toString("base64");
+    }
+
+    // =========================================================
+    // 6. RESPONSE
+    // =========================================================
+
+    return res.status(200).json({
+      success: true,
+
+      unit: {
+        id: unit.id,
+        Unit_Name: unit.Unit_Name,
+      },
+      totalConversions,
+      conversions: conversions.map((row) => ({
+        id: row.id,
+        Primary_Unit: row.Primary_Unit,
+        Secondary_Unit: row.Secondary_Unit,
+        Conversion_Rate:
+          row.Conversion_Rate !== null
+            ? Number(row.Conversion_Rate)
+            : null,
+      })),
+
+      nextCursor,
+      hasMore,
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching unit conversions:", err);
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 
 export {
-  addItem, editItem, deleteItem, addCategory,editCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
-  getItemsNotInCategory,moveItemsToCategory,
+  addItem, editItem, deleteItem, addCategory, editCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
+  getItemsNotInCategory, moveItemsToCategory,
   eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers, addItemConversion, getItemConversions,
   getAllItemsForLedger, getItemBills, getItemsByCategory, addStockAdjustment, editStockAdjustment,
-  deleteStockAdjustment
+  deleteStockAdjustment, addItemUnit, editItemUnit, getAllItemUnits, getAllItemUnitsCursor, getUnitConversions
 };
 // ALTER TABLE add_item
 

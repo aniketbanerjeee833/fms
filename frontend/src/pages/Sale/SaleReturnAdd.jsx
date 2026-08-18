@@ -17,7 +17,7 @@ import { useGetSingleSaleQuery } from "../../redux/api/saleApi";
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { LayoutDashboard } from "lucide-react";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 import { saleReturnApi, useCreateSaleReturnMutation } from "../../redux/api/saleReturnApi";
@@ -111,7 +111,7 @@ export default function SaleReturnAdd() {
     });
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  
+
   const [activeItemRow, setActiveItemRow] = useState(null);
   // find this line in your code and add refetch:
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
@@ -726,11 +726,11 @@ export default function SaleReturnAdd() {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
     if (splitsWatch.length > 1) {
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+      setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 
@@ -861,12 +861,12 @@ export default function SaleReturnAdd() {
 
 
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         cashInHandApi.util.invalidateTags([
@@ -2340,6 +2340,28 @@ export default function SaleReturnAdd() {
 
                                       }}
                                     />
+                                    {!hasPrimary && !hasSecondary && (
+                                      <div
+                                        onClick={() => {
+                                          setActiveUnitRow(i);
+                                          setShowAddUnitModal(true);
+
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+                                        }}
+                                        style={{
+                                          padding: "8px 10px",
+                                          borderBottom: "1px solid #e5e7eb",
+                                          cursor: "pointer",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#4CA1AF",
+                                          background: "#f8fafc",
+                                        }}
+                                      >
+                                        + Add Unit
+                                      </div>
+                                    )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -3332,20 +3354,20 @@ export default function SaleReturnAdd() {
           }}
         />
       )}
-       {showBankModal && (
-                          <BankAccountModal
-                            mode="add"
-                            onClose={() => {
-                              setShowBankModal(false);
-                              dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
-                            }}
-                             onSave={() => {
-                        refetchBanks();   // 🔹 refetch so new bank appears in dropdown
-                        setShowBankModal(false);
-                        
-                      }}
-                          />
-                        )}
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
+          }}
+        />
+      )}
       <style>
         {`
   /*  screens between 1000px and 640px */
