@@ -3408,9 +3408,20 @@ const oldSelected =
 const currentPrimary =
   it.Current_Primary_Unit || null;
 
-const currentSecondary =
-  it.Current_Secondary_Unit || null;
+const currentSecondary =it.Current_Secondary_Unit || null;
+const price = Number(it.Purchase_Price || 0);
+let discountAmount = 0;
 
+      if (Number(it.Discount_On_Purchase_Price || 0) > 0) {
+        if (it.Discount_Type_On_Purchase_Price === "Percentage") {
+          discountAmount =
+            (price * Number(it.Discount_On_Purchase_Price)) / 100;
+        } else {
+          discountAmount = Number(
+            it.Discount_On_Purchase_Price
+          );
+        }
+      }
 
 // Did this OLD purchase actually use its secondary unit?
 //
@@ -3546,8 +3557,10 @@ availableUnits = unitCodes.map((unitCode) => {
         Discount_Type_On_Purchase_Price:
           it.Discount_Type_On_Purchase_Price,
 
-        Tax_Amount:
-          it.Tax_Amount,
+        Tax_Amount:it.Tax_Amount,
+         Discount_Amount: Number(
+          discountAmount.toFixed(2)
+        ),
 
         Tax_Type:
           it.Tax_Type,
@@ -3771,10 +3784,329 @@ const uploadBillAndCreatePurchase = async (req, res, next) => {
   }
 
 };
+
+const getPurchasePrintReport = async (req, res) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const {
+      search = "",
+      fromDate,
+      toDate,
+    } = req.query;
+
+    let whereClause = "WHERE 1=1";
+    const params = [];
+
+    if (search) {
+  whereClause += `
+    AND (
+      p.Bill_Number LIKE ?
+      OR party.Party_Name LIKE ?
+      OR CAST(p.Total_Amount AS CHAR) LIKE ?
+      OR CAST(p.Balance_Due AS CHAR) LIKE ?
+    )
+  `;
+
+  const searchTerm = `%${search}%`;
+
+  params.push(
+    searchTerm,
+    searchTerm,
+    searchTerm,
+    searchTerm
+  );
+}
+
+    if (fromDate) {
+      whereClause += ` AND DATE(p.Bill_Date) >= ?`;
+      params.push(fromDate);
+    }
+
+    if (toDate) {
+      whereClause += ` AND DATE(p.Bill_Date) <= ?`;
+      params.push(toDate);
+    }
+
+    // PURCHASE HEADER
+
+    const [purchases] = await connection.query(
+      `
+      SELECT
+        p.id,
+        p.Purchase_Id,
+        p.Bill_Number,
+        p.Bill_Date,
+        p.Total_Amount,
+        p.Total_Paid,
+        p.Balance_Due,
+        p.Party_Id,
+
+       
+        
+
+        p.Terms_Conditions_Id,
+        p.Terms_Conditions_Description,
+
+        party.Party_Name,
+        party.GSTIN,
+        party.State,
+
+        tc.Title AS Terms_Conditions_Title
+
+      FROM add_purchase p
+
+      LEFT JOIN add_party party
+        ON party.Party_Id = p.Party_Id
+
+      LEFT JOIN terms_conditions tc
+        ON tc.id = p.Terms_Conditions_Id
+
+      ${whereClause}
+
+      ORDER BY p.Bill_Date ASC
+      `,
+      params
+    );
+
+    if (!purchases.length) {
+      return res.status(200).json({
+        success: true,
+        totalInvoices: 0,
+        invoices: [],
+        summary: {
+          totalAmount: 0,
+          totalPaid: 0,
+          totalDue: 0,
+          totalDiscount: 0,
+        },
+      });
+    }
+
+    const purchaseIds = purchases.map(
+      (p) => p.Purchase_Id
+    );
+
+    const numericIds = purchases.map(
+      (p) => p.id
+    );
+
+    const purchasePlaceholders =
+      purchaseIds.map(() => "?").join(",");
+
+    const idPlaceholders =
+      numericIds.map(() => "?").join(",");
+
+    // ITEMS
+
+    const [items] = await connection.query(
+      `
+      SELECT
+        pi.*,
+
+        i.Item_Name,
+        i.Item_HSN,
+        i.Item_Unit,
+        i.Item_Category,
+
+        i.Primary_Unit,
+        i.Secondary_Unit,
+        i.Conversion_Rate
+
+      FROM add_purchase_items pi
+
+      LEFT JOIN add_item i
+        ON i.Item_Id = pi.Item_Id
+
+      WHERE pi.Purchase_Id IN (${purchasePlaceholders})
+
+      ORDER BY pi.created_at ASC
+      `,
+      purchaseIds
+    );
+
+    // PAYMENT SPLITS
+
+    const [splits] = await connection.query(
+      `
+      SELECT
+        ps.*,
+        ba.Account_Display_Name
+
+      FROM payment_splits ps
+
+      LEFT JOIN bank_accounts ba
+        ON ba.id = ps.Bank_Account_Id
+
+      WHERE ps.Source_Type = 'Purchase'
+      AND ps.Source_Id IN (${idPlaceholders})
+
+      ORDER BY ps.id ASC
+      `,
+      numericIds
+    );
+
+    // GROUP ITEMS
+
+    const itemMap = {};
+
+    items.forEach((item) => {
+      if (!itemMap[item.Purchase_Id]) {
+        itemMap[item.Purchase_Id] = [];
+      }
+
+      const price = Number(
+        item.Purchase_Price || 0
+      );
+
+      let discountAmount = 0;
+
+      if (
+        Number(
+          item.Discount_On_Purchase_Price || 0
+        ) > 0
+      ) {
+        if (
+          item.Discount_Type_On_Purchase_Price ===
+          "Percentage"
+        ) {
+          discountAmount =
+            (price *
+              Number(
+                item.Discount_On_Purchase_Price
+              )) /
+            100;
+        } else {
+          discountAmount = Number(
+            item.Discount_On_Purchase_Price
+          );
+        }
+      }
+
+      itemMap[item.Purchase_Id].push({
+        ...item,
+        Discount_Amount: Number(
+          discountAmount.toFixed(2)
+        ),
+      });
+    });
+
+    // GROUP SPLITS
+
+    const splitMap = {};
+
+    splits.forEach((split) => {
+      if (!splitMap[split.Source_Id]) {
+        splitMap[split.Source_Id] = [];
+      }
+
+      splitMap[split.Source_Id].push({
+        Id: split.id,
+        Payment_Type: split.Payment_Type,
+        Bank_Account_Id:
+          split.Bank_Account_Id,
+        Account_Display_Name:
+          split.Account_Display_Name,
+        Amount: split.Amount,
+      });
+    });
+
+    // SUMMARY
+
+    const summary = {
+      totalAmount: 0,
+      totalPaid: 0,
+      totalBalanceDue: 0,
+      totalDiscount: 0,
+    };
+
+    const purchaseBills= purchases.map((purchase) => {
+      const purchaseItems =
+        itemMap[purchase.Purchase_Id] || [];
+
+      summary.totalAmount += Number(
+        purchase.Total_Amount || 0
+      );
+
+      summary.totalPaid += Number(
+        purchase.Total_Paid || 0
+      );
+
+      summary.totalBalanceDue += Number(
+        purchase.Balance_Due || 0
+      );
+
+      purchaseItems.forEach((item) => {
+        summary.totalDiscount += Number(
+          item.Discount_Amount || 0
+        );
+      });
+
+      return {
+        billPurchaseDetails: {
+          Purchase_Id: purchase.Purchase_Id,
+          Party_Name: purchase.Party_Name,
+          //Billing_Name: purchase.Billing_Name,
+          //Billing_Address:purchase.Billing_Address,
+          //Phone_Number: purchase.Phone_Number,
+          GSTIN: purchase.GSTIN,
+
+          Bill_Number: purchase.Bill_Number,
+          Bill_Date: purchase.Bill_Date,
+
+          Total_Amount:
+            purchase.Total_Amount,
+          Total_Paid:
+            purchase.Total_Paid,
+          Balance_Due:
+            purchase.Balance_Due,
+
+          Terms_Conditions_Id:
+            purchase.Terms_Conditions_Id,
+
+          Terms_Conditions_Description:
+            purchase.Terms_Conditions_Description,
+
+          Terms_Conditions_Title:
+            purchase.Terms_Conditions_Title,
+        },
+
+        splits:
+          splitMap[purchase.id] || [],
+
+        items: purchaseItems,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalPurchaseBills: purchaseBills.length,
+      purchaseBills,
+      summary,
+    });
+
+  } catch (error) {
+    console.error(
+      "Purchase Print Report Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to generate purchase print report",
+      error: error.message,
+    });
+  } finally {
+    if (connection) connection.release();
+  }
+};
 export {
   addPurchase, editPurchase, getSinglePurchase, getAllPurchases, exportAllPurchasesReportToExcel, getTotalPurchasesEachDay,
 
-  uploadBillAndCreatePurchase,deletePurchase
+  uploadBillAndCreatePurchase,deletePurchase,getPurchasePrintReport
 };
 
 

@@ -6334,12 +6334,16 @@ const getSalesPrintReport = async (req, res) => {
       whereClause += `
         AND (
           s.Invoice_Number LIKE ?
-          OR p.Party_Name LIKE ?
+          OR p.Party_Name LIKE ? OR
+           CAST(s.Total_Amount AS CHAR) LIKE ? OR
+        CAST(s.Balance_Due  AS CHAR) LIKE ?
         )
       `;
 
       params.push(
         `%${search}%`,
+        `%${search}%`,
+         `%${search}%`,
         `%${search}%`
       );
     }

@@ -145,6 +145,26 @@ export const purchaseApi = createApi({
     { type: "Purchase", id: "LIST" },
   ],
 }),
+getPurchasePrintReport: builder.query({
+  query: ({
+    search = "",
+    fromDate = "",
+    toDate = "",
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (search)
+      params.append("search", search);
+
+    if (fromDate)
+      params.append("fromDate", fromDate);
+
+    if (toDate)
+      params.append("toDate", toDate);
+
+    return `purchase/print-purchase-report?${params.toString()}`;
+  },
+}),
 
   }),
 });
@@ -157,6 +177,7 @@ export const {
   useGetSinglePurchaseQuery,
   useGetTotalPurchasesEachDayQuery,
   useUploadPurchaseBillMutation,
-  useDeletePurchaseMutation
+  useDeletePurchaseMutation,
+  useLazyGetPurchasePrintReportQuery
 } = purchaseApi
 

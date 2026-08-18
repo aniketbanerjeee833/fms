@@ -30,7 +30,7 @@ const formatRate = (rate) => `${rate}%`;
 
 const SalePurchaseBulkReportPrintTemplate = forwardRef(({ type = "sale", data, fromDate, toDate }, ref) => {
 
-    const records = type === "sale" ? data?.invoices || [] : data?.purchases || [];
+    const records = type === "sale" ? data?.invoices || [] : data?.purchaseBills || [];
     const summary = data?.summary || {};
     console.log(records);
     return (
@@ -292,8 +292,12 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(({ type = "sale", data, f
                     </div>
 
                     <div>
-                        <strong>Total Received:</strong> ₹
-                        {money(data.summary.totalReceived)}
+                        <strong>
+                            {type === "purchase" ? "Total Paid: " : "Total Received: "}
+                        </strong>
+                        ₹ {money(type === "purchase"
+                            ? data.summary.totalPaid
+                            : data.summary.totalReceived)}
                     </div>
 
                     <div>
@@ -301,12 +305,12 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(({ type = "sale", data, f
                         {money(data.summary.totalBalanceDue)}
                     </div>
 
-                    {Number(data.summary.totalDiscount) > 0 && (
+                    {/* {Number(data.summary.totalDiscount) > 0 && (
                         <div>
                             <strong>Total Discount:</strong> ₹
                             {money(data.summary.totalDiscount)}
                         </div>
-                    )}
+                    )} */}
                 </div>
             )}
             {records.length === 0 && (

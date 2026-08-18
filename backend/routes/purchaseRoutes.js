@@ -2,7 +2,7 @@ import express from "express";
 const router = express.Router();
 
 
-import { addPurchase, deletePurchase, editPurchase, exportAllPurchasesReportToExcel, getAllPurchases, getSinglePurchase,
+import { addPurchase, deletePurchase, editPurchase, exportAllPurchasesReportToExcel, getAllPurchases, getPurchasePrintReport, getSinglePurchase,
      getTotalPurchasesEachDay, 
      uploadBillAndCreatePurchase} from "../controllers/purchaseController.js";
 import userAuth from "../middleware/userAuth.js";
@@ -18,6 +18,7 @@ router.post(
   uploadPurchaseBill.single("bill"),
   uploadBillAndCreatePurchase
 );
+router.get("/print-purchase-report",userAuth,getPurchasePrintReport);
 
 router.delete("/delete-purchase/:Purchase_Id",userAuth,deletePurchase);
 

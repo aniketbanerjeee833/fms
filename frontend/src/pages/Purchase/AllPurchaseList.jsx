@@ -1,6 +1,6 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useDeletePurchaseMutation, useGetAllPurchasesQuery, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
+import { useDeletePurchaseMutation, useGetAllPurchasesQuery, useGetSinglePurchaseQuery, useLazyGetPurchasePrintReportQuery } from "../../redux/api/purchaseApi";
 
 import {
   MoreVertical,
@@ -9,7 +9,8 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   Trash2,
-  Undo2
+  Undo2,
+  PrinterIcon
 } from "lucide-react";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,6 +23,7 @@ import { bankAccountApi } from "../../redux/api/bankAccountApi";
 import { itemApi } from "../../redux/api/itemApi";
 import { useReactToPrint } from "react-to-print";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
+import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 
 
 export default function AllPurchaseList() {
@@ -40,6 +42,10 @@ export default function AllPurchaseList() {
 
   const [printPurchaseId, setPrintPurchaseId] = useState(null);
   const printRef = useRef(null);
+
+  const [showPurchaseBulkPrintReview, setShowPurchaseBulkPrintPreview] = useState(false);
+    
+    const bulkPurchasePrintRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
   const { data: printData } = useGetSinglePurchaseQuery(printPurchaseId, {
     skip: !printPurchaseId,
@@ -79,6 +85,13 @@ export default function AllPurchaseList() {
     toDate,
   });
   console.log(purchases, fromDate, toDate);
+  const [
+  triggerPurchaseBulkReport,
+  {
+    data: bulkPurchaseReportData,
+    isFetching: isBulkPurchaseFetching,
+  },
+] = useLazyGetPurchasePrintReportQuery();
 
   useEffect(() => {
     const closeRowMenu = () => {
@@ -157,6 +170,25 @@ export default function AllPurchaseList() {
       handlePrint();
     }
   }, [printData, printPurchaseId]);
+
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkPurchasePrintRef,
+    documentTitle: `Purchase-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+    onAfterPrint: () => setShowPurchaseBulkPrintPreview(false),
+  });
+   
+  /* trigger fetch on button click */
+  const handlePrintAllClick = async () => {
+    await triggerPurchaseBulkReport({ search: searchTerm, fromDate, toDate });
+    setShowPurchaseBulkPrintPreview(true);
+  };
+   
+  /* fire print once report data has arrived */
+  useEffect(() => {
+    if (bulkPurchaseReportData && showPurchaseBulkPrintReview) {
+      handleBulkPrint();
+    }
+  }, [bulkPurchaseReportData, showPurchaseBulkPrintReview]);
   return (
     <>
       <div className="flex flex-col bg-white">
@@ -320,7 +352,7 @@ export default function AllPurchaseList() {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4">
+          <div className="flex justify-end sm: mt-4 gap-2">
             {/* <button
               type="button"
               onClick={handleExportPurchaseReportExcel}
@@ -343,6 +375,16 @@ export default function AllPurchaseList() {
               />
               {/* Export Excel */}
             </button>
+               <button
+                          type="button"
+                          onClick={handlePrintAllClick}
+                          disabled={isBulkPurchaseFetching}
+                          className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+                          title="Print All (filtered) Reports"
+                        >
+                          <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+                          {isBulkPurchaseFetching && <span>Loading...</span>}
+                        </button>
 
 
 
@@ -719,6 +761,17 @@ export default function AllPurchaseList() {
               companyDetails: {},
 
             }}
+          />
+        </div>
+      )}
+      {bulkPurchaseReportData?.purchaseBills?.length > 0 && (
+        <div style={{ display: "none" }}>
+          <SalePurchaseBulkReportPrintTemplate
+            ref={bulkPurchasePrintRef}
+            type="purchase"
+            data={bulkPurchaseReportData}   // 🔹 use .invoices not .sales
+            fromDate={fromDate}
+            toDate={toDate}
           />
         </div>
       )}

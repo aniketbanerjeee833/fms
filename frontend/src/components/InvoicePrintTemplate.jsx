@@ -643,15 +643,21 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 {hasDiscountColumn && (
                   <td
                     className="invoice-item-right"
-
+                    style={{ whiteSpace: "nowrap" }}
                   >
-                    {Number(item.Discount_Amount || 0) > 0
-                      ? item.Discount_Type_On_Sale_Price === "Percentage"
-                        ? `${item.Discount_On_Sale_Price}% (₹${money(
-                          item.Discount_Amount
-                        )})`
-                        : `₹${money(item.Discount_Amount)}`
-                      : "-"}
+                    {Number(item.Discount_Amount || 0) > 0 ? (
+                      type === "sale" ? (
+                        item.Discount_Type_On_Sale_Price === "Percentage"
+                          ? `${item.Discount_On_Sale_Price}% (₹${money(item.Discount_Amount)})`
+                          : `₹${money(item.Discount_Amount)}`
+                      ) : (
+                        item.Discount_Type_On_Purchase_Price === "Percentage"
+                          ? `${item.Discount_On_Purchase_Price}% (₹${money(item.Discount_Amount)})`
+                          : `₹${money(item.Discount_Amount)}`
+                      )
+                    ) : (
+                      "-"
+                    )}
                   </td>
                 )}
 
