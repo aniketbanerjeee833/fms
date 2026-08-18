@@ -3,7 +3,8 @@ import { addInvoice, addSale, editSale, getAllSales, getLatestInvoiceNumber, get
      getSingleSale, printSaleBill, updateInvoice, getSingleNewSaleInvoice,
      getTotalSalesEachDay,
      exportAllSalesReportToExcel,
-     deleteSale
+     deleteSale,
+     getSalesPrintReport
 } from "../controllers/saleController.js";
 import userAuth from "../middleware/userAuth.js";
 const router = express.Router();
@@ -33,6 +34,7 @@ router.put("/edit-sale/:Sale_Id",userAuth,editSale)
 router.delete("/delete-sale/:Sale_Id",userAuth,deleteSale);
 
 router.get("/total-sales-by-day",userAuth,getTotalSalesEachDay)
+router.get("/print-sales-report",userAuth,getSalesPrintReport);
 
 
 // router.get("/top-selling-items-month-wise/:year",userAuth,getTopSellingItemsPerMonth)

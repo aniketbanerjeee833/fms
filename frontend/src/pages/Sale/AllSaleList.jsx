@@ -1,6 +1,6 @@
 
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useDeleteSaleMutation, useGetAllSalesQuery, useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { useDeleteSaleMutation, useGetAllSalesQuery, useGetSingleSaleQuery, useLazyGetSalesPrintReportQuery } from "../../redux/api/saleApi";
 
 import {
   Download,
@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   MoreVertical,
   Printer,
+  PrinterIcon,
   Trash2,
   Undo2
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import { useReactToPrint } from "react-to-print";
+import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 
 export default function AllSaleList() {
   const dispatch = useDispatch()
@@ -33,8 +35,9 @@ export default function AllSaleList() {
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [deleteSale, { isLoading: isDeleting }] = useDeleteSaleMutation();
   const [printSaleId, setPrintSaleId] = useState(null);
-
+const [showSaleBulkPrintPreview, setShowSaleBulkPrintPreview] = useState(false);
   const printRef = useRef(null);
+  const bulkSalePrintRef = useRef(null);
 
   const { data: printData } = useGetSingleSaleQuery(printSaleId, {
     skip: !printSaleId,
@@ -46,6 +49,9 @@ export default function AllSaleList() {
     toDate,
   });
   console.log(sales);
+
+  const [triggerSaleBulkReport, { data: bulkSaleReportData, isFetching: isBulkFetching }] =
+  useLazyGetSalesPrintReportQuery();
 
   const navigate = useNavigate();
 
@@ -138,7 +144,24 @@ export default function AllSaleList() {
     }
   }, [printData, printSaleId]);
   console.log(sales?.sales);
-
+const handleBulkPrint = useReactToPrint({
+  contentRef: bulkSalePrintRef,
+  documentTitle: `Sales-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+  onAfterPrint: () => setShowSaleBulkPrintPreview(false),
+});
+ 
+/* trigger fetch on button click */
+const handlePrintAllClick = async () => {
+  await triggerSaleBulkReport({ search: searchTerm, fromDate, toDate });
+  setShowSaleBulkPrintPreview(true);
+};
+ 
+/* fire print once report data has arrived */
+useEffect(() => {
+  if (bulkSaleReportData && showSaleBulkPrintPreview) {
+    handleBulkPrint();
+  }
+}, [bulkSaleReportData, showSaleBulkPrintPreview]);
   return (
     <>
 
@@ -298,7 +321,7 @@ export default function AllSaleList() {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4">
+          <div className="flex justify-end sm: mt-4 gap-2">
 
             {/* <button
               type="button"
@@ -324,6 +347,16 @@ export default function AllSaleList() {
                 className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
               />
               {/* Export Excel */}
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintAllClick}
+              disabled={isBulkFetching}
+              className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+              title="Print All (filtered) Reports"
+            >
+              <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+              {isBulkFetching && <span>Loading...</span>}
             </button>
 
           </div>
@@ -698,6 +731,18 @@ export default function AllSaleList() {
           />
         </div>
       )}
+   {/* // check what your bulk report response actually wraps invoices in */}
+{bulkSaleReportData?.invoices?.length > 0 && (
+  <div style={{ display: "none" }}>
+    <SalePurchaseBulkReportPrintTemplate
+      ref={bulkSalePrintRef}
+      type="sale"
+      data={bulkSaleReportData}   // 🔹 use .invoices not .sales
+      fromDate={fromDate}
+      toDate={toDate}
+    />
+  </div>
+)}
     </>
 
   )

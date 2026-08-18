@@ -5,6 +5,7 @@ const router = express.Router();
 import { eachItemHistory,  getAllSalesAndPurchasesYearWise, 
     getCategoriesWiseItemCount, getItemsSoldCount,
      getPartyWiseItemsSoldAndPurchased, getPartyWiseSalesAndPurchases, 
+     getSalesChartData, 
      getTotalPayablesLeft, 
      getTotalReceivablesLeft, 
      getTotalSalesPurchasesReceivablesPayablesProfit, 
@@ -20,5 +21,6 @@ router.get("/each-party-items-sold-purchased",userAuth,getPartyWiseItemsSoldAndP
 router.get("/item-rank-profit-wise",userAuth,  itemsProfitRankWise);
 router.get("/total-payables-left",userAuth,  getTotalPayablesLeft);
 router.get("/total-receivables-left",userAuth,  getTotalReceivablesLeft);
+router.get("/sales-chart",userAuth,getSalesChartData)
 //router.get("/rank-party-wise-sales-purchases",userAuth,  rankPartyWiseSalesAndPurchases)
 export default router;

@@ -134,6 +134,17 @@ export const saleApi = createApi({
     { type: "Sale", id: "LIST" },
   ],
     }),
+ getSalesPrintReport: builder.query({
+  query: ({ search = "", fromDate = "", toDate = "" } = {}) => {
+    const params = new URLSearchParams();
+
+    if (search) params.append("search", search);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+
+    return `/sale/print-sales-report?${params.toString()}`;
+  },
+}),
 
   }),
 });
@@ -152,7 +163,7 @@ export const saleApi = createApi({
    
     useEditSaleMutation,
     useDeleteSaleMutation,
-
+   
    
     useGetAllSalesQuery,
     
@@ -164,7 +175,9 @@ export const saleApi = createApi({
     usePrintSaleBillMutation,
 
     
-    useGetTotalSalesEachDayQuery
+    useGetTotalSalesEachDayQuery,
+     useLazyGetSalesPrintReportQuery
+
    
  }=saleApi
    

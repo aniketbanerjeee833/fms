@@ -45,6 +45,15 @@ export const dashboardApi = createApi({
     query: () => `dashboard/total-receivables-left`,
     providesTags: ["Dashboard"],  
   }),
+  getSalesChartData: builder.query({
+      query: ({ fromDate, toDate } = {}) => {
+        const params = new URLSearchParams();
+        if (fromDate) params.append("fromDate", fromDate);
+        if (toDate)   params.append("toDate", toDate);
+        return `dashboard/sales-chart?${params.toString()}`; // adjust route to match yours
+      },
+      providesTags: ["Dashboard"],
+    })
 })
 
 })
@@ -54,4 +63,4 @@ export const {
     useGetAllSalesAndPurchasesYearWiseQuery,
     useGetCategoriesWiseItemCountQuery,
     useGetPartyWiseSalesAndPurchasesQuery,
-    useGetTotalPayablesLeftQuery,useGetTotalReceivablesLeftQuery } = dashboardApi
+    useGetTotalPayablesLeftQuery,useGetTotalReceivablesLeftQuery,useGetSalesChartDataQuery } = dashboardApi

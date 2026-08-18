@@ -221,7 +221,7 @@
 .invoice-item-center {
   padding: 6px 4px;
   border: 1px solid #777;
-  font-size: 10px;
+  font-size: 9px;
 
   text-align: center;
   vertical-align: top;
@@ -230,7 +230,7 @@
 .invoice-item-right {
   padding: 6px 4px;
   border: 1px solid #777;
-  font-size: 10px;
+  font-size: 9px;
 
   text-align: right;
   vertical-align: top;
@@ -242,8 +242,6 @@
 
 
 
-
-
 /* =========================================================
    TOTAL ROW
 ========================================================= */
@@ -251,10 +249,11 @@
   padding: 6px 4px;
   border: 1px solid #777;
 
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
   text-align: right;
 }
+
 
 /* =========================================================
    BOTTOM LEFT + RIGHT

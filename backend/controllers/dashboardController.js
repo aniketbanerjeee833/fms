@@ -1481,7 +1481,101 @@ WHERE Current_Balance > 0;`);
   }
 };
 
-
+const getSalesChartData = async (req, res, next) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
+ 
+    const today = new Date();
+    const defaultFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+ 
+    const toDate   = req.query.toDate   || today.toISOString().slice(0, 10);
+    const fromDate = req.query.fromDate || defaultFrom.toISOString().slice(0, 10);
+ 
+    if (new Date(fromDate) > new Date(toDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "From date cannot be after To date",
+      });
+    }
+ 
+    /* ── current period totals, grouped by day ── */
+    const [rows] = await connection.query(
+      `SELECT DATE(Invoice_Date) AS date, COALESCE(SUM(Total_Amount), 0) AS total
+       FROM add_sale
+       WHERE Invoice_Date BETWEEN ? AND ?
+       GROUP BY DATE(Invoice_Date)`,
+      [`${fromDate} 00:00:00`, `${toDate} 23:59:59`]
+    );
+ 
+    const totalsByDate = {};
+    rows.forEach((r) => {
+      // MySQL DATE() may come back as a Date object depending on driver config
+      const key = typeof r.date === "string" ? r.date : r.date.toISOString().slice(0, 10);
+      totalsByDate[key] = Number(r.total);
+    });
+ 
+    /* ── zero-fill every day in the range so the chart line is continuous ── */
+    const series = [];
+    let cursor = new Date(fromDate);
+    const end  = new Date(toDate);
+    let currentPeriodTotal = 0;
+ 
+    while (cursor <= end) {
+      const dateStr = cursor.toISOString().slice(0, 10);
+      const total   = totalsByDate[dateStr] || 0;
+      series.push({ date: dateStr, total });
+      currentPeriodTotal += total;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+ 
+    /* ── previous period of the SAME length, immediately before fromDate ── */
+    const periodDays = series.length;
+    const prevTo   = new Date(fromDate);
+    prevTo.setDate(prevTo.getDate() - 1);
+    const prevFrom = new Date(prevTo);
+    prevFrom.setDate(prevFrom.getDate() - (periodDays - 1));
+ 
+    const prevFromStr = prevFrom.toISOString().slice(0, 10);
+    const prevToStr   = prevTo.toISOString().slice(0, 10);
+ 
+    const [[prevResult]] = await connection.query(
+      `SELECT COALESCE(SUM(Total_Amount), 0) AS total
+       FROM add_sale
+       WHERE Invoice_Date BETWEEN ? AND ?`,
+      [`${prevFromStr} 00:00:00`, `${prevToStr} 23:59:59`]
+    );
+ 
+    const previousPeriodTotal = Number(prevResult.total);
+ 
+    let percentChange = null;
+    if (previousPeriodTotal > 0) {
+      percentChange = ((currentPeriodTotal - previousPeriodTotal) / previousPeriodTotal) * 100;
+    } else if (currentPeriodTotal > 0) {
+      percentChange = 100; // previous period had zero sales — treat as +100%
+    } else {
+      percentChange = 0;
+    }
+ 
+    return res.status(200).json({
+      success: true,
+      fromDate,
+      toDate,
+      series,
+      totalSales: currentPeriodTotal,
+      previousPeriodTotal,
+      percentChange: Number(percentChange.toFixed(1)),
+      comparedTo: { fromDate: prevFromStr, toDate: prevToStr },
+    });
+ 
+  } catch (err) {
+    console.error("❌ getSalesChartData:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+ 
 export { getAllSalesAndPurchasesYearWise ,
   getCategoriesWiseItemCount,
   getTotalSalesPurchasesReceivablesPayablesProfit,
@@ -1491,7 +1585,8 @@ export { getAllSalesAndPurchasesYearWise ,
   getPartyWiseItemsSoldAndPurchased,
   itemsProfitRankWise,
   getTotalPayablesLeft,
-  getTotalReceivablesLeft};
+  getTotalReceivablesLeft,
+  getSalesChartData,};
 
 
 //   First — the table explaining where each transaction type goes

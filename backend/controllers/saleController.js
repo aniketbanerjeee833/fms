@@ -1529,10 +1529,10 @@ const addSale = async (req, res, next) => {
     // so payment_splits/bank_transactions/cash_transactions stay
     // consistent with add_sale.Total_Received.
     // =========================================================
-console.log("🔍 BEFORE INSERT PAYMENT SPLITS");
-console.log("saleIdNumber:", saleIdNumber);
-console.log("newSaleId:", newSaleId);
-console.log("validSplits:", JSON.stringify(validSplits, null, 2));
+    console.log("🔍 BEFORE INSERT PAYMENT SPLITS");
+    console.log("saleIdNumber:", saleIdNumber);
+    console.log("newSaleId:", newSaleId);
+    console.log("validSplits:", JSON.stringify(validSplits, null, 2));
 
     if (validSplits.length > 0) {
       await insertPaymentSplits({
@@ -1697,15 +1697,15 @@ console.log("validSplits:", JSON.stringify(validSplits, null, 2));
         // exactly like addPurchase.
         // =========================================================
 
-         Item_Id = itemRows[0].Item_Id;
+        Item_Id = itemRows[0].Item_Id;
 
-  let dbItemRow = itemRows[0];
+        let dbItemRow = itemRows[0];
         if (
-  !dbItemRow.Primary_Unit &&
-  Selected_Unit
-) {
-  await connection.execute(
-    `
+          !dbItemRow.Primary_Unit &&
+          Selected_Unit
+        ) {
+          await connection.execute(
+            `
     UPDATE add_item
     SET
       Primary_Unit = ?,
@@ -1713,19 +1713,19 @@ console.log("validSplits:", JSON.stringify(validSplits, null, 2));
       updated_at = NOW()
     WHERE Item_Id = ?
     `,
-    [
-      Selected_Unit,
-      Selected_Unit,
-      Item_Id,
-    ]
-  );
+            [
+              Selected_Unit,
+              Selected_Unit,
+              Item_Id,
+            ]
+          );
 
-  dbItemRow = {
-    ...dbItemRow,
-    Primary_Unit: Selected_Unit,
-    Item_Unit: Selected_Unit,
-  };
-}
+          dbItemRow = {
+            ...dbItemRow,
+            Primary_Unit: Selected_Unit,
+            Item_Unit: Selected_Unit,
+          };
+        }
 
         try {
           const result = resolveUnitAndStockDelta({
@@ -2361,128 +2361,7 @@ const getSingleNewSaleInvoice = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-// const getAllSales = async (req, res, next) => {
-//   let connection;
-//   try {
-//  connection = await db.getConnection();
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
 
-//     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     console.log("🔍 Params =>", { page, search, fromDate, toDate });
-
-//     let whereClauses = [];
-//     let params = [];
-
-//     // 🔎 Search
-//     if (search) {
-//       whereClauses.push(`
-//         (LOWER(a.Party_Name) LIKE ? 
-//          OR LOWER(s.Payment_Type) LIKE ? 
-//          OR LOWER(ba.Account_Display_Name) LIKE ?
-//           OR CAST(s.Total_Amount AS CHAR) LIKE ?
-//           OR CAST(s.Balance_Due AS CHAR) LIKE ?)
-//       `);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like, like);
-//     }
-
-
-// if (fromDate && toDate) {
-//   whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
-//   params.push(
-//     `${fromDate} 00:00:00`,
-//     `${toDate} 23:59:59`
-//   );
-// } else if (fromDate) {
-//   whereClauses.push(`s.Invoice_Date >= ?`);
-//   params.push(`${fromDate} 00:00:00`);
-// } else if (toDate) {
-//   whereClauses.push(`s.Invoice_Date <= ?`);
-//   params.push(`${toDate} 23:59:59`);
-// }
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-//     // 🧠 Main Paginated Query
-//      const query = `
-//       SELECT s.*, a.Party_Name,
-//         ba.Account_Display_Name AS Bank_Display_Name,
-//         CASE 
-//           WHEN s.Payment_Type = 'Bank' THEN ba.Account_Display_Name
-//           ELSE s.Payment_Type
-//         END AS Payment_Type_Display
-//       FROM add_sale s
-//       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//       LEFT JOIN bank_accounts ba ON s.Bank_Account_Id = ba.id
-//       ${whereSQL}
-//       ORDER BY s.created_at DESC 
-//       LIMIT ? OFFSET ?
-//     `;
-//     // const query = `
-//     //   SELECT s.*, a.Party_Name
-
-//     //   FROM add_sale s
-//     //   LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//     //   ${whereSQL}
-//     //   ORDER BY s.created_at DESC 
-//     //   LIMIT ? OFFSET ?
-//     // `;
-//     params.push(limit, offset);
-
-//     const [rows] = await db.query(query, params);
-
-
-//     const [count] = await db.query(
-//       `
-//       SELECT COUNT(*) AS total
-//       FROM add_sale s
-//       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//       LEFT JOIN bank_accounts ba ON s.Bank_Account_Id = ba.id
-//       ${whereSQL}
-//       `,
-//       params.slice(0, params.length - 2)
-//     );
-
-//     // const [count] = await db.query(
-//     //   `SELECT COUNT(*) AS total FROM add_sale`
-//     // )
-
-//       const totalsQuery = `
-//       SELECT
-//         COALESCE(SUM(s.Total_Amount), 0) AS totalAmount,
-//         COALESCE(SUM(s.Balance_Due), 0) AS totalBalance,
-//         COALESCE(SUM(s.Total_Received), 0) AS totalReceived
-//       FROM add_sale s
-//       LEFT JOIN add_party a 
-//         ON s.Party_Id = a.Party_Id
-//       LEFT JOIN bank_accounts ba 
-//         ON s.Bank_Account_Id = ba.id
-//       ${whereSQL}
-//     `;
-
-//     const [totalsResult] = await db.query(totalsQuery, params);
-//     return res.status(200).json({
-//       currentPage: page,
-//       totalPages: Math.ceil(count[0].total / limit),
-//       totalSales: count[0].total,
-//       sales: rows,
-//          totals: totalsResult[0]
-//     });
-
-//     //return res.status(200).json(rows);
-//   } catch (err) {
-//     if(connection)  connection.release();
-//     console.error("❌ Error fetching purchases:", err);
-//     next(err);
-//     // return res.status(500).json({ message: "Internal Server Error" });
-//   }finally {
-//     if(connection)  connection.release();
-//   }
-// };
 const getAllSales = async (req, res, next) => {
   let connection;
   try {
@@ -2950,9 +2829,9 @@ const getSingleSale = async (req, res, next) => {
     if (!saleId) {
       return res.status(400).json({ success: false, message: "Sale ID is required." });
     }
-//  p.Party_Name,
-//      p.GSTIN,
-//    (
+    //  p.Party_Name,
+    //      p.GSTIN,
+    //    (
     //   SELECT pa.Address_Text
     //   FROM add_party_addresses pa
     //   WHERE pa.Party_Id = s.Party_Id
@@ -2964,7 +2843,7 @@ const getSingleSale = async (req, res, next) => {
     // const salesTable    = isSaleForItemSale ? "add_new_sale"       : "add_sale";
     // const saleItemTable = isSaleForItemSale ? "add_new_sale_items" : "add_sale_items";
     // const itemTable     = isSaleForItemSale ? "add_item_sale"      : "add_item";
- 
+
     const salesTable = isSaleForItemSale ? "add_sale" : "add_sale";
     const saleItemTable = isSaleForItemSale ? "add_sale_items" : "add_sale_items";
     const itemTable = isSaleForItemSale ? "add_item" : "add_item";
@@ -3104,7 +2983,20 @@ const getSingleSale = async (req, res, next) => {
       const currentSecondary =
         it.Current_Secondary_Unit || null;
 
+      const price = Number(it.Sale_Price || 0);
 
+      let discountAmount = 0;
+
+      if (Number(it.Discount_On_Sale_Price || 0) > 0) {
+        if (it.Discount_Type_On_Sale_Price === "Percentage") {
+          discountAmount =
+            (price * Number(it.Discount_On_Sale_Price)) / 100;
+        } else {
+          discountAmount = Number(
+            it.Discount_On_Sale_Price
+          );
+        }
+      }
       // =====================================================
       // DID THIS OLD SALE ACTUALLY USE THE OLD SECONDARY?
       // =====================================================
@@ -3221,12 +3113,12 @@ const getSingleSale = async (req, res, next) => {
         Secondary_Unit:
           it.Secondary_Unit_Snapshot,
 
-        Selected_Unit:it.Selected_Unit,
-      Conversion_Rate:it.Conversion_Rate !== null
-    ? Number(it.Conversion_Rate)
-    : 0,
+        Selected_Unit: it.Selected_Unit,
+        Conversion_Rate: it.Conversion_Rate !== null
+          ? Number(it.Conversion_Rate)
+          : 0,
         // What Edit Sale dropdown should display
-        Available_Units:availableUnits,
+        Available_Units: availableUnits,
 
 
         // ================================================
@@ -3241,6 +3133,9 @@ const getSingleSale = async (req, res, next) => {
 
         Discount_Type_On_Sale_Price:
           it.Discount_Type_On_Sale_Price,
+        Discount_Amount: Number(
+          discountAmount.toFixed(2)
+        ),
 
         Tax_Amount:
           it.Tax_Amount,
@@ -3264,10 +3159,10 @@ const getSingleSale = async (req, res, next) => {
        ORDER BY ps.id ASC`,
       [saleHeader.id]   // numeric id — add to SELECT if not already there
     );
-console.log("🔍 SALE SPLIT DEBUG");
-console.log("saleId param:", saleId);
-console.log("saleHeader.id:", saleHeader.id);
-console.log("splits:", splits);
+    console.log("🔍 SALE SPLIT DEBUG");
+    console.log("saleId param:", saleId);
+    console.log("saleHeader.id:", saleHeader.id);
+    console.log("splits:", splits);
     // build a display summary for the header (e.g. "Cash + HDFC")
     const splitLabels = splits.map((s) =>
       s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
@@ -6420,13 +6315,357 @@ const getTotalSalesEachDay = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+const getSalesPrintReport = async (req, res) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
+
+    const {
+      search = "",
+      fromDate,
+      toDate,
+    } = req.query;
+
+    let whereClause = "WHERE 1=1";
+    const params = [];
+
+    if (search) {
+      whereClause += `
+        AND (
+          s.Invoice_Number LIKE ?
+          OR p.Party_Name LIKE ?
+        )
+      `;
+
+      params.push(
+        `%${search}%`,
+        `%${search}%`
+      );
+    }
+
+    if (fromDate) {
+      whereClause += ` AND DATE(s.Invoice_Date) >= ?`;
+      params.push(fromDate);
+    }
+
+    if (toDate) {
+      whereClause += ` AND DATE(s.Invoice_Date) <= ?`;
+      params.push(toDate);
+    }
+
+    // ====================================
+    // SALES HEADER
+    // ====================================
+
+    const [sales] = await connection.query(
+      `
+      SELECT
+        s.id,
+        s.Sale_Id,
+        s.Phone_Number,
+        s.Billing_Name,
+        s.Billing_Address,
+        s.Invoice_Number,
+        s.Invoice_Date,
+        s.State_Of_Supply,
+        s.Total_Amount,
+        s.Total_Received,
+        s.Balance_Due,
+        s.Party_Id,
+
+        s.Terms_Conditions_Id,
+        s.Terms_Conditions_Description,
+
+        p.Party_Name,
+        p.GSTIN,
+        p.State,
+
+        tc.Title AS Terms_Conditions_Title
+
+      FROM add_sale s
+
+      LEFT JOIN add_party p
+        ON s.Party_Id = p.Party_Id
+
+      LEFT JOIN terms_conditions tc
+        ON s.Terms_Conditions_Id = tc.id
+
+      ${whereClause}
+
+      ORDER BY s.Invoice_Date ASC
+      `,
+      params
+    );
+
+    if (!sales.length) {
+      return res.status(200).json({
+        success: true,
+        totalInvoices: 0,
+        invoices: [],
+      });
+    }
+
+    const saleIds = sales.map((s) => s.Sale_Id);
+    const numericIds = sales.map((s) => s.id);
+
+    const salePlaceholders =
+      saleIds.map(() => "?").join(",");
+
+    const idPlaceholders =
+      numericIds.map(() => "?").join(",");
+
+    // ====================================
+    // ITEMS
+    // ====================================
+
+    const [items] = await connection.query(
+      `
+      SELECT
+        si.*,
+
+        i.Item_Name,
+        i.Item_HSN,
+        i.Item_Unit,
+        i.Item_Category,
+
+        i.Primary_Unit,
+        i.Secondary_Unit,
+        i.Conversion_Rate
+
+      FROM add_sale_items si
+
+      LEFT JOIN add_item i
+        ON si.Item_Id = i.Item_Id
+
+      WHERE si.Sale_Id IN (${salePlaceholders})
+
+      ORDER BY si.created_at ASC
+      `,
+      saleIds
+    );
+
+    // ====================================
+    // PAYMENT SPLITS
+    // Source_Id = add_sale.id
+    // ====================================
+
+    const [splits] = await connection.query(
+      `
+      SELECT
+        ps.*,
+        ba.Account_Display_Name
+
+      FROM payment_splits ps
+
+      LEFT JOIN bank_accounts ba
+        ON ba.id = ps.Bank_Account_Id
+
+      WHERE ps.Source_Type = 'Sale'
+      AND ps.Source_Id IN (${idPlaceholders})
+
+      ORDER BY ps.id ASC
+      `,
+      numericIds
+    );
+
+    // ====================================
+    // GROUP ITEMS
+    // ====================================
+
+    const itemMap = {};
+
+    // items.forEach((item) => {
+    //   if (!itemMap[item.Sale_Id]) {
+    //     itemMap[item.Sale_Id] = [];
+    //   }
+
+    //   itemMap[item.Sale_Id].push(item);
+    // });
+    items.forEach((item) => {
+      const price = Number(item.Sale_Price || item.Purchase_Price || 0);
+
+      let discountAmount = 0;
+
+      if (
+        Number(item.Discount_On_Sale_Price || 0) > 0
+      ) {
+        if (
+          item.Discount_Type_On_Sale_Price === "Percentage"
+        ) {
+          discountAmount =
+            (price *
+              Number(item.Discount_On_Sale_Price)) /
+            100;
+        } else {
+          discountAmount = Number(
+            item.Discount_On_Sale_Price
+          );
+        }
+      }
+
+      item.Discount_Amount = Number(
+        discountAmount.toFixed(2)
+      );
+
+      if (!itemMap[item.Sale_Id]) {
+        itemMap[item.Sale_Id] = [];
+      }
+
+      itemMap[item.Sale_Id].push(item);
+    });
+
+    // ====================================
+    // GROUP SPLITS
+    // keyed by numeric sale id
+    // ====================================
+
+    const splitMap = {};
+
+    splits.forEach((split) => {
+      if (!splitMap[split.Source_Id]) {
+        splitMap[split.Source_Id] = [];
+      }
+
+      splitMap[split.Source_Id].push({
+        Id: split.id,
+        Payment_Type: split.Payment_Type,
+        Bank_Account_Id:
+          split.Bank_Account_Id,
+        Account_Display_Name:
+          split.Account_Display_Name,
+        Reference_Number:
+          split.Reference_Number,
+        Amount: split.Amount,
+      });
+    });
+
+    // ====================================
+    // FINAL REPORT
+    // SAME STRUCTURE AS getSingleSale
+    // ====================================
+
+    const invoices = sales.map((sale) => {
+      const saleSplits =
+        splitMap[sale.id] || [];
+
+      const splitLabels =
+        saleSplits.map((s) =>
+          s.Payment_Type === "Bank"
+            ? s.Account_Display_Name
+            : s.Payment_Type
+        );
+
+      const counts = {};
+
+      splitLabels.forEach((label) => {
+        counts[label] =
+          (counts[label] || 0) + 1;
+      });
+
+      const Payment_Type_Display =
+        Object.entries(counts)
+          .map(([label, count]) =>
+            count > 1
+              ? `${label} (x${count})`
+              : label
+          )
+          .join(" + ");
+
+      return {
+        invoicePartyDetails: {
+          Sale_Id: sale.Sale_Id,
+          Party_Name: sale.Party_Name,
+          Billing_Name: sale.Billing_Name,
+          Phone_Number: sale.Phone_Number,
+          Billing_Address:
+            sale.Billing_Address,
+          GSTIN: sale.GSTIN,
+          State_Of_Supply:
+            sale.State_Of_Supply,
+          State: sale.State,
+
+          Invoice_Number:
+            sale.Invoice_Number,
+          Invoice_Date:
+            sale.Invoice_Date,
+
+          Total_Amount:
+            sale.Total_Amount,
+          Total_Received:
+            sale.Total_Received,
+          Balance_Due:
+            sale.Balance_Due,
+
+          Terms_Conditions_Id:
+            sale.Terms_Conditions_Id,
+
+          Terms_Conditions_Description:
+            sale.Terms_Conditions_Description,
+
+          Terms_Conditions_Title:
+            sale.Terms_Conditions_Title,
+
+          Payment_Type_Display,
+        },
+
+        splits: saleSplits,
+
+        items:
+          itemMap[sale.Sale_Id] || [],
+      };
+    });
+    const grandTotalAmount = invoices.reduce(
+      (sum, inv) => sum + Number(inv.invoicePartyDetails.Total_Amount || 0),
+      0
+    );
+
+    const grandTotalReceived = invoices.reduce(
+      (sum, inv) => sum + Number(inv.invoicePartyDetails.Total_Received || 0),
+      0
+    );
+
+    const grandTotalBalanceDue = invoices.reduce(
+      (sum, inv) => sum + Number(inv.invoicePartyDetails.Balance_Due || 0),
+      0
+    );
+
+    return res.status(200).json({
+      success: true,
+      totalInvoices: invoices.length,
+
+      invoices,
+      summary: {
+        totalAmount: grandTotalAmount,
+        totalReceived: grandTotalReceived,
+        totalBalanceDue: grandTotalBalanceDue,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      "Sales Print Report Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to generate sales print report",
+      error: error.message,
+    });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 
 export {
   addSale, addNewSale, getAllSales, exportAllSalesReportToExcel, getAllNewSales, getSingleSale, getLatestInvoiceNumber,
   addInvoice, updateInvoice, getSingleInvoice,
   addNewSaleInvoice, updateNewSaleInvoice, getSingleNewSaleInvoice, getNewSaleLatestInvoiceNumber,
-  printSaleBill, editSale, deleteSale, editNewSale, getTotalNewSalesEachDay, getTotalSalesEachDay
+  printSaleBill, editSale, deleteSale, editNewSale, getTotalNewSalesEachDay, getTotalSalesEachDay, getSalesPrintReport
 };
 
 // const getTotalSalesEachDay = async (req, res, next) => {
