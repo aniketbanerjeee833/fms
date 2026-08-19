@@ -7,17 +7,19 @@ import {
   LayoutDashboard,
   MoreVertical,
   Printer,
+  PrinterIcon,
   Trash2
 } from "lucide-react";
 
 import { useEffect, useRef, useState } from "react";
-import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
+import { useDeleteSaleReturnMutation, useGetAllSaleReturnsQuery, useGetSaleReturnByIdQuery, useLazyGetSaleReturnPrintReportQuery } from "../../redux/api/saleReturnApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
 import { useReactToPrint } from "react-to-print";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
+import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 
 
 
@@ -43,11 +45,17 @@ export default function SaleReturn() {
   //console.log(saleReturns);
   const [printSaleReturnId, setPrintSaleReturnId] = useState(null);
   const printRef = useRef(null);
+  const [showSaleReturnBulkPrintPreview, setShowSaleReturnBulkPrintPreview] = useState(false);
+   
+    const bulkSaleReturnPrintRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
   const { data: printData } = useGetSaleReturnByIdQuery(printSaleReturnId, {
     skip: !printSaleReturnId,
   });
 
+    const [triggerSaleBulkReport, { data: bulkSaleReturnReportData, isFetching: isBulkFetching }] =
+    useLazyGetSaleReturnPrintReportQuery();
+    console.log(bulkSaleReturnReportData)
   useEffect(() => {
     const closeRowMenu = () => {
       setRowMenuOpen(null);
@@ -86,24 +94,24 @@ export default function SaleReturn() {
     });
   };
 
- const handleExportSaleReturnExcel = () => {
-  const params = new URLSearchParams();
+  const handleExportSaleReturnExcel = () => {
+    const params = new URLSearchParams();
 
-  if (searchTerm) params.set("search", searchTerm);
-  if (fromDate) params.set("fromDate", fromDate);
-  if (toDate) params.set("toDate", toDate);
+    if (searchTerm) params.set("search", searchTerm);
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
 
-  const a = document.createElement("a");
+    const a = document.createElement("a");
 
-  a.href =
-    `http://localhost:4000/api/sale-return/export-sale-return-excel?${params.toString()}`;
+    a.href =
+      `http://localhost:4000/api/sale-return/export-sale-return-excel?${params.toString()}`;
 
-  a.download = "";
+    a.download = "";
 
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-};
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
@@ -139,6 +147,26 @@ export default function SaleReturn() {
     }
   }, [printData, printSaleReturnId]);
 
+
+
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkSaleReturnPrintRef,
+    documentTitle: `Sales-Return-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+    onAfterPrint: () => setShowSaleReturnBulkPrintPreview(false),
+  });
+   
+  /* trigger fetch on button click */
+  const handlePrintAllClick = async () => {
+    await triggerSaleBulkReport({ search: searchTerm, fromDate, toDate });
+    setShowSaleReturnBulkPrintPreview(true);
+  };
+   
+  /* fire print once report data has arrived */
+  useEffect(() => {
+    if (bulkSaleReturnReportData && showSaleReturnBulkPrintPreview) {
+      handleBulkPrint();
+    }
+  }, [bulkSaleReturnReportData, showSaleReturnBulkPrintPreview]);
 
   return (
     <>
@@ -240,11 +268,11 @@ export default function SaleReturn() {
               <p className="text-sm font-medium text-black">Total  Amount</p>
               <h4 className="text-3xl font-bold text-black">
                 {/* ₹{saleReturns?.totals?.totalAmount} */}
-                 ₹{(Number(saleReturns?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
+                ₹{(Number(saleReturns?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
-                </h4>
+              </h4>
             </div>
 
             {/* Divider */}
@@ -278,9 +306,9 @@ export default function SaleReturn() {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4">
+          <div className="flex justify-end sm: mt-4 gap-2">
 
-                    <button
+            <button
               type="button"
               onClick={handleExportSaleReturnExcel}
               className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
@@ -293,6 +321,16 @@ export default function SaleReturn() {
                 className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
               />
               {/* Export Excel */}
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintAllClick}
+              disabled={isBulkFetching}
+              className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+              title="Print Reports"
+            >
+              <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+              {isBulkFetching && <span>Loading...</span>}
             </button>
           </div>
         </div>
@@ -334,7 +372,7 @@ export default function SaleReturn() {
                             }
                           );
                         }}
-                       style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
+                        style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
                       >
                         <td>
                           {(saleReturns?.currentPage - 1) * 10 + (idx + 1)}.
@@ -637,6 +675,17 @@ export default function SaleReturn() {
               companyDetails: {},
 
             }}
+          />
+        </div>
+      )}
+      {bulkSaleReturnReportData?.saleReturns?.length > 0 && (
+        <div style={{ display: "none" }}>
+          <SalePurchaseBulkReportPrintTemplate
+            ref={bulkSaleReturnPrintRef}
+            type="credit"
+            data={bulkSaleReturnReportData?.saleReturns || []}   // 🔹 use .invoices not .sales
+            fromDate={fromDate}
+            toDate={toDate}
           />
         </div>
       )}

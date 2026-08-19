@@ -2,7 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 export const saleReturnApi = createApi({
   reducerPath: "saleReturnApi",
-  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000/api",credentials: "include" }),
+  baseQuery: fetchBaseQuery({ baseUrl: "http://localhost:4000/api", credentials: "include" }),
   tagTypes: ["SaleReturn"],
 
   endpoints: (builder) => ({
@@ -50,6 +50,21 @@ export const saleReturnApi = createApi({
       }),
       invalidatesTags: ["SaleReturn"],
     }),
+    getSaleReturnPrintReport: builder.query({
+      query: ({
+        search = "",
+        fromDate = "",
+        toDate = "",
+      } = {}) => {
+        const params = new URLSearchParams();
+
+        if (search) params.append("search", search);
+        if (fromDate) params.append("fromDate", fromDate);
+        if (toDate) params.append("toDate", toDate);
+
+        return `sale-return/print-sale-return-report?${params.toString()}`;
+      },
+    }),
   }),
 });
 
@@ -59,4 +74,5 @@ export const {
   useCreateSaleReturnMutation,
   useUpdateSaleReturnMutation,
   useDeleteSaleReturnMutation,
+  useLazyGetSaleReturnPrintReportQuery
 } = saleReturnApi;

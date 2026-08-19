@@ -138,6 +138,7 @@ const [showSaleBulkPrintPreview, setShowSaleBulkPrintPreview] = useState(false);
       : "Sale",
     onAfterPrint: () => setPrintSaleId(null),
   });
+
   useEffect(() => {
     if (printData && printSaleId) {
       handlePrint();
@@ -737,7 +738,8 @@ useEffect(() => {
     <SalePurchaseBulkReportPrintTemplate
       ref={bulkSalePrintRef}
       type="sale"
-      data={bulkSaleReportData}   // 🔹 use .invoices not .sales
+      data={bulkSaleReportData?.invoices || []} 
+      //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
       fromDate={fromDate}
       toDate={toDate}
     />

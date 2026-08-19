@@ -769,7 +769,8 @@ export default function AllPurchaseList() {
           <SalePurchaseBulkReportPrintTemplate
             ref={bulkPurchasePrintRef}
             type="purchase"
-            data={bulkPurchaseReportData}   // 🔹 use .invoices not .sales
+              data={bulkPurchaseReportData?.purchaseBills || []}
+            //data={bulkPurchaseReportData}   // 🔹 use .invoices not .sales
             fromDate={fromDate}
             toDate={toDate}
           />
