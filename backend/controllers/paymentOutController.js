@@ -1531,6 +1531,223 @@ const exportPaymentOutsReportToExcel = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+const getPaymentOutPrintReport = async (req, res, next) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
 
-export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut, deletePaymentOut, exportPaymentOutsReportToExcel };
+    const {
+      search = "",
+      fromDate,
+      toDate,
+    } = req.query;
+
+    const whereClauses = [];
+    const params = [];
+
+    if (search) {
+      const like = `%${search}%`;
+
+      whereClauses.push(`
+        (
+          a.Party_Name LIKE ?
+          OR po.Payment_Number LIKE ?
+          OR CAST(po.Paid AS CHAR) LIKE ?
+        )
+      `);
+
+      params.push(like, like, like);
+    }
+
+    if (fromDate && toDate) {
+      whereClauses.push(
+        `DATE(po.Payment_Date) BETWEEN ? AND ?`
+      );
+
+      params.push(fromDate, toDate);
+    } else if (fromDate) {
+      whereClauses.push(
+        `DATE(po.Payment_Date) >= ?`
+      );
+
+      params.push(fromDate);
+    } else if (toDate) {
+      whereClauses.push(
+        `DATE(po.Payment_Date) <= ?`
+      );
+
+      params.push(toDate);
+    }
+
+    const whereClause =
+      whereClauses.length > 0
+        ? `WHERE ${whereClauses.join(" AND ")}`
+        : "";
+
+    // ===========================
+    // HEADER
+    // ===========================
+
+    const [payments] =
+      await connection.query(
+        `
+        SELECT
+          po.*,
+
+          a.Party_Name,
+          a.GSTIN
+         
+
+          
+
+        FROM payment_out po
+
+        LEFT JOIN add_party a
+          ON a.Party_Id = po.Party_Id
+
+        LEFT JOIN add_party_addresses pa
+          ON pa.Party_Id = po.Party_Id
+         AND pa.Address_Type = 'Billing'
+         AND pa.Is_Default = 1
+
+        ${whereClause}
+
+        ORDER BY po.Payment_Date ASC
+        `,
+        params
+      );
+
+    if (!payments.length) {
+      return res.status(200).json({
+        success: true,
+        totalPayments: 0,
+        paymentOuts: [],
+        summary: {
+          totalPaid: 0,
+        },
+      });
+    }
+
+    const paymentIds = payments.map(
+      (p) => p.id
+    );
+
+    const placeholders =
+      paymentIds.map(() => "?").join(",");
+
+    // ===========================
+    // SPLITS
+    // ===========================
+
+    const [splits] =
+      await connection.query(
+        `
+        SELECT
+          ps.*,
+          ba.Account_Display_Name
+
+        FROM payment_splits ps
+
+        LEFT JOIN bank_accounts ba
+          ON ba.id = ps.Bank_Account_Id
+
+        WHERE ps.Source_Type='Payment_Out'
+        AND ps.Source_Id IN (${placeholders})
+
+        ORDER BY ps.id ASC
+        `,
+        paymentIds
+      );
+
+    const splitMap = {};
+
+    splits.forEach((split) => {
+      if (!splitMap[split.Source_Id]) {
+        splitMap[split.Source_Id] = [];
+      }
+
+      splitMap[split.Source_Id].push({
+        Id: split.id,
+        Payment_Type:
+          split.Payment_Type,
+        Bank_Account_Id:
+          split.Bank_Account_Id,
+        Account_Display_Name:
+          split.Account_Display_Name,
+        Reference_Number:
+          split.Reference_Number,
+        Amount: split.Amount,
+      });
+    });
+
+    // ===========================
+    // RESPONSE
+    // ===========================
+
+    const summary = {
+      totalPaid: 0,
+    };
+
+    const paymentOuts = payments.map(
+      (payment) => {
+        summary.totalPaid += Number(
+          payment.Paid || 0
+        );
+
+        return {
+          paymentOutDetails: {
+            id: payment.id,
+
+            Party_Name:
+              payment.Party_Name,
+
+            GSTIN: payment.GSTIN,
+
+            // Phone_Number:
+            //   payment.Phone_Number,
+
+           
+
+            Payment_Number:
+              payment.Receipt_No,
+
+            Payment_Date:
+              payment.Payment_Date,
+
+            // Description:
+            //   payment.Description,
+
+            Paid:
+              payment.Paid,
+          },
+
+          splits:
+            splitMap[payment.id] || [],
+        };
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      totalPayments:
+        paymentOuts.length,
+
+      paymentOuts,
+
+      summary: {
+        totalPaid: Number(
+          summary.totalPaid.toFixed(2)
+        ),
+      },
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (connection)
+      connection.release();
+  }
+};
+
+export { getAllPaymentOuts, getPaymentOutById, createPaymentOut, updatePaymentOut, deletePaymentOut,
+   exportPaymentOutsReportToExcel,getPaymentOutPrintReport };

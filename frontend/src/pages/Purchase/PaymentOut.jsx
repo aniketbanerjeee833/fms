@@ -7,13 +7,14 @@ import {
     FileSpreadsheet,
     LayoutDashboard,
     Trash2,
-    Printer
+    Printer,
+    PrinterIcon
 } from "lucide-react";
 
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useEffect, useRef, useState } from "react";
-import { useAddPaymentOutMutation, useDeletePaymentOutMutation, useGetAllPaymentOutsQuery, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
+import { useAddPaymentOutMutation, useDeletePaymentOutMutation, useGetAllPaymentOutsQuery, useGetPaymentOutByIdQuery, useLazyGetPaymentOutPrintReportQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
@@ -23,6 +24,7 @@ import { itemApi } from "../../redux/api/itemApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { useReactToPrint } from "react-to-print";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
+import PaymentInOutBulkReportPrintTemplate from "../../components/Print/PaymentInOutBulkReportPrintTemplate";
 
 
 export default function PaymentOut() {
@@ -53,6 +55,15 @@ export default function PaymentOut() {
     const { data: printData } = useGetPaymentOutByIdQuery(printPaymentOutId, {
         skip: !printPaymentOutId,
     });
+
+    const [showPaymentOutBulkPrintPreview, setPaymentOutBulkPrintReview] = useState(false);
+
+    const bulkPaymentOutPrintRef = useRef(null);
+    /* fetch the full payment (with Party details) only when printing */
+
+
+    const [triggerPaymentOutReport, { data: bulkPaymentOutReportData, isFetching: isBulkFetching }] =
+        useLazyGetPaymentOutPrintReportQuery();
     const handlePageChange = (newPage) => {
         setSearchParams({
             page: newPage,
@@ -100,7 +111,7 @@ export default function PaymentOut() {
         };
     }, []);
 
-   
+
 
     const handleSavePaymentOut = async (formData) => {
         try {
@@ -185,6 +196,25 @@ export default function PaymentOut() {
         a.click();
         document.body.removeChild(a);
     };
+
+    const handleBulkPrint = useReactToPrint({
+        contentRef: bulkPaymentOutPrintRef,
+        documentTitle: `Payment-Out-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+        onAfterPrint: () => setPaymentOutBulkPrintReview(false),
+    });
+
+    /* trigger fetch on button click */
+    const handlePrintAllClick = async () => {
+        await triggerPaymentOutReport({ search: searchTerm, fromDate, toDate });
+        setPaymentOutBulkPrintReview(true);
+    };
+
+    /* fire print once report data has arrived */
+    useEffect(() => {
+        if (bulkPaymentOutReportData && showPaymentOutBulkPrintPreview) {
+            handleBulkPrint();
+        }
+    }, [bulkPaymentOutReportData, showPaymentOutBulkPrintPreview]);
     return (
         <>
 
@@ -354,7 +384,7 @@ export default function PaymentOut() {
                         </div>
 
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end sm: mt-4 gap-2">
                         {/* <button
                             type="button"
                             onClick={ handleExportPaymentOutReportExcel}
@@ -377,6 +407,17 @@ export default function PaymentOut() {
                             />
                             {/* Export Excel */}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handlePrintAllClick}
+                            disabled={isBulkFetching}
+                            className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+                            title="Print Reports"
+                        >
+                            <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+                            {isBulkFetching && <span>Loading...</span>}
+                        </button>
+
 
 
 
@@ -733,6 +774,18 @@ export default function PaymentOut() {
                         ref={printRef}
                         payment={printData?.paymentOut}
                         type="out"
+                    />
+                </div>
+            )}
+            {bulkPaymentOutReportData?.paymentOuts?.length > 0 && (
+                <div style={{ display: "none" }}>
+                    <PaymentInOutBulkReportPrintTemplate
+                        ref={bulkPaymentOutPrintRef}
+                        type="out"
+                        data={bulkPaymentOutReportData?.paymentOuts || []}
+                        //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
+                        fromDate={fromDate}
+                        toDate={toDate}
                     />
                 </div>
             )}

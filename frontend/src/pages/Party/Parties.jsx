@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 import { partyApi, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery } from "../../redux/api/partyAPi";
-import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer } from "lucide-react";
+import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useDispatch } from "react-redux";
@@ -431,13 +431,25 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     console.log(row, "row", transactionId, "transactionId");
     setPrintTarget({ type: row.Txn_Type, id: transactionId });
   };
+
+  const handleExportPartyReportExcel = () => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+
+    const a = document.createElement("a");
+    a.href = `http://localhost:4000/api/party/export-party-report-excel/${partyId}?${params.toString()}`;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
   return (
     <div className="flex flex-col  overflow-y-auto"
       style={{
         maxHeight: "calc(100vh - 180px)",
         minWidth: 0
       }}
-      >
+    >
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -538,6 +550,35 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           </div>
 
         </div>
+
+      </div>
+      <div className="flex justify-end gap-2 mr-2">
+        <button
+          type="button"
+          onClick={handleExportPartyReportExcel}
+          className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                                                                text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+          title="Export to Excel"
+        >
+          <FileSpreadsheet
+            size={16}
+            strokeWidth={2.2}
+            className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+          />
+          {/* Export Excel */}
+        </button>
+        <button
+          type="button"
+          //onClick={handlePrintAllClick}
+          //disabled={isBulkPurchaseFetching}
+          className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+          title="Print  Reports"
+        >
+          <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+          {/* {isBulkPurchaseFetching && <span>Loading...</span>} */}
+        </button>
+
+
       </div>
 
       {/* ── LEDGER TABLE ── */}
@@ -895,7 +936,7 @@ export default function Parties() {
     search: leftSearch,
     limit: 10,
   },
-);
+  );
 
   const parties = partiesData?.parties || [];
   const totalParties = partiesData?.totalParties || 0;

@@ -59,6 +59,23 @@ export const paymentInApi = createApi({
       }),
       invalidatesTags: [{ type: "PaymentIn", id: "LIST" }],
     }),
+    getPaymentInPrintReport: builder.query({
+  query: ({
+    search = "",
+    fromDate = "",
+    toDate = "",
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (search) params.append("search", search);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+
+    return `/payment-in/print-payment-in-report?${params.toString()}`;
+  },
+
+  providesTags: [{ type: "PaymentIn", id: "LIST" }],
+}),
   }),
 });
 
@@ -68,4 +85,5 @@ export const {
   useAddPaymentInMutation,
   useUpdatePaymentInMutation,
   useDeletePaymentInMutation,
+  useLazyGetPaymentInPrintReportQuery
 } = paymentInApi;

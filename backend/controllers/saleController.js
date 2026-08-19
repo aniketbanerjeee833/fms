@@ -6383,7 +6383,7 @@ const getSalesPrintReport = async (req, res) => {
 
         p.Party_Name,
         p.GSTIN,
-        p.State,
+     
 
         tc.Title AS Terms_Conditions_Title
 

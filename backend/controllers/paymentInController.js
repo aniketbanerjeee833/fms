@@ -1178,7 +1178,221 @@ const exportPaymentInsReportToExcel = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-export { getAllPaymentIns, getPaymentInById, createPaymentIn, updatePaymentIn, deletePaymentIn, exportPaymentInsReportToExcel };
+const getPaymentInPrintReport = async (req,res,next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const {
+      search = "",
+      fromDate,
+      toDate,
+    } = req.query;
+
+    const whereClauses = [];
+    const params = [];
+
+    if (search) {
+      const like = `%${search}%`;
+
+      whereClauses.push(`
+        (
+          a.Party_Name LIKE ?
+          OR pi.Receipt_No LIKE ?
+          OR CAST(pi.Received AS CHAR) LIKE ?
+        )
+      `);
+
+      params.push(like, like, like);
+    }
+
+    if (fromDate && toDate) {
+      whereClauses.push(
+        `DATE(pi.Payment_Date) BETWEEN ? AND ?`
+      );
+
+      params.push(fromDate, toDate);
+    } else if (fromDate) {
+      whereClauses.push(
+        `DATE(pi.Payment_Date) >= ?`
+      );
+
+      params.push(fromDate);
+    } else if (toDate) {
+      whereClauses.push(
+        `DATE(pi.Payment_Date) <= ?`
+      );
+
+      params.push(toDate);
+    }
+
+    const whereClause =
+      whereClauses.length > 0
+        ? `WHERE ${whereClauses.join(" AND ")}`
+        : "";
+
+    // ===========================
+    // HEADER
+    // ===========================
+
+    const [payments] =
+      await connection.query(
+        `
+      SELECT
+        pi.*,
+
+        a.Party_Name,
+        a.GSTIN
+       
+
+       
+
+      FROM payment_in pi
+
+      LEFT JOIN add_party a
+        ON a.Party_Id = pi.Party_Id
+
+      LEFT JOIN add_party_addresses pa
+        ON pa.Party_Id = pi.Party_Id
+       AND pa.Address_Type='Billing'
+       AND pa.Is_Default=1
+
+      ${whereClause}
+
+      ORDER BY pi.Payment_Date ASC
+      `,
+        params
+      );
+
+    if (!payments.length) {
+      return res.status(200).json({
+        success: true,
+        totalPayments: 0,
+        paymentIns: [],
+        summary: {
+          totalReceived: 0,
+        },
+      });
+    }
+
+    const paymentIds = payments.map(
+      (p) => p.id
+    );
+
+    const placeholders =
+      paymentIds.map(() => "?").join(",");
+
+    // ===========================
+    // SPLITS
+    // ===========================
+
+    const [splits] =
+      await connection.query(
+        `
+      SELECT
+        ps.*,
+        ba.Account_Display_Name
+
+      FROM payment_splits ps
+
+      LEFT JOIN bank_accounts ba
+        ON ba.id = ps.Bank_Account_Id
+
+      WHERE ps.Source_Type='Payment_In'
+      AND ps.Source_Id IN (${placeholders})
+
+      ORDER BY ps.id ASC
+      `,
+        paymentIds
+      );
+
+    const splitMap = {};
+
+    splits.forEach((split) => {
+      if (!splitMap[split.Source_Id]) {
+        splitMap[split.Source_Id] = [];
+      }
+
+      splitMap[split.Source_Id].push({
+        Id: split.id,
+        Payment_Type:
+          split.Payment_Type,
+        Bank_Account_Id:
+          split.Bank_Account_Id,
+        Account_Display_Name:
+          split.Account_Display_Name,
+        Reference_Number:
+          split.Reference_Number,
+        Amount: split.Amount,
+      });
+    });
+
+    const summary = {
+      totalReceived: 0,
+    };
+
+    const paymentIns = payments.map(
+      (payment) => {
+        summary.totalReceived += Number(
+          payment.Received || 0
+        );
+
+        return {
+          paymentInDetails: {
+            id: payment.id,
+
+            Party_Name:
+              payment.Party_Name,
+
+            GSTIN: payment.GSTIN,
+
+            // Phone_Number:
+            //   payment.Phone_Number,
+
+          
+            Receipt_No:
+              payment.Receipt_No,
+
+            Payment_Date:
+              payment.Payment_Date,
+
+            // Description:
+            //   payment.Description,
+
+            Received:
+              payment.Received,
+          },
+
+          splits:
+            splitMap[payment.id] || [],
+        };
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      totalPayments:
+        paymentIns.length,
+
+      paymentIns,
+
+      summary: {
+        totalReceived: Number(
+          summary.totalReceived.toFixed(2)
+        ),
+      },
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (connection)
+      connection.release();
+  }
+};
+export { getAllPaymentIns, getPaymentInById, createPaymentIn, updatePaymentIn, deletePaymentIn,
+   exportPaymentInsReportToExcel,
+   getPaymentInPrintReport };
 
 
 

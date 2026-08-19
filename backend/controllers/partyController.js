@@ -3,7 +3,7 @@ import db from "../config/db.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { sanitizeObject } from "../utils/sanitizeInput.js";
 import partySchema from "../validators/partySchema.js";
-
+import ExcelJS from "exceljs";
 import PdfPrinter from "pdfmake";
 const cleanValue = (value) => {
   if (value === undefined || value === null || value === "" || value === " ") {
@@ -310,8 +310,8 @@ const editParty = async (req, res, next) => {
 
     const cleanValue = (val) =>
       val !== undefined &&
-      val !== null &&
-      String(val).trim() !== ""
+        val !== null &&
+        String(val).trim() !== ""
         ? val
         : null;
 
@@ -383,7 +383,7 @@ const editParty = async (req, res, next) => {
       (address) => address.Address_Text?.trim()
     );
 
-    
+
     // Remove existing addresses
     await connection.execute(
       `DELETE FROM add_party_addresses
@@ -428,11 +428,11 @@ const editParty = async (req, res, next) => {
 
         amount: Opening_Balance,
 
-        txnDate:Opening_Balance_Date || todayDate,
+        txnDate: Opening_Balance_Date || todayDate,
 
-        directionOverride:Opening_Balance_Type === "To_Receive"
-            ? "Credit"
-            : "Debit",
+        directionOverride: Opening_Balance_Type === "To_Receive"
+          ? "Credit"
+          : "Debit",
       });
 
     } else {
@@ -508,8 +508,8 @@ const editParty = async (req, res, next) => {
   }
 };
 
-  // OR p.State LIKE ?
-  //         OR p.Email_Id LIKE ?
+// OR p.State LIKE ?
+//         OR p.Email_Id LIKE ?
 const getAllParties = async (req, res, next) => {
   let connection;
 
@@ -558,7 +558,7 @@ const getAllParties = async (req, res, next) => {
         like,
         like,
         like
-        
+
       );
     }
 
@@ -832,26 +832,26 @@ const getAllParties = async (req, res, next) => {
 };
 const getAllPartiesCursor = async (req, res, next) => {
   let connection;
- 
+
   try {
     connection = await db.getConnection();
- 
+
     const cursor = req.query.cursor
       ? parseInt(req.query.cursor, 10)
       : null;
- 
+
     const limit = req.query.limit
       ? Math.min(parseInt(req.query.limit, 10), 10)
       : 10;
- 
+
     const search = req.query.search
       ? req.query.search.trim()
       : "";
- 
+
     /* ── WHERE clauses ── */
     const conditions = [];
-    const params     = [];
- 
+    const params = [];
+
     if (search) {
       conditions.push(`(
         p.Party_Name   LIKE ? OR
@@ -862,52 +862,52 @@ const getAllPartiesCursor = async (req, res, next) => {
       const like = `%${search}%`;
       params.push(like, like, like, like);
     }
- 
+
     /* cursor: fetch rows whose internal id < cursor (desc order) */
     if (cursor) {
       conditions.push(`p.id < ?`);
       params.push(cursor);
     }
- 
+
     const whereSQL = conditions.length
       ? `WHERE ${conditions.join(" AND ")}`
       : "";
 
-      // ======================================================
-// TOTAL PARTIES COUNT (ignore cursor)
-// ======================================================
+    // ======================================================
+    // TOTAL PARTIES COUNT (ignore cursor)
+    // ======================================================
 
-const countConditions = [];
-const countParams = [];
+    const countConditions = [];
+    const countParams = [];
 
-if (search) {
-  countConditions.push(`(
+    if (search) {
+      countConditions.push(`(
     p.Party_Name LIKE ? OR
     p.GSTIN LIKE ? OR
     p.Phone_Number LIKE ? OR
     CAST(ABS(p.Current_Balance) AS CHAR) LIKE ?
   )`);
 
-  const like = `%${search}%`;
-  countParams.push(like, like, like, like);
-}
+      const like = `%${search}%`;
+      countParams.push(like, like, like, like);
+    }
 
-const countWhereSQL =
-  countConditions.length
-    ? `WHERE ${countConditions.join(" AND ")}`
-    : "";
+    const countWhereSQL =
+      countConditions.length
+        ? `WHERE ${countConditions.join(" AND ")}`
+        : "";
 
-const [countRows] = await connection.query(
-  `
+    const [countRows] = await connection.query(
+      `
   SELECT COUNT(*) AS totalParties
   FROM add_party p
   ${countWhereSQL}
   `,
-  countParams
-);
+      countParams
+    );
 
-const totalParties = countRows[0].totalParties;
- 
+    const totalParties = countRows[0].totalParties;
+
     /* ── MAIN QUERY — fetch limit + 1 to detect hasMore ── */
     const [rows] = await connection.query(
       `SELECT
@@ -928,17 +928,17 @@ const totalParties = countRows[0].totalParties;
        LIMIT ?`,
       [...params, limit + 1]   // fetch one extra to know if there's more
     );
- 
-    const hasMore    = rows.length > limit;
-    const pageRows   = hasMore ? rows.slice(0, limit) : rows;
+
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = pageRows.length
       ? pageRows[pageRows.length - 1].id
       : null;
- 
+
     /* ── ATTACH ADDRESSES ── */
     const partyIds = pageRows.map((p) => p.Party_Id);
     let addressRows = [];
- 
+
     if (partyIds.length > 0) {
       const placeholders = partyIds.map(() => "?").join(",");
       const [addrRows] = await connection.query(
@@ -950,33 +950,33 @@ const totalParties = countRows[0].totalParties;
       );
       addressRows = addrRows;
     }
- 
+
     const addressesByParty = {};
     for (const addr of addressRows) {
       if (!addressesByParty[addr.Party_Id]) {
         addressesByParty[addr.Party_Id] = [];
       }
       addressesByParty[addr.Party_Id].push({
-        id:           addr.id,
+        id: addr.id,
         Address_Type: addr.Address_Type,
         Address_Text: addr.Address_Text,
-        Is_Default:   Boolean(addr.Is_Default),
+        Is_Default: Boolean(addr.Is_Default),
       });
     }
- 
+
     const parties = pageRows.map((party) => ({
       ...party,
       addresses: addressesByParty[party.Party_Id] || [],
     }));
- 
+
     return res.status(200).json({
-      success:    true,
+      success: true,
       totalParties,
       parties,
       hasMore,
       nextCursor,
     });
- 
+
   } catch (err) {
     console.error("❌ getAllPartiesCursor:", err);
     next(err);
@@ -1009,28 +1009,28 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
     //   return res.status(404).json({ success: false, message: "Party not found" });
     // }
     // ─────────────────────────────────────────────
-// PARTY DETAILS
-// ─────────────────────────────────────────────
-const [[party]] = await connection.query(
-  `SELECT *
+    // PARTY DETAILS
+    // ─────────────────────────────────────────────
+    const [[party]] = await connection.query(
+      `SELECT *
    FROM add_party
    WHERE Party_Id = ?
    LIMIT 1`,
-  [Party_Id]
-);
+      [Party_Id]
+    );
 
-if (!party) {
-  return res.status(404).json({
-    success: false,
-    message: "Party not found",
-  });
-}
+    if (!party) {
+      return res.status(404).json({
+        success: false,
+        message: "Party not found",
+      });
+    }
 
-// ─────────────────────────────────────────────
-// PARTY ADDRESSES
-// ─────────────────────────────────────────────
-const [addresses] = await connection.query(
-  `SELECT
+    // ─────────────────────────────────────────────
+    // PARTY ADDRESSES
+    // ─────────────────────────────────────────────
+    const [addresses] = await connection.query(
+      `SELECT
       id,
       Address_Type,
       Address_Text,
@@ -1038,17 +1038,17 @@ const [addresses] = await connection.query(
    FROM add_party_addresses
    WHERE Party_Id = ?
    ORDER BY Address_Type, Is_Default DESC, id ASC`,
-  [Party_Id]
-);
+      [Party_Id]
+    );
 
-// Combine them
-const partyDetails = {
-  ...party,
-  addresses: addresses.map((address) => ({
-    ...address,
-    Is_Default: Boolean(address.Is_Default),
-  })),
-};
+    // Combine them
+    const partyDetails = {
+      ...party,
+      addresses: addresses.map((address) => ({
+        ...address,
+        Is_Default: Boolean(address.Is_Default),
+      })),
+    };
 
     // 🔹 Build ledger query — cursor + search + date
     const params = [Party_Id];
@@ -1074,25 +1074,25 @@ const partyDetails = {
     //   params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     // }
 
-//     if (cursor) {
-//   where += ` AND pl.id < ?`;
-//   params.push(cursor);
-// }
+    //     if (cursor) {
+    //   where += ` AND pl.id < ?`;
+    //   params.push(cursor);
+    // }
 
-if (cursor) {
-  try {
-    const decoded = JSON.parse(
-      Buffer.from(cursor, "base64").toString("utf8")
-    );
+    if (cursor) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(cursor, "base64").toString("utf8")
+        );
 
-    if (!decoded.date || !decoded.id) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid cursor.",
-      });
-    }
+        if (!decoded.date || !decoded.id) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor.",
+          });
+        }
 
-    where += `
+        where += `
       AND (
         pl.Txn_Date < ?
         OR (
@@ -1102,44 +1102,44 @@ if (cursor) {
       )
     `;
 
-    params.push(
-      decoded.date,
-      decoded.date,
-      Number(decoded.id)
-    );
+        params.push(
+          decoded.date,
+          decoded.date,
+          Number(decoded.id)
+        );
 
-  } catch {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid cursor.",
-    });
-  }
-}
-if (searchDate) {
-  where += ` AND DATE(pl.Txn_Date) = ?`;
-  params.push(searchDate);
-}
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor.",
+        });
+      }
+    }
+    if (searchDate) {
+      where += ` AND DATE(pl.Txn_Date) = ?`;
+      params.push(searchDate);
+    }
 
-// if (searchDate) {
-//   where += ` AND pl.Txn_Date = ?`;
-//   params.push(searchDate);
-// }
+    // if (searchDate) {
+    //   where += ` AND pl.Txn_Date = ?`;
+    //   params.push(searchDate);
+    // }
 
-// if (search) {
-//   where += ` AND (
-//     pl.Doc_Number LIKE ?
-//     OR CAST(pl.Amount AS CHAR) LIKE ?
-//     OR CAST(pl.Balance_Due AS CHAR) LIKE ?
-//   )`;
+    // if (search) {
+    //   where += ` AND (
+    //     pl.Doc_Number LIKE ?
+    //     OR CAST(pl.Amount AS CHAR) LIKE ?
+    //     OR CAST(pl.Balance_Due AS CHAR) LIKE ?
+    //   )`;
 
-//   params.push(
-//     `%${search}%`,
-//     `%${search}%`,
-//     `%${search}%`
-//   );
-// }
-if (search) {
-  where += ` AND (
+    //   params.push(
+    //     `%${search}%`,
+    //     `%${search}%`,
+    //     `%${search}%`
+    //   );
+    // }
+    if (search) {
+      where += ` AND (
     pl.Doc_Number LIKE ?
     OR CAST(pl.Amount AS CHAR) LIKE ?
     OR CAST(pl.Balance_Due AS CHAR) LIKE ?
@@ -1147,14 +1147,14 @@ if (search) {
     OR DATE_FORMAT(pl.Txn_Date,'%e/%c/%Y') LIKE ?
   )`;
 
-  params.push(
-    `%${search}%`,
-    `%${search}%`,
-    `%${search}%`,
-    `%${normalizedSearch}%`,
-    `%${normalizedSearch}%`
-  );
-}
+      params.push(
+        `%${search}%`,
+        `%${search}%`,
+        `%${search}%`,
+        `%${normalizedSearch}%`,
+        `%${normalizedSearch}%`
+      );
+    }
 
     // const [ledgerRows] = await connection.query(
     //   `SELECT id, Txn_Type, Source_Id, Direction, Amount, Doc_Number, Balance_Due, Running_Balance, Txn_Date
@@ -1164,8 +1164,8 @@ if (search) {
     //    LIMIT ${limit + 1}`,
     //   params
     // );
-const [ledgerRows] = await connection.query(
-  `SELECT
+    const [ledgerRows] = await connection.query(
+      `SELECT
       pl.id,
       pl.Txn_Type,
       pl.Source_Id,
@@ -1199,24 +1199,24 @@ const [ledgerRows] = await connection.query(
   pl.Txn_Date DESC,
   pl.id DESC
    LIMIT ${limit + 1}`,
-  params
-);
- //  ORDER BY pl.id DESC
+      params
+    );
+    //  ORDER BY pl.id DESC
     const hasMore = ledgerRows.length > limit;
     const pageRows = hasMore ? ledgerRows.slice(0, limit) : ledgerRows;
     //const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
     let nextCursor = null;
 
-if (hasMore && pageRows.length > 0) {
-  const last = pageRows[pageRows.length - 1];
+    if (hasMore && pageRows.length > 0) {
+      const last = pageRows[pageRows.length - 1];
 
-  nextCursor = Buffer.from(
-    JSON.stringify({
-      date: last.Txn_Date,
-      id: last.id,
-    })
-  ).toString("base64");
-}
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          date: last.Txn_Date,
+          id: last.id,
+        })
+      ).toString("base64");
+    }
 
     // 🔹 Summary — ALL TIME
     const [[purchaseSummary]] = await connection.query(
@@ -1368,15 +1368,15 @@ const printSinglePartyDetailsSalesPurchasesReport = async (req, res) => {
                       style: "label"
                     },
                     {
-                       text: safe(
-    new Date(entry.Bill_Date || entry.Invoice_Date)
-      .toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "numeric",
-        year: "numeric",
-      })
-  ),
-  style: "value"
+                      text: safe(
+                        new Date(entry.Bill_Date || entry.Invoice_Date)
+                          .toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "numeric",
+                            year: "numeric",
+                          })
+                      ),
+                      style: "value"
                     }
                   ]
                 }
@@ -1435,7 +1435,7 @@ const printSinglePartyDetailsSalesPurchasesReport = async (req, res) => {
                       ["Balance Due", safe(entry.Balance_Due)]
                     ]
                   },
-                  layout:  "noBordersBox"
+                  layout: "noBordersBox"
                 }
               ],
               margin: [0, 0, 0, 15]
@@ -1470,7 +1470,7 @@ const printSinglePartyDetailsSalesPurchasesReport = async (req, res) => {
           alignment: "center",
           margin: [0, 0, 0, 15]
         },
-          {
+        {
           text: `Billing Address: ${party.Billing_Address || "N/A"}`,
           alignment: "center",
           margin: [0, 0, 0, 15]
@@ -1752,8 +1752,8 @@ const getAllPartiesReceivablesLeft = async (req, res, next) => {
 //       whereClauses.push(`(
 //         Party_Name LIKE ? OR
 //         Phone_Number LIKE ? OR
-        
-        
+
+
 //         CAST(ABS(Current_Balance) AS CHAR) LIKE ?
 //       )`);
 
@@ -1883,7 +1883,7 @@ const getAllPayableParties = async (req, res, next) => {
         like,
         like,
         like
-        
+
       );
     }
 
@@ -1923,7 +1923,7 @@ const getAllPayableParties = async (req, res, next) => {
         like,
         like,
         like
-        
+
       );
     }
 
@@ -2099,7 +2099,7 @@ const getAllReceivableParties = async (req, res, next) => {
         like,
         like,
         like
-        
+
       );
     }
 
@@ -2139,7 +2139,7 @@ const getAllReceivableParties = async (req, res, next) => {
         like,
         like,
         like
-        
+
       );
     }
 
@@ -2268,206 +2268,401 @@ const getAllReceivableParties = async (req, res, next) => {
     }
   }
 };
-export { addParty,editParty,getAllParties, getAllPartiesCursor,getSinglePartyDetailsSalesPurchases,
-  printSinglePartyDetailsSalesPurchasesReport,getAllPartiesPayablesLeft,getAllPartiesReceivablesLeft,
-  getAllPayableParties,getAllReceivableParties
- };  // ✅ for ESM
-// const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
-//   let connection;
+const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
 
-//   try {
-//     connection = await db.getConnection();
+    const { Party_Id } = req.params;
+    // const search   = req.query.search ? req.query.search.trim().toLowerCase() : "";
+    // const fromDate = req.query.fromDate || null;
+    // const toDate   = req.query.toDate   || null;
+    // const normalizedSearch = search.replace(/-/g, "/");
+    const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
+    const searchDate = req.query.date || null;
+    const normalizedSearch = search.replace(/-/g, "/");
 
-//     const { Party_Id } = req.params;
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-// const salesCursor = req.query.salesCursor || null;
-// const purchasesCursor = req.query.purchasesCursor || null;
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
+    if (!Party_Id) {
+      return res.status(400).json({ success: false, message: "Party Id is required" });
+    }
 
-//     if (!Party_Id) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Party Id is required",
-//       });
+    /* ── PARTY DETAILS ── */
+    const [[party]] = await connection.query(
+      `SELECT * FROM add_party WHERE Party_Id = ? LIMIT 1`,
+      [Party_Id]
+    );
+
+    if (!party) {
+      return res.status(404).json({ success: false, message: "Party not found" });
+    }
+
+    const [addresses] = await connection.query(
+      `SELECT Address_Type, Address_Text, Is_Default
+       FROM add_party_addresses
+       WHERE Party_Id = ?
+       ORDER BY Address_Type, Is_Default DESC, id ASC`,
+      [Party_Id]
+    );
+    const defaultBilling = addresses.find(
+      (a) => a.Address_Type === "Billing" && a.Is_Default
+    );
+
+    /* ── LEDGER WHERE — same filters as getSinglePartyDetailsSalesPurchases, no cursor (export = all rows) ── */
+    const params = [Party_Id];
+    let where = `WHERE pl.Party_Id = ?`;
+
+    if (searchDate) {
+      where += ` AND DATE(pl.Txn_Date) = ?`;
+      params.push(searchDate);
+    }
+
+    if (search) {
+      where += ` AND (
+    pl.Doc_Number LIKE ?
+    OR CAST(pl.Amount AS CHAR) LIKE ?
+    OR CAST(pl.Balance_Due AS CHAR) LIKE ?
+    OR DATE_FORMAT(pl.Txn_Date,'%d/%m/%Y') LIKE ?
+    OR DATE_FORMAT(pl.Txn_Date,'%e/%c/%Y') LIKE ?
+  )`;
+      params.push(
+        `%${search}%`, `%${search}%`, `%${search}%`,
+        `%${normalizedSearch}%`, `%${normalizedSearch}%`
+      );
+    }
+
+    /* ── ALL ledger rows, no pagination ── */
+    const [ledgerRows] = await connection.query(
+      `SELECT
+         pl.id, pl.Txn_Type, pl.Source_Id, pl.Direction, pl.Amount,
+         pl.Doc_Number, pl.Balance_Due, pl.Running_Balance, pl.Txn_Date,
+         CASE pl.Txn_Type
+           WHEN 'Sale'     THEN s.Sale_Id
+           WHEN 'Purchase' THEN p.Purchase_Id
+           ELSE pl.Source_Id
+         END AS Formatted_Reference_Id
+       FROM party_ledger pl
+       LEFT JOIN add_sale     s ON pl.Txn_Type = 'Sale'     AND pl.Source_Id = s.id
+       LEFT JOIN add_purchase p ON pl.Txn_Type = 'Purchase' AND pl.Source_Id = p.id
+       ${where}
+       ORDER BY pl.Txn_Date ASC, pl.id ASC`,
+      params
+    );
+
+    /* ── SUMMARY — all-time (not filtered by date range, same as detail page) ── */
+    const [[purchaseSummary]] = await connection.query(
+      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+              COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+              COALESCE(SUM(Balance_Due),0) AS Balance_Due
+       FROM add_purchase WHERE Party_Id = ?`,
+      [Party_Id]
+    );
+    const [[salesSummary]] = await connection.query(
+      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+              COALESCE(SUM(Total_Received),0) AS Total_Received,
+              COALESCE(SUM(Balance_Due),0) AS Balance_Due
+       FROM add_sale WHERE Party_Id = ?`,
+      [Party_Id]
+    );
+    const [[saleReturnSummary]] = await connection.query(
+      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+              COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+              COALESCE(SUM(Balance_Due),0) AS Balance_Due
+       FROM sale_return WHERE Party_Id = ?`,
+      [Party_Id]
+    );
+    const [[purchaseReturnSummary]] = await connection.query(
+      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+              COALESCE(SUM(Total_Received),0) AS Total_Received,
+              COALESCE(SUM(Balance_Due),0) AS Balance_Due
+       FROM purchase_return WHERE Party_Id = ?`,
+      [Party_Id]
+    );
+    const [[paymentInSummary]] = await connection.query(
+      `SELECT COALESCE(SUM(Received),0) AS Total_Received FROM payment_in WHERE Party_Id = ?`,
+      [Party_Id]
+    );
+    const [[paymentOutSummary]] = await connection.query(
+      `SELECT COALESCE(SUM(Paid),0) AS Total_Paid FROM payment_out WHERE Party_Id = ?`,
+      [Party_Id]
+    );
+    const [[latestLedgerRow]] = await connection.query(
+      `SELECT Running_Balance FROM party_ledger WHERE Party_Id = ? ORDER BY id DESC LIMIT 1`,
+      [Party_Id]
+    );
+    const netBalance = latestLedgerRow ? Number(latestLedgerRow.Running_Balance) : 0;
+
+    /* ════════════════════════════════════════════════════════
+       BUILD WORKBOOK
+    ════════════════════════════════════════════════════════ */
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Party Ledger");
+
+    const LAST_COL = "G";
+
+    // sheet.columns = [
+    //   { key: "date", width: 14 },     // A Date
+    //   { key: "type", width: 16 },     // B Txn Type
+    //   { key: "doc", width: 18 },      // C Doc Number
+    //   { key: "direction", width: 12 },// D Direction
+    //   { key: "amount", width: 16 },   // E Amount
+    //   { key: "balance_due", width: 16 }, // F Balance Due
+    //   { key: "running", width: 18 },  // G Running Balance
+    // ];
+    sheet.columns = [
+      { key: "date", width: 14 },
+      { key: "type", width: 18 },
+      { key: "docno", width: 18 },
+      { key: "amount", width: 16 },     // NEW
+      { key: "received", width: 16 },
+      { key: "paid", width: 16 },
+      { key: "balance", width: 16 },
+    ];
+
+    /* ── ROW 1: Title ── */
+    sheet.mergeCells(`A1:${LAST_COL}1`);
+    const titleCell = sheet.getCell("A1");
+    titleCell.value = "PARTY  REPORT";
+    titleCell.font = { name: "Calibri", bold: true, size: 14 };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    sheet.getRow(1).height = 28;
+
+    /* ── ROW 2: Generated stamp ── */
+    //sheet.mergeCells(`A2:${LAST_COL}2`);
+    // const generatedOn = new Date().toLocaleString("en-IN", {
+    //   day: "2-digit", month: "2-digit", year: "numeric",
+    //   hour: "2-digit", minute: "2-digit", hour12: true,
+    // });
+    //const stampCell = sheet.getCell("A2");
+    // stampCell.value = searchDate
+    //   ? `Generated on ${generatedOn}  |  Date: ${searchDate}`
+    //   : `Generated on ${generatedOn}`;
+    //stampCell.font = { name: "Calibri", size: 10, italic: true };
+    sheet.getRow(2).height = 18;
+
+    /* ── ROW 3: blank ── */
+    sheet.addRow([]);
+    sheet.getRow(3).height = 6;
+
+    /* ── PARTY INFO BLOCK ── */
+    const infoStartRow = 4;
+    const infoRows = [
+      ["Party Name", party.Party_Name || "N/A"],
+      ["GSTIN", party.GSTIN || "N/A"],
+      ["Phone Number", party.Phone_Number || "N/A"],
+      ["Billing Address", defaultBilling?.Address_Text || "N/A"],
+     
+    ];
+
+    infoRows.forEach((r, i) => {
+      const row = sheet.getRow(infoStartRow + i);
+      row.getCell(1).value = r[0];
+      row.getCell(1).font = { name: "Calibri", bold: true, size: 10 };
+      sheet.mergeCells(`B${infoStartRow + i}:${LAST_COL}${infoStartRow + i}`);
+      row.getCell(2).value = r[1];
+      row.getCell(2).font = { name: "Calibri", size: 10 };
+      row.height = 16;
+    });
+
+    let cursorRow = infoStartRow + infoRows.length + 1; // blank spacer
+
+
+    /* ── LEDGER TABLE HEADER ── */
+    /* ── LEDGER TABLE HEADER (no title row) ── */
+    const ledgerHeaderRow = sheet.getRow(cursorRow);
+    [
+      "Date",
+      "Type",
+      "Invoice/Bill-No",
+      "Total Amount",
+      "Received",
+      "Paid",
+      "Balance Due",
+    ].forEach((h, i) => {
+      const cell = ledgerHeaderRow.getCell(i + 1);
+      cell.value = h;
+      cell.font = { name: "Calibri", bold: true, size: 10 };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      cell.border = {
+        top: { style: "thin" }, left: { style: "thin" },
+        bottom: { style: "medium" }, right: { style: "thin" },
+      };
+    });
+    ledgerHeaderRow.height = 22;
+    const FIRST_DATA_ROW = cursorRow + 1;
+    cursorRow += 1;
+
+    ledgerRows.forEach((txn) => {
+      const row = sheet.getRow(cursorRow);
+      const amount = Number(txn.Amount || 0);
+
+      row.getCell(1).value = txn.Txn_Date
+        ? new Date(txn.Txn_Date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+        : "N/A";
+      row.getCell(2).value = txn.Txn_Type || "N/A";
+      row.getCell(3).value =
+        txn.Doc_Number && txn.Doc_Number.trim()
+          ? txn.Doc_Number
+          : "N/A";
+
+      // Credit = money received; Debit = money paid
+      row.getCell(4).value = amount;
+      row.getCell(5).value = txn.Direction === "Credit" ? amount : "";
+      row.getCell(6).value = txn.Direction === "Debit" ? amount : "";
+      row.getCell(7).value = Number(txn.Balance_Due || 0);
+
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        cell.font = { name: "Calibri", size: 10 };
+        cell.alignment = { vertical: "middle" };
+        cell.border = {
+          top: { style: "hair" }, left: { style: "hair" },
+          bottom: { style: "hair" }, right: { style: "hair" },
+        };
+        if (colNumber >= 4) {
+          cell.numFmt = "#,##0.00";
+          cell.alignment = { horizontal: "right", vertical: "middle" };
+        }
+      });
+      row.height = 16;
+      cursorRow += 1;
+    });
+
+    if (ledgerRows.length === 0) {
+      sheet.mergeCells(`A${cursorRow}:${LAST_COL}${cursorRow}`);
+      const emptyCell = sheet.getCell(`A${cursorRow}`);
+      emptyCell.value = "No transactions found for this range.";
+      emptyCell.font = { name: "Calibri", italic: true, size: 10 };
+      emptyCell.alignment = { horizontal: "center" };
+      cursorRow += 1;
+    } else {
+      /* ── TOTAL ROW ── */
+      const lastDataRow = cursorRow - 1;
+      const totalRow = sheet.getRow(cursorRow);
+      totalRow.getCell(3).value = "TOTAL";
+
+      totalRow.getCell(4).value = {
+        formula: `SUM(D${FIRST_DATA_ROW}:D${lastDataRow})`
+      }; // Total Amount
+
+      totalRow.getCell(5).value = {
+        formula: `SUM(E${FIRST_DATA_ROW}:E${lastDataRow})`
+      }; // Received
+
+      totalRow.getCell(6).value = {
+        formula: `SUM(F${FIRST_DATA_ROW}:F${lastDataRow})`
+      }; // Paid
+      totalRow.getCell(7).value = {
+        formula: `SUM(G${FIRST_DATA_ROW}:G${lastDataRow})`
+      }; // Balance Due
+
+      totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        cell.font = { name: "Calibri", bold: true, size: 11 };
+        cell.alignment = { horizontal: "right", vertical: "middle" };
+        cell.border = {
+          top: { style: "medium" }, left: { style: "thin" },
+          bottom: { style: "medium" }, right: { style: "thin" },
+        };
+        if (colNumber === 4 || colNumber === 5) cell.numFmt = "#,##0.00";
+      });
+      totalRow.height = 22;
+    }
+
+    /* ── freeze header rows ── */
+    sheet.views = [{ state: "frozen", ySplit: FIRST_DATA_ROW - 1 }];
+
+    /* ════════════════════════════════════════════════════════
+       STREAM TO CLIENT
+    ════════════════════════════════════════════════════════ */
+    const safePartyName = (party.Party_Name || "Party").replace(/[^a-z0-9]/gi, "_");
+    const label = searchDate
+      ? `${safePartyName}_Ledger_${searchDate}`
+      : `${safePartyName}_Ledger_${new Date().toISOString().slice(0, 10)}`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${label}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (err) {
+    console.error("❌ Party ledger Excel export error:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+export {
+  addParty, editParty, getAllParties, getAllPartiesCursor, getSinglePartyDetailsSalesPurchases,
+  printSinglePartyDetailsSalesPurchasesReport, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft,
+  getAllPayableParties, getAllReceivableParties, exportSinglePartyDetailsReportToExcel
+};
+/* ── SUMMARY BLOCK ── */
+// sheet.mergeCells(`A${cursorRow}:${LAST_COL}${cursorRow}`);
+// const summaryTitleCell = sheet.getCell(`A${cursorRow}`);
+// summaryTitleCell.value = "SUMMARY";
+// summaryTitleCell.font = { name: "Calibri", bold: true, size: 12 };
+// sheet.getRow(cursorRow).height = 20;
+// cursorRow += 1;
+
+// const summaryHeaderRow = sheet.getRow(cursorRow);
+// ["Category", "Total Amount", "Paid / Received", "Balance Due"].forEach((h, i) => {
+//   const cell = summaryHeaderRow.getCell(i + 1);
+//   cell.value = h;
+//   cell.font = { name: "Calibri", bold: true, size: 10 };
+//   cell.border = {
+//     top: { style: "thin" }, left: { style: "thin" },
+//     bottom: { style: "medium" }, right: { style: "thin" },
+//   };
+//   cell.alignment = { horizontal: i === 0 ? "left" : "right", vertical: "middle" };
+// });
+// summaryHeaderRow.height = 20;
+// cursorRow += 1;
+
+// const summaryData = [
+//   ["Sales", salesSummary.Total_Amount, salesSummary.Total_Received, salesSummary.Balance_Due],
+//   ["Purchases", purchaseSummary.Total_Amount, purchaseSummary.Total_Paid, purchaseSummary.Balance_Due],
+//   ["Sale Returns", saleReturnSummary.Total_Amount, saleReturnSummary.Total_Paid, saleReturnSummary.Balance_Due],
+//   ["Purchase Returns", purchaseReturnSummary.Total_Amount, purchaseReturnSummary.Total_Received, purchaseReturnSummary.Balance_Due],
+//   ["Payment In", "", paymentInSummary.Total_Received, ""],
+//   ["Payment Out", "", paymentOutSummary.Total_Paid, ""],
+// ];
+
+// summaryData.forEach((r) => {
+//   const row = sheet.getRow(cursorRow);
+//   r.forEach((val, i) => {
+//     const cell = row.getCell(i + 1);
+//     cell.value = typeof val === "number" ? val : (val || "");
+//     cell.font = { name: "Calibri", size: 10 };
+//     cell.border = {
+//       top: { style: "hair" }, left: { style: "hair" },
+//       bottom: { style: "hair" }, right: { style: "hair" },
+//     };
+//     if (i > 0) {
+//       cell.numFmt = "#,##0.00";
+//       cell.alignment = { horizontal: "right", vertical: "middle" };
 //     }
+//   });
+//   row.height = 16;
+//   cursorRow += 1;
+// });
 
-//     // Party Details
-//     const [partyDetails] = await connection.query(
-//       `SELECT * FROM add_party WHERE Party_Id=?`,
-//       [Party_Id]
-//     );
-
-//     if (!partyDetails.length) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Party not found",
-//       });
-//     }
-
-//     // Build date condition
-//     let dateConditionSale = "";
-//     let dateConditionPurchase = "";
-//     const paramsSale = [Party_Id];
-//     const paramsPurchase = [Party_Id];
-
-//     if (fromDate && toDate) {
-//       dateConditionSale = "AND Invoice_Date BETWEEN ? AND ?";
-//       dateConditionPurchase = "AND Bill_Date BETWEEN ? AND ?";
-//       paramsSale.push(fromDate, toDate);
-//       paramsPurchase.push(fromDate, toDate);
-//     }
-
-//     // Fetch purchases
-//     const [purchases] = await connection.query(
-//       `
-//       SELECT 
-//         Purchase_Id,
-//         Bill_Date,
-//         Bill_Number,
-//         Total_Amount,
-//         State_Of_Supply,
-//         Total_Paid,
-//         Balance_Due,
-//         Payment_Type,
-//         "Purchase" AS Type
-//       FROM add_purchase
-//       WHERE Party_Id=? ${dateConditionPurchase}
-//       `,
-//       paramsPurchase
-//     );
-
-//     // Fetch sales
-//     const [sales] = await connection.query(
-//       `
-//       SELECT 
-//         Sale_Id,
-//         Invoice_Date,
-//         Invoice_Number,
-//         Total_Amount,
-//         State_Of_Supply,
-//         Total_Received,
-//         Balance_Due,
-//         Payment_Type,
-//         "Sale" AS Type
-//       FROM add_sale
-//       WHERE Party_Id=? ${dateConditionSale}
-//       `,
-//       paramsSale
-//     );
-
-//     // Combine transactions
-//     const combined = [
-//       ...purchases.map(p => ({
-//         ...p,
-//         date: p.Bill_Date
-//       })),
-//       ...sales.map(s => ({
-//         ...s,
-//         date: s.Invoice_Date
-//       }))
-//     ];
-
-//     // Sort latest first
-//     combined.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-//     const paged = combined.slice(offset, offset + limit);
-
-//     // Separate again
-//     let pagedPurchases = paged.filter(r => r.Type === "Purchase");
-//     let pagedSales = paged.filter(r => r.Type === "Sale");
-
-//     const totalRecords = combined.length;
-//     const totalPages = Math.ceil(totalRecords / limit);
-
-//     // Fetch purchase items
-//     const purchaseIds = pagedPurchases.map(r => r.Purchase_Id);
-
-//     if (purchaseIds.length > 0) {
-//       const [purchaseItems] = await connection.query(
-//         `
-//         SELECT pi.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
-//         FROM add_purchase_items pi
-//         LEFT JOIN add_item it ON it.Item_Id = pi.Item_Id
-//         WHERE pi.Purchase_Id IN (?)
-//         `,
-//         [purchaseIds]
-//       );
-
-//       pagedPurchases = pagedPurchases.map(p => ({
-//         ...p,
-//         items: purchaseItems.filter(i => i.Purchase_Id === p.Purchase_Id)
-//       }));
-//     }
-
-//     // Fetch sale items
-//     const saleIds = pagedSales.map(r => r.Sale_Id);
-
-//     if (saleIds.length > 0) {
-//       const [saleItems] = await connection.query(
-//         `
-//         SELECT si.*, it.Item_Name, it.Item_HSN, it.Item_Category, it.Item_Unit
-//         FROM add_sale_items si
-//         LEFT JOIN add_item it ON it.Item_Id = si.Item_Id
-//         WHERE si.Sale_Id IN (?)
-//         `,
-//         [saleIds]
-//       );
-
-//       pagedSales = pagedSales.map(s => ({
-//         ...s,
-//         items: saleItems.filter(i => i.Sale_Id === s.Sale_Id)
-//       }));
-//     }
-
-//     // Summary Purchases
-//     const [[purchaseSummary]] = await connection.query(
-//       `
-//       SELECT 
-//         COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-//         COALESCE(SUM(Total_Paid),0) AS Total_Paid,
-//         COALESCE(SUM(Balance_Due),0) AS Balance_Due
-//       FROM add_purchase
-//       WHERE Party_Id=? ${dateConditionPurchase}
-//       `,
-//       paramsPurchase
-//     );
-
-//     // Summary Sales
-//     const [[salesSummary]] = await connection.query(
-//       `
-//       SELECT 
-//         COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-//         COALESCE(SUM(Total_Received),0) AS Total_Received,
-//         COALESCE(SUM(Balance_Due),0) AS Balance_Due
-//       FROM add_sale
-//       WHERE Party_Id=? ${dateConditionSale}
-//       `,
-//       paramsSale
-//     );
-
-//     return res.status(200).json({
-//       success: true,
-//       partyId: Party_Id,
-//       partyDetails: partyDetails[0],
-//       totalRecords,
-//       totalPages,
-//       currentPage: page,
-//       limit,
-//       summary: {
-//         purchases: purchaseSummary,
-//         sales: salesSummary,
-//       },
-//       purchases: pagedPurchases,
-//       sales: pagedSales,
-//     });
-
-//   } catch (err) {
-//     console.error("❌ Error:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
+// /* Net balance row */
+// const netRow = sheet.getRow(cursorRow);
+// netRow.getCell(1).value = "Net Balance";
+// netRow.getCell(1).font = { name: "Calibri", bold: true, size: 10 };
+// sheet.mergeCells(`B${cursorRow}:C${cursorRow}`);
+// const netValCell = netRow.getCell(4);
+// netValCell.value = netBalance;
+// netValCell.numFmt = "#,##0.00";
+// netValCell.font = { name: "Calibri", bold: true, size: 10 };
+// netValCell.alignment = { horizontal: "right", vertical: "middle" };
+// netRow.eachCell({ includeEmpty: true }, (cell) => {
+//   cell.border = {
+//     top: { style: "medium" }, left: { style: "thin" },
+//     bottom: { style: "medium" }, right: { style: "thin" },
+//   };
+// });
+// netRow.height = 18;
+// cursorRow += 2; // spacer

@@ -580,7 +580,48 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                             );
                                         })}
                                     </tbody>
-                                    {showTaxColumns && (
+                                    <tfoot>
+                                        {/* {showTaxColumns && (
+                                            <tr>
+                                                <td colSpan={hasDiscountColumn ? 7 : 6} className="bulk-right bulk-bold">
+                                                    Total Tax
+                                                </td>
+                                                <td className="bulk-right bulk-bold">₹ {money(cgstTotal)}</td>
+                                                <td className="bulk-right bulk-bold">₹ {money(sgstTotal)}</td>
+                                                <td />
+                                            </tr>
+                                        )} */}
+
+                                        {/* 🔹 per-document totals row — quantity, discount, amount */}
+                                        <tr>
+                                            <td />
+                                            <td className="bulk-bold">Total</td>
+                                            <td />
+                                            {/* <td colSpan={3} className="bulk-right bulk-bold">Total</td> */}
+                                            <td className="bulk-right bulk-bold">
+                                                {money(items.reduce((s, i) => s + Number(i.Quantity || 0), 0))}
+                                            </td>
+                                            <td />
+                                            <td />
+                                            {hasDiscountColumn && (
+                                                <td className="bulk-right bulk-bold">
+                                                    ₹ {money(items.reduce((s, i) => s + Number(i.Discount_Amount || 0), 0))}
+                                                </td>
+                                            )}
+                                            {showTaxColumns && (
+                                                <>
+                                                    <td className="bulk-right bulk-bold">₹ {money(cgstTotal)}</td>
+                                                    <td className="bulk-right bulk-bold">₹ {money(sgstTotal)}</td>
+                                                    {/* <td />
+                                                    <td /> */}
+                                                </>
+                                            )}
+                                            <td className="bulk-right bulk-bold">
+                                                ₹ {money(items.reduce((s, i) => s + Number(i.Amount || 0), 0))}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                    {/* {showTaxColumns && (
                                         <tfoot>
                                             <tr>
                                                 <td
@@ -594,7 +635,7 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                                 <td />
                                             </tr>
                                         </tfoot>
-                                    )}
+                                    )} */}
                                 </table>
 
                                 {/* PAYMENT SPLITS */}
@@ -628,7 +669,7 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                         <span className="bulk-bold">₹ {money(doc[cfg.paidKey])}</span>
                                     </div>
                                     <div>
-                                        <span className="bulk-label">Balance</span>
+                                        <span className="bulk-label">Balance Due</span>
                                         <span className="bulk-bold">₹ {money(doc.Balance_Due)}</span>
                                     </div>
                                 </div>

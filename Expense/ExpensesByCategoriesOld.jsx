@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Search,
@@ -32,101 +32,140 @@ const fmt = (n) =>
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ExpensesByCategories() {
-  const ROW_ACTIONS = [
-    { key: "view", label: "View/Edit", icon: Eye },
-    { key: "delete", label: "Delete", icon: Trash2, danger: true },
-    { key: "duplicate", label: "Duplicate", icon: Copy },
-    { key: "pdf", label: "Open PDF", icon: FileText },
-    { key: "preview", label: "Preview", icon: Eye },
-    { key: "print", label: "Print", icon: Printer },
-    { key: "history", label: "View History", icon: History },
-  ];
 
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  // ── state now lives in the URL, same pattern as ExpensesByItems ──
-  const selectedCategoryId = searchParams.get("categoryId") || null;
-  const categorySearch = searchParams.get("q") || "";
-  const txnSearch = searchParams.get("txnSearch") || "";
+  const {
+    data: categoryResponse,
+    
+  } = useGetAllExpenseCategoriesQuery();
 
+  const categories = categoryResponse?.categories || [];
+  // console.log("raw category object:", categories);
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+
+  const {
+    data: expenseResponse,
+    //isLoading: isExpensesLoading,
+  } = useGetExpensesByCategoryQuery(
+    { categoryId: selectedCategoryId },
+    { skip: !selectedCategoryId }     // don't call until a category is selected
+  );
+  // console.log("Expense Response:", expenseResponse);
+
+  const categoryExpenses = expenseResponse?.expenses || [];
+
+
+
+
+  useEffect(() => {
+    if (!categories.length) return;
+
+    if (
+      selectedCategoryId === null &&
+      location.state?.categoryId
+    ) {
+      setSelectedCategoryId(location.state.categoryId);
+
+      // Clear the state so it doesn't keep forcing the same category
+      navigate(location.pathname, {
+        replace: true,
+        state: null,
+      });
+
+      return;
+    }
+
+    if (selectedCategoryId === null) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, selectedCategoryId, navigate, location.pathname, location.state]);
+
+  const [categorySearch, setCategorySearch] = useState("");
+  const [txnSearch, setTxnSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(null);
   const [transactionMenu, setTransactionMenu] = useState(null);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
 
-  /* ── helpers for merging into existing search params ── */
-  const setSelectedCategoryId = (id) => {
-    const next = new URLSearchParams(searchParams);
-    if (id === null) {
-      next.delete("categoryId");
-    } else {
-      next.set("categoryId", id);
-    }
-    setSearchParams(next);
-  };
 
-  const handleCategorySearchChange = (value) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) {
-      next.set("q", value);
-    } else {
-      next.delete("q");
-    }
-    setSearchParams(next, { replace: true });
-  };
-
-  const handleTxnSearchChange = (value) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) {
-      next.set("txnSearch", value);
-    } else {
-      next.delete("txnSearch");
-    }
-    setSearchParams(next, { replace: true });
-  };
-
-  const { data: categoryResponse } = useGetAllExpenseCategoriesQuery();
-  const categories = categoryResponse?.categories || [];
-
-  /* ── RIGHT SIDE — cursor-based infinite scroll (transactions) ── */
-  const [rightCursor, setRightCursor] = useState(null);
-  const rightSentinelRef = useRef(null);
-  const rightObserverRef = useRef(null);
- const rightCategoryRef = useRef(selectedCategoryId );
-
-// If the category just changed (ref hasn't caught up yet), force cursor to null
-// on THIS render — don't wait for the effect below to run on the next tick.
-const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? rightCursor : null;
-  const {
-    data: expenseResponse,
-    isLoading: isExpensesLoading,
-    isFetching: isExpensesFetching,
-  } = useGetExpensesByCategoryQuery(
+  const ROW_ACTIONS = [
     {
-      categoryId: selectedCategoryId,
-      cursor: effectiveRightCursor,
-      search: txnSearch,
+      key: "view",
+      label: "View/Edit",
+      icon: Eye,
     },
     {
-      skip: !selectedCategoryId,
-    }
-  );
+      key: "delete",
+      label: "Delete",
+      icon: Trash2,
+      danger: true,
+    },
+    {
+      key: "duplicate",
+      label: "Duplicate",
+      icon: Copy,
+    },
+    {
+      key: "pdf",
+      label: "Open PDF",
+      icon: FileText,
+    },
+    {
+      key: "preview",
+      label: "Preview",
+      icon: Eye,
+    },
+    {
+      key: "print",
+      label: "Print",
+      icon: Printer,
+    },
+    {
+      key: "history",
+      label: "View History",
+      icon: History,
+    },
+  ];
 
-  const categoryExpenses = expenseResponse?.expenses || [];
-  const expensesHasMore = expenseResponse?.hasMore ?? false;
-  const expensesNextCursor = expenseResponse?.nextCursor ?? null;
+
+  useEffect(() => {
+
+    const closeMenu = () => {
+
+      setTransactionMenu(null);
+
+      setMenuOpen(null);
+
+    };
+
+    document.addEventListener("click", closeMenu);
+
+    return () =>
+      document.removeEventListener(
+        "click",
+        closeMenu
+      );
+
+  }, []);
+
+
 
   const categoriesWithTotals = useMemo(() => {
     return categories.map((category) => {
-      const isSelected = String(category.id) === String(selectedCategoryId);
+      const isSelected = category.id === selectedCategoryId;
       const expensesForThisCategory = isSelected ? categoryExpenses : [];
 
       return {
         id: category.id,
         name: category.Category_Name,
-        type: category.Category_Type === "Direct" ? "Direct Expense" : "Indirect Expense",
+        type:
+          category.Category_Type === "Direct"
+            ? "Direct Expense"
+            : "Indirect Expense",
         amount: Number(category.Total_Spent) || 0,
         total: Number(category.Total_Spent) || 0,
         balance: expensesForThisCategory.reduce(
@@ -137,27 +176,35 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
           id: e.id,
           date: e.Expense_Date,
           expNo: e.Expense_Number,
-          party: e.Party_Name || "—",
-          paymentType: e.Payment_Type_Display || "—",
+          party: e.Party_Name || "—",      // ⚠️ confirm field name below
+          paymentType: e.Payment_Type_Display || "—", // ⚠️ confirm field name below
           amount: e.Total_Amount,
           balance: e.Balance_Due,
         })),
       };
     });
-  }, [categories, categoryExpenses, selectedCategoryId]);
+  }, [categories, categoryExpenses, selectedCategoryId]);   // ✅ new deps
+
 
   const selectedCategory =
-    categoriesWithTotals.find((c) => String(c.id) === String(selectedCategoryId)) ||
-    categoriesWithTotals[0];
+    categoriesWithTotals.find(
+      (c) => c.id === selectedCategoryId
+    ) || null;
 
-  const filteredTransactions = selectedCategory?.transactions || [];
-
-  // 🔹 left side stays CLIENT-SIDE filtered — no server search param for categories
   const filteredCategories = useMemo(() => {
     return categoriesWithTotals.filter((item) =>
       item.name.toLowerCase().includes(categorySearch.toLowerCase())
     );
   }, [categoriesWithTotals, categorySearch]);
+
+  const filteredTransactions = useMemo(() => {
+    if (!selectedCategory) return [];
+    return selectedCategory.transactions.filter(
+      (t) =>
+        (t.party || "").toLowerCase().includes(txnSearch.toLowerCase()) ||
+        (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
+    );
+  }, [selectedCategory, txnSearch]);
 
   const fmtDate = (d) =>
     d
@@ -165,86 +212,19 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
       : "—";
 
   const handleSelectCategory = (category) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("categoryId", category.id);
-    next.delete("txnSearch");
-    setSearchParams(next);
-
+    setSelectedCategoryId(category.id);
+    setTxnSearch("");
     setMenuOpen(null);
   };
 
-  /* ── auto-select first category / restore from navigation state ── */
-  useEffect(() => {
-    if (!categories.length) return;
 
-    if (!selectedCategoryId && location.state?.categoryId) {
-      setSelectedCategoryId(location.state.categoryId);
 
-      navigate(location.pathname + location.search, {
-        replace: true,
-        state: null,
-      });
-
-      return;
-    }
-
-    if (!selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, selectedCategoryId, navigate, location.pathname, location.state]);
-
-  /* reset right cursor when selected category or txn search changes */
-  useEffect(() => {
-    rightCategoryRef.current = selectedCategoryId;
-    setRightCursor(null);
-  }, [selectedCategoryId, txnSearch]);
-
-  const handleRightObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        expensesHasMore &&
-        expensesNextCursor &&
-        !isExpensesFetching &&
-        !isExpensesLoading
-      ) {
-        setRightCursor(expensesNextCursor);
-      }
-    },
-    [expensesHasMore, expensesNextCursor, isExpensesFetching, isExpensesLoading]
-  );
-
-  useEffect(() => {
-    if (rightObserverRef.current) {
-      rightObserverRef.current.disconnect();
-    }
-
-    rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
-
-    if (rightSentinelRef.current) {
-      rightObserverRef.current.observe(rightSentinelRef.current);
-    }
-
-    return () => rightObserverRef.current?.disconnect();
-  }, [handleRightObserver]);
-
-  useEffect(() => {
-    const closeMenu = () => {
-      setTransactionMenu(null);
-      setMenuOpen(null);
-    };
-
-    document.addEventListener("click", closeMenu);
-    return () => document.removeEventListener("click", closeMenu);
-  }, []);
 
   return (
     <>
+      {/* ── BREADCRUMB ── */}
+     
+
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
 
         {/* ── PAGE HEADER ── */}
@@ -259,14 +239,21 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
               type="button"
               onClick={() =>
                 navigate("/expense/add", {
-                  state: { from: location.pathname },
+                  state: {
+                    from: location.pathname,
+                  },
                 })
               }
               className="text-white px-4 py-2 rounded-md text-sm font-medium"
-              style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
+              style={{
+                backgroundColor: "#4CA1AF",
+                outline: "none",
+                boxShadow: "none",
+              }}
             >
               + Add Expense
             </button>
+
           </div>
         </div>
 
@@ -276,7 +263,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
           style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
         >
 
-          {/* ══ LEFT — 30% — category list (client-side filtered) ══ */}
+          {/* ══ LEFT — 30% — category list ══ */}
           <div
             className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
             style={{
@@ -291,12 +278,18 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
               <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
                 <Search
                   size={14}
-                  style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+                  style={{
+                    position: "absolute",
+                    left: 9,
+                    top: 10,
+                    color: "#94a3b8",
+                    pointerEvents: "none",
+                  }}
                 />
                 <input
                   type="text"
                   value={categorySearch}
-                  onChange={(e) => handleCategorySearchChange(e.target.value)}
+                  onChange={(e) => setCategorySearch(e.target.value)}
                   placeholder="Search Category"
                   className="border rounded-md text-sm outline-none"
                   style={{
@@ -329,20 +322,32 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
               </div>
             ) : (
               filteredCategories.map((category) => {
-                const isSelected = String(selectedCategoryId) === String(category.id);
+                const isSelected =
+                  selectedCategoryId === category.id;
 
                 return (
                   <div
                     key={category.id}
                     onClick={() => handleSelectCategory(category)}
+
                     onDoubleClick={() => {
+
+                      // Select the category
                       handleSelectCategory(category);
 
-                      const originalCategory = categories.find((c) => c.id === category.id);
+                      // Get original object from API response
+                      const originalCategory = categories.find(
+                        (c) => c.id === category.id
+                      );
+
                       setEditingCategory(originalCategory);
+
                       setShowEditCategoryModal(true);
+
                       setMenuOpen(null);
+
                     }}
+
                     className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                     style={{
                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
@@ -350,10 +355,15 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                       borderBottom: "1px solid #f1f5f9",
                     }}
                   >
+                    {/* left: icon + name */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div
                         className="flex items-center justify-center rounded-lg flex-shrink-0"
-                        style={{ width: 36, height: 36, backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9" }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+                        }}
                       >
                         <Receipt size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                       </div>
@@ -361,22 +371,33 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
                           {category.name}
                         </p>
-                        <p className="text-xs text-gray-400 truncate">{category.type}</p>
+                        <p className="text-xs text-gray-400 truncate">
+                          {category.type}
+                        </p>
                       </div>
                     </div>
 
+                    {/* right: amount + actions */}
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                      {/* <span className="text-sm text-gray-600 mr-1">
+                        ₹ {fmt(category.amount)}
+                      </span> */}
+
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
 
-                          const next = new URLSearchParams(searchParams);
-                          next.set("categoryId", category.id);
-                          next.delete("txnSearch");
-                          setSearchParams(next);
+                          // Select category immediately (Vyapar behaviour)
+                          setSelectedCategoryId(category.id);
 
-                          setMenuOpen(menuOpen === category.id ? null : category.id);
+                          setTxnSearch("");
+
+                          setMenuOpen(
+                            menuOpen === category.id
+                              ? null
+                              : category.id
+                          );
                         }}
                         className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                         style={{ backgroundColor: "transparent" }}
@@ -385,27 +406,43 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                         <MoreVertical size={14} style={{ color: "#94a3b8" }} />
                       </button>
 
-                      <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }} />
+                      <ChevronRight
+                        size={14}
+                        style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
+                      />
                     </div>
 
                     {menuOpen === category.id && (
                       <div
-                        onClick={(e) => e.stopPropagation()}
                         className="absolute bg-white shadow-lg rounded-md"
-                        style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0" }}
+                        style={{
+                          right: 10,
+                          top: 48,
+                          width: 140,
+                          zIndex: 50,
+                          border: "1px solid #e2e8f0",
+                        }}
                       >
                         <button
                           type="button"
                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
                           onClick={() => {
-                            const originalCategory = categories.find((c) => c.id === category.id);
+
+                            const originalCategory = categories.find(
+                              (c) => c.id === category.id
+                            );
+
                             setEditingCategory(originalCategory);
+
                             setShowEditCategoryModal(true);
+
                             setMenuOpen(null);
+
                           }}
                         >
                           View/Edit
                         </button>
+
                         <button
                           type="button"
                           className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
@@ -421,7 +458,10 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
+          <div
+            className="w-full lg:w-[70%] p-1 overflow-y-auto"
+            style={{ maxHeight: "calc(100vh - 180px)" }}
+          >
             <div className="flex flex-col h-full">
 
               {/* ── CATEGORY SUMMARY CARD ── */}
@@ -437,7 +477,9 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                     <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
                       {selectedCategory?.name}
                     </h6>
-                    <p className="text-gray-500 text-sm mt-0.5">{selectedCategory?.type}</p>
+                    <p className="text-gray-500 text-sm mt-0.5">
+                      {selectedCategory?.type}
+                    </p>
                   </div>
                 </div>
 
@@ -454,7 +496,9 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                     <p
                       className="font-bold"
                       style={{
-                        color: (selectedCategory?.balance ?? 0) > 0 ? "#dc2626" : "#16a34a",
+                        color: (selectedCategory?.balance ?? 0) > 0
+                          ? "#dc2626"
+                          : "#16a34a",
                         fontSize: 18,
                       }}
                     >
@@ -469,29 +513,44 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                 <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
                   <Search
                     size={16}
-                    style={{ position: "absolute", left: 10, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: 10,
+                      color: "#94a3b8",
+                      pointerEvents: "none",
+                    }}
                   />
                   <input
                     type="text"
                     value={txnSearch}
-                    onChange={(e) => handleTxnSearchChange(e.target.value)}
+                    onChange={(e) => setTxnSearch(e.target.value)}
                     placeholder="Search"
                     className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{ height: 36, paddingLeft: 34, paddingRight: 10, borderColor: "#dbe3ea" }}
+                    style={{
+                      height: 36,
+                      paddingLeft: 34,
+                      paddingRight: 10,
+                      borderColor: "#dbe3ea",
+                    }}
                   />
                 </div>
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div className="table-responsive table-desi">
-                <table className="w-full min-w-[600px]">
+              <div className="flex-1 overflow-x-auto">
+                <table className="w-full min-w-[600px]" style={{ fontSize: 13, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr>
+                    <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
                       {["Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h, index) => (
                         <th
                           key={index}
-                          className="text-left py-2 px-3"
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace:"nowrap" }}
+                          className="text-left py-2 px-3 font-semibold text-gray-500"
+                          style={{
+                            fontSize: 11,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                          }}
                         >
                           {h}
                         </th>
@@ -499,13 +558,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                     </tr>
                   </thead>
                   <tbody>
-                    {isExpensesLoading && !rightCursor ? (
-                      <tr>
-                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : filteredTransactions.length === 0 ? (
+                    {filteredTransactions.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
                           No transactions to show
@@ -515,7 +568,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                       filteredTransactions.map((txn) => (
                         <tr
                           key={txn.id}
-                          style={{ borderBottom: "1px solid #f1f5f9", position: "relative", cursor: "pointer" }}
+                          style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                           onDoubleClick={() => {
                             navigate(`/expense/edit/${txn.id}`, {
@@ -531,78 +584,136 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
-                          <td>{txn.expNo || "—"}</td>
-                          <td>{txn.party || "—"}</td>
-                          <td>{txn.paymentType || "—"}</td>
-                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>₹ {fmt(txn.amount)}</td>
-                          <td style={{ whiteSpace: "nowrap" }}>₹ {fmt(txn.balance)}</td>
-                          <td>
+                          <td className="py-2 px-3 text-gray-700">{txn.expNo || "—"}</td>
+                          <td className="py-2 px-3 text-gray-700">{txn.party || "—"}</td>
+                          <td className="py-2 px-3 text-gray-500">{txn.paymentType || "—"}</td>
+                          <td className="py-2 px-3 font-semibold" style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                            ₹ {fmt(txn.amount)}
+                          </td>
+                          <td className="py-2 px-3" style={{ whiteSpace: "nowrap" }}>
+                            ₹ {fmt(txn.balance)}
+                          </td>
+                          <td className="py-2 px-3">
                             <div className="flex items-center gap-1">
                               <div className="relative">
+
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.currentTarget.blur();
-                                    setTransactionMenu(transactionMenu === txn.id ? null : txn.id);
+
+                                    setTransactionMenu(
+                                      transactionMenu === txn.id ? null : txn.id
+                                    );
                                   }}
                                   className="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none"
-                                  style={{ background: "transparent", boxShadow: "none" }}
+                                  style={{
+                                    background: "transparent",
+                                    boxShadow: "none",
+                                  }}
                                 >
-                                  <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+
+                                  <MoreVertical
+                                    size={14}
+                                    style={{ color: "#94a3b8" }}
+                                  />
                                 </button>
 
                                 {transactionMenu === txn.id && (
+
                                   <div
                                     onClick={(e) => e.stopPropagation()}
                                     className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
-                                    style={{ width: 180, zIndex: 999, borderColor: "#e5e7eb" }}
+                                    style={{
+                                      width: 180,
+                                      zIndex: 999,
+                                      borderColor: "#e5e7eb",
+                                    }}
                                   >
-                                    {ROW_ACTIONS.map(({ key, label, icon: Icon, danger }) => (
-                                      <button
-                                        key={key}
-                                        type="button"
-                                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
-                                        style={{ color: danger ? "#dc2626" : "#374151" }}
-                                        onClick={() => {
-                                          setTransactionMenu(null);
 
-                                          if (key === "view") {
-                                            navigate(`/expense/edit/${txn.id}`, {
-                                              state: {
-                                                from: location.pathname,
-                                                categoryId: selectedCategoryId,
-                                                txnSearch,
-                                                categorySearch,
-                                              },
-                                            });
-                                          }
+                                    {ROW_ACTIONS.map(
+                                      ({
+                                        key,
+                                        label,
+                                        icon: Icon,
+                                        danger,
+                                      }) => (
 
-                                          if (key === "preview") {
-                                            navigate(`/expense/preview/${txn.id}`, {
-                                              state: {
-                                                from: location.pathname,
-                                                categoryId: selectedCategoryId,
-                                                txnSearch,
-                                                categorySearch,
-                                              },
-                                            });
-                                          }
+                                        <button
+                                          key={key}
+                                          type="button"
+                                          className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
+                                          style={{
+                                            color: danger
+                                              ? "#dc2626"
+                                              : "#374151",
+                                          }}
 
-                                          if (key === "print") {
-                                            const url = `/expense/preview/${txn.id}?autoPrint=1`;
-                                            window.open(url, "_blank");
+                                          onClick={() => {
+
+                                            setTransactionMenu(null);
+
+                                            if (key === "view") {
+                                              navigate(`/expense/edit/${txn.id}`, {
+                                                state: {
+                                                  from: location.pathname,
+                                                  categoryId: selectedCategoryId,
+                                                  txnSearch,
+                                                  categorySearch,
+                                                },
+                                              });
+                                            }
+
+                                            if (key === "preview") {
+                                              navigate(`/expense/preview/${txn.id}`, {
+                                                state: {
+                                                  from: location.pathname,
+                                                  categoryId: selectedCategoryId,
+                                                  txnSearch,
+                                                  categorySearch,
+                                                },
+                                              });
+                                            }
+
+                                          }}
+
+                                          onMouseOver={(e) =>
+
+                                            e.currentTarget.style.backgroundColor =
+                                            danger
+                                              ? "#fef2f2"
+                                              : "#f8fafc"
+
                                           }
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                      >
-                                        <Icon size={13} style={{ color: danger ? "#dc2626" : "#4CA1AF" }} />
-                                        {label}
-                                      </button>
-                                    ))}
+                                          onMouseOut={(e) =>
+
+                                            e.currentTarget.style.backgroundColor =
+                                            "transparent"
+
+                                          }
+                                        >
+
+                                          <Icon
+                                            size={13}
+                                            style={{
+                                              color: danger
+                                                ? "#dc2626"
+                                                : "#4CA1AF",
+                                            }}
+                                          />
+
+                                          {label}
+
+                                        </button>
+
+                                      )
+                                    )}
+
                                   </div>
+
                                 )}
+
                               </div>
                             </div>
                           </td>
@@ -611,21 +722,6 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                     )}
                   </tbody>
                 </table>
-
-                {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
-                <div ref={rightSentinelRef} style={{ height: "1px" }} />
-
-                {isExpensesFetching && rightCursor && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-sm text-gray-400">Loading more...</span>
-                  </div>
-                )}
-
-                {!expensesHasMore && categoryExpenses.length > 0 && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-xs text-gray-300">— End of transactions —</span>
-                  </div>
-                )}
               </div>
 
             </div>
@@ -643,6 +739,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
           }}
         />
       )}
+
     </>
   );
 }

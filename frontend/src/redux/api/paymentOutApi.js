@@ -66,6 +66,24 @@ export const paymentOutApi = createApi({
       }),
       invalidatesTags: [{ type: "PaymentOut", id: "LIST" }],
     }),
+    getPaymentOutPrintReport: builder.query({
+  query: ({
+    search = "",
+    fromDate = "",
+    toDate = "",
+  } = {}) => {
+    const params =
+      new URLSearchParams();
+
+     if (search) params.append("search", search);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+
+    return `/payment-out/print-payment-out-report?${params.toString()}`;
+  },
+
+  providesTags: ["PaymentOut"],
+}),
   }),
  
 
@@ -76,5 +94,6 @@ export const {
   useAddPaymentOutMutation,
   useUpdatePaymentOutMutation,
   useDeletePaymentOutMutation,
+  useLazyGetPaymentOutPrintReportQuery
  
 } = paymentOutApi;

@@ -6,10 +6,11 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   Trash2,
-  Printer
+  Printer,
+  PrinterIcon
 } from "lucide-react";
 
-import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery, useGetPurchaseReturnByIdQuery } from "../../redux/api/purchaseReturnApi";
+import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery, useGetPurchaseReturnByIdQuery, useLazyGetPurchaseReturnPrintReportQuery } from "../../redux/api/purchaseReturnApi";
 import { useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
@@ -17,6 +18,7 @@ import { itemApi } from "../../redux/api/itemApi";
 import { useDispatch } from "react-redux";
 import { useReactToPrint } from "react-to-print";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
+import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 
 
 
@@ -38,10 +40,15 @@ export default function PurchaseReturn() {
   const [deletePurchaseReturn, { isLoading: isDeleting }] = useDeletePurchaseReturnMutation();
   const [printPurchaseReturnId, setPrintPurchaseReturnId] = useState(null);
   const printRef = useRef(null);
+  const [showSaleReturnBulkPrintPreview, setShowSaleReturnBulkPrintPreview] = useState(false);
+
+  const bulkPurchaseReturnPrintRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
   const { data: printData } = useGetPurchaseReturnByIdQuery(printPurchaseReturnId, {
     skip: !printPurchaseReturnId,
   });
+  const [triggerPurchaseBulkReport, { data: bulkPurchaseReturnReportData, isFetching: isBulkFetching }] =
+    useLazyGetPurchaseReturnPrintReportQuery();
   const handlePageChange = (newPage) => {
     setSearchParams({
       page: newPage,
@@ -126,24 +133,42 @@ export default function PurchaseReturn() {
       handlePrint();
     }
   }, [printData, printPurchaseReturnId]);
-const handleExportPurchaseReturnExcel = () => {
-  const params = new URLSearchParams();
+  const handleExportPurchaseReturnExcel = () => {
+    const params = new URLSearchParams();
 
-  if (searchTerm) params.set("search", searchTerm);
-  if (fromDate) params.set("fromDate", fromDate);
-  if (toDate) params.set("toDate", toDate);
+    if (searchTerm) params.set("search", searchTerm);
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
 
-  const a = document.createElement("a");
+    const a = document.createElement("a");
 
-  a.href =
-    `http://localhost:4000/api/purchase-return/export-purchase-return-excel?${params.toString()}`;
+    a.href =
+      `http://localhost:4000/api/purchase-return/export-purchase-return-excel?${params.toString()}`;
 
-  a.download = "";
+    a.download = "";
 
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-};
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkPurchaseReturnPrintRef,
+    documentTitle: `Purchase-Return-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+    onAfterPrint: () => setShowSaleReturnBulkPrintPreview(false),
+  });
+
+  /* trigger fetch on button click */
+  const handlePrintAllClick = async () => {
+    await triggerPurchaseBulkReport({ search: searchTerm, fromDate, toDate });
+    setShowSaleReturnBulkPrintPreview(true);
+  };
+
+  /* fire print once report data has arrived */
+  useEffect(() => {
+    if (bulkPurchaseReturnReportData && showSaleReturnBulkPrintPreview) {
+      handleBulkPrint();
+    }
+  }, [bulkPurchaseReturnReportData, showSaleReturnBulkPrintPreview]);
   return (
     <>
 
@@ -244,20 +269,20 @@ const handleExportPurchaseReturnExcel = () => {
               <h4 className="text-3xl font-bold text-black">
                 {/* ₹ {purchaseReturns?.totals?.totalAmount} */}
                 ₹{(Number(purchaseReturns?.totals?.totalAmount) || 0).toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                
-                </h4>
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+
+              </h4>
             </div>
 
             {/* Divider */}
             <div className="border-t border-gray-300 mb-2"></div>
 
             {/* Received & Balance */}
-            
 
-             <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
               <div className="flex">
                 <span className="text-sm font-medium text-gray-500">
                   Received&nbsp;&nbsp;
@@ -284,9 +309,9 @@ const handleExportPurchaseReturnExcel = () => {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4">
-           
-                    <button
+          <div className="flex justify-end sm: mt-4 gap-2">
+
+            <button
               type="button"
               onClick={handleExportPurchaseReturnExcel}
               className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
@@ -300,7 +325,16 @@ const handleExportPurchaseReturnExcel = () => {
               />
               {/* Export Excel */}
             </button>
-
+            <button
+              type="button"
+              onClick={handlePrintAllClick}
+              disabled={isBulkFetching}
+              className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+              title="Print Reports"
+            >
+              <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+              {isBulkFetching && <span>Loading...</span>}
+            </button>
 
 
           </div>
@@ -345,7 +379,7 @@ const handleExportPurchaseReturnExcel = () => {
                             }
                           );
                         }}
-                        style={{ cursor: "pointer",borderBottom: "1px solid #f1f5f9", }}
+                        style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
                       >
                         <td>
                           {(purchaseReturns?.currentPage - 1) * 10 + (idx + 1)}.
@@ -647,6 +681,17 @@ const handleExportPurchaseReturnExcel = () => {
           />
         </div>
       )}
+        {bulkPurchaseReturnReportData?.purchaseReturns?.length > 0 && (
+              <div style={{ display: "none" }}>
+                <SalePurchaseBulkReportPrintTemplate
+                  ref={bulkPurchaseReturnPrintRef}
+                  type="debit"
+                  data={bulkPurchaseReturnReportData?.purchaseReturns || []}   // 🔹 use .invoices not .sales
+                  fromDate={fromDate}
+                  toDate={toDate}
+                />
+              </div>
+            )}
     </>
 
   )

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useReactToPrint } from "react-to-print";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -14,9 +15,12 @@ import {
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+
 import {
   useGetAllExpenseItemMastersCursorQuery,
   useGetExpenseItemUsageQuery,
+  useGetExpenseByIdQuery
 } from "../../redux/api/expenseApi";
 
 const fmt = (n) =>
@@ -40,6 +44,10 @@ export default function ExpensesByItems() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  /* ── EXPENSE PRINT ── */
+  const [printExpenseId, setPrintExpenseId] = useState(null);
+  const printRef = useRef(null);
 
   // ── state now lives in the URL ──
   const selectedItemId = searchParams.get("itemId") || null;
@@ -98,7 +106,6 @@ export default function ExpensesByItems() {
   });
 
   const items = itemResponse?.items || [];
-  console.log(items);
   const totalItems = itemResponse?.totalItems || 0;
   const itemsHasMore = itemResponse?.hasMore ?? false;
   const itemsNextCursor = itemResponse?.nextCursor ?? null;
@@ -145,11 +152,7 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
- const rightCategoryRef = useRef(selectedItemId);
 
-// If the category just changed (ref hasn't caught up yet), force cursor to null
-// on THIS render — don't wait for the effect below to run on the next tick.
-const effectiveRightCursor =rightCategoryRef.current === selectedItemId ? rightCursor : null;
   // const {
   //   data: usageResponse,
   //   isLoading: isUsageLoading,
@@ -159,30 +162,66 @@ const effectiveRightCursor =rightCategoryRef.current === selectedItemId ? rightC
   //   { skip: !selectedItemId }
   // );
   const {
-  data: usageResponse,
-  isLoading: isUsageLoading,
-  isFetching: isUsageFetching,
-} = useGetExpenseItemUsageQuery(
-  {
-    masterItemId: selectedItemId,
-    cursor: effectiveRightCursor,
-    search: txnSearch, // ← add
-  },
-  {
-    skip: !selectedItemId,
-  }
-);
+    data: usageResponse,
+    isLoading: isUsageLoading,
+    isFetching: isUsageFetching,
+  } = useGetExpenseItemUsageQuery(
+    {
+      masterItemId: selectedItemId,
+      cursor: rightCursor,
+      search: txnSearch, // ← add
+    },
+    {
+      skip: !selectedItemId,
+    }
+  );
+
+  /* ── EXPENSE PRINT DATA ── */
+
+  const {
+    data: printExpenseData,
+    isFetching: isPrintExpenseFetching,
+  } = useGetExpenseByIdQuery(printExpenseId, {
+    skip: !printExpenseId,
+  });
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+
+    documentTitle: printExpenseId
+      ? `Expense-${printExpenseId}`
+      : "Expense",
+
+    onAfterPrint: () => {
+      setPrintExpenseId(null);
+    },
+  });
+
+  useEffect(() => {
+    if (
+      printExpenseData?.expense &&
+      printExpenseId &&
+      !isPrintExpenseFetching
+    ) {
+      handlePrint();
+    }
+  }, [
+    printExpenseData,
+    printExpenseId,
+    isPrintExpenseFetching,
+    handlePrint,
+  ]);
+
 
   const itemUsage = usageResponse?.usage || [];
 
   const usageHasMore = usageResponse?.hasMore ?? false;
   const usageNextCursor = usageResponse?.nextCursor ?? null;
-  console.log(itemUsage)
+
   /* reset right cursor when selected item changes */
-useEffect(() => {
-  rightCategoryRef.current = selectedItemId;
-  setRightCursor(null);
-}, [selectedItemId, txnSearch]);
+  useEffect(() => {
+    setRightCursor(null);
+  }, [selectedItemId, txnSearch]);
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -271,7 +310,8 @@ useEffect(() => {
           0
         ),
         transactions: usageForThisItem.map((u) => ({
-          id: u.id,
+          id: u.id,                    // expense item/usage ID
+          expenseId: u.Expense_Id,     // actual expense ID
           date: u.Expense_Date,
           expNo: u.Expense_Number,
           party: u.Party_Name || "—",
@@ -285,7 +325,7 @@ useEffect(() => {
 
   const selectedItem =
     itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
-  console.log("selectedItem", selectedItem);
+
   /* transaction search still client-side filters the currently-loaded
      page(s) of usage rows — server-side date filter is separate (date param) */
   // const filteredTransactions = useMemo(() => {
@@ -296,9 +336,8 @@ useEffect(() => {
   //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
   //   );
   // }, [selectedItem, txnSearch]);
-  // const filteredTransactions =
-  // selectedItem?.transactions || [];
-   const filteredTransactions =selectedItem?.transactions || [];
+  const filteredTransactions =
+    selectedItem?.transactions || [];
 
   const fmtDate = (d) =>
     d
@@ -645,7 +684,7 @@ useEffect(() => {
                         <th
                           key={h}
                           //className="text-left py-2 px-3 "
-                          style={{  textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace:"nowrap" }}
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
                         >
                           {h}
                         </th>
@@ -667,6 +706,7 @@ useEffect(() => {
                       </tr>
                     ) : (
                       filteredTransactions.map((txn) => (
+
                         <tr
                           key={txn.id}
                           style={{
@@ -676,30 +716,38 @@ useEffect(() => {
                           }}
                           //style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
+
                           onDoubleClick={() => {
-                            navigate(`/expense/edit/${txn.id}`, {
-                              state: {
-                                from: location.pathname,
-                                itemId: selectedItemId,
-                                txnSearch,
-                                itemSearch,
+                            navigate(
+                              {
+                                pathname: `/expense/edit/${txn.expenseId}`,
+                                search: searchParams.toString(),
                               },
-                            });
+                              {
+                                state: {
+                                  from: location.pathname,
+                                  itemId: selectedItemId,
+                                  txnSearch,
+                                  itemSearch,
+                                },
+                              }
+                            );
                           }}
+
                         >
-                          <td  style={{ whiteSpace: "nowrap" }}>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
                           <td >{txn.expNo || "—"}</td>
                           <td >{txn.party || "—"}</td>
                           <td >{txn.paymentType || "—"}</td>
-                          <td  style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.amount)}
                           </td>
-                          <td  style={{ whiteSpace: "nowrap" }}>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.balance)}
                           </td>
-                          <td  style={{ position: "relative" }}>
+                          <td style={{ position: "relative" }}>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -742,28 +790,24 @@ useEffect(() => {
                                       setRowMenuOpen(null);
 
                                       if (key === "view") {
-                                        navigate(`/expense/edit/${txn.id}`, {
-                                          state: {
-                                            from: location.pathname,
-                                            itemId: selectedItemId,
-                                            txnSearch,
-                                            itemSearch,
+                                        navigate(
+                                          {
+                                            pathname: `/expense/edit/${txn.expenseId}`,
+                                            search: searchParams.toString(),
                                           },
-                                        });
+                                          {
+                                            state: {
+                                              from: location.pathname,
+                                              itemId: selectedItemId,
+                                              txnSearch,
+                                              itemSearch,
+                                            },
+                                          }
+                                        );
                                       }
-                                      // if (key === "preview") {
-                                      //   navigate(`/expense/preview/${txn.id}`, {
-                                      //     state: {
-                                      //       from: location.pathname,
-                                      //       itemId: selectedItemId,
-                                      //       txnSearch,
-                                      //       itemSearch,
-                                      //     },
-                                      //   });
-                                      // }
+
                                       if (key === "print") {
-                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
-                                        window.open(url, "_blank");
+                                        setPrintExpenseId(txn.expenseId);
                                       }
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
@@ -812,6 +856,22 @@ useEffect(() => {
             setEditingItem(null);
           }}
         />
+      )}
+
+      {/* ── EXPENSE PRINT TEMPLATE ── */}
+      {printExpenseData?.expense && (
+        <div
+          style={{
+            position: "absolute",
+            left: "-99999px",
+            top: 0,
+          }}
+        >
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        </div>
       )}
 
     </>

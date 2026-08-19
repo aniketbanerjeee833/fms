@@ -7,13 +7,14 @@ import {
     LayoutDashboard,
     MoreVertical,
     Printer,
+    PrinterIcon,
     Trash2
 } from "lucide-react";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useEffect, useRef, useState } from "react";
 
 import { toast } from "react-toastify";
-import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useGetPaymentInByIdQuery, useLazyGetPaymentInPrintReportQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { useDispatch } from "react-redux";
@@ -23,6 +24,7 @@ import { itemApi } from "../../redux/api/itemApi";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { useReactToPrint } from "react-to-print";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
+import PaymentInOutBulkReportPrintTemplate from "../../components/Print/PaymentInOutBulkReportPrintTemplate";
 
 
 
@@ -46,11 +48,17 @@ export default function PaymentIn() {
     const [deletePaymentIn, { isLoading: isDeleting }] = useDeletePaymentInMutation();
     const [printPaymentInId, setPrintPaymentInId] = useState(null);
     const printRef = useRef(null);
+    const [showPaymentInBulkPrintPreview, setPaymentInBulkPrintReview] = useState(false);
 
+    const bulkPaymentInPrintRef = useRef(null);
     /* fetch the full payment (with Party details) only when printing */
     const { data: printData } = useGetPaymentInByIdQuery(printPaymentInId, {
         skip: !printPaymentInId,
     });
+
+    const [triggerPaymentInReport, { data: bulkPaymentInReportData, isFetching: isBulkFetching }] =
+        useLazyGetPaymentInPrintReportQuery();
+        console.log(bulkPaymentInReportData);
     const handlePageChange = (newPage) => {
         setSearchParams({
             page: newPage,
@@ -96,7 +104,7 @@ export default function PaymentIn() {
     }, []);
 
 
-   
+
     const handleSavePaymentIn = async (formData) => {
         try {
             if (modal.mode === "edit") {
@@ -183,7 +191,25 @@ export default function PaymentIn() {
         a.click();
         document.body.removeChild(a);
     };
+    const handleBulkPrint = useReactToPrint({
+        contentRef: bulkPaymentInPrintRef,
+        documentTitle: `Payment-In-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+        onAfterPrint: () => setPaymentInBulkPrintReview(false),
+    });
 
+    /* trigger fetch on button click */
+    const handlePrintAllClick = async () => {
+        await triggerPaymentInReport({ search: searchTerm, fromDate, toDate });
+        setPaymentInBulkPrintReview(true);
+    };
+
+    /* fire print once report data has arrived */
+    useEffect(() => {
+        if (bulkPaymentInReportData && showPaymentInBulkPrintPreview) {
+            handleBulkPrint();
+        }
+    }, [bulkPaymentInReportData, showPaymentInBulkPrintPreview]);
+    
     return (
         <>
             <div className="flex flex-col bg-white">
@@ -348,15 +374,8 @@ export default function PaymentIn() {
                         </div>
 
                     </div>
-                    <div className="flex justify-end">
-                        {/* <button
-                            type="button"
-                            onClick={handleExportPaymentInReportExcel}
-                            className="flex items-center justify-center rounded-xl bg-emerald-600 p-2.5 text-white shadow-md transition-all duration-200 hover:bg-emerald-700 hover:shadow-lg active:scale-95"
-                            title="Export to Excel"
-                        >
-                            <FileSpreadsheet size={22} strokeWidth={2} />
-                        </button> */}
+                    <div className="flex justify-end sm: mt-4 gap-2">
+                        
                         <button
                             type="button"
                             onClick={handleExportPaymentInReportExcel}
@@ -370,6 +389,16 @@ export default function PaymentIn() {
                                 className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
                             />
                             {/* Export Excel */}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handlePrintAllClick}
+                            disabled={isBulkFetching}
+                            className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+                            title="Print Reports"
+                        >
+                            <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+                            {isBulkFetching && <span>Loading...</span>}
                         </button>
 
 
@@ -730,6 +759,19 @@ export default function PaymentIn() {
                         type="in"
                     />
                 </div>
+            )}
+
+            {bulkPaymentInReportData?.paymentIns?.length > 0 && (
+              <div style={{ display: "none" }}>
+                <PaymentInOutBulkReportPrintTemplate
+                  ref={bulkPaymentInPrintRef}
+                  type="in"
+                  data={bulkPaymentInReportData?.paymentIns || []} 
+                  //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
+                  fromDate={fromDate}
+                  toDate={toDate}
+                />
+              </div>
             )}
 
         </>

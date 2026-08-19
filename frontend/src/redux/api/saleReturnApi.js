@@ -64,6 +64,7 @@ export const saleReturnApi = createApi({
 
         return `sale-return/print-sale-return-report?${params.toString()}`;
       },
+      providesTags: ["SaleReturn"],
     }),
   }),
 });

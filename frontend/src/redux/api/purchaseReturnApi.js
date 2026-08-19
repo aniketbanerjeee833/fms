@@ -50,6 +50,22 @@ export const purchaseReturnApi = createApi({
       }),
       invalidatesTags: ["PurchaseReturn"],
     }),
+      getPurchaseReturnPrintReport: builder.query({
+      query: ({
+        search = "",
+        fromDate = "",
+        toDate = "",
+      } = {}) => {
+        const params = new URLSearchParams();
+
+        if (search) params.append("search", search);
+        if (fromDate) params.append("fromDate", fromDate);
+        if (toDate) params.append("toDate", toDate);
+
+        return `purchase-return/print-purchase-return-report?${params.toString()}`;
+      },
+      providesTags: ["PurchaseReturn"],
+    })
   }),
 });
  
@@ -59,5 +75,6 @@ export const {
   useCreatePurchaseReturnMutation,
   useUpdatePurchaseReturnMutation,
   useDeletePurchaseReturnMutation,
+  useLazyGetPurchaseReturnPrintReportQuery
 } = purchaseReturnApi;
  

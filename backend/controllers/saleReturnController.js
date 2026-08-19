@@ -3349,7 +3349,7 @@ const exportSaleReturnReportToExcel = async (req, res, next) => {
   }
 };
 
-const getSaleReturnPrintReport = async (req, res) => {
+const getSaleReturnPrintReport = async (req, res,next) => {
   let connection;
 
   try {
@@ -3428,8 +3428,8 @@ const getSaleReturnPrintReport = async (req, res) => {
         sr.Party_Id,
 
         p.Party_Name,
-        p.GSTIN,
-        p.State
+        p.GSTIN
+        
 
       FROM sale_return sr
 
@@ -3663,19 +3663,15 @@ const getSaleReturnPrintReport = async (req, res) => {
       saleReturns,
       summary,
     });
-  } catch (error) {
+  } catch (err) {
     console.error(
       "Sale Return Print Report Error:",
-      error
+      err
     );
 
-    return res.status(500).json({
-      success: false,
-      message:
-        "Failed to generate sale return print report",
-      error: error.message,
-    });
-  } finally {
+     next(err);
+  } 
+  finally {
     if (connection) {
       connection.release();
     }

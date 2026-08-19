@@ -1,9 +1,11 @@
 import express from "express";
 const router   = express.Router();
 import { createPurchaseReturn,  deletePurchaseReturn,  editPurchaseReturn, exportPurchaseReturnReportToExcel, getAllPurchaseReturns, 
-    getPurchaseReturnById } from "../controllers/purchaseReturnController.js";
+    getPurchaseReturnById, 
+    getPurchaseReturnPrintReport} from "../controllers/purchaseReturnController.js";
 import userAuth from "../middleware/userAuth.js";
 router.get("/export-purchase-return-excel",userAuth,exportPurchaseReturnReportToExcel);
+router.get("/print-purchase-return-report",userAuth,getPurchaseReturnPrintReport);
 router.get("/",  userAuth,    getAllPurchaseReturns);
 router.get("/:Purchase_Return_Id", userAuth,  getPurchaseReturnById);
 router.post("/:Purchase_Id",  userAuth,   createPurchaseReturn);

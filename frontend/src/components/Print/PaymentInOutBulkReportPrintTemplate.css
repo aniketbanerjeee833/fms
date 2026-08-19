@@ -1,0 +1,158 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Identical to your existing BulkReportPrintTemplate.css —
+   copied as-is since this component only uses classes you already
+   defined (bulk-print, bulk-invoice-block, bulk-splits, bulk-totals,
+   bulk-summary etc). No new classes needed.
+═══════════════════════════════════════════════════════════════════ */
+
+.bulk-print {
+  display: none;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #111827;
+  font-size: 11px;
+  width: 210mm;
+  padding: 10mm;
+  box-sizing: border-box;
+}
+
+@media print {
+  .bulk-print { display: block; }
+}
+
+.bulk-report-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 22px;
+  margin-bottom: 2px;
+}
+
+.bulk-report-subtitle {
+  text-align: center;
+  font-weight: 600;
+  font-size: 18px;
+  margin-bottom: 14px;
+  letter-spacing: 0.05em;
+}
+
+.bulk-invoice-block {
+  margin-bottom: 14px;
+  page-break-inside: avoid;
+}
+
+.bulk-invoice-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 20px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.bulk-label {
+  color: #4b5563;
+}
+
+.bulk-bold {
+  font-weight: 700;
+}
+
+.bulk-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+  margin-bottom: 6px;
+}
+
+.bulk-items-table th {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  padding: 4px 6px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.bulk-items-table td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 6px;
+}
+
+.bulk-center { text-align: center; }
+.bulk-right  { text-align: right; white-space: nowrap; }
+
+.bulk-splits {
+  font-size: 10.5px;
+  margin-bottom: 4px;
+  color: #374151;
+}
+
+.bulk-totals {
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  font-size: 11px;
+  border-top: 1px solid #d1d5db;
+  padding-top: 4px;
+}
+
+.bulk-totals > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bulk-terms {
+  margin-top: 6px;
+  font-size: 10px;
+}
+
+.bulk-terms-header {
+  font-weight: 700;
+  color: #4b5563;
+  margin-bottom: 2px;
+}
+
+.bulk-terms-body div {
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.bulk-divider {
+  border-top: 1px dashed #9ca3af;
+  margin: 14px 0;
+}
+
+.bulk-tax-table {
+  width: 100%;
+  max-width: 280px;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.bulk-tax-table td {
+  border: 1px solid #ccc;
+  padding: 3px 6px;
+}
+
+.bulk-empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px 0;
+}
+
+.bulk-summary {
+  width: 320px;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  font-size: 14px;
+  page-break-inside: avoid;
+}
+
+@page {
+  size: A4;
+  margin: 10mm;
+}

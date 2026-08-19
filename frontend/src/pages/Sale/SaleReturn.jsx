@@ -55,7 +55,7 @@ export default function SaleReturn() {
 
     const [triggerSaleBulkReport, { data: bulkSaleReturnReportData, isFetching: isBulkFetching }] =
     useLazyGetSaleReturnPrintReportQuery();
-    console.log(bulkSaleReturnReportData)
+    
   useEffect(() => {
     const closeRowMenu = () => {
       setRowMenuOpen(null);
