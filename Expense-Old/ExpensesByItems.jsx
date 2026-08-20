@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { useReactToPrint } from "react-to-print";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -15,12 +14,9 @@ import {
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
-import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
-
 import {
   useGetAllExpenseItemMastersCursorQuery,
   useGetExpenseItemUsageQuery,
-  useGetExpenseByIdQuery
 } from "../../redux/api/expenseApi";
 
 const fmt = (n) =>
@@ -44,10 +40,6 @@ export default function ExpensesByItems() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  /* ── EXPENSE PRINT ── */
-  const [printExpenseId, setPrintExpenseId] = useState(null);
-  const printRef = useRef(null);
 
   // ── state now lives in the URL ──
   const selectedItemId = searchParams.get("itemId") || null;
@@ -106,6 +98,7 @@ export default function ExpensesByItems() {
   });
 
   const items = itemResponse?.items || [];
+  console.log(items);
   const totalItems = itemResponse?.totalItems || 0;
   const itemsHasMore = itemResponse?.hasMore ?? false;
   const itemsNextCursor = itemResponse?.nextCursor ?? null;
@@ -152,7 +145,11 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
+ const rightCategoryRef = useRef(selectedItemId);
 
+// If the category just changed (ref hasn't caught up yet), force cursor to null
+// on THIS render — don't wait for the effect below to run on the next tick.
+const effectiveRightCursor =rightCategoryRef.current === selectedItemId ? rightCursor : null;
   // const {
   //   data: usageResponse,
   //   isLoading: isUsageLoading,
@@ -162,66 +159,30 @@ export default function ExpensesByItems() {
   //   { skip: !selectedItemId }
   // );
   const {
-    data: usageResponse,
-    isLoading: isUsageLoading,
-    isFetching: isUsageFetching,
-  } = useGetExpenseItemUsageQuery(
-    {
-      masterItemId: selectedItemId,
-      cursor: rightCursor,
-      search: txnSearch, // ← add
-    },
-    {
-      skip: !selectedItemId,
-    }
-  );
-
-  /* ── EXPENSE PRINT DATA ── */
-
-  const {
-    data: printExpenseData,
-    isFetching: isPrintExpenseFetching,
-  } = useGetExpenseByIdQuery(printExpenseId, {
-    skip: !printExpenseId,
-  });
-
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-
-    documentTitle: printExpenseId
-      ? `Expense-${printExpenseId}`
-      : "Expense",
-
-    onAfterPrint: () => {
-      setPrintExpenseId(null);
-    },
-  });
-
-  useEffect(() => {
-    if (
-      printExpenseData?.expense &&
-      printExpenseId &&
-      !isPrintExpenseFetching
-    ) {
-      handlePrint();
-    }
-  }, [
-    printExpenseData,
-    printExpenseId,
-    isPrintExpenseFetching,
-    handlePrint,
-  ]);
-
+  data: usageResponse,
+  isLoading: isUsageLoading,
+  isFetching: isUsageFetching,
+} = useGetExpenseItemUsageQuery(
+  {
+    masterItemId: selectedItemId,
+    cursor: effectiveRightCursor,
+    search: txnSearch, // ← add
+  },
+  {
+    skip: !selectedItemId,
+  }
+);
 
   const itemUsage = usageResponse?.usage || [];
 
   const usageHasMore = usageResponse?.hasMore ?? false;
   const usageNextCursor = usageResponse?.nextCursor ?? null;
-
+  console.log(itemUsage)
   /* reset right cursor when selected item changes */
-  useEffect(() => {
-    setRightCursor(null);
-  }, [selectedItemId, txnSearch]);
+useEffect(() => {
+  rightCategoryRef.current = selectedItemId;
+  setRightCursor(null);
+}, [selectedItemId, txnSearch]);
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -310,8 +271,7 @@ export default function ExpensesByItems() {
           0
         ),
         transactions: usageForThisItem.map((u) => ({
-          id: u.id,                    // expense item/usage ID
-          expenseId: u.Expense_Id,     // actual expense ID
+          id: u.id,
           date: u.Expense_Date,
           expNo: u.Expense_Number,
           party: u.Party_Name || "—",
@@ -325,7 +285,7 @@ export default function ExpensesByItems() {
 
   const selectedItem =
     itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
-
+  console.log("selectedItem", selectedItem);
   /* transaction search still client-side filters the currently-loaded
      page(s) of usage rows — server-side date filter is separate (date param) */
   // const filteredTransactions = useMemo(() => {
@@ -336,8 +296,9 @@ export default function ExpensesByItems() {
   //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
   //   );
   // }, [selectedItem, txnSearch]);
-  const filteredTransactions =
-    selectedItem?.transactions || [];
+  // const filteredTransactions =
+  // selectedItem?.transactions || [];
+   const filteredTransactions =selectedItem?.transactions || [];
 
   const fmtDate = (d) =>
     d
@@ -684,7 +645,7 @@ export default function ExpensesByItems() {
                         <th
                           key={h}
                           //className="text-left py-2 px-3 "
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          style={{  textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace:"nowrap" }}
                         >
                           {h}
                         </th>
@@ -706,7 +667,6 @@ export default function ExpensesByItems() {
                       </tr>
                     ) : (
                       filteredTransactions.map((txn) => (
-
                         <tr
                           key={txn.id}
                           style={{
@@ -716,38 +676,30 @@ export default function ExpensesByItems() {
                           }}
                           //style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
-
                           onDoubleClick={() => {
-                            navigate(
-                              {
-                                pathname: `/expense/edit/${txn.expenseId}`,
-                                search: searchParams.toString(),
+                            navigate(`/expense/edit/${txn.id}`, {
+                              state: {
+                                from: location.pathname,
+                                itemId: selectedItemId,
+                                txnSearch,
+                                itemSearch,
                               },
-                              {
-                                state: {
-                                  from: location.pathname,
-                                  itemId: selectedItemId,
-                                  txnSearch,
-                                  itemSearch,
-                                },
-                              }
-                            );
+                            });
                           }}
-
                         >
-                          <td style={{ whiteSpace: "nowrap" }}>
+                          <td  style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
                           <td >{txn.expNo || "—"}</td>
                           <td >{txn.party || "—"}</td>
                           <td >{txn.paymentType || "—"}</td>
-                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                          <td  style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.amount)}
                           </td>
-                          <td style={{ whiteSpace: "nowrap" }}>
+                          <td  style={{ whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.balance)}
                           </td>
-                          <td style={{ position: "relative" }}>
+                          <td  style={{ position: "relative" }}>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -790,24 +742,28 @@ export default function ExpensesByItems() {
                                       setRowMenuOpen(null);
 
                                       if (key === "view") {
-                                        navigate(
-                                          {
-                                            pathname: `/expense/edit/${txn.expenseId}`,
-                                            search: searchParams.toString(),
+                                        navigate(`/expense/edit/${txn.id}`, {
+                                          state: {
+                                            from: location.pathname,
+                                            itemId: selectedItemId,
+                                            txnSearch,
+                                            itemSearch,
                                           },
-                                          {
-                                            state: {
-                                              from: location.pathname,
-                                              itemId: selectedItemId,
-                                              txnSearch,
-                                              itemSearch,
-                                            },
-                                          }
-                                        );
+                                        });
                                       }
-
+                                      // if (key === "preview") {
+                                      //   navigate(`/expense/preview/${txn.id}`, {
+                                      //     state: {
+                                      //       from: location.pathname,
+                                      //       itemId: selectedItemId,
+                                      //       txnSearch,
+                                      //       itemSearch,
+                                      //     },
+                                      //   });
+                                      // }
                                       if (key === "print") {
-                                        setPrintExpenseId(txn.expenseId);
+                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
+                                        window.open(url, "_blank");
                                       }
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
@@ -856,22 +812,6 @@ export default function ExpensesByItems() {
             setEditingItem(null);
           }}
         />
-      )}
-
-      {/* ── EXPENSE PRINT TEMPLATE ── */}
-      {printExpenseData?.expense && (
-        <div
-          style={{
-            position: "absolute",
-            left: "-99999px",
-            top: 0,
-          }}
-        >
-          <ExpensePrintTemplate
-            ref={printRef}
-            expense={printExpenseData.expense}
-          />
-        </div>
       )}
 
     </>

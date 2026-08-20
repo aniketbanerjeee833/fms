@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { createPortal } from "react-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { expenseFormSchema } from "../../schema/expenseFormSchema";
 import { toast } from "react-toastify";
@@ -14,7 +15,6 @@ import {
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import AddExpenseCategoryModal from "../../components/Modal/AddExpenseCategoryModal";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
-import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 // import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 import { useGetAllPartiesQuery } from "../../redux/api/partyApi";
@@ -151,6 +151,44 @@ export default function AddExpense() {
     const [showBankModal, setShowBankModal] = useState(false);
     const [activeSplitRow, setActiveSplitRow] = useState(null); // which split row triggered "+ Add Bank A/C"
     const [showSplitBox, setShowSplitBox] = useState(false);
+    const [paymentOpen, setPaymentOpen] = useState(false);
+    const paymentRef = useRef(null);
+
+    const [openSplitDropdown, setOpenSplitDropdown] = useState(null);
+    const [splitDropdownPos, setSplitDropdownPos] = useState(null); // { top, left, width }
+    const splitDropdownRefs = useRef({});
+
+    const toggleSplitDropdown = (index) => {
+        if (openSplitDropdown === index) {
+            setOpenSplitDropdown(null);
+            return;
+        }
+        const rect = splitDropdownRefs.current[index]?.getBoundingClientRect();
+        if (rect) {
+            setSplitDropdownPos({
+                top: rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+            });
+        }
+        setOpenSplitDropdown(index);
+    };
+
+    /* lock page scroll while the split payment dropdown is open,
+       so the portal stays aligned with its trigger (Vyapar-style) */
+    useEffect(() => {
+        if (openSplitDropdown !== null) {
+            const previousOverflow = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            return () => {
+                document.body.style.overflow = previousOverflow;
+            };
+        }
+    }, [openSplitDropdown]);
+
+
+    /* close dropdowns on outside click */
+
 
     /* close dropdowns on outside click */
     useEffect(() => {
@@ -161,6 +199,21 @@ export default function AddExpense() {
             if (partyRef.current && !partyRef.current.contains(e.target)) {
                 setPartyOpen(false);
             }
+            if (
+                paymentRef.current &&
+                !paymentRef.current.contains(e.target)
+            ) {
+                setPaymentOpen(false);
+            }
+            let clickedInsideAnySplitRow = false;
+
+            Object.values(splitDropdownRefs.current).forEach((ref) => {
+                if (ref && ref.contains(e.target)) clickedInsideAnySplitRow = true;
+            });
+            if (e.target.closest && e.target.closest(".split-payment-portal")) {
+                clickedInsideAnySplitRow = true;
+            }
+            if (!clickedInsideAnySplitRow) setOpenSplitDropdown(null);
 
             let clickedInsideItem = false;
 
@@ -277,10 +330,31 @@ export default function AddExpense() {
     };
 
     /* ───────────────────────── PAYMENT SPLITS (mirrors PurchaseAdd) ───────────────────────── */
+    const buildPaymentTypeOptions = (bankList) => [
+        { value: "Cash", label: "Cash", repeatable: false },
+        { value: "Cheque", label: "Cheque", repeatable: true },
+        { value: "Neft", label: "Neft", repeatable: true },
+        ...(bankList || []).map((bank) => ({
+            value: `bank_${bank.Bank_Account_Id}`,
+            label: bank.Account_Display_Name,
+            repeatable: false,
+        })),
+    ];
+
     const getRowIdentifier = (type, bankId) => (type === "Bank" ? `bank_${bankId ?? ""}` : type);
 
+    const getUsedIdentifiers = (excludeIndex) =>
+        splitsValues
+            .map((s, i) => (i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)))
+            .filter(Boolean);
+
+    const getAvailableOptions = (excludeIndex) => {
+        const used = getUsedIdentifiers(excludeIndex);
+        return buildPaymentTypeOptions(banks).filter((opt) => opt.repeatable || !used.includes(opt.value));
+    };
+
     const needsReference = splitsValues.some(
-        (s) => s.Payment_Type === "Cheque" || s.Payment_Type === "Bank"
+        (s) => s.Payment_Type === "Cheque" || s.Payment_Type === "Neft" || s.Payment_Type === "Bank"
     );
 
     const totalPayment = splitsValues.reduce((sum, s) => sum + num(s.Amount), 0);
@@ -298,17 +372,13 @@ export default function AddExpense() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [totalAmountWatch, splitsValues.length]);
 
-    // One-directional: recompute Balance_Due whenever total or splits change.
-    // Total_Paid is only auto-derived from splits when there are 2+ payment rows;
-    // with 0 or 1 rows the user can type Total_Paid directly.
+    // One-directional: recompute Total_Paid / Balance_Due whenever total or splits change
     useEffect(() => {
         const bal = (Number(totalAmountWatch) || 0) - totalPayment;
         setValue("Balance_Due", bal.toFixed(2), { shouldDirty: true });
-        if (splitsValues.length > 1) {
-            setValue("Total_Paid", totalPayment.toFixed(2), { shouldDirty: true });
-        }
+        setValue("Total_Paid", totalPayment.toFixed(2), { shouldDirty: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [totalAmountWatch, totalPayment, splitsValues.length]);
+    }, [totalAmountWatch, totalPayment]);
 
 
     /* ───────────────────────── ROUND OFF ───────────────────────── */
@@ -844,28 +914,15 @@ export default function AddExpense() {
                                     {fields.map((field, i) => (
                                         <tr key={field.id}>
                                             <td style={{ textAlign: "center" }}>
-                                                <div className="flex items-center justify-center gap-2" style={{ height: 14 }}>
+                                                <div className="flex items-center justify-center gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDeleteRow(i)}
-                                                        style={{
-                                                            background: "transparent",
-                                                            border: "none",
-                                                            color: "red",
-                                                            cursor: "pointer",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            padding: 0,
-                                                            margin: 0,
-                                                            height: 14,
-                                                            width: 14,
-                                                            lineHeight: "14px",
-                                                        }}
+                                                        style={{ background: "transparent", border: "none", color: "red", cursor: "pointer" }}
                                                     >
-                                                        <Trash2 size={14} style={{ display: "block" }} />
+                                                        <Trash2 size={14} />
                                                     </button>
-                                                    <span style={{ lineHeight: "14px", fontSize: "inherit" }}>{i + 1}</span>
+                                                    <span>{i + 1}</span>
                                                 </div>
                                             </td>
 
@@ -1021,6 +1078,30 @@ export default function AddExpense() {
                                                 )}
                                             </td>
 
+                                            {/* <td>
+                                                <select
+                                                    value={itemsValues[i]?.Item_Unit ?? ""}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        if (value === "__ADD_UNIT__") {
+                                                            setActiveUnitRow(i);
+                                                            setShowAddUnitModal(true);
+                                                            return;
+                                                        }
+                                                        recalcRow(i, { Item_Unit: value });
+                                                    }}
+                                                    style={{ width: "100%", fontSize: 12 }}
+                                                >
+                                                    <option value=""></option>
+                                                    <option value="__ADD_UNIT__">➕ Add Unit</option>
+                                                    {itemUnits.map((unit) => (
+                                                        <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
+                                                            {`${unit.Unit_Name} (${unit.Unit_Shorthand})`}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </td> */}
+
                                             <td>
                                                 <div className="flex items-center gap-1">
                                                     <input
@@ -1034,6 +1115,17 @@ export default function AddExpense() {
                                                         className="outline-none border-b-2 text-gray-900"
                                                         style={{ marginBottom: 0, flex: "1 1 50px", minWidth: "20px" }}
                                                     />
+                                                    {/* {gstEnabled && (
+                                                        <select
+                                                            {...register(`items.${i}.Price_Type`)}
+                                                            value={itemsValues[i]?.Price_Type ?? "Tax Excluded"}
+                                                            onChange={(e) => recalcRow(i, { Price_Type: e.target.value })}
+                                                            style={{ fontSize: 11, padding: "1px 2px", flex: "0 0 60px", width: "80px" }}
+                                                        >
+                                                            <option value="Tax Excluded">Without Tax</option>
+                                                            <option value="Tax Included">With Tax</option>
+                                                        </select>
+                                                    )} */}
                                                 </div>
                                                 {errors?.items?.[i]?.Price && (
                                                     <p className="text-red-500 text-xs mt-1">{errors.items[i].Price.message}</p>
@@ -1133,32 +1225,68 @@ export default function AddExpense() {
                                     <div className="flex flex-col mt-3 gap-2 w-full sm:w-128">
                                         {!showSplitBox ? (
                                             <>
-                                                <div className="flex flex-col relative w-full">
+                                                <div ref={paymentRef} className="flex flex-col relative w-full">
                                                     <span className="active">Payment Type</span>
 
                                                     <input type="hidden" {...register("splits.0.Payment_Type")} />
 
-                                                    <PaymentTypeSelect
-                                                        value={
-                                                            splitsValues[0]?.Payment_Type === "Bank"
-                                                                ? `bank_${splitsValues[0]?.Bank_Account_Id || ""}`
-                                                                : splitsValues[0]?.Payment_Type || "Cash"
-                                                        }
-                                                        banks={banks}
-                                                        onAddBank={() => {
-                                                            setActiveSplitRow(0);
-                                                            setShowBankModal(true);
-                                                        }}
-                                                        onChange={(val) => {
-                                                            if (val.startsWith("bank_")) {
-                                                                setValue("splits.0.Payment_Type", "Bank", { shouldDirty: true });
-                                                                setValue("splits.0.Bank_Account_Id", Number(val.replace("bank_", "")), { shouldDirty: true });
-                                                            } else {
-                                                                setValue("splits.0.Payment_Type", val, { shouldDirty: true });
-                                                                setValue("splits.0.Bank_Account_Id", null, { shouldDirty: true });
-                                                            }
-                                                        }}
-                                                    />
+                                                    <div className="relative w-full">
+                                                        <div
+                                                            className="flex flex-row border rounded-md bg-white cursor-pointer items-center"
+                                                            onClick={() => setPaymentOpen((prev) => !prev)}
+                                                        >
+                                                            <span
+                                                                className="w-full py-1 px-2 text-gray-900"
+                                                                style={{ height: "2rem", lineHeight: "1.5rem" }}
+                                                            >
+                                                                {
+                                                                    buildPaymentTypeOptions(banks).find(
+                                                                        (o) =>
+                                                                            o.value ===
+                                                                            (splitsValues[0]?.Payment_Type === "Bank"
+                                                                                ? `bank_${splitsValues[0]?.Bank_Account_Id || ""}`
+                                                                                : splitsValues[0]?.Payment_Type || "Cash")
+                                                                    )?.label || "Cash"
+                                                                }
+                                                            </span>
+                                                            <span className="absolute right-2 top-2 text-gray-700">
+                                                                <ChevronDown size={16} />
+                                                            </span>
+                                                        </div>
+
+                                                        {paymentOpen && (
+                                                            <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                                                <span
+                                                                    onClick={() => {
+                                                                        setActiveSplitRow(0);
+                                                                        setShowBankModal(true);
+                                                                        setPaymentOpen(false);
+                                                                    }}
+                                                                    className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                                                                >
+                                                                    + Add Bank A/C
+                                                                </span>
+                                                                {buildPaymentTypeOptions(banks).map((opt) => (
+                                                                    <div
+                                                                        key={opt.value}
+                                                                        onClick={() => {
+                                                                            if (opt.value.startsWith("bank_")) {
+                                                                                setValue("splits.0.Payment_Type", "Bank", { shouldDirty: true });
+                                                                                setValue("splits.0.Bank_Account_Id", Number(opt.value.replace("bank_", "")), { shouldDirty: true });
+                                                                            } else {
+                                                                                setValue("splits.0.Payment_Type", opt.value, { shouldDirty: true });
+                                                                                setValue("splits.0.Bank_Account_Id", null, { shouldDirty: true });
+                                                                            }
+                                                                            setPaymentOpen(false);
+                                                                        }}
+                                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                                                    >
+                                                                        {opt.label}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
 
                                                 {needsReference && (
@@ -1180,44 +1308,81 @@ export default function AddExpense() {
                                         ) : (
                                             <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
                                                 {splitFields.map((field, index) => {
+                                                    const rowOptions = getAvailableOptions(index);
                                                     const currentIdentifier = getRowIdentifier(
                                                         splitsValues[index]?.Payment_Type,
                                                         splitsValues[index]?.Bank_Account_Id
                                                     );
                                                     const rowNeedsRef =
                                                         splitsValues[index]?.Payment_Type === "Cheque" ||
+                                                        splitsValues[index]?.Payment_Type === "Neft" ||
                                                         splitsValues[index]?.Payment_Type === "Bank";
-
-                                                    const usedValues = splitsValues
-                                                        .map((s, idx) =>
-                                                            idx === index ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-                                                        )
-                                                        .filter(Boolean);
 
                                                     return (
                                                         <div key={field.id} className="flex flex-col gap-2">
                                                             <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                                                                <div className="flex flex-col relative">
+                                                                <div
+                                                                    ref={(el) => (splitDropdownRefs.current[index] = el)}
+                                                                    className="flex flex-col relative"
+                                                                >
                                                                     <span className="text-xs text-gray-500 mb-1">Payment Type</span>
 
-                                                                    <PaymentTypeSelect
-                                                                        value={currentIdentifier || ""}
-                                                                        banks={banks}
-                                                                        usedValues={usedValues}
-                                                                        onAddBank={() => {
-                                                                            setActiveSplitRow(index);
-                                                                            setShowBankModal(true);
-                                                                        }}
-                                                                        onChange={(val) => {
-                                                                            if (val.startsWith("bank_")) {
-                                                                                setValue(`splits.${index}.Payment_Type`, "Bank", { shouldDirty: true });
-                                                                                setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldDirty: true });
-                                                                            } else {
-                                                                                setValue(`splits.${index}.Payment_Type`, val, { shouldDirty: true });
-                                                                                setValue(`splits.${index}.Bank_Account_Id`, null, { shouldDirty: true });
-                                                                            }
-                                                                        }}
-                                                                    />
+                                                                    <div className="relative w-full">
+                                                                        <div
+                                                                            className="flex flex-row border rounded-md bg-white cursor-pointer px-2 py-1.5 items-center justify-between"
+                                                                            onClick={() => toggleSplitDropdown(index)}
+                                                                        >
+                                                                            <span className="text-sm">
+                                                                                {rowOptions.find((o) => o.value === currentIdentifier)?.label || "Select Type"}
+                                                                            </span>
+                                                                            <ChevronDown size={16} className="text-gray-700" />
+                                                                        </div>
+
+                                                                        {openSplitDropdown === index &&
+                                                                            splitDropdownPos &&
+                                                                            createPortal(
+                                                                                <div
+                                                                                    className="split-payment-portal flex flex-col bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                                                                                    style={{
+                                                                                        position: "fixed",
+                                                                                        top: splitDropdownPos.top,
+                                                                                        left: splitDropdownPos.left,
+                                                                                        width: splitDropdownPos.width,
+                                                                                        zIndex: 1000,
+                                                                                    }}
+                                                                                >
+                                                                                    <span
+                                                                                        onClick={() => {
+                                                                                            setActiveSplitRow(index);
+                                                                                            setShowBankModal(true);
+                                                                                            setOpenSplitDropdown(null);
+                                                                                        }}
+                                                                                        className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                                                                                    >
+                                                                                        + Add Bank A/C
+                                                                                    </span>
+                                                                                    {rowOptions.map((opt) => (
+                                                                                        <div
+                                                                                            key={opt.value}
+                                                                                            onClick={() => {
+                                                                                                if (opt.value.startsWith("bank_")) {
+                                                                                                    setValue(`splits.${index}.Payment_Type`, "Bank", { shouldDirty: true });
+                                                                                                    setValue(`splits.${index}.Bank_Account_Id`, Number(opt.value.replace("bank_", "")), { shouldDirty: true });
+                                                                                                } else {
+                                                                                                    setValue(`splits.${index}.Payment_Type`, opt.value, { shouldDirty: true });
+                                                                                                    setValue(`splits.${index}.Bank_Account_Id`, null, { shouldDirty: true });
+                                                                                                }
+                                                                                                setOpenSplitDropdown(null);
+                                                                                            }}
+                                                                                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                                                        >
+                                                                                            {opt.label}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>,
+                                                                                document.body
+                                                                            )}
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="flex flex-col">
@@ -1331,74 +1496,53 @@ export default function AddExpense() {
                                                 </div>
                                             </div>
 
-                                            {gstEnabled && (
-                                                <>
+                                            <div style={{ width: "100%" }} className="flex items-center gap-3 relative">
+                                                <div className="flex items-center gap-2 relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="totalPaidCheck"
+                                                        className="w-4 h-4 cursor-pointer"
+                                                        disabled={splitsValues.length > 1}
+                                                        onChange={(e) => {
+                                                            const isChecked = e.target.checked;
+                                                            const total = parseFloat(totalAmountWatch);
+                                                            if (!total || isNaN(total)) return;
 
-                                                    <div style={{ width: "100%" }} className="flex items-center gap-3 relative">
-                                                        <div className="flex items-center gap-2 relative">
-                                                            <input
-                                                                type="checkbox"
-                                                                id="totalPaidCheck"
-                                                                className="w-4 h-4 cursor-pointer"
-                                                                disabled={splitsValues.length > 1}
-                                                                onChange={(e) => {
-                                                                    const isChecked = e.target.checked;
-                                                                    const total = parseFloat(totalAmountWatch);
-                                                                    if (!total || isNaN(total)) return;
+                                                            if (isChecked) {
+                                                                setValue("Total_Paid", total.toFixed(2), { shouldDirty: true });
+                                                                setValue("Balance_Due", "0.00", { shouldDirty: true });
+                                                            } else {
+                                                                setValue("Total_Paid", "0.00", { shouldDirty: true });
+                                                                setValue("Balance_Due", total.toFixed(2), { shouldDirty: true });
+                                                            }
+                                                            if (splitsValues.length === 1) {
+                                                                setValue("splits.0.Amount", isChecked ? total.toFixed(2) : "", { shouldDirty: true });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="font-medium whitespace-nowrap">Total Paid</span>
+                                                </div>
 
-                                                                    if (isChecked) {
-                                                                        setValue("Total_Paid", total.toFixed(2), { shouldDirty: true });
-                                                                        setValue("Balance_Due", "0.00", { shouldDirty: true });
-                                                                    } else {
-                                                                        setValue("Total_Paid", "0.00", { shouldDirty: true });
-                                                                        setValue("Balance_Due", total.toFixed(2), { shouldDirty: true });
-                                                                    }
-                                                                    if (splitsValues.length === 1) {
-                                                                        setValue("splits.0.Amount", isChecked ? total.toFixed(2) : "", { shouldDirty: true });
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <span className="font-medium whitespace-nowrap">Total Paid</span>
-                                                        </div>
+                                                <input
+                                                    type="text"
+                                                    value={watch("Total_Paid")}
+                                                    readOnly
+                                                    style={{ marginBottom: 0, height: "1rem", width: "100%", backgroundColor: "transparent", border: "none", borderBottom: "1px solid #d1d5db" }}
+                                                />
+                                                {errors?.Total_Paid && (
+                                                    <p className="text-red-500 text-xs mt-1">{errors.Total_Paid.message}</p>
+                                                )}
+                                            </div>
 
-                                                        <input
-                                                            type="text"
-                                                            value={watch("Total_Paid")}
-                                                            readOnly={splitsValues.length > 1}
-                                                            onChange={(e) => {
-                                                                if (splitsValues.length > 1) return;
-                                                                const val = sanitizeAmount(e.target.value);
-                                                                setValue("Total_Paid", val, { shouldDirty: true });
-
-                                                                const total = parseFloat(totalAmountWatch) || 0;
-                                                                const paid = parseFloat(val) || 0;
-                                                                setValue("Balance_Due", (total - paid).toFixed(2), { shouldDirty: true });
-
-                                                                if (splitsValues.length === 1) {
-                                                                    setValue("splits.0.Amount", val, { shouldDirty: true });
-                                                                }
-                                                            }}
-                                                            style={{ marginBottom: 0, height: "1rem", width: "100%", backgroundColor: "transparent", border: "none", borderBottom: "1px solid #d1d5db" }}
-                                                        />
-                                                        {errors?.Total_Paid && (
-                                                            <p className="text-red-500 text-xs mt-1">{errors.Total_Paid.message}</p>
-                                                        )}
-
-                                                    </div>
-
-                                                    <div style={{ width: "100%" }} className="flex gap-2 items-center">
-                                                        <span className="font-medium whitespace-nowrap">Balance Due</span>
-                                                        <input
-                                                            style={{ backgroundColor: "transparent", marginBottom: 0, height: "1rem", width: "100%", border: "none", borderBottom: "1px solid #d1d5db" }}
-                                                            type="text"
-                                                            value={watch("Balance_Due")}
-                                                            readOnly
-                                                        />
-                                                    </div>
-
-                                                </>
-                                            )}
-
+                                            <div style={{ width: "100%" }} className="flex gap-2 items-center">
+                                                <span className="font-medium whitespace-nowrap">Balance Due</span>
+                                                <input
+                                                    style={{ backgroundColor: "transparent", marginBottom: 0, height: "1rem", width: "100%", border: "none", borderBottom: "1px solid #d1d5db" }}
+                                                    type="text"
+                                                    value={watch("Balance_Due")}
+                                                    readOnly
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1474,3 +1618,4 @@ export default function AddExpense() {
         </>
     );
 }
+

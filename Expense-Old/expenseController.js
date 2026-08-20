@@ -1915,77 +1915,89 @@ export {
   getAllExpenseItemMasters,
   getAllExpenseItemMastersCursor
 };
-//WITH GST
-// {
-//   "Expense_Number": "EXP-001",
-//   "Expense_Date": "2026-07-30",
-//   "Bill_Date": "2026-07-30",
-//   "With_GST": true,
-//   "Category_Name": "Office Expense",
-//   "Category_Type": "Direct",
-//   "Party_Name": "ANJANEYA COMTECH PRIVATE LIMITED",
-//   "State_Of_Supply": "West Bengal",
-//   "Reference_Number": "CHQ123456",
-//   "Total_Amount": 1180,
-//   "Total_Paid": 1180,
-//   "splits": [
-//     {
-//       "Payment_Type": "Cash",
-//       "Bank_Account_Id": null,
-//       "Reference_Number": "",
-//       "Amount": 500
-//     },
-//     {
-//       "Payment_Type": "Bank",
-//       "Bank_Account_Id": 1,
-//       "Reference_Number": "UTR123456789",
-//       "Amount": 680
-//     }
-//   ],
-//   "items": [
-//     {
-//       "Item_Name": "Printer Paper",
-//       "Item_HSN": "4802",
-//       "Quantity": 10,
-//       "Price": 100,
-//       "Discount_On_Price": 0,
-//       "Discount_Type_On_Price": "Percentage",
-//       "Tax_Type": "GST",
-//       "Tax_Amount": 180,
-//       "Amount": 1180
-//     }
-//   ]
-// }
-//WITHOUT GST
 
-// {
-//   "Expense_Number": "EXP-002",
-//   "Expense_Date": "2026-07-30",
-//   "With_GST": false,
-//   "Category_Name": "Stationery",
-//   "Category_Type": "Indirect",
-//   "Reference_Number": "",
-//   "Total_Amount": 500,
-//   "Total_Paid": 500,
-//   "splits": [
-//     {
-//       "Payment_Type": "Cash",
-//       "Bank_Account_Id": null,
-//       "Reference_Number": "",
-//       "Amount": 500
+
+
+
+
+
+// 1. SQL — add Expense to the enum
+// sql
+// ALTER TABLE party_ledger MODIFY Txn_Type ENUM(
+//   'Sale','Purchase','Payment_In','Payment_Out',
+//   'Sale_Return','Purchase_Return','Opening_Balance','Expense'
+// ) NOT NULL;
+// 2. partyLedger.helper.js — add Expense to DEBIT_TYPES
+// javascript
+// const DEBIT_TYPES = [
+//   "Purchase",
+//   "Payment_In",
+//   "Sale_Return",
+//   "Expense",   // 🔹 add this — expense reduces what you're owed / increases what you owe
+// ];
+// 3. createExpense controller — use txnType: "Expense"
+// javascript
+//     // 🔹 party ledger — only for GST expenses with a party
+//     if (withGST && Party_Id) {
+//       await recordPartyLedger({
+//         connection,
+//         partyId:     Party_Id,
+//         txnType:     "Expense",        // 🔹 shows as "Expense" in UI, not "Purchase"
+//         referenceId: expenseId,
+//         amount:      totalAmount,
+//         txnDate:     Bill_Date,
+//         docNumber:   Expense_Number || `EXP${expenseId}`,
+//         balanceDue,
+//       });
 //     }
-//   ],
-//   "items": [
-//     {
-//       "Item_Name": "Pen",
-//       "Item_HSN": "",
-//       "Quantity": null,
-//       "Price": null,
-//       "Discount_On_Price": 0,
-//       "Discount_Type_On_Price": "Percentage",
-//       "Tax_Type": "None",
-//       "Tax_Amount": 0,
-//       "Amount": 500
+// 4. editExpense controller
+// javascript
+//     if (withGST && Party_Id) {
+//       await recordPartyLedger({
+//         connection,
+//         partyId:     Party_Id,
+//         txnType:     "Expense",
+//         referenceId: Number(id),
+//         amount:      totalAmount,
+//         txnDate:     Bill_Date,
+//         docNumber:   Expense_Number || `EXP${id}`,
+//         balanceDue,
+//       });
+//     } else if (existing.Party_Id) {
+//       // party removed or switched to non-GST — reverse old entry
+//       await reversePartyLedger({
+//         connection,
+//         partyId:     existing.Party_Id,
+//         txnType:     "Expense",
+//         referenceId: Number(id),
+//       });
 //     }
-//   ]
-// }
+// 5. deleteExpense controller
+// javascript
+//     if (expense.Party_Id) {
+//       await reversePartyLedger({
+//         connection,
+//         partyId:     expense.Party_Id,
+//         txnType:     "Expense",
+//         referenceId: Number(id),
+//       });
+//     }
+// 6. Frontend — add to delete switch case
+// Since Expense transactions can now appear in the party ledger, your handleConfirmDelete switch needs to handle it:
+
+// jsx
+// case "Expense":
+//   res = await deleteExpense(deleteTarget.Id).unwrap();
+//   break;
+// 7. getSinglePartyDetailsSalesPurchases — route mapping for navigation
+// If you have a TXN_TYPE_ROUTE_MAP for NavLink navigation from the party ledger, add:
+
+// jsx
+// const TXN_TYPE_ROUTE_MAP = {
+//   Sale: "sale",
+//   Purchase: "purchase",
+//   Sale_Return: "sale-return",
+//   Purchase_Return: "purchase-return",
+//   Expense: "expense",   // 🔹 add this — adjust to your actual expense route
+// };
+// Now party_ledger correctly labels these as "Expense" everywhere — in the transaction list, delete flow, and navigation — instead of being indistinguishable from actual purchases.
