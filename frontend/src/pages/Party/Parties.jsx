@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
-import { partyApi, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
 import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -136,6 +136,14 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     { Party_Id: partyId, cursor, search },
     { skip: !partyId }
   );
+
+   const [
+    triggerPartyBulkReport,
+    {
+      data: bulkPartyReportData,
+      isFetching: isBulkPartyFetching,
+    },
+  ] = useLazyGetPartyPrintReportQuery();
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
 
   const printRef = useRef(null);
@@ -443,6 +451,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     a.click();
     document.body.removeChild(a);
   };
+   const handlePrintAllClick = async () => {
+    const res=await triggerPartyBulkReport({  Party_Id: partyId,search});
+    console.log(res);
+   
+   
+  };
   return (
     <div className="flex flex-col  overflow-y-auto"
       style={{
@@ -569,7 +583,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
         </button>
         <button
           type="button"
-          //onClick={handlePrintAllClick}
+          onClick={handlePrintAllClick}
           //disabled={isBulkPurchaseFetching}
           className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
           title="Print  Reports"

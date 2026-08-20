@@ -1,6 +1,7 @@
 
 
 import db from "../config/db.js";
+import { getSaleReturnsForPrint } from "../helpers/printReportHelpers.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
@@ -3349,13 +3350,349 @@ const exportSaleReturnReportToExcel = async (req, res, next) => {
   }
 };
 
-const getSaleReturnPrintReport = async (req, res,next) => {
+// const getSaleReturnPrintReport = async (req, res,next) => {
+//   let connection;
+
+//   try {
+//     connection = await db.getConnection();
+
+//     const { search = "", fromDate, toDate } = req.query;
+
+//     const whereClauses = [];
+//     const params = [];
+
+//     if (search) {
+//       const like = `%${search}%`;
+
+//       whereClauses.push(`
+//         (
+//           p.Party_Name LIKE ?
+//           OR sr.Return_Number LIKE ?
+//           OR sr.Invoice_Number LIKE ?
+//           OR CAST(sr.Total_Amount AS CHAR) LIKE ?
+//           OR CAST(sr.Balance_Due AS CHAR) LIKE ?
+//           OR CAST(sr.Total_Paid AS CHAR) LIKE ?
+//         )
+//       `);
+
+//       params.push(
+//         like,
+//         like,
+//         like,
+//         like,
+//         like,
+//         like
+//       );
+//     }
+
+//     if (fromDate && toDate) {
+//       whereClauses.push(
+//         `DATE(sr.Return_Date) BETWEEN ? AND ?`
+//       );
+
+//       params.push(fromDate, toDate);
+//     } else if (fromDate) {
+//       whereClauses.push(
+//         `DATE(sr.Return_Date) >= ?`
+//       );
+
+//       params.push(fromDate);
+//     } else if (toDate) {
+//       whereClauses.push(
+//         `DATE(sr.Return_Date) <= ?`
+//       );
+
+//       params.push(toDate);
+//     }
+
+//     const whereClause =
+//       whereClauses.length > 0
+//         ? `WHERE ${whereClauses.join(" AND ")}`
+//         : "";
+
+//     // =====================================
+//     // HEADER
+//     // =====================================
+
+//     const [returns] = await connection.query(
+//       `
+//       SELECT
+//         sr.id,
+//         sr.Return_Number,
+//         sr.Invoice_Number,
+//         sr.Invoice_Date,
+//         sr.Return_Date,
+//         sr.State_Of_Supply,
+//         sr.Total_Amount,
+//         sr.Total_Paid,
+//         sr.Balance_Due,
+//         sr.Party_Id,
+
+//         p.Party_Name,
+//         p.GSTIN
+        
+
+//       FROM sale_return sr
+
+//       LEFT JOIN add_party p
+//         ON p.Party_Id = sr.Party_Id
+
+//       ${whereClause}
+
+//       ORDER BY sr.Return_Date ASC
+//       `,
+//       params
+//     );
+
+//     if (!returns.length) {
+//       return res.status(200).json({
+//         success: true,
+//         totalSaleReturns: 0,
+//         saleReturns: [],
+//         summary: {
+//           totalAmount: 0,
+//           totalPaid: 0,
+//           totalDue: 0,
+//           totalDiscount: 0,
+//         },
+//       });
+//     }
+
+//     const returnIds = returns.map(
+//       (r) => r.id
+//     );
+
+//     const placeholders =
+//       returnIds.map(() => "?").join(",");
+
+//     // =====================================
+//     // ITEMS
+//     // =====================================
+
+//     const [items] = await connection.query(
+//       `
+//       SELECT
+//         sri.*,
+
+//         i.Item_Name,
+//         i.Item_HSN,
+//         i.Item_Unit,
+//         i.Item_Category,
+
+//         i.Primary_Unit,
+//         i.Secondary_Unit,
+//         i.Conversion_Rate
+
+//       FROM sale_return_items sri
+
+//       LEFT JOIN add_item i
+//         ON i.Item_Id = sri.Item_Id
+
+//       WHERE sri.Sale_Return_Id IN (${placeholders})
+
+//       ORDER BY sri.created_at ASC
+//       `,
+//       returnIds
+//     );
+
+//     // =====================================
+//     // PAYMENT SPLITS
+//     // =====================================
+
+//     const [splits] = await connection.query(
+//       `
+//       SELECT
+//         ps.*,
+//         ba.Account_Display_Name
+
+//       FROM payment_splits ps
+
+//       LEFT JOIN bank_accounts ba
+//         ON ba.id = ps.Bank_Account_Id
+
+//       WHERE ps.Source_Type = 'Sale_Return'
+//       AND ps.Source_Id IN (${placeholders})
+
+//       ORDER BY ps.id ASC
+//       `,
+//       returnIds
+//     );
+
+//     const itemMap = {};
+//     const splitMap = {};
+
+//     items.forEach((item) => {
+//       if (!itemMap[item.Sale_Return_Id]) {
+//         itemMap[item.Sale_Return_Id] = [];
+//       }
+
+//       const price = Number(
+//         item.Sale_Price || 0
+//       );
+
+//       let discountAmount = 0;
+
+//       if (
+//         Number(item.Discount_On_Sale_Price || 0) > 0
+//       ) {
+//         if (
+//           item.Discount_Type_On_Sale_Price ===
+//           "Percentage"
+//         ) {
+//           discountAmount =
+//             (price *
+//               Number(
+//                 item.Discount_On_Sale_Price
+//               )) /
+//             100;
+//         } else {
+//           discountAmount = Number(
+//             item.Discount_On_Sale_Price
+//           );
+//         }
+//       }
+
+//       itemMap[item.Sale_Return_Id].push({
+//         ...item,
+//         Discount_Amount: Number(
+//           discountAmount.toFixed(2)
+//         ),
+//       });
+//     });
+
+//     splits.forEach((split) => {
+//       if (!splitMap[split.Source_Id]) {
+//         splitMap[split.Source_Id] = [];
+//       }
+
+//       splitMap[split.Source_Id].push({
+//         Id: split.id,
+//         Payment_Type: split.Payment_Type,
+//         Bank_Account_Id:
+//           split.Bank_Account_Id,
+//         Account_Display_Name:
+//           split.Account_Display_Name,
+//         Amount: split.Amount,
+//       });
+//     });
+
+//     // =====================================
+//     // SUMMARY
+//     // =====================================
+
+//     const summary = {
+//       totalAmount: 0,
+//       totalPaid: 0,
+//       totalDue: 0,
+//       totalDiscount: 0,
+//     };
+
+//     const saleReturns = returns.map((row) => {
+//       const returnItems =
+//         itemMap[row.id] || [];
+
+//       summary.totalAmount += Number(
+//         row.Total_Amount || 0
+//       );
+
+//       summary.totalPaid += Number(
+//         row.Total_Paid || 0
+//       );
+
+//       summary.totalDue += Number(
+//         row.Balance_Due || 0
+//       );
+
+//       returnItems.forEach((item) => {
+//         summary.totalDiscount += Number(
+//           item.Discount_Amount || 0
+//         );
+//       });
+
+//       return {
+//         saleReturnDetails: {
+//           Sale_Return_Id: row.id,
+
+//           Party_Name: row.Party_Name,
+//           GSTIN: row.GSTIN,
+
+//           Return_Number: row.Return_Number,
+//           Invoice_Number: row.Invoice_Number,
+//           Invoice_Date: row.Invoice_Date,
+//           Return_Date: row.Return_Date,
+
+//           State_Of_Supply:
+//             row.State_Of_Supply,
+
+//           Total_Amount:
+//             row.Total_Amount,
+
+//           Total_Paid:
+//             row.Total_Paid,
+
+//           Balance_Due:
+//             row.Balance_Due,
+//         },
+
+//         splits:
+//           splitMap[row.id] || [],
+
+//         items: returnItems,
+//       };
+//     });
+
+//     summary.totalAmount = Number(
+//       summary.totalAmount.toFixed(2)
+//     );
+
+//     summary.totalPaid = Number(
+//       summary.totalPaid.toFixed(2)
+//     );
+
+//     summary.totalDue = Number(
+//       summary.totalDue.toFixed(2)
+//     );
+
+//     summary.totalDiscount = Number(
+//       summary.totalDiscount.toFixed(2)
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       totalSaleReturns:
+//         saleReturns.length,
+//       saleReturns,
+//       summary,
+//     });
+//   } catch (err) {
+//     console.error(
+//       "Sale Return Print Report Error:",
+//       err
+//     );
+
+//      next(err);
+//   } 
+//   finally {
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// };
+const getSaleReturnPrintReport = async (
+  req,
+  res,
+  next
+) => {
   let connection;
 
   try {
     connection = await db.getConnection();
 
-    const { search = "", fromDate, toDate } = req.query;
+    const {
+      search = "",
+      fromDate,
+      toDate,
+    } = req.query;
 
     const whereClauses = [];
     const params = [];
@@ -3409,253 +3746,15 @@ const getSaleReturnPrintReport = async (req, res,next) => {
         ? `WHERE ${whereClauses.join(" AND ")}`
         : "";
 
-    // =====================================
-    // HEADER
-    // =====================================
-
-    const [returns] = await connection.query(
-      `
-      SELECT
-        sr.id,
-        sr.Return_Number,
-        sr.Invoice_Number,
-        sr.Invoice_Date,
-        sr.Return_Date,
-        sr.State_Of_Supply,
-        sr.Total_Amount,
-        sr.Total_Paid,
-        sr.Balance_Due,
-        sr.Party_Id,
-
-        p.Party_Name,
-        p.GSTIN
-        
-
-      FROM sale_return sr
-
-      LEFT JOIN add_party p
-        ON p.Party_Id = sr.Party_Id
-
-      ${whereClause}
-
-      ORDER BY sr.Return_Date ASC
-      `,
+    const {
+      saleReturns,
+      summary,
+    } = await getSaleReturnsForPrint(
+      connection,
+      whereClause,
       params
     );
-
-    if (!returns.length) {
-      return res.status(200).json({
-        success: true,
-        totalSaleReturns: 0,
-        saleReturns: [],
-        summary: {
-          totalAmount: 0,
-          totalPaid: 0,
-          totalDue: 0,
-          totalDiscount: 0,
-        },
-      });
-    }
-
-    const returnIds = returns.map(
-      (r) => r.id
-    );
-
-    const placeholders =
-      returnIds.map(() => "?").join(",");
-
-    // =====================================
-    // ITEMS
-    // =====================================
-
-    const [items] = await connection.query(
-      `
-      SELECT
-        sri.*,
-
-        i.Item_Name,
-        i.Item_HSN,
-        i.Item_Unit,
-        i.Item_Category,
-
-        i.Primary_Unit,
-        i.Secondary_Unit,
-        i.Conversion_Rate
-
-      FROM sale_return_items sri
-
-      LEFT JOIN add_item i
-        ON i.Item_Id = sri.Item_Id
-
-      WHERE sri.Sale_Return_Id IN (${placeholders})
-
-      ORDER BY sri.created_at ASC
-      `,
-      returnIds
-    );
-
-    // =====================================
-    // PAYMENT SPLITS
-    // =====================================
-
-    const [splits] = await connection.query(
-      `
-      SELECT
-        ps.*,
-        ba.Account_Display_Name
-
-      FROM payment_splits ps
-
-      LEFT JOIN bank_accounts ba
-        ON ba.id = ps.Bank_Account_Id
-
-      WHERE ps.Source_Type = 'Sale_Return'
-      AND ps.Source_Id IN (${placeholders})
-
-      ORDER BY ps.id ASC
-      `,
-      returnIds
-    );
-
-    const itemMap = {};
-    const splitMap = {};
-
-    items.forEach((item) => {
-      if (!itemMap[item.Sale_Return_Id]) {
-        itemMap[item.Sale_Return_Id] = [];
-      }
-
-      const price = Number(
-        item.Sale_Price || 0
-      );
-
-      let discountAmount = 0;
-
-      if (
-        Number(item.Discount_On_Sale_Price || 0) > 0
-      ) {
-        if (
-          item.Discount_Type_On_Sale_Price ===
-          "Percentage"
-        ) {
-          discountAmount =
-            (price *
-              Number(
-                item.Discount_On_Sale_Price
-              )) /
-            100;
-        } else {
-          discountAmount = Number(
-            item.Discount_On_Sale_Price
-          );
-        }
-      }
-
-      itemMap[item.Sale_Return_Id].push({
-        ...item,
-        Discount_Amount: Number(
-          discountAmount.toFixed(2)
-        ),
-      });
-    });
-
-    splits.forEach((split) => {
-      if (!splitMap[split.Source_Id]) {
-        splitMap[split.Source_Id] = [];
-      }
-
-      splitMap[split.Source_Id].push({
-        Id: split.id,
-        Payment_Type: split.Payment_Type,
-        Bank_Account_Id:
-          split.Bank_Account_Id,
-        Account_Display_Name:
-          split.Account_Display_Name,
-        Amount: split.Amount,
-      });
-    });
-
-    // =====================================
-    // SUMMARY
-    // =====================================
-
-    const summary = {
-      totalAmount: 0,
-      totalPaid: 0,
-      totalDue: 0,
-      totalDiscount: 0,
-    };
-
-    const saleReturns = returns.map((row) => {
-      const returnItems =
-        itemMap[row.id] || [];
-
-      summary.totalAmount += Number(
-        row.Total_Amount || 0
-      );
-
-      summary.totalPaid += Number(
-        row.Total_Paid || 0
-      );
-
-      summary.totalDue += Number(
-        row.Balance_Due || 0
-      );
-
-      returnItems.forEach((item) => {
-        summary.totalDiscount += Number(
-          item.Discount_Amount || 0
-        );
-      });
-
-      return {
-        saleReturnDetails: {
-          Sale_Return_Id: row.id,
-
-          Party_Name: row.Party_Name,
-          GSTIN: row.GSTIN,
-
-          Return_Number: row.Return_Number,
-          Invoice_Number: row.Invoice_Number,
-          Invoice_Date: row.Invoice_Date,
-          Return_Date: row.Return_Date,
-
-          State_Of_Supply:
-            row.State_Of_Supply,
-
-          Total_Amount:
-            row.Total_Amount,
-
-          Total_Paid:
-            row.Total_Paid,
-
-          Balance_Due:
-            row.Balance_Due,
-        },
-
-        splits:
-          splitMap[row.id] || [],
-
-        items: returnItems,
-      };
-    });
-
-    summary.totalAmount = Number(
-      summary.totalAmount.toFixed(2)
-    );
-
-    summary.totalPaid = Number(
-      summary.totalPaid.toFixed(2)
-    );
-
-    summary.totalDue = Number(
-      summary.totalDue.toFixed(2)
-    );
-
-    summary.totalDiscount = Number(
-      summary.totalDiscount.toFixed(2)
-    );
-
+console.log("saleReturns", saleReturns.length);
     return res.status(200).json({
       success: true,
       totalSaleReturns:
@@ -3669,9 +3768,8 @@ const getSaleReturnPrintReport = async (req, res,next) => {
       err
     );
 
-     next(err);
-  } 
-  finally {
+    next(err);
+  } finally {
     if (connection) {
       connection.release();
     }

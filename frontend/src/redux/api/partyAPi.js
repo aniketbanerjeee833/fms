@@ -388,7 +388,31 @@ getAllReceivableParties: builder.query({
 
   providesTags: ["Party"],
 }),
-  
+  getPartyPrintReport: builder.query({
+  query: ({
+    Party_Id,
+    search,
+   
+  }) => {
+    const params = new URLSearchParams();
+
+    if (search?.trim()) {
+      params.append(
+        "search",
+        search.trim()
+      );
+    }
+
+    // if (date) {
+    //   params.append("date", date);
+    // }
+
+    return {
+      url: `/party/print-report/${Party_Id}?${params.toString()}`,
+      method: "GET",
+    };
+  },
+}),
    
    
   
@@ -404,7 +428,8 @@ getAllReceivableParties: builder.query({
     useGetAllPartiesReceivablesLeftQuery,useGetAllPartiesPayablesLeftQuery,
     useGetAllPayablePartiesQuery,
     useGetAllReceivablePartiesQuery,
-    useGetAllPartiesCursorQuery
+    useGetAllPartiesCursorQuery,
+    useLazyGetPartyPrintReportQuery
 
  }=partyApi
    

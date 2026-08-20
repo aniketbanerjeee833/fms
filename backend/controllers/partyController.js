@@ -1,5 +1,6 @@
 
 import db from "../config/db.js";
+import { getPaymentInsForPrint, getPaymentOutsForPrint, getPurchaseReturnsForPrint, getPurchasesForPrint, getSaleReturnsForPrint, getSalesForPrint } from "../helpers/printReportHelpers.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { sanitizeObject } from "../utils/sanitizeInput.js";
 import partySchema from "../validators/partySchema.js";
@@ -2593,10 +2594,288 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+const buildFilters = ({
+  partyId,
+  alias,
+  numberField,
+  amountField,
+  balanceField,
+  dateField,
+  search,
+  searchDate,
+}) => {
+  let where = `WHERE ${alias}.Party_Id = ?`;
+  const params = [partyId];
+
+  if (search) {
+    where += `
+      AND (
+        ${numberField} LIKE ?
+        OR CAST(${amountField} AS CHAR) LIKE ?
+        OR CAST(${balanceField} AS CHAR) LIKE ?
+      )
+    `;
+
+    params.push(
+      `%${search}%`,
+      `%${search}%`,
+      `%${search}%`
+    );
+  }
+
+  if (searchDate) {
+    where += ` AND DATE(${dateField}) = ?`;
+    params.push(searchDate);
+  }
+
+  return { where, params };
+};
+const getPartyPrintReport = async (
+  req,
+  res,
+  next
+) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const { Party_Id } = req.params;
+
+    const search = req.query.search
+      ? req.query.search.trim()
+      : "";
+
+    const searchDate =
+      req.query.date || null;
+
+    if (!Party_Id) {
+      return res.status(400).json({
+        success: false,
+        message: "Party Id is required",
+      });
+    }
+
+    const [[party]] = await connection.query(
+      `
+      SELECT *
+      FROM add_party
+      WHERE Party_Id = ?
+      LIMIT 1
+      `,
+      [Party_Id]
+    );
+
+    if (!party) {
+      return res.status(404).json({
+        success: false,
+        message: "Party not found",
+      });
+    }
+
+    const [addresses] =
+      await connection.query(
+        `
+        SELECT
+          id,
+          Address_Type,
+          Address_Text,
+          Is_Default
+        FROM add_party_addresses
+        WHERE Party_Id = ?
+        `,
+        [Party_Id]
+      );
+
+    const partyDetails = {
+      ...party,
+      addresses,
+    };
+
+    const purchaseFilter =
+      buildFilters({
+        partyId: Party_Id,
+        alias: "party",
+        numberField: "p.Bill_Number",
+        amountField: "p.Total_Amount",
+        balanceField: "p.Balance_Due",
+        dateField: "p.Bill_Date",
+        search,
+        searchDate,
+      });
+
+    const salesFilter =
+      buildFilters({
+        partyId: Party_Id,
+        alias: "p",
+        numberField:
+          "s.Invoice_Number",
+        amountField:
+          "s.Total_Amount",
+        balanceField:
+          "s.Balance_Due",
+        dateField:
+          "s.Invoice_Date",
+        search,
+        searchDate,
+      });
+
+    const purchaseReturnFilter =
+      buildFilters({
+        partyId: Party_Id,
+        alias: "p",
+        numberField:
+          "pr.Return_Number",
+        amountField:
+          "pr.Total_Amount",
+        balanceField:
+          "pr.Balance_Due",
+        dateField:
+          "pr.Return_Date",
+        search,
+        searchDate,
+      });
+
+    const saleReturnFilter =
+      buildFilters({
+        partyId: Party_Id,
+        alias: "p",
+        numberField:
+          "sr.Return_Number",
+        amountField:
+          "sr.Total_Amount",
+        balanceField:
+          "sr.Balance_Due",
+        dateField:
+          "sr.Return_Date",
+        search,
+        searchDate,
+      });
+
+    const paymentInFilter =
+      buildFilters({
+        partyId: Party_Id,
+        alias: "a",
+        numberField:
+          "pi.Receipt_No",
+        amountField:
+          "pi.Received",
+        balanceField:
+          "pi.Received",
+        dateField:
+          "pi.Payment_Date",
+        search,
+        searchDate,
+      });
+
+    const paymentOutFilter =
+      buildFilters({
+        partyId: Party_Id,
+        alias: "a",
+        numberField:
+          "po.Payment_Number",
+        amountField:
+          "po.Paid",
+        balanceField:
+          "po.Paid",
+        dateField:
+          "po.Payment_Date",
+        search,
+        searchDate,
+      });
+
+    const [
+      purchasesData,
+      salesData,
+      purchaseReturnsData,
+      saleReturnsData,
+      paymentInsData,
+      paymentOutsData,
+    ] = await Promise.all([
+      getPurchasesForPrint(
+        connection,
+        purchaseFilter.where,
+        purchaseFilter.params
+      ),
+
+      getSalesForPrint(
+        connection,
+        salesFilter.where,
+        salesFilter.params
+      ),
+
+      getPurchaseReturnsForPrint(
+        connection,
+        purchaseReturnFilter.where,
+        purchaseReturnFilter.params
+      ),
+
+      getSaleReturnsForPrint(
+        connection,
+        saleReturnFilter.where,
+        saleReturnFilter.params
+      ),
+
+      getPaymentInsForPrint(
+        connection,
+        paymentInFilter.where,
+        paymentInFilter.params
+      ),
+
+      getPaymentOutsForPrint(
+        connection,
+        paymentOutFilter.where,
+        paymentOutFilter.params
+      ),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+
+      partyDetails,
+
+        purchases:
+    purchasesData.purchaseBills,
+      purchaseSummary:
+        purchasesData.summary,
+
+      sales:
+        salesData.invoices,
+      salesSummary:
+        salesData.summary,
+
+      purchaseReturns:
+        purchaseReturnsData.purchaseReturns,
+      purchaseReturnSummary:
+        purchaseReturnsData.summary,
+
+      saleReturns:
+        saleReturnsData.saleReturns,
+      saleReturnSummary:
+        saleReturnsData.summary,
+
+      paymentIns:
+        paymentInsData.paymentIns,
+      paymentInSummary:
+        paymentInsData.summary,
+
+      paymentOuts:
+        paymentOutsData.paymentOuts,
+      paymentOutSummary:
+        paymentOutsData.summary,
+    });
+  } catch (err) {
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 export {
   addParty, editParty, getAllParties, getAllPartiesCursor, getSinglePartyDetailsSalesPurchases,
   printSinglePartyDetailsSalesPurchasesReport, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft,
-  getAllPayableParties, getAllReceivableParties, exportSinglePartyDetailsReportToExcel
+  getAllPayableParties, getAllReceivableParties, exportSinglePartyDetailsReportToExcel,getPartyPrintReport
 };
 /* ── SUMMARY BLOCK ── */
 // sheet.mergeCells(`A${cursorRow}:${LAST_COL}${cursorRow}`);

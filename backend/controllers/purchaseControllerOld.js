@@ -12,7 +12,6 @@ import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../uti
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
-import { getPurchasesForPrint } from "../helpers/printReportHelpers.js";
 
 
 
@@ -55,13 +54,14 @@ const normalizeNumber = (val) => {
 //only amount >0 needs to have an item name why please expalin ?
 
 // Because Amount is the one field that represents actual money at stake//
+
+
+//OLD
 // const addPurchase = async (req, res, next) => {
 //   let connection;
 //   try {
 //     connection = await db.getConnection();
 //     await connection.beginTransaction();
-
-//     //console.log(req.body);
 
 //     const cleanData = sanitizeObject(req.body);
 //     const validation = purchaseSchema.safeParse(cleanData);
@@ -79,62 +79,39 @@ const normalizeNumber = (val) => {
 //       Total_Amount,
 //       Total_Paid,
 //       Balance_Due,
-//       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
+//       splits,
 //       items,
-//       Terms_Conditions_Id,          // nullable int — null if user typed fresh or cleared
+//       Terms_Conditions_Id,
 //       Terms_Conditions_Description,
 //     } = validation.data;
 
-//     // 🔻 REMOVED: manual !Party_Name / !Bill_Number / !Bill_Date / items.length===0 check
-//     //    — Party_Name is enforced by the schema (min(1)); Bill_Number, Bill_Date presence-shape,
-//     //      and items being an empty array are all now legitimately allowed by the schema itself,
-//     //      so re-checking them here would just re-impose the old strict rules the schema
-//     //      was changed to relax. safeParse() above is the single source of truth now.
-
-
-
+//     // ── TERMS & CONDITIONS — unchanged ──
 //     let termsId = null;
 //     let termsDescription = null;
 
-
-
-//     if (
-//       Terms_Conditions_Id &&
-//       Terms_Conditions_Description?.trim()
-//     ) {
-//       // Template selected and untouched
+//     if (Terms_Conditions_Id && Terms_Conditions_Description?.trim()) {
 //       termsId = Number(Terms_Conditions_Id);
 //       termsDescription = Terms_Conditions_Description.trim();
-
 //     } else if (Terms_Conditions_Description?.trim()) {
-//       // Custom / edited description
-//       // UI has already cleared the template ID/title
 //       termsId = null;
 //       termsDescription = Terms_Conditions_Description.trim();
 //     }
 
-//     // Otherwise:
-//     // termsId = null
-//     // termsDescription = null
 //     if (termsId) {
 //       const [[selectedTerm]] = await connection.query(
-//         `SELECT id
-//      FROM terms_conditions
-//      WHERE id = ?
-//        AND Purchase_Bill = 1
-//      LIMIT 1`,
+//         `SELECT id FROM terms_conditions WHERE id = ? AND Purchase_Bill = 1 LIMIT 1`,
 //         [termsId]
 //       );
-
 //       if (!selectedTerm) {
 //         await connection.rollback();
-
 //         return res.status(400).json({
 //           success: false,
 //           message: "Invalid Terms & Conditions for Purchase Bill.",
 //         });
 //       }
 //     }
+
+//     // ── SPLITS — unchanged ──
 //     const normalizedSplits = (splits || []).map((s) => ({ ...s, Amount: Number(s.Amount) || 0 }));
 
 //     const firstValidIndex = normalizedSplits.findIndex((s) => {
@@ -155,7 +132,6 @@ const normalizeNumber = (val) => {
 //     const totalPaid = validSplits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
 //     const balanceDue = totalAmount - totalPaid;
 
-//     // 🔹 total paid cannot exceed total amount
 //     if (totalPaid > totalAmount) {
 //       await connection.rollback();
 //       return res.status(400).json({
@@ -172,113 +148,27 @@ const normalizeNumber = (val) => {
 //       }
 //     }
 
-
-
-//     // 🔻 REMOVED: per-item "Item name missing" loop check
-//     //    — Item_Name is now optional().default("") in the schema (blank rows are legitimately
-//     //      allowed to be submitted/skipped), so this loop was re-imposing a requirement the
-//     //      schema intentionally dropped. If you need to *skip* blank rows during insert rather
-//     //      than accept them, filter items below instead of validating/rejecting here:
-//     //      const itemsToInsert = items.filter((item) => item.Item_Name?.trim());
-
-//     // const [partyRows] = await connection.execute(
-//     //   "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
-//     //   [Party_Name]
-//     // );
-//     // if (partyRows.length === 0) {
-//     //   await connection.rollback();
-//     //   return res.status(404).json({ message: "Party not found." });
-//     // }
-//     // const Party_Id = partyRows[0].Party_Id;
-//     // =========================================================
-//     // 7. FIND PARTY / AUTO-CREATE NEW PARTY
-//     // =========================================================
-
+//     // ── PARTY RESOLUTION — unchanged ──
 //     const [partyRows] = await connection.execute(
-//       `SELECT *
-//    FROM add_party
-//    WHERE TRIM(Party_Name) = TRIM(?)
-//    LIMIT 1`,
+//       `SELECT * FROM add_party WHERE TRIM(Party_Name) = TRIM(?) LIMIT 1`,
 //       [Party_Name]
 //     );
 
 //     let Party_Id;
 
 //     if (partyRows.length === 0) {
-//       // =======================================================
-//       // A. CREATE PARTY MASTER
-//       // =======================================================
-
 //       const [partyResult] = await connection.execute(
-//         `INSERT INTO add_party
-//      (
-//        Party_Name,
-
-
-//        created_at,
-//        updated_at
-//      )
-//      VALUES (?, NOW(), NOW())`,
-//         [
-//           Party_Name.trim(),
-
-
-//         ]
+//         `INSERT INTO add_party (Party_Name, created_at, updated_at) VALUES (?, NOW(), NOW())`,
+//         [Party_Name.trim()]
 //       );
-
 //       const partyIdNumber = partyResult.insertId;
-
-//       Party_Id =
-//         "PTY" +
-//         partyIdNumber
-//           .toString()
-//           .padStart(3, "0");
-
-//       await connection.execute(
-//         `UPDATE add_party
-//      SET Party_Id = ?
-//      WHERE id = ?`,
-//         [Party_Id, partyIdNumber]
-//       );
-
-//       // =======================================================
-//       // B. CREATE DEFAULT BILLING ADDRESS
-//       // =======================================================
-
-//       // Only create address row if user actually entered address
-//       // if (Billing_Address?.trim()) {
-//       //   await connection.execute(
-//       //     `INSERT INTO add_party_address
-//       //      (
-//       //        Party_Id,
-//       //        Billing_Address,
-//       //        Is_Default,
-//       //        created_at,
-//       //        updated_at
-//       //      )
-//       //      VALUES (?, ?, 1, NOW(), NOW())`,
-//       //     [
-//       //       Party_Id,
-//       //       Billing_Address.trim(),
-//       //     ]
-//       //   );
-//       // }
-//     }
-
-//     // =========================================================
-//     // EXISTING PARTY
-//     // =========================================================
-//     else {
+//       Party_Id = "PTY" + partyIdNumber.toString().padStart(3, "0");
+//       await connection.execute(`UPDATE add_party SET Party_Id = ? WHERE id = ?`, [Party_Id, partyIdNumber]);
+//     } else {
 //       Party_Id = partyRows[0].Party_Id;
-
-//       // IMPORTANT:
-//       // Don't update party phone here.
-//       // Don't update default billing address here.
-//       //
-//       // Phone_Number and Billing_Address entered in this sale
-//       // belong to this invoice only.
 //     }
 
+//     // ── FINANCIAL YEAR — unchanged ──
 //     const [fy] = await connection.query(
 //       `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
 //     );
@@ -288,47 +178,24 @@ const normalizeNumber = (val) => {
 //     }
 //     const activeFY = fy[0].Financial_Year;
 
+//     // ── PURCHASE HEADER — unchanged ──
 //     const [purchaseResult] = await connection.execute(
 //       `INSERT INTO add_purchase
-//    (
-//      Party_Id,
-//      Bill_Number,
-//      Bill_Date,
-//      financial_year,
-//      State_Of_Supply,
-//      Total_Amount,
-//      Total_Paid,
-//      Balance_Due,
-//      Terms_Conditions_Id,
-//      Terms_Conditions_Description,
-//      created_at,
-//      updated_at
-//    )
-//    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//        (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
+//         Total_Amount, Total_Paid, Balance_Due, Terms_Conditions_Id, Terms_Conditions_Description,
+//         created_at, updated_at)
+//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 //       [
-//         Party_Id,
-//         Bill_Number,
-//         Bill_Date,
-//         activeFY,
-//         cleanValue(State_Of_Supply),
-
-//         totalAmount,
-//         totalPaid,
-//         balanceDue,
-
-//         // Terms
-//         termsId,
-//         termsDescription,
+//         Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply),
+//         totalAmount, totalPaid, balanceDue, termsId, termsDescription,
 //       ]
 //     );
 
 //     const purchaseIdNumber = purchaseResult.insertId;
 //     const newPurchaseId = "PUR" + purchaseIdNumber.toString().padStart(3, "0");
 
-//     await connection.execute(
-//       `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
-//       [newPurchaseId, purchaseIdNumber]
-//     );
+//     await connection.execute(`UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`, [newPurchaseId, purchaseIdNumber]);
+
 //     if (validSplits.length > 0) {
 //       await insertPaymentSplits({
 //         connection,
@@ -339,18 +206,6 @@ const normalizeNumber = (val) => {
 //         splits: validSplits,
 //       });
 //     }
-//     // 🔹 insert splits + fan out to bank/cash ledgers
-//     //     if (totalPaid > 0 && validSplits.length > 0) {
-//     //   await insertPaymentSplits({
-//     //     connection,
-//     //     sourceType: "Purchase",
-//     //     sourceId: purchaseIdNumber,
-//     //     partyName: Party_Name,
-//     //     txnDate: Bill_Date,
-//     //     splits: validSplits,   // 🔹 use the filtered array here
-//     //   });
-//     // }
-   
 
 //     await recordPartyLedger({
 //       connection,
@@ -363,7 +218,9 @@ const normalizeNumber = (val) => {
 //       balanceDue: balanceDue,
 //     });
 
-//     // items loop — unchanged, now naturally handles an empty items array (no-op loop)
+//     // ═══════════════════════════════════════════════════════
+//     // ITEMS LOOP — unit resolution + snapshot logic
+//     // ═══════════════════════════════════════════════════════
 //     for (const item of items) {
 //       if (!item.Item_Name?.trim()) {
 //         if ((normalizeNumber(item.Amount) ?? 0) > 0) {
@@ -373,12 +230,14 @@ const normalizeNumber = (val) => {
 //         continue;
 //       }
 
+      
 //       const {
 //         Item_Category,
 //         Item_Name,
 //         Item_HSN,
 //         Quantity,
 //         Item_Unit,
+
 //         Purchase_Price,
 //         Discount_On_Purchase_Price,
 //         Discount_Type_On_Purchase_Price,
@@ -388,52 +247,303 @@ const normalizeNumber = (val) => {
 //         Item_Image,
 //       } = item;
 
+//       // UI currently calls the selected billing unit "Item_Unit".
+//       // Backend internally calls it Selected_Unit.
+//       const Selected_Unit = Item_Unit || null;
+
 //       const [itemRows] = await connection.execute(
 //         "SELECT * FROM add_item WHERE TRIM(Item_Name) = TRIM(?) LIMIT 1",
 //         [Item_Name]
 //       );
 
 //       let Item_Id;
+//       let stockDelta;
+//       let snapshot = { Primary_Unit_Snapshot: null, Secondary_Unit_Snapshot: null };
+//       let resolvedSelectedUnit = null;
 
+//       // if (itemRows.length === 0) {
+//       //   // ── NEW ITEM — legacy/no-unit, never invent a primary/secondary here ──
+//       //   const [itemResult] = await connection.execute(
+//       //     `INSERT INTO add_item
+//       //      (Item_Name, Item_HSN, Item_Unit, Item_Category, Stock_Quantity, created_at, updated_at)
+//       //      VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+//       //     [
+//       //       Item_Name,
+//       //       cleanValue(Item_HSN),
+//       //       Item_Unit || "",
+//       //       Item_Category || "",
+//       //       normalizeNumber(Quantity) ?? 0,
+//       //     ]
+//       //   );
+//       //   const itemIdNum = itemResult.insertId;
+//       //   Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
+//       //   await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, itemIdNum]);
+
+//       //   stockDelta = normalizeNumber(Quantity) ?? 0;
+//       //   // snapshot stays null — legacy item, no unit config
+//       // } else {
+//       //   // ── EXISTING ITEM — resolve unit + stock delta ──
+//       //   Item_Id = itemRows[0].Item_Id;
+//       //   const dbItemRow = itemRows[0];
+
+//       //   try {
+//       //     const result = resolveUnitAndStockDelta({ dbItemRow, Selected_Unit, Quantity });
+//       //     stockDelta = result.stockDelta;
+//       //     snapshot = result.snapshot;
+//       //     resolvedSelectedUnit = result.resolvedSelectedUnit;
+//       //   } catch (unitErr) {
+//       //     await connection.rollback();
+//       //     return res.status(400).json({ success: false, message: unitErr.message });
+//       //   }
+
+//       //   await connection.execute(
+//       //     `UPDATE add_item
+//       //      SET Stock_Quantity = Stock_Quantity + ?,
+//       //          Item_HSN = ?,
+//       //          Item_Category = ?,
+//       //          updated_at = NOW()
+//       //      WHERE Item_Id = ?`,
+//       //     [stockDelta, cleanValue(Item_HSN) || dbItemRow.Item_HSN, Item_Category || "", Item_Id]
+//       //   );
+//       // }
 //       if (itemRows.length === 0) {
-//         const [itemResult] = await connection.execute(
-//           `INSERT INTO add_item
-//            (Item_Name, Item_HSN, Item_Unit, Item_Category, Stock_Quantity, created_at, updated_at)
-//            VALUES (?, ?, ?, ?, ?,  NOW(), NOW())`,
-//           [
-//             Item_Name,
-//             cleanValue(Item_HSN),
-//             Item_Unit || "",
+//         // =========================================================
+//         // NEW ITEM CREATED DIRECTLY FROM PURCHASE
+//         // =========================================================
+//         //
+//         // Frontend Item_Unit = unit selected by user.
+//         //
+//         // Example:
+//         // Item_Unit = "Kg"
+//         //
+//         // New item becomes:
+//         // Primary_Unit    = Kg
+//         // Secondary_Unit  = NULL
+//         // Conversion_Rate = NULL
+//         //
+//         // Purchase snapshot:
+//         // Primary = Kg
+//         // Secondary = NULL
+//         // Selected = Kg
+//         //
+//         // If Item_Unit = "" (NONE):
+//         // everything remains NULL.
+//         // =========================================================
 
-//             Item_Category || "",
-//             normalizeNumber(Quantity),
-//           ]
+//         const selectedUnit = Item_Unit || null;
+
+//         const primaryUnit = selectedUnit;
+
+//         const [itemResult] = await connection.execute(
+//           `
+//     INSERT INTO add_item
+// (
+//   Item_Name,
+//   Item_HSN,
+//   Item_Unit,
+//   Item_Category,
+
+//   Primary_Unit,
+//   Secondary_Unit,
+//   Conversion_Rate,
+
+//   Purchase_Price,
+
+//   Stock_Quantity,
+
+//   created_at,
+//   updated_at
+// )
+// VALUES
+// (
+//   ?, ?, ?, ?,
+//   ?, ?, ?,
+//   ?,
+//   ?,
+//   NOW(), NOW()
+// )
+//     `,
+//           [
+//   Item_Name,
+//   cleanValue(Item_HSN),
+
+//   // Legacy field
+//   Item_Unit || "",
+
+//   Item_Category || "",
+
+//   // Unit system
+//   primaryUnit,
+//   null,
+//   null,
+
+//   // ✅ Latest purchase price
+//   normalizeNumber(Purchase_Price) ?? null,
+
+//   // Initial stock
+//   normalizeNumber(Quantity) ?? 0,
+// ]
 //         );
+
 //         const itemIdNum = itemResult.insertId;
+
 //         Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
+
 //         await connection.execute(
-//           `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
+//           `
+//     UPDATE add_item
+//     SET Item_Id = ?
+//     WHERE id = ?
+//     `,
 //           [Item_Id, itemIdNum]
 //         );
-//       } else {
+
+//         // Stock was already inserted above.
+//         // This variable is needed for consistency,
+//         // but DON'T add it to stock again here.
+//         stockDelta =normalizeNumber(Quantity) ?? 0;
+
+//         // Bill snapshot
+//         snapshot = {
+//           Primary_Unit_Snapshot: primaryUnit,
+//           Secondary_Unit_Snapshot: null,
+//         };
+
+//         // The actual unit selected in this purchase row
+//         resolvedSelectedUnit = selectedUnit;
+
+//       }
+//        else {
+
+//         // =========================================================
+//         // EXISTING ITEM
+//         // =========================================================
+
+       
 //         Item_Id = itemRows[0].Item_Id;
-//         await connection.execute(
-//           `UPDATE add_item
-//            SET Stock_Quantity = Stock_Quantity + ?,
-//                Item_HSN = ?,
-//                Item_Category = ?,
-//                updated_at = NOW()
-//            WHERE Item_Id = ?`,
-//           [normalizeNumber(Quantity), cleanValue(Item_HSN) || itemRows[0].Item_HSN, Item_Category || "", Item_Id]
-//         );
+
+// let dbItemRow = itemRows[0];
+
+// // =========================================================
+// // EXISTING ITEM BUT NO UNIT CONFIGURED YET
+// //
+// // Example:
+// // add_item:
+// // Primary_Unit = NULL
+// // Secondary_Unit = NULL
+// //
+// // User selects Kgs in Purchase.
+// //
+// // → Make Kgs the Primary_Unit immediately.
+// // =========================================================
+
+// if (
+//   !dbItemRow.Primary_Unit &&
+//   Selected_Unit
+// ) {
+//   await connection.execute(
+//     `
+//     UPDATE add_item
+//     SET
+//       Primary_Unit = ?,
+//       Item_Unit = ?,
+//       updated_at = NOW()
+//     WHERE Item_Id = ?
+//     `,
+//     [
+//       Selected_Unit,
+//       Selected_Unit,
+//       Item_Id,
+//     ]
+//   );
+
+//   // IMPORTANT:
+//   // Update local object too because resolveUnitAndStockDelta()
+//   // uses dbItemRow, not the database again.
+//   dbItemRow = {
+//     ...dbItemRow,
+//     Primary_Unit: Selected_Unit,
+//     Item_Unit: Selected_Unit,
+//   };
+// }
+// //const isService =dbItemRow?.Item_Type === "Service";;
+// // =========================================================
+// // NOW RESOLVE UNIT + STOCK
+// // =========================================================
+
+// try {
+// //   if (isService) {
+// //   stockDelta = 0;
+
+// //  snapshot = {
+// //   Primary_Unit_Snapshot: null,
+// //   Secondary_Unit_Snapshot: null,
+// // };
+
+// // resolvedSelectedUnit = Selected_Unit ?? null;
+
+// //   //resolvedSelectedUnit = Selected_Unit;
+// // }
+
+//   const result = resolveUnitAndStockDelta({
+//     dbItemRow,
+//     Selected_Unit,
+//     Quantity,
+//   });
+
+//   stockDelta = result.stockDelta;
+//   snapshot = result.snapshot;
+//   resolvedSelectedUnit =
+//     result.resolvedSelectedUnit;
+
+ 
+
+// } catch (unitErr) {
+//   await connection.rollback();
+
+//   return res.status(400).json({
+//     success: false,
+//     message: unitErr.message,
+//   });
+// }
+
+//         // Existing item → increase existing stock
+        
+//        await connection.execute(
+//   `
+//   UPDATE add_item
+//   SET
+//     Stock_Quantity = Stock_Quantity + ?,
+//     Item_HSN = ?,
+//     Item_Category = ?,
+//     Purchase_Price = ?,
+//     updated_at = NOW()
+//   WHERE Item_Id = ?
+//   `,
+//   [
+//     stockDelta,
+
+//     cleanValue(Item_HSN) || dbItemRow.Item_HSN,
+
+//     Item_Category || "",
+
+//     // ✅ Always keep latest purchase price
+//     normalizeNumber(Purchase_Price) ?? null,
+
+//     Item_Id,
+//   ]
+// );
+        
 //       }
 
 //       const [pitResult] = await connection.execute(
 //         `INSERT INTO add_purchase_items
 //          (Purchase_Id, Item_Id, Quantity, Purchase_Price,
 //           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//           Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+//           Tax_Type, Tax_Amount, Amount,
+//           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
+//           created_at, updated_at)
+//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
 //         [
 //           newPurchaseId,
 //           Item_Id,
@@ -444,6 +554,9 @@ const normalizeNumber = (val) => {
 //           cleanValue(Tax_Type),
 //           normalizeNumber(Tax_Amount) ?? 0,
 //           normalizeNumber(Amount) ?? 0,
+//           snapshot.Primary_Unit_Snapshot,
+//           snapshot.Secondary_Unit_Snapshot,
+//           resolvedSelectedUnit,
 //         ]
 //       );
 //       const pitId = pitResult.insertId;
@@ -452,20 +565,21 @@ const normalizeNumber = (val) => {
 //         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
 //         [newPurchaseItemId, pitId]
 //       );
+     
 //       await recordItemLedger({
-//         connection,
-//         itemId: Item_Id,
-//         txnType: "Purchase",
-//         referenceId: pitResult.insertId,   // purchase_item row's numeric id
-//         //formattedId: newPurchaseId,
-//          billId:      newPurchaseId,
-//           billNumber: Bill_Number,   // AEPL-22
-//         partyName: Party_Name,
-//         quantity: normalizeNumber(Quantity) ?? 0,
-//         rate: normalizeNumber(Purchase_Price) ?? null,
-//         txnDate: Bill_Date,
-
-//       });
+//   connection,
+//   itemId:       Item_Id,
+//   txnType:      "Purchase",
+//   referenceId:  pitResult.insertId,
+//   billId:       newPurchaseId,
+//   billNumber:   Bill_Number,
+//   partyName:    Party_Name,
+//   quantity:     normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
+//   selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+//   baseQty:      stockDelta,                         // 🔹 normalized: e.g. 0.5
+//   rate:         normalizeNumber(Purchase_Price) ?? null,
+//   txnDate:      Bill_Date,
+// });
 //     }
 
 //     await connection.commit();
@@ -484,8 +598,6 @@ const normalizeNumber = (val) => {
 //   }
 // };
 
-
-//NEW
 const addPurchase = async (req, res, next) => {
   let connection;
   try {
@@ -679,84 +791,39 @@ const addPurchase = async (req, res, next) => {
       // UI currently calls the selected billing unit "Item_Unit".
       // Backend internally calls it Selected_Unit.
       const Selected_Unit = Item_Unit || null;
+      let selectedUnitId = null;
+
+if (Selected_Unit) {
+  const [unitRows] = await connection.execute(
+    `
+    SELECT id
+    FROM units
+    WHERE Unit_Shorthand = ?
+    LIMIT 1
+    `,
+    [Selected_Unit]
+  );
+
+  selectedUnitId = unitRows?.[0]?.id || null;
+}
 
       const [itemRows] = await connection.execute(
         "SELECT * FROM add_item WHERE TRIM(Item_Name) = TRIM(?) LIMIT 1",
         [Item_Name]
       );
-
+      let primaryUnitSnapshotId = null;
+let secondaryUnitSnapshotId = null;
       let Item_Id;
       let stockDelta;
       let snapshot = { Primary_Unit_Snapshot: null, Secondary_Unit_Snapshot: null };
       let resolvedSelectedUnit = null;
 
-      // if (itemRows.length === 0) {
-      //   // ── NEW ITEM — legacy/no-unit, never invent a primary/secondary here ──
-      //   const [itemResult] = await connection.execute(
-      //     `INSERT INTO add_item
-      //      (Item_Name, Item_HSN, Item_Unit, Item_Category, Stock_Quantity, created_at, updated_at)
-      //      VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      //     [
-      //       Item_Name,
-      //       cleanValue(Item_HSN),
-      //       Item_Unit || "",
-      //       Item_Category || "",
-      //       normalizeNumber(Quantity) ?? 0,
-      //     ]
-      //   );
-      //   const itemIdNum = itemResult.insertId;
-      //   Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
-      //   await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, itemIdNum]);
-
-      //   stockDelta = normalizeNumber(Quantity) ?? 0;
-      //   // snapshot stays null — legacy item, no unit config
-      // } else {
-      //   // ── EXISTING ITEM — resolve unit + stock delta ──
-      //   Item_Id = itemRows[0].Item_Id;
-      //   const dbItemRow = itemRows[0];
-
-      //   try {
-      //     const result = resolveUnitAndStockDelta({ dbItemRow, Selected_Unit, Quantity });
-      //     stockDelta = result.stockDelta;
-      //     snapshot = result.snapshot;
-      //     resolvedSelectedUnit = result.resolvedSelectedUnit;
-      //   } catch (unitErr) {
-      //     await connection.rollback();
-      //     return res.status(400).json({ success: false, message: unitErr.message });
-      //   }
-
-      //   await connection.execute(
-      //     `UPDATE add_item
-      //      SET Stock_Quantity = Stock_Quantity + ?,
-      //          Item_HSN = ?,
-      //          Item_Category = ?,
-      //          updated_at = NOW()
-      //      WHERE Item_Id = ?`,
-      //     [stockDelta, cleanValue(Item_HSN) || dbItemRow.Item_HSN, Item_Category || "", Item_Id]
-      //   );
-      // }
       if (itemRows.length === 0) {
         // =========================================================
         // NEW ITEM CREATED DIRECTLY FROM PURCHASE
         // =========================================================
         //
-        // Frontend Item_Unit = unit selected by user.
-        //
-        // Example:
-        // Item_Unit = "Kg"
-        //
-        // New item becomes:
-        // Primary_Unit    = Kg
-        // Secondary_Unit  = NULL
-        // Conversion_Rate = NULL
-        //
-        // Purchase snapshot:
-        // Primary = Kg
-        // Secondary = NULL
-        // Selected = Kg
-        //
-        // If Item_Unit = "" (NONE):
-        // everything remains NULL.
+       
         // =========================================================
 
         const selectedUnit = Item_Unit || null;
@@ -772,8 +839,12 @@ const addPurchase = async (req, res, next) => {
   Item_Unit,
   Item_Category,
 
+  
   Primary_Unit,
+  Primary_Unit_Id,
+
   Secondary_Unit,
+  Secondary_Unit_Id,
   Conversion_Rate,
 
   Purchase_Price,
@@ -786,6 +857,7 @@ const addPurchase = async (req, res, next) => {
 VALUES
 (
   ?, ?, ?, ?,
+  ?, ?,
   ?, ?, ?,
   ?,
   ?,
@@ -802,8 +874,15 @@ VALUES
   Item_Category || "",
 
   // Unit system
+  // Primary
   primaryUnit,
+  selectedUnitId,
+
+  // Secondary
   null,
+  null,
+
+  // Conversion
   null,
 
   // ✅ Latest purchase price
@@ -837,6 +916,8 @@ VALUES
           Primary_Unit_Snapshot: primaryUnit,
           Secondary_Unit_Snapshot: null,
         };
+        primaryUnitSnapshotId = selectedUnitId;
+secondaryUnitSnapshotId = null;
 
         // The actual unit selected in this purchase row
         resolvedSelectedUnit = selectedUnit;
@@ -852,6 +933,9 @@ VALUES
         Item_Id = itemRows[0].Item_Id;
 
 let dbItemRow = itemRows[0];
+primaryUnitSnapshotId =dbItemRow.Primary_Unit_Id || null;
+
+secondaryUnitSnapshotId =dbItemRow.Secondary_Unit_Id || null;
 
 // =========================================================
 // EXISTING ITEM BUT NO UNIT CONFIGURED YET
@@ -875,15 +959,17 @@ if (
     UPDATE add_item
     SET
       Primary_Unit = ?,
+      Primary_Unit_Id = ?,
       Item_Unit = ?,
       updated_at = NOW()
     WHERE Item_Id = ?
     `,
-    [
-      Selected_Unit,
-      Selected_Unit,
-      Item_Id,
-    ]
+   [
+  Selected_Unit,
+  selectedUnitId,
+  Selected_Unit,
+  Item_Id,
+]
   );
 
   // IMPORTANT:
@@ -892,8 +978,11 @@ if (
   dbItemRow = {
     ...dbItemRow,
     Primary_Unit: Selected_Unit,
+    Primary_Unit_Id: selectedUnitId,
     Item_Unit: Selected_Unit,
   };
+  primaryUnitSnapshotId = selectedUnitId;
+secondaryUnitSnapshotId = null;
 }
 //const isService =dbItemRow?.Item_Type === "Service";;
 // =========================================================
@@ -901,18 +990,7 @@ if (
 // =========================================================
 
 try {
-//   if (isService) {
-//   stockDelta = 0;
 
-//  snapshot = {
-//   Primary_Unit_Snapshot: null,
-//   Secondary_Unit_Snapshot: null,
-// };
-
-// resolvedSelectedUnit = Selected_Unit ?? null;
-
-//   //resolvedSelectedUnit = Selected_Unit;
-// }
 
   const result = resolveUnitAndStockDelta({
     dbItemRow,
@@ -922,9 +1000,10 @@ try {
 
   stockDelta = result.stockDelta;
   snapshot = result.snapshot;
-  resolvedSelectedUnit =
-    result.resolvedSelectedUnit;
+  resolvedSelectedUnit =result.resolvedSelectedUnit;
+  primaryUnitSnapshotId =dbItemRow?.Primary_Unit_Id || null;
 
+secondaryUnitSnapshotId =dbItemRow?.Secondary_Unit_Id || null;
  
 
 } catch (unitErr) {
@@ -966,28 +1045,70 @@ try {
       }
 
       const [pitResult] = await connection.execute(
-        `INSERT INTO add_purchase_items
-         (Purchase_Id, Item_Id, Quantity, Purchase_Price,
-          Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-          Tax_Type, Tax_Amount, Amount,
-          Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
-          created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          newPurchaseId,
-          Item_Id,
-          normalizeNumber(Quantity) ?? 0,
-          normalizeNumber(Purchase_Price) ?? 0,
-          cleanDiscount(Discount_On_Purchase_Price),
-          cleanValue(Discount_Type_On_Purchase_Price),
-          cleanValue(Tax_Type),
-          normalizeNumber(Tax_Amount) ?? 0,
-          normalizeNumber(Amount) ?? 0,
-          snapshot.Primary_Unit_Snapshot,
-          snapshot.Secondary_Unit_Snapshot,
-          resolvedSelectedUnit,
-        ]
-      );
+  `
+  INSERT INTO add_purchase_items
+  (
+    Purchase_Id,
+    Item_Id,
+
+    Quantity,
+    Purchase_Price,
+
+    Discount_On_Purchase_Price,
+    Discount_Type_On_Purchase_Price,
+
+    Tax_Type,
+    Tax_Amount,
+    Amount,
+
+    Primary_Unit_Snapshot,
+    Primary_Unit_Snapshot_Id,
+
+    Secondary_Unit_Snapshot,
+    Secondary_Unit_Snapshot_Id,
+
+    Selected_Unit,
+    Selected_Unit_Id,
+
+    created_at,
+    updated_at
+  )
+  VALUES
+  (
+    ?, ?,
+    ?, ?,
+    ?, ?,
+    ?, ?, ?,
+    ?, ?,
+    ?, ?,
+    ?, ?,
+    NOW(), NOW()
+  )
+  `,
+  [
+    newPurchaseId,
+    Item_Id,
+
+    normalizeNumber(Quantity) ?? 0,
+    normalizeNumber(Purchase_Price) ?? 0,
+
+    cleanDiscount(Discount_On_Purchase_Price),
+    cleanValue(Discount_Type_On_Purchase_Price),
+
+    cleanValue(Tax_Type),
+    normalizeNumber(Tax_Amount) ?? 0,
+    normalizeNumber(Amount) ?? 0,
+
+    snapshot.Primary_Unit_Snapshot,
+    primaryUnitSnapshotId,
+
+    snapshot.Secondary_Unit_Snapshot,
+    secondaryUnitSnapshotId,
+
+    resolvedSelectedUnit,
+    selectedUnitId,
+  ]
+);
       const pitId = pitResult.insertId;
       const newPurchaseItemId = "PIT" + pitId.toString().padStart(3, "0");
       await connection.execute(
@@ -1005,6 +1126,7 @@ try {
   partyName:    Party_Name,
   quantity:     normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
   selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
+  selectedUnitId,
   baseQty:      stockDelta,                         // 🔹 normalized: e.g. 0.5
   rate:         normalizeNumber(Purchase_Price) ?? null,
   txnDate:      Bill_Date,
@@ -2814,6 +2936,561 @@ if (purchaseReturn) {
 //     AND pa.Address_Type = 'Billing'
 //     AND pa.Is_Default = 1
 // ) AS Billing_Address,
+// const getSinglePurchase = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     const { Purchase_Id: purchaseId } = req.params;
+
+//     connection = await db.getConnection();
+
+//     // =========================================================
+//     // 1. VALIDATE PURCHASE ID
+//     // =========================================================
+
+//     if (!purchaseId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Purchase ID is required.",
+//       });
+//     }
+
+//     // =========================================================
+//     // 2. FETCH PURCHASE HEADER
+//     // =========================================================
+
+//     const [purchaseData] = await connection.query(
+//       `
+//       SELECT
+//         pu.id,
+//         pu.Purchase_Id,
+//         pu.Bill_Number,
+//         pu.Bill_Date,
+//         pu.State_Of_Supply,
+//         pu.Total_Amount,
+//         pu.Total_Paid,
+//         pu.Balance_Due,
+//         pu.Party_Id,
+
+//         pu.Terms_Conditions_Id,
+//         pu.Terms_Conditions_Description,
+
+//          p.Party_Name,
+//     p.GSTIN,
+//     p.State,
+     
+
+//         tc.Title AS Terms_Conditions_Title
+
+//       FROM add_purchase pu
+
+//       LEFT JOIN add_party p
+//         ON pu.Party_Id = p.Party_Id
+
+//       LEFT JOIN terms_conditions tc
+//         ON pu.Terms_Conditions_Id = tc.id
+
+//       WHERE pu.Purchase_Id = ?
+//       `,
+//       [purchaseId]
+//     );
+
+//     if (purchaseData.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Purchase not found.",
+//       });
+//     }
+
+//     const purchaseHeader = purchaseData[0];
+
+//     // =========================================================
+//     // 3. FETCH PURCHASE ITEMS
+//     // =========================================================
+//     //
+//     // IMPORTANT:
+//     //
+//     // Unit information comes from add_purchase_items:
+//     //
+//     // Primary_Unit_Snapshot
+//     // Secondary_Unit_Snapshot
+//     // Selected_Unit
+//     //
+//     // We DO NOT use current add_item Primary/Secondary to
+//     // determine historical bill dropdown.
+//     //
+//     // =========================================================
+
+//     const [items] = await connection.query(
+//       `
+//      SELECT
+//   pi.Purchase_Items_Id,
+//   pi.Item_Id,
+
+//   i.Item_Name,
+//   i.Item_HSN,
+//   i.Item_Unit,
+//   i.Item_Category,
+
+//   -- CURRENT MASTER
+//   i.Primary_Unit AS Current_Primary_Unit,
+//   i.Secondary_Unit AS Current_Secondary_Unit,
+//        i.Conversion_Rate,
+//   pi.Quantity,
+
+//   -- HISTORICAL SNAPSHOT
+//   pi.Primary_Unit_Snapshot,
+//   pi.Secondary_Unit_Snapshot,
+//   pi.Selected_Unit,
+
+//   pi.Purchase_Price,
+//   pi.Discount_On_Purchase_Price,
+//   pi.Discount_Type_On_Purchase_Price,
+//   pi.Tax_Amount,
+//   pi.Tax_Type,
+//   pi.Amount,
+//   pi.created_at
+
+//       FROM add_purchase_items pi
+
+//       LEFT JOIN add_item i
+//         ON pi.Item_Id = i.Item_Id
+
+//       WHERE pi.Purchase_Id = ?
+
+//       ORDER BY pi.created_at DESC
+//       `,
+//       [purchaseId]
+//     );
+
+//     // =========================================================
+//     // 4. FETCH ALL UNITS FROM UNIT MASTER
+//     // =========================================================
+//     //
+//     // Used ONLY when purchase item has NO unit snapshot.
+//     //
+//     // Example:
+//     //
+//     // Historical bill:
+//     //
+//     // Primary snapshot   = NULL
+//     // Secondary snapshot = NULL
+//     //
+//     // Then dropdown:
+//     //
+//     // None
+//     // Kg
+//     // Gm
+//     // Box
+//     // Pcs
+//     // ...
+//     //
+//     // =========================================================
+
+//     const [allUnits] = await connection.query(
+//       `
+//       SELECT
+//         Unit_Shorthand,
+//         Unit_Name
+//       FROM units
+//       ORDER BY Unit_Name ASC
+//       `
+//     );
+
+//     // =========================================================
+//     // 5. FORMAT PURCHASE ITEMS + AVAILABLE UNITS
+//     // =========================================================
+
+//     const formattedItems = items.map((it) => {
+//       let availableUnits = [];
+
+//       // =======================================================
+//       // CASE 1:
+//       // PURCHASE ROW HAS A UNIT SNAPSHOT
+//       // =======================================================
+//       //
+//       // Example:
+//       //
+//       // Historical:
+//       //
+//       // Primary   = Kg
+//       // Secondary = Gm
+//       //
+//       // Current item might now be:
+//       //
+//       // Primary   = Kg
+//       // Secondary = Box
+//       //
+//       // OLD BILL STILL SHOWS:
+//       //
+//       // Kg
+//       // Gm
+//       //
+//       // =======================================================
+
+//       // if (it.Primary_Unit_Snapshot) {
+//       //   const snapshotUnits = [
+//       //     it.Primary_Unit_Snapshot,
+//       //     it.Secondary_Unit_Snapshot,
+//       //   ].filter(Boolean);
+
+//       //   availableUnits = snapshotUnits.map(
+//       //     (unitCode) => {
+//       //       // Get full unit name from unit master if it
+//       //       // still exists there.
+//       //       const masterUnit = allUnits.find(
+//       //         (unit) =>
+//       //           unit.Unit_Shorthand === unitCode
+//       //       );
+
+//       //       return {
+//       //         Unit_Shorthand: unitCode,
+
+//       //         // If old unit was removed from master,
+//       //         // still preserve/display its shorthand.
+//       //         Unit_Name:
+//       //           masterUnit?.Unit_Name || unitCode,
+//       //       };
+//       //     }
+//       //   );
+//       // }
+
+     
+
+//       // else {
+//       //   availableUnits = [
+//       //     {
+//       //       Unit_Shorthand: null,
+//       //       Unit_Name: "None",
+//       //     },
+
+//       //     ...allUnits.map((unit) => ({
+//       //       Unit_Shorthand:
+//       //         unit.Unit_Shorthand,
+
+//       //       Unit_Name:
+//       //         unit.Unit_Name,
+//       //     })),
+//       //   ];
+//       // }
+// // =======================================================
+// // DECIDE WHICH UNITS EDIT PURCHASE SHOULD SHOW
+// // =======================================================
+
+// const oldPrimary =
+//   it.Primary_Unit_Snapshot || null;
+
+// const oldSecondary =
+//   it.Secondary_Unit_Snapshot || null;
+
+// const oldSelected =
+//   it.Selected_Unit || null;
+
+// const currentPrimary =
+//   it.Current_Primary_Unit || null;
+
+// const currentSecondary =it.Current_Secondary_Unit || null;
+// const price = Number(it.Purchase_Price || 0);
+// let discountAmount = 0;
+
+//       if (Number(it.Discount_On_Purchase_Price || 0) > 0) {
+//         if (it.Discount_Type_On_Purchase_Price === "Percentage") {
+//           discountAmount =
+//             (price * Number(it.Discount_On_Purchase_Price)) / 100;
+//         } else {
+//           discountAmount = Number(
+//             it.Discount_On_Purchase_Price
+//           );
+//         }
+//       }
+
+// // Did this OLD purchase actually use its secondary unit?
+// //
+// // Old snapshot: KG / GM
+// // Selected:     GM
+// //
+// // => TRUE
+// const oldUsedSecondary =
+//   oldSecondary &&
+//   oldSelected === oldSecondary;
+
+
+// let unitCodes = [];
+
+
+// // =======================================================
+// // CASE 1: OLD PURCHASE USED OLD SECONDARY
+// //
+// // Old snapshot  = KG / GM
+// // Old selected  = GM
+// // Current master = KG / BOX
+// //
+// // SHOW => KG / GM
+// // =======================================================
+
+// if (oldUsedSecondary) {
+
+//   unitCodes = [
+//     oldPrimary,
+//     oldSecondary,
+//   ].filter(Boolean);
+
+// }
+
+
+// // =======================================================
+// // CASE 2: OLD PURCHASE USED PRIMARY
+// //
+// // Old snapshot   = KG / GM
+// // Old selected   = KG
+// // Current master = KG / BOX
+// //
+// // SHOW => KG / BOX
+// //
+// // ALSO:
+// // Current master KG only
+// // => show KG only
+// // =======================================================
+
+// else {
+
+//   unitCodes = [
+//     currentPrimary,
+//     currentSecondary,
+//   ].filter(Boolean);
+
+// }
+
+
+// // Remove duplicates just in case
+// unitCodes = [...new Set(unitCodes)];
+
+
+// // =======================================================
+// // CREATE Available_Units FOR FRONTEND
+// // =======================================================
+
+// availableUnits = unitCodes.map((unitCode) => {
+
+//   const masterUnit = allUnits.find(
+//     (unit) =>
+//       unit.Unit_Shorthand === unitCode
+//   );
+
+//   return {
+//     Unit_Shorthand: unitCode,
+//     Unit_Name:
+//       masterUnit?.Unit_Name || unitCode,
+//   };
+// });
+//       // =======================================================
+//       // RETURN FORMATTED ITEM
+//       // =======================================================
+
+//       return {
+//         Purchase_Items_Id:
+//           it.Purchase_Items_Id,
+
+//         Item_Id:
+//           it.Item_Id,
+
+//         Item_Name:
+//           it.Item_Name,
+
+//         Item_HSN:it.Item_HSN,
+
+//         // Keep legacy column for old application data
+//         Item_Unit:it.Item_Unit,
+
+//         Item_Category:it.Item_Category,
+
+//         Quantity:
+//           it.Quantity,
+
+//         // =====================================================
+//         // UNIT DATA
+//         // =====================================================
+
+//         Primary_Unit:it.Primary_Unit_Snapshot,
+
+//         Secondary_Unit:
+//           it.Secondary_Unit_Snapshot,
+
+//         // ONE unit selected by user for this bill row
+//         Selected_Unit:it.Selected_Unit,
+//         Conversion_Rate:it.Conversion_Rate !== null
+//     ? Number(it.Conversion_Rate)
+//     : 0,
+//         // Units frontend should show in edit dropdown
+//         Available_Units:
+//           availableUnits,
+
+//         // =====================================================
+//         // PRICE / TAX
+//         // =====================================================
+
+//         Purchase_Price:
+//           it.Purchase_Price,
+
+//         Discount_On_Purchase_Price:
+//           it.Discount_On_Purchase_Price,
+
+//         Discount_Type_On_Purchase_Price:
+//           it.Discount_Type_On_Purchase_Price,
+
+//         Tax_Amount:it.Tax_Amount,
+//          Discount_Amount: Number(
+//           discountAmount.toFixed(2)
+//         ),
+
+//         Tax_Type:
+//           it.Tax_Type,
+
+//         Amount:
+//           it.Amount,
+
+//         created_at:
+//           it.created_at,
+//       };
+//     });
+
+//     // =========================================================
+//     // 6. FETCH PAYMENT SPLITS
+//     // =========================================================
+
+//     const [splits] = await connection.query(
+//       `
+//       SELECT
+//         ps.id,
+//         ps.Payment_Type,
+//         ps.Bank_Account_Id,
+//         ps.Reference_Number,
+//         ps.Amount,
+
+//         ba.Account_Display_Name,
+
+//         CASE
+//           WHEN ps.Payment_Type = 'Bank'
+//             THEN ba.Account_Display_Name
+//           ELSE ps.Payment_Type
+//         END AS Payment_Type_Display
+
+//       FROM payment_splits ps
+
+//       LEFT JOIN bank_accounts ba
+//         ON ba.id = ps.Bank_Account_Id
+
+//       WHERE
+//         ps.Source_Type = 'Purchase'
+//         AND ps.Source_Id = ?
+
+//       ORDER BY ps.id ASC
+//       `,
+//       [purchaseHeader.id]
+//     );
+
+//     // =========================================================
+//     // 7. PAYMENT DISPLAY
+//     // =========================================================
+
+//     const splitSummary =
+//       splits
+//         .map((s) => s.Payment_Type_Display)
+//         .join(" + ") || "—";
+
+//     // =========================================================
+//     // 8. RESPONSE
+//     // =========================================================
+
+//     return res.status(200).json({
+//       success: true,
+
+//       // =======================================================
+//       // PURCHASE HEADER
+//       // =======================================================
+
+//       billPurchaseDetails: {
+//         Purchase_Id:
+//           purchaseHeader.Purchase_Id,
+
+//         Party_Name:
+//           purchaseHeader.Party_Name,
+
+//         GSTIN:
+//           purchaseHeader.GSTIN,
+
+//         State_Of_Supply:
+//           purchaseHeader.State_Of_Supply,
+//           State:
+//           purchaseHeader.State,
+
+//         Bill_Number:
+//           purchaseHeader.Bill_Number,
+
+//         Bill_Date:
+//           purchaseHeader.Bill_Date,
+
+//         Total_Amount:
+//           purchaseHeader.Total_Amount,
+
+//         Total_Paid:
+//           purchaseHeader.Total_Paid,
+
+//         Balance_Due: purchaseHeader.Balance_Due,
+
+//         Billing_Address: purchaseHeader.Billing_Address,
+
+//         Shipping_Address:purchaseHeader.Shipping_Address,
+
+//         Payment_Type_Display:splitSummary,
+
+//         Terms_Conditions_Id: purchaseHeader.Terms_Conditions_Id,
+
+//         Terms_Conditions_Description: purchaseHeader.Terms_Conditions_Description,
+
+//         Terms_Conditions_Title: purchaseHeader.Terms_Conditions_Title,
+//       },
+
+//       // =======================================================
+//       // PAYMENT SPLITS
+//       // =======================================================
+
+//       splits: splits.map((s) => ({
+//         id: s.id,
+
+//         Payment_Type: s.Payment_Type,
+
+//         Bank_Account_Id: s.Bank_Account_Id,
+
+//         Account_Display_Name: s.Account_Display_Name,
+
+//         Payment_Type_Display: s.Payment_Type_Display,
+
+//         Reference_Number: s.Reference_Number,
+
+//         Amount: s.Amount,
+//       })),
+
+//       // =======================================================
+//       // PURCHASE ITEMS
+//       // =======================================================
+
+//       items: formattedItems,
+//     });
+//   } catch (err) {
+//     console.error(
+//       "❌ Error getting single purchase:",
+//       err
+//     );
+
+//     next(err);
+//   } finally {
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// };
+
 const getSinglePurchase = async (req, res, next) => {
   let connection;
 
@@ -2910,16 +3587,15 @@ const getSinglePurchase = async (req, res, next) => {
   i.Item_Unit,
   i.Item_Category,
 
-  -- CURRENT MASTER
   i.Primary_Unit AS Current_Primary_Unit,
   i.Secondary_Unit AS Current_Secondary_Unit,
-       i.Conversion_Rate,
+  i.Conversion_Rate,
+
   pi.Quantity,
 
-  -- HISTORICAL SNAPSHOT
-  pi.Primary_Unit_Snapshot,
-  pi.Secondary_Unit_Snapshot,
-  pi.Selected_Unit,
+  pu.Unit_Shorthand  AS Primary_Unit_Snapshot,
+  su.Unit_Shorthand  AS Secondary_Unit_Snapshot,
+  sel.Unit_Shorthand AS Selected_Unit,
 
   pi.Purchase_Price,
   pi.Discount_On_Purchase_Price,
@@ -2929,14 +3605,23 @@ const getSinglePurchase = async (req, res, next) => {
   pi.Amount,
   pi.created_at
 
-      FROM add_purchase_items pi
+FROM add_purchase_items pi
 
-      LEFT JOIN add_item i
-        ON pi.Item_Id = i.Item_Id
+LEFT JOIN add_item i
+  ON pi.Item_Id = i.Item_Id
 
-      WHERE pi.Purchase_Id = ?
+LEFT JOIN units pu
+  ON pu.id = pi.Primary_Unit_Snapshot_Id
 
-      ORDER BY pi.created_at DESC
+LEFT JOIN units su
+  ON su.id = pi.Secondary_Unit_Snapshot_Id
+
+LEFT JOIN units sel
+  ON sel.id = pi.Selected_Unit_Id
+
+WHERE pi.Purchase_Id = ?
+
+ORDER BY pi.created_at DESC
       `,
       [purchaseId]
     );
@@ -3369,7 +4054,6 @@ availableUnits = unitCodes.map((unitCode) => {
   }
 };
 
-
 const getTotalPurchasesEachDay = async (req, res, next) => {
   let connection;
   try {
@@ -3444,336 +4128,11 @@ const uploadBillAndCreatePurchase = async (req, res, next) => {
 
 };
 
-// const getPurchasePrintReport = async (req, res) => {
-//   let connection;
-
-//   try {
-//     connection = await db.getConnection();
-
-//     const {
-//       search = "",
-//       fromDate,
-//       toDate,
-//     } = req.query;
-
-//     let whereClause = "WHERE 1=1";
-//     const params = [];
-
-//     if (search) {
-//   whereClause += `
-//     AND (
-//       p.Bill_Number LIKE ?
-//       OR party.Party_Name LIKE ?
-//       OR CAST(p.Total_Amount AS CHAR) LIKE ?
-//       OR CAST(p.Balance_Due AS CHAR) LIKE ?
-//     )
-//   `;
-
-//   const searchTerm = `%${search}%`;
-
-//   params.push(
-//     searchTerm,
-//     searchTerm,
-//     searchTerm,
-//     searchTerm
-//   );
-// }
-
-//     if (fromDate) {
-//       whereClause += ` AND DATE(p.Bill_Date) >= ?`;
-//       params.push(fromDate);
-//     }
-
-//     if (toDate) {
-//       whereClause += ` AND DATE(p.Bill_Date) <= ?`;
-//       params.push(toDate);
-//     }
-
-//     // PURCHASE HEADER
-
-//     const [purchases] = await connection.query(
-//       `
-//       SELECT
-//         p.id,
-//         p.Purchase_Id,
-//         p.Bill_Number,
-//         p.Bill_Date,
-//         p.Total_Amount,
-//         p.Total_Paid,
-//         p.Balance_Due,
-//         p.Party_Id,
-
-       
-        
-
-//         p.Terms_Conditions_Id,
-//         p.Terms_Conditions_Description,
-
-//         party.Party_Name,
-//         party.GSTIN,
-       
-
-//         tc.Title AS Terms_Conditions_Title
-
-//       FROM add_purchase p
-
-//       LEFT JOIN add_party party
-//         ON party.Party_Id = p.Party_Id
-
-//       LEFT JOIN terms_conditions tc
-//         ON tc.id = p.Terms_Conditions_Id
-
-//       ${whereClause}
-
-//       ORDER BY p.Bill_Date ASC
-//       `,
-//       params
-//     );
-
-//     if (!purchases.length) {
-//       return res.status(200).json({
-//         success: true,
-//         totalInvoices: 0,
-//         invoices: [],
-//         summary: {
-//           totalAmount: 0,
-//           totalPaid: 0,
-//           totalDue: 0,
-//           totalDiscount: 0,
-//         },
-//       });
-//     }
-
-//     const purchaseIds = purchases.map(
-//       (p) => p.Purchase_Id
-//     );
-
-//     const numericIds = purchases.map(
-//       (p) => p.id
-//     );
-
-//     const purchasePlaceholders =
-//       purchaseIds.map(() => "?").join(",");
-
-//     const idPlaceholders =
-//       numericIds.map(() => "?").join(",");
-
-//     // ITEMS
-
-//     const [items] = await connection.query(
-//       `
-//       SELECT
-//         pi.*,
-
-//         i.Item_Name,
-//         i.Item_HSN,
-//         i.Item_Unit,
-//         i.Item_Category,
-
-//         i.Primary_Unit,
-//         i.Secondary_Unit,
-//         i.Conversion_Rate
-
-//       FROM add_purchase_items pi
-
-//       LEFT JOIN add_item i
-//         ON i.Item_Id = pi.Item_Id
-
-//       WHERE pi.Purchase_Id IN (${purchasePlaceholders})
-
-//       ORDER BY pi.created_at ASC
-//       `,
-//       purchaseIds
-//     );
-
-//     // PAYMENT SPLITS
-
-//     const [splits] = await connection.query(
-//       `
-//       SELECT
-//         ps.*,
-//         ba.Account_Display_Name
-
-//       FROM payment_splits ps
-
-//       LEFT JOIN bank_accounts ba
-//         ON ba.id = ps.Bank_Account_Id
-
-//       WHERE ps.Source_Type = 'Purchase'
-//       AND ps.Source_Id IN (${idPlaceholders})
-
-//       ORDER BY ps.id ASC
-//       `,
-//       numericIds
-//     );
-
-//     // GROUP ITEMS
-
-//     const itemMap = {};
-
-//     items.forEach((item) => {
-//       if (!itemMap[item.Purchase_Id]) {
-//         itemMap[item.Purchase_Id] = [];
-//       }
-
-//       const price = Number(
-//         item.Purchase_Price || 0
-//       );
-
-//       let discountAmount = 0;
-
-//       if (
-//         Number(
-//           item.Discount_On_Purchase_Price || 0
-//         ) > 0
-//       ) {
-//         if (
-//           item.Discount_Type_On_Purchase_Price ===
-//           "Percentage"
-//         ) {
-//           discountAmount =
-//             (price *
-//               Number(
-//                 item.Discount_On_Purchase_Price
-//               )) /
-//             100;
-//         } else {
-//           discountAmount = Number(
-//             item.Discount_On_Purchase_Price
-//           );
-//         }
-//       }
-
-//       itemMap[item.Purchase_Id].push({
-//         ...item,
-//         Discount_Amount: Number(
-//           discountAmount.toFixed(2)
-//         ),
-//       });
-//     });
-
-//     // GROUP SPLITS
-
-//     const splitMap = {};
-
-//     splits.forEach((split) => {
-//       if (!splitMap[split.Source_Id]) {
-//         splitMap[split.Source_Id] = [];
-//       }
-
-//       splitMap[split.Source_Id].push({
-//         Id: split.id,
-//         Payment_Type: split.Payment_Type,
-//         Bank_Account_Id:
-//           split.Bank_Account_Id,
-//         Account_Display_Name:
-//           split.Account_Display_Name,
-//         Amount: split.Amount,
-//       });
-//     });
-
-//     // SUMMARY
-
-//     const summary = {
-//       totalAmount: 0,
-//       totalPaid: 0,
-//       totalBalanceDue: 0,
-//       totalDiscount: 0,
-//     };
-
-//     const purchaseBills= purchases.map((purchase) => {
-//       const purchaseItems =
-//         itemMap[purchase.Purchase_Id] || [];
-
-//       summary.totalAmount += Number(
-//         purchase.Total_Amount || 0
-//       );
-
-//       summary.totalPaid += Number(
-//         purchase.Total_Paid || 0
-//       );
-
-//       summary.totalBalanceDue += Number(
-//         purchase.Balance_Due || 0
-//       );
-
-//       purchaseItems.forEach((item) => {
-//         summary.totalDiscount += Number(
-//           item.Discount_Amount || 0
-//         );
-//       });
-
-//       return {
-//         billPurchaseDetails: {
-//           Purchase_Id: purchase.Purchase_Id,
-//           Party_Name: purchase.Party_Name,
-//           //Billing_Name: purchase.Billing_Name,
-//           //Billing_Address:purchase.Billing_Address,
-//           //Phone_Number: purchase.Phone_Number,
-//           GSTIN: purchase.GSTIN,
-
-//           Bill_Number: purchase.Bill_Number,
-//           Bill_Date: purchase.Bill_Date,
-
-//           Total_Amount:
-//             purchase.Total_Amount,
-//           Total_Paid:
-//             purchase.Total_Paid,
-//           Balance_Due:
-//             purchase.Balance_Due,
-
-//           Terms_Conditions_Id:
-//             purchase.Terms_Conditions_Id,
-
-//           Terms_Conditions_Description:
-//             purchase.Terms_Conditions_Description,
-
-//           Terms_Conditions_Title:
-//             purchase.Terms_Conditions_Title,
-//         },
-
-//         splits:
-//           splitMap[purchase.id] || [],
-
-//         items: purchaseItems,
-//       };
-//     });
-
-//     return res.status(200).json({
-//       success: true,
-//       totalPurchaseBills: purchaseBills.length,
-//       purchaseBills,
-//       summary,
-//     });
-
-//   } catch (error) {
-//     console.error(
-//       "Purchase Print Report Error:",
-//       error
-//     );
-
-//     return res.status(500).json({
-//       success: false,
-//       message:
-//         "Failed to generate purchase print report",
-//       error: error.message,
-//     });
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-
-const getPurchasePrintReport = async (
-  req,
-  res
-) => {
-
+const getPurchasePrintReport = async (req, res) => {
   let connection;
 
   try {
-
-    connection =
-      await db.getConnection();
+    connection = await db.getConnection();
 
     const {
       search = "",
@@ -3781,69 +4140,310 @@ const getPurchasePrintReport = async (
       toDate,
     } = req.query;
 
-    let whereClause =
-      "WHERE 1=1";
-
+    let whereClause = "WHERE 1=1";
     const params = [];
 
     if (search) {
-      whereClause += `
-      AND (
-        p.Bill_Number LIKE ?
-        OR party.Party_Name LIKE ?
-        OR CAST(p.Total_Amount AS CHAR) LIKE ?
-        OR CAST(p.Balance_Due AS CHAR) LIKE ?
-      )
-      `;
+  whereClause += `
+    AND (
+      p.Bill_Number LIKE ?
+      OR party.Party_Name LIKE ?
+      OR CAST(p.Total_Amount AS CHAR) LIKE ?
+      OR CAST(p.Balance_Due AS CHAR) LIKE ?
+    )
+  `;
 
-      const term = `%${search}%`;
+  const searchTerm = `%${search}%`;
 
-      params.push(
-        term,
-        term,
-        term,
-        term
-      );
-    }
+  params.push(
+    searchTerm,
+    searchTerm,
+    searchTerm,
+    searchTerm
+  );
+}
 
     if (fromDate) {
-      whereClause +=
-        ` AND DATE(p.Bill_Date) >= ?`;
-
+      whereClause += ` AND DATE(p.Bill_Date) >= ?`;
       params.push(fromDate);
     }
 
     if (toDate) {
-      whereClause +=
-        ` AND DATE(p.Bill_Date) <= ?`;
-
+      whereClause += ` AND DATE(p.Bill_Date) <= ?`;
       params.push(toDate);
     }
 
-  const {
-  purchaseBills,
-  summary,
-} = await getPurchasesForPrint(
-  connection,
-  whereClause,
-  params
-);
+    // PURCHASE HEADER
 
-return res.status(200).json({
-  success: true,
-  totalPurchaseBills:
-    purchaseBills.length,
-  purchaseBills,
-  summary,
-});
+    const [purchases] = await connection.query(
+      `
+      SELECT
+        p.id,
+        p.Purchase_Id,
+        p.Bill_Number,
+        p.Bill_Date,
+        p.Total_Amount,
+        p.Total_Paid,
+        p.Balance_Due,
+        p.Party_Id,
 
+       
+        
 
+        p.Terms_Conditions_Id,
+        p.Terms_Conditions_Description,
 
-  
+        party.Party_Name,
+        party.GSTIN,
+       
 
+        tc.Title AS Terms_Conditions_Title
+
+      FROM add_purchase p
+
+      LEFT JOIN add_party party
+        ON party.Party_Id = p.Party_Id
+
+      LEFT JOIN terms_conditions tc
+        ON tc.id = p.Terms_Conditions_Id
+
+      ${whereClause}
+
+      ORDER BY p.Bill_Date ASC
+      `,
+      params
+    );
+
+    if (!purchases.length) {
+      return res.status(200).json({
+        success: true,
+        totalInvoices: 0,
+        invoices: [],
+        summary: {
+          totalAmount: 0,
+          totalPaid: 0,
+          totalDue: 0,
+          totalDiscount: 0,
+        },
+      });
+    }
+
+    const purchaseIds = purchases.map(
+      (p) => p.Purchase_Id
+    );
+
+    const numericIds = purchases.map(
+      (p) => p.id
+    );
+
+    const purchasePlaceholders =
+      purchaseIds.map(() => "?").join(",");
+
+    const idPlaceholders =
+      numericIds.map(() => "?").join(",");
+
+    // ITEMS
+
+    const [items] = await connection.query(
+      `
+      SELECT
+        pi.*,
+
+        i.Item_Name,
+        i.Item_HSN,
+        i.Item_Unit,
+        i.Item_Category,
+
+        i.Primary_Unit,
+        i.Secondary_Unit,
+        i.Conversion_Rate
+
+      FROM add_purchase_items pi
+
+      LEFT JOIN add_item i
+        ON i.Item_Id = pi.Item_Id
+
+      WHERE pi.Purchase_Id IN (${purchasePlaceholders})
+
+      ORDER BY pi.created_at ASC
+      `,
+      purchaseIds
+    );
+
+    // PAYMENT SPLITS
+
+    const [splits] = await connection.query(
+      `
+      SELECT
+        ps.*,
+        ba.Account_Display_Name
+
+      FROM payment_splits ps
+
+      LEFT JOIN bank_accounts ba
+        ON ba.id = ps.Bank_Account_Id
+
+      WHERE ps.Source_Type = 'Purchase'
+      AND ps.Source_Id IN (${idPlaceholders})
+
+      ORDER BY ps.id ASC
+      `,
+      numericIds
+    );
+
+    // GROUP ITEMS
+
+    const itemMap = {};
+
+    items.forEach((item) => {
+      if (!itemMap[item.Purchase_Id]) {
+        itemMap[item.Purchase_Id] = [];
+      }
+
+      const price = Number(
+        item.Purchase_Price || 0
+      );
+
+      let discountAmount = 0;
+
+      if (
+        Number(
+          item.Discount_On_Purchase_Price || 0
+        ) > 0
+      ) {
+        if (
+          item.Discount_Type_On_Purchase_Price ===
+          "Percentage"
+        ) {
+          discountAmount =
+            (price *
+              Number(
+                item.Discount_On_Purchase_Price
+              )) /
+            100;
+        } else {
+          discountAmount = Number(
+            item.Discount_On_Purchase_Price
+          );
+        }
+      }
+
+      itemMap[item.Purchase_Id].push({
+        ...item,
+        Discount_Amount: Number(
+          discountAmount.toFixed(2)
+        ),
+      });
+    });
+
+    // GROUP SPLITS
+
+    const splitMap = {};
+
+    splits.forEach((split) => {
+      if (!splitMap[split.Source_Id]) {
+        splitMap[split.Source_Id] = [];
+      }
+
+      splitMap[split.Source_Id].push({
+        Id: split.id,
+        Payment_Type: split.Payment_Type,
+        Bank_Account_Id:
+          split.Bank_Account_Id,
+        Account_Display_Name:
+          split.Account_Display_Name,
+        Amount: split.Amount,
+      });
+    });
+
+    // SUMMARY
+
+    const summary = {
+      totalAmount: 0,
+      totalPaid: 0,
+      totalBalanceDue: 0,
+      totalDiscount: 0,
+    };
+
+    const purchaseBills= purchases.map((purchase) => {
+      const purchaseItems =
+        itemMap[purchase.Purchase_Id] || [];
+
+      summary.totalAmount += Number(
+        purchase.Total_Amount || 0
+      );
+
+      summary.totalPaid += Number(
+        purchase.Total_Paid || 0
+      );
+
+      summary.totalBalanceDue += Number(
+        purchase.Balance_Due || 0
+      );
+
+      purchaseItems.forEach((item) => {
+        summary.totalDiscount += Number(
+          item.Discount_Amount || 0
+        );
+      });
+
+      return {
+        billPurchaseDetails: {
+          Purchase_Id: purchase.Purchase_Id,
+          Party_Name: purchase.Party_Name,
+          //Billing_Name: purchase.Billing_Name,
+          //Billing_Address:purchase.Billing_Address,
+          //Phone_Number: purchase.Phone_Number,
+          GSTIN: purchase.GSTIN,
+
+          Bill_Number: purchase.Bill_Number,
+          Bill_Date: purchase.Bill_Date,
+
+          Total_Amount:
+            purchase.Total_Amount,
+          Total_Paid:
+            purchase.Total_Paid,
+          Balance_Due:
+            purchase.Balance_Due,
+
+          Terms_Conditions_Id:
+            purchase.Terms_Conditions_Id,
+
+          Terms_Conditions_Description:
+            purchase.Terms_Conditions_Description,
+
+          Terms_Conditions_Title:
+            purchase.Terms_Conditions_Title,
+        },
+
+        splits:
+          splitMap[purchase.id] || [],
+
+        items: purchaseItems,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalPurchaseBills: purchaseBills.length,
+      purchaseBills,
+      summary,
+    });
+
+  } catch (error) {
+    console.error(
+      "Purchase Print Report Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to generate purchase print report",
+      error: error.message,
+    });
   } finally {
-    if (connection)
-      connection.release();
+    if (connection) connection.release();
   }
 };
 export {

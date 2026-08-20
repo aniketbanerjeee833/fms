@@ -144,7 +144,7 @@ const PaymentInOutBulkReportPrintTemplate = forwardRef(
 
                                         <td>
                                             {details.Receipt_No ||
-                                                details.Payment_Number ||
+                                                
                                                 "-"}
                                         </td>
 
