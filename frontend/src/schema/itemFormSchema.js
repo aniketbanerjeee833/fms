@@ -84,10 +84,10 @@ export const itemFormSchema = z
       .trim()
       .min(1, "Item Name is required"),
 
-    // Item_Category: z
-    //   .string()
-    //   .trim()
-    //   .min(1, "Category is required"),
+     Item_Type: z
+      .enum(["Product", "Service"])
+      .optional()
+      .default("Product"),
    Item_Category: z
         .union([
           z.string(),

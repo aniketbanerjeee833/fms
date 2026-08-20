@@ -113,6 +113,7 @@ const addItem = async (req, res, next) => {
 
     const {
       Item_Name,
+      Item_Type,
       Item_HSN,
       Item_Category,
       Item_Unit,
@@ -138,7 +139,25 @@ const addItem = async (req, res, next) => {
     // =========================================================
     // 4. DUPLICATE ITEM CHECK
     // =========================================================
+    const isService = Item_Type === "Service";
+    if (
+      isService &&
+      (
+        Opening_Quantity ||
+        At_Price ||
+        As_Of_Date ||
+        Min_Stock ||
+        Location
+      )
+    ) {
+      await connection.rollback();
 
+      return res.status(400).json({
+        success: false,
+        message:
+          "Service items cannot have stock details.",
+      });
+    }
     const normalizedName =
       Item_Name.trim().toLowerCase();
 
@@ -268,7 +287,7 @@ const addItem = async (req, res, next) => {
       Numeric Stock_Quantity does NOT need to change.
     */
 
-    const stockQuantity = Opening_Quantity ?? 0;
+    //const stockQuantity = Opening_Quantity ?? 0;
 
     // =========================================================
     // 8. LEGACY Item_Unit
@@ -299,13 +318,36 @@ const addItem = async (req, res, next) => {
     // =========================================================
     // 9. INSERT ITEM
     // =========================================================
+    const openingQuantity = isService
+      ? null
+      : (Opening_Quantity ?? null);
 
+    const atPrice = isService
+      ? null
+      : (At_Price ?? null);
+
+    const asOfDate = isService
+      ? null
+      : (As_Of_Date || null);
+
+    const minStock = isService
+      ? null
+      : (Min_Stock ?? null);
+
+    const location = isService
+      ? null
+      : (Location || null);
+
+    const stockQuantity = isService
+      ? 0
+      : Number(Opening_Quantity ?? 0);
     const [result] = await connection.execute(
       `
     INSERT INTO add_item
     (
       Item_Id,
       Item_Name,
+      Item_Type,
       Item_HSN,
       Item_Category,
       Item_Unit,
@@ -324,7 +366,7 @@ const addItem = async (req, res, next) => {
     VALUES
     (
       ?, ?, ?, ?,
-      ?,
+      ?,?,
       ?, ?, ?,
       ?, ?, ?, ?, ?, ?,
       NOW(),
@@ -334,6 +376,7 @@ const addItem = async (req, res, next) => {
       [
         itemId,
         Item_Name,
+        Item_Type || "Product",
         Item_HSN || null,
         Item_Category || "",
 
@@ -343,12 +386,18 @@ const addItem = async (req, res, next) => {
         secondaryUnit,
         conversionRate,
 
+        // stockQuantity,
+        // Opening_Quantity ?? null,
+        // At_Price ?? null,
+        // As_Of_Date ?? null,
+        // Min_Stock ?? null,
+        // Location ?? null,
         stockQuantity,
-        Opening_Quantity ?? null,
-        At_Price ?? null,
-        As_Of_Date || null,
-        Min_Stock ?? null,
-        Location || null,
+        openingQuantity,
+        atPrice,
+        asOfDate,
+        minStock,
+        location,
       ]
     );
 
@@ -385,19 +434,7 @@ const addItem = async (req, res, next) => {
     // =========================================================
     // 11. OPENING STOCK LEDGER ENTRY
     // =========================================================
-    // if (stockQuantity > 0) {
-    //   await recordItemLedger({
-    //     connection,
-    //     itemId,
-    //     txnType: "Opening_Stock",
-    //     referenceId: result.insertId,
-    //     formattedId: itemId,
-    //     partyName: null,
-    //     quantity: stockQuantity,
-    //     rate: At_Price ?? null,
-    //     txnDate: As_Of_Date || new Date().toISOString().slice(0, 10)
-    //   });
-    // }
+
     if (stockQuantity > 0) {
       await recordItemLedger({
         connection,
@@ -643,6 +680,7 @@ const editItem = async (req, res, next) => {
     // const { Item_Name, Item_HSN, Item_Unit,  Item_Category } = validation.data;
     const {
       Item_Name,
+      Item_Type,
       Item_HSN,
       Item_Unit,          // legacy
 
@@ -675,6 +713,25 @@ const editItem = async (req, res, next) => {
         message: "Another item with this name already exists.",
       });
     }
+    const isService = Item_Type === "Service";
+
+    if (
+      isService &&
+      (
+        Number(Opening_Quantity) > 0 ||
+        Number(At_Price) > 0 ||
+        As_Of_Date ||
+        Number(Min_Stock) > 0 ||
+        Location
+      )
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Service items cannot have stock details.",
+      });
+    }
     // =========================================================
     // PRIMARY UNIT LOCK
     //
@@ -701,19 +758,40 @@ const editItem = async (req, res, next) => {
     // FROM add_item
     // WHERE Item_Id = ?
     // LIMIT 1
+    //     const [[existingItem]] = await connection.query(
+    //       `
+
+    //   SELECT
+    //   id,
+    //   Primary_Unit,
+    //   Secondary_Unit,
+    //   Conversion_Rate
+    // FROM add_item
+    // WHERE Item_Id = ?
+    // LIMIT 1
+
+
+    //   `,
+    //       [Item_Id]
+    //     );
     const [[existingItem]] = await connection.query(
       `
-
   SELECT
-  id,
-  Primary_Unit,
-  Secondary_Unit,
-  Conversion_Rate
-FROM add_item
-WHERE Item_Id = ?
-LIMIT 1
+    id,
+    Item_Type,
 
+    Opening_Quantity,
+    At_Price,
+    As_Of_Date,
+    Min_Stock,
+    Location,
 
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate
+  FROM add_item
+  WHERE Item_Id = ?
+  LIMIT 1
   `,
       [Item_Id]
     );
@@ -829,6 +907,7 @@ LIMIT 1
       `UPDATE add_item
 SET
     Item_Name=?,
+    Item_Type=?,
     Item_HSN=?,
     Item_Unit=?,
 
@@ -849,7 +928,9 @@ SET
 WHERE Item_Id=?`,
       [
         Item_Name,
+        Item_Type || "Product",
         Item_HSN || null,
+
         Item_Unit || "",
 
         Item_Category || "",
@@ -860,11 +941,30 @@ WHERE Item_Id=?`,
           ? Conversion_Rate ?? null
           : null,
 
-        Opening_Quantity ?? null,
-        At_Price ?? null,
-        As_Of_Date || null,
-        Min_Stock ?? null,
-        Location || null,
+        // Opening_Quantity ?? null,
+        // At_Price ?? null,
+        // As_Of_Date || null,
+        // Min_Stock ?? null,
+        // Location || null,
+        Item_Type === "Service"
+          ? existingItem.Opening_Quantity
+          : Opening_Quantity ?? null,
+
+        Item_Type === "Service"
+          ? existingItem.At_Price
+          : At_Price ?? null,
+
+        Item_Type === "Service"
+          ? existingItem.As_Of_Date
+          : As_Of_Date || null,
+
+        Item_Type === "Service"
+          ? existingItem.Min_Stock
+          : Min_Stock ?? null,
+
+        Item_Type === "Service"
+          ? existingItem.Location
+          : Location || null,
 
         Item_Id,
       ]
@@ -878,32 +978,6 @@ WHERE Item_Id=?`,
     // UPDATE OPENING STOCK LEDGER
     // =========================================================
 
-
-    // await recordItemLedger({
-    //   connection,
-    //   itemId: Item_Id,
-    //   txnType: "Opening_Stock",
-
-    //   // Same Source_Id used when the item was created
-    //   referenceId: existingItem.id,
-
-    //   billId: Item_Id,
-    //   billNumber: null,
-    //   partyName: null,
-
-    //   // User-entered opening quantity
-    //   quantity: Number(Opening_Quantity) || 0,
-
-    //   // Display unit
-    //   selectedUnit: Primary_Unit || null,
-
-    //   // Stock quantity (same as quantity for opening stock)
-    //   baseQty: Number(Opening_Quantity) || 0,
-
-    //   rate: At_Price ?? null,
-
-    //   txnDate: As_Of_Date || new Date().toISOString().slice(0, 10),
-    // });
     // =========================================================
     // CREATE OPENING STOCK LEDGER ONLY IF USER ENTERED IT
     // =========================================================
@@ -1023,451 +1097,7 @@ WHERE Item_Id=?`,
   }
 }
 
-// const editItem = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     await connection.beginTransaction(); // ✅ Start transaction
 
-//     const { Item_Id } = req.params;
-//     const cleanData = sanitizeObject(req.body);
-//     const validation = itemFormSchema.safeParse(cleanData);
-//     if (!validation.success) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         errors: validation.error.errors,
-//       });
-//     }
-//     // const { Item_Name, Item_HSN, Item_Unit,  Item_Category } = validation.data;
-//     const {
-//       Item_Name,
-//       Item_HSN,
-//       Item_Unit,          // legacy
-
-//       Item_Category,
-
-//       Primary_Unit,
-//       Secondary_Unit,
-//       Conversion_Rate,
-
-//       Opening_Quantity,
-//       At_Price,
-//       As_Of_Date,
-//       Min_Stock,
-//       Location,
-//     } = validation.data;
-//     const normalizedName = Item_Name.trim().toLowerCase();
-
-//     const [duplicate] = await connection.query(
-//       `SELECT Item_Id
-//    FROM add_item
-//    WHERE LOWER(TRIM(Item_Name)) = ?
-//      AND Item_Id <> ?`,
-//       [normalizedName, Item_Id]
-//     );
-
-//     if (duplicate.length > 0) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         success: false,
-//         message: "Another item with this name already exists.",
-//       });
-//     }
-//     // =========================================================
-//     // PRIMARY UNIT LOCK
-//     //
-//     // RULE:
-//     // If this item has EVER been used in a transaction
-//     // with ANY selected unit, Primary_Unit cannot change.
-//     //
-//     // Secondary_Unit can still change.
-//     // =========================================================
-
-//     //   const [[existingItem]] = await connection.query(
-//     //     `
-//     //   SELECT Primary_Unit
-//     //   FROM add_item
-//     //   WHERE Item_Id = ?
-//     //   LIMIT 1
-//     // `,
-//     //     [Item_Id]
-//     //   );
-//     // SELECT
-//     //   Primary_Unit,
-//     //   Secondary_Unit,
-//     //   Conversion_Rate
-//     // FROM add_item
-//     // WHERE Item_Id = ?
-//     // LIMIT 1
-//     const [[existingItem]] = await connection.query(
-//       `
-
-//   SELECT
-//   id,
-//   Primary_Unit,
-//   Secondary_Unit,
-//   Conversion_Rate
-// FROM add_item
-// WHERE Item_Id = ?
-// LIMIT 1
-
-
-//   `,
-//       [Item_Id]
-//     );
-
-//     if (!existingItem) {
-//       await connection.rollback();
-
-//       return res.status(404).json({
-//         success: false,
-//         message: "Item not found.",
-//       });
-//     }
-
-//     //const oldPrimary = existingItem.Primary_Unit || null;
-//     //const newPrimary = Primary_Unit || null;
-
-//     const oldPrimary = existingItem.Primary_Unit || null;
-//     const oldSecondary = existingItem.Secondary_Unit || null;
-//     const oldConversion =
-//       existingItem.Conversion_Rate == null
-//         ? null
-//         : Number(existingItem.Conversion_Rate);
-
-//     const newConversion =
-//       Secondary_Unit
-//         ? (
-//           Conversion_Rate == null
-//             ? null
-//             : Number(Conversion_Rate)
-//         )
-//         : null;
-
-//     const newPrimary = Primary_Unit || null;
-//     const newSecondary = Secondary_Unit || null;
-//     //const newConversion =
-//     Secondary_Unit ? Number(Conversion_Rate) || null : null;
-//     // =========================================================
-//     // ONLY CHECK WHEN PRIMARY IS BEING CHANGED
-//     // =========================================================
-//     //+
-//     // (
-//     //   SELECT COUNT(*)
-//     //   FROM add_sale_items
-//     //   WHERE Item_Id = ?
-//     //     AND Selected_Unit IS NOT NULL
-//     //     AND TRIM(Selected_Unit) <> ''
-//     // )
-//     const hasTransactions = await hasItemTransactions(
-//       connection,
-//       Item_Id
-//     );
-
-//     //     if (oldPrimary !== newPrimary) {
-
-//     //       const [[{ unitUsedCount }]] = await connection.query(
-//     //         `
-//     //      SELECT
-//     // (
-//     //     SELECT COUNT(*)
-//     //     FROM add_purchase_items
-//     //     WHERE Item_Id = ?
-//     //       AND Selected_Unit IS NOT NULL
-//     //       AND TRIM(Selected_Unit) <> ''
-//     // )
-//     // +
-//     // (
-//     //     SELECT COUNT(*)
-//     //     FROM add_sale_items
-//     //     WHERE Item_Id = ?
-//     //       AND Selected_Unit IS NOT NULL
-//     //       AND TRIM(Selected_Unit) <> ''
-//     // )
-//     // +
-//     // (
-//     //     SELECT COUNT(*)
-//     //     FROM purchase_return_items
-//     //     WHERE Item_Id = ?
-//     //       AND Selected_Unit IS NOT NULL
-//     //       AND TRIM(Selected_Unit) <> ''
-//     // )
-//     // +
-//     // (
-//     //     SELECT COUNT(*)
-//     //     FROM sale_return_items
-//     //     WHERE Item_Id = ?
-//     //       AND Selected_Unit IS NOT NULL
-//     //       AND TRIM(Selected_Unit) <> ''
-//     // )
-//     // AS unitUsedCount
-//     //     `,
-//     //         [
-//     //           Item_Id,
-//     //           Item_Id,
-//     //           Item_Id,
-//     //           Item_Id,
-//     //         ]
-//     //       );
-
-
-//     //       // =======================================================
-//     //       // ANY UNIT HAS BEEN USED
-//     //       // PRIMARY IS NOW LOCKED
-//     //       // =======================================================
-
-//     //       if (Number(unitUsedCount) > 0) {
-//     //         await connection.rollback();
-
-//     //         return res.status(400).json({
-//     //           success: false,
-//     //           // message:
-//     //           //   `Primary Unit "${oldPrimary || "None"}" cannot be changed ` +
-//     //           //   `because this item has already been used with a unit in a transaction.`,
-//     //                 message:
-//     //             `Unit cannot be changed ` +
-//     //             `because this item has already been used with a unit in a transaction.`,
-//     //         });
-//     //       }
-//     //     }
-//     if (hasTransactions) {
-
-//       // ------------------------------------------------------
-//       // Rule 1
-//       // Primary can never change after transactions
-//       // ------------------------------------------------------
-
-//       if (oldPrimary !== newPrimary) {
-//         await connection.rollback();
-
-//         return res.status(400).json({
-//           success: false,
-//           message:
-//             " Unit cannot be changed because this item has already been used in transactions.",
-//         });
-//       }
-
-//       // ------------------------------------------------------
-//       // Rule 2
-//       // Once Secondary exists, it becomes locked.
-//       //
-//       // If Secondary is still NULL,
-//       // user may add one later.
-//       // ------------------------------------------------------
-
-//       if (oldSecondary !== null) {
-//         if (
-//           oldSecondary !== newSecondary ||
-//           oldConversion !== newConversion
-//         ) {
-//           await connection.rollback();
-
-//           return res.status(400).json({
-//             success: false,
-//             message:
-//               "Secondary Unit and Conversion Rate cannot be changed because this item has already been used in transactions.",
-//           });
-//         }
-//       }
-//     }
-//     const [result] = await connection.execute(
-//       `UPDATE add_item
-// SET
-//     Item_Name=?,
-//     Item_HSN=?,
-//     Item_Unit=?,
-
-//     Item_Category=?,
-
-//     Primary_Unit=?,
-//     Secondary_Unit=?,
-//     Conversion_Rate=?,
-
-//     Opening_Quantity=?,
-//     At_Price=?,
-//     As_Of_Date=?,
-//     Min_Stock=?,
-//     Location=?,
-
-//     updated_at=NOW()
-
-// WHERE Item_Id=?`,
-//       [
-//         Item_Name,
-//         Item_HSN || null,
-//         Item_Unit || "",
-
-//         Item_Category || "",
-
-//         Primary_Unit || null,
-//         Secondary_Unit || null,
-//         Secondary_Unit
-//           ? Conversion_Rate ?? null
-//           : null,
-
-//         Opening_Quantity ?? null,
-//         At_Price ?? null,
-//         As_Of_Date || null,
-//         Min_Stock ?? null,
-//         Location || null,
-
-//         Item_Id,
-//       ]
-//     );
-
-//     if (result.affectedRows === 0) {
-//       await connection.rollback();
-//       return res.status(404).json({ message: "Item not found" });
-//     }
-//     // =========================================================
-//     // UPDATE OPENING STOCK LEDGER
-//     // =========================================================
-
-
-//     // await recordItemLedger({
-//     //   connection,
-//     //   itemId: Item_Id,
-//     //   txnType: "Opening_Stock",
-
-//     //   // Same Source_Id used when the item was created
-//     //   referenceId: existingItem.id,
-
-//     //   billId: Item_Id,
-//     //   billNumber: null,
-//     //   partyName: null,
-
-//     //   // User-entered opening quantity
-//     //   quantity: Number(Opening_Quantity) || 0,
-
-//     //   // Display unit
-//     //   selectedUnit: Primary_Unit || null,
-
-//     //   // Stock quantity (same as quantity for opening stock)
-//     //   baseQty: Number(Opening_Quantity) || 0,
-
-//     //   rate: At_Price ?? null,
-
-//     //   txnDate: As_Of_Date || new Date().toISOString().slice(0, 10),
-//     // });
-//     // =========================================================
-// // CREATE OPENING STOCK LEDGER ONLY IF USER ENTERED IT
-// // =========================================================
-
-// if (
-//   Opening_Quantity !== null &&
-//   Opening_Quantity !== undefined &&
-//   Number(Opening_Quantity) > 0
-// ) {
-//   await recordItemLedger({
-//     connection,
-//     itemId: Item_Id,
-//     txnType: "Opening_Stock",
-
-//     referenceId: existingItem.id,
-
-//     billId: null,
-//     billNumber: null,
-//     partyName: null,
-
-//     quantity: Number(Opening_Quantity),
-
-//     selectedUnit: Primary_Unit || null,
-
-//     baseQty: Number(Opening_Quantity),
-
-//     rate: At_Price ?? null,
-
-//     txnDate:
-//       As_Of_Date ||
-//       new Date().toISOString().slice(0, 10),
-//   });
-// }
-//     const [[latestLedger]] = await connection.query(
-//       `
-//   SELECT Running_Stock
-//   FROM item_ledger
-//   WHERE Item_Id = ?
-//   ORDER BY id DESC
-//   LIMIT 1
-//   `,
-//       [Item_Id]
-//     );
-
-//     await connection.query(
-//       `
-//   UPDATE add_item
-//   SET Stock_Quantity = ?
-//   WHERE Item_Id = ?
-//   `,
-//       [
-//         latestLedger
-//           ? Number(latestLedger.Running_Stock)
-//           : 0,
-//         Item_Id,
-//       ]
-//     );
-//     // =========================================================
-//     // UPDATE UNIT CONVERSION
-//     // =========================================================
-
-//     // =========================================================
-//     // SAVE UNIT CONVERSION HISTORY
-//     // =========================================================
-
-//     if (
-//       Primary_Unit &&
-//       Secondary_Unit &&
-//       Number(Conversion_Rate) > 0
-//     ) {
-//       await connection.execute(
-//         `
-//       INSERT INTO item_unit_conversions
-//       (
-//         Item_Id,
-//         Primary_Unit,
-//         Secondary_Unit,
-//         Conversion_Rate
-//       )
-//       SELECT ?, ?, ?, ?
-//       WHERE NOT EXISTS (
-//         SELECT 1
-//         FROM item_unit_conversions
-//         WHERE Item_Id = ?
-//           AND Primary_Unit = ?
-//           AND Secondary_Unit = ?
-//           AND Conversion_Rate = ?
-//       )
-//     `,
-//         [
-//           Item_Id,
-//           Primary_Unit,
-//           Secondary_Unit,
-//           Conversion_Rate,
-
-//           Item_Id,
-//           Primary_Unit,
-//           Secondary_Unit,
-//           Conversion_Rate,
-//         ]
-//       );
-//     }
-//     await connection.commit();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Item updated successfully",
-//     });
-
-//   } catch (err) {
-//     if (connection) await connection.rollback();
-//     console.error("❌ Error editing item:", err);
-//     next(err);
-//     // return res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// }
 const deleteItem = async (req, res, next) => {
   let connection;
 
@@ -1518,30 +1148,59 @@ const deleteItem = async (req, res, next) => {
     // item cannot be deleted.
     // =========================================================
 
+    // const [[ledgerCount]] = await connection.query(
+    //   `
+    //   SELECT COUNT(*) AS count
+    //   FROM item_ledger
+    //   WHERE Item_Id = ?
+    //   `,
+    //   [Item_Id]
+    // );
+
+    // if (Number(ledgerCount.count) > 0) {
+    //   await connection.rollback();
+
+    //   return res.status(400).json({
+    //     success: false,
+    //     canDelete: false,
+    //     message:
+    //       "This item cannot be deleted because transactions exist for this item. Delete the related sales, purchases, returns, stock adjustments, or opening stock transaction first.",
+    //   });
+    // }
     const [[ledgerCount]] = await connection.query(
-      `
-      SELECT COUNT(*) AS count
-      FROM item_ledger
-      WHERE Item_Id = ?
-      `,
-      [Item_Id]
-    );
+  `
+  SELECT COUNT(*) AS count
+  FROM item_ledger
+  WHERE Item_Id = ?
+    AND Txn_Type <> 'Opening_Stock'
+  `,
+  [Item_Id]
+);
 
-    if (Number(ledgerCount.count) > 0) {
-      await connection.rollback();
+if (Number(ledgerCount.count) > 0) {
+  await connection.rollback();
 
-      return res.status(400).json({
-        success: false,
-        canDelete: false,
-        message:
-          "This item cannot be deleted because transactions exist for this item. Delete the related sales, purchases, returns, stock adjustments, or opening stock transaction first.",
-      });
-    }
+  return res.status(400).json({
+    success: false,
+    canDelete: false,
+    message:
+      "This item cannot be deleted because transactions exist for this item. Delete related purchases, sales, returns, or stock adjustments first.",
+  });
+}
+
+// DELETE OPENING STOCK ENTRIES
+await connection.query(
+  `
+  DELETE FROM item_ledger
+  WHERE Item_Id = ?
+    AND Txn_Type = 'Opening_Stock'
+  `,
+  [Item_Id]
+);
 
     // =========================================================
-    // 3. DELETE ITEM UNIT CONVERSIONS
+    // DELETE ITEM UNIT CONVERSIONS
     // =========================================================
-
     await connection.query(
       `
       DELETE FROM item_unit_conversions
@@ -1551,7 +1210,7 @@ const deleteItem = async (req, res, next) => {
     );
 
     // =========================================================
-    // 4. DELETE STOCK ADJUSTMENTS
+    //  DELETE STOCK ADJUSTMENTS
     //
     // Normally there should be none because any adjustment
     // should have an item_ledger row.
@@ -1568,7 +1227,7 @@ const deleteItem = async (req, res, next) => {
     );
 
     // =========================================================
-    // 5. DELETE ITEM
+    //  DELETE ITEM
     // =========================================================
 
     await connection.query(
@@ -1580,7 +1239,7 @@ const deleteItem = async (req, res, next) => {
     );
 
     // =========================================================
-    // 6. COMMIT
+    //  COMMIT
     // =========================================================
 
     await connection.commit();
@@ -2134,41 +1793,29 @@ FROM (
           : !item.Secondary_Unit
             ? true
             : !hasTransactions;
+
+      const isService = item.Item_Type === "Service";
       return {
         ...item,
 
         // Prices now come directly from add_item
-        Purchase_Price: item.Purchase_Price ?? 0,
+        Purchase_Price: isService
+          ? null
+          : (item.Purchase_Price ?? 0),
+        //Purchase_Price: item.Purchase_Price ?? 0,
 
+        Stock_Quantity: isService
+          ? null
+          : (item.Stock_Quantity ?? 0),
         Sale_Price: item.Sale_Price ?? 0,
 
         Available_Units: availableUnits,
 
-        unitConversions:
-          conversionsByItem[item.Item_Id] || [],
+        unitConversions: conversionsByItem[item.Item_Id] || [],
 
         Can_Edit_Units: canEditUnits,
       };
-      // return {
-      //   ...item,
 
-      //   Purchase_Price:
-      //     latestPurchasePrice[item.Item_Id] ?? 0,
-
-      //   Tax_Type:
-      //     latestTaxType[item.Item_Id] ?? null,
-
-      //   Sale_Price:
-      //     latestSalePrice[item.Item_Id] ?? 0,
-
-      //   // CURRENT configured units
-      //   Available_Units: availableUnits,
-
-      //   // Historical conversion records
-      //   unitConversions: conversionsByItem[item.Item_Id] || [],
-
-      //   Can_Edit_Units: canEditUnits,
-      // };
     });
 
     // =========================================================
@@ -2214,6 +1861,7 @@ const getAllItemsForLedger = async (req, res, next) => {
       : "";
     const limit = parseInt(req.query.limit, 10) || 10;
     const cursorId = req.query.cursor ? Number(req.query.cursor) : null;
+    const type = req.query.type?.trim();
 
     // const params = [];
 
@@ -2251,18 +1899,29 @@ const getAllItemsForLedger = async (req, res, next) => {
     const whereParts = [];
     const params = [];
 
+
     if (search) {
       const like = `%${search}%`;
+
       whereParts.push(`(
-        LOWER(Item_Name) LIKE ?
-        OR LOWER(Item_Category) LIKE ?
-        OR LOWER(Item_HSN) LIKE ?
-        OR LOWER(Item_Id) LIKE ?
-        OR LOWER(Item_Unit) LIKE ?
-        OR LOWER(Primary_Unit) LIKE ?
-        OR LOWER(Secondary_Unit) LIKE ?
-      )`);
+    LOWER(Item_Name) LIKE ?
+    OR LOWER(Item_Category) LIKE ?
+    OR LOWER(Item_HSN) LIKE ?
+    OR LOWER(Item_Id) LIKE ?
+    OR LOWER(Item_Unit) LIKE ?
+    OR LOWER(Primary_Unit) LIKE ?
+    OR LOWER(Secondary_Unit) LIKE ?
+  )`);
+
       params.push(like, like, like, like, like, like, like);
+    }
+
+    if (type === "Product") {
+      whereParts.push(`Item_Type = 'Product'`);
+    }
+
+    if (type === "Service") {
+      whereParts.push(`Item_Type = 'Service'`);
     }
 
     if (cursorId) {
@@ -2270,7 +1929,10 @@ const getAllItemsForLedger = async (req, res, next) => {
       params.push(cursorId);
     }
 
-    const whereSQL = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+    const whereSQL =
+      whereParts.length
+        ? `WHERE ${whereParts.join(" AND ")}`
+        : "";
 
     // =========================================================
     // 2. GET ALL ITEMS
@@ -2488,11 +2150,9 @@ const getAllItemsForLedger = async (req, res, next) => {
       conversionsByItem[conversion.Item_Id].push({
         id: conversion.id,
 
-        Primary_Unit:
-          conversion.Primary_Unit,
+        Primary_Unit: conversion.Primary_Unit,
 
-        Secondary_Unit:
-          conversion.Secondary_Unit,
+        Secondary_Unit: conversion.Secondary_Unit,
 
         Conversion_Rate:
           conversion.Conversion_Rate !== null
@@ -2653,8 +2313,7 @@ const getAllItemsForLedger = async (req, res, next) => {
           latestSalePrice[item.Item_Id] ?? 0,
 
         // Current configured units
-        Available_Units:
-          availableUnits,
+        Available_Units: availableUnits,
 
         // Historical conversion records
         unitConversions:
@@ -2756,6 +2415,7 @@ const getItemBills = async (req, res, next) => {
       `SELECT
       id,
          Item_Id,
+           Item_Type,
          Item_Name,
          Item_HSN,
          Item_Category,
@@ -3003,23 +2663,66 @@ const getItemBills = async (req, res, next) => {
     //
     // Frontend uses Resolved_Bill_Id to build its nav link.
     // =========================================================
+    const isService = item.Item_Type === "Service";
+
+    const filteredTransactions = isService
+      ? transactions.filter(
+        (row) =>
+          ![
+            "Opening_Stock",
+            "Add_Adjustment",
+            "Reduce_Adjustment",
+          ].includes(row.Txn_Type)
+      )
+      : transactions;
 
     return res.status(200).json({
       success: true,
 
       item: {
         ...item,
-        Conversion_Rate: item.Conversion_Rate !== null ? Number(item.Conversion_Rate) : null,
-        Stock_Quantity: Number(item.Stock_Quantity || 0),
+
+        Conversion_Rate:
+          item.Conversion_Rate !== null
+            ? Number(item.Conversion_Rate)
+            : null,
+
+        ...(isService
+          ? {
+            Purchase_Price: null,
+            Stock_Quantity: null,
+            Opening_Quantity: null,
+            At_Price: null,
+            Min_Stock: null,
+            Location: null,
+            As_Of_Date: null,
+          }
+          : {
+            Purchase_Price:
+              item.Purchase_Price !== null ? Number(item.Purchase_Price) : null,
+
+            Stock_Quantity: Number(item.Stock_Quantity || 0),
+          }),
       },
 
-      transactions: transactions.map((row) => {
-        let resolvedBillId = row.Bill_Id; // Purchase / Sale — already correct
+      transactions: filteredTransactions.map((row) => {
+        let resolvedBillId = row.Bill_Id;
 
-        if (row.Txn_Type === "Purchase_Return" && row.Source_Id) {
-          resolvedBillId = purchaseReturnMap.get(row.Source_Id) ?? null;
-        } else if (row.Txn_Type === "Sale_Return" && row.Source_Id) {
-          resolvedBillId = saleReturnMap.get(row.Source_Id) ?? null;
+        if (
+          row.Txn_Type === "Purchase_Return" &&
+          row.Source_Id
+        ) {
+          resolvedBillId =
+            purchaseReturnMap.get(row.Source_Id) ??
+            null;
+
+        } else if (
+          row.Txn_Type === "Sale_Return" &&
+          row.Source_Id
+        ) {
+          resolvedBillId =
+            saleReturnMap.get(row.Source_Id) ??
+            null;
         }
 
         const adjustment =
@@ -3028,7 +2731,6 @@ const getItemBills = async (req, res, next) => {
             ? adjustmentMap.get(row.Source_Id)
             : null;
 
-
         return {
           Ledger_Id: row.Ledger_Id,
           Item_Id: row.Item_Id,
@@ -3036,26 +2738,38 @@ const getItemBills = async (req, res, next) => {
           Direction: row.Direction,
           Source_Id: row.Source_Id,
           Selected_Unit: row.Selected_Unit,
-          //Bill_Id: row.Bill_Id,
-          Document_Id: resolvedBillId, // SAL001 / PUR001 / numeric return header id
 
-          Number: row.Bill_Number,     // INV-001 / AEPL-001 / SR-001 / PR-001
+          Document_Id: resolvedBillId,
+
+          Number: row.Bill_Number,
           Party_Name: row.Party_Name,
+
           Quantity: Number(row.Quantity || 0),
-          Rate: row.Rate !== null ? Number(row.Rate) : null,
-          // ✅ ONLY populated for adjustments
+
+          Rate:
+            row.Rate !== null
+              ? Number(row.Rate)
+              : null,
+
           At_Price:
             adjustment?.At_Price !== null &&
               adjustment?.At_Price !== undefined
               ? Number(adjustment.At_Price)
               : null,
 
-          // ✅ ONLY populated for adjustments
-          Details: adjustment?.Details ?? null,
+          Details:
+            adjustment?.Details ?? null,
 
-          // ✅ ONLY populated for adjustments
-          Adjustment_Date: formatDateOnly(adjustment?.Adjustment_Date) ?? null,
-          Running_Stock: Number(row.Running_Stock || 0),
+          Adjustment_Date:
+            formatDateOnly(
+              adjustment?.Adjustment_Date
+            ) ?? null,
+
+          Running_Stock:
+            isService
+              ? null
+              : Number(row.Running_Stock || 0),
+
           Txn_Date: row.Txn_Date,
         };
       }),
@@ -3063,6 +2777,88 @@ const getItemBills = async (req, res, next) => {
       nextCursor,
       hasMore,
     });
+    // const isService = item.Item_Type === "Service";
+    //     return res.status(200).json({
+    //       success: true,
+
+    //       // item: {
+    //       //   ...item,
+    //       //   Conversion_Rate: item.Conversion_Rate !== null ? Number(item.Conversion_Rate) : null,
+    //       //   Stock_Quantity: Number(item.Stock_Quantity || 0),
+    //       // },
+    //         item: {
+    //     ...item,
+
+    //     Conversion_Rate:
+    //       item.Conversion_Rate !== null? Number(item.Conversion_Rate): null,
+
+    //     ...(isService
+    //       ? {
+    //           Purchase_Price: null,
+    //           Stock_Quantity: null,
+    //           Opening_Quantity: null,
+    //           At_Price: null,
+    //           Min_Stock: null,
+    //           Location: null,
+    //           As_Of_Date: null,
+    //         }
+    //       : {
+    //           Purchase_Price:item.Purchase_Price !== null? Number(item.Purchase_Price): null,
+
+    //           Stock_Quantity:Number(item.Stock_Quantity || 0),
+    //         }),
+    //   },
+
+    //       transactions: transactions.map((row) => {
+    //         let resolvedBillId = row.Bill_Id; // Purchase / Sale — already correct
+
+    //         if (row.Txn_Type === "Purchase_Return" && row.Source_Id) {
+    //           resolvedBillId = purchaseReturnMap.get(row.Source_Id) ?? null;
+    //         } else if (row.Txn_Type === "Sale_Return" && row.Source_Id) {
+    //           resolvedBillId = saleReturnMap.get(row.Source_Id) ?? null;
+    //         }
+
+    //         const adjustment =
+    //           row.Txn_Type === "Add_Adjustment" ||
+    //             row.Txn_Type === "Reduce_Adjustment"
+    //             ? adjustmentMap.get(row.Source_Id)
+    //             : null;
+
+
+    //         return {
+    //           Ledger_Id: row.Ledger_Id,
+    //           Item_Id: row.Item_Id,
+    //           Txn_Type: row.Txn_Type,
+    //           Direction: row.Direction,
+    //           Source_Id: row.Source_Id,
+    //           Selected_Unit: row.Selected_Unit,
+    //           //Bill_Id: row.Bill_Id,
+    //           Document_Id: resolvedBillId, // SAL001 / PUR001 / numeric return header id
+
+    //           Number: row.Bill_Number,     // INV-001 / AEPL-001 / SR-001 / PR-001
+    //           Party_Name: row.Party_Name,
+    //           Quantity: Number(row.Quantity || 0),
+    //           Rate: row.Rate !== null ? Number(row.Rate) : null,
+    //           // ✅ ONLY populated for adjustments
+    //           At_Price:
+    //             adjustment?.At_Price !== null &&
+    //               adjustment?.At_Price !== undefined
+    //               ? Number(adjustment.At_Price)
+    //               : null,
+
+    //           // ✅ ONLY populated for adjustments
+    //           Details: adjustment?.Details ?? null,
+
+    //           // ✅ ONLY populated for adjustments
+    //           Adjustment_Date: formatDateOnly(adjustment?.Adjustment_Date) ?? null,
+    //           Running_Stock: Number(row.Running_Stock || 0),
+    //           Txn_Date: row.Txn_Date,
+    //         };
+    //       }),
+
+    //       nextCursor,
+    //       hasMore,
+    //     });
 
   } catch (err) {
     console.error("❌ Error fetching item bills:", err);
@@ -5130,7 +4926,7 @@ const addItemUnit = async (req, res, next) => {
     //   [Unit_Name]
     // );
     const [existingUnit] = await connection.query(
-  `
+      `
   SELECT id
   FROM units
   WHERE
@@ -5141,12 +4937,12 @@ const addItemUnit = async (req, res, next) => {
     )
   LIMIT 1
   `,
-  [
-    Unit_Name,
-    Unit_Shorthand,
-    Unit_Shorthand,
-  ]
-);
+      [
+        Unit_Name,
+        Unit_Shorthand,
+        Unit_Shorthand,
+      ]
+    );
 
     if (existingUnit.length > 0) {
       await connection.rollback();
@@ -5273,7 +5069,7 @@ const editItemUnit = async (req, res, next) => {
     //   [Unit_Name, id]
     // );
     const [duplicate] = await connection.query(
-  `
+      `
   SELECT id
   FROM units
   WHERE (
@@ -5286,22 +5082,22 @@ const editItemUnit = async (req, res, next) => {
   AND id <> ?
   LIMIT 1
   `,
-  [
-    Unit_Name,
-    Unit_Shorthand,
-    Unit_Shorthand,
-    id,
-  ]
-);
+      [
+        Unit_Name,
+        Unit_Shorthand,
+        Unit_Shorthand,
+        id,
+      ]
+    );
 
-   if (duplicate.length > 0) {
-  await connection.rollback();
+    if (duplicate.length > 0) {
+      await connection.rollback();
 
-  return res.status(400).json({
-    success: false,
-    message: "Unit name or shorthand already exists",
-  });
-}
+      return res.status(400).json({
+        success: false,
+        message: "Unit name or shorthand already exists",
+      });
+    }
 
     await connection.query(
       `
@@ -5386,8 +5182,12 @@ const getAllItemUnitsCursor = async (req, res, next) => {
       );
     }
 
+    // if (cursorId) {
+    //   whereParts.push(`id < ?`);
+    //   params.push(cursorId);
+    // }
     if (cursorId) {
-      whereParts.push(`id < ?`);
+      whereParts.push(`id > ?`);
       params.push(cursorId);
     }
 

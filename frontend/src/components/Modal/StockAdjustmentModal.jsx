@@ -15,6 +15,7 @@ export default function StockAdjustmentModal({
   editingAdjustment = null,
   onClose,
   onSave,
+  onRefresh
 }) {
   const dispatch = useDispatch();
   const isEditMode = !!editingAdjustment;
@@ -102,6 +103,7 @@ export default function StockAdjustmentModal({
       } else {
         res = await addStockAdjustment(payload).unwrap();
       }
+      await onRefresh?.();
       dispatch(
         itemApi.util.invalidateTags([
           { type: "Item", id: "LIST" },

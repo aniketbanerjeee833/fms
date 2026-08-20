@@ -694,32 +694,52 @@ moveItemsToCategory: builder.mutation({
       ],
     }),
 
-    getAllItemsForLedger: builder.query({
-      query: ({ cursor = null, search = "", limit = 10 }) => {
-        const params = new URLSearchParams();
-        if (cursor) params.append("cursor", cursor);
-        if (search?.trim()) params.append("search", search.trim());
-        params.append("limit", limit);
-        return `item/ledger?${params.toString()}`;
-      },
-      serializeQueryArgs: ({ queryArgs }) => ({
-        search: queryArgs.search,
-      }),
-      merge: (currentCache, newData, { arg }) => {
-        if (!arg.cursor) {
-          return newData;
-        }
-        currentCache.items.push(...newData.items);
-        currentCache.hasMore = newData.hasMore;
-        currentCache.nextCursor = newData.nextCursor;
-      },
-      forceRefetch: ({ currentArg, previousArg }) =>
-        currentArg?.cursor !== previousArg?.cursor ||
-        currentArg?.search !== previousArg?.search,
-      /* already correctly scoped — matches your invalidation bundle's
-         { type: "ItemLedger", id: "LIST" } */
-      providesTags: [{ type: "ItemLedger", id: "LIST" }],
-    }),
+  getAllItemsForLedger: builder.query({
+  query: ({
+    cursor = null,
+    search = "",
+    type = "",
+    limit = 10,
+  }) => {
+    const params = new URLSearchParams();
+
+    if (cursor) params.append("cursor", cursor);
+
+    if (search?.trim()) {
+      params.append("search", search.trim());
+    }
+
+    if (type) {
+      params.append("type", type);
+    }
+
+    params.append("limit", limit);
+
+    return `item/ledger?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: queryArgs.search,
+    type: queryArgs.type,
+  }),
+
+  merge: (currentCache, newData, { arg }) => {
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    currentCache.items.push(...newData.items);
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+  },
+
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.search !== previousArg?.search ||
+    currentArg?.type !== previousArg?.type,
+
+  providesTags: [{ type: "ItemLedger", id: "LIST" }],
+}),
 
     getItemBills: builder.query({
       query: ({ Item_Id, cursor = null, search = "", date = "" }) => {

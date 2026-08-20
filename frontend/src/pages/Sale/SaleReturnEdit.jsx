@@ -1821,7 +1821,7 @@ export default function SaleReturndEdit() {
                                         <td>{idx + 1}</td>
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
 
                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
@@ -1831,6 +1831,19 @@ export default function SaleReturndEdit() {
                                           }}
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                        </td> */}
+                                         <td className="px-3 py-2 text-gray-600">
+                                          {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
+                                        </td>
+
+                                        <td className="px-3 py-2" style={{
+                                          padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                          color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                          fontWeight: "500",
+                                        }}>
+                                          {it.Item_Type === "Service"
+                                            ? ""
+                                            : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
                                         </td>
                                       </tr>
                                     ))}

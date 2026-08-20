@@ -6,8 +6,8 @@ import { compressAndSavePurchaseBill } from "../utils/purchaseBillUpload.js";
 // import { parseInvoiceText } from "../utils/invoiceParser.js";
 import { extractInvoiceWithAI } from "../utils/invoiceAIParser.js";
 import ExcelJS from "exceljs";
-import { recordBankTransaction } from "../utils/bankAccountHelper.js";
-import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+// import { recordBankTransaction } from "../utils/bankAccountHelper.js";
+// import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
@@ -658,21 +658,7 @@ const addPurchase = async (req, res, next) => {
         continue;
       }
 
-      // const {
-      //   Item_Category,
-      //   Item_Name,
-      //   Item_HSN,
-      //   Quantity,
-      //   Item_Unit,
-      //   Selected_Unit,      // 🔹 which unit (Primary or Secondary) this row is in
-      //   Purchase_Price,
-      //   Discount_On_Purchase_Price,
-      //   Discount_Type_On_Purchase_Price,
-      //   Tax_Type,
-      //   Tax_Amount,
-      //   Amount,
-      //   Item_Image,
-      // } = item;
+      
       const {
         Item_Category,
         Item_Name,
@@ -861,32 +847,7 @@ VALUES
         // EXISTING ITEM
         // =========================================================
 
-        // Item_Id = itemRows[0].Item_Id;
-
-        // const dbItemRow = itemRows[0];
-
-        // try {
-        //   const result = resolveUnitAndStockDelta({
-        //     dbItemRow,
-        //     Selected_Unit,
-        //     Quantity,
-        //   });
-
-        //   stockDelta = result.stockDelta;
-
-        //   snapshot = result.snapshot;
-
-        //   resolvedSelectedUnit = result.resolvedSelectedUnit;
-
-        // } catch (unitErr) {
-
-        //   await connection.rollback();
-
-        //   return res.status(400).json({
-        //     success: false,
-        //     message: unitErr.message,
-        //   });
-        // }
+       
         Item_Id = itemRows[0].Item_Id;
 
 let dbItemRow = itemRows[0];
@@ -933,12 +894,25 @@ if (
     Item_Unit: Selected_Unit,
   };
 }
-
+//const isService =dbItemRow?.Item_Type === "Service";;
 // =========================================================
 // NOW RESOLVE UNIT + STOCK
 // =========================================================
 
 try {
+//   if (isService) {
+//   stockDelta = 0;
+
+//  snapshot = {
+//   Primary_Unit_Snapshot: null,
+//   Secondary_Unit_Snapshot: null,
+// };
+
+// resolvedSelectedUnit = Selected_Unit ?? null;
+
+//   //resolvedSelectedUnit = Selected_Unit;
+// }
+
   const result = resolveUnitAndStockDelta({
     dbItemRow,
     Selected_Unit,
@@ -946,11 +920,11 @@ try {
   });
 
   stockDelta = result.stockDelta;
-
   snapshot = result.snapshot;
-
   resolvedSelectedUnit =
     result.resolvedSelectedUnit;
+
+ 
 
 } catch (unitErr) {
   await connection.rollback();
@@ -962,6 +936,7 @@ try {
 }
 
         // Existing item → increase existing stock
+        
        await connection.execute(
   `
   UPDATE add_item
@@ -986,6 +961,7 @@ try {
     Item_Id,
   ]
 );
+        
       }
 
       const [pitResult] = await connection.execute(
@@ -1017,20 +993,7 @@ try {
         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
         [newPurchaseItemId, pitId]
       );
-      //    await recordItemLedger({
-      //   connection,
-      //   itemId: Item_Id,
-      //   txnType: "Purchase",
-      //   referenceId: pitResult.insertId,   // purchase_item row's numeric id
-      //   //formattedId: newPurchaseId,
-      //    billId:      newPurchaseId,
-      //     billNumber: Bill_Number,   // AEPL-22
-      //   partyName: Party_Name,
-      //   quantity: normalizeNumber(Quantity) ?? 0,
-      //   rate: normalizeNumber(Purchase_Price) ?? null,
-      //   txnDate: Bill_Date,
-
-      // });
+     
       await recordItemLedger({
   connection,
   itemId:       Item_Id,

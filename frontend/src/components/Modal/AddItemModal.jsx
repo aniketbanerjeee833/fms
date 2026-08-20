@@ -17,7 +17,7 @@ import SelectUnitModal from "./SelectUnitModal";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
 
-export default function AddItemModal({ onClose, onSave }) {
+export default function AddItemModal({ onClose, onSave, defaultItemType = "Product" }) {
     const dispatch = useDispatch();
     const dropdownRef = useRef(null);
 
@@ -29,6 +29,9 @@ export default function AddItemModal({ onClose, onSave }) {
         formState: { errors },
     } = useForm({
         resolver: zodResolver(itemFormSchema),
+        defaultValues: {
+            Item_Type: defaultItemType,   // ← pre-selects the toggle
+        },
     });
 
     const { data: itemUnitsFetched } = useGetAllItemUnitsQuery();
@@ -50,6 +53,18 @@ export default function AddItemModal({ onClose, onSave }) {
     const primaryUnit = watch("Primary_Unit");
     const secondaryUnit = watch("Secondary_Unit");
     const conversionRate = watch("Conversion_Rate");
+
+    const itemType = watch("Item_Type") || "Product";
+    {/* label text swaps based on Item_Type — table/schema stays Item_Name, Item_HSN etc. unchanged */ }
+    const fieldLabel = (base) => (itemType === "Service" ? `Service ${base}` : `Item ${base}`);
+    //const TABS = itemType === "Service" ? ["Items"] : ["Items", "Stock"];
+
+    // keep activeTab valid if it becomes "Stock" while itemType flips to Service
+    useEffect(() => {
+        if (itemType === "Service" && activeTab === "Stock") {
+            setActiveTab("Items");
+        }
+    }, [itemType, activeTab]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -111,14 +126,16 @@ export default function AddItemModal({ onClose, onSave }) {
             if (onClose) {
                 onClose();
             }
-            dispatch(itemApi.util.invalidateTags(["Item","ItemLedger"]));
-                    dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-                    dispatch(saleApi.util.invalidateTags(["Sale"]));
+            dispatch(itemApi.util.invalidateTags(["Item", "ItemLedger"]));
+            dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+            dispatch(saleApi.util.invalidateTags(["Sale"]));
         } catch (error) {
             console.error("Submission failed:", error);
             toast.error(error?.data?.message || "Failed to add new item");
         }
     };
+    const formValues = watch()
+    console.log(formValues)
 
     return (
         <>
@@ -128,7 +145,7 @@ export default function AddItemModal({ onClose, onSave }) {
                     backgroundColor: "rgba(39, 19, 19, 0.3)",
                     backdropFilter: "blur(4px)",
                     padding: "1rem",
-                     marginTop: "50px",
+                    marginTop: "50px",
 
                 }}
                 onClick={onClose}
@@ -153,7 +170,8 @@ export default function AddItemModal({ onClose, onSave }) {
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-6 w-full mb-3">
+
+                    {/* <div className="flex gap-6 w-full mb-3">
                         <div className="flex space-x-8">
                             {["Items", "Stock"].map((tab) => (
                                 <button
@@ -168,6 +186,77 @@ export default function AddItemModal({ onClose, onSave }) {
                                         padding: "0.5rem 1rem",
                                         borderBottom: activeTab === tab ? "1px solid red" : "none",
                                         color: activeTab === tab ? "red" : "gray",
+                                        fontWeight: activeTab === tab ? "600" : "500",
+                                    }}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
+                    </div> */}
+                    {/* ── Product / Service toggle ── */}
+                    <style>{`
+  .item-toggle {
+    position: relative;
+    width: 44px; height: 24px;
+    background: #d1d5db;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .item-toggle.on { background: #4CA1AF; }
+  .item-toggle::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .item-toggle.on::after { transform: translateX(20px); }
+`}</style>
+
+                    <div className="flex items-center gap-3 mb-4">
+                        {/* <span className="text-sm font-medium text-gray-700">Item Type</span> */}
+                        <span className={`text-sm ${itemType === "Product" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
+                            Product
+                        </span>
+                        <div
+                            className={`item-toggle ${itemType === "Service" ? "on" : ""}`}
+                            onClick={() => {
+                                const next = itemType === "Product" ? "Service" : "Product";
+                                setValue("Item_Type", next, { shouldValidate: true, shouldDirty: true });
+                                if (next === "Service" && activeTab === "Stock") {
+                                    setActiveTab("Items");
+                                }
+                            }}
+                        />
+                        <span className={`text-sm ${itemType === "Service" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
+                            Service
+                        </span>
+                    </div>
+
+                    <input type="hidden" {...register("Item_Type")} />
+
+                    {/* Tabs — Stock hidden entirely when Service */}
+                    <div className="flex gap-6 w-full mb-3">
+                        <div className="flex space-x-8">
+                            {(itemType === "Service" ? ["Items"] : ["Items", "Stock"]).map((tab) => (
+                                <button
+                                    type="button"
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    style={{
+                                        cursor: "pointer",
+                                        backgroundColor: "transparent",
+                                        border: "none",
+                                        outline: "none",
+                                        padding: "0.5rem 1rem",
+                                        borderBottom: activeTab === tab ? "2px solid #4CA1AF" : "2px solid transparent",
+                                        color: activeTab === tab ? "#4CA1AF" : "gray",
                                         fontWeight: activeTab === tab ? "600" : "500",
                                     }}
                                 >
@@ -294,7 +383,7 @@ export default function AddItemModal({ onClose, onSave }) {
                                     {/* Item Name */}
                                     <div className="input-field col s6" style={{ width: "50%" }}>
                                         <span className="active">
-                                            Item Name
+                                            {fieldLabel("Name")}
                                             <span className="text-red-500 font-bold text-lg">&nbsp;*</span>
                                         </span>
                                         <input
@@ -313,7 +402,8 @@ export default function AddItemModal({ onClose, onSave }) {
                                 <div className="flex gap-4 mt-4">
                                     {/* HSN */}
                                     <div className="input-field col s6" style={{ width: "50%" }}>
-                                        <span className="active">Item HSN Code</span>
+                                        {/* //<span className="active">Item HSN Code</span> */}
+                                        <span className="active">{fieldLabel("HSN Code")}</span>
                                         <input
                                             type="text"
                                             id="Item_HSN"
@@ -332,7 +422,8 @@ export default function AddItemModal({ onClose, onSave }) {
 
                                     {/* Unit */}
                                     <div className="input-field col s6" style={{ width: "50%" }}>
-                                        <span className="active">Unit</span>
+                                        {/* <span className="active">Unit</span> */}
+                                        <span className="active">{fieldLabel("Unit")}</span>
 
                                         <div className="mt-2">
                                             <button
@@ -365,7 +456,7 @@ export default function AddItemModal({ onClose, onSave }) {
                                         </div>
                                     </div>
                                 </div>
-                              
+
                             </div>
                         )}
 
@@ -486,164 +577,3 @@ export default function AddItemModal({ onClose, onSave }) {
     );
 }
 
-//   <div className="mt-6">
-
-//                                     {/* <h3 className="font-semibold text-gray-800 mb-3">
-//                                         Sale Price
-//                                     </h3> */}
-
-//                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-
-//                                         {/* Sale Price */}
-//                                         <div className="w-full">
-//                                             <span className="font-semibold text-gray-800">Sale Price</span>
-
-//                                             <input
-//                                                 type="text"
-//                                                 placeholder="Sale Price"
-//                                                 className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           text-gray-900
-//         "
-//                                                 {...register("Sale_Price")}
-//                                                 onInput={(e) => {
-//                                                     e.target.value = e.target.value
-//                                                         .replace(/[^0-9.]/g, "")
-//                                                         .replace(/(\..*)\./g, "$1");
-//                                                 }}
-//                                             />
-//                                         </div>
-
-//                                         {/* Sale Price Type */}
-//                                         {/* <div className="w-full">
-//                                             <label className="block text-xs text-gray-600 mb-1">
-//                                                 Sale Price Type
-//                                             </label>
-
-//                                             <select
-//                                                 className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           bg-white
-//         "
-//                                                 {...register("Sale_Price_Type")}
-//                                             >
-//                                                 <option value="Without_Tax">Without Tax</option>
-//                                                 <option value="With_Tax">With Tax</option>
-//                                             </select>
-//                                         </div> */}
-
-//                                         {/* Discount */}
-//                                         <div className="w-full">
-//                                             <label className="block text-xs text-gray-600 mb-1">
-//                                                 Disc. On Sale Price
-//                                             </label>
-
-//                                             <input
-//                                                 type="text"
-//                                                 placeholder="Disc. On Sale Price"
-//                                                 className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           text-gray-900
-//         "
-//                                                 {...register("Discount_On_Sale_Price")}
-//                                                 onInput={(e) => {
-//                                                     e.target.value = e.target.value
-//                                                         .replace(/[^0-9.]/g, "")
-//                                                         .replace(/(\..*)\./g, "$1");
-//                                                 }}
-//                                             />
-//                                         </div>
-
-//                                         {/* Discount Type */}
-//                                         <div className="w-full">
-//                                             <label className="block text-xs text-gray-600 mb-1">
-//                                                 Discount Type
-//                                             </label>
-
-//                                             <select
-//                                                 className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           bg-white
-//         "
-//                                                 {...register("Discount_Type_On_Sale_Price")}
-//                                             >
-//                                                 <option value="Percentage">Percentage</option>
-//                                                 <option value="Amount">Amount</option>
-//                                             </select>
-//                                         </div>
-
-//                                     </div>
-
-//                                     {errors?.Discount_On_Sale_Price && (
-//                                         <p className="text-red-500 text-xs mt-1">
-//                                             {errors.Discount_On_Sale_Price.message}
-//                                         </p>
-//                                     )}
-
-//                                 </div>
-
-//                                 <div className="mt-6">
-
-                                    
-
-//                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-//                                         {/* Purchase Price */}
-//                                         <div className="w-full">
-//                                            <span className="font-semibold text-gray-800">Purchase Price</span>
-
-//                                             <input
-//                                                 type="text"
-//                                                 placeholder="Purchase Price"
-//                                                 className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           text-gray-900
-//         "
-//                                                 {...register("Purchase_Price")}
-//                                                 onInput={(e) => {
-//                                                     e.target.value = e.target.value
-//                                                         .replace(/[^0-9.]/g, "")
-//                                                         .replace(/(\..*)\./g, "$1");
-//                                                 }}
-//                                             />
-//                                         </div>
-
-//                                         {/* Purchase Price Type */}
-//                                         {/* <div className="w-full">
-//                                             <label className="block text-xs text-gray-600 mb-1">
-//                                                 Purchase Price Type
-//                                             </label>
-
-//                                             <select
-//                                                 className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           bg-white
-//         "
-//                                                 {...register("Purchase_Price_Type")}
-//                                             >
-//                                                 <option value="Without_Tax">Without Tax</option>
-//                                                 <option value="With_Tax">With Tax</option>
-//                                             </select>
-//                                         </div> */}
-
-//                                     </div>
-
-//                                 </div>

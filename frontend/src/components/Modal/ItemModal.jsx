@@ -2,8 +2,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { itemFormSchema } from "../../schema/itemFormSchema";
 import { useRef } from "react";
 import { useState } from "react";
-import { itemApi, useAddCategoryMutation, useEditItemMutation, useGetAllCategoriesQuery, useGetAllItemUnitsQuery, 
-  useGetEachItemBillAndInvoiceNumbersQuery } from "../../redux/api/itemApi";
+import {
+  itemApi, useAddCategoryMutation, useEditItemMutation, useGetAllCategoriesQuery, useGetAllItemUnitsQuery,
+  useGetEachItemBillAndInvoiceNumbersQuery
+} from "../../redux/api/itemApi";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
@@ -14,7 +16,8 @@ import SelectUnitModal from "./SelectUnitModal";
 
 
 
-export default function ItemModal({ itemDetails, editingItem, onClose }) {
+export default function ItemModal({ itemDetails, editingItem, onClose, onRefreshBills,
+  onRefreshTab }) {
   const dropdownRef = useRef(null);
   const dispatch = useDispatch()
 
@@ -32,7 +35,16 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
     resolver: zodResolver(itemFormSchema)
 
   })
-
+const toLocalDateString = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
+  };
+  console.log(itemDetails, "itemDetails");
+  const itemType = watch("Item_Type") || "Product";
   const { data: categories } = useGetAllCategoriesQuery()
 
   const [newCategory, setNewCategory] = useState("");
@@ -60,9 +72,9 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
   console.log(editingItem, "editingItem")
   //const canEditUnits = itemDetails?.Can_Edit_Units ?? true;
   const canEditUnits = itemDetails?.Can_Edit_Units ?? {
-  Primary: true,
-  Secondary: true,
-};
+    Primary: true,
+    Secondary: true,
+  };
   useEffect(() => {
     if (!editingItem) return;
     if (!itemDetails) return;
@@ -72,6 +84,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
 
     reset({
       Item_Name: itemDetails.Item_Name,
+      Item_Type: itemDetails.Item_Type || "Product",   // ← add this
       Item_Description: itemDetails.Item_Description,
       Item_Category: itemDetails.Item_Category,
       Item_Unit: itemDetails.Item_Unit,
@@ -79,22 +92,23 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
       Primary_Unit: itemDetails.Primary_Unit,
       Secondary_Unit: itemDetails.Secondary_Unit,
       Conversion_Rate: itemDetails.Conversion_Rate,
-      // ✅ Sale Price
+      //  Sale Price
       Sale_Price: itemDetails.Sale_Price ?? "",
       Sale_Price_Type: itemDetails.Sale_Price_Type ?? "Without_Tax",
       Discount_On_Sale_Price: itemDetails.Discount_On_Sale_Price ?? "",
       Discount_Type_On_Sale_Price:
         itemDetails.Discount_Type_On_Sale_Price ?? "Percentage",
 
-      // ✅ Purchase Price
+      //  Purchase Price
       Purchase_Price: itemDetails.Purchase_Price ?? "",
       Purchase_Price_Type:
         itemDetails.Purchase_Price_Type ?? "Without_Tax",
       Opening_Quantity: itemDetails.Opening_Quantity ?? "",
       At_Price: itemDetails.At_Price ?? "",
-      As_Of_Date:
-        itemDetails.As_Of_Date ??
-        new Date().toISOString().slice(0, 10),
+      // As_Of_Date:
+      //   itemDetails.As_Of_Date ??
+      //   new Date().toISOString().slice(0, 10),
+         As_Of_Date:toLocalDateString(itemDetails.As_Of_Date),
       Min_Stock: itemDetails.Min_Stock ?? "",
       Location: itemDetails.Location ?? "",
     });
@@ -182,31 +196,70 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
   console.log(formValues, "formValues")
   const onSubmit = async () => {
     if (!editingItem) return;
+    const payload = {
+      ...formValues,
+    };
+
+    if (payload.Item_Type === "Service") {
+      payload.Opening_Quantity = null;
+      payload.At_Price = null;
+      payload.As_Of_Date = null;
+      payload.Min_Stock = null;
+      payload.Location = null;
+    }
+    const oldType = itemDetails.Item_Type;
+    const newType = payload.Item_Type;
 
     try {
-      const res = await editItem({
-        body: formValues,
+      //   const res = await editItem({
+      //     body: formValues,
+      //     Item_Id: itemDetails.Item_Id,
+      //   }).unwrap();
+      await editItem({
+        body: payload,
         Item_Id: itemDetails.Item_Id,
       }).unwrap();
 
-      console.log(res, "res");
+      //await onRefresh?.();
+      await onRefreshBills?.();
 
-      if (res?.success) {
-        toast.success(res?.message || "Item Updated Successfully");
-
-        setEachItemBillAndInvoiceNumbersModalOpen(false);
-        onClose();
-
-        dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);
-        dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-        dispatch(saleApi.util.invalidateTags(["Sale"]));
+      // switch Product/Service tab if changed
+      if (oldType !== newType) {
+        onRefreshTab?.(newType);
       }
+      toast.success("Item Updated Successfully");
+
+      setEachItemBillAndInvoiceNumbersModalOpen(false);
+      onClose();
+
+      dispatch(
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );
+
+      dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+      dispatch(saleApi.util.invalidateTags(["Sale"]));
+      // console.log(res, "res");
+
+      // if (res?.success) {
+      //   toast.success(res?.message || "Item Updated Successfully");
+
+      //   setEachItemBillAndInvoiceNumbersModalOpen(false);
+      //   onClose();
+
+      //   dispatch(
+      //     itemApi.util.invalidateTags([
+      //       { type: "Item", id: "LIST" },
+      //       { type: "ItemsByCategory", id: "LIST" },
+      //       { type: "ItemLedger", id: "LIST" },
+      //     ])
+      //   );
+      //   dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+      //   dispatch(saleApi.util.invalidateTags(["Sale"]));
+      // }
     } catch (err) {
       console.error("Failed to update item:", err);
 
@@ -267,7 +320,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
               ✕
             </button>
           </div>
-          <div className="flex gap-6 w-full mt-6 pb-3">
+          {/* <div className="flex gap-6 w-full mt-6 pb-3">
             <div className=" flex space-x-8 pl-4">
               {["Items", "Stock"].map((tab) => (
                 <button
@@ -290,9 +343,86 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
               ))}
             </div>
 
+          </div> */}
+           {/* // .item-toggle.disabled { cursor: not-allowed; opacity: 0.5; } */}
+          <style>{`
+  .item-toggle {
+    position: relative;
+    width: 44px; height: 24px;
+    background: #d1d5db;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .item-toggle.on { background: #4CA1AF; }
+ 
+  .item-toggle::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .item-toggle.on::after { transform: translateX(20px); }
+`}</style>
+
+          <div className="flex items-center gap-3 mb-2">
+            <span className={`text-sm ${itemType === "Product" ? "font-medium text-gray-700" : "text-gray-400"}`}>
+              Product
+            </span>
+            <div
+              className={`item-toggle ${itemType === "Service" ? "on" : ""} 
+              
+              
+              `}
+              onClick={() => {
+                // ${itemDetails?.Stock_Quantity ? "disabled" : ""}
+                // lock the toggle once the item already has stock history — switching
+                // Product ↔ Service after transactions exist would make past
+                // quantity/stock data meaningless
+                //if (itemDetails?.Stock_Quantity) return;
+
+                const next = itemType === "Product" ? "Service" : "Product";
+                setValue("Item_Type", next, { shouldValidate: true, shouldDirty: true });
+                if (next === "Service" && activeTab === "Stock") {
+                  setActiveTab("Items");
+                }
+              }}
+            />
+            <span className={`text-sm ${itemType === "Service" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
+              Service
+            </span>
           </div>
 
+          <input type="hidden" {...register("Item_Type")} />
 
+          <div className="flex gap-6 w-full mt-6 pb-3">
+            <div className="flex space-x-8 pl-4">
+              {(itemType === "Service" ? ["Items"] : ["Items", "Stock"]).map((tab) => (
+                <button
+                  type="button"
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    cursor: "pointer",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    outline: "none",
+                    padding: "0.5rem 1rem",
+                    borderBottom: activeTab === tab ? "2px solid #4CA1AF" : "2px solid transparent",
+                    color: activeTab === tab ? "#4CA1AF" : "gray",
+                    fontWeight: activeTab === tab ? "600" : "500",
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
           <form onSubmit={handleSubmit(onSubmit)}>
             {activeTab === "Items" && (
               <div >
@@ -529,19 +659,19 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
                           </button>
                         )} */}
                         {canEditUnits.Secondary && (
-  <button
-    type="button"
-    onClick={() => setShowSelectUnitModal(true)}
-    className="mt-3 px-4 py-2 rounded-md border"
-    style={{
-      backgroundColor: "white",
-      borderColor: "#4CA1AF",
-      color: "#4CA1AF",
-    }}
-  >
-    Add Secondary Unit
-  </button>
-)}
+                          <button
+                            type="button"
+                            onClick={() => setShowSelectUnitModal(true)}
+                            className="mt-3 px-4 py-2 rounded-md border"
+                            style={{
+                              backgroundColor: "white",
+                              borderColor: "#4CA1AF",
+                              color: "#4CA1AF",
+                            }}
+                          >
+                            Add Secondary Unit
+                          </button>
+                        )}
                       </>
                     )}
 
@@ -586,48 +716,48 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
                       </>
                     )} */}
                     {primaryUnit && secondaryUnit && (
-  <>
-    <div className="mt-2 p-2 rounded-md border bg-gray-50">
-      <div className="text-sm">
-        <div>
-          <strong>Primary Unit:</strong>{" "}
-          {primaryUnit.toUpperCase()}
-        </div>
+                      <>
+                        <div className="mt-2 p-2 rounded-md border bg-gray-50">
+                          <div className="text-sm">
+                            <div>
+                              <strong>Primary Unit:</strong>{" "}
+                              {primaryUnit.toUpperCase()}
+                            </div>
 
-        <div className="mt-1">
-          <strong>Secondary Unit:</strong>{" "}
-          {secondaryUnit.toUpperCase()}
-        </div>
+                            <div className="mt-1">
+                              <strong>Secondary Unit:</strong>{" "}
+                              {secondaryUnit.toUpperCase()}
+                            </div>
 
-        <div className="mt-1 text-[#4CA1AF]">
-          <strong>Conversion:</strong>{" "}
-          1 {primaryUnit.toUpperCase()} ={" "}
-          {formatConversionRate(conversionRate)}{" "}
-          {secondaryUnit.toUpperCase()}
-        </div>
-      </div>
-    </div>
+                            <div className="mt-1 text-[#4CA1AF]">
+                              <strong>Conversion:</strong>{" "}
+                              1 {primaryUnit.toUpperCase()} ={" "}
+                              {formatConversionRate(conversionRate)}{" "}
+                              {secondaryUnit.toUpperCase()}
+                            </div>
+                          </div>
+                        </div>
 
-    {canEditUnits.Secondary && (
-      <button
-        type="button"
-        onClick={() => setShowSelectUnitModal(true)}
-        className="mt-3 px-4 py-2 rounded-md border"
-        style={{
-          backgroundColor: "white",
-          borderColor: "#4CA1AF",
-          color: "#4CA1AF",
-        }}
-      >
-        Edit Secondary Unit
-      </button>
-    )}
-  </>
-)}
+                        {canEditUnits.Secondary && (
+                          <button
+                            type="button"
+                            onClick={() => setShowSelectUnitModal(true)}
+                            className="mt-3 px-4 py-2 rounded-md border"
+                            style={{
+                              backgroundColor: "white",
+                              borderColor: "#4CA1AF",
+                              color: "#4CA1AF",
+                            }}
+                          >
+                            Edit Secondary Unit
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 
-               
+
 
 
               </div>)}
@@ -869,165 +999,3 @@ export default function ItemModal({ itemDetails, editingItem, onClose }) {
 
 
 
-
-//  <div className="mt-6">
-
-//                   {/* <h3 className="font-semibold text-gray-800 mb-3">
-//                                         Sale Price
-//                                     </h3> */}
-
-//                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-
-//                     {/* Sale Price */}
-//                     <div className="w-full">
-//                       <span className="font-semibold text-gray-800">Sale Price</span>
-
-//                       <input
-//                         type="text"
-//                         placeholder="Sale Price"
-//                         className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           text-gray-900
-//         "
-//                         {...register("Sale_Price")}
-//                         onInput={(e) => {
-//                           e.target.value = e.target.value
-//                             .replace(/[^0-9.]/g, "")
-//                             .replace(/(\..*)\./g, "$1");
-//                         }}
-//                       />
-//                     </div>
-
-//                     {/* Sale Price Type */}
-//                     {/* <div className="w-full">
-//                       <label className="block text-xs text-gray-600 mb-1">
-//                         Sale Price Type
-//                       </label>
-
-//                       <select
-//                         className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           bg-white
-//         "
-//                         {...register("Sale_Price_Type")}
-//                       >
-//                         <option value="Without_Tax">Without Tax</option>
-//                         <option value="With_Tax">With Tax</option>
-//                       </select>
-//                     </div> */}
-
-//                     {/* Discount */}
-//                     <div className="w-full">
-//                       <label className="block text-xs text-gray-600 mb-1">
-//                         Disc. On Sale Price
-//                       </label>
-
-//                       <input
-//                         type="text"
-//                         placeholder="Disc. On Sale Price"
-//                         className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           text-gray-900
-//         "
-//                         {...register("Discount_On_Sale_Price")}
-//                         onInput={(e) => {
-//                           e.target.value = e.target.value
-//                             .replace(/[^0-9.]/g, "")
-//                             .replace(/(\..*)\./g, "$1");
-//                         }}
-//                       />
-//                     </div>
-
-//                     {/* Discount Type */}
-//                     {/* <div className="w-full">
-//                       <label className="block text-xs text-gray-600 mb-1">
-//                         Discount Type
-//                       </label>
-
-//                       <select
-//                         className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           bg-white
-//         "
-//                         {...register("Discount_Type_On_Sale_Price")}
-//                       >
-//                         <option value="Percentage">Percentage</option>
-//                         <option value="Amount">Amount</option>
-//                       </select>
-//                     </div> */}
-
-//                   </div>
-
-//                   {errors?.Discount_On_Sale_Price && (
-//                     <p className="text-red-500 text-xs mt-1">
-//                       {errors.Discount_On_Sale_Price.message}
-//                     </p>
-//                   )}
-
-//                 </div>
-
-//                 <div className="mt-6">
-
-
-
-//                   {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-
-                   
-//                     <div className="w-full">
-//                       <span className="font-semibold text-gray-800">Purchase Price</span>
-
-//                       <input
-//                         type="text"
-//                         placeholder="Purchase Price"
-//                         className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           text-gray-900
-//         "
-//                         {...register("Purchase_Price")}
-//                         onInput={(e) => {
-//                           e.target.value = e.target.value
-//                             .replace(/[^0-9.]/g, "")
-//                             .replace(/(\..*)\./g, "$1");
-//                         }}
-//                       />
-//                     </div>
-
-//                     {/* Purchase Price Type */}
-//                     {/* <div className="w-full">
-//                       <label className="block text-xs text-gray-600 mb-1">
-//                         Purchase Price Type
-//                       </label>
-
-//                       <select
-//                         className="
-//           w-full
-//           border-b-2 border-gray-300
-//           outline-none
-//           py-1.5
-//           bg-white
-//         "
-//                         {...register("Purchase_Price_Type")}
-//                       >
-//                         <option value="Without_Tax">Without Tax</option>
-//                         <option value="With_Tax">With Tax</option>
-//                       </select>
-//                     </div> *
-
-//                   </div> */}
-
-//                 </div>

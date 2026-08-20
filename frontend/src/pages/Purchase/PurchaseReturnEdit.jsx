@@ -115,7 +115,7 @@ export default function PurchaseReturndEdit() {
 
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
-  const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+ 
   const [activeItemRow, setActiveItemRow] = useState(null);
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
@@ -667,37 +667,37 @@ export default function PurchaseReturndEdit() {
 
   // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
   // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
+  // const buildPaymentTypeOptions = (banks) => [
+  //   { value: "Cash", label: "Cash", repeatable: false },
+  //   { value: "Cheque", label: "Cheque", repeatable: true },
+  //   { value: "Neft", label: "Neft", repeatable: true },
+  //   ...(banks || []).map((bank) => ({
+  //     value: `bank_${bank.Bank_Account_Id}`,
+  //     label: bank.Account_Display_Name,
+  //     repeatable: false,
+  //   })),
+  // ];
 
   const getRowIdentifier = (type, bankId) =>
     type === "Bank" ? `bank_${bankId ?? ""}` : type;
 
   //Inside the component:
 
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
+  // const getUsedIdentifiers = (excludeIndex) => {
+  //   const splitValues = watch("splits") || [];
+  //   return splitValues
+  //     .map((s, i) =>
+  //       i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+  //     )
+  //     .filter(Boolean);
+  // };
 
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
+  // const getAvailableOptions = (excludeIndex) => {
+  //   const used = getUsedIdentifiers(excludeIndex);
+  //   return buildPaymentTypeOptions(banks).filter(
+  //     (opt) => opt.repeatable || !used.includes(opt.value)
+  //   );
+  // };
 
   const handleAddPaymentType = () => {
     appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
@@ -1868,8 +1868,8 @@ export default function PurchaseReturndEdit() {
                                         <td>{idx + 1}</td>
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        {/* <td className="px-3 py-2 text-gray-500">{it.Stock_Quantity || 0}</td> */}
+                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        
                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
@@ -1878,6 +1878,19 @@ export default function PurchaseReturndEdit() {
                                           }}
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                        </td> */}
+                                         <td className="px-3 py-2 text-gray-600">
+                                          {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
+                                        </td>
+
+                                        <td className="px-3 py-2" style={{
+                                          padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                          color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                          fontWeight: "500",
+                                        }}>
+                                          {it.Item_Type === "Service"
+                                            ? ""
+                                            : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
                                         </td>
                                       </tr>
                                     ))}
@@ -3402,11 +3415,11 @@ export default function PurchaseReturndEdit() {
 
             await refetchItems();
 
-            setNewlyAddedItem(savedItem);
+            // setNewlyAddedItem(savedItem);
 
-            setTimeout(() => {
-              setNewlyAddedItem(null);
-            }, 8000);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
             setShowItemAddModal(false);
 

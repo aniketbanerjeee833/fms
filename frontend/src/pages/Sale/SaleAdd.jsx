@@ -1702,7 +1702,7 @@ export default function SaleAdd() {
                             <div
                               style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                            border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
                               <div
                                 onMouseDown={(e) => {
@@ -1750,7 +1750,7 @@ export default function SaleAdd() {
                                       <tr
                                         key={idx}
                                         onClick={() => {
-                                          if (it.Stock_Quantity <= 0) {
+                                          if (it.Stock_Quantity <= 0 && it.Item_Type !== "Service") {
                                             // show confirmation modal instead of directly adding
                                             setConfirmModal({ open: true, item: it, rowIndex: i });
                                             return;
@@ -1764,7 +1764,20 @@ export default function SaleAdd() {
                                         <td>{idx + 1}</td>
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        <td className="px-3 py-2 text-gray-600">
+                                          {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
+                                        </td>
+
+                                        <td className="px-3 py-2" style={{
+                                          padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                          color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                          fontWeight: "500",
+                                        }}>
+                                          {it.Item_Type === "Service"
+                                            ? ""
+                                            : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
+                                        </td>
+                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
 
                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
@@ -1774,7 +1787,7 @@ export default function SaleAdd() {
                                           }}
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                        </td>
+                                        </td> */}
                                       </tr>
                                     ))}
 
@@ -1822,7 +1835,7 @@ export default function SaleAdd() {
                                       setConfirmModal({ open: false, item: null, rowIndex: null });
                                     }}
                                     className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white 
-          hover:bg-[#4CA1AF]"
+                                hover:bg-[#4CA1AF]"
                                   >
                                     Yes, Add Item
                                   </button>
@@ -1833,7 +1846,7 @@ export default function SaleAdd() {
                                     }
                                     style={{ outline: "none", backgroundColor: "gray" }}
                                     className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300
-           text-gray-700 "
+                                text-gray-700 "
                                   >
                                     Cancel
                                   </button>

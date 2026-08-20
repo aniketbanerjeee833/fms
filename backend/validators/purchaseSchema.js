@@ -226,28 +226,7 @@ const digitsOnly = (fieldName, required = true) =>
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
 
-// const paymentSplitSchema = z
-//   .object({
-//     Payment_Type: z
-//       .enum(["Cash", "Cheque", "Neft", "Bank"])
-//       .or(z.literal(""))
-//       .refine((val) => val !== "", {
-//         message: "Please select a payment type.",
-//       }),
 
-//     Bank_Account_Id: z
-//       .union([z.number(), z.string(), z.null(), z.undefined()])
-//       .optional(),
-
-//     Reference_Number: z
-//       .string()
-//       .trim()
-//       .nullable()
-//       .optional()
-//       .transform((val) => val ?? ""),
-
-//     Amount: digitsOnly("Amount", true),
-//   })
 const paymentSplitSchema = z
   .object({
     Payment_Type: z

@@ -2176,7 +2176,7 @@ export default function SaleEdit() {
                                       <tr
                                         key={idx}
                                         onClick={() => {
-                                          if (it.Stock_Quantity <= 0) {
+                                          if (it.Stock_Quantity <= 0 &&  it.Item_Type!=="Service") {
                                             // show confirmation modal instead of directly adding
                                             setConfirmModal({ open: true, item: it, rowIndex: i });
                                             return;
@@ -2243,7 +2243,7 @@ export default function SaleEdit() {
                                         <td>{idx + 1}</td>
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
@@ -2252,6 +2252,19 @@ export default function SaleEdit() {
                                           }}
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                        </td> */}
+                                         <td className="px-3 py-2 text-gray-600">
+                                          {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
+                                        </td>
+
+                                        <td className="px-3 py-2" style={{
+                                          padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                          color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                          fontWeight: "500",
+                                        }}>
+                                          {it.Item_Type === "Service"
+                                            ? ""
+                                            : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
                                         </td>
                                       </tr>
                                     ))}
