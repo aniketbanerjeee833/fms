@@ -406,6 +406,33 @@ const addItem = async (req, res, next) => {
     // 10. SAVE UNIT CONVERSION
     // =========================================================
 
+    // if (
+    //   primaryUnit &&
+    //   secondaryUnit &&
+    //   conversionRate !== null &&
+    //   Number(conversionRate) > 0
+    // ) {
+    //   await connection.execute(
+    //     `
+    //   INSERT IGNORE INTO item_unit_conversions
+    //   (
+    //     Item_Id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate
+    //   )
+    //   VALUES (?, ?, ?, ?)
+    // `,
+    //     [
+    //       itemId,
+    //       primaryUnit,
+    //       secondaryUnit,
+    //       conversionRate,
+    //     ]
+    //   );
+    // }
+
+    
     if (
       primaryUnit &&
       secondaryUnit &&
@@ -416,15 +443,15 @@ const addItem = async (req, res, next) => {
         `
       INSERT IGNORE INTO item_unit_conversions
       (
-        Item_Id,
+        
         Primary_Unit,
         Secondary_Unit,
         Conversion_Rate
       )
-      VALUES (?, ?, ?, ?)
+      VALUES ( ?, ?, ?)
     `,
         [
-          itemId,
+         
           primaryUnit,
           secondaryUnit,
           conversionRate,
@@ -547,23 +574,33 @@ const addItemConversion = async (req, res, next) => {
     connection = await db.getConnection();
 
     const {
-      Item_Id,
+      
       Primary_Unit,
       Secondary_Unit,
       Conversion_Rate,
     } = req.body;
 
+    // if (
+    //   !Item_Id ||
+    //   !Primary_Unit ||
+    //   !Secondary_Unit ||
+    //   !Number(Conversion_Rate)
+    // ) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Invalid conversion data.",
+    //   });
+    // }
     if (
-      !Item_Id ||
-      !Primary_Unit ||
-      !Secondary_Unit ||
-      !Number(Conversion_Rate)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid conversion data.",
-      });
-    }
+  !Primary_Unit ||
+  !Secondary_Unit ||
+  !Number(Conversion_Rate)
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Invalid conversion data.",
+  });
+}
     // if (await hasItemTransactions(connection, Item_Id)) {
     //   return res.status(400).json({
     //     success: false,
@@ -571,39 +608,64 @@ const addItemConversion = async (req, res, next) => {
     //       "This item has already been used in transactions. Unit configuration cannot be changed.",
     //   });
     // }
-    await connection.execute(
-      `
-      INSERT IGNORE INTO item_unit_conversions
-      (
-        Item_Id,
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate
-      )
-      VALUES (?, ?, ?, ?)
-      `,
-      [
-        Item_Id,
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate,
-      ]
-    );
-
-    const [conversions] = await connection.query(
-      `
-      SELECT
-        id,
-        Primary_Unit,
-        Secondary_Unit,
-        Conversion_Rate
-      FROM item_unit_conversions
-      WHERE Item_Id = ?
-      ORDER BY id DESC
-      `,
-      [Item_Id]
-    );
-
+    // await connection.execute(
+    //   `
+    //   INSERT IGNORE INTO item_unit_conversions
+    //   (
+    //     Item_Id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate
+    //   )
+    //   VALUES (?, ?, ?, ?)
+    //   `,
+    //   [
+    //     Item_Id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate,
+    //   ]
+    // );
+await connection.execute(
+  `
+  INSERT IGNORE INTO item_unit_conversions
+  (
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate
+  )
+  VALUES (?, ?, ?)
+  `,
+  [
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate,
+  ]
+);
+    // const [conversions] = await connection.query(
+    //   `
+    //   SELECT
+    //     id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate
+    //   FROM item_unit_conversions
+    //   WHERE Item_Id = ?
+    //   ORDER BY id DESC
+    //   `,
+    //   [Item_Id]
+    // );
+const [conversions] = await connection.query(
+  `
+  SELECT
+    id,
+    Primary_Unit,
+    Secondary_Unit,
+    Conversion_Rate
+  FROM item_unit_conversions
+  ORDER BY id DESC
+  `
+);
     return res.status(200).json({
       success: true,
       message: "Conversion saved successfully.",
@@ -642,6 +704,7 @@ const getItemConversions = async (req, res, next) => {
     const [conversions] = await connection.query(
       `
   SELECT DISTINCT
+  id,
     Primary_Unit,
     Secondary_Unit,
     Conversion_Rate
@@ -1043,6 +1106,45 @@ WHERE Item_Id=?`,
     // SAVE UNIT CONVERSION HISTORY
     // =========================================================
 
+    // if (
+    //   Primary_Unit &&
+    //   Secondary_Unit &&
+    //   Number(Conversion_Rate) > 0
+    // ) {
+    //   await connection.execute(
+    //     `
+    //   INSERT INTO item_unit_conversions
+    //   (
+    //     Item_Id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate
+    //   )
+    //   SELECT ?, ?, ?, ?
+    //   WHERE NOT EXISTS (
+    //     SELECT 1
+    //     FROM item_unit_conversions
+    //     WHERE Item_Id = ?
+    //       AND Primary_Unit = ?
+    //       AND Secondary_Unit = ?
+    //       AND Conversion_Rate = ?
+    //   )
+    // `,
+    //     [
+    //       Item_Id,
+    //       Primary_Unit,
+    //       Secondary_Unit,
+    //       Conversion_Rate,
+
+    //       Item_Id,
+    //       Primary_Unit,
+    //       Secondary_Unit,
+    //       Conversion_Rate,
+    //     ]
+    //   );
+    // }
+
+    
     if (
       Primary_Unit &&
       Secondary_Unit &&
@@ -1052,28 +1154,27 @@ WHERE Item_Id=?`,
         `
       INSERT INTO item_unit_conversions
       (
-        Item_Id,
+        
         Primary_Unit,
         Secondary_Unit,
         Conversion_Rate
       )
-      SELECT ?, ?, ?, ?
+      SELECT  ?, ?, ?
       WHERE NOT EXISTS (
         SELECT 1
         FROM item_unit_conversions
-        WHERE Item_Id = ?
-          AND Primary_Unit = ?
+        WHERE Primary_Unit = ?
           AND Secondary_Unit = ?
           AND Conversion_Rate = ?
       )
     `,
         [
-          Item_Id,
+          
           Primary_Unit,
           Secondary_Unit,
           Conversion_Rate,
 
-          Item_Id,
+          
           Primary_Unit,
           Secondary_Unit,
           Conversion_Rate,
@@ -1616,10 +1717,21 @@ const getAllItems = async (req, res, next) => {
     // 7. UNIT CONVERSION HISTORY
     // =========================================================
 
+    // const [unitConversions] = await connection.query(`
+    //   SELECT
+    //     id,
+    //     Item_Id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate,
+    //     created_at
+    //   FROM item_unit_conversions
+    //   ORDER BY created_at DESC, id DESC
+    // `);
     const [unitConversions] = await connection.query(`
       SELECT
         id,
-        Item_Id,
+        
         Primary_Unit,
         Secondary_Unit,
         Conversion_Rate,
@@ -2012,11 +2124,24 @@ const getAllItemsForLedger = async (req, res, next) => {
     // 5. UNIT CONVERSION HISTORY
     // =========================================================
 
+    // const [unitConversions] = await connection.query(
+    //   `
+    //   SELECT
+    //     id,
+    //     Item_Id,
+    //     Primary_Unit,
+    //     Secondary_Unit,
+    //     Conversion_Rate,
+    //     created_at
+    //   FROM item_unit_conversions
+    //   ORDER BY created_at DESC, id DESC
+    //   `
+    // );
     const [unitConversions] = await connection.query(
       `
       SELECT
         id,
-        Item_Id,
+        
         Primary_Unit,
         Secondary_Unit,
         Conversion_Rate,
@@ -5239,6 +5364,8 @@ const getAllItemUnitsCursor = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+//CURSOR
+
 const getUnitConversions = async (req, res, next) => {
   let connection;
 
@@ -5258,7 +5385,7 @@ const getUnitConversions = async (req, res, next) => {
     }
 
     // =========================================================
-    // 1. GET UNIT
+    // GET UNIT
     // =========================================================
 
     const [[unit]] = await connection.query(
@@ -5282,33 +5409,27 @@ const getUnitConversions = async (req, res, next) => {
     }
 
     // =========================================================
-    // 2. BUILD FILTERS
+    // FILTERS
     // =========================================================
 
-    // const where = [
-    //   `(Primary_Unit = ? OR Secondary_Unit = ?)`
-    // ];
-
-    // const params = [
-    //   unit.Unit_Shorthand,
-    //   unit.Unit_Shorthand,
-    // ];
     const where = [
       `Primary_Unit = ?`
     ];
 
     const params = [
-      unit.Unit_Shorthand,
+      unit.Unit_Shorthand
     ];
 
     if (search?.trim()) {
       const like = `%${search.trim().toLowerCase()}%`;
 
-      where.push(`(
-        LOWER(COALESCE(Primary_Unit, '')) LIKE ?
-        OR LOWER(COALESCE(Secondary_Unit, '')) LIKE ?
-        OR CAST(COALESCE(Conversion_Rate, 0) AS CHAR) LIKE ?
-      )`);
+      where.push(`
+        (
+          LOWER(COALESCE(Primary_Unit,'')) LIKE ?
+          OR LOWER(COALESCE(Secondary_Unit,'')) LIKE ?
+          OR CAST(COALESCE(Conversion_Rate,0) AS CHAR) LIKE ?
+        )
+      `);
 
       params.push(
         like,
@@ -5317,27 +5438,24 @@ const getUnitConversions = async (req, res, next) => {
       );
     }
 
-    const countWhere = [...where];
-    const countParams = [...params];
+    // =========================================================
+    // TOTAL COUNT
+    // =========================================================
 
     const [countRows] = await connection.query(
       `
-  SELECT COUNT(*) AS total
-  FROM (
-    SELECT DISTINCT
-      Primary_Unit,
-      Secondary_Unit,
-      Conversion_Rate
-    FROM item_unit_conversions
-    WHERE ${countWhere.join(" AND ")}
-  ) x
-  `,
-      countParams
+      SELECT COUNT(*) AS total
+      FROM item_unit_conversions
+      WHERE ${where.join(" AND ")}
+      `,
+      params
     );
 
-    const totalConversions = Number(countRows[0]?.total || 0);
+    const totalConversions =
+      Number(countRows[0]?.total || 0);
+
     // =========================================================
-    // 3. CURSOR PAGINATION
+    // CURSOR PAGINATION
     // =========================================================
 
     if (cursor) {
@@ -5355,8 +5473,7 @@ const getUnitConversions = async (req, res, next) => {
 
         where.push(`id < ?`);
         params.push(Number(decoded.id));
-
-      } catch {
+      } catch (err) {
         return res.status(400).json({
           success: false,
           message: "Invalid cursor",
@@ -5365,33 +5482,21 @@ const getUnitConversions = async (req, res, next) => {
     }
 
     // =========================================================
-    // 4. FETCH LIMIT + 1
+    // FETCH DATA
     // =========================================================
 
-    // const [rows] = await connection.query(
-    //   `
-    //   SELECT
-    //     id,
-    //     Primary_Unit,
-    //     Secondary_Unit,
-    //     Conversion_Rate
-    //   FROM item_unit_conversions
-    //   WHERE ${where.join(" AND ")}
-    //   ORDER BY id DESC
-    //   LIMIT ?
-    //   `,
-    //   [...params, limit + 1]
-    // );
     const [rows] = await connection.query(
       `
-  SELECT DISTINCT
-    Primary_Unit,
-    Secondary_Unit,
-    Conversion_Rate
-  FROM item_unit_conversions
-  WHERE ${where.join(" AND ")}
-  LIMIT ?
-  `,
+      SELECT
+        id,
+        Primary_Unit,
+        Secondary_Unit,
+        Conversion_Rate
+      FROM item_unit_conversions
+      WHERE ${where.join(" AND ")}
+      ORDER BY id DESC
+      LIMIT ?
+      `,
       [...params, limit + 1]
     );
 
@@ -5402,13 +5507,14 @@ const getUnitConversions = async (req, res, next) => {
       : rows;
 
     // =========================================================
-    // 5. NEXT CURSOR
+    // NEXT CURSOR
     // =========================================================
 
     let nextCursor = null;
 
     if (hasMore && conversions.length > 0) {
-      const last = conversions[conversions.length - 1];
+      const last =
+        conversions[conversions.length - 1];
 
       nextCursor = Buffer.from(
         JSON.stringify({
@@ -5416,9 +5522,14 @@ const getUnitConversions = async (req, res, next) => {
         })
       ).toString("base64");
     }
-
+console.log(
+  rows.map(r => ({
+    id: r.id,
+    rate: r.Conversion_Rate
+  }))
+);
     // =========================================================
-    // 6. RESPONSE
+    // RESPONSE
     // =========================================================
 
     return res.status(200).json({
@@ -5427,8 +5538,11 @@ const getUnitConversions = async (req, res, next) => {
       unit: {
         id: unit.id,
         Unit_Name: unit.Unit_Name,
+        Unit_Shorthand: unit.Unit_Shorthand,
       },
+
       totalConversions,
+
       conversions: conversions.map((row) => ({
         id: row.id,
         Primary_Unit: row.Primary_Unit,
@@ -5444,7 +5558,10 @@ const getUnitConversions = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error("❌ Error fetching unit conversions:", err);
+    console.error(
+      "❌ Error fetching unit conversions:",
+      err
+    );
     next(err);
   } finally {
     if (connection) {

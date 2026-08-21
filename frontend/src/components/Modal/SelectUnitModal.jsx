@@ -162,19 +162,28 @@ export default function SelectUnitModal({
 });
 
     // 8. PERSIST to item_unit_conversions (so it shows up next time as "saved")
-    if (Item_Id) {
-      try {
-        await addItemConversion({
-          Item_Id,
-          Primary_Unit: baseUnit,
-          Secondary_Unit: secondaryUnit,
-          Conversion_Rate: rate,
-        }).unwrap();
-      } catch (err) {
-        console.error("Failed to save conversion history:", err);
-        // don't block the form save on this — conversion history is a nice-to-have
-      }
-    }
+    // if (Item_Id) {
+    //   try {
+    //     await addItemConversion({
+    //       Item_Id,
+    //       Primary_Unit: baseUnit,
+    //       Secondary_Unit: secondaryUnit,
+    //       Conversion_Rate: rate,
+    //     }).unwrap();
+    //   } catch (err) {
+    //     console.error("Failed to save conversion history:", err);
+    //     // don't block the form save on this — conversion history is a nice-to-have
+    //   }
+    // }
+    try {
+  await addItemConversion({
+    Primary_Unit: baseUnit,
+    Secondary_Unit: secondaryUnit,
+    Conversion_Rate: rate,
+  }).unwrap();
+} catch (err) {
+  console.error("Failed to save conversion history:", err);
+}
 
     // 9. UPDATE PARENT FORM STATE
     onSave({ baseUnit, secondaryUnit, conversionRate: rate });

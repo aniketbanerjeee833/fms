@@ -79,7 +79,7 @@ export default function ItemUnits() {
         data: conversionsResponse,
         isLoading: isConversionsLoading,
         isFetching: isConversionsFetching,
-        refetch: refetchConversions
+       // refetch: refetchConversions
     } = useGetUnitConversionsQuery({ unitId: selectedUnitId, cursor: effectiveRightCursor, search: conversionSearch });
     console.log(conversionsResponse, "conversionsResponse");
     const conversions = conversionsResponse?.conversions || [];
@@ -105,8 +105,8 @@ export default function ItemUnits() {
         return () => rightObserverRef.current?.disconnect();
     }, [handleRightObserver]);
 
-    const selectedUnit = units.find((u) => u.id === selectedUnitId) || null;
-
+    // const selectedUnit = units.find((u) => u.id === selectedUnitId) || null;
+    const selectedUnit = units.find((u) => Number(u.id) === Number(selectedUnitId)) || null;
     const handleSelectUnit = (unit) => {
         const next = new URLSearchParams(searchParams);
         next.set("unitId", unit.id);
@@ -526,17 +526,39 @@ export default function ItemUnits() {
             )}
             {showSelectUnitModal && (
                 <SelectUnitModal
-                 units={itemUnits || []}
+                    units={itemUnits || []}
                     onClose={() => setShowSelectUnitModal(false)}
+                    // onSave={() => {
+                    //     setShowSelectUnitModal(false);
+
+                    //     // reset infinite scroll cursor
+                    //     setRightCursor(null);
+
+                    //     // refetch conversions for selected unit
+                    //     refetchConversions();
+                    // }}
                     onSave={() => {
+                        console.log("PARENT ONSAVE");
+
                         setShowSelectUnitModal(false);
-
-                        // reset infinite scroll cursor
+                        rightUnitRef.current = null;
                         setRightCursor(null);
-
-                        // refetch conversions for selected unit
-                        refetchConversions();
                     }}
+                // onSave={async () => {
+                //     console.log("PARENT ONSAVE");
+
+                //     setShowSelectUnitModal(false);
+
+                //     setRightCursor(null);
+
+
+                //     refetchConversions().then((res) => {
+                //         console.log("REFETCH RESULT", res);
+                //     });
+                //     // const result = await refetchConversions();
+
+                //     // console.log("REFETCH RESULT", result);
+                // }}
                 />
             )}
             {/* {showSelectUnitModal && (

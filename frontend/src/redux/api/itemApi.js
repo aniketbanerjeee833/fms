@@ -577,7 +577,7 @@ export const itemApi = createApi({
         body,
       }),
       /* left as-is — conversions don't affect stock/category views directly */
-      invalidatesTags: ["ItemConversions"],
+      invalidatesTags: ["ItemConversions", "Unit"],
     }),
 
     getEachItemBillAndInvoiceNumbers: builder.query({
@@ -894,41 +894,119 @@ getAllItemUnitsCursor: builder.query({
 
   providesTags: ["Unit"],
 }),
+// getUnitConversions: builder.query({
+//   query: ({ unitId, cursor = null, search = "" }) => {
+//     const params = new URLSearchParams();
+
+//     if (cursor) params.set("cursor", cursor);
+//     if (search?.trim()) params.set("search", search.trim());
+
+//     return `unit/${unitId}/conversions?${params.toString()}`;
+//   },
+
+//   serializeQueryArgs: ({ queryArgs }) => {
+//     const { unitId, search } = queryArgs;
+
+//     return {
+//       unitId,
+//       search,
+//     };
+//   },
+
+//   merge: (currentCache, newData, { arg }) => {
+//     // First load / search change / unit change
+//     if (!arg.cursor) {
+//       return newData;
+//     }
+
+//     currentCache.conversions.push(
+//       ...newData.conversions
+//     );
+
+//     currentCache.nextCursor = newData.nextCursor;
+//     currentCache.hasMore = newData.hasMore;
+
+//     if (newData.unit) {
+//       currentCache.unit = newData.unit;
+//     }
+//   },
+// // merge: (currentCache, newData, { arg }) => {
+// //   if (!arg.cursor) {
+// //     currentCache.conversions = newData.conversions;
+// //     currentCache.nextCursor = newData.nextCursor;
+// //     currentCache.hasMore = newData.hasMore;
+// //     currentCache.unit = newData.unit;
+// //     currentCache.totalConversions = newData.totalConversions;
+// //     return;
+// //   }
+
+// //   currentCache.conversions.push(
+// //     ...newData.conversions
+// //   );
+
+// //   currentCache.nextCursor = newData.nextCursor;
+// //   currentCache.hasMore = newData.hasMore;
+// // },
+//   forceRefetch: ({ currentArg, previousArg }) =>
+//     currentArg?.cursor !== previousArg?.cursor ||
+//     currentArg?.search !== previousArg?.search ||
+//     currentArg?.unitId !== previousArg?.unitId,
+// providesTags: ["ItemConversions"],
+//  //providesTags: ["Unit"],
+// }),
 getUnitConversions: builder.query({
   query: ({ unitId, cursor = null, search = "" }) => {
     const params = new URLSearchParams();
 
-    if (cursor) params.set("cursor", cursor);
-    if (search?.trim()) params.set("search", search.trim());
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+
+    if (search?.trim()) {
+      params.set("search", search.trim());
+    }
 
     return `unit/${unitId}/conversions?${params.toString()}`;
   },
 
-  serializeQueryArgs: ({ queryArgs }) => {
-    const { unitId, search } = queryArgs;
-
+  serializeQueryArgs: ({ endpointName, queryArgs }) => {
     return {
-      unitId,
-      search,
+      endpointName,
+      unitId: queryArgs.unitId,
+      search: queryArgs.search || "",
     };
   },
 
   merge: (currentCache, newData, { arg }) => {
-    // First load / search change / unit change
+    console.log("MERGE", {
+      cursor: arg.cursor,
+      incoming: newData.conversions?.length,
+    });
+
+    // FIRST PAGE → REPLACE EVERYTHING
     if (!arg.cursor) {
-      return newData;
+      currentCache.success = newData.success;
+      currentCache.unit = newData.unit;
+      currentCache.totalConversions = newData.totalConversions;
+      currentCache.conversions = [...newData.conversions];
+      currentCache.nextCursor = newData.nextCursor;
+      currentCache.hasMore = newData.hasMore;
+
+      return;
     }
 
-    currentCache.conversions.push(
-      ...newData.conversions
+    // NEXT PAGE → APPEND
+    const existingIds = new Set(
+      currentCache.conversions.map((c) => c.id)
     );
 
+    const uniqueRows = newData.conversions.filter(
+      (c) => !existingIds.has(c.id)
+    );
+
+    currentCache.conversions.push(...uniqueRows);
     currentCache.nextCursor = newData.nextCursor;
     currentCache.hasMore = newData.hasMore;
-
-    if (newData.unit) {
-      currentCache.unit = newData.unit;
-    }
   },
 
   forceRefetch: ({ currentArg, previousArg }) =>
@@ -936,7 +1014,7 @@ getUnitConversions: builder.query({
     currentArg?.search !== previousArg?.search ||
     currentArg?.unitId !== previousArg?.unitId,
 
- providesTags: ["Unit"],
+  providesTags: ["Unit"],
 }),
 
   }),

@@ -1,6 +1,6 @@
 
 import db from "../config/db.js";
-import { getPaymentInsForPrint, getPaymentOutsForPrint, getPurchaseReturnsForPrint, getPurchasesForPrint, getSaleReturnsForPrint, getSalesForPrint } from "../helpers/printReportHelpers.js";
+import { getExpensesForPrint, getPaymentInsForPrint, getPaymentOutsForPrint, getPurchaseReturnsForPrint, getPurchasesForPrint, getSaleReturnsForPrint, getSalesForPrint } from "../helpers/printReportHelpers.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { sanitizeObject } from "../utils/sanitizeInput.js";
 import partySchema from "../validators/partySchema.js";
@@ -2609,7 +2609,8 @@ const getPartyPrintReport = async (
       });
 
     const purchaseReturnFilter =
-      buildFilters({
+   
+    buildFilters({
         partyId: Party_Id,
         alias: "p",
         numberField:

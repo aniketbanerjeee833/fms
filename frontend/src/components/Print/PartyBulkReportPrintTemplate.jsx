@@ -1,4 +1,4 @@
-import React from 'react'
+
 
 import { forwardRef } from "react";
 import "./PartyBulkReportPrintTemplate.css";
@@ -6,11 +6,11 @@ import "./PartyBulkReportPrintTemplate.css";
 /* ── which top-level `type` labels carry an items table ── */
 // const ITEM_TXN_TYPES = ["Sale", "Purchase", "Sale Return", "Purchase Return"];
 const ITEM_TXN_TYPES = [
-  "Sale",
-  "Purchase",
-  "Sale Return",
-  "Purchase Return",
-  "Expense",
+    "Sale",
+    "Purchase",
+    "Sale Return",
+    "Purchase Return",
+    "Expense",
 ];
 /* ── per-type config, mirrors SalePurchaseBulkReportPrintTemplate's TYPE_CONFIG ── */
 const TYPE_CONFIG = {
@@ -34,6 +34,16 @@ const TYPE_CONFIG = {
         discountKey: "Discount_On_Purchase_Price",
         discountTypeKey: "Discount_Type_On_Purchase_Price",
     },
+    Expense: {
+        docLabel: "Expense No.",
+        docNumberKey: "Expense_Number",
+        amountKey: "Total_Amount",
+        paidKey: "Total_Paid",      // ← fixed
+        paidLabel: "Paid",           // ← fixed label to match
+        priceKey: "Price",
+        discountKey: "Discount_On_Price",
+        discountTypeKey: "Discount_Type_On_Price",
+    },
     "Sale Return": {
         docLabel: "Return No.",
         docNumberKey: "Return_Number",
@@ -55,15 +65,15 @@ const TYPE_CONFIG = {
         discountTypeKey: "Discount_Type_On_Purchase_Price",
     },
     Expense: {
-  docLabel: "Expense No.",
-  docNumberKey: "Expense_Number",
-  amountKey: "Total_Amount",
-  paidKey: "Total_Amount",
-  paidLabel: "Amount",
-  priceKey: "Price",
-  discountKey: "Discount_On_Price",
-  discountTypeKey: "Discount_Type_On_Price",
-},
+        docLabel: "Expense No.",
+        docNumberKey: "Expense_Number",
+        amountKey: "Total_Amount",
+        paidKey: "Total_Amount",
+        paidLabel: "Amount",
+        priceKey: "Price",
+        discountKey: "Discount_On_Price",
+        discountTypeKey: "Discount_Type_On_Price",
+    },
 };
 
 /* ── pull the nested "doc" object out of record.data, whichever key it's under ── */
@@ -74,6 +84,7 @@ const getDoc = (data) =>
     data?.saleReturnDetails ||
     data?.paymentInDetails ||
     data?.paymentOutDetails ||
+    data?.expenseDetails ||   // ← add this
     data ||
     {};
 
