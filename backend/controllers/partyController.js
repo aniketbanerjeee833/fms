@@ -1121,24 +1121,7 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
       params.push(searchDate);
     }
 
-    // if (searchDate) {
-    //   where += ` AND pl.Txn_Date = ?`;
-    //   params.push(searchDate);
-    // }
-
-    // if (search) {
-    //   where += ` AND (
-    //     pl.Doc_Number LIKE ?
-    //     OR CAST(pl.Amount AS CHAR) LIKE ?
-    //     OR CAST(pl.Balance_Due AS CHAR) LIKE ?
-    //   )`;
-
-    //   params.push(
-    //     `%${search}%`,
-    //     `%${search}%`,
-    //     `%${search}%`
-    //   );
-    // }
+   
     if (search) {
       where += ` AND (
     pl.Doc_Number LIKE ?
@@ -2785,85 +2768,181 @@ const getPartyPrintReport = async (
       });
 
     const [
-      purchasesData,
-      salesData,
-      purchaseReturnsData,
-      saleReturnsData,
-      paymentInsData,
-      paymentOutsData,
-    ] = await Promise.all([
-      getPurchasesForPrint(
-        connection,
-        purchaseFilter.where,
-        purchaseFilter.params
-      ),
+  purchasesData,
+  salesData,
+  purchaseReturnsData,
+  saleReturnsData,
+  paymentInsData,
+  paymentOutsData,
+] = await Promise.all([
+  getPurchasesForPrint(
+    connection,
+    purchaseFilter.where,
+    purchaseFilter.params
+  ),
 
-      getSalesForPrint(
-        connection,
-        salesFilter.where,
-        salesFilter.params
-      ),
+  getSalesForPrint(
+    connection,
+    salesFilter.where,
+    salesFilter.params
+  ),
 
-      getPurchaseReturnsForPrint(
-        connection,
-        purchaseReturnFilter.where,
-        purchaseReturnFilter.params
-      ),
+  getPurchaseReturnsForPrint(
+    connection,
+    purchaseReturnFilter.where,
+    purchaseReturnFilter.params
+  ),
 
-      getSaleReturnsForPrint(
-        connection,
-        saleReturnFilter.where,
-        saleReturnFilter.params
-      ),
+  getSaleReturnsForPrint(
+    connection,
+    saleReturnFilter.where,
+    saleReturnFilter.params
+  ),
 
-      getPaymentInsForPrint(
-        connection,
-        paymentInFilter.where,
-        paymentInFilter.params
-      ),
+  getPaymentInsForPrint(
+    connection,
+    paymentInFilter.where,
+    paymentInFilter.params
+  ),
 
-      getPaymentOutsForPrint(
-        connection,
-        paymentOutFilter.where,
-        paymentOutFilter.params
+  getPaymentOutsForPrint(
+    connection,
+    paymentOutFilter.where,
+    paymentOutFilter.params
+  ),
+]);
+
+// ADD HERE
+const transactions = [
+  ...purchasesData.purchaseBills.map((p) => ({
+    type: "Purchase",
+    date: p.billPurchaseDetails.Bill_Date,
+    number: p.billPurchaseDetails.Bill_Number,
+    amount: Number(
+      p.billPurchaseDetails.Total_Amount || 0
+    ),
+    balance: Number(
+      p.billPurchaseDetails.Balance_Due || 0
+    ),
+    data: p,
+  })),
+
+  ...salesData.invoices.map((s) => ({
+    type: "Sale",
+    date: s.invoicePartyDetails.Invoice_Date,
+    number:
+      s.invoicePartyDetails.Invoice_Number,
+    amount: Number(
+      s.invoicePartyDetails.Total_Amount || 0
+    ),
+    balance: Number(
+      s.invoicePartyDetails.Balance_Due || 0
+    ),
+    data: s,
+  })),
+
+  ...purchaseReturnsData.purchaseReturns.map(
+    (pr) => ({
+      type: "Purchase Return",
+      date:
+        pr.purchaseReturnDetails.Return_Date,
+      number:
+        pr.purchaseReturnDetails
+          .Return_Number,
+      amount: Number(
+        pr.purchaseReturnDetails
+          .Total_Amount || 0
       ),
-    ]);
+      balance: Number(
+        pr.purchaseReturnDetails
+          .Balance_Due || 0
+      ),
+      data: pr,
+    })
+  ),
+
+  ...saleReturnsData.saleReturns.map(
+    (sr) => ({
+      type: "Sale Return",
+      date:
+        sr.saleReturnDetails.Return_Date,
+      number:
+        sr.saleReturnDetails.Return_Number,
+      amount: Number(
+        sr.saleReturnDetails.Total_Amount ||
+          0
+      ),
+      balance: Number(
+        sr.saleReturnDetails.Balance_Due ||
+          0
+      ),
+      data: sr,
+    })
+  ),
+
+  ...paymentInsData.paymentIns.map((pi) => ({
+    type: "Payment In",
+    date: pi.paymentInDetails.Payment_Date,
+    number: pi.paymentInDetails.Receipt_No,
+    amount: Number(
+      pi.paymentInDetails.Received || 0
+    ),
+    balance: 0,
+    data: pi,
+  })),
+
+  ...paymentOutsData.paymentOuts.map(
+    (po) => ({
+      type: "Payment Out",
+      date:
+        po.paymentOutDetails.Payment_Date,
+      number:
+        po.paymentOutDetails.Payment_Number,
+      amount: Number(
+        po.paymentOutDetails.Paid || 0
+      ),
+      balance: 0,
+      data: po,
+    })
+  ),
+].sort(
+  (a, b) =>
+    new Date(a.date) - new Date(b.date)
+);
 
     return res.status(200).json({
-      success: true,
+  success: true,
 
-      partyDetails,
+  partyDetails,
 
-        purchases:
-    purchasesData.purchaseBills,
-      purchaseSummary:
-        purchasesData.summary,
+  purchases: purchasesData.purchaseBills,
+  purchaseSummary: purchasesData.summary,
 
-      sales:
-        salesData.invoices,
-      salesSummary:
-        salesData.summary,
+  sales: salesData.invoices,
+  salesSummary: salesData.summary,
 
-      purchaseReturns:
-        purchaseReturnsData.purchaseReturns,
-      purchaseReturnSummary:
-        purchaseReturnsData.summary,
+  purchaseReturns:
+    purchaseReturnsData.purchaseReturns,
+  purchaseReturnSummary:
+    purchaseReturnsData.summary,
 
-      saleReturns:
-        saleReturnsData.saleReturns,
-      saleReturnSummary:
-        saleReturnsData.summary,
+  saleReturns:
+    saleReturnsData.saleReturns,
+  saleReturnSummary:
+    saleReturnsData.summary,
 
-      paymentIns:
-        paymentInsData.paymentIns,
-      paymentInSummary:
-        paymentInsData.summary,
+  paymentIns:
+    paymentInsData.paymentIns,
+  paymentInSummary:
+    paymentInsData.summary,
 
-      paymentOuts:
-        paymentOutsData.paymentOuts,
-      paymentOutSummary:
-        paymentOutsData.summary,
-    });
+  paymentOuts:
+    paymentOutsData.paymentOuts,
+  paymentOutSummary:
+    paymentOutsData.summary,
+
+  transactions, // ADD THIS
+});
   } catch (err) {
     next(err);
   } finally {
