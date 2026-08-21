@@ -1,5 +1,7 @@
 import db from "../config/db.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
+import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
+import { getExpenseItemUsageForPrint } from "../helpers/printReportHelpers.js";
 
 const PAGE_SIZE = 20;
 
@@ -321,9 +323,6 @@ const getAllExpenseItemMastersCursor = async (req, res, next) => {
   }
 };
 
-/* ═══════════════════════════════════════
-   CREATE EXPENSE
-═══════════════════════════════════════ */
 /* ═══════════════════════════════════════
    HELPER — get or create expense item master by name
 ═══════════════════════════════════════ */
@@ -707,6 +706,23 @@ const createExpense = async (req, res, next) => {
     }
 
     // =========================================================
+    // 11a. PARTY LEDGER — only for GST expenses with a party
+    // =========================================================
+
+    if (withGST && Party_Id) {
+      await recordPartyLedger({
+        connection,
+        partyId: Party_Id,
+        txnType: "Expense",
+        referenceId: expenseId,
+        amount: totalAmount,
+        txnDate,
+        docNumber: Expense_Number,
+        balanceDue,
+      });
+    }
+
+    // =========================================================
     // 12. ITEMS
     //
     // Same relaxed Sale/Purchase rule:
@@ -869,6 +885,7 @@ const createExpense = async (req, res, next) => {
     }
   }
 };
+
 /* ═══════════════════════════════════════
    EDIT EXPENSE
 ═══════════════════════════════════════ */
@@ -1127,6 +1144,45 @@ const editExpense = async (req, res, next) => {
       ) || null;
 
     // =========================================================
+    // 11a. SYNC PARTY LEDGER
+    //
+    // - party switched (A -> B) or removed -> reverse old party
+    // - GST on + party present             -> record/update
+    // - same party but GST turned off      -> reverse
+    // =========================================================
+
+    const oldPartyId = existingExpense.Party_Id;
+
+    if (oldPartyId && oldPartyId !== Party_Id) {
+      await reversePartyLedger({
+        connection,
+        partyId: oldPartyId,
+        txnType: "Expense",
+        referenceId: Number(id),
+      });
+    }
+
+    if (withGST && Party_Id) {
+      await recordPartyLedger({
+        connection,
+        partyId: Party_Id,
+        txnType: "Expense",
+        referenceId: Number(id),
+        amount: totalAmount,
+        txnDate,
+        docNumber: Expense_Number,
+        balanceDue,
+      });
+    } else if (oldPartyId && oldPartyId === Party_Id) {
+      await reversePartyLedger({
+        connection,
+        partyId: oldPartyId,
+        txnType: "Expense",
+        referenceId: Number(id),
+      });
+    }
+
+    // =========================================================
     // 12. DELETE OLD PAYMENT SPLITS
     //
     // This should also reverse old Cash/Bank transactions
@@ -1327,6 +1383,7 @@ const editExpense = async (req, res, next) => {
     }
   }
 };
+
 /* ═══════════════════════════════════════
    GET SINGLE EXPENSE FOR EDIT
 ═══════════════════════════════════════ */
@@ -1359,6 +1416,26 @@ const getExpenseById = async (req, res, next) => {
       [expense.id]
     );
 
+    const itemsWithDiscount = items.map((item) => {
+      const price = Number(item.Price) || 0;
+      const discount = Number(item.Discount_On_Price) || 0;
+
+      let discountAmount = 0;
+
+      if (discount > 0) {
+        if (item.Discount_Type_On_Price === "Percentage") {
+          discountAmount = (price * discount) / 100;
+        } else {
+          discountAmount = discount;
+        }
+      }
+
+      return {
+        ...item,
+        Discount_Amount: Number(discountAmount.toFixed(2)),
+      };
+    });
+
     // 🔹 splits
     const [splits] = await connection.query(
       `SELECT ps.*, ba.Account_Display_Name
@@ -1380,8 +1457,14 @@ const getExpenseById = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      expense: { ...expense, Payment_Type_Display, items, splits },
+      expense: {
+        ...expense,
+        Payment_Type_Display,
+        items: itemsWithDiscount,
+        splits,
+      },
     });
+
   } catch (err) {
     console.error("❌ Get expense by id error:", err);
     next(err);
@@ -1410,6 +1493,15 @@ const deleteExpense = async (req, res, next) => {
     // 🔹 wipe splits + ledger rows first
     await deletePaymentSplits({ connection, sourceType: "Expense", sourceId: Number(id) });
 
+    if (expense.Party_Id) {
+      await reversePartyLedger({
+        connection,
+        partyId: expense.Party_Id,
+        txnType: "Expense",
+        referenceId: Number(id),
+      });
+    }
+
     await connection.query(`DELETE FROM expense_items WHERE Expense_Id = ?`, [id]);
     await connection.query(`DELETE FROM expenses WHERE id = ?`, [id]);
 
@@ -1423,83 +1515,6 @@ const deleteExpense = async (req, res, next) => {
   }
 };
 
-
-//Category
-// const getExpensesByCategory = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     const { categoryId } = req.params;
-//     const lastId = req.query.lastId ? Number(req.query.lastId) : null;
-//     const search = req.query.search?.trim().toLowerCase() || "";
-//     const date = req.query.date || null;
-
-//     const whereClauses = [`e.Category_Id = ?`];
-//     const params = [categoryId];
-
-//     if (lastId) { whereClauses.push(`e.id < ?`); params.push(lastId); }
-//     if (search) {
-//       whereClauses.push(`(LOWER(e.Expense_Number) LIKE ? OR LOWER(a.Party_Name) LIKE ?)`);
-//       params.push(`%${search}%`, `%${search}%`);
-//     }
-//     if (date) {
-//       whereClauses.push(`DATE(e.Expense_Date) = ?`);
-//       params.push(date);
-//     }
-
-//     const [rows] = await connection.query(
-//       `SELECT e.id, e.Expense_Number, e.Expense_Date, e.With_GST,
-//               e.Total_Amount, e.Total_Paid, e.Balance_Due, a.Party_Name
-//        FROM expenses e
-//        LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
-//        WHERE ${whereClauses.join(" AND ")}
-//        ORDER BY e.id DESC LIMIT ?`,
-//       [...params, PAGE_SIZE + 1]
-//     );
-
-//     const hasMore = rows.length > PAGE_SIZE;
-//     const pageRows = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-
-//     // 🔹 attach Payment_Type_Display from payment_splits
-//     const expenseIds = pageRows.map((r) => r.id);
-//     if (expenseIds.length > 0) {
-//       const [splits] = await connection.query(
-//         `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
-//          FROM payment_splits ps
-//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//          WHERE ps.Source_Type = 'Expense'
-//            AND ps.Source_Id IN (${expenseIds.map(() => "?").join(",")})`,
-//         expenseIds
-//       );
-
-//       const splitMap = {};
-//       for (const s of splits) {
-//         if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
-//         splitMap[s.Source_Id].push(
-//           s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-//         );
-//       }
-
-//       for (const row of pageRows) {
-//         const labels = splitMap[row.id] || [];
-//         const counts = {};
-//         labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
-//         row.Payment_Type_Display = Object.entries(counts)
-//           .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
-//           .join(" , ") || "—";
-//       }
-//     }
-
-//     const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
-
-//     return res.status(200).json({ success: true, expenses: pageRows, hasMore, nextCursor });
-//   } catch (err) {
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const getExpensesByCategory = async (req, res, next) => {
   let connection;
 
@@ -1530,8 +1545,8 @@ const getExpensesByCategory = async (req, res, next) => {
     }
 
     // Search
-   if (search) {
-  whereClauses.push(`
+    if (search) {
+      whereClauses.push(`
     (
       LOWER(e.Expense_Number) LIKE ?
       OR LOWER(a.Party_Name) LIKE ?
@@ -1544,16 +1559,16 @@ const getExpensesByCategory = async (req, res, next) => {
     )
   `);
 
-  const like = `%${search}%`;
+      const like = `%${search}%`;
 
-  params.push(
-    like, // Expense Number
-    like, // Party Name
-    like, // Total Amount
-    like, // Balance Due
-    like  // Date
-  );
-}
+      params.push(
+        like, // Expense Number
+        like, // Party Name
+        like, // Total Amount
+        like, // Balance Due
+        like  // Date
+      );
+    }
 
     // Date filter
     if (date) {
@@ -1618,8 +1633,8 @@ const getExpensesByCategory = async (req, res, next) => {
           WHERE ps.Source_Type = 'Expense'
             AND ps.Source_Id IN (
               ${expenseIds
-                .map(() => "?")
-                .join(",")}
+            .map(() => "?")
+            .join(",")}
             )
           `,
           expenseIds
@@ -1662,9 +1677,9 @@ const getExpensesByCategory = async (req, res, next) => {
     }
 
     const nextCursor =
-  hasMore && pageRows.length > 0
-    ? pageRows[pageRows.length - 1].id
-    : null;
+      hasMore && pageRows.length > 0
+        ? pageRows[pageRows.length - 1].id
+        : null;
 
     return res.status(200).json({
       success: true,
@@ -1686,6 +1701,7 @@ const getExpensesByCategory = async (req, res, next) => {
     }
   }
 };
+
 //by items
 const getExpenseItemUsage = async (req, res, next) => {
   let connection;
@@ -1829,8 +1845,8 @@ const getExpenseItemUsage = async (req, res, next) => {
           WHERE ps.Source_Type = 'Expense'
             AND ps.Source_Id IN (
               ${expenseIds
-                .map(() => "?")
-                .join(",")}
+            .map(() => "?")
+            .join(",")}
             )
           `,
           expenseIds
@@ -1895,7 +1911,104 @@ const getExpenseItemUsage = async (req, res, next) => {
     }
   }
 };
+const getExpenseItemUsagePrintReport =async (req, res, next) => {
+    let connection;
 
+    try {
+      connection =await db.getConnection();
+
+      const masterItemId =req.query.masterItemId? Number(
+              req.query.masterItemId
+            )
+          : null;
+
+      if (!masterItemId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "masterItemId is required",
+        });
+      }
+
+      const date =req.query.date || null;
+
+      const search =req.query.search?.trim() || "";
+
+      const whereClauses = [
+        `WHERE ei.Expense_Item_Master_Id = ?`,
+      ];
+
+      const params = [masterItemId];
+
+      // Date filter
+      if (date) {
+        whereClauses.push(
+          `AND DATE(e.Expense_Date) = ?`
+        );
+
+        params.push(date);
+      }
+
+      // Search filter
+      if (search) {
+        const like = `%${search}%`;
+
+        whereClauses.push(`
+          AND (
+            e.Expense_Number LIKE ?
+            OR a.Party_Name LIKE ?
+            OR CAST(ei.Amount AS CHAR) LIKE ?
+            OR DATE_FORMAT(
+                 e.Expense_Date,
+                 '%d-%m-%Y'
+               ) LIKE ?
+          )
+        `);
+
+        params.push(
+          like,
+          like,
+          like,
+          like
+        );
+      }
+
+      const whereClause =
+        whereClauses.join(" ");
+
+      const {
+        expenseUsages,
+        summary,
+      } =
+        await getExpenseItemUsageForPrint(
+          connection,
+          whereClause,
+          params
+        );
+
+      return res.status(200).json({
+        success: true,
+
+        totalRecords:
+          expenseUsages.length,
+
+        expenseUsages,
+
+        summary,
+      });
+    } catch (err) {
+      console.error(
+        "Expense Item Usage Print Report Error:",
+        err
+      );
+
+      next(err);
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  };
 
 export {
   getExpenseItemUsage,
@@ -1913,79 +2026,7 @@ export {
   deleteExpenseItemMaster,
 
   getAllExpenseItemMasters,
-  getAllExpenseItemMastersCursor
-};
-//WITH GST
-// {
-//   "Expense_Number": "EXP-001",
-//   "Expense_Date": "2026-07-30",
-//   "Bill_Date": "2026-07-30",
-//   "With_GST": true,
-//   "Category_Name": "Office Expense",
-//   "Category_Type": "Direct",
-//   "Party_Name": "ANJANEYA COMTECH PRIVATE LIMITED",
-//   "State_Of_Supply": "West Bengal",
-//   "Reference_Number": "CHQ123456",
-//   "Total_Amount": 1180,
-//   "Total_Paid": 1180,
-//   "splits": [
-//     {
-//       "Payment_Type": "Cash",
-//       "Bank_Account_Id": null,
-//       "Reference_Number": "",
-//       "Amount": 500
-//     },
-//     {
-//       "Payment_Type": "Bank",
-//       "Bank_Account_Id": 1,
-//       "Reference_Number": "UTR123456789",
-//       "Amount": 680
-//     }
-//   ],
-//   "items": [
-//     {
-//       "Item_Name": "Printer Paper",
-//       "Item_HSN": "4802",
-//       "Quantity": 10,
-//       "Price": 100,
-//       "Discount_On_Price": 0,
-//       "Discount_Type_On_Price": "Percentage",
-//       "Tax_Type": "GST",
-//       "Tax_Amount": 180,
-//       "Amount": 1180
-//     }
-//   ]
-// }
-//WITHOUT GST
+  getAllExpenseItemMastersCursor,
 
-// {
-//   "Expense_Number": "EXP-002",
-//   "Expense_Date": "2026-07-30",
-//   "With_GST": false,
-//   "Category_Name": "Stationery",
-//   "Category_Type": "Indirect",
-//   "Reference_Number": "",
-//   "Total_Amount": 500,
-//   "Total_Paid": 500,
-//   "splits": [
-//     {
-//       "Payment_Type": "Cash",
-//       "Bank_Account_Id": null,
-//       "Reference_Number": "",
-//       "Amount": 500
-//     }
-//   ],
-//   "items": [
-//     {
-//       "Item_Name": "Pen",
-//       "Item_HSN": "",
-//       "Quantity": null,
-//       "Price": null,
-//       "Discount_On_Price": 0,
-//       "Discount_Type_On_Price": "Percentage",
-//       "Tax_Type": "None",
-//       "Tax_Amount": 0,
-//       "Amount": 500
-//     }
-//   ]
-// }
+  getExpenseItemUsagePrintReport,
+};

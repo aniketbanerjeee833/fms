@@ -184,7 +184,9 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
     }, [items]);
 
     const showDiscountColumn = useMemo(() => {
-        return items.some((item) => num(item?.Discount_On_Price) > 0);
+        return items.some(
+            (item) => num(item?.Discount_Amount) > 0
+        );
     }, [items]);
 
     const showTax = useMemo(() => {
@@ -332,27 +334,12 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
     ======================================================= */
 
     const totalDiscount = useMemo(() => {
-        return items.reduce((sum, item) => {
-            const price = num(item?.Price);
-            const quantity = num(item?.Quantity);
-            const discountValue = num(item?.Discount_On_Price);
-
-            if (!discountValue) return sum;
-
-            const subtotal = price * quantity;
-
-            if (
-                (item?.Discount_Type_On_Price || "Percentage") ===
-                "Percentage"
-            ) {
-                return sum + (subtotal * discountValue) / 100;
-            }
-
-            return sum + discountValue * quantity;
-        }, 0);
+        return items.reduce(
+            (sum, item) => sum + num(item?.Discount_Amount),
+            0
+        );
     }, [items]);
 
-    const showYouSaved = totalDiscount > 0;
 
     /* =======================================================
        PARTY DETAILS
@@ -557,7 +544,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                             Price/Unit
                         </th>
 
-                        {showTax && showDiscountColumn && (
+                        {showDiscountColumn && (
                             <th className="expense-table-header">
                                 Discount
                             </th>
@@ -627,11 +614,13 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                 ? taxAmount
                                 : 0;
 
+                            const discountAmount = num(item?.Discount_Amount);
+
                             const discountText =
-                                discount > 0
+                                discountAmount > 0
                                     ? item?.Discount_Type_On_Price === "Percentage"
-                                        ? `${money(discount)}%`
-                                        : `₹${money(discount)}`
+                                        ? `${money(discount)}% (₹${money(discountAmount)})`
+                                        : `₹${money(discountAmount)}`
                                     : "";
 
                             return (
@@ -661,7 +650,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                         ₹{money(price)}
                                     </td>
 
-                                    {!showTax && showDiscountColumn && (
+                                    {showDiscountColumn && (
                                         <td className="expense-item-right">
                                             {discountText}
                                         </td>
@@ -737,7 +726,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                 colSpan={
                                     5 +
                                     (showHsnColumn ? 1 : 0) +
-                                    (!showTax && showDiscountColumn ? 1 : 0) +
+                                    (showDiscountColumn ? 1 : 0) +
                                     (showTax ? 1 : 0) +
                                     (showTax && showCGSTSGST ? 2 : 0) +
                                     (showTax && showIGST ? 1 : 0)
@@ -781,8 +770,10 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                             <td className="expense-total-cell"></td>
 
                             {/* Discount */}
-                            {!showTax && showDiscountColumn && (
-                                <td className="expense-total-cell"></td>
+                            {showDiscountColumn && (
+                                <td className="expense-total-cell">
+                                    ₹{money(totalDiscount)}
+                                </td>
                             )}
 
                             {/* Taxable Amount */}
@@ -1014,18 +1005,6 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                     ₹{money(balanceDue)}
                                 </td>
                             </tr>
-
-                            {showYouSaved && (
-                                <tr>
-                                    <td className="expense-summary-cell">
-                                        You Saved
-                                    </td>
-
-                                    <td className="expense-summary-cell-right">
-                                        ₹{money(totalDiscount)}
-                                    </td>
-                                </tr>
-                            )}
 
                         </tbody>
 

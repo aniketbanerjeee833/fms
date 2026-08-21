@@ -1405,7 +1405,7 @@ export default function PurchaseReturndEdit() {
                     style={{ marginBottom: 0, border: "none", width: "50%" }}
                     className="w-full outline-none  text-gray-900
                           invoice-number-class"
-                    readOnly
+                    //readOnly
                   />
                   {/* {errors?.Invoice_Number && (
                           <p className="text-red-500 text-xs mt-1">

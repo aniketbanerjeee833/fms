@@ -1324,3 +1324,539 @@ export const getPaymentOutsForPrint = async (
     summary,
   };
 };
+
+export const getExpenseItemUsageForPrint =
+  async (
+    connection,
+    whereClause = "",
+    params
+  ) => {
+    const [rows] =
+      await connection.query(
+        `
+        SELECT
+          ei.*,
+
+          eim.Item_Name,
+          eim.Item_HSN,
+
+          e.id AS Expense_Id,
+          e.Expense_Number,
+          e.Expense_Date,
+
+          ec.Category_Name,
+
+          a.Party_Name
+
+        FROM expense_items ei
+
+        LEFT JOIN expense_item_master eim
+          ON eim.id = ei.Expense_Item_Master_Id
+
+        JOIN expenses e
+          ON ei.Expense_Id = e.id
+
+        LEFT JOIN expense_categories ec
+          ON ec.id = e.Category_Id
+
+        LEFT JOIN add_party a
+          ON a.Party_Id = e.Party_Id
+
+        ${whereClause}
+
+        ORDER BY e.Expense_Date ASC
+        `,
+        params
+      );
+
+    if (!rows.length) {
+      return {
+        expenseUsages: [],
+        summary: {
+          totalQuantity: 0,
+          totalAmount: 0,
+          totalDiscount: 0,
+        },
+      };
+    }
+
+    const expenseIds = [
+      ...new Set(
+        rows.map(
+          (row) => row.Expense_Id
+        )
+      ),
+    ];
+
+    const placeholders =
+      expenseIds
+        .map(() => "?")
+        .join(",");
+
+    // ==========================
+    // SPLITS
+    // ==========================
+
+    const [splits] =
+      await connection.query(
+        `
+        SELECT
+          ps.*,
+          ba.Account_Display_Name
+
+        FROM payment_splits ps
+
+        LEFT JOIN bank_accounts ba
+          ON ba.id = ps.Bank_Account_Id
+
+        WHERE ps.Source_Type='Expense'
+        AND ps.Source_Id IN (${placeholders})
+
+        ORDER BY ps.id ASC
+        `,
+        expenseIds
+      );
+
+    const splitMap = {};
+
+    splits.forEach((split) => {
+      if (!splitMap[split.Source_Id]) {
+        splitMap[split.Source_Id] = [];
+      }
+
+      splitMap[split.Source_Id].push({
+        Id: split.id,
+
+        Payment_Type:
+          split.Payment_Type,
+
+        Bank_Account_Id:
+          split.Bank_Account_Id,
+
+        Account_Display_Name:
+          split.Account_Display_Name,
+
+        Reference_Number:
+          split.Reference_Number,
+
+        Amount: split.Amount,
+      });
+    });
+
+    // ==========================
+    // GROUP ITEMS
+    // ==========================
+
+    const expenseMap = {};
+
+    rows.forEach((item) => {
+      if (!expenseMap[item.Expense_Id]) {
+        expenseMap[item.Expense_Id] = {
+          expenseDetails: {
+            Expense_Id:
+              item.Expense_Id,
+
+            Expense_Number:
+              item.Expense_Number,
+
+            Expense_Date:
+              item.Expense_Date,
+
+            Party_Name:
+              item.Party_Name,
+
+            Category_Name:
+              item.Category_Name,
+          },
+
+          splits:
+            splitMap[
+              item.Expense_Id
+            ] || [],
+
+          items: [],
+        };
+      }
+
+      const price = Number(
+        item.Price || 0
+      );
+
+      let discountAmount = 0;
+
+      if (
+        Number(
+          item.Discount_On_Price || 0
+        ) > 0
+      ) {
+        if (
+          item.Discount_Type_On_Price ===
+          "Percentage"
+        ) {
+          discountAmount =
+            (price *
+              Number(
+                item.Discount_On_Price
+              )) /
+            100;
+        } else {
+          discountAmount = Number(
+            item.Discount_On_Price
+          );
+        }
+      }
+
+      expenseMap[
+        item.Expense_Id
+      ].items.push({
+        ...item,
+
+        Discount_Amount: Number(
+          discountAmount.toFixed(2)
+        ),
+      });
+    });
+
+    // ==========================
+    // SUMMARY
+    // ==========================
+
+    const summary = {
+      totalQuantity: 0,
+      totalAmount: 0,
+      totalDiscount: 0,
+    };
+
+    const expenseUsages =
+      Object.values(expenseMap);
+
+    expenseUsages.forEach(
+      (expense) => {
+        expense.items.forEach(
+          (item) => {
+            summary.totalQuantity +=
+              Number(
+                item.Quantity || 0
+              );
+
+            summary.totalAmount +=
+              Number(
+                item.Amount || 0
+              );
+
+            summary.totalDiscount +=
+              Number(
+                item.Discount_Amount ||
+                  0
+              );
+          }
+        );
+      }
+    );
+
+    return {
+      expenseUsages,
+
+      summary: {
+        totalQuantity: Number(
+          summary.totalQuantity.toFixed(
+            2
+          )
+        ),
+
+        totalAmount: Number(
+          summary.totalAmount.toFixed(
+            2
+          )
+        ),
+
+        totalDiscount: Number(
+          summary.totalDiscount.toFixed(
+            2
+          )
+        ),
+      },
+    };
+  };
+
+  export const getExpensesForPrint = async (
+  connection,
+  whereClause,
+  params
+) => {
+  const [expenses] = await connection.query(
+    `
+    SELECT
+      e.id,
+
+      e.Expense_Number,
+      e.Expense_Date,
+
+      e.Total_Amount,
+      e.Total_Paid,
+      e.Balance_Due,
+
+      e.Party_Id,
+      e.Category_Id,
+
+      p.Party_Name,
+      p.GSTIN,
+
+      ec.Category_Name
+
+    FROM expenses e
+
+    LEFT JOIN add_party p
+      ON p.Party_Id = e.Party_Id
+
+    LEFT JOIN expense_categories ec
+      ON ec.id = e.Category_Id
+
+    ${whereClause}
+
+    ORDER BY e.Expense_Date ASC
+    `,
+    params
+  );
+
+  if (!expenses.length) {
+    return {
+      expenses: [],
+      summary: {
+        totalAmount: 0,
+        totalPaid: 0,
+        totalDue: 0,
+        totalDiscount: 0,
+      },
+    };
+  }
+
+  const expenseIds = expenses.map(
+    (expense) => expense.id
+  );
+
+  const placeholders =
+    expenseIds.map(() => "?").join(",");
+
+  // ===================================
+  // ITEMS
+  // ===================================
+
+  const [items] = await connection.query(
+    `
+    SELECT
+      ei.*,
+
+      eim.Item_Name,
+      eim.Item_HSN
+
+    FROM expense_items ei
+
+    LEFT JOIN expense_item_master eim
+      ON eim.id =
+      ei.Expense_Item_Master_Id
+
+    WHERE ei.Expense_Id IN (${placeholders})
+
+    ORDER BY ei.created_at ASC
+    `,
+    expenseIds
+  );
+
+  // ===================================
+  // SPLITS
+  // ===================================
+
+  const [splits] = await connection.query(
+    `
+    SELECT
+      ps.*,
+
+      ba.Account_Display_Name
+
+    FROM payment_splits ps
+
+    LEFT JOIN bank_accounts ba
+      ON ba.id = ps.Bank_Account_Id
+
+    WHERE ps.Source_Type = 'Expense'
+    AND ps.Source_Id IN (${placeholders})
+
+    ORDER BY ps.id ASC
+    `,
+    expenseIds
+  );
+
+  const itemMap = {};
+  const splitMap = {};
+
+  // ===================================
+  // ITEMS MAP
+  // ===================================
+
+  items.forEach((item) => {
+    if (!itemMap[item.Expense_Id]) {
+      itemMap[item.Expense_Id] = [];
+    }
+
+    const price = Number(
+      item.Price || 0
+    );
+
+    let discountAmount = 0;
+
+    if (
+      Number(
+        item.Discount_On_Price || 0
+      ) > 0
+    ) {
+      if (
+        item.Discount_Type_On_Price ===
+        "Percentage"
+      ) {
+        discountAmount =
+          (price *
+            Number(
+              item.Discount_On_Price
+            )) /
+          100;
+      } else {
+        discountAmount = Number(
+          item.Discount_On_Price
+        );
+      }
+    }
+
+    itemMap[item.Expense_Id].push({
+      ...item,
+
+      Discount_Amount: Number(
+        discountAmount.toFixed(2)
+      ),
+    });
+  });
+
+  // ===================================
+  // SPLITS MAP
+  // ===================================
+
+  splits.forEach((split) => {
+    if (!splitMap[split.Source_Id]) {
+      splitMap[split.Source_Id] = [];
+    }
+
+    splitMap[split.Source_Id].push({
+      Id: split.id,
+
+      Payment_Type:
+        split.Payment_Type,
+
+      Bank_Account_Id:
+        split.Bank_Account_Id,
+
+      Account_Display_Name:
+        split.Account_Display_Name,
+
+      Amount: split.Amount,
+    });
+  });
+
+  // ===================================
+  // SUMMARY
+  // ===================================
+
+  const summary = {
+    totalAmount: 0,
+    totalPaid: 0,
+    totalDue: 0,
+    totalDiscount: 0,
+  };
+
+  const expenseBills = expenses.map(
+    (row) => {
+      const expenseItems =
+        itemMap[row.id] || [];
+
+      summary.totalAmount += Number(
+        row.Total_Amount || 0
+      );
+
+      summary.totalPaid += Number(
+        row.Total_Paid || 0
+      );
+
+      summary.totalDue += Number(
+        row.Balance_Due || 0
+      );
+
+      expenseItems.forEach((item) => {
+        summary.totalDiscount += Number(
+          item.Discount_Amount || 0
+        );
+      });
+
+      return {
+        expenseDetails: {
+          Expense_Id: row.id,
+
+          Expense_Number:
+            row.Expense_Number,
+
+          Expense_Date:
+            row.Expense_Date,
+
+          Party_Id:
+            row.Party_Id,
+
+          Party_Name:
+            row.Party_Name,
+
+          GSTIN:
+            row.GSTIN,
+
+          Category_Id:
+            row.Category_Id,
+
+          Category_Name:
+            row.Category_Name,
+
+          Total_Amount:
+            row.Total_Amount,
+
+          Total_Paid:
+            row.Total_Paid,
+
+          Balance_Due:
+            row.Balance_Due,
+        },
+
+        splits:
+          splitMap[row.id] || [],
+
+        items: expenseItems,
+      };
+    }
+  );
+
+  return {
+    expenseBills,
+
+    summary: {
+      totalAmount: Number(
+        summary.totalAmount.toFixed(2)
+      ),
+
+      totalPaid: Number(
+        summary.totalPaid.toFixed(2)
+      ),
+
+      totalDue: Number(
+        summary.totalDue.toFixed(2)
+      ),
+
+      totalDiscount: Number(
+        summary.totalDiscount.toFixed(2)
+      ),
+    },
+  };
+};

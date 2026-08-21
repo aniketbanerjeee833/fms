@@ -154,6 +154,12 @@ export default function SelectUnitModal({
       setConversionError("Please enter conversion rate");
       return;
     }
+    console.log("Calling API", {
+  Item_Id,
+  Primary_Unit: baseUnit,
+  Secondary_Unit: secondaryUnit,
+  Conversion_Rate: rate,
+});
 
     // 8. PERSIST to item_unit_conversions (so it shows up next time as "saved")
     if (Item_Id) {

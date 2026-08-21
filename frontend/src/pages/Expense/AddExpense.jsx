@@ -594,21 +594,54 @@ export default function AddExpense() {
                                                     >
                                                         + Add Party
                                                     </span>
-                                                    {filteredParties.map((party) => (
-                                                        <div
-                                                            key={party.Party_Id}
-                                                            onClick={() => {
-                                                                setPartySearch(party.Party_Name);
-                                                                setValue("Party_Id", party.Party_Id, { shouldValidate: true });
-                                                                setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-                                                                setPartyOpen(false);
-                                                            }}
-                                                            className="flex justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                        >
-                                                            <span>{party.Party_Name}</span>
-                                                            <span className="text-gray-400 text-xs">Bal: {party.Balance ?? 0}</span>
-                                                        </div>
-                                                    ))}
+
+                                                    {filteredParties.map((party) => {
+                                                        const bal = Number(party.Current_Balance ?? 0);
+                                                        const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                                                        return (
+                                                            <div
+                                                                key={party.Party_Id}
+                                                                onClick={() => {
+                                                                    setPartySearch(party.Party_Name);
+                                                                    setValue("Party_Id", party.Party_Id, {
+                                                                        shouldValidate: true,
+                                                                    });
+                                                                    setValue("Party_Name", party.Party_Name, {
+                                                                        shouldValidate: true,
+                                                                    });
+                                                                    setPartyOpen(false);
+                                                                }}
+                                                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                                                style={{ borderBottom: "1px solid #f3f4f6" }}
+                                                            >
+                                                                {/* Left — party name */}
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                                                        {party.Party_Name}
+                                                                    </span>
+                                                                </div>
+
+                                                                {/* Right — balance */}
+                                                                <div className="flex flex-col items-end flex-shrink-0">
+                                                                    <span className="text-xs text-gray-400">
+                                                                        Balance
+                                                                    </span>
+
+                                                                    <span
+                                                                        className="text-xs font-semibold"
+                                                                        style={{ color: balColor }}
+                                                                    >
+                                                                        ₹{bal.toLocaleString("en-IN", {
+                                                                            minimumFractionDigits: 2,
+                                                                            maximumFractionDigits: 2,
+                                                                        })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+
                                                     {filteredParties.length === 0 && (
                                                         <p className="px-3 py-2 text-gray-500">No Party found</p>
                                                     )}
@@ -843,8 +876,8 @@ export default function AddExpense() {
                                 <tbody>
                                     {fields.map((field, i) => (
                                         <tr key={field.id}>
-                                            <td style={{ textAlign: "center" }}>
-                                                <div className="flex items-center justify-center gap-2" style={{ height: 14 }}>
+                                            <td style={{ textAlign: "center", verticalAlign: "middle" }}>
+                                                <div className="flex items-center justify-center gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDeleteRow(i)}
@@ -934,6 +967,7 @@ export default function AddExpense() {
                                                                                     Item_HSN: item.Item_HSN || "",
                                                                                     // Item_Unit: item.Item_Unit || "",
                                                                                     Price: item.Price || "",
+                                                                                    Quantity: 1,
                                                                                     // Price_Type: item.Price_Type || "Tax Excluded",
                                                                                     Tax_Type: item.Tax_Type || "None",
                                                                                 });

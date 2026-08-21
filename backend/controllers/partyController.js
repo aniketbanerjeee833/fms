@@ -1721,106 +1721,7 @@ const getAllPartiesReceivablesLeft = async (req, res, next) => {
 };
 
 
-// const getAllPayableParties = async (req, res, next) => {
-//   let connection;
 
-//   try {
-//     connection = await db.getConnection();
-
-//     const search = req.query.search?.trim() || "";
-
-//     const whereClauses = [`Current_Balance <= 0`];
-//     const params = [];
-
-//     if (search) {
-//       whereClauses.push(`(
-//         Party_Name LIKE ? OR
-//         Phone_Number LIKE ? OR
-
-
-//         CAST(ABS(Current_Balance) AS CHAR) LIKE ?
-//       )`);
-
-//       const like = `%${search}%`;
-//       params.push(like, like, like);
-//     }
-
-//     const whereSQL = `WHERE ${whereClauses.join(" AND ")}`;
-
-//     // =====================================================
-//     // GET PARTIES
-//     // =====================================================
-
-//     const [parties] = await connection.query(
-//       `
-//       SELECT
-//         Party_Id,
-//         Party_Name,
-//         Phone_Number,
-//         GSTIN,
-//         State,
-//         Billing_Name,
-//         Email_Id,
-//         Opening_Balance,
-//         Opening_Balance_Type,
-//         Opening_Balance_Date,
-//         Credit_Limit,
-//         Credit_Limit_Type,
-//         Current_Balance,
-//         updated_at AS Last_Txn_Date
-//       FROM add_party
-//       ${whereSQL}
-//       ORDER BY Party_Name ASC
-//       `,
-//       params
-//     );
-
-//     // =====================================================
-//     // ATTACH ADDRESSES
-//     // =====================================================
-
-//     const partyIds = parties.map((p) => p.Party_Id);
-
-//     if (partyIds.length > 0) {
-//       const [allAddresses] = await connection.query(
-//         `
-//         SELECT *
-//         FROM add_party_addresses
-//         WHERE Party_Id IN (?)
-//         ORDER BY Is_Default DESC, id ASC
-//         `,
-//         [partyIds]
-//       );
-
-//       const addressMap = {};
-
-//       allAddresses.forEach((addr) => {
-//         if (!addressMap[addr.Party_Id]) {
-//           addressMap[addr.Party_Id] = [];
-//         }
-
-//         addressMap[addr.Party_Id].push(addr);
-//       });
-
-//       parties.forEach((party) => {
-//         party.addresses = addressMap[party.Party_Id] || [];
-//       });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       totalParties: parties.length,
-//       parties,
-//     });
-//   } catch (err) {
-//     console.error("❌ getAllPayableParties:", err);
-//     next(err);
-//   } finally {
-//     if (connection) {
-//       connection.release();
-//     }
-//   }
-// };
 const getAllPayableParties = async (req, res, next) => {
   let connection;
 
@@ -2333,42 +2234,42 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
     );
 
     /* ── SUMMARY — all-time (not filtered by date range, same as detail page) ── */
-    const [[purchaseSummary]] = await connection.query(
-      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-              COALESCE(SUM(Total_Paid),0) AS Total_Paid,
-              COALESCE(SUM(Balance_Due),0) AS Balance_Due
-       FROM add_purchase WHERE Party_Id = ?`,
-      [Party_Id]
-    );
-    const [[salesSummary]] = await connection.query(
-      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-              COALESCE(SUM(Total_Received),0) AS Total_Received,
-              COALESCE(SUM(Balance_Due),0) AS Balance_Due
-       FROM add_sale WHERE Party_Id = ?`,
-      [Party_Id]
-    );
-    const [[saleReturnSummary]] = await connection.query(
-      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-              COALESCE(SUM(Total_Paid),0) AS Total_Paid,
-              COALESCE(SUM(Balance_Due),0) AS Balance_Due
-       FROM sale_return WHERE Party_Id = ?`,
-      [Party_Id]
-    );
-    const [[purchaseReturnSummary]] = await connection.query(
-      `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
-              COALESCE(SUM(Total_Received),0) AS Total_Received,
-              COALESCE(SUM(Balance_Due),0) AS Balance_Due
-       FROM purchase_return WHERE Party_Id = ?`,
-      [Party_Id]
-    );
-    const [[paymentInSummary]] = await connection.query(
-      `SELECT COALESCE(SUM(Received),0) AS Total_Received FROM payment_in WHERE Party_Id = ?`,
-      [Party_Id]
-    );
-    const [[paymentOutSummary]] = await connection.query(
-      `SELECT COALESCE(SUM(Paid),0) AS Total_Paid FROM payment_out WHERE Party_Id = ?`,
-      [Party_Id]
-    );
+    // const [[purchaseSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM add_purchase WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
+    // const [[salesSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Received),0) AS Total_Received,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM add_sale WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
+    // const [[saleReturnSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Paid),0) AS Total_Paid,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM sale_return WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
+    // const [[purchaseReturnSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Total_Amount),0) AS Total_Amount,
+    //           COALESCE(SUM(Total_Received),0) AS Total_Received,
+    //           COALESCE(SUM(Balance_Due),0) AS Balance_Due
+    //    FROM purchase_return WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
+    // const [[paymentInSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Received),0) AS Total_Received FROM payment_in WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
+    // const [[paymentOutSummary]] = await connection.query(
+    //   `SELECT COALESCE(SUM(Paid),0) AS Total_Paid FROM payment_out WHERE Party_Id = ?`,
+    //   [Party_Id]
+    // );
     const [[latestLedgerRow]] = await connection.query(
       `SELECT Running_Balance FROM party_ledger WHERE Party_Id = ? ORDER BY id DESC LIMIT 1`,
       [Party_Id]
@@ -2557,9 +2458,13 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
        STREAM TO CLIENT
     ════════════════════════════════════════════════════════ */
     const safePartyName = (party.Party_Name || "Party").replace(/[^a-z0-9]/gi, "_");
-    const label = searchDate
-      ? `${safePartyName}_Ledger_${searchDate}`
-      : `${safePartyName}_Ledger_${new Date().toISOString().slice(0, 10)}`;
+    // const label = searchDate
+    //   ? `${safePartyName}_Party_Report_${searchDate}`
+    //   : `${safePartyName}_Party_Report_${new Date().toISOString().slice(0, 10)}`;
+
+       const label = searchDate
+      ? `${safePartyName}_Party_Report`
+      : `${safePartyName}_Party_Report`;
 
     res.setHeader(
       "Content-Type",
@@ -2756,7 +2661,7 @@ const getPartyPrintReport = async (
         partyId: Party_Id,
         alias: "a",
         numberField:
-          "po.Payment_Number",
+          "po.Receipt_No",
         amountField:
           "po.Paid",
         balanceField:
@@ -2766,14 +2671,30 @@ const getPartyPrintReport = async (
         search,
         searchDate,
       });
+      const expenseFilter =
+  buildFilters({
+    partyId: Party_Id,
+    alias: "p",
+    numberField:
+      "e.Expense_Number",
+    amountField:
+      "e.Total_Amount",
+    balanceField:
+      "e.Balance_Due",
+    dateField:
+      "e.Expense_Date",
+    search,
+    searchDate,
+  });
 
-    const [
+const [
   purchasesData,
   salesData,
   purchaseReturnsData,
   saleReturnsData,
   paymentInsData,
   paymentOutsData,
+  expensesData,
 ] = await Promise.all([
   getPurchasesForPrint(
     connection,
@@ -2810,26 +2731,77 @@ const getPartyPrintReport = async (
     paymentOutFilter.where,
     paymentOutFilter.params
   ),
-]);
 
+  getExpensesForPrint(
+    connection,
+    expenseFilter.where,
+    expenseFilter.params
+  ),
+]);
+let openingBalanceQuery = `
+  SELECT
+    Txn_Date,
+    Amount,
+    Direction
+  FROM party_ledger
+  WHERE Party_Id = ?
+    AND Txn_Type = 'Opening_Balance'
+`;
+
+const openingBalanceParams = [Party_Id];
+
+if (searchDate) {
+  openingBalanceQuery += ` AND DATE(Txn_Date) = ?`;
+  openingBalanceParams.push(searchDate);
+}
+
+if (search) {
+  openingBalanceQuery += `
+    AND (
+      CAST(Amount AS CHAR) LIKE ?
+      OR DATE_FORMAT(Txn_Date,'%d/%m/%Y') LIKE ?
+      OR DATE_FORMAT(Txn_Date,'%e/%c/%Y') LIKE ?
+     
+    )
+  `;
+
+  const like = `%${search}%`;
+
+  openingBalanceParams.push(
+    like,
+    like,
+    like
+   
+  );
+}
+
+const [openingBalances] = await connection.query(
+  openingBalanceQuery,
+  openingBalanceParams
+);
 // ADD HERE
 const transactions = [
-  ...purchasesData.purchaseBills.map((p) => ({
-    type: "Purchase",
-    date: p.billPurchaseDetails.Bill_Date,
-    number: p.billPurchaseDetails.Bill_Number,
-    amount: Number(
-      p.billPurchaseDetails.Total_Amount || 0
-    ),
-    balance: Number(
-      p.billPurchaseDetails.Balance_Due || 0
-    ),
-    data: p,
-  })),
 
-  ...salesData.invoices.map((s) => ({
+  ...(purchasesData.purchaseBills || []).map(
+    (p) => ({
+      type: "Purchase",
+      date: p.billPurchaseDetails.Bill_Date,
+      number:
+        p.billPurchaseDetails.Bill_Number,
+      amount: Number(
+        p.billPurchaseDetails.Total_Amount || 0
+      ),
+      balance: Number(
+        p.billPurchaseDetails.Balance_Due || 0
+      ),
+      data: p,
+    })
+  ),
+
+  ...(salesData.invoices || []).map((s) => ({
     type: "Sale",
-    date: s.invoicePartyDetails.Invoice_Date,
+    date:
+      s.invoicePartyDetails.Invoice_Date,
     number:
       s.invoicePartyDetails.Invoice_Number,
     amount: Number(
@@ -2841,27 +2813,25 @@ const transactions = [
     data: s,
   })),
 
-  ...purchaseReturnsData.purchaseReturns.map(
-    (pr) => ({
-      type: "Purchase Return",
-      date:
-        pr.purchaseReturnDetails.Return_Date,
-      number:
-        pr.purchaseReturnDetails
-          .Return_Number,
-      amount: Number(
-        pr.purchaseReturnDetails
-          .Total_Amount || 0
-      ),
-      balance: Number(
-        pr.purchaseReturnDetails
-          .Balance_Due || 0
-      ),
-      data: pr,
-    })
-  ),
+  ...(purchaseReturnsData.purchaseReturns ||
+    []).map((pr) => ({
+    type: "Purchase Return",
+    date:
+      pr.purchaseReturnDetails.Return_Date,
+    number:
+      pr.purchaseReturnDetails.Return_Number,
+    amount: Number(
+      pr.purchaseReturnDetails.Total_Amount ||
+        0
+    ),
+    balance: Number(
+      pr.purchaseReturnDetails.Balance_Due ||
+        0
+    ),
+    data: pr,
+  })),
 
-  ...saleReturnsData.saleReturns.map(
+  ...(saleReturnsData.saleReturns || []).map(
     (sr) => ({
       type: "Sale Return",
       date:
@@ -2880,18 +2850,22 @@ const transactions = [
     })
   ),
 
-  ...paymentInsData.paymentIns.map((pi) => ({
-    type: "Payment In",
-    date: pi.paymentInDetails.Payment_Date,
-    number: pi.paymentInDetails.Receipt_No,
-    amount: Number(
-      pi.paymentInDetails.Received || 0
-    ),
-    balance: 0,
-    data: pi,
-  })),
+  ...(paymentInsData.paymentIns || []).map(
+    (pi) => ({
+      type: "Payment In",
+      date:
+        pi.paymentInDetails.Payment_Date,
+      number:
+        pi.paymentInDetails.Receipt_No,
+      amount: Number(
+        pi.paymentInDetails.Received || 0
+      ),
+      balance: 0,
+      data: pi,
+    })
+  ),
 
-  ...paymentOutsData.paymentOuts.map(
+  ...(paymentOutsData.paymentOuts || []).map(
     (po) => ({
       type: "Payment Out",
       date:
@@ -2905,45 +2879,88 @@ const transactions = [
       data: po,
     })
   ),
+  ...openingBalances.map((ob) => ({
+  type:
+    ob.Direction === "Credit"
+      ? "Receivable Opening Balance"
+      : "Payable Opening Balance",
+
+  date: ob.Txn_Date,
+
+  number: "-",
+
+  amount: Number(ob.Amount || 0),
+
+  balance: Number(ob.Amount || 0),
+
+  data: ob,
+})),
+...(expensesData.expenseBills || []).map(
+  (e) => ({
+    type: "Expense",
+
+    date:
+      e.expenseDetails.Expense_Date,
+
+    number:
+      e.expenseDetails.Expense_Number,
+
+    amount: Number(
+      e.expenseDetails.Total_Amount || 0
+    ),
+
+    balance: Number(
+      e.expenseDetails.Balance_Due || 0
+    ),
+
+    data: e,
+  })
+),
 ].sort(
   (a, b) =>
     new Date(a.date) - new Date(b.date)
 );
 
-    return res.status(200).json({
+//     return res.status(200).json({
+//   success: true,
+
+//   partyDetails,
+
+//   purchases: purchasesData.purchaseBills,
+//   purchaseSummary: purchasesData.summary,
+
+//   sales: salesData.invoices,
+//   salesSummary: salesData.summary,
+
+//   purchaseReturns:
+//     purchaseReturnsData.purchaseReturns,
+//   purchaseReturnSummary:
+//     purchaseReturnsData.summary,
+
+//   saleReturns:
+//     saleReturnsData.saleReturns,
+//   saleReturnSummary:
+//     saleReturnsData.summary,
+
+//   paymentIns:
+//     paymentInsData.paymentIns,
+//   paymentInSummary:
+//     paymentInsData.summary,
+
+//   paymentOuts:
+//     paymentOutsData.paymentOuts,
+//   paymentOutSummary:
+//     paymentOutsData.summary,
+
+//   transactions, // ADD THIS
+// });
+  return res.status(200).json({
   success: true,
-
   partyDetails,
-
-  purchases: purchasesData.purchaseBills,
-  purchaseSummary: purchasesData.summary,
-
-  sales: salesData.invoices,
-  salesSummary: salesData.summary,
-
-  purchaseReturns:
-    purchaseReturnsData.purchaseReturns,
-  purchaseReturnSummary:
-    purchaseReturnsData.summary,
-
-  saleReturns:
-    saleReturnsData.saleReturns,
-  saleReturnSummary:
-    saleReturnsData.summary,
-
-  paymentIns:
-    paymentInsData.paymentIns,
-  paymentInSummary:
-    paymentInsData.summary,
-
-  paymentOuts:
-    paymentOutsData.paymentOuts,
-  paymentOutSummary:
-    paymentOutsData.summary,
-
-  transactions, // ADD THIS
+  transactions,
 });
-  } catch (err) {
+
+} catch (err) {
     next(err);
   } finally {
     if (connection) {

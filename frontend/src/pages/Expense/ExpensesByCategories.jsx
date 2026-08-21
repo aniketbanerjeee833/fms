@@ -15,11 +15,15 @@ import {
 } from "lucide-react";
 
 import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
 
 import {
   useGetAllExpenseCategoriesQuery,
   useGetExpensesByCategoryQuery,
-  useGetExpenseByIdQuery
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+  useDeleteExpenseCategoryMutation
 } from "../../redux/api/expenseApi";
 
 import EditExpenseCategoryModal from "../../components/Modal/EditExpenseCategoryModal";
@@ -56,6 +60,7 @@ export default function ExpensesByCategories() {
   const [transactionMenu, setTransactionMenu] = useState(null);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   /* ── helpers for merging into existing search params ── */
   const setSelectedCategoryId = (id) => {
@@ -150,6 +155,64 @@ export default function ExpensesByCategories() {
   const categoryExpenses = expenseResponse?.expenses || [];
   const expensesHasMore = expenseResponse?.hasMore ?? false;
   const expensesNextCursor = expenseResponse?.nextCursor ?? null;
+
+  const [deleteExpense, { isLoading: isDeletingExpense }] =
+    useDeleteExpenseMutation();
+
+  const [deleteExpenseCategory, { isLoading: isDeletingCategory }] =
+    useDeleteExpenseCategoryMutation();
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      // DELETE CATEGORY
+      if (deleteTarget.type === "category") {
+        const res = await deleteExpenseCategory({
+          id: deleteTarget.categoryId,
+        }).unwrap();
+
+        toast.success(
+          res?.message || "Expense category deleted successfully"
+        );
+
+        // If deleted category was selected, clear it
+        if (
+          String(selectedCategoryId) ===
+          String(deleteTarget.categoryId)
+        ) {
+          setSelectedCategoryId(null);
+        }
+
+        setMenuOpen(null);
+        setDeleteTarget(null);
+
+        return;
+      }
+
+      // DELETE EXPENSE
+      const res = await deleteExpense({
+        id: deleteTarget.expenseId,
+      }).unwrap();
+
+      toast.success(
+        res?.message || "Expense deleted successfully"
+      );
+
+      setDeleteTarget(null);
+
+    } catch (error) {
+      console.error("Failed to delete:", error);
+
+      toast.error(
+        error?.data?.message ||
+        "Failed to delete. Please try again."
+      );
+
+      // Close modal even when deletion fails
+      setDeleteTarget(null);
+    }
+  };
 
   const categoriesWithTotals = useMemo(() => {
     return categories.map((category) => {
@@ -438,12 +501,23 @@ export default function ExpensesByCategories() {
                         >
                           View/Edit
                         </button>
+
                         <button
                           type="button"
                           className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
+                          onClick={() => {
+                            setDeleteTarget({
+                              type: "category",
+                              categoryId: category.id,
+                              categoryName: category.name,
+                            });
+
+                            setMenuOpen(null);
+                          }}
                         >
                           Delete
                         </button>
+
                       </div>
                     )}
                   </div>
@@ -496,21 +570,82 @@ export default function ExpensesByCategories() {
                 </div>
               </div>
 
-              {/* ── SEARCH TRANSACTIONS ── */}
-              <div className="px-1 py-2" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
-                  <Search
-                    size={16}
-                    style={{ position: "absolute", left: 10, top: 10, color: "#94a3b8", pointerEvents: "none" }}
-                  />
-                  <input
-                    type="text"
-                    value={txnSearch}
-                    onChange={(e) => handleTxnSearchChange(e.target.value)}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{ height: 36, paddingLeft: 34, paddingRight: 10, borderColor: "#dbe3ea" }}
-                  />
+              {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+              <div
+                className="px-1 py-2"
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+
+                  {/* SEARCH */}
+                  <div
+                    className="relative"
+                    style={{
+                      width: "40%",
+                      minWidth: 220,
+                      maxWidth: 300,
+                      height: 36,
+                    }}
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={txnSearch}
+                      onChange={(e) => handleTxnSearchChange(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                      }}
+                    />
+                  </div>
+
+                  {/* EXCEL + PRINT BUTTONS */}
+                  <div className="flex items-center gap-2">
+
+                    {/* EXCEL */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+                      title="Export to Excel"
+                    >
+                      <FileSpreadsheet
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                    {/* PRINT */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
+                      title="Print Reports"
+                    >
+                      <PrinterIcon
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                  </div>
+
                 </div>
               </div>
 
@@ -557,7 +692,7 @@ export default function ExpensesByCategories() {
                               },
                               {
                                 state: {
-                                  from: location.pathname,
+                                  from: "expense-categories",
                                   categoryId: selectedCategoryId,
                                   txnSearch,
                                   categorySearch,
@@ -602,6 +737,7 @@ export default function ExpensesByCategories() {
                                         type="button"
                                         className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
                                         style={{ color: danger ? "#dc2626" : "#374151" }}
+
                                         onClick={() => {
                                           setTransactionMenu(null);
 
@@ -613,13 +749,22 @@ export default function ExpensesByCategories() {
                                               },
                                               {
                                                 state: {
-                                                  from: location.pathname,
+                                                  from: "expense-categories",
                                                   categoryId: selectedCategoryId,
                                                   txnSearch,
                                                   categorySearch,
                                                 },
                                               }
                                             );
+                                          }
+
+                                          if (key === "delete") {
+                                            setDeleteTarget({
+                                              type: "expense",
+                                              expenseId: txn.id,
+                                            });
+
+                                            return;
                                           }
 
                                           if (key === "print") {
@@ -673,6 +818,28 @@ export default function ExpensesByCategories() {
             setShowEditCategoryModal(false);
             setEditingCategory(null);
           }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={
+            deleteTarget.type === "category"
+              ? "Delete Expense Category"
+              : "Delete Expense"
+          }
+          message={
+            deleteTarget.type === "category"
+              ? `Are you sure you want to delete "${deleteTarget.categoryName}"? This action cannot be undone.`
+              : "Are you sure you want to delete this expense? This action cannot be undone."
+          }
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={
+            deleteTarget.type === "category"
+              ? isDeletingCategory
+              : isDeletingExpense
+          }
         />
       )}
 

@@ -77,6 +77,62 @@ export default function EditExpense() {
     const location = useLocation();
     const { id } = useParams();
 
+    // NEW 
+    const getBackDestination = () => {
+        const from = location.state?.from;
+
+        if (from === "expense-categories") {
+            return {
+                pathname: "/expense/categories",
+                search: location.search,
+                state: {
+                    categoryId: location.state?.categoryId,
+                    txnSearch: location.state?.txnSearch,
+                    categorySearch: location.state?.categorySearch,
+                },
+            };
+        }
+
+        if (from === "expense-items") {
+            return {
+                pathname: "/expense/items",
+                search: location.search,
+                state: {
+                    itemId: location.state?.itemId,
+                    txnSearch: location.state?.txnSearch,
+                    itemSearch: location.state?.itemSearch,
+                },
+            };
+        }
+
+        if (from === "party-details") {
+            return {
+                pathname: "/party/parties",
+                search: location.search,
+                state: {
+                    partyId: location.state?.partyId,
+                },
+            };
+        }
+
+        if (from === "party-payables") {
+            return {
+                pathname: "/party/payables",
+                search: location.search,
+                state: {
+                    partyId: location.state?.partyId,
+                },
+            };
+        }
+
+        // fallback — unknown/missing "from"
+        return {
+            pathname: "/expense/categories",
+            search: location.search,
+            state: {},
+        };
+    };
+
 
     /* ───────────────────────── MOCK DATA (replace with API) ───────────────────────── */
     // TODO: const { data: categories } = useGetAllExpenseCategoriesQuery();
@@ -283,13 +339,10 @@ export default function EditExpense() {
                     Discount_On_Price: item.Discount_On_Price || "",
                     Discount_Type_On_Price:
                         item.Discount_Type_On_Price || "Percentage",
-                    Tax_Type: expense.With_GST
-                        ? (item.Tax_Type || "None")
-                        : "None",
 
-                    Tax_Amount: expense.With_GST
-                        ? (item.Tax_Amount || "")
-                        : "0.00",
+                    Tax_Type: item.Tax_Type || "None",
+
+                    Tax_Amount: item.Tax_Amount || "",
 
                     Amount: item.Amount || "",
                 })) || [emptyRow()];
@@ -341,9 +394,7 @@ export default function EditExpense() {
         const qty = Math.max(0, num(row.Quantity));
         let subtotal = price * qty;
 
-        const taxPercent = gstEnabled
-            ? (TAX_RATES[row.Tax_Type] ?? 0)
-            : 0;
+        const taxPercent = TAX_RATES[row.Tax_Type] ?? 0;
 
         // If the entered price already includes tax, strip the tax portion out first
         // so discount + tax below always operate on the tax-excluded base amount.
@@ -414,35 +465,44 @@ export default function EditExpense() {
         (s) => s.Payment_Type === "Cheque" || s.Payment_Type === "Bank"
     );
 
-    const totalPayment = splitsValues.reduce((sum, s) => sum + num(s.Amount), 0);
+    const computedTotalPaid = splitsValues.reduce(
+        (sum, s) => sum + (parseFloat(s.Amount) || 0),
+        0
+    );
 
     const handleAddPaymentType = () => {
-        appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
+        appendSplit({
+            Payment_Type: "",
+            Bank_Account_Id: null,
+            Reference_Number: "",
+            Amount: "",
+        });
+
         setShowSplitBox(true);
     };
 
-    // Auto-fill the single split's Amount with Total_Amount, one-directional only
+    // Recalculate Balance Due and Total Paid
+    // whenever Total Amount or payment splits change.
     useEffect(() => {
-        if (splitsValues.length === 1) {
-            setValue("splits.0.Amount", totalAmountWatch, { shouldDirty: true });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [totalAmountWatch, splitsValues.length]);
+        const bal =
+            (Number(totalAmountWatch) || 0) - computedTotalPaid;
 
-    // Recalculate Balance Due and Total Paid when payment splits change
-    useEffect(() => {
-        const bal = (Number(totalAmountWatch) || 0) - totalPayment;
+        setValue("Balance_Due", bal.toFixed(2), {
+            shouldValidate: false,
+            shouldDirty: true,
+        });
 
-        setValue("Balance_Due", bal.toFixed(2), { shouldDirty: true });
-
+        // When multiple payment types are used,
+        // Total Paid is the sum of all split amounts.
         if (splitsValues.length > 1) {
-            setValue("Total_Paid", totalPayment.toFixed(2), {
+            setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+                shouldValidate: false,
                 shouldDirty: true,
             });
         }
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [totalAmountWatch, totalPayment, splitsValues.length]);
+    }, [totalAmountWatch, computedTotalPaid]);
 
 
     /* ───────────────────────── ROUND OFF ───────────────────────── */
@@ -483,19 +543,12 @@ export default function EditExpense() {
 
             toast.success("Expense updated successfully");
 
+            // NEW
             setTimeout(() => {
-                navigate(
-                    `${location.state?.from || "/expense/categories"}${location.search}`,
-                    {
-                        state: {
-                            categoryId: location.state?.categoryId,
-                            itemId: location.state?.itemId,
-                            txnSearch: location.state?.txnSearch,
-                            categorySearch: location.state?.categorySearch,
-                            itemSearch: location.state?.itemSearch,
-                        },
-                    }
-                );
+                const dest = getBackDestination();
+                navigate(`${dest.pathname}${dest.search}`, {
+                    state: dest.state,
+                });
             }, 1200);
 
         } catch (error) {
@@ -678,27 +731,22 @@ export default function EditExpense() {
                     </div>
 
                     <div className="flex items-center gap-2">
+
+
                         <button
                             type="button"
-                            onClick={() =>
-                                navigate(
-                                    `${location.state?.from || "/expense/categories"}${location.search}`,
-                                    {
-                                        state: {
-                                            categoryId: location.state?.categoryId,
-                                            itemId: location.state?.itemId,
-                                            txnSearch: location.state?.txnSearch,
-                                            categorySearch: location.state?.categorySearch,
-                                            itemSearch: location.state?.itemSearch,
-                                        },
-                                    }
-                                )
-                            }
+                            onClick={() => {
+                                const dest = getBackDestination();
+                                navigate(`${dest.pathname}${dest.search}`, {
+                                    state: dest.state,
+                                });
+                            }}
                             className="text-white font-bold py-2 px-4 rounded"
                             style={{ backgroundColor: "#4CA1AF" }}
                         >
                             Back
                         </button>
+
                     </div>
                 </div>
 
@@ -751,21 +799,53 @@ export default function EditExpense() {
                                                     >
                                                         + Add Party
                                                     </span>
-                                                    {filteredParties.map((party) => (
-                                                        <div
-                                                            key={party.Party_Id}
-                                                            onClick={() => {
-                                                                setPartySearch(party.Party_Name);
-                                                                setValue("Party_Id", party.Party_Id, { shouldValidate: true });
-                                                                setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-                                                                setPartyOpen(false);
-                                                            }}
-                                                            className="flex justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                        >
-                                                            <span>{party.Party_Name}</span>
-                                                            <span className="text-gray-400 text-xs">Bal: {party.Balance ?? 0}</span>
-                                                        </div>
-                                                    ))}
+                                                    {filteredParties.map((party) => {
+                                                        const bal = Number(party.Current_Balance ?? 0);
+                                                        const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                                                        return (
+                                                            <div
+                                                                key={party.Party_Id}
+                                                                onClick={() => {
+                                                                    setPartySearch(party.Party_Name);
+                                                                    setValue("Party_Id", party.Party_Id, {
+                                                                        shouldValidate: true,
+                                                                    });
+                                                                    setValue("Party_Name", party.Party_Name, {
+                                                                        shouldValidate: true,
+                                                                    });
+                                                                    setPartyOpen(false);
+                                                                }}
+                                                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                                                style={{ borderBottom: "1px solid #f3f4f6" }}
+                                                            >
+                                                                {/* Party Name */}
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                                                        {party.Party_Name}
+                                                                    </span>
+                                                                </div>
+
+                                                                {/* Balance */}
+                                                                <div className="flex flex-col items-end flex-shrink-0">
+                                                                    <span className="text-xs text-gray-400">
+                                                                        Balance
+                                                                    </span>
+
+                                                                    <span
+                                                                        className="text-xs font-semibold"
+                                                                        style={{ color: balColor }}
+                                                                    >
+                                                                        ₹
+                                                                        {bal.toLocaleString("en-IN", {
+                                                                            minimumFractionDigits: 2,
+                                                                            maximumFractionDigits: 2,
+                                                                        })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                     {filteredParties.length === 0 && (
                                                         <p className="px-3 py-2 text-gray-500">No Party found</p>
                                                     )}
@@ -981,7 +1061,7 @@ export default function EditExpense() {
                         {errors?.items?.message && (
                             <p className="text-red-500 text-xs mt-4 px-2">{errors.items.message}</p>
                         )}
-                        <div className="table-responsive mt-6">
+                        <div className="table-responsive table-desi mt-6">
                             <table
                                 className="table table-hover w-full"
                                 style={{
@@ -989,25 +1069,20 @@ export default function EditExpense() {
                                     width: "100%",
                                 }}
                             >
+
                                 <thead>
                                     <tr>
-                                        <th style={{ width: gstEnabled ? "3%" : "5%" }}>#</th>
+                                        <th style={{ width: "3%" }}>#</th>
 
-                                        <th style={{ width: gstEnabled ? "20%" : "40%" }}>
-                                            Item
-                                        </th>
+                                        <th>Item</th>
 
-                                        {gstEnabled && (
-                                            <th style={{ width: "10%" }}>
-                                                HSN Code
-                                            </th>
-                                        )}
+                                        {gstEnabled && <th>HSN Code</th>}
 
-                                        <th style={{ width: gstEnabled ? "6%" : "10%" }}>
-                                            Qty
-                                        </th>
+                                        <th style={{ width: "6%" }}>Qty</th>
 
-                                        <th style={{ width: gstEnabled ? "13%" : "15%" }}>
+                                        {/* <th style={{ width: "9%" }}>Unit</th> */}
+
+                                        <th style={{ width: gstEnabled ? "13%" : "auto" }}>
                                             Price/Unit
                                         </th>
 
@@ -1017,26 +1092,24 @@ export default function EditExpense() {
                                             </th>
                                         )}
 
-                                        {/* FIX: Tax and Tax Amount columns now always render
-                                            (matching Add Expense), instead of being hidden
-                                            entirely in non-GST mode. */}
-                                        <th style={{ width: gstEnabled ? "10%" : "15%" }}>
+                                        <th style={{ width: "10%" }}>
                                             Tax
                                         </th>
 
-                                        <th style={{ width: gstEnabled ? "8%" : "10%" }}>
+                                        <th style={{ width: "8%" }}>
                                             Tax Amount
                                         </th>
 
-                                        <th style={{ width: gstEnabled ? "9%" : "15%" }}>
+                                        <th style={{ width: "9%" }}>
                                             Amount
                                         </th>
                                     </tr>
                                 </thead>
+
                                 <tbody>
                                     {fields.map((field, i) => (
                                         <tr key={field.id}>
-                                            <td style={{ textAlign: "center" }}>
+                                            <td style={{ textAlign: "center", verticalAlign: "middle" }}>
                                                 <div className="flex items-center justify-center gap-2">
                                                     <button
                                                         type="button"
@@ -1123,6 +1196,7 @@ export default function EditExpense() {
                                                                                     Item_HSN: item.Item_HSN || "",
                                                                                     // Item_Unit: item.Item_Unit || "",
                                                                                     Price: item.Price || "",
+                                                                                    Quantity: 1,
                                                                                     // Price_Type: item.Price_Type || "Tax Excluded",
                                                                                     Tax_Type: item.Tax_Type || "None",
                                                                                 });
@@ -1690,14 +1764,21 @@ export default function EditExpense() {
 
                         {/* ═══ ACTION BUTTONS ═══ */}
                         <div className="flex justify-end gap-4 mt-6 px-2">
+
                             <button
                                 type="button"
-                                onClick={() => navigate("/expense/all-expenses")}
+                                onClick={() => {
+                                    const dest = getBackDestination();
+                                    navigate(`${dest.pathname}${dest.search}`, {
+                                        state: dest.state,
+                                    });
+                                }}
                                 className="text-white font-bold py-2 px-4 rounded"
                                 style={{ backgroundColor: "#94a3b8" }}
                             >
                                 Cancel
                             </button>
+
                             <button
                                 type="submit"
                                 disabled={isUpdatingExpense}
@@ -1706,6 +1787,7 @@ export default function EditExpense() {
                             >
                                 {isUpdatingExpense ? "Updating..." : "Update"}
                             </button>
+
                         </div>
                     </form>
 

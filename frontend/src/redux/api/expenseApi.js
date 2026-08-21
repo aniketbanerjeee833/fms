@@ -144,7 +144,9 @@ export const expenseApi = createApi({
         method: "PUT",
         body,
       }),
-      invalidatesTags: [
+
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Expense", id },
         { type: "Expense", id: "LIST" },
         { type: "ExpenseCategory", id: "LIST" },
         { type: "ExpenseItem", id: "LIST" },
@@ -193,146 +195,146 @@ export const expenseApi = createApi({
     //     { type: "Expense", id: `CATEGORY_${categoryId}` },
     //   ],
     // }),
-getExpensesByCategory: builder.query({
-  query: ({
-    categoryId,
-    cursor = null,
-    search = "",
-    date = "",
-  }) => {
-    const params = new URLSearchParams();
+    getExpensesByCategory: builder.query({
+      query: ({
+        categoryId,
+        cursor = null,
+        search = "",
+        date = "",
+      }) => {
+        const params = new URLSearchParams();
 
-    if (cursor) {
-      params.set("cursor", cursor);
-    }
+        if (cursor) {
+          params.set("cursor", cursor);
+        }
 
-    if (search?.trim()) {
-      params.set("search", search.trim());
-    }
+        if (search?.trim()) {
+          params.set("search", search.trim());
+        }
 
-    if (date) {
-      params.set("date", date);
-    }
+        if (date) {
+          params.set("date", date);
+        }
 
-    return (
-      `expense/by-category/${categoryId}` +
-      `?${params.toString()}`
-    );
-  },
+        return (
+          `expense/by-category/${categoryId}` +
+          `?${params.toString()}`
+        );
+      },
 
-  serializeQueryArgs: ({
-    queryArgs,
-  }) => {
-    const {
-      categoryId,
-      search,
-      date,
-    } = queryArgs;
+      serializeQueryArgs: ({
+        queryArgs,
+      }) => {
+        const {
+          categoryId,
+          search,
+          date,
+        } = queryArgs;
 
-    return {
-      categoryId,
-      search,
-      date,
-    };
-  },
+        return {
+          categoryId,
+          search,
+          date,
+        };
+      },
 
-  merge: (
-    currentCache,
-    newData,
-    { arg }
-  ) => {
-    // First page / filter change
-    if (!arg.cursor) {
-      return newData;
-    }
+      merge: (
+        currentCache,
+        newData,
+        { arg }
+      ) => {
+        // First page / filter change
+        if (!arg.cursor) {
+          return newData;
+        }
 
-    // Next page
-    currentCache.expenses.push(
-      ...newData.expenses
-    );
+        // Next page
+        currentCache.expenses.push(
+          ...newData.expenses
+        );
 
-    currentCache.hasMore =
-      newData.hasMore;
+        currentCache.hasMore =
+          newData.hasMore;
 
-    currentCache.nextCursor =
-      newData.nextCursor;
-  },
+        currentCache.nextCursor =
+          newData.nextCursor;
+      },
 
-  forceRefetch: ({
-    currentArg,
-    previousArg,
-  }) =>
-    currentArg?.cursor !==
-      previousArg?.cursor ||
-    currentArg?.search !==
-      previousArg?.search ||
-    currentArg?.date !==
-      previousArg?.date ||
-    currentArg?.categoryId !==
-      previousArg?.categoryId,
+      forceRefetch: ({
+        currentArg,
+        previousArg,
+      }) =>
+        currentArg?.cursor !==
+        previousArg?.cursor ||
+        currentArg?.search !==
+        previousArg?.search ||
+        currentArg?.date !==
+        previousArg?.date ||
+        currentArg?.categoryId !==
+        previousArg?.categoryId,
 
-   providesTags: [{ type: "Expense", id: "LIST" }],
-}),
-   getExpenseItemUsage: builder.query({
-  query: ({
-    masterItemId,
-    cursor = null,
-    date = "",
-    search = "",
-  }) => {
-    const params = new URLSearchParams();
+      providesTags: [{ type: "Expense", id: "LIST" }],
+    }),
+    getExpenseItemUsage: builder.query({
+      query: ({
+        masterItemId,
+        cursor = null,
+        date = "",
+        search = "",
+      }) => {
+        const params = new URLSearchParams();
 
-    if (masterItemId)
-      params.append("masterItemId", masterItemId);
+        if (masterItemId)
+          params.append("masterItemId", masterItemId);
 
-    if (cursor)
-      params.append("lastId", cursor);
+        if (cursor)
+          params.append("lastId", cursor);
 
-    if (date)
-      params.append("date", date);
+        if (date)
+          params.append("date", date);
 
-    if (search?.trim())
-      params.append("search", search.trim());
+        if (search?.trim())
+          params.append("search", search.trim());
 
-    return `expense/item-usage?${params.toString()}`;
-  },
+        return `expense/item-usage?${params.toString()}`;
+      },
 
-  serializeQueryArgs: ({ queryArgs }) => {
-    const {
-      masterItemId,
-      date,
-      search,
-    } = queryArgs;
+      serializeQueryArgs: ({ queryArgs }) => {
+        const {
+          masterItemId,
+          date,
+          search,
+        } = queryArgs;
 
-    return {
-      masterItemId,
-      date,
-      search,
-    };
-  },
+        return {
+          masterItemId,
+          date,
+          search,
+        };
+      },
 
-  merge: (currentCache, newData, { arg }) => {
-    if (!arg.cursor) {
-      return newData;
-    }
+      merge: (currentCache, newData, { arg }) => {
+        if (!arg.cursor) {
+          return newData;
+        }
 
-    currentCache.usage.push(...newData.usage);
-    currentCache.hasMore = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
-  },
+        currentCache.usage.push(...newData.usage);
+        currentCache.hasMore = newData.hasMore;
+        currentCache.nextCursor = newData.nextCursor;
+      },
 
-  forceRefetch: ({
-    currentArg,
-    previousArg,
-  }) =>
-    currentArg?.cursor !== previousArg?.cursor ||
-    currentArg?.date !== previousArg?.date ||
-    currentArg?.search !== previousArg?.search || // ← add this
-    currentArg?.masterItemId !== previousArg?.masterItemId,
+      forceRefetch: ({
+        currentArg,
+        previousArg,
+      }) =>
+        currentArg?.cursor !== previousArg?.cursor ||
+        currentArg?.date !== previousArg?.date ||
+        currentArg?.search !== previousArg?.search || // ← add this
+        currentArg?.masterItemId !== previousArg?.masterItemId,
 
 
-  providesTags: [{ type: "Expense", id: "LIST" }],
-}),
+      providesTags: [{ type: "Expense", id: "LIST" }],
+    }),
   }),
 });
 

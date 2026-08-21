@@ -8,19 +8,21 @@ import {
   Package,
   Eye,
   Trash2,
-  Copy,
-  FileText,
   Printer,
-  History,
+
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
 import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
 
 import {
   useGetAllExpenseItemMastersCursorQuery,
   useGetExpenseItemUsageQuery,
-  useGetExpenseByIdQuery
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+  useDeleteExpenseItemMasterMutation
 } from "../../redux/api/expenseApi";
 
 const fmt = (n) =>
@@ -58,6 +60,7 @@ export default function ExpensesByItems() {
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   /* ── helpers for merging into existing search params ── */
   const setSelectedItemId = (id) => {
@@ -153,14 +156,6 @@ export default function ExpensesByItems() {
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
 
-  // const {
-  //   data: usageResponse,
-  //   isLoading: isUsageLoading,
-  //   isFetching: isUsageFetching,
-  // } = useGetExpenseItemUsageQuery(
-  //   { masterItemId: selectedItemId, cursor: rightCursor },
-  //   { skip: !selectedItemId }
-  // );
   const {
     data: usageResponse,
     isLoading: isUsageLoading,
@@ -175,6 +170,76 @@ export default function ExpensesByItems() {
       skip: !selectedItemId,
     }
   );
+
+  const [deleteExpense, { isLoading: isDeletingExpense }] =
+    useDeleteExpenseMutation();
+
+  const [deleteExpenseItem, { isLoading: isDeletingExpenseItem }] =
+    useDeleteExpenseItemMasterMutation();
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      /* =====================================================
+         DELETE EXPENSE ITEM MASTER
+      ===================================================== */
+      if (deleteTarget.type === "item") {
+
+        // Reset left-side pagination
+        setLeftCursor(null);
+
+        const res = await deleteExpenseItem({
+          id: deleteTarget.itemId,
+        }).unwrap();
+
+        toast.success(
+          res?.message || "Expense item deleted successfully"
+        );
+
+        // If the deleted item was selected,
+        // clear selection so another item can be selected.
+        if (
+          String(selectedItemId) ===
+          String(deleteTarget.itemId)
+        ) {
+          setSelectedItemId(null);
+        }
+
+        setMenuOpen(null);
+        setDeleteTarget(null);
+
+        return;
+      }
+
+      /* =====================================================
+         DELETE EXPENSE TRANSACTION
+      ===================================================== */
+      setRightCursor(null);
+
+      const res = await deleteExpense({
+        id: deleteTarget.expenseId,
+      }).unwrap();
+
+      toast.success(
+        res?.message || "Expense deleted successfully"
+      );
+
+      setDeleteTarget(null);
+
+    } catch (error) {
+      console.error("Failed to delete:", error);
+
+      toast.error(
+        error?.data?.message ||
+        "Failed to delete. Please try again."
+      );
+
+      // Close the confirmation modal even when deletion fails
+      setDeleteTarget(null);
+
+    }
+  };
 
   /* ── EXPENSE PRINT DATA ── */
 
@@ -568,9 +633,22 @@ export default function ExpensesByItems() {
                           >
                             View/Edit
                           </button>
-                          <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500">
+
+                          <button
+                            className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+                            onClick={() => {
+                              setDeleteTarget({
+                                type: "item",
+                                itemId: item.id,
+                                itemName: item.name,
+                              });
+
+                              setMenuOpen(null);
+                            }}
+                          >
                             Delete
                           </button>
+
                         </div>
                       )}
                     </div>
@@ -646,32 +724,82 @@ export default function ExpensesByItems() {
                 </div>
               )}
 
-              {/* ── SEARCH TRANSACTIONS ── */}
-              <div className="px-1 py-2" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
-                  <Search
-                    size={16}
+              {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+              <div
+                className="px-1 py-2"
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+
+                  {/* SEARCH */}
+                  <div
+                    className="relative"
                     style={{
-                      position: "absolute",
-                      left: 10,
-                      top: 10,
-                      color: "#94a3b8",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={txnSearch}
-                    onChange={(e) => handleTxnSearchChange(e.target.value)}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{
+                      width: "40%",
+                      minWidth: 220,
+                      maxWidth: 300,
                       height: 36,
-                      paddingLeft: 34,
-                      paddingRight: 10,
-                      borderColor: "#dbe3ea",
                     }}
-                  />
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={txnSearch}
+                      onChange={(e) => handleTxnSearchChange(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                      }}
+                    />
+                  </div>
+
+                  {/* EXCEL + PRINT BUTTONS */}
+                  <div className="flex items-center gap-2">
+
+                    {/* EXCEL */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+                      title="Export to Excel"
+                    >
+                      <FileSpreadsheet
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                    {/* PRINT */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
+                      title="Print Reports"
+                    >
+                      <PrinterIcon
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                  </div>
+
                 </div>
               </div>
 
@@ -725,7 +853,7 @@ export default function ExpensesByItems() {
                               },
                               {
                                 state: {
-                                  from: location.pathname,
+                                  from: "expense-items",
                                   itemId: selectedItemId,
                                   txnSearch,
                                   itemSearch,
@@ -786,7 +914,7 @@ export default function ExpensesByItems() {
                                     key={key}
                                     className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
                                     style={{ color: danger ? "#dc2626" : "#374151" }}
-                                    onClick={() => {
+                                    onClick={async () => {
                                       setRowMenuOpen(null);
 
                                       if (key === "view") {
@@ -797,13 +925,21 @@ export default function ExpensesByItems() {
                                           },
                                           {
                                             state: {
-                                              from: location.pathname,
+                                              from: "expense-items",
                                               itemId: selectedItemId,
                                               txnSearch,
                                               itemSearch,
                                             },
                                           }
                                         );
+                                      }
+
+                                      if (key === "delete") {
+                                        setDeleteTarget({
+                                          expenseId: txn.expenseId,
+                                        });
+
+                                        return;
                                       }
 
                                       if (key === "print") {
@@ -855,6 +991,28 @@ export default function ExpensesByItems() {
             setShowEditItemModal(false);
             setEditingItem(null);
           }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={
+            deleteTarget.type === "item"
+              ? "Delete Expense Item"
+              : "Delete Expense"
+          }
+          message={
+            deleteTarget.type === "item"
+              ? `Are you sure you want to delete "${deleteTarget.itemName}"? This action cannot be undone.`
+              : "Are you sure you want to delete this expense? This action cannot be undone."
+          }
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={
+            deleteTarget.type === "item"
+              ? isDeletingExpenseItem
+              : isDeletingExpense
+          }
         />
       )}
 

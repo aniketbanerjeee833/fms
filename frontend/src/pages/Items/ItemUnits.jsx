@@ -283,7 +283,7 @@ export default function ItemUnits() {
                                         </div>
 
                                         {/* SHOW MENU ONLY WHEN System = 0 AND Is_Used = 0 */}
-                                        {Number(unit.Is_System) === 0 &&
+                                        {/* {Number(unit.Is_System) === 0 &&
                                             Number(unit.Is_Used) === 0 && (
                                                 <div
                                                     style={{ position: "relative" }}
@@ -354,7 +354,7 @@ export default function ItemUnits() {
                                                         </div>
                                                     )}
                                                 </div>
-                                            )}
+                                            )} */}
                                     </div>
                                 );
                             })
