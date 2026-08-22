@@ -64,16 +64,7 @@ const TYPE_CONFIG = {
         discountKey: "Discount_On_Purchase_Price",
         discountTypeKey: "Discount_Type_On_Purchase_Price",
     },
-    Expense: {
-        docLabel: "Expense No.",
-        docNumberKey: "Expense_Number",
-        amountKey: "Total_Amount",
-        paidKey: "Total_Amount",
-        paidLabel: "Amount",
-        priceKey: "Price",
-        discountKey: "Discount_On_Price",
-        discountTypeKey: "Discount_Type_On_Price",
-    },
+
 };
 
 /* ── pull the nested "doc" object out of record.data, whichever key it's under ── */
@@ -260,6 +251,17 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                 <span className="bulk-bold">
                                                     {doc[cfg.docNumberKey] || txn.number || "-"}
                                                 </span>
+                                                {txn.type === "Expense" &&
+                                                    doc.Category_Name && (
+                                                        <span style={{ marginLeft: "12px" }}>
+                                                            <span style={{ fontWeight: 700 }}>
+                                                                Category:
+                                                            </span>{" "}
+                                                            <span style={{ fontWeight: 500 }}>
+                                                                {doc.Category_Name}
+                                                            </span>
+                                                        </span>
+                                                    )}
                                             </div>
                                         </div>
 

@@ -17,7 +17,7 @@ import BankAccountModal from "../../components/Modal/BankAccountModal";
 import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 // import AddUnitModal from "../../components/Modal/AddUnitModal";
 
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 import {
@@ -25,6 +25,7 @@ import {
     useGetAllExpenseItemMastersQuery,
     useCreateExpenseMutation,
 } from "../../redux/api/expenseApi";
+import { useDispatch } from "react-redux";
 
 
 
@@ -73,13 +74,13 @@ const emptyRow = () => ({
 export default function AddExpense() {
     const navigate = useNavigate();
     const location = useLocation();
-
+    const dispatch=useDispatch();
 
     /* ───────────────────────── MOCK DATA (replace with API) ───────────────────────── */
     // TODO: const { data: categories } = useGetAllExpenseCategoriesQuery();
     const {
         data: categoryResponse,
-        isLoading: isCategoryLoading,
+        //isLoading: isCategoryLoading,
     } = useGetAllExpenseCategoriesQuery();
 
     const categories = categoryResponse?.categories || [];
@@ -90,7 +91,7 @@ export default function AddExpense() {
 
     const {
         data: itemResponse,
-        isLoading: isItemLoading,
+        //isLoading: isItemLoading,
     } = useGetAllExpenseItemMastersQuery();
 
     const items = itemResponse?.items || [];
@@ -101,14 +102,14 @@ export default function AddExpense() {
 
     const {
         data: partiesResponse,
-        isLoading: isPartyLoading,
+        //isLoading: isPartyLoading,
     } = useGetAllPartiesQuery();
     // console.log("Parties:", partiesResponse);
 
     // TODO: const { data: banks = [] } = useGetAllBankAccountsQuery();
     const {
         data: banks = [],
-        isLoading: isBankLoading,
+        //isLoading: isBankLoading,
     } = useGetAllBankAccountsQuery();
     // console.log("Banks:", banks);
 
@@ -325,6 +326,21 @@ export default function AddExpense() {
         }
     };
 
+    //TOAST
+    const onInvalid = (errors) => {
+        if (errors?.Total_Paid) {
+            toast.error(errors.Total_Paid.message || "Paid amount cannot exceed Total Amount");
+            return;
+        }
+
+        // Optional: show other validation errors through toast as well
+        const firstError = Object.values(errors)[0];
+
+        if (firstError?.message) {
+            toast.error(firstError.message);
+        }
+    };
+
     /* ───────────────────────── SUBMIT ───────────────────────── */
     const onSubmit = async (data) => {
 
@@ -347,6 +363,11 @@ export default function AddExpense() {
             }
 
             toast.success("Expense created successfully");
+            dispatch(partyApi.util.invalidateTags([
+                      "Party",
+                      "PartyLedger",
+                    ])
+                  );
 
             setTimeout(() => {
                 navigate("/expense/categories");
@@ -546,7 +567,7 @@ export default function AddExpense() {
                 </div>
 
                 <div style={{ padding: "16px 0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
-                    <form onSubmit={handleSubmit(onSubmit)}>
+                    <form onSubmit={handleSubmit(onSubmit, onInvalid)}>
                         {/* ═══ TOP FIELDS ═══ */}
                         <div className="flex flex-col sm:flex-row justify-between gap-6 w-full px-2 heading-wrapper">
                             {/* LEFT — Category (+ Party if GST) */}
@@ -807,7 +828,8 @@ export default function AddExpense() {
                                         <p className="text-red-500 text-xs">{errors.Expense_Date.message}</p>
                                     )}
                                 </div>
-                                {gstEnabled && (
+
+                                {/* {gstEnabled && (
                                     <div className="flex flex-col items-end w-full gap-1">
                                         <div className="flex items-center w-full gap-3 justify-end">
                                             <span className="whitespace-nowrap">Bill Date</span>
@@ -822,7 +844,8 @@ export default function AddExpense() {
                                             <p className="text-red-500 text-xs">{errors.Bill_Date.message}</p>
                                         )}
                                     </div>
-                                )}
+                                )} */}
+                                
                                 {gstEnabled && (
                                     <div className="flex items-center w-full gap-3 justify-end">
                                         <span className="whitespace-nowrap">
@@ -1414,9 +1437,7 @@ export default function AddExpense() {
                                                             }}
                                                             style={{ marginBottom: 0, height: "1rem", width: "100%", backgroundColor: "transparent", border: "none", borderBottom: "1px solid #d1d5db" }}
                                                         />
-                                                        {errors?.Total_Paid && (
-                                                            <p className="text-red-500 text-xs mt-1">{errors.Total_Paid.message}</p>
-                                                        )}
+                                                        {/* Total Paid validation is shown through toast */}
 
                                                     </div>
 

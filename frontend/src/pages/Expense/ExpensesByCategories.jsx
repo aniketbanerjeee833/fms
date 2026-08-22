@@ -1,11 +1,11 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
-import { NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import {  useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
-  LayoutDashboard,
+ 
   Search,
   MoreVertical,
-  SquarePen,
+ 
   ChevronRight,
   Receipt,
   Tags,
@@ -136,7 +136,8 @@ export default function ExpensesByCategories() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
-
+const rightCategoryRef = useRef(selectedCategoryId );
+const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? rightCursor : null;
   const {
     data: expenseResponse,
     isLoading: isExpensesLoading,
@@ -144,7 +145,7 @@ export default function ExpensesByCategories() {
   } = useGetExpensesByCategoryQuery(
     {
       categoryId: selectedCategoryId,
-      cursor: rightCursor,
+      cursor: effectiveRightCursor,
       search: txnSearch,
     },
     {

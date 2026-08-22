@@ -1394,7 +1394,14 @@ const getExpenseById = async (req, res, next) => {
     const { id } = req.params;
 
     const [[expense]] = await connection.query(
-      `SELECT e.*, a.Party_Name, ec.Category_Name, ec.Category_Type
+      `SELECT e.*, a.Party_Name, a.GSTIN, a.State, a.Phone_Number,  (
+    SELECT pa.Address_Text
+    FROM add_party_addresses pa
+    WHERE pa.Party_Id = e.Party_Id
+      AND pa.Address_Type = 'Billing'
+      AND pa.Is_Default = 1
+    LIMIT 1
+  ) AS Billing_Address, ec.Category_Name, ec.Category_Type
        FROM expenses e
        LEFT JOIN add_party a ON e.Party_Id = a.Party_Id
        LEFT JOIN expense_categories ec ON e.Category_Id = ec.id

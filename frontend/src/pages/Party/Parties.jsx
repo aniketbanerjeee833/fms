@@ -1321,8 +1321,20 @@ export default function Parties() {
           partyDetails={partyModal.data || {}}
           editingParty={partyModal.mode === "edit"}
           onClose={() => {
+            
             setPartyModal({ open: false, mode: "add", data: null });
           }}
+          onSave={(res) => {
+      console.log("Saved party:", res);
+
+      setPartyModal({
+        open: false,
+        mode: "add",
+        data: null,
+      });
+
+      // optionally refetch party list here
+    }}
         />
       )}
     </>

@@ -57,13 +57,25 @@
 .expense-company-details {
     width: 52%;
     text-align: right;
-    line-height: 1.45;
+    /* line-height: 1.2; */
+    font-size: 11px;
 }
-
+.expense-company-address {
+  font-size: 11px;
+  white-space: nowrap;
+}
 .expense-company-name {
     font-size: 20px;
     font-weight: bold;
 }
+/* .invoice-company-details {
+ 
+  text-align: right;
+
+  font-size: 11px;
+} */
+
+
 
 
 /* =========================================================

@@ -1893,8 +1893,8 @@ export default function PurchaseAdd() {
                                 </div>
 
                                 {/* ══════════════════════════════════════════════
-        EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
-    ══════════════════════════════════════════════ */}
+                                EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
+                                  ══════════════════════════════════════════════ */}
                                 <table className="w-full text-sm border-collapse">
                                   <thead className="bg-gray-100 border-b">
                                     <tr>
@@ -3203,7 +3203,7 @@ export default function PurchaseAdd() {
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
                             setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
-
+                            
                           } else {
                             if (originalTotal !== null) {
                               setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });

@@ -23,6 +23,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     GSTIN,
     State,
     Billing_Address,
+    Phone_Number,
     State_Of_Supply,
     Total_Amount,
     Total_Paid,
@@ -112,8 +113,8 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
   const taxGroupList = Object.values(taxGroups).filter((g) => g.halfRate > 0);
   const totalTax = items.reduce((s, i) => s + Number(i.Tax_Amount || 0), 0);
-  const cgstTotal = totalTax / 2;
-  const sgstTotal = totalTax / 2;
+  //const cgstTotal = totalTax / 2;
+  //const sgstTotal = totalTax / 2;
   // const totalTax = items.reduce(
   //   (sum, item) => sum + getTaxAmount(item),
   //   0
@@ -130,6 +131,13 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     (sum, item) => sum + Number(item?.Quantity || 0),
     0
   );
+
+  const itemsSum = items.reduce(
+    (sum, item) => sum + Number(item.Amount || 0),
+    0
+  );
+
+  //const roundOff = Number(Total_Amount || 0) - itemsSum;
 
   // =========================================================
   // AMOUNT IN WORDS
@@ -321,7 +329,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             {companyName}
           </div>
 
-          <div>
+          <div className="invoice-company-address">
             {companyAddress}
           </div>
 
@@ -385,6 +393,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   {Billing_Address}
                 </div>
               )}
+              {Phone_Number && <div>Contact No. : {Phone_Number}</div>}
 
               {GSTIN && (
                 <div>
@@ -643,7 +652,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 {hasDiscountColumn && (
                   <td
                     className="invoice-item-right"
-                    
+
                   >
                     {Number(item.Discount_Amount || 0) > 0 ? (
                       type === "sale" ? (
@@ -807,22 +816,16 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </td>
               </>
             )}
+
+
+
             {/* <td className="invoice-total-cell">
-              ₹ {money(cgst)}
-            </td>
-
-
-            <td className="invoice-total-cell">
-              ₹ {money(sgst)}
-            </td> */}
-
-
-            <td className="invoice-total-cell">
               {hasItems ? `₹ ${money(Total_Amount)}` : ""}
-            </td>
-            {/* <td className="invoice-total-cell">
-              ₹ {money(Total_Amount)}
             </td> */}
+            <td className="invoice-total-cell">
+              {hasItems ? `₹ ${money(itemsSum)}` : ""}
+            </td>
+
 
           </tr>
 
@@ -936,40 +939,33 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
           <table className="invoice-summary-table">
-
             <tbody>
 
               <tr>
-
-                <td className="invoice-summary-cell">
-                  Sub Total
-                </td>
-
+                <td className="invoice-summary-cell">Sub Total</td>
                 <td className="invoice-summary-cell-right">
-                  ₹ {money(Total_Amount)}
+                  ₹ {money(itemsSum)}
                 </td>
-
               </tr>
 
-
+              {/* ✅ Round Off row — only shown when it's non-zero */}
+              {/* {Math.abs(roundOff) >= 0.01 && (
+                <tr>
+                  <td className="invoice-summary-cell">Round Off</td>
+                
+                  <td className="invoice-summary-cell-right">
+                     ₹ {money(Math.abs(roundOff))}
+                  </td>
+                </tr>
+              )} */}
 
               <tr>
                 <td className="invoice-summary-cell">
-                  <div className="invoice-bold">
-                    Total
-                  </div>
-                  <div>
-                    {type === "sale" ? "Received" : "Paid"}
-                  </div>
+                  <div className="invoice-bold">Total</div>
+                  <div>{type === "sale" ? "Received" : "Paid"}</div>
                 </td>
-
                 <td className="invoice-summary-cell-right">
-                  <div className="invoice-bold">
-                    ₹ {money(Total_Amount)}
-                  </div>
-                  {/* <div>
-                      ₹ {money(Total_Paid)}
-                    </div> */}
+                  <div className="invoice-bold">₹ {money(Total_Amount)}</div>
                   <div>
                     {type === "sale" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
                   </div>
@@ -977,19 +973,11 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               </tr>
 
               <tr>
-
-                <td className="invoice-summary-cell">
-                  Balance
-                </td>
-
-                <td className="invoice-summary-cell-right">
-                  ₹ {money(Balance_Due)}
-                </td>
-
+                <td className="invoice-summary-cell">Balance</td>
+                <td className="invoice-summary-cell-right">₹ {money(Balance_Due)}</td>
               </tr>
 
             </tbody>
-
           </table>
 
           {/* </div> */}
@@ -1013,7 +1001,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
         </div>
 
         <div className="invoice-bottom-right">
-          ...
+
         </div>
 
       </div>

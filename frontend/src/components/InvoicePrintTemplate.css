@@ -120,10 +120,22 @@
   object-position: left center;
 }
 
-.invoice-company-details {
+/* .invoice-company-details {
   width: 52%;
   text-align: right;
   line-height: 1.45;
+} */
+
+.invoice-company-details {
+ 
+  text-align: right;
+  /* //line-height: 1.2; */
+  font-size: 11px;
+}
+
+.invoice-company-address {
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .invoice-company-name {

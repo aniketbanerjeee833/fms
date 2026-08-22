@@ -25,10 +25,16 @@ import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintT
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import { useReactToPrint } from "react-to-print";
 import PartyBulkReportPrintTemplate from "../../components/Print/PartyBulkReportPrintTemplate";
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import {
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+} from "../../redux/api/expenseApi";
 
 const TXN_TYPE_ROUTE_MAP = {
   Sale: "sale",
   Purchase: "purchase",
+  Expense: "expense",
   Sale_Return: "sale/return",
   Purchase_Return: "purchase/return",
 };
@@ -38,6 +44,7 @@ const MODAL_TXN_TYPES = ["Payment_In", "Payment_Out"];
 const PARTY_TYPE_META = {
   Sale: { label: "Sale", color: "#059669" },
   Purchase: { label: "Purchase", color: "#dc2626" },
+  Expense: { label: "Expense", color: "#dc2626" },
   Sale_Return: { label: "Sale Return", color: "#059669" },
   Purchase_Return: { label: "Purchase Return", color: "#dc2626" },
   Payment_In: { label: "Payment In", color: "#059669" },
@@ -87,6 +94,10 @@ const DELETE_CONFIG = {
   Purchase: {
     title: "Delete Purchase",
     label: "purchase bill",
+  },
+  Expense: {
+    title: "Delete Expense",
+    label: "expense",
   },
   Sale_Return: {
     title: "Delete Credit Note",
@@ -180,9 +191,13 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
     skip: printTarget.type !== "Payment_Out" || !printTarget.id,
   })
+    const { data: printExpenseData } = useGetExpenseByIdQuery(printTarget.id, {
+      skip: printTarget.type !== "Expense" || !printTarget.id,
+    });
   const printReady =
     (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
     (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
+    (printTarget.type === "Expense" && printExpenseData?.expense) ||
     (printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn) ||
     (printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn) ||
     (printTarget.type === "Payment_In" && printPaymentInData?.paymentIn) ||
@@ -322,94 +337,101 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
   const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
   const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
-
+   const [deleteExpense, { isLoading: isDeletingExpense }] = useDeleteExpenseMutation();
   const isDeleting =
     isDeletingSale ||
     isDeletingPurchase ||
     isDeletingSaleReturn ||
     isDeletingPurchaseReturn ||
     isDeletingPaymentIn ||
-    isDeletingPaymentOut;
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-
-    try {
-      let res;
-
-      switch (deleteTarget.Txn_Type) {
-        case "Sale":
-          res = await deleteSale(deleteTarget.Id).unwrap();
-          break;
-
-        case "Purchase":
-          res = await deletePurchase(
-            deleteTarget.Id
-          ).unwrap();
-          break;
-
-        case "Sale_Return":
-          res = await deleteSaleReturn(deleteTarget.Id).unwrap();
-          break;
-
-        case "Purchase_Return":
-          res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
-          break;
-
-        case "Payment_In":
-          res = await deletePaymentIn(deleteTarget.Id).unwrap();
-          break;
-
-        case "Payment_Out":
-          res = await deletePaymentOut(deleteTarget.Id).unwrap();
-          break;
-
-        default:
-          toast.error(
-            "Unknown transaction type — cannot delete"
-          );
-          return;
-      }
-
-      toast.success(res?.message || "Deleted successfully");
-
-      setDeleteTarget(null);
-
-      dispatch(
-        partyApi.util.invalidateTags([
-          "Party",
-          "PartyLedger"
-        ])
-      );
-      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-      dispatch(
-        bankAccountApi.util.invalidateTags(["BankAccount"])
-      )
-      dispatch(saleApi.util.invalidateTags(["Sale"]));
-      dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-      dispatch(
-        itemApi.util.invalidateTags([
-          "Item",
-          "ItemLedger",
-        ])
-      );
-    } catch (err) {
-
-      console.error(
-        "❌ Delete error:",
-        err
-      );
-
-      toast.error(
-        err?.data?.message ||
-        "Failed to delete"
-      );
-      setDeleteTarget(null);
-
-      // IMPORTANT:
-      // Don't close modal here.
-      // User should see the error and can close it manually.
-    }
-  };
+    isDeletingPaymentOut ||
+    isDeletingExpense;
+ const handleConfirmDelete = async () => {
+     if (!deleteTarget) return;
+ 
+     try {
+       let res;
+ 
+       switch (deleteTarget.Txn_Type) {
+         case "Sale":
+           res = await deleteSale(deleteTarget.Id).unwrap();
+           break;
+ 
+         case "Purchase":
+           res = await deletePurchase(
+             deleteTarget.Id
+           ).unwrap();
+           break;
+ 
+         case "Expense":
+           res = await deleteExpense({
+             id: deleteTarget.Id,
+           }).unwrap();
+           break;
+ 
+         case "Sale_Return":
+           res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+           break;
+ 
+         case "Purchase_Return":
+           res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+           break;
+ 
+         case "Payment_In":
+           res = await deletePaymentIn(deleteTarget.Id).unwrap();
+           break;
+ 
+         case "Payment_Out":
+           res = await deletePaymentOut(deleteTarget.Id).unwrap();
+           break;
+ 
+         default:
+           toast.error(
+             "Unknown transaction type — cannot delete"
+           );
+           return;
+       }
+ 
+       toast.success(res?.message || "Deleted successfully");
+ 
+       setDeleteTarget(null);
+ 
+       dispatch(
+         partyApi.util.invalidateTags([
+           "Party",
+           "PartyLedger"
+         ])
+       );
+       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+       dispatch(
+         bankAccountApi.util.invalidateTags(["BankAccount"])
+       )
+       dispatch(saleApi.util.invalidateTags(["Sale"]));
+       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+       dispatch(
+         itemApi.util.invalidateTags([
+           "Item",
+           "ItemLedger",
+         ])
+       );
+     } catch (err) {
+ 
+       console.error(
+         "❌ Delete error:",
+         err
+       );
+ 
+       toast.error(
+         err?.data?.message ||
+         "Failed to delete"
+       );
+       setDeleteTarget(null);
+ 
+       // IMPORTANT:
+       // Don't close modal here.
+       // User should see the error and can close it manually.
+     }
+   };
   const handleBulkPrint = useReactToPrint({
     contentRef: bulkPartyPrintRef,
     documentTitle: `Party-Report`,
@@ -627,8 +649,9 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
               ledger.map((row, idx) => {
                 const meta = PARTY_TYPE_META[row.Txn_Type] ?? { label: row.Txn_Type, color: "#6b7280" };
                 const refId =
-                  row.Sale_Id || row.Purchase_Id || row.Sale_Return_Id ||
-                  row.Purchase_Return_Id || row.Payment_In_Id || row.Payment_Out_Id;
+                 row.Sale_Id || row.Purchase_Id || row.Expense_Id ||
+                  row.Sale_Return_Id || row.Purchase_Return_Id ||
+                  row.Payment_In_Id || row.Payment_Out_Id;
 
                 const transactionId = row.Formatted_Reference_Id || refId;
                 const menuId = `${row.Txn_Type}-${transactionId || idx}`;
@@ -648,7 +671,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                             pathname: `/${route}/edit/${transactionId}`,
                             search: searchParams.toString(),
                           },
-                          { state: { from: "party-details", partyId } }
+                          { state: { from: "party-receivables", partyId } }
                         );
                       }
                     }}
@@ -743,8 +766,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                 pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
                                 search: searchParams.toString(),
                               }}
-                              state={{
-                                from: "party-details",
+                               state={{
+                                from: "party-receivables",
                                 partyId,
                               }}
                               className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -875,6 +898,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         )}
+          {printTarget.type === "Expense" && printExpenseData?.expense && (
+                  <ExpensePrintTemplate
+                    ref={printRef}
+                    expense={printExpenseData.expense}
+                  />
+                )}
 
         {/* SALE RETURN — Credit Note */}
         {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (

@@ -46,14 +46,20 @@
 }
 
 .receipt-company-details {
-  width: 52%;
+  /* width: 52%; */
   text-align: right;
-  line-height: 1.45;
+  font-size: 11px;
+  /* line-height: 1.45; */
 }
 
 .receipt-company-name {
   font-size: 20px;
   font-weight: bold;
+}
+
+.receipt-company-address {
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 /* ── SHARED TABLE ── */
@@ -108,95 +114,67 @@
 }
 
 /* ── WIDTHS ── */
-.receipt-w30 { width: 30%; }
-.receipt-w50 { width: 50%; }
-.receipt-w70 { width: 70%; }
-
-/* ── AMOUNT IN WORDS ── */
-.receipt-words-body {
-  padding: 8px 10px;
-  text-align: center;
-  font-size: 11px;
-  border: 1px solid #777;
-  border-top: none;
+.receipt-w30 {
+  width: 30%;
 }
+
+.receipt-w50 {
+  width: 50%;
+}
+
+.receipt-w70 {
+  width: 70%;
+}
+
+
 /* =========================================================
    BOTTOM LEFT + RIGHT
 ========================================================= */
 
-.receipt-bottom-grid {
-  display: grid;
-  grid-template-columns: 50% 50%;
-  align-items: stretch;
-  width: 100%;
+.receipt-combined-table {
+  margin-top: 0;
 }
 
-.receipt-bottom-left,
-.receipt-bottom-right {
-  min-width: 0;
-  height: 100%;
-  box-sizing: border-box;
+.receipt-combined-table th.receipt-section-header {
+  width: 50%;
 }
 
-.receipt-bottom-left {
-  display: flex;
-  flex-direction: column;
+.receipt-words-cell {
+  text-align: center;
+  vertical-align: middle;
 }
 
-.receipt-bottom-right {
-  display: flex;
-  flex-direction: column;
-}
-.receipt-amounts {
-  width: 100%;
-  box-sizing: border-box;
+.receipt-words-header {
+  text-align: center;
 }
 
-.receipt-print .receipt-amounts .receipt-amounts-header {
-  background-color: #0b7fa3 !important;
-  color: #ffffff !important;
-
-  padding: 6px;
-  border: 1px solid #777;
-
-  font-size: 11px;
-  font-weight: bold;
+.receipt-empty-left {
+  min-height: 55px;
 }
 
-.receipt-print .receipt-amounts .receipt-amounts-header > div {
-  color: #ffffff !important;
+.receipt-empty-right {
+  min-height: 55px;
 }
 
-
-.receipt-amount-row {
+.receipt-combined-table .receipt-amount-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
-  padding: 6px;
+  border: none;
+  padding: 0;
   margin: 0;
-
-  border: 1px solid #777;
-  border-top: none;
-
   font-size: 11px;
   line-height: 1;
 }
 
-/* .receipt-amount-label {
-  text-align: left;
-}
 
-.receipt-amount-value {
-  text-align: right;
-} */
- 
 .receipt-amount-label,
 .receipt-amount-value {
   margin: 0;
   padding: 0;
   line-height: 1;
 }
+
 .receipt-signature-row {
   width: 100%;
   display: flex;
@@ -223,6 +201,7 @@
   font-weight: bold;
   margin-bottom: 10px;
 }
+
 /* ── PRINT ── */
 @media print {
 
@@ -265,21 +244,8 @@
   /* AMOUNTS TEXT */
 
   .receipt-amounts-header,
-  .receipt-amounts-header > div {
+  .receipt-amounts-header>div {
     color: #ffffff !important;
-  }
-
-  /* BOTTOM GRID */
-
-  .receipt-bottom-grid {
-    display: grid !important;
-    grid-template-columns: 50% 50% !important;
-    align-items: stretch !important;
-  }
-
-  .receipt-bottom-left,
-  .receipt-bottom-right {
-    height: 100% !important;
   }
 
   /* SIGNATURE */

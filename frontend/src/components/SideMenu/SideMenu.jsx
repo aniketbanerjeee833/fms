@@ -260,7 +260,7 @@ if (
                  </span>
             </NavLink>
                {renderMenu("Parties",     <Users size={20}/>, [
-           { to: "/party/add", text: "Add Parties" },
+          //  { to: "/party/add", text: "Add Parties" },
             { to: "/party/parties", text: "Party Details" },
              
           ])}

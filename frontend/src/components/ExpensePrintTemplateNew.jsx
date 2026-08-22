@@ -320,13 +320,13 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
             ? num(expense.Balance_Due)
             : Math.max(0, totalAmount - totalPaid);
 
-    const roundOff = num(expense?.Round_Off);
+    //const roundOff = num(expense?.Round_Off);
 
-    const showRoundOff =
-        expense?.Round_Off !== undefined &&
-        expense?.Round_Off !== null &&
-        expense?.Round_Off !== "" &&
-        Math.abs(roundOff) > 0;
+    // const showRoundOff =
+    //     expense?.Round_Off !== undefined &&
+    //     expense?.Round_Off !== null &&
+    //     expense?.Round_Off !== "" &&
+    //     Math.abs(roundOff) > 0;
 
     /* =======================================================
        DISCOUNT TOTAL
@@ -340,7 +340,12 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
             0
         );
     }, [items]);
- 
+     const itemsSum = items.reduce(
+    (sum, item) => sum + Number(item.Amount || 0),
+    0
+  );
+
+  const roundOff = Number(totalAmount || 0) - itemsSum;
 
 
     /* =======================================================
@@ -806,8 +811,12 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                             )}
 
                             {/* Amount */}
-                            <td className="expense-total-cell">
+                            {/* <td className="expense-total-cell">
                                 ₹{money(totalAmount)}
+                            </td> */}
+
+                             <td className="expense-total-cell">
+                                ₹{money(itemsSum)}
                             </td>
 
                         </tr>
@@ -967,7 +976,18 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                 </tr>
                             )}
 
-                            {showRoundOff && (
+                            {/* {showRoundOff && (
+                                <tr>
+                                    <td className="expense-summary-cell">
+                                        Round off
+                                    </td>
+
+                                    <td className="expense-summary-cell-right">
+                                        ₹{money(roundOff)}
+                                    </td>
+                                </tr>
+                            )} */}
+                              {Math.abs(roundOff) >= 0.01 && (
                                 <tr>
                                     <td className="expense-summary-cell">
                                         Round off

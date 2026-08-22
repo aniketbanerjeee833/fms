@@ -12,17 +12,12 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   if (!invoice) return null;
 
   const {
-    Purchase_Id,
-    Bill_Number,
-    Bill_Date,
-
-    Sale_Id,
-    Invoice_Number,
-    Invoice_Date,
+   
     Party_Name,
     GSTIN,
     State,
     Billing_Address,
+    Phone_Number,
     State_Of_Supply,
     Total_Amount,
     Total_Paid,
@@ -52,9 +47,9 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     : invoice.Return_Date;
 
   // original bill reference
-  const originalBillRef = type === "debit"
-    ? invoice.Bill_Number     // the purchase bill this return is against
-    : invoice.Invoice_Number; // the sale invoice this return is against
+  // const originalBillRef = type === "debit"
+  //   ? invoice.Bill_Number     
+  //   : invoice.Invoice_Number; 
   // =========================================================
   // HELPERS
   // =========================================================
@@ -125,8 +120,8 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
   const taxGroupList = Object.values(taxGroups).filter((g) => g.halfRate > 0);
   const totalTax = items.reduce((s, i) => s + Number(i.Tax_Amount || 0), 0);
-  const cgstTotal = totalTax / 2;
-  const sgstTotal = totalTax / 2;
+  //const cgstTotal = totalTax / 2;
+  //const sgstTotal = totalTax / 2;
   // const totalTax = items.reduce(
   //   (sum, item) => sum + getTaxAmount(item),
   //   0
@@ -143,7 +138,12 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     (sum, item) => sum + Number(item?.Quantity || 0),
     0
   );
+const itemsSum = items.reduce(
+    (sum, item) => sum + Number(item.Amount || 0),
+    0
+  );
 
+  //const roundOff = Number(Total_Amount || 0) - itemsSum;
   // =========================================================
   // AMOUNT IN WORDS
   // =========================================================
@@ -340,9 +340,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             Phone no.: {companyPhone} Email: {companyEmail}
           </div>
 
-          {/* <div>
-            GSTIN: {companyGSTIN}, State: 19-West Bengal
-          </div> */}
+         
           <div>
             GSTIN: {companyGSTIN}
           </div>
@@ -399,6 +397,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   {Billing_Address}
                 </div>
               )}
+              {Phone_Number && <div>Contact No. : {Phone_Number}</div>}
 
               {GSTIN && (
                 <div>
@@ -447,43 +446,6 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             </td>
 
 
-            {/* BILL DETAILS */}
-
-            {/* <td className="invoice-cell invoice-cell-right">
-
-              {/* <div>
-                Bill No. : {safe(Bill_Number, Purchase_Id)}
-              </div>
-
-              <div>
-                Date : {formattedDate}
-              </div> 
-              <div>
-                {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
-                {safe(documentNumber)}
-              </div>
-
-              <div>
-                {type === "sale" ? "Date" : "Date"} :{" "}
-                {documentDate
-                  ? new Date(documentDate).toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })
-                  : "-"}
-              </div>
-
-              {/* <div>
-                Place of supply:{" "}
-                {safe(State_Of_Supply, "19-West Bengal")}
-              </div> 
-
-              <div>
-                Place of Supply: {formatState(State_Of_Supply)}
-              </div>
-
-            </td> */}
 
           </tr>
         </tbody>
@@ -711,21 +673,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
           <tr>
 
-            {/* <td
-              colSpan={3}
-              className="invoice-total-cell"
-            >
-              Total
-            </td>
-
-
-            <td className="invoice-total-cell">
-              {money(totalQuantity)}
-            </td>
-
-
-            <td className="invoice-item-cell">
-            </td> */}
+         
             <td className="invoice-total-cell"></td>
 
             {/* Item Name column */}
@@ -787,8 +735,11 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
 
-            <td className="invoice-total-cell">
+            {/* <td className="invoice-total-cell">
               ₹ {money(Total_Amount)}
+            </td> */}
+             <td className="invoice-total-cell">
+              { `₹ ${money(itemsSum)}`}
             </td>
 
           </tr>
@@ -895,7 +846,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               Amounts
             </div>
 
-
+{/* 
             <table className="invoice-summary-table">
 
               <tbody>
@@ -928,9 +879,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                     <div className="invoice-bold">
                       ₹ {money(Total_Amount)}
                     </div>
-                    {/* <div>
-                      ₹ {money(Total_Paid)}
-                    </div> */}
+                    
                     <div>
                       {type === "debit" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
                     </div>
@@ -951,7 +900,48 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
               </tbody>
 
-            </table>
+            </table> */}
+            <table className="invoice-summary-table">
+            <tbody>
+
+              <tr>
+                <td className="invoice-summary-cell">Sub Total</td>
+                <td className="invoice-summary-cell-right">
+                  ₹ {money(itemsSum)}
+                </td>
+              </tr>
+
+              {/* ✅ Round Off row — only shown when it's non-zero */}
+              {/* {Math.abs(roundOff) >= 0.01 && (
+                <tr>
+                  <td className="invoice-summary-cell">Round Off</td>
+                 
+                  <td className="invoice-summary-cell-right">
+                     ₹ {money(Math.abs(roundOff))}
+                  </td>
+                </tr>
+              )} */}
+
+              <tr>
+                <td className="invoice-summary-cell">
+                  <div className="invoice-bold">Total</div>
+                  <div>{type === "sale" ? "Received" : "Paid"}</div>
+                </td>
+                <td className="invoice-summary-cell-right">
+                  <div className="invoice-bold">₹ {money(Total_Amount)}</div>
+                  <div>
+                    {type === "sale" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td className="invoice-summary-cell">Balance</td>
+                <td className="invoice-summary-cell-right">₹ {money(Balance_Due)}</td>
+              </tr>
+
+            </tbody>
+          </table>
 
           {/* </div> */}
           {/* ===================================================
@@ -976,7 +966,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
         </div>
 
         <div className="invoice-bottom-right">
-          ...
+          
         </div>
 
       </div>
