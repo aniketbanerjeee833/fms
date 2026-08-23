@@ -23,7 +23,7 @@ export default function SelectUnitModal({
   //   skip: !Item_Id,
   // });
 
-   const {
+  const {
     data: allConversions = [],
   } = useGetItemConversionsQuery();
 
@@ -155,11 +155,11 @@ export default function SelectUnitModal({
       return;
     }
     console.log("Calling API", {
-  Item_Id,
-  Primary_Unit: baseUnit,
-  Secondary_Unit: secondaryUnit,
-  Conversion_Rate: rate,
-});
+      Item_Id,
+      Primary_Unit: baseUnit,
+      Secondary_Unit: secondaryUnit,
+      Conversion_Rate: rate,
+    });
 
     // 8. PERSIST to item_unit_conversions (so it shows up next time as "saved")
     // if (Item_Id) {
@@ -176,14 +176,14 @@ export default function SelectUnitModal({
     //   }
     // }
     try {
-  await addItemConversion({
-    Primary_Unit: baseUnit,
-    Secondary_Unit: secondaryUnit,
-    Conversion_Rate: rate,
-  }).unwrap();
-} catch (err) {
-  console.error("Failed to save conversion history:", err);
-}
+      await addItemConversion({
+        Primary_Unit: baseUnit,
+        Secondary_Unit: secondaryUnit,
+        Conversion_Rate: rate,
+      }).unwrap();
+    } catch (err) {
+      console.error("Failed to save conversion history:", err);
+    }
 
     // 9. UPDATE PARENT FORM STATE
     onSave({ baseUnit, secondaryUnit, conversionRate: rate });
@@ -200,6 +200,7 @@ export default function SelectUnitModal({
         backgroundColor: "rgba(0,0,0,0.4)",
         backdropfilter: "blur(4px)",
         zIndex: 50,
+        marginTop: "50px",
       }}
     >
       <div
@@ -402,50 +403,60 @@ export default function SelectUnitModal({
                   <p className="text-xs font-semibold text-gray-500 mt-2">
                     Previously Used
                   </p>
+                  <div style={{
+                    maxHeight: "180px",
+                    overflowY: "auto",
+                    paddingRight: "4px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                  >
+                    {savedConversions.map((conversion) => {
+                      const rate = Number(conversion.Conversion_Rate);
+                      const rowKey = `saved-${conversion.id}`;
+                      const isChecked = selectedRate === rowKey;
 
-                  {savedConversions.map((conversion) => {
-                    const rate = Number(conversion.Conversion_Rate);
-                    const rowKey = `saved-${conversion.id}`;
-                    const isChecked = selectedRate === rowKey;
-
-                    return (
-                      <div
-                        key={rowKey}
-                        className="flex items-center gap-3 cursor-pointer"
-                        onClick={() => {
-                          setSelectedRate(rowKey);
-                          setCustomRate(String(rate));
-                        }}
-                      >
-                        {/* 🔹 same custom-styled circle used for custom-rate/suggestion rows above,
-                            instead of a bare native <input type="radio"> that rendered tiny/inconsistent */}
+                      return (
                         <div
-                          style={{
-                            width: 18,
-                            height: 18,
-                            borderRadius: "50%",
-                            border: `2px solid ${isChecked ? "#4CA1AF" : "#9ca3af"}`,
-                            backgroundColor: isChecked ? "#4CA1AF" : "transparent",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
+
+                          key={rowKey}
+                          className="flex items-center gap-3 cursor-pointer"
+                          onClick={() => {
+                            setSelectedRate(rowKey);
+                            setCustomRate(String(rate));
                           }}
                         >
-                          {isChecked && (
-                            <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "white" }} />
-                          )}
-                        </div>
+                          {/* 🔹 same custom-styled circle used for custom-rate/suggestion rows above,
+                            instead of a bare native <input type="radio"> that rendered tiny/inconsistent */}
+                          <div
+                            style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: "50%",
+                              border: `2px solid ${isChecked ? "#4CA1AF" : "#9ca3af"}`,
+                              backgroundColor: isChecked ? "#4CA1AF" : "transparent",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {isChecked && (
+                              <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "white" }} />
+                            )}
+                          </div>
 
-                        <span className="text-sm">
-                          1 <strong>{baseLabel.toUpperCase()}</strong>
-                          {" = "}
-                          <strong>{rate}</strong>{" "}
-                          {secondaryLabel.toUpperCase()}
-                        </span>
-                      </div>
-                    );
-                  })}
+                          <span className="text-sm">
+                            1 <strong>{baseLabel.toUpperCase()}</strong>
+                            {" = "}
+                            <strong>{rate}</strong>{" "}
+                            {secondaryLabel.toUpperCase()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               )}
 
