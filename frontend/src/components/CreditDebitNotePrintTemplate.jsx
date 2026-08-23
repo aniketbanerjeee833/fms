@@ -8,11 +8,11 @@ import "./CreditDebitNotePrintTemplate.css";
 // const CreditDebitNotePrintTemplate = forwardRef(({ purchase }, ref) => 
 const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
-
+console.log(type)
   if (!invoice) return null;
 
   const {
-   
+
     Party_Name,
     GSTIN,
     State,
@@ -20,6 +20,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     Phone_Number,
     State_Of_Supply,
     Total_Amount,
+    Round_Off,
     Total_Paid,
     Total_Received,
     Balance_Due,
@@ -78,13 +79,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       maximumFractionDigits: 2,
     });
 
-  // const formattedDate = Bill_Date
-  //   ? new Date(Bill_Date).toLocaleDateString("en-IN", {
-  //     day: "2-digit",
-  //     month: "2-digit",
-  //     year: "numeric",
-  //   })
-  //   : "-";
+
 
   // =========================================================
   // TAX
@@ -138,11 +133,11 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     (sum, item) => sum + Number(item?.Quantity || 0),
     0
   );
-const itemsSum = items.reduce(
+  const itemsSum = items.reduce(
     (sum, item) => sum + Number(item.Amount || 0),
     0
   );
-
+  const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
   //const roundOff = Number(Total_Amount || 0) - itemsSum;
   // =========================================================
   // AMOUNT IN WORDS
@@ -282,14 +277,35 @@ const itemsSum = items.reduce(
   const showTaxColumns = items.some(
     (item) => Number(item.Tax_Amount || 0) > 0
   );
-  console.log(
-    items.map(i => ({
-      name: i.Item_Name,
-      taxType: i.Tax_Type,
-      taxAmount: i.Tax_Amount
-    }))
+  const hasDiscountColumn = items.some(
+    (item) => Number(item.Discount_Amount || 0) > 0
   );
+  const getLineDiscount = (item, type) => {
+    console.log("type inside getLineDiscount", type);
+    const price = Number(
+      item.Sale_Price || item.Purchase_Price || 0
+    );
 
+    const qty = Number(item.Quantity || 0);
+
+    if (type === "credit") {
+      const discount = Number(
+        item.Discount_On_Sale_Price || 0
+      );
+
+      return item.Discount_Type_On_Sale_Price === "Percentage"
+        ? (price * qty * discount) / 100
+        : discount * qty;
+    }
+
+    const discount = Number(
+      item.Discount_On_Purchase_Price || 0
+    );
+
+    return item.Discount_Type_On_Purchase_Price === "Percentage"
+      ? (price * qty * discount) / 100
+      : discount * qty;
+  };
   console.log("showTaxColumns =", showTaxColumns);
   return (
     <div
@@ -332,15 +348,16 @@ const itemsSum = items.reduce(
             {companyName}
           </div>
 
-          <div>
+          <div className="invoice-company-address">
             {companyAddress}
           </div>
+
 
           <div>
             Phone no.: {companyPhone} Email: {companyEmail}
           </div>
 
-         
+
           <div>
             GSTIN: {companyGSTIN}
           </div>
@@ -514,12 +531,14 @@ const itemsSum = items.reduce(
               Price/ Unit
             </th>
 
-            {/* <th
-              className="invoice-table-header"
-              style={{ width: "13%" }}
-            >
-              Taxable amount
-            </th> */}
+            {hasDiscountColumn && (
+              <th
+                className="invoice-table-header"
+                style={{ width: "12%" }}
+              >
+                Discount
+              </th>
+            )}
             {showTaxColumns && (
               <th
                 className="invoice-table-header"
@@ -529,19 +548,7 @@ const itemsSum = items.reduce(
               </th>
             )}
 
-            {/* <th
-              className="invoice-table-header"
-              style={{ width: "10%" }}
-            >
-              CGST
-            </th>
 
-            <th
-              className="invoice-table-header"
-              style={{ width: "10%" }}
-            >
-              SGST
-            </th> */}
             {showTaxColumns && (
               <>
                 <th className="invoice-table-header" style={{ width: "10%" }}>
@@ -607,11 +614,32 @@ const itemsSum = items.reduce(
 
                 <td className="invoice-item-right">
                   ₹ {money(
-                    type === "sale"
+                    type === "credit"
                       ? item.Sale_Price
                       : item.Purchase_Price
                   )}
                 </td>
+                {hasDiscountColumn && (
+                  <td className="invoice-item-right">
+                    {getLineDiscount(item, type) > 0 ? (
+                      type === "credit" ? (
+                        item.Discount_Type_On_Sale_Price === "Percentage"
+                          ? `${item.Discount_On_Sale_Price}% (₹${money(
+                            getLineDiscount(item, type)
+                          )})`
+                          : `₹${money(getLineDiscount(item, type))}`
+                      ) : (
+                        item.Discount_Type_On_Purchase_Price === "Percentage"
+                          ? `${item.Discount_On_Purchase_Price}% (₹${money(
+                            getLineDiscount(item, type)
+                          )})`
+                          : `₹${money(getLineDiscount(item, type))}`
+                      )
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                )}
 
                 {/* <td className="invoice-item-right">
                   ₹ {money(item.Amount)}
@@ -673,11 +701,11 @@ const itemsSum = items.reduce(
 
           <tr>
 
-         
+
             <td className="invoice-total-cell"></td>
 
             {/* Item Name column */}
-          <td className="invoice-total-cell "  style={{ textAlign: "left" }}>
+            <td className="invoice-total-cell " style={{ textAlign: "left" }}>
               Total
             </td>
 
@@ -691,6 +719,17 @@ const itemsSum = items.reduce(
             )}
             {/* Price/Unit */}
             <td className="invoice-total-cell"></td>
+            {hasDiscountColumn && (
+              <td className="invoice-total-cell">
+                ₹{" "}
+                {money(
+                  items.reduce(
+                    (sum, item) => sum + getLineDiscount(item, type),
+                    0
+                  )
+                )}
+              </td>
+            )}
             {showTaxColumns && (
               <td className="invoice-total-cell">
                 ₹ {money(
@@ -738,8 +777,8 @@ const itemsSum = items.reduce(
             {/* <td className="invoice-total-cell">
               ₹ {money(Total_Amount)}
             </td> */}
-             <td className="invoice-total-cell">
-              { `₹ ${money(itemsSum)}`}
+            <td className="invoice-total-cell">
+              {`₹ ${money(itemsSum)}`}
             </td>
 
           </tr>
@@ -760,72 +799,72 @@ const itemsSum = items.reduce(
 
 
           {/* <div className="invoice-summary-column"> */}
-            {hasTaxDetails && (<table
-              className="invoice-summary-table"
-              style={{ width: "100%" }}
-            >
-              <thead>
-                <tr>
-                  <td className="invoice-summary-cell">
-                    Tax Details
+          {hasTaxDetails && (<table
+            className="invoice-summary-table"
+            style={{ width: "100%" }}
+          >
+            <thead>
+              <tr>
+                <td className="invoice-summary-cell">
+                  Tax Details
+                </td>
+
+                {taxGroupList.map((g) => (
+                  <td
+                    key={g.halfRate}
+                    className="invoice-summary-cell-right"
+                  >
+                    {g.halfRate}%
                   </td>
+                ))}
+              </tr>
+            </thead>
 
-                  {taxGroupList.map((g) => (
-                    <td
-                      key={g.halfRate}
-                      className="invoice-summary-cell-right"
-                    >
-                      {g.halfRate}%
-                    </td>
-                  ))}
-                </tr>
-              </thead>
+            <tbody>
+              <tr>
+                <td className="invoice-summary-cell">
+                  CGST
+                </td>
 
-              <tbody>
-                <tr>
-                  <td className="invoice-summary-cell">
-                    CGST
+                {taxGroupList.map((g) => (
+                  <td
+                    key={g.halfRate}
+                    className="invoice-summary-cell-right"
+                  >
+                    ₹ {money(g.cgst)}
                   </td>
+                ))}
+              </tr>
 
-                  {taxGroupList.map((g) => (
-                    <td
-                      key={g.halfRate}
-                      className="invoice-summary-cell-right"
-                    >
-                      ₹ {money(g.cgst)}
-                    </td>
-                  ))}
-                </tr>
+              <tr>
+                <td className="invoice-summary-cell">
+                  SGST
+                </td>
 
-                <tr>
-                  <td className="invoice-summary-cell">
-                    SGST
+                {taxGroupList.map((g) => (
+                  <td
+                    key={g.halfRate}
+                    className="invoice-summary-cell-right"
+                  >
+                    ₹ {money(g.sgst)}
                   </td>
-
-                  {taxGroupList.map((g) => (
-                    <td
-                      key={g.halfRate}
-                      className="invoice-summary-cell-right"
-                    >
-                      ₹ {money(g.sgst)}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>)}
-            {/* // : (
+                ))}
+              </tr>
+            </tbody>
+          </table>)}
+          {/* // : (
             //   <div
             //     style={{
             //       border: "1px solid #777",
             //       height: "65px",
             //     }}
             //   /> */}
-            
+
           {/* </div> */}
 
 
 
-          
+
 
 
 
@@ -842,66 +881,12 @@ const itemsSum = items.reduce(
 
           {/* <div className="invoice-summary-column "> */}
 
-            <div className="invoice-summary-header">
-              Amounts
-            </div>
-
-{/* 
-            <table className="invoice-summary-table">
-
-              <tbody>
-
-                <tr>
-
-                  <td className="invoice-summary-cell">
-                    Sub Total
-                  </td>
-
-                  <td className="invoice-summary-cell-right">
-                    ₹ {money(Total_Amount)}
-                  </td>
-
-                </tr>
+          <div className="invoice-summary-header">
+            Amounts
+          </div>
 
 
-
-                <tr>
-                  <td className="invoice-summary-cell">
-                    <div className="invoice-bold">
-                      Total
-                    </div>
-                    <div>
-                      {type === "debit" ? "Received" : "Paid"}
-                    </div>
-                  </td>
-
-                  <td className="invoice-summary-cell-right">
-                    <div className="invoice-bold">
-                      ₹ {money(Total_Amount)}
-                    </div>
-                    
-                    <div>
-                      {type === "debit" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
-                    </div>
-                  </td>
-                </tr>
-
-                <tr>
-
-                  <td className="invoice-summary-cell">
-                    Balance
-                  </td>
-
-                  <td className="invoice-summary-cell-right">
-                    ₹ {money(Balance_Due)}
-                  </td>
-
-                </tr>
-
-              </tbody>
-
-            </table> */}
-            <table className="invoice-summary-table">
+          <table className="invoice-summary-table">
             <tbody>
 
               <tr>
@@ -921,16 +906,28 @@ const itemsSum = items.reduce(
                   </td>
                 </tr>
               )} */}
+              {hasRoundOff && (
+                <tr>
+                  <td className="invoice-summary-cell">
+                    Round Off
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    {Number(Round_Off) < 0 ? "- " : ""}
+                    ₹ {money(Math.abs(Number(Round_Off)))}
+                  </td>
+                </tr>
+              )}
 
               <tr>
                 <td className="invoice-summary-cell">
                   <div className="invoice-bold">Total</div>
-                  <div>{type === "sale" ? "Received" : "Paid"}</div>
+                  <div>{type === "debit" ? "Received" : "Paid"}</div>
                 </td>
                 <td className="invoice-summary-cell-right">
                   <div className="invoice-bold">₹ {money(Total_Amount)}</div>
                   <div>
-                    {type === "sale" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
+                    {type === "debit" ? "₹ " + money(Total_Received) : "₹ " + money(Total_Paid)}
                   </div>
                 </td>
               </tr>
@@ -952,21 +949,21 @@ const itemsSum = items.reduce(
 
 
       </div>
-        <div className="grid grid-cols-2 invoice-bottom-grid">
+      <div className="grid grid-cols-2 invoice-bottom-grid">
 
         <div className="invoice-bottom-left">
           <div className="invoice-words-header">
-              Bill Amount In Words
-            </div>
+            Bill Amount In Words
+          </div>
 
-            <div className="invoice-words">
-              {amountInWords}
-            </div>
+          <div className="invoice-words">
+            {amountInWords}
+          </div>
 
         </div>
 
         <div className="invoice-bottom-right">
-          
+
         </div>
 
       </div>

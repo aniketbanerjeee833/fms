@@ -13,6 +13,7 @@ import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelpe
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 import { getPurchasesForPrint } from "../helpers/printReportHelpers.js";
+import { syncUnitIdsForItem, syncUnitIdsForPurchaseItem } from "../helpers/unitSyncHelper.js";
 
 
 
@@ -506,6 +507,7 @@ const addPurchase = async (req, res, next) => {
       Bill_Date,
       State_Of_Supply,
       Total_Amount,
+      Round_Off,
       Total_Paid,
       Balance_Due,
       splits,
@@ -560,12 +562,13 @@ const addPurchase = async (req, res, next) => {
     const totalAmount = Number(Total_Amount) || 0;
     const totalPaid = validSplits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
     const balanceDue = totalAmount - totalPaid;
-
+    const roundOffValue = Number(Round_Off) || 0
     if (totalPaid > totalAmount) {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: "Received amount should be less than or equal to Total Amount",
+       // message: "Received amount should be less than or equal to Total Amount",
+        message: "Paid amount should be less than or equal to Total Amount",
       });
     }
     if (totalPaid > 0) {
@@ -611,12 +614,12 @@ const addPurchase = async (req, res, next) => {
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase
        (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
-        Total_Amount, Total_Paid, Balance_Due, Terms_Conditions_Id, Terms_Conditions_Description,
+        Total_Amount, Round_Off,Total_Paid, Balance_Due, Terms_Conditions_Id, Terms_Conditions_Description,
         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply),
-        totalAmount, totalPaid, balanceDue, termsId, termsDescription,
+        totalAmount,roundOffValue,totalPaid, balanceDue, termsId, termsDescription,
       ]
     );
 
@@ -994,7 +997,13 @@ try {
         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
         [newPurchaseItemId, pitId]
       );
-     
+     await syncUnitIdsForItem(connection, Item_Id);
+await syncUnitIdsForPurchaseItem(connection, {
+  purchaseItemRowId: pitId,
+  Primary_Unit_Snapshot:   snapshot.Primary_Unit_Snapshot,
+  Secondary_Unit_Snapshot: snapshot.Secondary_Unit_Snapshot,
+  Selected_Unit:           resolvedSelectedUnit,
+});
       await recordItemLedger({
   connection,
   itemId:       Item_Id,
@@ -1417,6 +1426,7 @@ const editPurchase = async (req, res, next) => {
       Bill_Date,
       State_Of_Supply,
       Total_Amount,
+      Round_Off,
       Total_Paid,
       Balance_Due,
       splits,
@@ -1470,12 +1480,14 @@ const editPurchase = async (req, res, next) => {
     const totalAmount = Number(Total_Amount) || 0;
     const totalPaid = validSplits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
     const balanceDue = totalAmount - totalPaid;
+    const roundOffValue = Number(Round_Off) || 0
 
     if (totalPaid > totalAmount) {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: "Received amount should be less than or equal to Total Amount",
+        //message: "Received amount should be less than or equal to Total Amount",
+        message:"Paid amount cannot excedd total amount"
       });
     }
     if (totalPaid > 0) {
@@ -1500,13 +1512,13 @@ const editPurchase = async (req, res, next) => {
     await connection.query(
       `UPDATE add_purchase SET
          Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
-         Total_Amount = ?, Total_Paid = ?, Balance_Due = ?,
+         Total_Amount = ?, Round_Off = ?, Total_Paid = ?, Balance_Due = ?,
          Terms_Conditions_Id = ?, Terms_Conditions_Description = ?,
          updated_at = NOW()
        WHERE Purchase_Id = ?`,
       [
         Party_Id, Bill_Number, Bill_Date, cleanValue(State_Of_Supply),
-        totalAmount, totalPaid, balanceDue,
+        totalAmount,roundOffValue, totalPaid, balanceDue,
         termsId, termsDescription,
         purchaseId,
       ]
@@ -2225,76 +2237,6 @@ for (const line of resolvedLines) {
 
 const oldQtyByItem = new Map();
 
-// for (const old of oldItems) {
-
-//   const rawQty =
-//     Number(old.Quantity) || 0;
-
-//   // Get CURRENT item conversion.
-//   //
-//   // Your rule is that historical conversion rate is
-//   // NOT frozen — old transactions use the item's
-//   // current conversion rate.
-
-//   const snapPrimary = old.Primary_Unit_Snapshot || null;
-// const snapSecondary = old.Secondary_Unit_Snapshot || null;
-
-// let baseQty = rawQty;
-
-// if (snapPrimary && snapSecondary && old.Selected_Unit === snapSecondary) {
-
-//   const [[historicalRate]] =
-//     await connection.query(
-//       `
-//       SELECT Conversion_Rate
-//       FROM item_unit_conversions
-//       WHERE Item_Id = ? AND Primary_Unit = ? AND Secondary_Unit = ?
-//       ORDER BY id DESC
-//       LIMIT 1
-//       `,
-//       [old.Item_Id, snapPrimary, snapSecondary]
-//     );
-
-//   const conversionRate = Number(historicalRate?.Conversion_Rate) || 0;
-
-//   if (conversionRate <= 0) {
-//     await connection.rollback();
-
-//     return res.status(400).json({
-//       success: false,
-//       message:
-//         `Missing historical conversion rate for item ${old.Item_Id} (${snapPrimary} → ${snapSecondary}).`,
-//     });
-//   }
-
-//   baseQty =
-//     rawQty / conversionRate;
-// }
-  
-//   const [[ledgerRow]] = await connection.query(
-//     `
-//     SELECT Base_Qty
-//     FROM item_ledger
-//     WHERE Item_Id = ?
-//       AND Txn_Type = 'Purchase'
-//       AND Source_Id = ?
-//     LIMIT 1
-//     `,
-//     [old.Item_Id, old.id]
-//   );
-
-//   const baseQty = Number(ledgerRow?.Base_Qty) || 0;
-
-//   oldQtyByItem.set(
-//     old.Item_Id,
-//     (oldQtyByItem.get(old.Item_Id) || 0) + baseQty
-//   );
-//   // oldQtyByItem.set(
-//   //   old.Item_Id,
-//   //   (oldQtyByItem.get(old.Item_Id) || 0) +
-//   //     baseQty
-//   // );
-// }
 
 
 // =======================================================
@@ -2378,14 +2320,13 @@ for (const old of oldItems) {
           `
           SELECT Conversion_Rate
           FROM item_unit_conversions
-          WHERE Item_Id = ?
-            AND Primary_Unit = ?
+          WHERE Primary_Unit = ?
             AND Secondary_Unit = ?
           ORDER BY id DESC
           LIMIT 1
           `,
           [
-            old.Item_Id,
+            
             snapPrimary,
             snapSecondary,
           ]
@@ -2498,18 +2439,17 @@ for (const itemId of allItemIds) {
         ["PIT" + id.toString().padStart(3, "0"), id]
       );
 
-      // await recordItemLedger({
-      //   connection,
-      //   itemId: line.Item_Id,
-      //   txnType: "Purchase",
-      //   referenceId: id,
-      //   billId: purchaseId,
-      //   billNumber: Bill_Number,
-      //   partyName: Party_Name,
-      //   quantity: normalizeNumber(line.Quantity) ?? 0,
-      //   rate: normalizeNumber(line.Purchase_Price) ?? null,
-      //   txnDate: Bill_Date,
-      // });
+      await syncUnitIdsForItem(connection,line.Item_Id);
+
+// 🔹 sync purchase item snapshot ids
+await syncUnitIdsForPurchaseItem(connection, {
+  purchaseItemRowId: id,
+  Primary_Unit_Snapshot:line.snapshot.Primary_Unit_Snapshot,
+
+  Secondary_Unit_Snapshot:line.snapshot.Secondary_Unit_Snapshot,
+
+  Selected_Unit:line.resolvedSelectedUnit,
+});
       await recordItemLedger({
   connection,
  itemId: line.Item_Id,
@@ -2846,6 +2786,7 @@ const getSinglePurchase = async (req, res, next) => {
         pu.Bill_Date,
         pu.State_Of_Supply,
         pu.Total_Amount,
+        pu.Round_Off,
         pu.Total_Paid,
         pu.Balance_Due,
         pu.Party_Id,
@@ -2905,10 +2846,51 @@ const getSinglePurchase = async (req, res, next) => {
     // determine historical bill dropdown.
     //
     // =========================================================
+//worked
+  //   const [items] = await connection.query(
+  //     `
+  //    SELECT
+  // pi.Purchase_Items_Id,
+  // pi.Item_Id,
 
-    const [items] = await connection.query(
-      `
-     SELECT
+  // i.Item_Name,
+  // i.Item_HSN,
+  // i.Item_Unit,
+  // i.Item_Category,
+
+  // -- CURRENT MASTER
+  // i.Primary_Unit AS Current_Primary_Unit,
+  // i.Secondary_Unit AS Current_Secondary_Unit,
+  //      i.Conversion_Rate,
+  // pi.Quantity,
+
+  // -- HISTORICAL SNAPSHOT
+  // pi.Primary_Unit_Snapshot,
+  // pi.Secondary_Unit_Snapshot,
+  // pi.Selected_Unit,
+
+  // pi.Purchase_Price,
+  // pi.Discount_On_Purchase_Price,
+  // pi.Discount_Type_On_Purchase_Price,
+  // pi.Tax_Amount,
+  // pi.Tax_Type,
+  // pi.Amount,
+  // pi.created_at
+
+  //     FROM add_purchase_items pi
+
+  //     LEFT JOIN add_item i
+  //       ON pi.Item_Id = i.Item_Id
+
+  //     WHERE pi.Purchase_Id = ?
+
+  //     ORDER BY pi.created_at DESC
+  //     `,
+  //     [purchaseId]
+  //   );
+  const [items] = await connection.query(
+    `
+   SELECT
   pi.Purchase_Items_Id,
   pi.Item_Id,
 
@@ -2917,16 +2899,21 @@ const getSinglePurchase = async (req, res, next) => {
   i.Item_Unit,
   i.Item_Category,
 
-  -- CURRENT MASTER
   i.Primary_Unit AS Current_Primary_Unit,
   i.Secondary_Unit AS Current_Secondary_Unit,
-       i.Conversion_Rate,
+  i.Conversion_Rate,
+
   pi.Quantity,
 
-  -- HISTORICAL SNAPSHOT
-  pi.Primary_Unit_Snapshot,
-  pi.Secondary_Unit_Snapshot,
-  pi.Selected_Unit,
+  -- IDs
+  pi.Primary_Unit_Snapshot_Id,
+  pi.Secondary_Unit_Snapshot_Id,
+  pi.Selected_Unit_Id,
+
+  -- Names from unit master
+  pu.Unit_Shorthand AS Primary_Unit_Snapshot,
+  su.Unit_Shorthand AS Secondary_Unit_Snapshot,
+  sel.Unit_Shorthand AS Selected_Unit,
 
   pi.Purchase_Price,
   pi.Discount_On_Purchase_Price,
@@ -2936,17 +2923,99 @@ const getSinglePurchase = async (req, res, next) => {
   pi.Amount,
   pi.created_at
 
-      FROM add_purchase_items pi
+FROM add_purchase_items pi
 
-      LEFT JOIN add_item i
-        ON pi.Item_Id = i.Item_Id
+LEFT JOIN add_item i
+  ON pi.Item_Id = i.Item_Id
 
-      WHERE pi.Purchase_Id = ?
+LEFT JOIN units pu
+  ON pi.Primary_Unit_Snapshot_Id = pu.id
 
-      ORDER BY pi.created_at DESC
-      `,
-      [purchaseId]
-    );
+LEFT JOIN units su
+  ON pi.Secondary_Unit_Snapshot_Id = su.id
+
+LEFT JOIN units sel
+  ON pi.Selected_Unit_Id = sel.id
+
+WHERE pi.Purchase_Id = ?
+
+ORDER BY pi.created_at DESC`
+    ,
+    [purchaseId]
+  );
+
+//WILL WORK 
+// const [items] = await connection.query(
+//   `
+// SELECT
+//   pi.Purchase_Items_Id,
+//   pi.Item_Id,
+
+//   i.Item_Name,
+//   i.Item_HSN,
+//   i.Item_Category,
+
+//   -- CURRENT ITEM UNIT FROM UNIT MASTER
+//   iu.Unit_Shorthand AS Item_Unit,
+
+//   i.Conversion_Rate,
+
+//   pi.Quantity,
+
+//   -- Snapshot IDs
+//   pi.Primary_Unit_Snapshot_Id,
+//   pi.Secondary_Unit_Snapshot_Id,
+//   pi.Selected_Unit_Id,
+
+//   -- FRONTEND EXPECTS THESE NAMES
+//   pu.Unit_Shorthand  AS Primary_Unit,
+//   su.Unit_Shorthand  AS Secondary_Unit,
+//   sel.Unit_Shorthand AS Selected_Unit,
+
+//   -- Current master units (used by backend logic)
+//   cpu.Unit_Shorthand AS Current_Primary_Unit,
+//   csu.Unit_Shorthand AS Current_Secondary_Unit,
+
+//   pi.Purchase_Price,
+//   pi.Discount_On_Purchase_Price,
+//   pi.Discount_Type_On_Purchase_Price,
+//   pi.Tax_Amount,
+//   pi.Tax_Type,
+//   pi.Amount,
+//   pi.created_at
+
+// FROM add_purchase_items pi
+
+// LEFT JOIN add_item i
+//   ON pi.Item_Id = i.Item_Id
+
+// -- Historical snapshot units
+// LEFT JOIN units pu
+//   ON pi.Primary_Unit_Snapshot_Id = pu.id
+
+// LEFT JOIN units su
+//   ON pi.Secondary_Unit_Snapshot_Id = su.id
+
+// LEFT JOIN units sel
+//   ON pi.Selected_Unit_Id = sel.id
+
+// -- Current master units
+// LEFT JOIN units cpu
+//   ON i.Primary_Unit_Id = cpu.id
+
+// LEFT JOIN units csu
+//   ON i.Secondary_Unit_Id = csu.id
+
+// -- Current item unit
+// LEFT JOIN units iu
+//   ON i.Item_Unit_Id = iu.id
+
+// WHERE pi.Purchase_Id = ?
+
+// ORDER BY pi.created_at DESC
+// `,
+//   [purchaseId]
+// );
 
     // =========================================================
     // 4. FETCH ALL UNITS FROM UNIT MASTER
@@ -3013,51 +3082,7 @@ const getSinglePurchase = async (req, res, next) => {
       //
       // =======================================================
 
-      // if (it.Primary_Unit_Snapshot) {
-      //   const snapshotUnits = [
-      //     it.Primary_Unit_Snapshot,
-      //     it.Secondary_Unit_Snapshot,
-      //   ].filter(Boolean);
-
-      //   availableUnits = snapshotUnits.map(
-      //     (unitCode) => {
-      //       // Get full unit name from unit master if it
-      //       // still exists there.
-      //       const masterUnit = allUnits.find(
-      //         (unit) =>
-      //           unit.Unit_Shorthand === unitCode
-      //       );
-
-      //       return {
-      //         Unit_Shorthand: unitCode,
-
-      //         // If old unit was removed from master,
-      //         // still preserve/display its shorthand.
-      //         Unit_Name:
-      //           masterUnit?.Unit_Name || unitCode,
-      //       };
-      //     }
-      //   );
-      // }
-
-     
-
-      // else {
-      //   availableUnits = [
-      //     {
-      //       Unit_Shorthand: null,
-      //       Unit_Name: "None",
-      //     },
-
-      //     ...allUnits.map((unit) => ({
-      //       Unit_Shorthand:
-      //         unit.Unit_Shorthand,
-
-      //       Unit_Name:
-      //         unit.Unit_Name,
-      //     })),
-      //   ];
-      // }
+ 
 // =======================================================
 // DECIDE WHICH UNITS EDIT PURCHASE SHOULD SHOW
 // =======================================================
@@ -3071,8 +3096,7 @@ const oldSecondary =
 const oldSelected =
   it.Selected_Unit || null;
 
-const currentPrimary =
-  it.Current_Primary_Unit || null;
+const currentPrimary =it.Current_Primary_Unit || null;
 
 const currentSecondary =it.Current_Secondary_Unit || null;
 const price = Number(it.Purchase_Price || 0);
@@ -3224,15 +3248,12 @@ availableUnits = unitCodes.map((unitCode) => {
           it.Discount_Type_On_Purchase_Price,
 
         Tax_Amount:it.Tax_Amount,
-         Discount_Amount: Number(
-          discountAmount.toFixed(2)
-        ),
+         Discount_Amount: Number(discountAmount.toFixed(2)),
 
         Tax_Type:
           it.Tax_Type,
 
-        Amount:
-          it.Amount,
+        Amount:it.Amount,
 
         created_at:
           it.created_at,
@@ -3304,22 +3325,17 @@ availableUnits = unitCodes.map((unitCode) => {
         GSTIN:
           purchaseHeader.GSTIN,
 
-        State_Of_Supply:
-          purchaseHeader.State_Of_Supply,
-          State:
-          purchaseHeader.State,
+        State_Of_Supply:purchaseHeader.State_Of_Supply,
+          State:purchaseHeader.State,
 
-        Bill_Number:
-          purchaseHeader.Bill_Number,
+        Bill_Number:purchaseHeader.Bill_Number,
 
-        Bill_Date:
-          purchaseHeader.Bill_Date,
+        Bill_Date:purchaseHeader.Bill_Date,
 
-        Total_Amount:
-          purchaseHeader.Total_Amount,
+        Total_Amount:purchaseHeader.Total_Amount,
+        Round_Off:purchaseHeader.Round_Off,
 
-        Total_Paid:
-          purchaseHeader.Total_Paid,
+        Total_Paid:purchaseHeader.Total_Paid,
 
         Balance_Due: purchaseHeader.Balance_Due,
 

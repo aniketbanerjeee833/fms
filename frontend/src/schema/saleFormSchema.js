@@ -91,6 +91,14 @@ export const saleFormSchema = z.object({
   State_Of_Supply: z.string().nullable().optional(),
   // 🔹 Auto-calculated but cannot be empty
    Total_Amount: digitsOnly("Total_Amount", false).default(0),
+    Round_Off: z
+  .union([z.string(), z.number()])
+  .optional()
+  .transform((val) => {
+    if (val === "" || val === undefined || val === null) return 0;
+    const n = Number(val);
+    return isNaN(n) ? 0 : n;
+  }),
     Balance_Due: digitsOnly("Balance_Due", false).default(0),
 
   // 🔹 Optional but digits if provided

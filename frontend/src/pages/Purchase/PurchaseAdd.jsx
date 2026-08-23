@@ -9,7 +9,7 @@ import { useRef } from "react";
 import { useEffect } from "react";
 
 import {
-  useAddPurchaseMutation, useUploadPurchaseBillMutation
+  useAddPurchaseMutation
 } from "../../redux/api/purchaseApi";
 import { toast } from "react-toastify";
 
@@ -85,7 +85,7 @@ export default function PurchaseAdd() {
   const [showPartyModal, setShowPartyModal] = useState(false);
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
-  const [originalTotal, setOriginalTotal] = useState(null);
+  //const [originalTotal, setOriginalTotal] = useState(null);
   // const[chequeNumber,setChequeNumber]=useState(false);
   // const[neftNumber,setNeftNumber]=useState(false);
   // const [paymentType, setPaymentType] = useState("")
@@ -98,6 +98,7 @@ export default function PurchaseAdd() {
   const [showBankModal, setShowBankModal] = useState(false);
   const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
   //console.log(termsTemplates, "termsTemplates");
+  const [isRoundOff, setIsRoundOff] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
 
 
@@ -110,35 +111,7 @@ export default function PurchaseAdd() {
       return
     }
     else if (newCategory.trim() !== "") {
-      // try {
-      //   // ✅ Call backend
-      //   const res = await addCategory({
-      //     body: { Item_Category: newCategory.trim() },
-      //   });
 
-      //   // Some RTK Query wrappers put the response under `.data`
-      //   const data = res?.data || res;
-
-      //   if (data?.success) {
-      //     const addedCat = newCategory.trim();
-
-      //     // ✅ Auto-select the new category (single value)
-      //     //setSelected(addedCat);
-      //     setValue("Item_Category", addedCat); // directly set single category
-
-      //     // ✅ Refresh cache
-      //     dispatch(itemApi.util.invalidateTags(["Category"]));
-
-      //     // ✅ Reset showTermsConditionsModal & input
-      //     setShowModal(false);
-      //     // setNewCategory("");
-      //     // setOpen(true);
-      //   } else {
-      //     console.warn("⚠️ Category not added. Response:", data);
-      //   }
-      // } catch (err) {
-      //   console.error("❌ Error adding category:", err);
-      // }
       try {
         const data = await addCategory({
           body: { Item_Category: newCategory.trim() },
@@ -245,6 +218,7 @@ export default function PurchaseAdd() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
+      Round_Off: "",   // 🔹 was "0.00"
       Terms_Conditions_Id: null,
       Terms_Conditions_Description: "",
       //Payment_Type: "Cash",
@@ -284,66 +258,7 @@ export default function PurchaseAdd() {
     control,
     name: "splits",
   });
-  const handleAddRow = () => {
-    setRows((prev) => [
-      // only close CategoryOpen, preserve lock states
-      ...prev.map((row) => ({
-        ...row,
-        CategoryOpen: false,
-        itemOpen: false, // also close item dropdown if open,
-        addUnitModalOpen: false,
-        unitOpen: false
-      })),
-      {
-        itemSearch: "",
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: false,
-        isUnitLocked: false,
-        isExistingItem: false,
-        categorySearch: "",
-        addUnitModalOpen: false,
-        unitOpen: false,
-        unitSearch: "",
-      },
-    ]);
 
-    append({
-      Item_Category: "",
-      Item_Name: "",
-      Item_HSN: "",
-      Quantity: "",
-      Item_Unit: "",
-      Purchase_Price: "",
-      Discount_On_Purchase_Price: "",
-      Discount_Type_On_Purchase_Price: "Percentage",
-      Tax_Type: "None",
-      Tax_Amount: "",
-      Amount: "",
-    });
-  };
-
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
-
-    // 2. calculate new total excluding the deleted row
-    const newTotal = currentItems.reduce((sum, row, idx) => {
-      if (idx === i) return sum;                    // skip deleted row
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
-
-    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-    const newBalanceDue = newTotal - currentTotalPaid;
-
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
-
-    // 4. update totals
-    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  };
 
   // const handleDeleteRow = (i) => {
   //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
@@ -392,29 +307,131 @@ export default function PurchaseAdd() {
       Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
+  const getRawTotal = () => {
+    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  };
 
+  const applyRoundOff = (roundOffValue) => {
+    const rawTotal = getRawTotal();
+    const totalPaid = Number(watch("Total_Paid")) || 0;
+    const newTotal = rawTotal + roundOffValue;
 
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  };
+  const syncTotalsAfterItemChange = () => {
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      applyRoundOff(currentRoundOff);
+    } else {
+      const rawTotal = getRawTotal();
+      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+  };
+  const handleAddRow = () => {
+    setRows((prev) => [
+      // only close CategoryOpen, preserve lock states
+      ...prev.map((row) => ({
+        ...row,
+        CategoryOpen: false,
+        itemOpen: false, // also close item dropdown if open,
+        addUnitModalOpen: false,
+        unitOpen: false
+      })),
+      {
+        itemSearch: "",
+        itemOpen: false,
+        CategoryOpen: false,
+        isHSNLocked: false,
+        isUnitLocked: false,
+        isExistingItem: false,
+        categorySearch: "",
+        addUnitModalOpen: false,
+        unitOpen: false,
+        unitSearch: "",
+      },
+    ]);
 
+    append({
+      Item_Category: "",
+      Item_Name: "",
+      Item_HSN: "",
+      Quantity: "",
+      Item_Unit: "",
+      Purchase_Price: "",
+      Discount_On_Purchase_Price: "",
+      Discount_Type_On_Purchase_Price: "Percentage",
+      Tax_Type: "None",
+      Tax_Amount: "",
+      Amount: "",
+    });
+  };
 
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   //const currentItems = watch("items");
 
+  //   // 2. calculate new total excluding the deleted row
+  //   // const newTotal = currentItems.reduce((sum, row, idx) => {
+  //   //   if (idx === i) return sum;                    // skip deleted row
+  //   //   return sum + parseFloat(row.Amount || 0);
+  //   // }, 0);
 
-  //const itemsValues = watch("items"); // watch all rows
+  //   //const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+  //   //const newBalanceDue = newTotal - currentTotalPaid;
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals
+  //   syncTotalsAfterItemChange();
+  //   // setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+  //   // setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  // };
+
+  const handleDeleteRow = (i) => {
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new raw total excluding the deleted row
+    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals — respecting Round Off if active
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      const newTotal = newRawTotal + currentRoundOff;
+      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+
+    // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
+    // if (isTotalPaid) {
+    //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
+    //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
+    //   if ((watch("splits") || []).length === 1) {
+    //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    //   }
+    // }
+  };
+
   const formValues = watch();
 
-  // const handleSelect = (rowIndex, categoryName) => {
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[rowIndex] = {
-  //       ...updated[rowIndex],
-  //       Item_Category: categoryName,
-  //       CategoryOpen: false,
-  //       isExistingItem: false,   // user-typed, so still editable
-  //     };
-  //     return updated;
-  //   });
 
-  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  // };
 
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
@@ -748,123 +765,154 @@ export default function PurchaseAdd() {
   // const paymentType = watch("Payment_Type", "");
   const paymentType = watch("splits.0.Payment_Type");
   console.log("Total Amount:", watch("Total_Amount"));
-  // const formData = new FormData();
 
-  const [file, setFile] = useState(null);
-  const [uploadBill, { isLoading: isUploadBillLoading }] = useUploadPurchaseBillMutation();
+  const calculateTotals = (items = []) => {
+    return items.reduce(
+      (acc, item) => {
+        const qty = Number(item.Quantity) || 0;
+        const price = Number(item.Purchase_Price) || 0;
+
+        const subtotal = qty * price;
+
+        const discountRaw =
+          Number(item.Discount_On_Purchase_Price) || 0;
+
+        const discount =
+          item.Discount_Type_On_Purchase_Price === "Percentage"
+            ? (subtotal * discountRaw) / 100
+            : discountRaw;
+
+        acc.totalQty += qty;
+        acc.totalDiscount += discount;
+        acc.totalTax += Number(item.Tax_Amount) || 0;
+        acc.totalAmount += Number(item.Amount) || 0;
+
+        return acc;
+      },
+      {
+        totalQty: 0,
+        totalDiscount: 0,
+        totalTax: 0,
+        totalAmount: 0,
+      }
+    );
+  };
+  const totals = calculateTotals(itemsValues || []);
+ // const [file, setFile] = useState(null);
+  //const [uploadBill, { isLoading: isUploadBillLoading }] = useUploadPurchaseBillMutation();
   //const [invoiceData,setInvoiceData] = useState(null);
 
 
-  const normalizeDate = (dateStr) => {
+  // const normalizeDate = (dateStr) => {
 
-    if (!dateStr) return "";
+  //   if (!dateStr) return "";
 
-    // replace separators
-    const clean = dateStr.replace(/[./]/g, "-");
+  //   // replace separators
+  //   const clean = dateStr.replace(/[./]/g, "-");
 
-    const parts = clean.split("-");
+  //   const parts = clean.split("-");
 
-    if (parts.length === 3) {
+  //   if (parts.length === 3) {
 
-      let [d, m, y] = parts;
+  //     let [d, m, y] = parts;
 
-      if (y.length === 2) y = "20" + y;
+  //     if (y.length === 2) y = "20" + y;
 
-      if (d.length === 1) d = "0" + d;
-      if (m.length === 1) m = "0" + m;
+  //     if (d.length === 1) d = "0" + d;
+  //     if (m.length === 1) m = "0" + m;
 
-      return `${y}-${m}-${d}`; // HTML date input format
-    }
+  //     return `${y}-${m}-${d}`; // HTML date input format
+  //   }
 
-    // fallback if AI gives text date
-    const parsed = new Date(dateStr);
+  //   // fallback if AI gives text date
+  //   const parsed = new Date(dateStr);
 
-    if (!isNaN(parsed)) {
-      return parsed.toISOString().split("T")[0];
-    }
+  //   if (!isNaN(parsed)) {
+  //     return parsed.toISOString().split("T")[0];
+  //   }
 
-    return "";
-  };
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
+  //   return "";
+  // };
+  // const handleFileChange = (e) => {
+  //   setFile(e.target.files[0]);
+  // };
 
-  const uploadInvoice = async () => {
+  // const uploadInvoice = async () => {
 
-    if (!file) {
-      alert("Please select invoice image");
-      return;
-    }
+  //   if (!file) {
+  //     alert("Please select invoice image");
+  //     return;
+  //   }
 
-    try {
+  //   try {
 
-      const formData = new FormData();
-      formData.append("bill", file);
+  //     const formData = new FormData();
+  //     formData.append("bill", file);
 
-      const res = await uploadBill({
-        body: formData,
-      }).unwrap();
+  //     const res = await uploadBill({
+  //       body: formData,
+  //     }).unwrap();
 
-      const data = res.data;
+  //     const data = res.data;
 
-      console.log("AI DATA:", data);
+  //     console.log("AI DATA:", data);
 
-      // const formatDate = (dateStr) => {
-      //   if (!dateStr) return "";
-      //   const [d, m, y] = dateStr.split(".");
-      //   return `${y}-${m}-${d}`;
-      // };
+  //     // const formatDate = (dateStr) => {
+  //     //   if (!dateStr) return "";
+  //     //   const [d, m, y] = dateStr.split(".");
+  //     //   return `${y}-${m}-${d}`;
+  //     // };
 
-      setValue("Party_Name", data.Party_Name || "");
-      setPartySearch(data.Party_Name || "");
-      // setValue("GSTIN", data.GSTIN || "");
-      setShowGSTIN(data.GSTIN || "");
-      setValue("Bill_Number", data.Bill_Number || "");
-      setValue("Bill_Date", normalizeDate(data.Bill_Date));
-      // setValue("Bill_Date", formatDate(data.Bill_Date));
-      setValue("State_Of_Supply", data.State_Of_Supply || "");
-      setValue("Total_Amount", data.Total_Amount || "");
-      setValue("Total_Paid", data.Total_Amount || "");
-      setValue("Balance_Due", 0);
+  //     setValue("Party_Name", data.Party_Name || "");
+  //     setPartySearch(data.Party_Name || "");
+  //     // setValue("GSTIN", data.GSTIN || "");
+  //     setShowGSTIN(data.GSTIN || "");
+  //     setValue("Bill_Number", data.Bill_Number || "");
+  //     setValue("Bill_Date", normalizeDate(data.Bill_Date));
+  //     // setValue("Bill_Date", formatDate(data.Bill_Date));
+  //     setValue("State_Of_Supply", data.State_Of_Supply || "");
+  //     setValue("Total_Amount", data.Total_Amount || "");
+  //     setValue("Total_Paid", data.Total_Amount || "");
+  //     setValue("Balance_Due", 0);
 
-      const formattedItems = (data.items || []).map((item) => ({
-        Item_Category: "",
-        Item_Name: item.Item_Name || "",
-        Item_HSN: item.Item_HSN || "",
-        Quantity: Number(item.Quantity) || 0,
-        Item_Unit: "",
-        Purchase_Price: item.Purchase_Price || "",
-        Discount_On_Purchase_Price: "",
-        Discount_Type_On_Purchase_Price: "Percentage",
-        Tax_Type: "None",
-        Tax_Amount: "",
-        Amount: item.Amount || "",
-      }));
+  //     const formattedItems = (data.items || []).map((item) => ({
+  //       Item_Category: "",
+  //       Item_Name: item.Item_Name || "",
+  //       Item_HSN: item.Item_HSN || "",
+  //       Quantity: Number(item.Quantity) || 0,
+  //       Item_Unit: "",
+  //       Purchase_Price: item.Purchase_Price || "",
+  //       Discount_On_Purchase_Price: "",
+  //       Discount_Type_On_Purchase_Price: "Percentage",
+  //       Tax_Type: "None",
+  //       Tax_Amount: "",
+  //       Amount: item.Amount || "",
+  //     }));
 
-      remove();
-      formattedItems.forEach(item => append(item));
+  //     remove();
+  //     formattedItems.forEach(item => append(item));
 
-      setRows(
-        formattedItems.map((item) => ({
-          itemSearch: item.Item_Name,
-          Item_HSN: item.Item_HSN || "",
-          itemOpen: false,
-          CategoryOpen: false,
-          isHSNLocked: false,
-          isUnitLocked: false,
-          isExistingItem: false,
-          categorySearch: "",
-          addUnitModalOpen: false
-        }))
-      );
+  //     setRows(
+  //       formattedItems.map((item) => ({
+  //         itemSearch: item.Item_Name,
+  //         Item_HSN: item.Item_HSN || "",
+  //         itemOpen: false,
+  //         CategoryOpen: false,
+  //         isHSNLocked: false,
+  //         isUnitLocked: false,
+  //         isExistingItem: false,
+  //         categorySearch: "",
+  //         addUnitModalOpen: false
+  //       }))
+  //     );
 
-      alert("Invoice scanned successfully");
+  //     alert("Invoice scanned successfully");
 
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed");
-    }
-  };
+  //   } catch (err) {
+  //     console.error(err);
+  //     alert("Upload failed");
+  //   }
+  // };
   // per-row search + open state
 
 
@@ -1032,7 +1080,7 @@ export default function PurchaseAdd() {
   "
             >
               {/* INVOICE UPLOAD */}
-              <div
+              {/* <div
                 className="
       flex flex-col sm:flex-row
       items-center
@@ -1041,7 +1089,7 @@ export default function PurchaseAdd() {
       w-auto sm:w-auto
     "
               >
-                {/* Hidden File Input  */}
+                
                 <input
                   type="file"
                   accept="image/*"
@@ -1078,7 +1126,7 @@ export default function PurchaseAdd() {
                   <Upload size={18} />
                   {isUploadBillLoading ? "Uploading..." : "Upload"}
                 </button>
-              </div>
+              </div> */}
 
               {/* BUTTONS */}
               <div
@@ -1821,7 +1869,7 @@ export default function PurchaseAdd() {
                                     setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                     setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                     //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                                    setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit, { shouldValidate: true, shouldDirty: true });
                                     basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
                                     basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
                                     const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
@@ -1837,8 +1885,9 @@ export default function PurchaseAdd() {
 
                                     setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                     setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                    syncTotalsAfterItemChange();
+                                    // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                    // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                   } else {
                                     // no match — close dropdown
                                     handleRowChange(i, "itemOpen", false);
@@ -1970,8 +2019,9 @@ export default function PurchaseAdd() {
 
                                             setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                             setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                            setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                            syncTotalsAfterItemChange();
+                                            // setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                            // setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
                                           }}
 
                                           className="hover:bg-gray-100 cursor-pointer border-b"
@@ -1994,10 +2044,10 @@ export default function PurchaseAdd() {
                                           </td>
 
                                           <td className="px-3 py-2" style={{
-                                              padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                              color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                              fontWeight: "500", 
-                                            }}>
+                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                            fontWeight: "500",
+                                          }}>
                                             {it.Item_Type === "Service"
                                               ? ""
                                               : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
@@ -2098,8 +2148,9 @@ export default function PurchaseAdd() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                               setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                             }}
                             placeholder="Qty"
                           />
@@ -2111,200 +2162,7 @@ export default function PurchaseAdd() {
                         </td>
 
 
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
-                          <Controller
-                            control={control}
-                            name={`items.${i}.Item_Unit`}
-                            render={({ field }) => {
-                              const row = rows[i];
-                              const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-                              console.log(row, "row")
-                              return (
-                                <select
-                                  {...field}
-                                  value={field.value || ""}
-                                  className="form-select"
-                                  style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                  //disabled={row?.isUnitLocked}
-                                  onChange={(e) => {
-                                    const newUnit = e.target.value;
 
-                                    if (newUnit === "__ADD_UNIT__") {
-                                      setActiveUnitRow(i);
-                                      setShowAddUnitModal(true);
-                                      return;
-                                    }
-
-                                    const previousUnit = field.value;
-                                    field.onChange(newUnit);
-                                    handleRowChange(i, "Item_Unit", newUnit);
-                                    setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
-                                    //const quantity = Number(itemsValues[i]?.Quantity);
-
-                                    // if (!Number.isFinite(quantity) || quantity <= 0) {
-                                    //   return;
-                                    // }
-                                    // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
-                                    const primaryUnit = row?.Primary_Unit;
-                                    const secondaryUnit = row?.Secondary_Unit;
-                                    const conversionRate = Number(row?.Conversion_Rate) || 0;
-
-                                    if (
-                                      previousUnit &&
-                                      newUnit &&
-                                      previousUnit !== newUnit &&
-                                      primaryUnit &&
-                                      secondaryUnit &&
-                                      conversionRate > 0
-                                    ) {
-                                      //const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
-
-                                      //let newPrice = currentPrice;
-
-                                      // switching FROM primary TO secondary — price per unit gets smaller
-                                      // if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
-                                      //   newPrice = currentPrice / conversionRate;
-                                      // }
-                                      // // switching FROM secondary TO primary — price per unit gets bigger
-                                      // else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
-                                      //   newPrice = currentPrice * conversionRate;
-                                      // }
-
-                                      //const roundedPrice = newPrice.toFixed(2);
-                                      // const basePrice =
-                                      //   Number(basePurchasePriceRef.current[i]) || 0;
-
-                                      // if (basePrice <= 0) {
-                                      //   return;
-                                      // }
-
-                                      // let newPrice = basePrice;
-
-                                      // // =====================================================
-                                      // // PRIMARY → SECONDARY
-                                      // // Example:
-                                      // // ₹45 / Kg
-                                      // // 1 Kg = 1000 Gm
-                                      // // ₹45 / 1000 = ₹0.045
-                                      // // UI allows only 2 decimals → ₹0.05
-                                      // // =====================================================
-
-                                      // if (
-                                      //   previousUnit === primaryUnit &&
-                                      //   newUnit === secondaryUnit
-                                      // ) {
-                                      //   newPrice = basePrice / conversionRate;
-                                      // }
-
-                                      // // =====================================================
-                                      // // SECONDARY → PRIMARY
-                                      // // IMPORTANT:
-                                      // // Do NOT use current displayed price.
-                                      // // Restore original base price.
-                                      // // =====================================================
-
-                                      // else if (
-                                      //   previousUnit === secondaryUnit &&
-                                      //   newUnit === primaryUnit
-                                      // ) {
-                                      //   //newPrice = basePrice;
-                                      //    newPrice = basePrice * conversionRate;
-                                      // }
-
-                                      // else {
-                                      //   return;
-                                      // }
-
-                                      // const roundedPrice = newPrice.toFixed(2);
-                                      //                                       If going to the original unit
-                                      //         ↓
-                                      // Restore basePrice
-
-                                      // Otherwise
-                                      //         ↓
-                                      // Convert basePrice
-                                      const basePrice =
-                                        Number(basePurchasePriceRef.current[i]) || 0;
-
-                                      const baseUnit =
-                                        basePurchaseUnitRef.current[i];
-
-                                      if (basePrice <= 0 || !baseUnit) {
-                                        return;
-                                      }
-
-                                      let newPrice;
-
-                                      if (newUnit === baseUnit) {
-                                        // Restore original entered price
-                                        newPrice = basePrice;
-                                      }
-                                      else if (
-                                        baseUnit === primaryUnit &&
-                                        newUnit === secondaryUnit
-                                      ) {
-                                        // Primary → Secondary
-                                        newPrice = basePrice / conversionRate;
-                                      }
-                                      else if (
-                                        baseUnit === secondaryUnit &&
-                                        newUnit === primaryUnit
-                                      ) {
-                                        // Secondary → Primary
-                                        newPrice = basePrice * conversionRate;
-                                      }
-                                      else {
-                                        return;
-                                      }
-
-                                      const roundedPrice = newPrice.toFixed(2);
-
-
-
-
-                                      setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
-
-                                      // recompute Amount/Tax/Total with the new price
-                                      const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                        { ...itemsValues[i], Purchase_Price: roundedPrice },
-                                        i,
-                                        itemsValues
-                                      );
-
-                                      setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                      setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                      setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                      setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                    }
-                                  }}
-                                >
-                                  {availableUnits.length > 0 ? (
-                                    availableUnits.map((unit) => (
-                                      <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                        {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                      </option>
-                                    ))
-                                  ) : (
-                                    <>
-                                      <option value="">NONE</option>
-                                      {Array.isArray(itemUnits) &&
-                                        itemUnits.map((unit) => (
-                                          <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                            {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                          </option>
-                                        ))}
-                                      <option value="__ADD_UNIT__">➕ Add Unit</option>
-                                    </>
-                                  )}
-                                </select>
-                              );
-                            }}
-                          />
-
-                          {errors?.items?.[i]?.Item_Unit && (
-                            <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
-                          )}
-                        </td> */}
                         <td style={{ padding: "0px", width: "10%" }}>
                           <Controller
                             control={control}
@@ -2603,24 +2461,18 @@ export default function PurchaseAdd() {
                                                       shouldDirty: true,
                                                     }
                                                   );
+                                                  syncTotalsAfterItemChange();
 
-                                                  setValue(
-                                                    "Total_Amount",
-                                                    Total_Amount,
-                                                    {
-                                                      shouldValidate: true,
-                                                      shouldDirty: true,
-                                                    }
-                                                  );
+                                                  // setValue("Total_Amount",Total_Amount,{shouldValidate: true,shouldDirty: true,});
 
-                                                  setValue(
-                                                    "Balance_Due",
-                                                    Balance_Due,
-                                                    {
-                                                      shouldValidate: true,
-                                                      shouldDirty: true,
-                                                    }
-                                                  );
+                                                  // setValue(
+                                                  //   "Balance_Due",
+                                                  //   Balance_Due,
+                                                  //   {
+                                                  //     shouldValidate: true,
+                                                  //     shouldDirty: true,
+                                                  //   }
+                                                  // );
                                                 }
                                               }}
                                               style={{
@@ -2706,59 +2558,15 @@ export default function PurchaseAdd() {
 
                                 setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                               }}
 
                               placeholder="Price"
                             />
 
-                            {/* </div>
-                              {errors?.items?.[i]?.Purchase_Price && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Purchase_Price.message}
-                                </p>
-                              )} */}
 
-                            {/* <input
-  type="text"
-  className="form-control"
-  style={{ width: "100%", marginBottom: "0px" }}
-  {...register(`items.${i}.Purchase_Price`)}
-  onChange={(e) => {
-    let val = e.target.value;
-
-    val = val.replace(/[^0-9.]/g, "");   // allow only digits + dot
-
-    const parts = val.split(".");
-    if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-    if (val.includes(".")) {
-      const [int, dec] = val.split(".");
-      val = int + "." + dec.slice(0, 2);     // limit decimals to 2
-    }
-
-    e.target.value = val;
-
-    const priceNumber = Number(val) || 0; // convert safely
-
-    setValue(`items.${i}.Purchase_Price`, priceNumber, { shouldValidate: true });
-
-    if (!itemsValues[i]?.Item_Name?.trim()) return;
-
-    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-      { ...itemsValues[i], Purchase_Price: priceNumber }, // numeric value
-      i,
-      itemsValues
-    );
-
-    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-    setValue(`items.${i}.Amount`, Amount);
-    setValue("Total_Amount", Total_Amount);
-    setValue("Balance_Due", Balance_Due);
-  }}
-  placeholder="Price"
-/> */}
 
                           </div>
                           {errors?.items?.[i]?.Purchase_Price && (
@@ -2803,8 +2611,9 @@ export default function PurchaseAdd() {
 
                                 setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                               }}
 
                               placeholder="Discount"
@@ -2830,8 +2639,9 @@ export default function PurchaseAdd() {
 
                                     setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                     setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                    syncTotalsAfterItemChange();
+                                    // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                    // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                   }}
                                 >
                                   <option value="Percentage">%</option>
@@ -2867,8 +2677,9 @@ export default function PurchaseAdd() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 }}
                               >
                                 <option value="None">None</option>
@@ -2918,7 +2729,34 @@ export default function PurchaseAdd() {
                     )
                   })}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>Total</td>
+                    <td></td>
 
+                    <td className="text-right">
+                      {totals.totalQty}
+                    </td>
+
+                    <td></td>
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalDiscount.toFixed(2)}
+                    </td>
+
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalTax.toFixed(2)}
+                    </td>
+
+                    <td className="text-right">
+                      ₹{totals.totalAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
 
               </table>
               <div className="flex sm:w-1/4 p-2">
@@ -2931,6 +2769,21 @@ export default function PurchaseAdd() {
                   + Add Row
                 </button>
               </div>
+              {/* <div className="flex justify-end w-full px-2 py-2 gap-6 border-t">
+                <div className="flex flex-col items-end">
+                  <span className="text-xsuppercase tracking-wide">Tax Amount</span>
+                  <span className="font-bold">
+                    ₹{(itemsValues || []).reduce((sum, it) => sum + (Number(it.Tax_Amount) || 0), 0).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-end">
+                  <span className="text-xsuppercase tracking-wide">Total Amount</span>
+                  <span className="font-bold" >
+                    ₹{(itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0).toFixed(2)}
+                  </span>
+                </div>
+              </div> */}
               <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
 
 
@@ -3183,7 +3036,7 @@ export default function PurchaseAdd() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -3242,6 +3095,46 @@ export default function PurchaseAdd() {
                           setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div> */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={isRoundOff}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setIsRoundOff(isChecked);
+
+                          const rawTotal = getRawTotal();
+
+                          if (isChecked) {
+                            const rounded = Math.round(rawTotal);
+                            const diff = Number((rounded - rawTotal).toFixed(2));
+                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(diff);
+                          } else {
+                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(0);
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                      <input
+                        type="text"
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="border border-gray-300 text-right text-sm"
+                        {...register("Round_Off")}
+                        disabled={!isRoundOff}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                          const numVal = parseFloat(val) || 0;
+                          applyRoundOff(numVal);
+                        }}
                       />
                     </div>
 

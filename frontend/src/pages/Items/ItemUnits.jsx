@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Search, Package, Tags, Eye, Trash2, MoreVertical } from "lucide-react";
 
 import {
+    itemApi,
     useGetAllItemUnitsCursorQuery,
 
     useGetAllItemUnitsQuery,
@@ -12,11 +13,13 @@ import {
 
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import SelectUnitModal from "../../components/Modal/SelectUnitModal";
+import { useDispatch } from "react-redux";
 
 /* ════════════════════════════════════════════════════════════
    MAIN PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ItemUnits() {
+    const dispatch = useDispatch();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const selectedUnitId = searchParams.get("unitId") || null;
@@ -26,7 +29,9 @@ export default function ItemUnits() {
     const [showAddUnitModal, setShowAddUnitModal] = useState(false);
     const [showSelectUnitModal, setShowSelectUnitModal] = useState(false)
     const { data: itemUnits } = useGetAllItemUnitsQuery();
+    const [editingUnit, setEditingUnit] = useState(null);
     // ── LEFT — units cursor pagination ──────────────────────────
+    const [resetKey, setResetKey] = useState(0);
     const [leftCursor, setLeftCursor] = useState(null);
     const leftSentinelRef = useRef(null);
     const leftObserverRef = useRef(null);
@@ -35,12 +40,31 @@ export default function ItemUnits() {
         data: unitsResponse,
         isLoading: isUnitsLoading,
         isFetching: isUnitsFetching,
-    } = useGetAllItemUnitsCursorQuery({ cursor: leftCursor, search: unitSearch, limit: 10 });
+         // 🔹 part of the query args now
+        //refetch: refetchUnits
+    } = useGetAllItemUnitsCursorQuery({ cursor: leftCursor, search: unitSearch, limit: 10 ,resetKey});
     console.log(unitsResponse, "unitsResponse");
-    const units = unitsResponse?.units || [];
-    const totalUnits = unitsResponse?.totalUnits || 0;
-    const unitsHasMore = unitsResponse?.hasMore ?? false;
-    const unitsNextCursor = unitsResponse?.nextCursor ?? null;
+      const [displayUnits, setDisplayUnits] = useState([]);
+  const [displayTotal, setDisplayTotal] = useState(0);
+  const [displayHasMore, setDisplayHasMore] = useState(false);
+  const [displayNextCursor, setDisplayNextCursor] = useState(null);
+
+  useEffect(() => {
+    if (!unitsResponse) return;   // don't clear on the brief undefined gap
+    setDisplayUnits(unitsResponse.units || []);
+    setDisplayTotal(unitsResponse.totalUnits || 0);
+    setDisplayHasMore(unitsResponse.hasMore ?? false);
+    setDisplayNextCursor(unitsResponse.nextCursor ?? null);
+  }, [unitsResponse]);
+
+  const units            = displayUnits;
+  const totalUnits        = displayTotal;
+  const unitsHasMore      = displayHasMore;
+  const unitsNextCursor   = displayNextCursor;
+    // const units = unitsResponse?.units || [];
+    // const totalUnits = unitsResponse?.totalUnits || 0;
+    // const unitsHasMore = unitsResponse?.hasMore ?? false;
+    // const unitsNextCursor = unitsResponse?.nextCursor ?? null;
 
     useEffect(() => { setLeftCursor(null); }, [unitSearch]);
 
@@ -79,7 +103,7 @@ export default function ItemUnits() {
         data: conversionsResponse,
         isLoading: isConversionsLoading,
         isFetching: isConversionsFetching,
-       // refetch: refetchConversions
+        // refetch: refetchConversions
     } = useGetUnitConversionsQuery({ unitId: selectedUnitId, cursor: effectiveRightCursor, search: conversionSearch });
     console.log(conversionsResponse, "conversionsResponse");
     const conversions = conversionsResponse?.conversions || [];
@@ -239,6 +263,21 @@ export default function ItemUnits() {
                                     <div
                                         key={unit.id}
                                         onClick={() => handleSelectUnit(unit)}
+                                        // onDoubleClick={() => {
+                                        //     handleSelectUnit(unit);
+                                        //     setShowAddUnitModal(true);
+                                        //     setEditingUnit(unit);
+                                        //     //setShowEditItemModal(true);
+                                        //     setUnitMenuOpen(null);
+                                        // }}
+                                        onDoubleClick={() => {
+                                            if (Number(unit.Is_System) === 1 ||  Number(unit.Is_Used) === 1) return;
+
+                                            handleSelectUnit(unit);
+                                            setEditingUnit(unit);
+                                            setShowAddUnitModal(true);
+                                            setUnitMenuOpen(null);
+                                        }}
                                         className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                                         style={{
                                             backgroundColor: isSelected ? "#f0f9ff" : "transparent",
@@ -283,8 +322,9 @@ export default function ItemUnits() {
                                         </div>
 
                                         {/* SHOW MENU ONLY WHEN System = 0 AND Is_Used = 0 */}
-                                        {/* {Number(unit.Is_System) === 0 &&
-                                            Number(unit.Is_Used) === 0 && (
+                                        {/* Number(unit.Is_Used) === 0 && */}
+                                        {Number(unit.Is_System) === 0 && Number(unit.Is_Used) === 0 &&
+                                            (
                                                 <div
                                                     style={{ position: "relative" }}
                                                     onClick={(e) => e.stopPropagation()}
@@ -325,8 +365,12 @@ export default function ItemUnits() {
                                                                 type="button"
                                                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                                                                 onClick={() => {
-                                                                    setUnitMenuOpen(null);
+
                                                                     //handleEditUnit(unit);
+                                                                    handleSelectUnit(unit);
+                                                                    setEditingUnit(unit);
+                                                                    setShowAddUnitModal(true);
+                                                                    setUnitMenuOpen(null);
                                                                 }}
                                                             >
                                                                 <Eye
@@ -335,7 +379,7 @@ export default function ItemUnits() {
                                                                 />
                                                                 Edit
                                                             </button>
-
+{/* 
                                                             <button
                                                                 type="button"
                                                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -350,11 +394,11 @@ export default function ItemUnits() {
                                                                     style={{ color: "#dc2626" }}
                                                                 />
                                                                 Delete
-                                                            </button>
+                                                            </button> */}
                                                         </div>
                                                     )}
                                                 </div>
-                                            )} */}
+                                            )}
                                     </div>
                                 );
                             })
@@ -510,7 +554,55 @@ export default function ItemUnits() {
 
                 </div>
             </div>
+            {/* {showAddUnitModal && (
+                <AddUnitModal
+                    initialData={editingUnit}
+                    onClose={() => {
+                        setShowAddUnitModal(false);
+                        setEditingUnit(null);
+                    }}
+                    onSave={(savedUnit) => {
+                        setShowAddUnitModal(false);
+                        setEditingUnit(null);
 
+                        if (savedUnit?.id) {
+                            const next = new URLSearchParams(searchParams);
+                            next.set("unitId", savedUnit.id);
+                            setSearchParams(next);
+                        }
+                        refetchUnits();
+                    }}
+                />
+            )} */}
+            {showAddUnitModal && (
+                <AddUnitModal
+                    initialData={editingUnit}
+                    onClose={() => {
+                        setShowAddUnitModal(false);
+                        setEditingUnit(null);
+                    }}
+                    onSave={(savedUnit) => {
+                        setShowAddUnitModal(false);
+                        setEditingUnit(null);
+                        dispatch(itemApi.util.invalidateTags(["Unit"]));
+                        // 🔹 reset cursor to null FIRST — forces merge() to replace, not append
+                        setLeftCursor(null);
+                         setResetKey((k) => k + 1);  
+
+                        if (savedUnit?.id) {
+                            const next = new URLSearchParams(searchParams);
+                            next.set("unitId", savedUnit.id);
+                            setSearchParams(next);
+                        }
+
+                        // refetchUnits() no longer strictly needed since cursor reset
+                        // + RTK's invalidatesTags already triggers a refetch automatically —
+                        // but harmless to keep as a belt-and-suspenders call
+                        //refetchUnits();
+                    }}
+                />
+            )}
+            {/* 
             {showAddUnitModal && (
                 <AddUnitModal
                     onClose={() => setShowAddUnitModal(false)}
@@ -523,7 +615,7 @@ export default function ItemUnits() {
                         }
                     }}
                 />
-            )}
+            )} */}
             {showSelectUnitModal && (
                 <SelectUnitModal
                     units={itemUnits || []}

@@ -26,6 +26,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     Phone_Number,
     State_Of_Supply,
     Total_Amount,
+    Round_Off,
     Total_Paid,
     Total_Received,
     Balance_Due,
@@ -71,13 +72,6 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       maximumFractionDigits: 2,
     });
 
-  // const formattedDate = Bill_Date
-  //   ? new Date(Bill_Date).toLocaleDateString("en-IN", {
-  //     day: "2-digit",
-  //     month: "2-digit",
-  //     year: "numeric",
-  //   })
-  //   : "-";
 
   // =========================================================
   // TAX
@@ -137,6 +131,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     0
   );
 
+const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
   //const roundOff = Number(Total_Amount || 0) - itemsSum;
 
   // =========================================================
@@ -291,6 +286,31 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   //   (item) => Number(getTaxAmount(item)) > 0
   // );
   //const hasTax = taxGroupList.length > 0;  // true if ANY item has GST
+  const getLineDiscount = (item, type) => {
+    const price = Number(
+      item.Sale_Price || item.Purchase_Price || 0
+    );
+
+    const qty = Number(item.Quantity || 0);
+
+    if (type === "sale") {
+      const discount = Number(
+        item.Discount_On_Sale_Price || 0
+      );
+
+      return item.Discount_Type_On_Sale_Price === "Percentage"
+        ? (price * qty * discount) / 100
+        : discount * qty;
+    }
+
+    const discount = Number(
+      item.Discount_On_Purchase_Price || 0
+    );
+
+    return item.Discount_Type_On_Purchase_Price === "Percentage"
+      ? (price * qty * discount) / 100
+      : discount * qty;
+  };
   return (
     <div
       ref={ref}
@@ -443,41 +463,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             {/* BILL DETAILS */}
 
-            {/* <td className="invoice-cell invoice-cell-right">
 
-              {/* <div>
-                Bill No. : {safe(Bill_Number, Purchase_Id)}
-              </div>
-
-              <div>
-                Date : {formattedDate}
-              </div> 
-              <div>
-                {type === "sale" ? "Invoice No." : "Bill No."} :{" "}
-                {safe(documentNumber)}
-              </div>
-
-              <div>
-                {type === "sale" ? "Date" : "Date"} :{" "}
-                {documentDate
-                  ? new Date(documentDate).toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })
-                  : "-"}
-              </div>
-
-              {/* <div>
-                Place of supply:{" "}
-                {safe(State_Of_Supply, "19-West Bengal")}
-              </div> 
-
-              <div>
-                Place of Supply: {formatState(State_Of_Supply)}
-              </div>
-
-            </td> */}
 
           </tr>
         </tbody>
@@ -615,6 +601,8 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             const isTaxable = gstRate > 0 && taxAmount > 0;
 
+
+
             return (
               <tr key={item.Sale_Items_Id || item.Purchase_Items_Id || idx}>
                 <td className="invoice-item-center">{idx + 1}</td>
@@ -650,6 +638,27 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   )}
                 </td>
                 {hasDiscountColumn && (
+                  <td className="invoice-item-right">
+                    {getLineDiscount(item, type) > 0 ? (
+                      type === "sale" ? (
+                        item.Discount_Type_On_Sale_Price === "Percentage"
+                          ? `${item.Discount_On_Sale_Price}% (₹${money(
+                            getLineDiscount(item, type)
+                          )})`
+                          : `₹${money(getLineDiscount(item, type))}`
+                      ) : (
+                        item.Discount_Type_On_Purchase_Price === "Percentage"
+                          ? `${item.Discount_On_Purchase_Price}% (₹${money(
+                            getLineDiscount(item, type)
+                          )})`
+                          : `₹${money(getLineDiscount(item, type))}`
+                      )
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                )}
+                {/* {hasDiscountColumn && (
                   <td
                     className="invoice-item-right"
 
@@ -668,7 +677,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                       "-"
                     )}
                   </td>
-                )}
+                )} */}
 
                 {/* <td className="invoice-item-right">
                   ₹ {money(item.Tax_Amount)}
@@ -747,21 +756,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
           <tr>
 
-            {/* <td
-              colSpan={3}
-              className="invoice-total-cell"
-            >
-              Total
-            </td>
 
-
-            <td className="invoice-total-cell">
-              {money(totalQuantity)}
-            </td>
-
-
-            <td className="invoice-item-cell">
-            </td> */}
             <td className="invoice-total-cell"></td>
 
             {/* Item Name column */}
@@ -782,12 +777,23 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             )}
             {/* Price/Unit */}
             <td className="invoice-total-cell"></td>
-            {hasDiscountColumn && (
+            {/* {hasDiscountColumn && (
               <td className="invoice-total-cell">
                 ₹ {money(
                   items.reduce(
                     (sum, item) =>
                       sum + Number(item.Discount_Amount || 0),
+                    0
+                  )
+                )}
+              </td>
+            )} */}
+            {hasDiscountColumn && (
+              <td className="invoice-total-cell">
+                ₹{" "}
+                {money(
+                  items.reduce(
+                    (sum, item) => sum + getLineDiscount(item, type),
                     0
                   )
                 )}
@@ -898,18 +904,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </tr>
               </tbody>
             </table>)}
-          {/* //   : (
-            //   <div
-            //     style={{
-            //       border: "1px solid #777",
-            //       flex: 1,
-            //       //minHeight: "100%",
-            //       //height: "65px",
-            //       //height: "90px"
-            //       height: "100%"
-            //     }}
-            //   />
-            // )} */}
+
         </div>
 
 
@@ -958,6 +953,19 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   </td>
                 </tr>
               )} */}
+             {hasRoundOff && (
+                <tr>
+                  <td className="invoice-summary-cell">
+                    Round Off
+                  </td>
+
+                  <td className="invoice-summary-cell-right">
+                    {Number(Round_Off) < 0 ? "- " : ""}
+                    ₹ {money(Math.abs(Number(Round_Off)))}
+                  </td>
+                </tr>
+              )}
+
 
               <tr>
                 <td className="invoice-summary-cell">
@@ -1045,164 +1053,3 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 export default InvoicePrintTemplate;
 
-{/* {items.map((item, idx) => {
-
-            const taxAmount = getTaxAmount(item);
-
-            const itemCgst = taxAmount / 2;
-
-            const itemSgst = taxAmount / 2;
-
-            const isTaxable =
-              item?.Tax_Type &&
-              item.Tax_Type !== "None" &&
-              taxAmount > 0;
-
-            return (
-              <tr
-                key={item.Purchase_Items_Id || idx}
-              >
-
-               
-
-                <td className="invoice-item-center">
-                  {idx + 1}
-                </td>
-
-
-
-                <td className="invoice-item-cell invoice-bold">
-                  {safe(item.Item_Name)}
-                </td>
-
-
-              
-
-                <td className="invoice-item-cell">
-                  {safe(item.Item_HSN)}
-                </td>
-
-
-                
-
-                <td className="invoice-item-right">
-                  {money(item.Quantity)}
-                  {item.Item_Unit
-                    ? ` ${item.Item_Unit}`
-                    : ""}
-                </td>
-
-
-              
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Purchase_Price)}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Amount)}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(itemCgst)}
-                  {isTaxable ? " (9%)" : ""}
-                </td>
-
-
-              
-
-                <td className="invoice-item-right">
-                  ₹ {money(itemSgst)}
-                  {isTaxable ? " (9%)" : ""}
-                </td>
-
-
-               
-
-                <td className="invoice-item-right">
-                  ₹ {money(item.Amount)}
-                </td>
-
-              </tr>
-            );
-          })} */}
-
-{/* <div className="invoice-bottom-left">
-
-         
-
-
-
-          <div className="invoice-summary-column">
-
-
-
-
-            
-            <table className="invoice-summary-table" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <td className="invoice-summary-cell">Tax Details</td>
-                  {taxGroupList.map((g) => (
-                    <td key={g.halfRate} className="invoice-summary-cell-right">
-                      {g.halfRate}%
-                    </td>
-                  ))}
-               
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="invoice-summary-cell">CGST</td>
-                  {taxGroupList.map((g) => (
-                    <td key={g.halfRate} className="invoice-summary-cell-right">
-                      ₹ {money(g.cgst)}
-                    </td>
-                  ))}
-                 
-                </tr>
-                <tr>
-                  <td className="invoice-summary-cell">SGST</td>
-                  {taxGroupList.map((g) => (
-                    <td key={g.halfRate} className="invoice-summary-cell-right">
-                      ₹ {money(g.sgst)}
-                    </td>
-                  ))}
-                
-                </tr>
-              </tbody>
-            </table>
-
-           
-
-
-
-
-          </div>
-
-
-
-          <div>
-
-            <div className="invoice-words-header">
-              Bill Amount In Words
-            </div>
-
-            <div className="invoice-words">
-              {amountInWords}
-            </div>
-
-          </div>
-
-
-
-
-
-
-        </div> */}

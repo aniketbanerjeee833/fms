@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
 
 import db from "../config/db.js";
 import { getPurchaseReturnsForPrint } from "../helpers/printReportHelpers.js";
-import { recordBankTransaction } from "../utils/bankAccountHelper.js";
-import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+import { syncUnitIdsForItem, syncUnitIdsForPurchaseReturnItem } from "../helpers/unitSyncHelper.js";
+
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import {
@@ -299,6 +299,7 @@ const getPurchaseReturnById = async (req, res, next) => {
          pr.Return_Date,
          pr.State_Of_Supply,
          pr.Total_Amount,
+         pr.Round_Off,
          pr.Total_Received,
          pr.Balance_Due,
          pr.Party_Id,
@@ -335,11 +336,54 @@ const getPurchaseReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
+    //   const [items] = await connection.query(
+    //     `
+    // SELECT
+    //     pri.id,
+
+    //     pri.Item_Id,
+
+    //     i.Item_Name,
+    //     i.Item_HSN,
+    //     i.Item_Unit,
+    //     i.Item_Category,
+
+    //     -- CURRENT MASTER
+    //     i.Primary_Unit AS Current_Primary_Unit,
+    //     i.Secondary_Unit AS Current_Secondary_Unit,
+    //      i.Conversion_Rate,
+
+    //     pri.Quantity,
+
+    //     -- HISTORICAL SNAPSHOT
+    //     pri.Primary_Unit_Snapshot,
+    //     pri.Secondary_Unit_Snapshot,
+    //     pri.Selected_Unit,
+
+    //     pri.Purchase_Price,
+    //     pri.Discount_On_Purchase_Price,
+    //     pri.Discount_Type_On_Purchase_Price,
+    //     pri.Tax_Amount,
+    //     pri.Tax_Type,
+    //     pri.Amount,
+    //     pri.created_at
+
+    // FROM purchase_return_items pri
+
+    // LEFT JOIN add_item i
+    //   ON pri.Item_Id = i.Item_Id
+
+    // WHERE pri.Purchase_Return_Id = ?
+
+    // ORDER BY pri.created_at DESC
+    // `,
+    //     [Purchase_Return_Id]
+    //   );
     const [items] = await connection.query(
       `
   SELECT
       pri.id,
-     
+
       pri.Item_Id,
 
       i.Item_Name,
@@ -350,14 +394,14 @@ const getPurchaseReturnById = async (req, res, next) => {
       -- CURRENT MASTER
       i.Primary_Unit AS Current_Primary_Unit,
       i.Secondary_Unit AS Current_Secondary_Unit,
-       i.Conversion_Rate,
+      i.Conversion_Rate,
 
       pri.Quantity,
 
-      -- HISTORICAL SNAPSHOT
-      pri.Primary_Unit_Snapshot,
-      pri.Secondary_Unit_Snapshot,
-      pri.Selected_Unit,
+      -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
+      pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+      pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+      pu3.Unit_Shorthand AS Selected_Unit,
 
       pri.Purchase_Price,
       pri.Discount_On_Purchase_Price,
@@ -371,6 +415,15 @@ const getPurchaseReturnById = async (req, res, next) => {
 
   LEFT JOIN add_item i
     ON pri.Item_Id = i.Item_Id
+
+  LEFT JOIN units pu1
+    ON pu1.id = pri.Primary_Unit_Snapshot_Id
+
+  LEFT JOIN units pu2
+    ON pu2.id = pri.Secondary_Unit_Snapshot_Id
+
+  LEFT JOIN units pu3
+    ON pu3.id = pri.Selected_Unit_Id
 
   WHERE pri.Purchase_Return_Id = ?
 
@@ -413,12 +466,22 @@ const getPurchaseReturnById = async (req, res, next) => {
       // CURRENT MASTER
       // =======================================================
 
-      const currentPrimary =
-        it.Current_Primary_Unit || null;
+      const currentPrimary =it.Current_Primary_Unit || null;
 
-      const currentSecondary =
-        it.Current_Secondary_Unit || null;
+      const currentSecondary =it.Current_Secondary_Unit || null;
+      const price = Number(it.Purchase_Price || 0);
+      let discountAmount = 0;
 
+      if (Number(it.Discount_On_Purchase_Price || 0) > 0) {
+        if (it.Discount_Type_On_Purchase_Price === "Percentage") {
+          discountAmount =
+            (price * Number(it.Discount_On_Purchase_Price)) / 100;
+        } else {
+          discountAmount = Number(
+            it.Discount_On_Purchase_Price
+          );
+        }
+      }
       // =======================================================
       // DID THIS RETURN USE THE OLD SECONDARY UNIT?
       // =======================================================
@@ -524,6 +587,7 @@ const getPurchaseReturnById = async (req, res, next) => {
         Tax_Type: it.Tax_Type,
 
         Tax_Amount: it.Tax_Amount,
+        Discount_Amount: Number(discountAmount.toFixed(2)),
 
         Amount: it.Amount,
 
@@ -635,6 +699,7 @@ const createPurchaseReturn = async (req, res, next) => {
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
       Total_Amount,
+      Round_Off,
       splits,
       items,
     } = req.body;
@@ -778,6 +843,7 @@ const createPurchaseReturn = async (req, res, next) => {
     );
 
     const totalAmount = Number(Total_Amount) || 0;
+    const roundOffValue = Number(Round_Off) || 0
 
     // Always derive it ourselves
     const balanceDue = totalAmount - totalReceived;
@@ -795,14 +861,7 @@ const createPurchaseReturn = async (req, res, next) => {
       });
     }
 
-    // if (isNaN(totalReceived) || totalReceived < 0) {
-    //   await connection.rollback();
 
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Split amounts must be valid numbers",
-    //   });
-    // }
 
     // =========================================================
     // 6. VALIDATE ONLY SURVIVING SPLITS
@@ -856,10 +915,11 @@ const createPurchaseReturn = async (req, res, next) => {
          Return_Date,
          State_Of_Supply,
          Total_Amount,
+         Round_Off,
          Total_Received,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Purchase_Id,
         party.Party_Id,
@@ -870,6 +930,7 @@ const createPurchaseReturn = async (req, res, next) => {
         Return_Date,
         State_Of_Supply || null,
         totalAmount,
+        roundOffValue,
         totalReceived,
         balanceDue,
       ]
@@ -1183,24 +1244,7 @@ VALUES
 )
          
          `,
-        // [
-        //   id,
-        //   Item_Id,
 
-        //   Number(Quantity) || 0,
-        //   Number(Purchase_Price) || 0,
-
-        //   Number(Discount_On_Purchase_Price) || 0,
-
-        //   Discount_Type_On_Purchase_Price ||
-        //   "percentage",
-
-        //   Tax_Type || null,
-
-        //   Number(Tax_Amount) || 0,
-
-        //   Number(Amount) || 0,
-        // ]
         [
           id,
           Item_Id,
@@ -1227,7 +1271,23 @@ VALUES
       //
       // Therefore stock decreases.
       // =======================================================
+      await syncUnitIdsForItem(
+        connection,
+        Item_Id
+      );
 
+      await syncUnitIdsForPurchaseReturnItem(
+        connection,
+        {
+          purchaseReturnItemRowId: prItemId,
+
+          Primary_Unit_Snapshot: snapshot.Primary_Unit_Snapshot,
+
+          Secondary_Unit_Snapshot: snapshot.Secondary_Unit_Snapshot,
+
+          Selected_Unit: resolvedSelectedUnit,
+        }
+      );
       await connection.query(
         `UPDATE add_item
          SET
@@ -1240,19 +1300,7 @@ VALUES
           Item_Id,
         ]
       );
-      // await recordItemLedger({
-      //   connection,
-      //   itemId: Item_Id,
-      //   txnType: "Purchase_Return",
-      //   referenceId: prItemId,
-      //   //formattedId: Return_Number || null,
-      //   billId: id,                  // purchase_return.id
-      //   billNumber: Return_Number || null,
-      //   partyName: Party_Name,
-      //   quantity: Number(Quantity) || 0,
-      //   rate: Number(Purchase_Price) || null,
-      //   txnDate: Return_Date,
-      // });
+
       await recordItemLedger({
         connection,
 
@@ -1359,6 +1407,7 @@ const editPurchaseReturn = async (req, res, next) => {
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
       Total_Amount,
+      Round_Off,
       splits,
       items,
     } = req.body;
@@ -1398,6 +1447,7 @@ const editPurchaseReturn = async (req, res, next) => {
     const totalAmount = Number(Total_Amount) || 0;
     const totalReceived = validSplits.reduce((sum, split) => sum + split.Amount, 0);
     const balanceDue = totalAmount - totalReceived;
+    const roundOffValue = Number(Round_Off) || 0
 
     if (totalReceived > totalAmount) {
       await connection.rollback();
@@ -1444,6 +1494,7 @@ const editPurchaseReturn = async (req, res, next) => {
          Return_Date     = ?,
          State_Of_Supply = ?,
          Total_Amount    = ?,
+         Round_Off       = ?,
          Total_Received  = ?,
          Balance_Due     = ?,
          updated_at      = NOW()
@@ -1456,6 +1507,7 @@ const editPurchaseReturn = async (req, res, next) => {
         Return_Date,
         State_Of_Supply || null,
         totalAmount,
+        roundOffValue,
         totalReceived,
         balanceDue,
         Purchase_Return_Id,
@@ -1774,14 +1826,13 @@ const editPurchaseReturn = async (req, res, next) => {
               `
           SELECT Conversion_Rate
           FROM item_unit_conversions
-          WHERE Item_Id = ?
-            AND Primary_Unit = ?
+          WHERE  Primary_Unit = ?
             AND Secondary_Unit = ?
           ORDER BY id DESC
           LIMIT 1
           `,
               [
-                old.Item_Id,
+               
                 oldPrimary,
                 oldSecondary,
               ]
@@ -1806,12 +1857,6 @@ const editPurchaseReturn = async (req, res, next) => {
         oldBaseQty
       );
     }
-    // for (const old of oldItems) {
-    //   oldQtyByItem.set(
-    //     old.Item_Id,
-    //     (oldQtyByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
-    //   );
-    // }
 
     // =========================================================
     // 17. ADJUST add_item.Stock_Quantity BY DIFF
@@ -1891,18 +1936,24 @@ const editPurchaseReturn = async (req, res, next) => {
 
       const prItemId = insertResult.insertId;
 
-      // 🔹 item ledger — direction Out (same as before, unchanged)
-      // await recordItemLedger({
-      //   connection,
-      //   itemId: line.Item_Id,
-      //   txnType: "Purchase_Return",
-      //   referenceId: prItemId,
-      //   billId: existing.id,
-      //   partyName: Party_Name,
-      //   quantity: line.Quantity,
-      //   rate: line.Purchase_Price || null,
-      //   txnDate: Return_Date
-      // });
+
+      await syncUnitIdsForItem(
+        connection,
+        line.Item_Id
+      );
+
+      await syncUnitIdsForPurchaseReturnItem(
+        connection,
+        {
+          purchaseReturnItemRowId: prItemId,
+
+          Primary_Unit_Snapshot: line.Primary_Unit_Snapshot,
+
+          Secondary_Unit_Snapshot: line.Secondary_Unit_Snapshot,
+
+          Selected_Unit: line.Selected_Unit,
+        }
+      );
       await recordItemLedger({
         connection,
         itemId: line.Item_Id,
@@ -2914,9 +2965,9 @@ const getPurchaseReturnPrintReport = async (
     return res.status(200).json({
       success: true,
 
-      totalPurchaseReturns:result.purchaseReturns.length,
+      totalPurchaseReturns: result.purchaseReturns.length,
 
-      purchaseReturns:result.purchaseReturns,
+      purchaseReturns: result.purchaseReturns,
 
       summary: result.summary,
     });

@@ -1,4 +1,5 @@
 import db from "../config/db.js";
+import { syncUnitIdForLedgerRow } from "../helpers/unitSyncHelper.js";
 
 /*
   Direction convention:
@@ -93,7 +94,10 @@ export const recordItemLedger = async ({
         [shift, itemId, existingRow.id]
       );
     }
-
+await syncUnitIdForLedgerRow(connection, {
+      ledgerRowId:   existingRow.id,
+      Selected_Unit: selectedUnit,
+    });
     const [[updated]] = await connection.query(
       `SELECT Running_Stock FROM item_ledger WHERE id = ?`,
       [existingRow.id]
@@ -117,7 +121,7 @@ export const recordItemLedger = async ({
     ? baseStock + base
     : baseStock - base;
 
-  await connection.query(
+  const [insertResult] = await connection.query(
     `
     INSERT INTO item_ledger
 (
@@ -152,9 +156,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       txnDate,
     ]
   );
+  
 await markUnitAsUsed(connection, selectedUnit);
+await syncUnitIdForLedgerRow(connection, {
+     ledgerRowId: insertResult.insertId,
+    Selected_Unit: selectedUnit,
+  });
   return newStock;
 };
+
 export const reverseItemLedger = async ({
   connection,
   itemId,

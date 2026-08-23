@@ -13,7 +13,7 @@ import { toast } from "react-toastify";
 
 import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
-import { LayoutDashboard } from "lucide-react";
+
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 
@@ -80,28 +80,16 @@ export default function PurchaseReturnAdd() {
   const [showPartyModal, setShowPartyModal] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
   const [showBankModal, setShowBankModal] = useState(false);
-  const [originalTotal, setOriginalTotal] = useState(null);
+  //const [originalTotal, setOriginalTotal] = useState(null);
   const [addCategory] = useAddCategoryMutation();
   const [showSplitBox, setShowSplitBox] = useState(false);
 
-  // const itemUnits = {
-  //   "gm": "Gram",
-  //   "Kg": "Kilogram",
-  //   "lt": "Litre",
-  //   "pcs": "Piece",
 
-  // }
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   // const [newUnitKey, setNewUnitKey] = useState("");
   // const [newUnitName, setNewUnitName] = useState("");
-  //  const itemUnitsFetched = {
-  //     "gm": "Gram",
-  //     "Kg": "Kilogram",
-  //     "lt": "Litre",
-  //     "pcs": "Piece",
 
-  //   }
   const states = [
     "Andaman and Nicobar Islands",
     "Andhra Pradesh",
@@ -140,6 +128,7 @@ export default function PurchaseReturnAdd() {
     "Uttarakhand",
     "West Bengal"
   ];
+    const [isRoundOff, setIsRoundOff] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
 
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
@@ -268,6 +257,7 @@ export default function PurchaseReturnAdd() {
       Return_Date: new Date().toISOString().slice(0, 10),
       State_Of_Supply: "",
       Total_Amount: "",
+      Round_Off: "",
       Balance_Due: "",
       Total_Received: "",
       splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
@@ -303,69 +293,7 @@ export default function PurchaseReturnAdd() {
 
 
 
-  const handleAddRow = () => {
-    setRows((prev) => [
-      ...prev.map((row) => ({
-        ...row,
-        CategoryOpen: false,
-        itemOpen: false,
-        unitOpen: false
-      })),
-      {
-        itemSearch: "",
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: false,
-        isUnitLocked: false,
-        isExistingItem: false,
-        categorySearch: "",
-        unitOpen: false,
-        unitSearch: "",
-      },
-    ]);
 
-    append({
-      Item_Category: "",
-      Item_Name: "",
-      Item_HSN: "",
-      Quantity: "",
-      Item_Unit: "",
-      Purchase_Price: "",
-      Discount_On_Purchase_Price: "",
-      Discount_Type_On_Purchase_Price: "Percentage",
-      Tax_Type: "None",
-      Tax_Amount: "",
-      Amount: "",
-    });
-
-    // No total recalc needed — new row is empty (Amount = 0)
-    // Total_Amount stays the same, Balance_Due stays the same
-  };
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
-
-    // 2. calculate new total excluding the deleted row
-    const newTotal = currentItems.reduce((sum, row, idx) => {
-      if (idx === i) return sum;                    // skip deleted row
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
-
-    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
-    const newBalanceDue = newTotal - currentTotalReceived;
-
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
-
-    // 4. update totals
-    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  };
   const itemsValues = watch("items");   // watch all item rows
   const totalReceived = watch("Total_Received"); // watch Total_Received
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
@@ -409,28 +337,123 @@ export default function PurchaseReturnAdd() {
     };
   };
 
+  const getRawTotal = () => {
+    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  };
 
+  const applyRoundOff = (roundOffValue) => {
+    const rawTotal = getRawTotal();
+    const totalReceived = Number(watch("Total_Received")) || 0;
+    const newTotal = rawTotal + roundOffValue;
 
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    setValue("Balance_Due", (newTotal - totalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  };
+  const syncTotalsAfterItemChange = () => {
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      applyRoundOff(currentRoundOff);
+    } else {
+      const rawTotal = getRawTotal();
+      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (rawTotal - Number(watch("Total_Received") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+  };
+  const handleAddRow = () => {
+    setRows((prev) => [
+      ...prev.map((row) => ({
+        ...row,
+        CategoryOpen: false,
+        itemOpen: false,
+        unitOpen: false
+      })),
+      {
+        itemSearch: "",
+        itemOpen: false,
+        CategoryOpen: false,
+        isHSNLocked: false,
+        isUnitLocked: false,
+        isExistingItem: false,
+        categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
+      },
+    ]);
+
+    append({
+      Item_Category: "",
+      Item_Name: "",
+      Item_HSN: "",
+      Quantity: "",
+      Item_Unit: "",
+      Purchase_Price: "",
+      Discount_On_Purchase_Price: "",
+      Discount_Type_On_Purchase_Price: "Percentage",
+      Tax_Type: "None",
+      Tax_Amount: "",
+      Amount: "",
+    });
+
+    // No total recalc needed — new row is empty (Amount = 0)
+    // Total_Amount stays the same, Balance_Due stays the same
+  };
+
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   const currentItems = watch("items");
+
+  //   // 2. calculate new total excluding the deleted row
+  //   const newTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;                    // skip deleted row
+  //     return sum + parseFloat(row.Amount || 0);
+  //   }, 0);
+
+  //   const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+  //   const newBalanceDue = newTotal - currentTotalReceived;
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+  //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  // };
 
 
   //const itemsValues = watch("items"); // watch all rows
+  
+  const handleDeleteRow = (i) => {
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+    //const newBalanceDue = newRawTotal - currentTotalReceived;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      const newTotal = newRawTotal + currentRoundOff;
+      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newRawTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+  };
   const formValues = watch();
 
-  // const handleSelect = (rowIndex, categoryName) => {
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[rowIndex] = {
-  //       ...updated[rowIndex],
-  //       Item_Category: categoryName,
-  //       CategoryOpen: false,
-  //       isExistingItem: false,   // user-typed, so still editable
-  //     };
-  //     return updated;
-  //   });
-
-  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  // };
-
+ 
 
 
 
@@ -590,7 +613,10 @@ export default function PurchaseReturnAdd() {
         Amount: item.Amount || "",
       }));
       setRows(prefilledRows)
+      const roundOffFromDb = Number(purchase.billPurchaseDetails?.Round_Off) || 0;
 
+      //  checkbox reflects whether a real round-off was applied
+      setIsRoundOff(roundOffFromDb !== 0);
       reset({
         Return_Date: new Date().toISOString().slice(0, 10),
         Return_Number: "",
@@ -600,6 +626,7 @@ export default function PurchaseReturnAdd() {
         Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
         State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
         Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
+        Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
         Total_Received: "",
         Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
         // splits replaces Payment_Type / Bank_Account_Id / Reference_Number —
@@ -643,6 +670,38 @@ export default function PurchaseReturnAdd() {
       setShowGSTIN(purchase.GSTIN || "");   // ✅ only UI update
     }
   }, [purchase]);
+    const calculateTotals = (items = []) => {
+    return items.reduce(
+      (acc, item) => {
+        const qty = Number(item.Quantity) || 0;
+        const price = Number(item.Purchase_Price) || 0;
+
+        const subtotal = qty * price;
+
+        const discountRaw =
+          Number(item.Discount_On_Purchase_Price) || 0;
+
+        const discount =
+          item.Discount_Type_On_Purchase_Price === "Percentage"
+            ? (subtotal * discountRaw) / 100
+            : discountRaw;
+
+        acc.totalQty += qty;
+        acc.totalDiscount += discount;
+        acc.totalTax += Number(item.Tax_Amount) || 0;
+        acc.totalAmount += Number(item.Amount) || 0;
+
+        return acc;
+      },
+      {
+        totalQty: 0,
+        totalDiscount: 0,
+        totalTax: 0,
+        totalAmount: 0,
+      }
+    );
+  };
+  const totals = calculateTotals(itemsValues || []);
   // Keeps amount inputs numeric-only (digits + a single decimal point)
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
@@ -1807,8 +1866,9 @@ export default function PurchaseReturnAdd() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 } else {
                                   // no match — close dropdown
                                   handleRowChange(i, "itemOpen", false);
@@ -1941,8 +2001,9 @@ export default function PurchaseReturnAdd() {
 
                                           setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                          syncTotalsAfterItemChange();
+                                          // setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                          // setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
                                         }}
 
                                         className="hover:bg-gray-100 cursor-pointer border-b"
@@ -2058,8 +2119,9 @@ export default function PurchaseReturnAdd() {
 
                             setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                             setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            syncTotalsAfterItemChange();
+                            // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                            // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                           }}
                           placeholder="Qty"
                         />
@@ -2586,23 +2648,12 @@ export default function PurchaseReturnAdd() {
                                                   }
                                                 );
 
-                                                setValue(
-                                                  "Total_Amount",
-                                                  Total_Amount,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
+                                                // setValue("Total_Amount",Total_Amount,{shouldValidate: true,shouldDirty: true,}
+                                                // );
 
-                                                setValue(
-                                                  "Balance_Due",
-                                                  Balance_Due,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
+                                                // setValue("Balance_Due",Balance_Due,{houldValidate: true,shouldDirty: true,}
+                                                // );
+                                                syncTotalsAfterItemChange();
                                               }
                                             }}
                                             style={{
@@ -2682,8 +2733,9 @@ export default function PurchaseReturnAdd() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                               setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                             }}
 
                             placeholder="Price"
@@ -2731,8 +2783,9 @@ export default function PurchaseReturnAdd() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount);
                               setValue(`items.${i}.Amount`, Amount);
-                              setValue("Total_Amount", Total_Amount);
-                              setValue("Balance_Due", Balance_Due);
+                              syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount);
+                              // setValue("Balance_Due", Balance_Due);
                             }}
 
                             placeholder="Discount"
@@ -2757,8 +2810,9 @@ export default function PurchaseReturnAdd() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 }}
                               >
                                 <option value="Percentage">%</option>
@@ -2790,8 +2844,9 @@ export default function PurchaseReturnAdd() {
                                 );
                                 setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                               }}
                             >
                               <option value="None">None</option>
@@ -2840,84 +2895,39 @@ export default function PurchaseReturnAdd() {
                     </tr>
                   ))}
                 </tbody>
+                 <tfoot>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>Total</td>
+                    <td></td>
+
+                    <td className="text-right">
+                      {totals.totalQty}
+                    </td>
+
+                    <td></td>
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalDiscount.toFixed(2)}
+                    </td>
+
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalTax.toFixed(2)}
+                    </td>
+
+                    <td className="text-right">
+                      ₹{totals.totalAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
 
 
               </table>
 
 
-              {/* <div className="flex flex-col  mt-3 gap-2  w-full sm:w-64">
-                          <div className="flex flex-col w-full">
-                      <span className="active">Payment Type</span>
-
-                      <select
-                        id="Payment_Type"
-                        value={
-                          watch("Payment_Type") === "Bank"
-                            ? `bank_${watch("Bank_Account_Id") || ""}`
-                            : watch("Payment_Type") || ""
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val.startsWith("bank_")) {
-                            const bankId = val.replace("bank_", "");
-                            setValue("Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                            setValue("Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                          } else {
-                            setValue("Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                            setValue("Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                          }
-                        }}
-                      >
-                        <option value="">Select Payment Type</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
-                        <option value="Neft">Neft</option>
-                        {banks?.map((bank) => (
-                          <option
-                            key={bank.Bank_Account_Id}
-                            value={`bank_${bank.Bank_Account_Id}`}
-                          >
-                            {bank.Account_Display_Name}
-                          </option>
-                        ))}
-                       
-                      </select>
-
-                      {errors?.Payment_Type && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Payment_Type?.message}</p>
-                      )}
-                      {errors?.Bank_Account_Id && (
-                        <p className="text-red-500 text-xs mt-1">{errors?.Bank_Account_Id?.message}</p>
-                      )}
-                    </div>
-
-
-
-
-                          {(paymentType === "Cheque" || paymentType === "Neft") && (
-
-                            <div className="flex flex-col w-full ">
-                              <span className="active whitespace-nowrap">
-                                {paymentType === "Cheque" ? "Cheque Number" : "NEFT Reference Number"}
-                              </span>
-
-                              <input
-                                type="text"
-                                id="Reference_Number"
-                                {...register("Reference_Number")}
-                                placeholder={`Enter ${paymentType} number`}
-                                className="w-full outline-none border-b-2 text-gray-900"
-                              />
-
-                              {errors?.Reference_Number && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors?.Reference_Number?.message}
-                                </p>
-                              )}
-                            </div>
-
-                          )}
-                        </div> */}
               {/* Payment Type — single payment or split box, same pattern as Payment-In/Payment-Out */}
               <div className="flex sm:w-1/4 p-2">
                 <button
@@ -2947,35 +2957,6 @@ export default function PurchaseReturnAdd() {
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
 
-                          {/* <select
-                            id="Payment_Type"
-                            value={
-                              paymentType === "Bank"
-                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                                : paymentType || ""
-                            }
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val.startsWith("bank_")) {
-                                const bankId = val.replace("bank_", "");
-                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                              } else {
-                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                              }
-                            }}
-                          >
-                            <option value="">Select Payment Type</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Neft">Neft</option>
-                            {banks?.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </select> */}
                           <PaymentTypeSelect
                             value={
                               paymentType === "Bank"
@@ -3169,7 +3150,7 @@ export default function PurchaseReturnAdd() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -3228,6 +3209,46 @@ export default function PurchaseReturnAdd() {
                           setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div> */}
+                      <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={isRoundOff}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setIsRoundOff(isChecked);
+
+                          const rawTotal = getRawTotal();
+
+                          if (isChecked) {
+                            const rounded = Math.round(rawTotal);
+                            const diff = Number((rounded - rawTotal).toFixed(2));
+                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(diff);
+                          } else {
+                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(0);
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                      <input
+                        type="text"
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="border border-gray-300 text-right text-sm"
+                        {...register("Round_Off")}
+                        disabled={!isRoundOff}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                          const numVal = parseFloat(val) || 0;
+                          applyRoundOff(numVal);
+                        }}
                       />
                     </div>
 

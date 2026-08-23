@@ -4,7 +4,7 @@ import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery, useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
 
@@ -17,7 +17,7 @@ import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { FileText, LayoutDashboard, Upload } from "lucide-react";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
@@ -27,6 +27,8 @@ import TermsConditionsModal from "../../components/Modal/TermsConditionsModal";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
 import AddItemModal from "../../components/Modal/AddItemModal";
+import PaymentTypeSelect from "../../components/PaymentTypeSelect";
+import BankAccountModal from "../../components/Modal/BankAccountModal";
 export default function PurchaseAdd() {
 
   const dispatch = useDispatch();
@@ -52,6 +54,7 @@ export default function PurchaseAdd() {
 
   const categoryRefs = useRef([]); // store refs for category dropdowns
   const itemRefs = useRef([]);     // store refs for item dropdowns
+  const unitRefs = useRef([]);
   const basePurchasePriceRef = useRef({});
   const basePurchaseUnitRef = useRef({});
 
@@ -64,13 +67,13 @@ export default function PurchaseAdd() {
   // const { data: items, } = useGetAllItemsQuery();
   console.log(items);
   const { data: categories } = useGetAllCategoriesQuery()
-  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   //console.log(banks, "banks");
   const [open, setOpen] = useState(false);
   //console.log(categories, "categories");
   //const[categoryOpen,setCategoryOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
+  //] = useState(null);
 
   //const [showTermsSection, setShowTermsSection] = useState(false);
   //const [showTermsConditionsModal, setShowTermsConditionsModal] = useState(false);
@@ -92,9 +95,10 @@ export default function PurchaseAdd() {
   //const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   ///const [originalTemplateDescription, setOriginalTemplateDescription] = useState("");
 
-
+  const [showBankModal, setShowBankModal] = useState(false);
   const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
   //console.log(termsTemplates, "termsTemplates");
+  const [isRoundOff, setIsRoundOff] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
 
 
@@ -158,7 +162,8 @@ export default function PurchaseAdd() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false,unitOpen:false
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", addUnitModalOpen: false,
+      unitOpen: false, unitSearch: "",
     }
   ]);
 
@@ -181,16 +186,31 @@ export default function PurchaseAdd() {
         prev.map((row, idx) => {
           const catRef = categoryRefs.current[idx];
           const itemRef = itemRefs.current[idx];
+          const unitRef = unitRefs.current[idx];
 
           const clickedInsideCategory =
             catRef && catRef.contains(event.target);
           const clickedInsideItem =
             itemRef && itemRef.contains(event.target);
+          const clickedInsideUnit =
+            unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
+          // if (!clickedInsideCategory && !clickedInsideItem) {
+          //   return { ...row, CategoryOpen: false, itemOpen: false };
+          // }
 
           return row;
         })
@@ -226,6 +246,7 @@ export default function PurchaseAdd() {
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
+      Round_Off: "",   // 🔹 was "0.00"
       Terms_Conditions_Id: null,
       Terms_Conditions_Description: "",
       //Payment_Type: "Cash",
@@ -273,7 +294,7 @@ export default function PurchaseAdd() {
         CategoryOpen: false,
         itemOpen: false, // also close item dropdown if open,
         addUnitModalOpen: false,
-        unitOpen:false
+        unitOpen: false
       })),
       {
         itemSearch: "",
@@ -284,7 +305,8 @@ export default function PurchaseAdd() {
         isExistingItem: false,
         categorySearch: "",
         addUnitModalOpen: false,
-        unitOpen:false
+        unitOpen: false,
+        unitSearch: "",
       },
     ]);
 
@@ -372,29 +394,61 @@ export default function PurchaseAdd() {
       Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
+  const getRawTotal = () => {
+    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  };
 
+  const applyRoundOff = (roundOffValue) => {
+    const rawTotal = getRawTotal();
+    const totalPaid = Number(watch("Total_Paid")) || 0;
+    const newTotal = rawTotal + roundOffValue;
 
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  };
+  const syncTotalsAfterItemChange = () => {
+  if (isRoundOff) {
+    const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+    applyRoundOff(currentRoundOff);
+  } else {
+    const rawTotal = getRawTotal();
+    setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  }
+};
 
+  // const recomputeTotals = (rawTotal, roundOffEnabled) => {
+  //   const rounded = Math.round(rawTotal);
+  //   const diff = rounded - rawTotal; // e.g. raw 240.40 -> diff -0.40 ; raw 239.60 -> diff +0.40
 
+  //   if (roundOffEnabled) {
+  //     setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Round_Off", diff.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   } else {
+  //     setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Round_Off", diff.toFixed(2), { shouldValidate: true, shouldDirty: true }); // shown but not applied
+  //   }
+
+  //   return { rounded, rawTotal, diff };
+  // };
+  // const recalculateAllTotals = (roundOffEnabled) => {
+  //   //const currentItems = watch("items") || [];
+  //   const rawTotal = itemsValues.reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+
+  //   recomputeTotals(rawTotal, roundOffEnabled);
+
+  //   const finalTotal = roundOffEnabled ? Math.round(rawTotal) : rawTotal;
+  //   setValue("Balance_Due", (finalTotal - Number(watch("Total_Paid") || 0)).toFixed(2), {
+  //     shouldValidate: true,
+  //     shouldDirty: true,
+  //   });
+  // };
 
 
   //const itemsValues = watch("items"); // watch all rows
   const formValues = watch();
 
-  // const handleSelect = (rowIndex, categoryName) => {
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[rowIndex] = {
-  //       ...updated[rowIndex],
-  //       Item_Category: categoryName,
-  //       CategoryOpen: false,
-  //       isExistingItem: false,   // user-typed, so still editable
-  //     };
-  //     return updated;
-  //   });
 
-  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  // };
 
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
@@ -407,37 +461,37 @@ export default function PurchaseAdd() {
 
   // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
   // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
+  // const buildPaymentTypeOptions = (banks) => [
+  //   { value: "Cash", label: "Cash", repeatable: false },
+  //   { value: "Cheque", label: "Cheque", repeatable: true },
+  //   { value: "Neft", label: "Neft", repeatable: true },
+  //   ...(banks || []).map((bank) => ({
+  //     value: `bank_${bank.Bank_Account_Id}`,
+  //     label: bank.Account_Display_Name,
+  //     repeatable: false,
+  //   })),
+  // ];
 
   const getRowIdentifier = (type, bankId) =>
     type === "Bank" ? `bank_${bankId ?? ""}` : type;
 
   //Inside the component:
 
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
+  // const getUsedIdentifiers = (excludeIndex) => {
+  //   const splitValues = watch("splits") || [];
+  //   return splitValues
+  //     .map((s, i) =>
+  //       i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+  //     )
+  //     .filter(Boolean);
+  // };
 
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
+  // const getAvailableOptions = (excludeIndex) => {
+  //   const used = getUsedIdentifiers(excludeIndex);
+  //   return buildPaymentTypeOptions(banks).filter(
+  //     (opt) => opt.repeatable || !used.includes(opt.value)
+  //   );
+  // };
 
   const handleAddPaymentType = () => {
     appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
@@ -459,10 +513,16 @@ export default function PurchaseAdd() {
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
+    // setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+    //   shouldValidate: false,
+    //   shouldDirty: true,
+    // });
+    if (splitsWatch.length > 1) {
+      setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 
@@ -609,12 +669,12 @@ export default function PurchaseAdd() {
       // 8. Invalidate RTK Query caches
       // =======================================================
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         cashInHandApi.util.invalidateTags(["CashInHand",])
@@ -840,20 +900,11 @@ export default function PurchaseAdd() {
     }
   };
   // per-row search + open state
-  const [unitSearch, setUnitSearch] = useState("");
-  const [unitOpen, setUnitOpen] = useState(false);
-  const unitRef = useRef(null);
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (unitRef.current && !unitRef.current.contains(e.target)) {
-        setUnitOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-  //console.log("Invoice Data:", invoiceData);
+
+
+
+
   return (
     <>
 
@@ -1131,13 +1182,13 @@ export default function PurchaseAdd() {
 
                             if (matchedParty) {
                               setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                              setCurrentPartyDetails(matchedParty);
+                              //setCurrentPartyDetails(matchedParty);
 
                               //setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
                             } else {
                               // setValue("Phone_Number", "", { shouldValidate: true, shouldDirty: true });
                               setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                              setCurrentPartyDetails(null);
+                              //setCurrentPartyDetails(null);
                             }
                           }}
                           onClick={(e) => {
@@ -1158,7 +1209,7 @@ export default function PurchaseAdd() {
                                 setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
 
                                 //setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
-                                setCurrentPartyDetails(matchedParty);
+                                //setCurrentPartyDetails(matchedParty);
                                 //setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
                               } else {
                                 //setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
@@ -1230,7 +1281,7 @@ export default function PurchaseAdd() {
                                     setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
                                     setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
                                     //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
-                                    setCurrentPartyDetails(party);
+                                    //setCurrentPartyDetails(party);
                                     setOpen(false);
                                   }}
                                   className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
@@ -1309,7 +1360,7 @@ export default function PurchaseAdd() {
                           //   }
                           // );
 
-                          setCurrentPartyDetails(newParty);
+                          //setCurrentPartyDetails(newParty);
 
                           setShowPartyModal(false);
                         }}
@@ -1733,6 +1784,7 @@ export default function PurchaseAdd() {
                                 const typedValue = e.target.value;
                                 handleRowChange(i, "itemSearch", typedValue);
                                 handleRowChange(i, "CategoryOpen", false);
+                                handleRowChange(i, "unitOpen", false);
                                 setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
                                 // setValue(`items.${i}.Item_Name`, typedValue);
                                 handleRowChange(i, "isHSNLocked", false);
@@ -1827,7 +1879,12 @@ export default function PurchaseAdd() {
                                   }
                                 }, 150); // small delay so click-from-dropdown fires first
                               }}
-                              onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                              onClick={() => {
+                                handleRowChange(i, "itemOpen", true);
+                                handleRowChange(i, "unitOpen", false);
+                                handleRowChange(i, "CategoryOpen", false);
+                              }}
+                              //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                               placeholder="Item Name"
                               className="w-full outline-none border-b-2 text-gray-900"
                             />
@@ -1870,8 +1927,8 @@ export default function PurchaseAdd() {
                                 </div>
 
                                 {/* ══════════════════════════════════════════════
-        EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
-    ══════════════════════════════════════════════ */}
+                                EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
+                                  ══════════════════════════════════════════════ */}
                                 <table className="w-full text-sm border-collapse">
                                   <thead className="bg-gray-100 border-b">
                                     <tr>
@@ -1917,6 +1974,7 @@ export default function PurchaseAdd() {
                                             handleRowChange(i, "itemSearch", it.Item_Name);
                                             handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
                                             handleRowChange(i, "CategoryOpen", false);
+                                            handleRowChange(i, "unitOpen", false);
                                             setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
 
                                             setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
@@ -1955,15 +2013,28 @@ export default function PurchaseAdd() {
                                           <td>{idx + 1}</td>
                                           <td className="px-3 py-2">{it.Item_Name}</td>
                                           <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                          {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
                                           <td className="px-3 py-2 whitespace-nowrap"
                                             style={{
                                               padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
                                               color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                              fontWeight: "500", // optional: matches Tailwind's medium weight
+                                              fontWeight: "500", 
                                             }}
                                           >
                                             {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
+                                          </td> */}
+                                          <td className="px-3 py-2 text-gray-600">
+                                            {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
+                                          </td>
+
+                                          <td className="px-3 py-2" style={{
+                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                            fontWeight: "500",
+                                          }}>
+                                            {it.Item_Type === "Service"
+                                              ? ""
+                                              : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
                                           </td>
                                         </tr>
                                       ))}
@@ -2074,200 +2145,7 @@ export default function PurchaseAdd() {
                         </td>
 
 
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
-                          <Controller
-                            control={control}
-                            name={`items.${i}.Item_Unit`}
-                            render={({ field }) => {
-                              const row = rows[i];
-                              const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-                              console.log(row, "row")
-                              return (
-                                <select
-                                  {...field}
-                                  value={field.value || ""}
-                                  className="form-select"
-                                  style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                  //disabled={row?.isUnitLocked}
-                                  onChange={(e) => {
-                                    const newUnit = e.target.value;
-
-                                    if (newUnit === "__ADD_UNIT__") {
-                                      setActiveUnitRow(i);
-                                      setShowAddUnitModal(true);
-                                      return;
-                                    }
-
-                                    const previousUnit = field.value;
-                                    field.onChange(newUnit);
-                                    handleRowChange(i, "Item_Unit", newUnit);
-                                    setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
-                                    //const quantity = Number(itemsValues[i]?.Quantity);
-
-                                    // if (!Number.isFinite(quantity) || quantity <= 0) {
-                                    //   return;
-                                    // }
-                                    // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
-                                    const primaryUnit = row?.Primary_Unit;
-                                    const secondaryUnit = row?.Secondary_Unit;
-                                    const conversionRate = Number(row?.Conversion_Rate) || 0;
-
-                                    if (
-                                      previousUnit &&
-                                      newUnit &&
-                                      previousUnit !== newUnit &&
-                                      primaryUnit &&
-                                      secondaryUnit &&
-                                      conversionRate > 0
-                                    ) {
-                                      //const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
-
-                                      //let newPrice = currentPrice;
-
-                                      // switching FROM primary TO secondary — price per unit gets smaller
-                                      // if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
-                                      //   newPrice = currentPrice / conversionRate;
-                                      // }
-                                      // // switching FROM secondary TO primary — price per unit gets bigger
-                                      // else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
-                                      //   newPrice = currentPrice * conversionRate;
-                                      // }
-
-                                      //const roundedPrice = newPrice.toFixed(2);
-                                      // const basePrice =
-                                      //   Number(basePurchasePriceRef.current[i]) || 0;
-
-                                      // if (basePrice <= 0) {
-                                      //   return;
-                                      // }
-
-                                      // let newPrice = basePrice;
-
-                                      // // =====================================================
-                                      // // PRIMARY → SECONDARY
-                                      // // Example:
-                                      // // ₹45 / Kg
-                                      // // 1 Kg = 1000 Gm
-                                      // // ₹45 / 1000 = ₹0.045
-                                      // // UI allows only 2 decimals → ₹0.05
-                                      // // =====================================================
-
-                                      // if (
-                                      //   previousUnit === primaryUnit &&
-                                      //   newUnit === secondaryUnit
-                                      // ) {
-                                      //   newPrice = basePrice / conversionRate;
-                                      // }
-
-                                      // // =====================================================
-                                      // // SECONDARY → PRIMARY
-                                      // // IMPORTANT:
-                                      // // Do NOT use current displayed price.
-                                      // // Restore original base price.
-                                      // // =====================================================
-
-                                      // else if (
-                                      //   previousUnit === secondaryUnit &&
-                                      //   newUnit === primaryUnit
-                                      // ) {
-                                      //   //newPrice = basePrice;
-                                      //    newPrice = basePrice * conversionRate;
-                                      // }
-
-                                      // else {
-                                      //   return;
-                                      // }
-
-                                      // const roundedPrice = newPrice.toFixed(2);
-                                      //                                       If going to the original unit
-                                      //         ↓
-                                      // Restore basePrice
-
-                                      // Otherwise
-                                      //         ↓
-                                      // Convert basePrice
-                                      const basePrice =
-                                        Number(basePurchasePriceRef.current[i]) || 0;
-
-                                      const baseUnit =
-                                        basePurchaseUnitRef.current[i];
-
-                                      if (basePrice <= 0 || !baseUnit) {
-                                        return;
-                                      }
-
-                                      let newPrice;
-
-                                      if (newUnit === baseUnit) {
-                                        // Restore original entered price
-                                        newPrice = basePrice;
-                                      }
-                                      else if (
-                                        baseUnit === primaryUnit &&
-                                        newUnit === secondaryUnit
-                                      ) {
-                                        // Primary → Secondary
-                                        newPrice = basePrice / conversionRate;
-                                      }
-                                      else if (
-                                        baseUnit === secondaryUnit &&
-                                        newUnit === primaryUnit
-                                      ) {
-                                        // Secondary → Primary
-                                        newPrice = basePrice * conversionRate;
-                                      }
-                                      else {
-                                        return;
-                                      }
-
-                                      const roundedPrice = newPrice.toFixed(2);
-
-
-
-
-                                      setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
-
-                                      // recompute Amount/Tax/Total with the new price
-                                      const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                        { ...itemsValues[i], Purchase_Price: roundedPrice },
-                                        i,
-                                        itemsValues
-                                      );
-
-                                      setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                      setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                      setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                      setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                    }
-                                  }}
-                                >
-                                  {availableUnits.length > 0 ? (
-                                    availableUnits.map((unit) => (
-                                      <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                        {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                      </option>
-                                    ))
-                                  ) : (
-                                    <>
-                                      <option value="">NONE</option>
-                                      {Array.isArray(itemUnits) &&
-                                        itemUnits.map((unit) => (
-                                          <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                            {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                          </option>
-                                        ))}
-                                      <option value="__ADD_UNIT__">➕ Add Unit</option>
-                                    </>
-                                  )}
-                                </select>
-                              );
-                            }}
-                          />
-
-                          {errors?.items?.[i]?.Item_Unit && (
-                            <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
-                          )}
-                        </td> */}
+                     
                         <td style={{ padding: "0px", width: "10%" }}>
                           <Controller
                             control={control}
@@ -2275,127 +2153,335 @@ export default function PurchaseAdd() {
                             render={({ field }) => {
                               const row = rows[i];
                               const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-                              const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
+                              //const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
+                              const allUnits =
+                                availableUnits.length > 0
+                                  ? availableUnits
+                                  : (Array.isArray(itemUnits) ? itemUnits : []);
 
 
+                              const hasPrimary = !!row?.Primary_Unit;
+                              const hasSecondary = !!row?.Secondary_Unit;
 
-                              const filtered = allUnits.filter((u) =>
-                                u.Unit_Name?.toLowerCase().includes(unitSearch.toLowerCase()) ||
-                                u.Unit_Shorthand?.toLowerCase().includes(unitSearch.toLowerCase())
+                              let unitsWithNone = [];
+
+                              if (!hasPrimary && !hasSecondary) {
+                                // No units configured → show None + all master units
+                                unitsWithNone = [
+                                  {
+                                    Unit_Name: "None",
+                                    Unit_Shorthand: "",
+                                  },
+                                  ...(Array.isArray(itemUnits) ? itemUnits : []),
+                                ];
+                              } else {
+                                // Item has its own units
+                                unitsWithNone = allUnits;
+                              }
+
+
+                              // const filtered = unitsWithNone.filter((u) => {
+                              //   const label =
+                              //     `${u.Unit_Name} (${u.Unit_Shorthand})`.toLowerCase();
+
+                              //   return label.includes(unitSearch.toLowerCase());
+                              // });
+
+
+                              //const selectedLabel = allUnits.find(u => u.Unit_Shorthand === field.value);
+                              const selectedLabel = unitsWithNone.find(
+                                u => u.Unit_Shorthand === field.value
                               );
 
-                              const selectedLabel = allUnits.find(u => u.Unit_Shorthand === field.value);
+                              const getUnitLabel = (unit) =>
+                                unit?.Unit_Shorthand
+                                  ? `${unit.Unit_Name} (${unit.Unit_Shorthand})`
+                                  : unit.Unit_Name;
+                              const displayLabel = selectedLabel
+                                ? getUnitLabel(selectedLabel)
+                                : "";
+                              const filtered = unitsWithNone.filter((u) => {
+                                const label = getUnitLabel(u).toLowerCase();
 
+                                return label.includes(
+                                  (rows[i]?.unitSearch || "").toLowerCase()
+                                );
+                              });
                               return (
-                                <div ref={unitRef} style={{ position: "relative", width: "100%" }}>
-                                  {/* trigger input */}
+                                <div
+                                  //  ref={unitRef} 
+                                  ref={(el) => (unitRefs.current[i] = el)}
+                                  style={{ position: "relative", width: "100%" }}>
+
+
                                   <input
-                                    type="text"
-                                    readOnly={!unitOpen}
-                                    
-                                    value={unitOpen ? unitSearch : (selectedLabel ? `${selectedLabel.Unit_Name} (${selectedLabel.Unit_Shorthand})` : "")}
-                                    placeholder="Select unit"
-                                    onClick={() => handleRowChange(i, "unitOpen", !rows[i]?.unitOpen)}
-                                    //onClick={() => { setUnitOpen(true); setUnitSearch(""); }}
-                                    onChange={(e) => { setUnitSearch(e.target.value); setUnitOpen(true); }}
-                                    style={{
-                                      width: "100%",
-                                      fontSize: 12,
-                                      //border: "1px solid #d1d5db",
-                                      //borderRadius: 4,
-                                      //padding: "3px 6px",
-                                      cursor: "pointer",
-                                      backgroundColor: "white",
-                                      outline: "none",
-                                      marginBottom: 0
+                                    readOnly
+                                    value={displayLabel}
+                                    onClick={() => {
+                                      handleRowChange(i, "unitOpen", true);
+                                      handleRowChange(i, "itemOpen", false);
+                                      handleRowChange(i, "CategoryOpen", false);
                                     }}
                                   />
 
                                   {rows[i]?.unitOpen && (
-                                    <div style={{
-                                      position: "absolute",
-                                      top: "100%",
-                                      left: 0,
-                                      zIndex: 30,
-                                      width: "180px",
-                                      background: "white",
-                                      border: "1px solid #e5e7eb",
-                                      borderRadius: 6,
-                                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                      marginTop: 2,
-                                      maxHeight: 180,
-                                      overflowY: "auto",
-                                    }}>
-                                      {/* Add Unit */}
-                                      {/* <div
-                                        onClick={() => { setActiveUnitRow(i); setShowAddUnitModal(true); setUnitOpen(false); }}
-                                        style={{ padding: "6px 10px", fontSize: 12, color: "#4CA1AF", cursor: "pointer", fontWeight: 500, borderBottom: "1px solid #f3f4f6" }}
-                                      >
-                                        ➕ Add Unit
-                                      </div> */}
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        zIndex: 30,
+                                        width: "180px",
+                                        background: "white",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: 6,
+                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                        marginTop: 2,
+                                        maxHeight: 180,
+                                        overflowY: "auto",
+                                      }}
+                                    >
+                                      <input
+                                        type="text"
+                                        placeholder="Search unit..."
+                                        value={rows[i]?.unitSearch || ""}
+                                        // value={unitSearch}
+                                        onChange={(e) =>
+                                          handleRowChange(i, "unitSearch", e.target.value)
+                                        }
+                                        //onChange={(e) => setUnitSearch(e.target.value)}
+                                        style={{
+                                          width: "100%",
+                                          marginBottom: 0,
 
+                                        }}
+                                      />
+                                      {!hasPrimary && !hasSecondary && (
+                                        <div
+                                          onClick={() => {
+                                            setActiveUnitRow(i);
+                                            setShowAddUnitModal(true);
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+                                          }}
+                                          style={{
+                                            padding: "8px 10px",
+                                            borderBottom: "1px solid #e5e7eb",
+                                            cursor: "pointer",
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "#4CA1AF",
+                                            background: "#f8fafc",
+                                          }}
+                                        >
+                                          + Add Unit
+                                        </div>
+                                      )}
                                       {filtered.length === 0 ? (
-                                        <div style={{ padding: "6px 10px", fontSize: 12, color: "#9ca3af" }}>No units found</div>
+                                        <div
+                                          onClick={() => {
+                                            field.onChange("");
+
+                                            setValue(
+                                              `items.${i}.Item_Unit`,
+                                              "",
+                                              {
+                                                shouldValidate: true,
+                                                shouldDirty: true,
+                                              }
+                                            );
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+
+                                            //setUnitSearch("");
+                                          }}
+                                          style={{
+                                            padding: "6px 10px",
+                                            fontSize: 12,
+                                            //color: "#9ca3af",
+                                            backgroundColor:
+                                              field.value === "" ? "#eaf6f7" : "transparent",
+                                            color:
+                                              field.value === "" ? "#4CA1AF" : "#374151",
+                                            fontWeight:
+                                              field.value === "" ? 500 : 400,
+                                          }}
+                                        >
+                                          None
+                                        </div>
                                       ) : (
                                         filtered.map((unit) => {
-                                          const isSelected = field.value === unit.Unit_Shorthand;
+                                          const isSelected =
+                                            field.value === unit.Unit_Shorthand;
+
                                           return (
                                             <div
                                               key={unit.Unit_Shorthand}
                                               onClick={() => {
                                                 const newUnit = unit.Unit_Shorthand;
+
                                                 const previousUnit = field.value;
+
                                                 field.onChange(newUnit);
-                                                handleRowChange(i, "Item_Unit", newUnit);
-                                                setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
-                                                setUnitOpen(false);
-                                                setUnitSearch("");
 
-                                                // ── price auto-scale logic — unchanged from your original ──
-                                                const primaryUnit = row?.Primary_Unit;
-                                                const secondaryUnit = row?.Secondary_Unit;
-                                                const conversionRate = Number(row?.Conversion_Rate) || 0;
+                                                handleRowChange(
+                                                  i,
+                                                  "Item_Unit",
+                                                  newUnit
+                                                );
 
-                                                if (previousUnit && newUnit && previousUnit !== newUnit && primaryUnit && secondaryUnit && conversionRate > 0) {
-                                                  const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
+                                                setValue(
+                                                  `items.${i}.Item_Unit`,
+                                                  newUnit,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                // close dropdown
+                                                handleRowChange(i, "unitOpen", false);
+                                                handleRowChange(i, "unitSearch", "");
+
+                                                //setUnitSearch("");
+
+
+                                                const primaryUnit =
+                                                  row?.Primary_Unit;
+
+                                                const secondaryUnit =
+                                                  row?.Secondary_Unit;
+
+                                                const conversionRate =
+                                                  Number(
+                                                    row?.Conversion_Rate
+                                                  ) || 0;
+
+                                                if (
+                                                  previousUnit &&
+                                                  newUnit &&
+                                                  previousUnit !== newUnit &&
+                                                  primaryUnit &&
+                                                  secondaryUnit &&
+                                                  conversionRate > 0
+                                                ) {
+                                                  const basePrice =
+                                                    Number(basePurchasePriceRef.current[i]) || 0;
+
                                                   const baseUnit = basePurchaseUnitRef.current[i];
-                                                  if (basePrice <= 0 || !baseUnit) return;
+
+                                                  if (
+                                                    basePrice <= 0 ||
+                                                    !baseUnit
+                                                  )
+                                                    return;
 
                                                   let newPrice;
+
                                                   if (newUnit === baseUnit) {
                                                     newPrice = basePrice;
-                                                  } else if (baseUnit === primaryUnit && newUnit === secondaryUnit) {
-                                                    newPrice = basePrice / conversionRate;
-                                                  } else if (baseUnit === secondaryUnit && newUnit === primaryUnit) {
-                                                    newPrice = basePrice * conversionRate;
+                                                  } else if (
+                                                    baseUnit === primaryUnit &&
+                                                    newUnit === secondaryUnit
+                                                  ) {
+                                                    newPrice =
+                                                      basePrice /
+                                                      conversionRate;
+                                                  } else if (
+                                                    baseUnit === secondaryUnit &&
+                                                    newUnit === primaryUnit
+                                                  ) {
+                                                    newPrice =
+                                                      basePrice *
+                                                      conversionRate;
                                                   } else {
                                                     return;
                                                   }
 
-                                                  const roundedPrice = newPrice.toFixed(2);
-                                                  setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
+                                                  const roundedPrice =
+                                                    newPrice.toFixed(2);
 
-                                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                                    { ...itemsValues[i], Purchase_Price: roundedPrice }, i, itemsValues
+                                                  setValue(
+                                                    `items.${i}.Purchase_Price`,
+                                                    roundedPrice,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
                                                   );
-                                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+
+                                                  const {
+                                                    Tax_Amount,
+                                                    Amount,
+                                                    Total_Amount,
+                                                    Balance_Due,
+                                                  } = calculateRowAmount(
+                                                    {
+                                                      ...itemsValues[i],
+                                                      Purchase_Price:
+                                                        roundedPrice,
+                                                    },
+                                                    i,
+                                                    itemsValues
+                                                  );
+
+                                                  setValue(
+                                                    `items.${i}.Tax_Amount`,
+                                                    Tax_Amount,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
+
+                                                  setValue(
+                                                    `items.${i}.Amount`,
+                                                    Amount,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
+
+                                                  setValue(
+                                                    "Total_Amount",
+                                                    Total_Amount,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
+
+                                                  setValue(
+                                                    "Balance_Due",
+                                                    Balance_Due,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
                                                 }
                                               }}
                                               style={{
                                                 padding: "6px 10px",
                                                 fontSize: 12,
                                                 cursor: "pointer",
-                                                backgroundColor: isSelected ? "#eaf6f7" : "transparent",
-                                                color: isSelected ? "#4CA1AF" : "#374151",
-                                                fontWeight: isSelected ? 500 : 400,
+                                                backgroundColor: isSelected
+                                                  ? "#eaf6f7"
+                                                  : "transparent",
+                                                color: isSelected
+                                                  ? "#4CA1AF"
+                                                  : "#374151",
+                                                fontWeight: isSelected
+                                                  ? 500
+                                                  : 400,
                                               }}
-                                              onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "#f9fafb"; }}
-                                              onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
                                             >
-                                              {unit.Unit_Name} ({unit.Unit_Shorthand})
+                                              {getUnitLabel(unit)}
+                                              {/* {unit.Unit_Name} (
+                                              {unit.Unit_Shorthand}) */}
                                             </div>
                                           );
                                         })
@@ -2468,52 +2554,7 @@ export default function PurchaseAdd() {
                               placeholder="Price"
                             />
 
-                            {/* </div>
-                              {errors?.items?.[i]?.Purchase_Price && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors.items[i].Purchase_Price.message}
-                                </p>
-                              )} */}
-
-                            {/* <input
-  type="text"
-  className="form-control"
-  style={{ width: "100%", marginBottom: "0px" }}
-  {...register(`items.${i}.Purchase_Price`)}
-  onChange={(e) => {
-    let val = e.target.value;
-
-    val = val.replace(/[^0-9.]/g, "");   // allow only digits + dot
-
-    const parts = val.split(".");
-    if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-    if (val.includes(".")) {
-      const [int, dec] = val.split(".");
-      val = int + "." + dec.slice(0, 2);     // limit decimals to 2
-    }
-
-    e.target.value = val;
-
-    const priceNumber = Number(val) || 0; // convert safely
-
-    setValue(`items.${i}.Purchase_Price`, priceNumber, { shouldValidate: true });
-
-    if (!itemsValues[i]?.Item_Name?.trim()) return;
-
-    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-      { ...itemsValues[i], Purchase_Price: priceNumber }, // numeric value
-      i,
-      itemsValues
-    );
-
-    setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-    setValue(`items.${i}.Amount`, Amount);
-    setValue("Total_Amount", Total_Amount);
-    setValue("Balance_Due", Balance_Due);
-  }}
-  placeholder="Price"
-/> */}
+                          
 
                           </div>
                           {errors?.items?.[i]?.Purchase_Price && (
@@ -2726,7 +2767,7 @@ export default function PurchaseAdd() {
                             type="hidden"
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
-
+                          {/* 
                           <select
                             id="Payment_Type"
                             value={
@@ -2755,7 +2796,26 @@ export default function PurchaseAdd() {
                                 {bank.Account_Display_Name}
                               </option>
                             ))}
-                          </select>
+                          </select> */}
+                          <PaymentTypeSelect
+                            value={
+                              paymentType === "Bank"
+                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                : paymentType || ""
+                            }
+                            banks={banks}
+                            onAddBank={() => setShowBankModal(true)}
+                            onChange={(val) => {
+                              if (val.startsWith("bank_")) {
+                                const bankId = val.replace("bank_", "");
+                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                              } else {
+                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                              }
+                            }}
+                          />
 
                           {errors?.splits?.[0]?.Payment_Type && (
                             <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
@@ -2789,19 +2849,30 @@ export default function PurchaseAdd() {
                         {splitFields.map((field, index) => {
                           const rowType = watch(`splits.${index}.Payment_Type`);
                           const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
+                          //const rowOptions = getAvailableOptions(index);
                           const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
                           const amountField = register(`splits.${index}.Amount`, {
                             required: "Required",
                             validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                           });
+                          // inside splitFields.map
+                          const usedValues = splitsWatch
+                            .map((s, idx) => {
+                              if (idx === index) return null; // exclude current row
+                              return s.Payment_Type === "Bank"
+                                ? `bank_${s.Bank_Account_Id}`
+                                : s.Payment_Type || null;
+                            })
+                            .filter(Boolean);
+
+
 
                           return (
                             <div key={field.id} className="flex flex-col gap-2">
                               <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
                                 <div className="flex flex-col flex-1">
                                   <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
+                                  {/* <select
                                     value={currentIdentifier || ""}
                                     onChange={(e) => {
                                       const val = e.target.value;
@@ -2821,7 +2892,22 @@ export default function PurchaseAdd() {
                                         {opt.label}
                                       </option>
                                     ))}
-                                  </select>
+                                  </select> */}
+                                  <PaymentTypeSelect
+                                    value={currentIdentifier || ""}
+                                    banks={banks}
+                                    onAddBank={() => setShowBankModal(true)}
+                                    usedValues={usedValues}
+                                    onChange={(val) => {
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                  />
                                 </div>
 
                                 <div className="flex flex-col flex-1">
@@ -2893,7 +2979,7 @@ export default function PurchaseAdd() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -2913,7 +2999,7 @@ export default function PurchaseAdd() {
 
                             setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
                             setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
-
+                            
                           } else {
                             if (originalTotal !== null) {
                               setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
@@ -2952,6 +3038,46 @@ export default function PurchaseAdd() {
                           setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div> */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={isRoundOff}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setIsRoundOff(isChecked);
+
+                          const rawTotal = getRawTotal();
+
+                          if (isChecked) {
+                            const rounded = Math.round(rawTotal);
+                            const diff = Number((rounded - rawTotal).toFixed(2));
+                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(diff);
+                          } else {
+                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(0);
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                      <input
+                        type="text"
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="border border-gray-300 text-right text-sm"
+                        {...register("Round_Off")}
+                        disabled={!isRoundOff}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                          const numVal = parseFloat(val) || 0;
+                          applyRoundOff(numVal);
+                        }}
                       />
                     </div>
 
@@ -3144,9 +3270,8 @@ export default function PurchaseAdd() {
           }}
 
         />
-      )
+      )}
 
-      }
       {showItemAddModal && (
         <AddItemModal
           onClose={() => {
@@ -3178,6 +3303,20 @@ export default function PurchaseAdd() {
             }
 
             setActiveItemRow(null);
+          }}
+        />
+      )}
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
           }}
         />
       )}

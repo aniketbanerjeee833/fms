@@ -1,6 +1,7 @@
 
 
 import db from "../config/db.js";
+import { syncUnitIdsForItem } from "../helpers/unitSyncHelper.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 import { sanitizeObject } from "../utils/sanitizeInput.js";
 import itemFormSchema from "../validators/itemSchema.js";
@@ -401,36 +402,12 @@ const addItem = async (req, res, next) => {
       ]
     );
 
-
+await syncUnitIdsForItem(connection, itemId);
     // =========================================================
     // 10. SAVE UNIT CONVERSION
     // =========================================================
 
-    // if (
-    //   primaryUnit &&
-    //   secondaryUnit &&
-    //   conversionRate !== null &&
-    //   Number(conversionRate) > 0
-    // ) {
-    //   await connection.execute(
-    //     `
-    //   INSERT IGNORE INTO item_unit_conversions
-    //   (
-    //     Item_Id,
-    //     Primary_Unit,
-    //     Secondary_Unit,
-    //     Conversion_Rate
-    //   )
-    //   VALUES (?, ?, ?, ?)
-    // `,
-    //     [
-    //       itemId,
-    //       primaryUnit,
-    //       secondaryUnit,
-    //       conversionRate,
-    //     ]
-    //   );
-    // }
+    
 
     
     if (
@@ -805,38 +782,8 @@ const editItem = async (req, res, next) => {
     // Secondary_Unit can still change.
     // =========================================================
 
-    //   const [[existingItem]] = await connection.query(
-    //     `
-    //   SELECT Primary_Unit
-    //   FROM add_item
-    //   WHERE Item_Id = ?
-    //   LIMIT 1
-    // `,
-    //     [Item_Id]
-    //   );
-    // SELECT
-    //   Primary_Unit,
-    //   Secondary_Unit,
-    //   Conversion_Rate
-    // FROM add_item
-    // WHERE Item_Id = ?
-    // LIMIT 1
-    //     const [[existingItem]] = await connection.query(
-    //       `
 
-    //   SELECT
-    //   id,
-    //   Primary_Unit,
-    //   Secondary_Unit,
-    //   Conversion_Rate
-    // FROM add_item
-    // WHERE Item_Id = ?
-    // LIMIT 1
-
-
-    //   `,
-    //       [Item_Id]
-    //     );
+  
     const [[existingItem]] = await connection.query(
       `
   SELECT
@@ -1037,6 +984,7 @@ WHERE Item_Id=?`,
       await connection.rollback();
       return res.status(404).json({ message: "Item not found" });
     }
+    await syncUnitIdsForItem(connection, Item_Id);
     // =========================================================
     // UPDATE OPENING STOCK LEDGER
     // =========================================================
@@ -1106,44 +1054,7 @@ WHERE Item_Id=?`,
     // SAVE UNIT CONVERSION HISTORY
     // =========================================================
 
-    // if (
-    //   Primary_Unit &&
-    //   Secondary_Unit &&
-    //   Number(Conversion_Rate) > 0
-    // ) {
-    //   await connection.execute(
-    //     `
-    //   INSERT INTO item_unit_conversions
-    //   (
-    //     Item_Id,
-    //     Primary_Unit,
-    //     Secondary_Unit,
-    //     Conversion_Rate
-    //   )
-    //   SELECT ?, ?, ?, ?
-    //   WHERE NOT EXISTS (
-    //     SELECT 1
-    //     FROM item_unit_conversions
-    //     WHERE Item_Id = ?
-    //       AND Primary_Unit = ?
-    //       AND Secondary_Unit = ?
-    //       AND Conversion_Rate = ?
-    //   )
-    // `,
-    //     [
-    //       Item_Id,
-    //       Primary_Unit,
-    //       Secondary_Unit,
-    //       Conversion_Rate,
-
-    //       Item_Id,
-    //       Primary_Unit,
-    //       Secondary_Unit,
-    //       Conversion_Rate,
-    //     ]
-    //   );
-    // }
-
+   
     
     if (
       Primary_Unit &&
@@ -1302,13 +1213,13 @@ await connection.query(
     // =========================================================
     // DELETE ITEM UNIT CONVERSIONS
     // =========================================================
-    await connection.query(
-      `
-      DELETE FROM item_unit_conversions
-      WHERE Item_Id = ?
-      `,
-      [Item_Id]
-    );
+    // await connection.query(
+    //   `
+    //   DELETE FROM item_unit_conversions
+    //   WHERE Item_Id = ?
+    //   `,
+    //   [Item_Id]
+    // );
 
     // =========================================================
     //  DELETE STOCK ADJUSTMENTS
@@ -1447,134 +1358,6 @@ const eachItemBillAndInvoiceNumbers = async (req, res, next) => {
 
 
 
-// const getAllItems = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const page = req.query.page ? parseInt(req.query.page, 10) : null;
-//     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-//     console.log("🔍 Params =>", { page, search, fromDate, toDate });
-//     console.log(fromDate, toDate, search, page);
-//     const limit = 10;
-//     const offset = page ? (page - 1) * limit : 0;
-
-//     // ✅ Build WHERE clause dynamically
-//     let whereClauses = [];
-//     let params = [];
-
-//     // 🧠 Search term condition
-//     if (search) {
-//       whereClauses.push(`
-//         (LOWER(Item_Name) LIKE ? 
-//          OR LOWER(Item_Category) LIKE ? 
-//          OR LOWER(Item_HSN) LIKE ? 
-//          OR LOWER(Item_Id) LIKE ? 
-//          OR LOWER(Item_Unit) LIKE ?)
-//       `);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like, like);
-//     }
-
-//     // 📅 Date range condition
-//     // if (fromDate && toDate) {
-//     //   whereClauses.push("DATE(created_at) BETWEEN ? AND ?");
-//     //   params.push(fromDate, toDate);
-//     // } else if (fromDate) {
-//     //   whereClauses.push("DATE(created_at) >= ?");
-//     //   params.push(fromDate);
-//     // } else if (toDate) {
-//     //   whereClauses.push("DATE(created_at) <= ?");
-//     //   params.push(toDate);
-//     // }
-//     if (fromDate && toDate) {
-//       whereClauses.push(`DATE(created_at) BETWEEN ? AND ?`);
-//       params.push(
-//         `${fromDate} 00:00:00`,
-//         `${toDate} 23:59:59`
-//       );
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(created_at) >= ?`);
-//       params.push(`${fromDate} 00:00:00`);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(created_at) <= ?`);
-//       params.push(`${toDate} 23:59:59`);
-//     }
-//     // Combine WHERE clauses
-//     const whereSQL = whereClauses.length ? "WHERE " + whereClauses.join(" AND ") : "";
-
-//     // ✅ Fetch items
-//     const query = `
-//       SELECT * FROM add_item 
-//       ${whereSQL}
-//       ORDER BY created_at DESC
-//       ${page ? "LIMIT ? OFFSET ?" : ""}
-//     `;
-//     if (page) params.push(limit, offset);
-
-//     const [items] = await db.query(query, params);
-
-//     // ✅ Count total for pagination
-//     let [totalItems] = await db.query(
-//       `SELECT COUNT(*) AS total FROM add_item ${whereSQL}`,
-//       params.slice(0, params.length - (page ? 2 : 0))
-//     );
-
-//     // ✅ Get latest purchase and sales prices
-//     const [purchaseItems] = await db.query(`
-//       SELECT Item_Id, Purchase_Price,Tax_Type 
-//       FROM add_purchase_items 
-//       ORDER BY created_at DESC
-//     `);
-//     const [salesItems] = await db.query(`
-//       SELECT Item_Id, Sale_Price 
-//       FROM add_sale_items 
-//       ORDER BY created_at DESC
-//     `);
-
-//     const latestPurchasePrice = {};
-//     const latestTaxType = {};
-//     purchaseItems.forEach((row) => {
-//       if (!latestPurchasePrice[row.Item_Id]) {
-//         latestPurchasePrice[row.Item_Id] = row.Purchase_Price;
-//         latestTaxType[row.Item_Id] = row.Tax_Type;
-//       }
-//     });
-//     const latestSalePrice = {};
-//     salesItems.forEach((row) => {
-//       if (!latestSalePrice[row.Item_Id]) {
-//         latestSalePrice[row.Item_Id] = row.Sale_Price;
-//       }
-//     });
-
-//     //console.log(latestPurchasePrice, latestTaxType, latestSalePrice);
-//     // ✅ Merge results
-//     const combined = items.map((item) => ({
-//       ...item,
-//       Purchase_Price: latestPurchasePrice[item.Item_Id] || 0.0,
-//       Tax_Type: latestTaxType[item.Item_Id],
-//       Sale_Price: latestSalePrice[item.Item_Id] || 0.0,
-//     }));
-
-//     //console.log(combined);
-//     // ✅ Response
-//     return res.status(200).json({
-//       success: true,
-//       currentPage: page || 1,
-//       totalPages: page ? Math.ceil(totalItems[0].total / limit) : 1,
-//       totalItems: totalItems[0].total,
-//       items: combined,
-//     });
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error fetching items:", err);
-//     next(err);
-//     // return res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 
 const getAllItems = async (req, res, next) => {
@@ -1658,12 +1441,35 @@ const getAllItems = async (req, res, next) => {
     // 3. GET ITEMS
     // =========================================================
 
+    // let query = `
+    //   SELECT *
+    //   FROM add_item
+    //   ${whereSQL}
+    //   ORDER BY created_at DESC
+    // `;
     let query = `
-      SELECT *
-      FROM add_item
-      ${whereSQL}
-      ORDER BY created_at DESC
-    `;
+  SELECT
+    ai.*,
+
+
+    pu.Unit_Name      AS Primary_Unit_Name,
+    pu.Unit_Shorthand AS Primary_Unit_Shorthand,
+
+    su.Unit_Name      AS Secondary_Unit_Name,
+    su.Unit_Shorthand AS Secondary_Unit_Shorthand
+
+  FROM add_item ai
+
+  LEFT JOIN units pu
+    ON ai.Primary_Unit_Id = pu.id
+
+  LEFT JOIN units su
+    ON ai.Secondary_Unit_Id = su.id
+
+  ${whereSQL}
+
+  ORDER BY ai.created_at DESC
+`;
 
     if (page) {
       query += ` LIMIT ? OFFSET ?`;
@@ -1844,91 +1650,160 @@ FROM (
     // =========================================================
     // 11. MERGE EVERYTHING
     // =========================================================
-    const [unitMaster] = await connection.query(`
-  SELECT
-    Unit_Name,
-    Unit_Shorthand
-  FROM units
-`);
-    const unitLookup = {};
+//     const [unitMaster] = await connection.query(`
+//   SELECT
+//     Unit_Name,
+//     Unit_Shorthand
+//   FROM units
+// `);
+//     const unitLookup = {};
 
-    unitMaster.forEach((unit) => {
-      unitLookup[unit.Unit_Shorthand] = unit.Unit_Name;
+//     unitMaster.forEach((unit) => {
+//       unitLookup[unit.Unit_Shorthand] = unit.Unit_Name;
+//     });
+const combined = items.map((item) => {
+  const availableUnits = [];
+
+  // PRIMARY
+  if (item.Primary_Unit_Id) {
+    availableUnits.push({
+      Unit_Id: item.Primary_Unit_Id,
+      Unit_Shorthand:
+        item.Primary_Unit_Shorthand,
+
+      Unit_Name:
+        item.Primary_Unit_Name,
     });
+  }
 
-    const combined = items.map((item) => {
-      // =======================================================
-      // AVAILABLE UNITS = CURRENT ITEM MASTER ONLY
-      //
-      // Example:
-      // Current master:
-      // Primary   = Kgs
-      // Secondary = BOX
-      //
-      // Available_Units:
-      // Kgs + BOX
-      //
-      // OLD Kgs/gm conversions are NOT included here.
-      // =======================================================
+  // SECONDARY
+  if (
+    item.Secondary_Unit_Id &&
+    item.Secondary_Unit_Id !== item.Primary_Unit_Id
+  ) {
+    availableUnits.push({
+      Unit_Id: item.Secondary_Unit_Id,
 
-      const availableUnits = [];
+      Unit_Shorthand:
+        item.Secondary_Unit_Shorthand,
 
-      // PRIMARY
-      if (item.Primary_Unit) {
-        availableUnits.push({
-          Unit_Shorthand: item.Primary_Unit,
-
-          Unit_Name:
-            unitLookup[item.Primary_Unit] ||
-            item.Primary_Unit,
-        });
-      }
-
-      // SECONDARY
-      if (
-        item.Secondary_Unit &&
-        item.Secondary_Unit !== item.Primary_Unit
-      ) {
-        availableUnits.push({
-          Unit_Shorthand: item.Secondary_Unit,
-
-          Unit_Name:
-            unitLookup[item.Secondary_Unit] ||
-            item.Secondary_Unit,
-        });
-      }
-      const hasTransactions = usedItemSet.has(item.Item_Id);
-
-      const canEditUnits =
-        !item.Primary_Unit
-          ? true
-          : !item.Secondary_Unit
-            ? true
-            : !hasTransactions;
-
-      const isService = item.Item_Type === "Service";
-      return {
-        ...item,
-
-        // Prices now come directly from add_item
-        Purchase_Price: isService
-          ? null
-          : (item.Purchase_Price ?? 0),
-        //Purchase_Price: item.Purchase_Price ?? 0,
-
-        Stock_Quantity: isService
-          ? null
-          : (item.Stock_Quantity ?? 0),
-        Sale_Price: item.Sale_Price ?? 0,
-
-        Available_Units: availableUnits,
-
-        unitConversions: conversionsByItem[item.Item_Id] || [],
-
-        Can_Edit_Units: canEditUnits,
-      };
-
+      Unit_Name:
+        item.Secondary_Unit_Name,
     });
+  }
+
+  const hasTransactions =
+    usedItemSet.has(item.Item_Id);
+
+  const canEditUnits =
+    !item.Primary_Unit_Id
+      ? true
+      : !item.Secondary_Unit_Id
+      ? true
+      : !hasTransactions;
+
+  const isService =
+    item.Item_Type === "Service";
+
+  return {
+    ...item,
+ //Item_Unit:item.Item_Unit_Shorthand || item.Item_Unit,
+
+  // Primary_Unit:
+  //   item.Primary_Unit_Shorthand || item.Primary_Unit,
+
+  // Secondary_Unit:
+  //   item.Secondary_Unit_Shorthand || item.Secondary_Unit,
+    Purchase_Price: isService
+      ? null
+      : (item.Purchase_Price ?? 0),
+
+    Stock_Quantity: isService
+      ? null
+      : (item.Stock_Quantity ?? 0),
+
+    Sale_Price:item.Sale_Price ?? 0,
+
+    Available_Units:availableUnits,
+
+    unitConversions:conversionsByItem[item.Item_Id] || [],
+
+    Can_Edit_Units:canEditUnits,
+  };
+});
+    // const combined = items.map((item) => {
+    //   // =======================================================
+    //   // AVAILABLE UNITS = CURRENT ITEM MASTER ONLY
+    //   //
+    //   // Example:
+    //   // Current master:
+    //   // Primary   = Kgs
+    //   // Secondary = BOX
+    //   //
+    //   // Available_Units:
+    //   // Kgs + BOX
+    //   //
+    //   // OLD Kgs/gm conversions are NOT included here.
+    //   // =======================================================
+
+    //   const availableUnits = [];
+
+    //   // PRIMARY
+    //   if (item.Primary_Unit) {
+    //     availableUnits.push({
+    //       Unit_Shorthand: item.Primary_Unit,
+
+    //       Unit_Name:
+    //         unitLookup[item.Primary_Unit] ||
+    //         item.Primary_Unit,
+    //     });
+    //   }
+
+    //   // SECONDARY
+    //   if (
+    //     item.Secondary_Unit &&
+    //     item.Secondary_Unit !== item.Primary_Unit
+    //   ) {
+    //     availableUnits.push({
+    //       Unit_Shorthand: item.Secondary_Unit,
+
+    //       Unit_Name:
+    //         unitLookup[item.Secondary_Unit] ||
+    //         item.Secondary_Unit,
+    //     });
+    //   }
+    //   const hasTransactions = usedItemSet.has(item.Item_Id);
+
+    //   const canEditUnits =
+    //     !item.Primary_Unit
+    //       ? true
+    //       : !item.Secondary_Unit
+    //         ? true
+    //         : !hasTransactions;
+
+    //   const isService = item.Item_Type === "Service";
+    //   return {
+    //     ...item,
+
+    //     // Prices now come directly from add_item
+    //     Purchase_Price: isService
+    //       ? null
+    //       : (item.Purchase_Price ?? 0),
+    //     //Purchase_Price: item.Purchase_Price ?? 0,
+
+    //     Stock_Quantity: isService
+    //       ? null
+    //       : (item.Stock_Quantity ?? 0),
+    //     Sale_Price: item.Sale_Price ?? 0,
+
+    //     Available_Units: availableUnits,
+
+    //     unitConversions: conversionsByItem[item.Item_Id] || [],
+
+    //     Can_Edit_Units: canEditUnits,
+    //   };
+
+    // });
 
     // =========================================================
     // 12. RESPONSE
@@ -1975,72 +1850,67 @@ const getAllItemsForLedger = async (req, res, next) => {
     const cursorId = req.query.cursor ? Number(req.query.cursor) : null;
     const type = req.query.type?.trim();
 
-    // const params = [];
-
-    // let whereSQL = "";
-
-    // if (search) {
-    //   const like = `%${search}%`;
-
-    //   whereSQL = `
-    //     WHERE (
-    //       LOWER(Item_Name) LIKE ?
-    //       OR LOWER(Item_Category) LIKE ?
-    //       OR LOWER(Item_HSN) LIKE ?
-    //       OR LOWER(Item_Id) LIKE ?
-    //       OR LOWER(Item_Unit) LIKE ?
-    //       OR LOWER(Primary_Unit) LIKE ?
-    //       OR LOWER(Secondary_Unit) LIKE ?
-    //     )
-    //   `;
-
-    //   params.push(
-    //     like,
-    //     like,
-    //     like,
-    //     like,
-    //     like,
-    //     like,
-    //     like
-    //   );
-    // }
-    // if (cursorId) {
-    //   whereClauses.push(`id < ?`);
-    //   params.push(cursorId);
-    // }
+   
     const whereParts = [];
     const params = [];
 
 
-    if (search) {
-      const like = `%${search}%`;
+  //   if (search) {
+  //     const like = `%${search}%`;
 
-      whereParts.push(`(
-    LOWER(Item_Name) LIKE ?
-    OR LOWER(Item_Category) LIKE ?
-    OR LOWER(Item_HSN) LIKE ?
-    OR LOWER(Item_Id) LIKE ?
-    OR LOWER(Item_Unit) LIKE ?
-    OR LOWER(Primary_Unit) LIKE ?
-    OR LOWER(Secondary_Unit) LIKE ?
+  //     whereParts.push(`(
+  //   LOWER(Item_Name) LIKE ?
+  //   OR LOWER(Item_Category) LIKE ?
+  //   OR LOWER(Item_HSN) LIKE ?
+  //   OR LOWER(Item_Id) LIKE ?
+  //   OR LOWER(Item_Unit) LIKE ?
+  //   OR LOWER(Primary_Unit) LIKE ?
+  //   OR LOWER(Secondary_Unit) LIKE ?
+  // )`);
+
+  //     params.push(like, like, like, like, like, like, like);
+  //   }
+
+  //   if (type === "Product") {
+  //     whereParts.push(`Item_Type = 'Product'`);
+  //   }
+
+  //   if (type === "Service") {
+  //     whereParts.push(`Item_Type = 'Service'`);
+  //   }
+
+  //   if (cursorId) {
+  //     whereParts.push(`id < ?`);
+  //     params.push(cursorId);
+  //   }
+if (search) {
+  const like = `%${search}%`;
+
+  whereParts.push(`(
+    LOWER(ai.Item_Name) LIKE ?
+    OR LOWER(ai.Item_Category) LIKE ?
+    OR LOWER(ai.Item_HSN) LIKE ?
+    OR LOWER(ai.Item_Id) LIKE ?
+    OR LOWER(ai.Item_Unit) LIKE ?
+    OR LOWER(ai.Primary_Unit) LIKE ?
+    OR LOWER(ai.Secondary_Unit) LIKE ?
   )`);
 
-      params.push(like, like, like, like, like, like, like);
-    }
+  params.push(like, like, like, like, like, like, like);
+}
 
-    if (type === "Product") {
-      whereParts.push(`Item_Type = 'Product'`);
-    }
+if (type === "Product") {
+  whereParts.push(`ai.Item_Type = 'Product'`);
+}
 
-    if (type === "Service") {
-      whereParts.push(`Item_Type = 'Service'`);
-    }
+if (type === "Service") {
+  whereParts.push(`ai.Item_Type = 'Service'`);
+}
 
-    if (cursorId) {
-      whereParts.push(`id < ?`);
-      params.push(cursorId);
-    }
-
+if (cursorId) {
+  whereParts.push(`ai.id < ?`);
+  params.push(cursorId);
+}
     const whereSQL =
       whereParts.length
         ? `WHERE ${whereParts.join(" AND ")}`
@@ -2295,189 +2165,304 @@ const getAllItemsForLedger = async (req, res, next) => {
     // Used to show unit name + shorthand
     // =========================================================
 
-    const [unitMaster] = await connection.query(
-      `
-      SELECT
-        Unit_Name,
-        Unit_Shorthand
-      FROM units
-      `
-    );
+    // const [unitMaster] = await connection.query(
+    //   `
+    //   SELECT
+    //     Unit_Name,
+    //     Unit_Shorthand
+    //   FROM units
+    //   `
+    // );
 
-    const unitLookup = {};
+    // const unitLookup = {};
 
-    unitMaster.forEach((unit) => {
-      unitLookup[unit.Unit_Shorthand] =
-        unit.Unit_Name;
-    });
+    // unitMaster.forEach((unit) => {
+    //   unitLookup[unit.Unit_Shorthand] =
+    //     unit.Unit_Name;
+    // });
 
 
-    const [[{ totalItems }]] = await db.query(
-      `
+  //   const [[{ totalItems }]] = await db.query(
+  //     `
+  // SELECT COUNT(*) AS totalItems
+  // FROM add_item
+  // ${whereSQL}
+  // `,
+  //     params
+  //   );
+  const [[{ totalItems }]] = await connection.query(
+  `
   SELECT COUNT(*) AS totalItems
-  FROM add_item
+  FROM add_item ai
   ${whereSQL}
   `,
-      params
-    );
+  params
+);
 
-    const [rows] = await db.query(
-      `
-  SELECT *
-  FROM add_item
-  ${whereSQL}
-  ORDER BY id DESC
-  LIMIT ?
-  `,
-      [...params, limit + 1]
-    );
+  //   const [rows] = await db.query(
+  //     `
+  // SELECT *
+  // FROM add_item
+  // ${whereSQL}
+  // ORDER BY id DESC
+  // LIMIT ?
+  // `,
+  //     [...params, limit + 1]
+  //   );
+  const [rows]= await db.query(
+    `SELECT
+  ai.*,
+
+  pu.Unit_Name      AS Primary_Unit_Name,
+  pu.Unit_Shorthand AS Primary_Unit_Shorthand,
+
+  su.Unit_Name      AS Secondary_Unit_Name,
+  su.Unit_Shorthand AS Secondary_Unit_Shorthand
+
+FROM add_item ai
+
+LEFT JOIN units pu
+  ON ai.Primary_Unit_Id = pu.id
+
+LEFT JOIN units su
+  ON ai.Secondary_Unit_Id = su.id
+
+${whereSQL}
+
+ORDER BY ai.id DESC
+LIMIT ?`
+    ,
+    [...params, limit + 1]
+  )
 
     const hasMore = rows.length > limit;
     const pageItems = hasMore ? rows.slice(0, limit) : rows;
-    // const hasMore = items.length > limit;
-    // const pageItems = hasMore ? items.slice(0, limit) : items;
-    const result = pageItems.map((item) => {
+   
+    // const result = pageItems.map((item) => {
 
-      // -------------------------------------------------------
-      // CURRENT AVAILABLE UNITS
-      //
-      // Only current item master units.
-      // Historical conversions are kept separately.
-      // -------------------------------------------------------
+    //   // -------------------------------------------------------
+    //   // CURRENT AVAILABLE UNITS
+    //   //
+    //   // Only current item master units.
+    //   // Historical conversions are kept separately.
+    //   // -------------------------------------------------------
 
-      const availableUnits = [];
+    //   const availableUnits = [];
 
-      // PRIMARY UNIT
-      if (item.Primary_Unit) {
-        availableUnits.push({
-          Unit_Shorthand:
-            item.Primary_Unit,
+    //   // PRIMARY UNIT
+    //   if (item.Primary_Unit) {
+    //     availableUnits.push({
+    //       Unit_Shorthand:
+    //         item.Primary_Unit,
 
-          Unit_Name:
-            unitLookup[item.Primary_Unit] ||
-            item.Primary_Unit,
-        });
-      }
+    //       Unit_Name:
+    //         unitLookup[item.Primary_Unit] ||
+    //         item.Primary_Unit,
+    //     });
+    //   }
 
-      // SECONDARY UNIT
-      if (
-        item.Secondary_Unit &&
-        item.Secondary_Unit !== item.Primary_Unit
-      ) {
-        availableUnits.push({
-          Unit_Shorthand:
-            item.Secondary_Unit,
+    //   // SECONDARY UNIT
+    //   if (
+    //     item.Secondary_Unit &&
+    //     item.Secondary_Unit !== item.Primary_Unit
+    //   ) {
+    //     availableUnits.push({
+    //       Unit_Shorthand:
+    //         item.Secondary_Unit,
 
-          Unit_Name:
-            unitLookup[item.Secondary_Unit] ||
-            item.Secondary_Unit,
-        });
-      }
+    //       Unit_Name:
+    //         unitLookup[item.Secondary_Unit] ||
+    //         item.Secondary_Unit,
+    //     });
+    //   }
 
-      // =======================================================
-      // UNIT USAGE / EDIT PERMISSION
-      // =======================================================
+    //   // =======================================================
+    //   // UNIT USAGE / EDIT PERMISSION
+    //   // =======================================================
 
-      // const hasTransactions =usedItemSet.has(item.Item_Id);
-
+    //   // const hasTransactions =usedItemSet.has(item.Item_Id);
 
 
-      // const canEditUnits =
-      //   !item.Primary_Unit
-      //     ? true
-      //     : !item.Secondary_Unit
-      //       ? true
-      //       : !hasTransactions;
-      const usedUnits =
-        usedUnitsByItem[item.Item_Id] || new Set();
 
-      const primaryUsed =
-        item.Primary_Unit
-          ? usedUnits.has(item.Primary_Unit)
-          : false;
+      
+    //   const usedUnits =
+    //     usedUnitsByItem[item.Item_Id] || new Set();
 
-      const secondaryUsed =
-        item.Secondary_Unit
-          ? usedUnits.has(item.Secondary_Unit)
-          : false;
+    //   const primaryUsed =
+    //     item.Primary_Unit
+    //       ? usedUnits.has(item.Primary_Unit)
+    //       : false;
 
-      //    const canEditUnits =
-      // !item.Secondary_Unit
-      //   ? true
-      //   : !primaryUsed;
-      const canEditUnits = {
-        Primary: !primaryUsed,
+    //   const secondaryUsed =
+    //     item.Secondary_Unit
+    //       ? usedUnits.has(item.Secondary_Unit)
+    //       : false;
 
-        // If there is no secondary yet, it can be added.
-        // If secondary exists, it can only be changed if it has NOT been used.
-        Secondary: !secondaryUsed,
-      };
-      //           console.log("🔍 UNIT CHECK", {
-      //   Item_Id: item.Item_Id,
-      //   Primary_Unit: item.Primary_Unit,
-      //   Secondary_Unit: item.Secondary_Unit,
-      //   usedUnits: [...usedUnits],
-      //   primaryUsed,
-      //   canEditUnits,
-      // });
-      // -------------------------------------------------------
-      // RETURN ITEM
-      // -------------------------------------------------------
+    //   //    const canEditUnits =
+    //   // !item.Secondary_Unit
+    //   //   ? true
+    //   //   : !primaryUsed;
+    //   const canEditUnits = {
+    //     Primary: !primaryUsed,
 
-      return {
-        ...item,
+    //     // If there is no secondary yet, it can be added.
+    //     // If secondary exists, it can only be changed if it has NOT been used.
+    //     Secondary: !secondaryUsed,
+    //   };
+    
+    //   // -------------------------------------------------------
+    //   // RETURN ITEM
+    //   // -------------------------------------------------------
 
-        // Latest transaction information
-        Purchase_Price:
-          latestPurchasePrice[item.Item_Id] ?? 0,
+    //   return {
+    //     ...item,
 
-        Tax_Type:
-          latestTaxType[item.Item_Id] ?? null,
+    //     // Latest transaction information
+    //     Purchase_Price:
+    //       latestPurchasePrice[item.Item_Id] ?? 0,
 
-        Sale_Price:
-          latestSalePrice[item.Item_Id] ?? 0,
+    //     Tax_Type:
+    //       latestTaxType[item.Item_Id] ?? null,
 
-        // Current configured units
-        Available_Units: availableUnits,
+    //     Sale_Price:
+    //       latestSalePrice[item.Item_Id] ?? 0,
 
-        // Historical conversion records
-        unitConversions:
-          conversionsByItem[item.Item_Id] || [],
+    //     // Current configured units
+    //     Available_Units: availableUnits,
 
-        // Unit editing permission
-        Can_Edit_Units:
-          canEditUnits,
+    //     // Historical conversion records
+    //     unitConversions:
+    //       conversionsByItem[item.Item_Id] || [],
 
-        // Numeric values
-        Conversion_Rate:
-          item.Conversion_Rate !== null
-            ? Number(item.Conversion_Rate)
-            : null,
+    //     // Unit editing permission
+    //     Can_Edit_Units:
+    //       canEditUnits,
 
-        Stock_Quantity:
-          Number(item.Stock_Quantity || 0),
+    //     // Numeric values
+    //     Conversion_Rate:
+    //       item.Conversion_Rate !== null
+    //         ? Number(item.Conversion_Rate)
+    //         : null,
 
-        Opening_Quantity:
-          item.Opening_Quantity !== null
-            ? Number(item.Opening_Quantity)
-            : null,
+    //     Stock_Quantity:
+    //       Number(item.Stock_Quantity || 0),
 
-        At_Price:
-          item.At_Price !== null
-            ? Number(item.At_Price)
-            : null,
+    //     Opening_Quantity:
+    //       item.Opening_Quantity !== null
+    //         ? Number(item.Opening_Quantity)
+    //         : null,
 
-        Min_Stock:
-          item.Min_Stock !== null
-            ? Number(item.Min_Stock)
-            : null,
-      };
-    });
+    //     At_Price:
+    //       item.At_Price !== null
+    //         ? Number(item.At_Price)
+    //         : null,
+
+    //     Min_Stock:
+    //       item.Min_Stock !== null
+    //         ? Number(item.Min_Stock)
+    //         : null,
+    //   };
+    // });
 
     // =========================================================
     // 12. RESPONSE
     // =========================================================
 
+const result = pageItems.map((item) => {
+  // =======================================================
+  // AVAILABLE UNITS
+  // =======================================================
+
+  const availableUnits = [];
+
+  if (item.Primary_Unit_Id) {
+    availableUnits.push({
+      Unit_Id: item.Primary_Unit_Id,
+      Unit_Shorthand: item.Primary_Unit_Shorthand,
+      Unit_Name: item.Primary_Unit_Name,
+    });
+  }
+
+  if (
+    item.Secondary_Unit_Id &&
+    item.Secondary_Unit_Id !== item.Primary_Unit_Id
+  ) {
+    availableUnits.push({
+      Unit_Id: item.Secondary_Unit_Id,
+      Unit_Shorthand: item.Secondary_Unit_Shorthand,
+      Unit_Name: item.Secondary_Unit_Name,
+    });
+  }
+
+  // =======================================================
+  // UNIT USAGE / EDIT PERMISSION
+  // =======================================================
+
+  const usedUnits =
+    usedUnitsByItem[item.Item_Id] || new Set();
+
+  const primaryUsed =
+    item.Primary_Unit_Shorthand
+      ? usedUnits.has(item.Primary_Unit_Shorthand)
+      : false;
+
+  const secondaryUsed =
+    item.Secondary_Unit_Shorthand
+      ? usedUnits.has(item.Secondary_Unit_Shorthand)
+      : false;
+
+  const canEditUnits = {
+    Primary: !primaryUsed,
+    Secondary: !secondaryUsed,
+  };
+
+  // =======================================================
+  // RETURN ITEM
+  // =======================================================
+
+  return {
+    ...item,
+
+    Purchase_Price:
+      latestPurchasePrice[item.Item_Id] ?? 0,
+
+    Tax_Type:
+      latestTaxType[item.Item_Id] ?? null,
+
+    Sale_Price:
+      latestSalePrice[item.Item_Id] ?? 0,
+
+    Available_Units: availableUnits,
+
+    unitConversions:
+      conversionsByItem[item.Item_Id] || [],
+
+    Can_Edit_Units: canEditUnits,
+
+    Conversion_Rate:
+      item.Conversion_Rate !== null
+        ? Number(item.Conversion_Rate)
+        : null,
+
+    Stock_Quantity:
+      Number(item.Stock_Quantity || 0),
+
+    Opening_Quantity:
+      item.Opening_Quantity !== null
+        ? Number(item.Opening_Quantity)
+        : null,
+
+    At_Price:
+      item.At_Price !== null
+        ? Number(item.At_Price)
+        : null,
+
+    Min_Stock:
+      item.Min_Stock !== null
+        ? Number(item.Min_Stock)
+        : null,
+  };
+});
     return res.status(200).json({
       success: true,
       totalItems,
@@ -4379,14 +4364,13 @@ const editStockAdjustment = async (req, res, next) => {
         SELECT
           Conversion_Rate
         FROM item_unit_conversions
-        WHERE Item_Id = ?
-          AND Primary_Unit = ?
+        WHERE  Primary_Unit = ?
           AND Secondary_Unit = ?
         ORDER BY id DESC
         LIMIT 1
         `,
         [
-          Item_Id,
+          
           item.Primary_Unit,
           Selected_Unit,
         ]

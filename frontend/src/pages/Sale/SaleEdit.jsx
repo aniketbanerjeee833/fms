@@ -130,7 +130,7 @@ export default function SaleEdit() {
   const [showEditPartyModal, setShowEditPartyModal] = useState(false);
   const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
   const [showSplitBox, setShowSplitBox] = useState(false);
-  const [originalTotal, setOriginalTotal] = useState(null);
+  //const [originalTotal, setOriginalTotal] = useState(null);
   const [showBankModal, setShowBankModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState({
     open: false,
@@ -142,6 +142,7 @@ export default function SaleEdit() {
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
+   const [isRoundOff, setIsRoundOff] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
 
@@ -169,6 +170,7 @@ export default function SaleEdit() {
       Invoice_Date: "",
       State_Of_Supply: "",
       Total_Amount: "",
+      Round_Off: "",   
       Balance_Due: "",
       Total_Received: "",
       Terms_Conditions_Id: null,
@@ -276,84 +278,7 @@ export default function SaleEdit() {
     name: "splits",
   });
 
-
-  const handleAddRow = () => {
-    setRows((prev) => [
-      // only close CategoryOpen, preserve lock states
-      ...prev.map((row) => ({
-        ...row,
-        CategoryOpen: false,
-        itemOpen: false, // also close item dropdown if open
-        unitOpen: false
-      })),
-      {
-        itemSearch: "",
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: false,
-        isUnitLocked: false,
-        isExistingItem: false,
-        categorySearch: "",
-        unitOpen: false,
-        unitSearch: "",
-      },
-    ]);
-
-    append({
-      Item_Category: "",
-      Item_Name: "",
-      Item_HSN: "",
-      Quantity: "",
-      Item_Unit: "",
-      Sale_Price: "",
-      Discount_On_Sale_Price: "",
-      Discount_Type_On_Sale_Price: "Percentage",
-      Tax_Type: "None",
-      Tax_Amount: "",
-      Amount: "",
-    });
-  };
-
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
-
-    // 2. calculate new total excluding the deleted row
-    const newTotal = currentItems.reduce((sum, row, idx) => {
-      if (idx === i) return sum;                    // skip deleted row
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
-
-    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
-    const newBalanceDue = newTotal - currentTotalReceived;
-
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
-
-    // 4. update totals
-    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  };
-  // const handleSelect = (rowIndex, categoryName) => {
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[rowIndex] = {
-  //       ...updated[rowIndex],
-  //       Item_Category: categoryName,
-  //       CategoryOpen: false,
-  //       isExistingItem: false,   // user-typed, so still editable
-  //     };
-  //     return updated;
-  //   });
-
-  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  // };
-  const handleAddCategory = async () => {
+const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {
       return
@@ -390,6 +315,167 @@ export default function SaleEdit() {
       }
     }
   };
+  
+
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
+ 
+  const itemsValues = watch("items");   // watch all item rows
+  const totalReceived = watch("Total_Received"); // watch Total_Received
+  const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
+
+  // helper to calculate amount in a specific row
+  const calculateRowAmount = (row, index, itemsValues) => {
+    console.log(row, "row", index, "index", itemsValues, "itemsValues");
+    const price = num(row.Sale_Price);
+    const qty = row.Quantity || 0; // default 0
+    const subtotal = price * qty;
+
+    // discount
+    let disc = num(row.Discount_On_Sale_Price);
+    if ((row.Discount_Type_On_Sale_Price || "Percentage") === "Percentage") {
+      disc = (subtotal * disc) / 100;
+    }
+    const afterDiscount = Math.max(0, subtotal - disc);
+
+    // tax
+    const taxPercent = TAX_RATES[row.Tax_Type] ?? 0;
+    const taxAmount = (afterDiscount * taxPercent) / 100;
+
+    const finalAmount = afterDiscount + taxAmount;
+
+    // ✅ Recalculate total with current row updated
+    let totalAmount = 0;
+    itemsValues?.forEach((r, i) => {
+      if (i === index) {
+        // use updated values for current row
+        totalAmount += parseFloat(finalAmount || 0);
+      } else {
+        totalAmount += parseFloat(r.Amount || 0);
+      }
+    });
+
+    return {
+      ...row,
+      Quantity: Number(qty),
+      Tax_Amount: taxAmount.toFixed(2),
+      Amount: finalAmount.toFixed(2),
+      Total_Amount: totalAmount.toFixed(2), // ✅ correct grand total
+      Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
+    };
+  };
+  const getRawTotal = () => {
+    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  };
+
+  const applyRoundOff = (roundOffValue) => {
+    const rawTotal = getRawTotal();
+    const totalPaid = Number(watch("Total_Paid")) || 0;
+    const newTotal = rawTotal + roundOffValue;
+
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  };
+  const syncTotalsAfterItemChange = () => {
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      applyRoundOff(currentRoundOff);
+    } else {
+      const rawTotal = getRawTotal();
+      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+  };
+const handleAddRow = () => {
+    setRows((prev) => [
+      // only close CategoryOpen, preserve lock states
+      ...prev.map((row) => ({
+        ...row,
+        CategoryOpen: false,
+        itemOpen: false, // also close item dropdown if open
+        unitOpen: false
+      })),
+      {
+        itemSearch: "",
+        itemOpen: false,
+        CategoryOpen: false,
+        isHSNLocked: false,
+        isUnitLocked: false,
+        isExistingItem: false,
+        categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
+      },
+    ]);
+
+    append({
+      Item_Category: "",
+      Item_Name: "",
+      Item_HSN: "",
+      Quantity: "",
+      Item_Unit: "",
+      Sale_Price: "",
+      Discount_On_Sale_Price: "",
+      Discount_Type_On_Sale_Price: "Percentage",
+      Tax_Type: "None",
+      Tax_Amount: "",
+      Amount: "",
+    });
+  };
+  const handleDeleteRow = (i) => {
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new total excluding the deleted row
+    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+    //const newBalanceDue = newRawTotal - currentTotalReceived;
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      const newTotal = newRawTotal + currentRoundOff;
+      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newRawTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+  };
+
+//  const handleDeleteRow = (i) => {
+//     // 1. get current items BEFORE removal
+//     const currentItems = watch("items");
+
+//     // 2. calculate new total excluding the deleted row
+//     const newTotal = currentItems.reduce((sum, row, idx) => {
+//       if (idx === i) return sum;                    // skip deleted row
+//       return sum + parseFloat(row.Amount || 0);
+//     }, 0);
+
+//     const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+//     const newBalanceDue = newTotal - currentTotalReceived;
+
+//     // 3. remove from UI state and form
+//     setRows((prev) => prev.filter((_, idx) => idx !== i));
+//     remove(i);
+
+//     // 4. update totals
+//     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+//     setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+//   };
+
+  
   const handleItemSelect = (it, i) => {
     console.log("Selected Item:", it, "at row", i);
     setRows((prev) => {
@@ -453,56 +539,10 @@ export default function SaleEdit() {
 
     setValue(`items.${i}.Tax_Amount`, Tax_Amount);
     setValue(`items.${i}.Amount`, Amount);
-    setValue(`Total_Amount`, Total_Amount);
-    setValue(`Balance_Due`, Balance_Due);
+    syncTotalsAfterItemChange()
+    // setValue(`Total_Amount`, Total_Amount);
+    // setValue(`Balance_Due`, Balance_Due);
   };
-  const itemsValues = watch("items");   // watch all item rows
-  const totalReceived = watch("Total_Received"); // watch Total_Received
-  const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
-
-  // helper to calculate amount in a specific row
-  const calculateRowAmount = (row, index, itemsValues) => {
-    console.log(row, "row", index, "index", itemsValues, "itemsValues");
-    const price = num(row.Sale_Price);
-    const qty = row.Quantity || 0; // default 0
-    const subtotal = price * qty;
-
-    // discount
-    let disc = num(row.Discount_On_Sale_Price);
-    if ((row.Discount_Type_On_Sale_Price || "Percentage") === "Percentage") {
-      disc = (subtotal * disc) / 100;
-    }
-    const afterDiscount = Math.max(0, subtotal - disc);
-
-    // tax
-    const taxPercent = TAX_RATES[row.Tax_Type] ?? 0;
-    const taxAmount = (afterDiscount * taxPercent) / 100;
-
-    const finalAmount = afterDiscount + taxAmount;
-
-    // ✅ Recalculate total with current row updated
-    let totalAmount = 0;
-    itemsValues?.forEach((r, i) => {
-      if (i === index) {
-        // use updated values for current row
-        totalAmount += parseFloat(finalAmount || 0);
-      } else {
-        totalAmount += parseFloat(r.Amount || 0);
-      }
-    });
-
-    return {
-      ...row,
-      Quantity: Number(qty),
-      Tax_Amount: taxAmount.toFixed(2),
-      Amount: finalAmount.toFixed(2),
-      Total_Amount: totalAmount.toFixed(2), // ✅ correct grand total
-      Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
-    };
-  };
-
-
-
 
   const formValues = watch();
 
@@ -670,7 +710,10 @@ export default function SaleEdit() {
       setRows(prefilledRows)
 
       //setRows(prefilledRows);
+      const roundOffFromDb = Number(sale.invoicePartyDetails?.Round_Off) || 0;
 
+      //  checkbox reflects whether a real round-off was applied
+      setIsRoundOff(roundOffFromDb !== 0)
       reset({
         Party_Name: sale.invoicePartyDetails?.Party_Name || "",
         Billing_Name: sale.invoicePartyDetails?.Billing_Name || "",
@@ -683,6 +726,7 @@ export default function SaleEdit() {
         //  Invoice_Date: sale.invoicePartyDetails?.Invoice_Date,
         State_Of_Supply: sale.invoicePartyDetails?.State_Of_Supply || "",
         Total_Amount: sale.invoicePartyDetails?.Total_Amount || "",
+        Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
         Total_Received: sale.invoicePartyDetails?.Total_Received || "",
         Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
         Terms_Conditions_Id: sale?.invoicePartyDetails?.Terms_Conditions_Id ?? null,
@@ -746,6 +790,39 @@ export default function SaleEdit() {
     setCurrentPartyDetails(matchedParty || null);
 
   }, [salePartyName, parties?.parties]);
+
+   const calculateTotals = (items = []) => {
+    return items.reduce(
+      (acc, item) => {
+        const qty = Number(item.Quantity) || 0;
+        const price = Number(item.Sale_Price) || 0;
+
+        const subtotal = qty * price;
+
+        const discountRaw =
+          Number(item.Discount_On_Sale_Price) || 0;
+
+        const discount =
+          item.Discount_Type_On_Sale_Price === "Percentage"
+            ? (subtotal * discountRaw) / 100
+            : discountRaw;
+
+        acc.totalQty += qty;
+        acc.totalDiscount += discount;
+        acc.totalTax += Number(item.Tax_Amount) || 0;
+        acc.totalAmount += Number(item.Amount) || 0;
+
+        return acc;
+      },
+      {
+        totalQty: 0,
+        totalDiscount: 0,
+        totalTax: 0,
+        totalAmount: 0,
+      }
+    );
+  };
+  const totals = calculateTotals(itemsValues || []);
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
     const parts = val.split(".");
@@ -958,6 +1035,7 @@ export default function SaleEdit() {
       //Total_Received: totalReceived,
       //Balance_Due: Number(balanceDue.toFixed(2)),
       Total_Amount: Number(totalAmount.toFixed(2)),
+      Round_Off: Number(data.Round_Off || 0),
       Total_Received: Number(totalReceived.toFixed(2)),
       Balance_Due: Number(balanceDue.toFixed(2)),
 
@@ -2094,8 +2172,9 @@ export default function SaleEdit() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 } else {
                                   // no match — close dropdown
                                   handleRowChange(i, "itemOpen", false);
@@ -2234,8 +2313,9 @@ export default function SaleEdit() {
 
                                           setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                          syncTotalsAfterItemChange();
+                                          // setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                          // setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
                                         }}
 
                                         className="hover:bg-gray-100 cursor-pointer border-b"
@@ -2402,8 +2482,9 @@ export default function SaleEdit() {
 
                             setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
                             setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                            setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                            setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                            syncTotalsAfterItemChange();
+                            // setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                            // setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                           }}
                           placeholder="Qty"
                         />
@@ -2928,23 +3009,18 @@ export default function SaleEdit() {
                                                   }
                                                 );
 
-                                                setValue(
-                                                  "Total_Amount",
-                                                  Total_Amount,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
+                                                // setValue(
+                                                //   "Total_Amount",
+                                                //   Total_Amount,
+                                                //   {
+                                                //     shouldValidate: true,
+                                                //     shouldDirty: true,
+                                                //   }
+                                                // );
 
-                                                setValue(
-                                                  "Balance_Due",
-                                                  Balance_Due,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
+                                                // setValue("Balance_Due",Balance_Due,{shouldValidate: true,shouldDirty: true,}
+                                                // );
+                                                syncTotalsAfterItemChange();
                                               }
                                             }}
                                             style={{
@@ -3012,8 +3088,9 @@ export default function SaleEdit() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount);
                               setValue(`items.${i}.Amount`, Amount);
-                              setValue("Total_Amount", Total_Amount);
-                              setValue("Balance_Due", Balance_Due);
+                                // setValue("Total_Amount", Total_Amount);
+                                // setValue("Balance_Due", Balance_Due);
+                                syncTotalsAfterItemChange();
                             }}
 
 
@@ -3035,28 +3112,7 @@ export default function SaleEdit() {
                             className="form-control"
                             style={{ width: "50%", marginBottom: "0px" }}
                             {...register(`items.${i}.Discount_On_Sale_Price`)}
-                            // onInput={(e) => {
-                            //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                            //   //                 const { Tax_Amount, Amount ,Total_Amount} = calculateRowAmount({
-                            //   //   ...itemsValues[i],
-
-                            //   //   Discount_On_Purchase_Price: e.target.value,
-
-                            //   // });
-                            //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                            //     { ...itemsValues[i], Discount_On_Sale_Price: e.target.value },
-                            //     i,
-                            //     itemsValues
-                            //   );
-
-                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
-                            //   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                            //   setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                            //   setValue("Balance_Due", Balance_Due, { shouldValidate: true });
-                            //   // setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                            //   // setValue(`items.${i}.Amount`, Amount);
-
-                            // }}
+                            
                             onInput={(e) => {
                               let val = e.target.value;
 
@@ -3083,8 +3139,9 @@ export default function SaleEdit() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount);
                               setValue(`items.${i}.Amount`, Amount);
-                              setValue("Total_Amount", Total_Amount);
-                              setValue("Balance_Due", Balance_Due);
+                              syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount);
+                              // setValue("Balance_Due", Balance_Due);
                             }}
                             placeholder="Discount"
                           />
@@ -3112,8 +3169,9 @@ export default function SaleEdit() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                                 }}
                               >
                                 <option value="Percentage">%</option>
@@ -3156,8 +3214,9 @@ export default function SaleEdit() {
                                   shouldValidate: true,
                                 });
                                 setValue(`items.${i}.Amount`, Amount, { shouldValidate: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true });
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true });
                               }}
                             >
                               <option value="None">None</option>
@@ -3207,6 +3266,34 @@ export default function SaleEdit() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>Total</td>
+                    <td></td>
+
+                    <td className="text-right">
+                      {totals.totalQty}
+                    </td>
+
+                    <td></td>
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalDiscount.toFixed(2)}
+                    </td>
+
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalTax.toFixed(2)}
+                    </td>
+
+                    <td className="text-right">
+                      ₹{totals.totalAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
 
 
               </table>
@@ -3469,7 +3556,7 @@ export default function SaleEdit() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -3528,6 +3615,46 @@ export default function SaleEdit() {
                           setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div> */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={isRoundOff}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setIsRoundOff(isChecked);
+
+                          const rawTotal = getRawTotal();
+
+                          if (isChecked) {
+                            const rounded = Math.round(rawTotal);
+                            const diff = Number((rounded - rawTotal).toFixed(2));
+                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(diff);
+                          } else {
+                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(0);
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                      <input
+                        type="text"
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="border border-gray-300 text-right text-sm"
+                        {...register("Round_Off")}
+                        disabled={!isRoundOff}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                          const numVal = parseFloat(val) || 0;
+                          applyRoundOff(numVal);
+                        }}
                       />
                     </div>
 

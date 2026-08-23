@@ -2,6 +2,7 @@
 
 import db from "../config/db.js";
 import { getSaleReturnsForPrint } from "../helpers/printReportHelpers.js";
+import { syncUnitIdsForItem, syncUnitIdsForSaleReturnItem } from "../helpers/unitSyncHelper.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
@@ -172,6 +173,7 @@ const getSaleReturnById = async (req, res, next) => {
      sr.Return_Date,
      sr.State_Of_Supply,
      sr.Total_Amount,
+     sr.Round_Off,
      sr.Total_Paid,
      sr.Balance_Due,
      sr.Party_Id,
@@ -208,11 +210,54 @@ const getSaleReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
-    const [items] = await connection.query(
-      `
+  //   const [items] = await connection.query(
+  //     `
+  // SELECT
+  //     sri.id,
+     
+  //     sri.Item_Id,
+
+  //     i.Item_Name,
+  //     i.Item_HSN,
+  //     i.Item_Unit,
+  //     i.Item_Category,
+
+  //     -- CURRENT MASTER
+  //     i.Primary_Unit AS Current_Primary_Unit,
+  //     i.Secondary_Unit AS Current_Secondary_Unit,
+  //     i.Conversion_Rate,
+
+  //     sri.Quantity,
+
+  //     -- HISTORICAL SNAPSHOT
+  //     sri.Primary_Unit_Snapshot,
+  //     sri.Secondary_Unit_Snapshot,
+  //     sri.Selected_Unit,
+
+  //     sri.Sale_Price,
+  //     sri.Discount_On_Sale_Price,
+  //     sri.Discount_Type_On_Sale_Price,
+  //     sri.Tax_Amount,
+  //     sri.Tax_Type,
+  //     sri.Amount,
+  //     sri.created_at
+
+  // FROM sale_return_items sri
+
+  // LEFT JOIN add_item i
+  //   ON sri.Item_Id = i.Item_Id
+
+  // WHERE sri.Sale_Return_Id = ?
+
+  // ORDER BY sri.created_at DESC
+  // `,
+  //     [Sale_Return_Id]
+  //   );
+  const [items] = await connection.query(
+  `
   SELECT
       sri.id,
-     
+
       sri.Item_Id,
 
       i.Item_Name,
@@ -227,10 +272,10 @@ const getSaleReturnById = async (req, res, next) => {
 
       sri.Quantity,
 
-      -- HISTORICAL SNAPSHOT
-      sri.Primary_Unit_Snapshot,
-      sri.Secondary_Unit_Snapshot,
-      sri.Selected_Unit,
+      -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
+      pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+      pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+      pu3.Unit_Shorthand AS Selected_Unit,
 
       sri.Sale_Price,
       sri.Discount_On_Sale_Price,
@@ -245,12 +290,21 @@ const getSaleReturnById = async (req, res, next) => {
   LEFT JOIN add_item i
     ON sri.Item_Id = i.Item_Id
 
+  LEFT JOIN units pu1
+    ON pu1.id = sri.Primary_Unit_Snapshot_Id
+
+  LEFT JOIN units pu2
+    ON pu2.id = sri.Secondary_Unit_Snapshot_Id
+
+  LEFT JOIN units pu3
+    ON pu3.id = sri.Selected_Unit_Id
+
   WHERE sri.Sale_Return_Id = ?
 
   ORDER BY sri.created_at DESC
   `,
-      [Sale_Return_Id]
-    );
+  [Sale_Return_Id]
+);
 
     // =========================================================
     // 3. FETCH ALL UNITS (for edit dropdown — same as purchase)
@@ -283,12 +337,22 @@ const getSaleReturnById = async (req, res, next) => {
       // CURRENT MASTER
       // =======================================================
 
-      const currentPrimary =
-        it.Current_Primary_Unit || null;
+      const currentPrimary =it.Current_Primary_Unit || null;
 
-      const currentSecondary =
-        it.Current_Secondary_Unit || null;
+      const currentSecondary =it.Current_Secondary_Unit || null;
+      const price = Number(it.Sale_Price || 0);
+      let discountAmount = 0;
 
+      if (Number(it.Discount_On_Sale_Price || 0) > 0) {
+        if (it.Discount_Type_On_Sale_Price === "Percentage") {
+          discountAmount =
+            (price * Number(it.Discount_On_Sale_Price)) / 100;
+        } else {
+          discountAmount = Number(
+            it.Discount_On_Sale_Price
+          );
+        }
+      }
       // =======================================================
       // DID THIS RETURN USE THE OLD SECONDARY UNIT?
       // =======================================================
@@ -387,15 +451,14 @@ const getSaleReturnById = async (req, res, next) => {
 
         Sale_Price: it.Sale_Price,
 
-        Discount_On_Purchase_Price:
-          it.Discount_On_Purchase_Price,
+        Discount_On_Sale_Price:it.Discount_On_Sale_Price,
 
-        Discount_Type_On_Purchase_Price:
-          it.Discount_Type_On_Purchase_Price,
+        Discount_Type_On_Sale_Price:it.Discount_Type_On_Sale_Price,
 
         Tax_Type: it.Tax_Type,
 
         Tax_Amount: it.Tax_Amount,
+        Discount_Amount: Number(discountAmount.toFixed(2)),
 
         Amount: it.Amount,
 
@@ -490,499 +553,6 @@ const getSaleReturnById = async (req, res, next) => {
 
 /* ── CREATE ───────────────────────────────────────────────── */
 
-// const createSaleReturn = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     const { Sale_Id } = req.params;
-
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
-
-//     const {
-//       Party_Name,
-//       Return_Number,
-//       Invoice_Number,
-//       Invoice_Date,
-//       Return_Date = new Date().toISOString().slice(0, 10),
-//       State_Of_Supply,
-//       Total_Amount,
-//       splits,
-//       items,
-//     } = req.body;
-
-//     // =========================================================
-//     // 1. BASIC VALIDATION
-//     //
-//     // Empty items are allowed.
-//     // =========================================================
-
-//     if (!Sale_Id || !Party_Name) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         success: false,
-//         message: "Sale and Customer are required",
-//       });
-//     }
-
-//     // =========================================================
-//     // 2. PAYMENT SPLITS
-//     //
-//     // First valid split:
-//     // Cash ₹0 -> KEEP
-//     //
-//     // Later:
-//     // HDFC ₹0 -> DROP
-//     // ANCO ₹20 -> KEEP
-//     // =========================================================
-
-//     const normalizedSplits = (splits || [])
-//       .filter((split) => {
-//         if (!split.Payment_Type) {
-//           return false;
-//         }
-
-//         if (
-//           split.Payment_Type === "Bank" &&
-//           !split.Bank_Account_Id
-//         ) {
-//           return false;
-//         }
-
-//         return true;
-//       })
-//       .map((split) => ({
-//         ...split,
-//         Amount: Number(split.Amount) || 0,
-//       }));
-
-//     const validSplits = normalizedSplits.filter(
-//       (split, index) => {
-//         if (index === 0) {
-//           return true;
-//         }
-
-//         return split.Amount > 0;
-//       }
-//     );
-
-//     // =========================================================
-//     // 3. TOTALS
-//     //
-//     // Don't trust Total_Paid from frontend.
-//     // =========================================================
-
-//     const totalAmount =
-//       Number(Total_Amount) || 0;
-
-//     const totalPaid = validSplits.reduce(
-//       (sum, split) =>
-//         sum + (Number(split.Amount) || 0),
-//       0
-//     );
-
-//     const balanceDue =
-//       totalAmount - totalPaid;
-
-//     if (totalPaid > totalAmount) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Paid amount should be less than or equal to Total Amount",
-//       });
-//     }
-
-//     // =========================================================
-//     // 4. VALIDATE ONLY SURVIVING SPLITS
-//     // =========================================================
-
-//     if (validSplits.length > 0) {
-//       try {
-//         validateSplits(
-//           validSplits,
-//           totalPaid
-//         );
-//       } catch (validationErr) {
-//         await connection.rollback();
-
-//         return res.status(400).json({
-//           success: false,
-//           message: validationErr.message,
-//         });
-//       }
-//     }
-
-//     // =========================================================
-//     // 5. FIND PARTY
-//     // =========================================================
-
-//     const [[party]] =
-//       await connection.query(
-//         `SELECT Party_Id
-//          FROM add_party
-//          WHERE Party_Name = ?
-//          LIMIT 1`,
-//         [Party_Name]
-//       );
-
-//     if (!party) {
-//       await connection.rollback();
-
-//       return res.status(404).json({
-//         success: false,
-//         message: "Customer not found",
-//       });
-//     }
-
-//     // =========================================================
-//     // 6. CREATE SALE RETURN HEADER
-//     // =========================================================
-
-//     const [headerResult] =
-//       await connection.query(
-//         `INSERT INTO sale_return
-//         (
-//           Sale_Id,
-//           Party_Id,
-//           Return_Number,
-//           Invoice_Number,
-//           Invoice_Date,
-//           Return_Date,
-//           State_Of_Supply,
-//           Total_Amount,
-//           Total_Paid,
-//           Balance_Due
-//         )
-//         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//         [
-//           Sale_Id,
-//           party.Party_Id,
-//           Return_Number || null,
-//           Invoice_Number || null,
-//           Invoice_Date || null,
-//           Return_Date,
-//           State_Of_Supply || null,
-//           totalAmount,
-//           totalPaid,
-//           balanceDue,
-//         ]
-//       );
-
-//     const Sale_Return_Id =headerResult.insertId;
-
-//     // =========================================================
-//     // 7. PAYMENT SPLITS
-//     //
-//     // IMPORTANT:
-//     // Cash ₹0 first split is also inserted.
-//     // =========================================================
-
-//     if (validSplits.length > 0) {
-//       await insertPaymentSplits({
-//         connection,
-//         sourceType: "Sale_Return",
-//         sourceId: Sale_Return_Id,
-//         partyName: Party_Name,
-//         txnDate: Return_Date,
-//         splits: validSplits,
-//       });
-//     }
-
-//     // =========================================================
-//     // 8. PARTY LEDGER
-//     // =========================================================
-
-//     await recordPartyLedger({
-//       connection,
-//       partyId: party.Party_Id,
-//       txnType: "Sale_Return",
-//       referenceId: Sale_Return_Id,
-//       amount: totalAmount,
-//       txnDate: Return_Date,
-//       docNumber: Return_Number,
-//       balanceDue,
-//     });
-
-//     // =========================================================
-//     // 9. ITEMS
-//     //
-//     // No name + Amount > 0 -> ERROR
-//     // No name + Amount 0   -> SKIP
-//     // =========================================================
-
-//     for (const item of items || []) {
-//       const itemName =
-//         item.Item_Name?.trim();
-
-//       const itemAmount =
-//         Number(item.Amount) || 0;
-
-//       if (!itemName) {
-//         if (itemAmount > 0) {
-//           await connection.rollback();
-
-//           return res.status(400).json({
-//             success: false,
-//             message:
-//               "Please enter an item name for the row.",
-//           });
-//         }
-
-//         continue;
-//       }
-
-//       const {
-//         Item_Category,
-//         Item_HSN,
-//         Item_Unit,
-//         Quantity,
-//         Sale_Price,
-//         Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price,
-//         Tax_Type,
-//         Tax_Amount,
-//         Amount,
-//       } = item;
-
-//       // =======================================================
-//       // 10. FIND ITEM
-//       // =======================================================
-
-//       const [[existingItem]] =
-//         await connection.query(
-//           `SELECT *
-//            FROM add_item
-//            WHERE TRIM(Item_Name) = TRIM(?)
-//            LIMIT 1`,
-//           [itemName]
-//         );
-
-//       let Item_Id;
-
-//       // =======================================================
-//       // 11. CREATE ITEM IF NEEDED
-//       // =======================================================
-
-//       if (!existingItem) {
-//         const [maxRow] =
-//           await connection.query(
-//             `SELECT
-//                MAX(
-//                  CAST(
-//                    SUBSTRING(Item_Id, 4)
-//                    AS UNSIGNED
-//                  )
-//                ) AS maxId
-//              FROM add_item
-//              WHERE Item_Id LIKE 'ITM%'`
-//           );
-
-//         const autoId =
-//           (maxRow[0]?.maxId || 0) + 1;
-
-//         Item_Id ="ITM" + autoId.toString().padStart(3, "0");
-
-//         await connection.execute(
-//           `INSERT INTO add_item
-//            (
-//              Item_Id,
-//              Item_Name,
-//              Item_Category,
-//              Item_HSN,
-//              Item_Unit,
-//              Stock_Quantity,
-//              created_at,
-//              updated_at
-//            )
-//            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//           [
-//             Item_Id,
-//             itemName,
-//             Item_Category || "",
-//             cleanValue(Item_HSN),
-//             Item_Unit || "",
-//             0,
-//           ]
-//         );
-//       } else {
-//         Item_Id = existingItem.Item_Id;
-
-//         // =====================================================
-//         // 12. UPDATE ALLOWED MASTER DATA
-//         // =====================================================
-
-//         const updates = [];
-//         const params = [];
-
-//         if (
-//           Item_HSN &&
-//           Item_HSN !== existingItem.Item_HSN
-//         ) {
-//           updates.push("Item_HSN = ?");
-//           params.push(Item_HSN);
-//         }
-
-//         if (
-//           Item_Category !== undefined &&
-//           Item_Category !== existingItem.Item_Category
-//         ) {
-//           updates.push("Item_Category = ?");
-//           params.push(Item_Category || "");
-//         }
-
-//         if (updates.length > 0) {
-//           params.push(Item_Id);
-
-//           await connection.query(
-//             `UPDATE add_item
-//              SET ${updates.join(", ")},
-//                  updated_at = NOW()
-//              WHERE Item_Id = ?`,
-//             params
-//           );
-//         }
-//       }
-
-//       // =======================================================
-//       // 13. INSERT RETURN ITEM
-//       // =======================================================
-
-//       // await connection.query(
-//       //   `INSERT INTO sale_return_items
-//       //   (
-//       //     Sale_Return_Id,
-//       //     Item_Id,
-//       //     Quantity,
-//       //     Sale_Price,
-//       //     Discount_On_Sale_Price,
-//       //     Discount_Type_On_Sale_Price,
-//       //     Tax_Type,
-//       //     Tax_Amount,
-//       //     Amount
-//       //   )
-//       //   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//       //   [
-//       //     Sale_Return_Id,
-//       //     Item_Id,
-//       //     Number(Quantity) || 0,
-//       //     Number(Sale_Price) || 0,
-//       //     Number(Discount_On_Sale_Price) || 0,
-//       //     Discount_Type_On_Sale_Price ||
-//       //       "Percentage",
-//       //     Tax_Type || null,
-//       //     Number(Tax_Amount) || 0,
-//       //     Number(Amount) || 0,
-//       //   ]
-//       // );
-//       const [srItemResult] = await connection.query(
-//   `INSERT INTO sale_return_items
-//   (
-//     Sale_Return_Id,
-//     Item_Id,
-//     Quantity,
-//     Sale_Price,
-//     Discount_On_Sale_Price,
-//     Discount_Type_On_Sale_Price,
-//     Tax_Type,
-//     Tax_Amount,
-//     Amount
-//   )
-//   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//   [
-//     Sale_Return_Id,
-//     Item_Id,
-//     Number(Quantity) || 0,
-//     Number(Sale_Price) || 0,
-//     Number(Discount_On_Sale_Price) || 0,
-//     Discount_Type_On_Sale_Price || "Percentage",
-//     Tax_Type || null,
-//     Number(Tax_Amount) || 0,
-//     Number(Amount) || 0,
-//   ]
-// );
-
-// const saleReturnItemId = srItemResult.insertId;
-
-//       // =======================================================
-//       // 14. SALE RETURN -> STOCK COMES BACK
-//       // =======================================================
-
-//       await connection.query(
-//         `UPDATE add_item
-//          SET
-//            Stock_Quantity =
-//              Stock_Quantity + ?,
-//            updated_at = NOW()
-//          WHERE Item_Id = ?`,
-//         [
-//           Number(Quantity) || 0,
-//           Item_Id,
-//         ]
-//       );
-//       await recordItemLedger({
-//   connection,
-
-//   itemId: Item_Id,
-
-//   txnType: "Sale_Return",
-
-//   // Exact sale_return_items row.
-//   // Used for reverse/edit/delete.
-//   referenceId: saleReturnItemId,
-
-//   // Parent sale_return header.
-//   // Used to open the complete return bill.
-//   billId: Sale_Return_Id,
-
-//   // Human-readable number shown in UI.
-//   billNumber: Return_Number || null,
-
-//   partyName: Party_Name,
-
-//   quantity: Number(Quantity) || 0,
-
-//   rate: Number(Sale_Price) || null,
-
-//   txnDate: Return_Date,
-// });
-//     }
-
-//     // =========================================================
-//     // 15. COMMIT
-//     // =========================================================
-
-//     await connection.commit();
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Sale Return created",
-//       Sale_Return_Id,
-//       totalAmount,
-//       totalPaid,
-//       balanceDue,
-//     });
-
-//   } catch (err) {
-//     if (connection) {
-//       await connection.rollback();
-//     }
-
-//     console.error(
-//       "createSaleReturn:",
-//       err
-//     );
-
-//     next(err);
-
-//   } finally {
-//     if (connection) {
-//       connection.release();
-//     }
-//   }
-// };
 
 const createSaleReturn = async (req, res, next) => {
   let connection;
@@ -1001,6 +571,7 @@ const createSaleReturn = async (req, res, next) => {
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
       Total_Amount,
+      Round_Off,
       splits,
       items,
     } = req.body;
@@ -1069,6 +640,7 @@ const createSaleReturn = async (req, res, next) => {
 
     const totalAmount = Number(Total_Amount) || 0;
     const balanceDue = totalAmount - totalPaid;
+     const roundOffValue = Number(Round_Off) || 0
 
     // =========================================================
     // 5. TOTAL VALIDATION
@@ -1129,10 +701,11 @@ const createSaleReturn = async (req, res, next) => {
          Return_Date,
          State_Of_Supply,
          Total_Amount,
+         Round_Off,
          Total_Paid,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Sale_Id,
         party.Party_Id,
@@ -1143,6 +716,7 @@ const createSaleReturn = async (req, res, next) => {
         Return_Date,
         State_Of_Supply || null,
         totalAmount,
+        roundOffValue,
         totalPaid,
         balanceDue,
       ]
@@ -1390,6 +964,23 @@ const createSaleReturn = async (req, res, next) => {
       );
 
       const srItemId = srItemResult.insertId;
+      await syncUnitIdsForItem(
+  connection,
+  Item_Id
+);
+
+await syncUnitIdsForSaleReturnItem(
+  connection,
+  {
+    saleReturnItemRowId: srItemId,
+
+    Primary_Unit_Snapshot:snapshot.Primary_Unit_Snapshot,
+
+    Secondary_Unit_Snapshot:snapshot.Secondary_Unit_Snapshot,
+
+    Selected_Unit:resolvedSelectedUnit,
+  }
+);
 
       // =========================================================
       // 15. STOCK
@@ -1476,650 +1067,7 @@ const createSaleReturn = async (req, res, next) => {
 };
 /* ── EDIT ─────────────────────────────────────────────────── */
 
-// const editSaleReturn = async (req, res, next) => {
-//   let connection;
 
-//   try {
-//     const { Sale_Return_Id } = req.params;
-
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
-
-//     // =========================================================
-//     // 1. CHECK RETURN EXISTS
-//     // =========================================================
-
-//     const [[existing]] =
-//       await connection.query(
-//         `SELECT *
-//          FROM sale_return
-//          WHERE id = ?`,
-//         [Sale_Return_Id]
-//       );
-
-//     if (!existing) {
-//       await connection.rollback();
-
-//       return res.status(404).json({
-//         success: false,
-//         message: "Sale Return not found",
-//       });
-//     }
-
-//     // =========================================================
-//     // 2. BODY
-//     // =========================================================
-
-//     const {
-//       Party_Name,
-//       Return_Number,
-//       Invoice_Number,
-//       Invoice_Date,
-//       Return_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       splits,
-//       items,
-//     } = req.body;
-
-//     // =========================================================
-//     // 3. PAYMENT SPLITS
-//     // =========================================================
-
-//     const normalizedSplits = (splits || [])
-//       .filter((split) => {
-//         if (!split.Payment_Type) {
-//           return false;
-//         }
-
-//         if (
-//           split.Payment_Type === "Bank" &&
-//           !split.Bank_Account_Id
-//         ) {
-//           return false;
-//         }
-
-//         return true;
-//       })
-//       .map((split) => ({
-//         ...split,
-//         Amount: Number(split.Amount) || 0,
-//       }));
-
-//     const validSplits =
-//       normalizedSplits.filter(
-//         (split, index) => {
-//           // first valid payment stays,
-//           // including ₹0
-//           if (index === 0) {
-//             return true;
-//           }
-
-//           // later zero payments disappear
-//           return split.Amount > 0;
-//         }
-//       );
-
-//     // =========================================================
-//     // 4. TOTALS
-//     // =========================================================
-
-//     const totalAmount =
-//       Number(Total_Amount) || 0;
-
-//     const totalPaid =
-//       validSplits.reduce(
-//         (sum, split) =>
-//           sum +
-//           (Number(split.Amount) || 0),
-//         0
-//       );
-
-//     const balanceDue =
-//       totalAmount - totalPaid;
-
-//     if (totalPaid > totalAmount) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Paid amount should be less than or equal to Total Amount",
-//       });
-//     }
-
-//     // =========================================================
-//     // 5. VALIDATE SURVIVING SPLITS
-//     // =========================================================
-
-//     if (validSplits.length > 0) {
-//       try {
-//         validateSplits(
-//           validSplits,
-//           totalPaid
-//         );
-//       } catch (validationErr) {
-//         await connection.rollback();
-
-//         return res.status(400).json({
-//           success: false,
-//           message: validationErr.message,
-//         });
-//       }
-//     }
-
-//     // =========================================================
-//     // 6. PARTY
-//     // =========================================================
-
-//     const [[party]] =
-//       await connection.query(
-//         `SELECT Party_Id
-//          FROM add_party
-//          WHERE Party_Name = ?
-//          LIMIT 1`,
-//         [Party_Name]
-//       );
-
-//     if (!party) {
-//       await connection.rollback();
-
-//       return res.status(404).json({
-//         success: false,
-//         message: "Customer not found",
-//       });
-//     }
-
-//     // =========================================================
-//     // 7. UPDATE HEADER
-//     // =========================================================
-
-//     await connection.query(
-//       `UPDATE sale_return
-//        SET
-//          Party_Id = ?,
-//          Return_Number = ?,
-//          Invoice_Number = ?,
-//          Invoice_Date = ?,
-//          Return_Date = ?,
-//          State_Of_Supply = ?,
-//          Total_Amount = ?,
-//          Total_Paid = ?,
-//          Balance_Due = ?,
-//          updated_at = NOW()
-//        WHERE id = ?`,
-//       [
-//         party.Party_Id,
-//         Return_Number || null,
-//         Invoice_Number || null,
-//         Invoice_Date || null,
-//         Return_Date,
-//         State_Of_Supply || null,
-//         totalAmount,
-//         totalPaid,
-//         balanceDue,
-//         Sale_Return_Id,
-//       ]
-//     );
-
-//     // =========================================================
-//     // 8. REPLACE PAYMENT SPLITS
-//     // =========================================================
-
-//     await deletePaymentSplits({
-//       connection,
-//       sourceType: "Sale_Return",
-//       sourceId: Number(Sale_Return_Id),
-//     });
-
-//     if (validSplits.length > 0) {
-//       await insertPaymentSplits({
-//         connection,
-//         sourceType: "Sale_Return",
-//         sourceId: Number(Sale_Return_Id),
-//         partyName: Party_Name,
-//         txnDate: Return_Date,
-//         splits: validSplits,
-//       });
-//     }
-
-//     // =========================================================
-//     // 9. PARTY LEDGER
-//     // =========================================================
-
-//     await recordPartyLedger({
-//       connection,
-//       partyId: party.Party_Id,
-//       txnType: "Sale_Return",
-//       referenceId: Number(Sale_Return_Id),
-//       amount: totalAmount,
-//       txnDate: Return_Date,
-//       docNumber: Return_Number,
-//       balanceDue,
-//     });
-
-//     // =========================================================
-//     // 10. OLD ITEMS
-//     // =========================================================
-
-//     const [oldItems] =
-//       await connection.query(
-//         `SELECT *
-//          FROM sale_return_items
-//          WHERE Sale_Return_Id = ?`,
-//         [Sale_Return_Id]
-//       );
-
-//     // =========================================================
-//     // 11. RESOLVE NEW LINES
-//     // =========================================================
-
-//     const resolvedLines = [];
-
-//     for (const item of items || []) {
-//       const itemName =
-//         item.Item_Name?.trim();
-
-//       const itemAmount =
-//         Number(item.Amount) || 0;
-
-//       // =======================================================
-//       // No name + positive amount -> ERROR
-//       // No name + zero amount     -> SKIP
-//       // =======================================================
-
-//       if (!itemName) {
-//         if (itemAmount > 0) {
-//           await connection.rollback();
-
-//           return res.status(400).json({
-//             success: false,
-//             message:
-//               "Please enter an item name for the row.",
-//           });
-//         }
-
-//         continue;
-//       }
-
-//       const {
-//         Item_Category,
-//         Item_HSN,
-//         Item_Unit,
-//         Quantity,
-//         Sale_Price,
-//         Discount_On_Sale_Price,
-//         Discount_Type_On_Sale_Price,
-//         Tax_Type,
-//         Tax_Amount,
-//         Amount,
-//       } = item;
-
-//       let Item_Id =
-//         item.Item_Id || null;
-
-//       let dbItemRow = null;
-
-//       // =======================================================
-//       // 12. FIND ITEM
-//       // =======================================================
-
-//       if (Item_Id) {
-//         const [rows] =
-//           await connection.query(
-//             `SELECT *
-//              FROM add_item
-//              WHERE Item_Id = ?
-//              LIMIT 1`,
-//             [Item_Id]
-//           );
-
-//         dbItemRow =
-//           rows[0] || null;
-
-//       } else {
-//         const [rows] =
-//           await connection.query(
-//             `SELECT *
-//              FROM add_item
-//              WHERE TRIM(Item_Name) = TRIM(?)
-//              LIMIT 1`,
-//             [itemName]
-//           );
-
-//         dbItemRow =
-//           rows[0] || null;
-
-//         Item_Id =
-//           dbItemRow?.Item_Id || null;
-//       }
-
-//       // =======================================================
-//       // 13. CREATE ITEM
-//       // =======================================================
-
-//       if (!dbItemRow) {
-//         const [maxRow] =
-//           await connection.query(
-//             `SELECT
-//                MAX(
-//                  CAST(
-//                    SUBSTRING(Item_Id, 4)
-//                    AS UNSIGNED
-//                  )
-//                ) AS maxId
-//              FROM add_item
-//              WHERE Item_Id LIKE 'ITM%'`
-//           );
-
-//         const autoId =
-//           (maxRow[0]?.maxId || 0) + 1;
-
-//         Item_Id =
-//           "ITM" +
-//           autoId
-//             .toString()
-//             .padStart(3, "0");
-
-//         await connection.execute(
-//           `INSERT INTO add_item
-//            (
-//              Item_Id,
-//              Item_Name,
-//              Item_Category,
-//              Item_HSN,
-//              Item_Unit,
-//              Stock_Quantity,
-//              created_at,
-//              updated_at
-//            )
-//            VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//           [
-//             Item_Id,
-//             itemName,
-//             Item_Category || "",
-//             cleanValue(Item_HSN),
-//             Item_Unit || "",
-//             0,
-//           ]
-//         );
-
-//         dbItemRow = {
-//           Item_Id,
-//           Item_HSN,
-//           Item_Category,
-//           Item_Unit,
-//         };
-
-//       } else {
-//         // =====================================================
-//         // 14. UPDATE ALLOWED MASTER FIELDS
-//         // =====================================================
-
-//         const updates = [];
-//         const params = [];
-
-//         if (
-//           Item_HSN &&
-//           Item_HSN !== dbItemRow.Item_HSN
-//         ) {
-//           updates.push("Item_HSN = ?");
-//           params.push(Item_HSN);
-//         }
-
-//         if (
-//           Item_Category !== undefined &&
-//           Item_Category !==
-//           dbItemRow.Item_Category
-//         ) {
-//           updates.push(
-//             "Item_Category = ?"
-//           );
-
-//           params.push(
-//             Item_Category || ""
-//           );
-//         }
-
-//         if (updates.length > 0) {
-//           params.push(Item_Id);
-
-//           await connection.query(
-//             `UPDATE add_item
-//              SET ${updates.join(", ")},
-//                  updated_at = NOW()
-//              WHERE Item_Id = ?`,
-//             params
-//           );
-//         }
-//       }
-
-//       // =======================================================
-//       // 15. KEEP RESOLVED LINE
-//       // =======================================================
-
-//       resolvedLines.push({
-//         ...item,
-
-//         Item_Id,
-
-//         Quantity:
-//           Number(Quantity) || 0,
-
-//         Sale_Price:
-//           Number(Sale_Price) || 0,
-
-//         Discount_On_Sale_Price:
-//           Number(
-//             Discount_On_Sale_Price
-//           ) || 0,
-
-//         Discount_Type_On_Sale_Price:
-//           Discount_Type_On_Sale_Price ||
-//           "Percentage",
-
-//         Tax_Type:
-//           Tax_Type || null,
-
-//         Tax_Amount:
-//           Number(Tax_Amount) || 0,
-
-//         Amount:
-//           Number(Amount) || 0,
-//       });
-//     }
-
-//     // =========================================================
-//     // 16. NEW QUANTITY PER ITEM
-//     // =========================================================
-
-//     const newQtyByItem =
-//       new Map();
-
-//     for (const line of resolvedLines) {
-//       newQtyByItem.set(
-//         line.Item_Id,
-//         (newQtyByItem.get(line.Item_Id) || 0) +
-//         line.Quantity
-//       );
-//     }
-
-//     // =========================================================
-//     // 17. OLD QUANTITY PER ITEM
-//     // =========================================================
-
-//     const oldQtyByItem =
-//       new Map();
-
-//     for (const old of oldItems) {
-//       oldQtyByItem.set(
-//         old.Item_Id,
-//         (oldQtyByItem.get(old.Item_Id) || 0) +
-//         (Number(old.Quantity) || 0)
-//       );
-//     }
-
-//     // =========================================================
-//     // 18. STOCK DIFFERENCE
-//     //
-//     // SALE RETURN ADDS STOCK.
-//     //
-//     // Old return = 5
-//     // New return = 8
-//     // diff = +3
-//     // stock += 3
-//     //
-//     // Old return = 8
-//     // New return = 5
-//     // diff = -3
-//     // stock -= 3
-//     // =========================================================
-
-//     const allItemIds =
-//       new Set([
-//         ...newQtyByItem.keys(),
-//         ...oldQtyByItem.keys(),
-//       ]);
-
-//     for (const itemId of allItemIds) {
-//       const newQty =
-//         newQtyByItem.get(itemId) || 0;
-
-//       const oldQty =
-//         oldQtyByItem.get(itemId) || 0;
-
-//       const diff =
-//         newQty - oldQty;
-
-//       if (diff !== 0) {
-//         await connection.query(
-//           `UPDATE add_item
-//            SET
-//              Stock_Quantity =
-//                Stock_Quantity + ?,
-//              updated_at = NOW()
-//            WHERE Item_Id = ?`,
-//           [
-//             diff,
-//             itemId,
-//           ]
-//         );
-//       }
-//     }
-//     // =========================================================
-//     // 19. REVERSE OLD ITEM LEDGER ENTRIES
-//     // =========================================================
-
-//     for (const old of oldItems) {
-//       await reverseItemLedger({
-//         connection,
-
-//         itemId: old.Item_Id,
-//         txnType: "Sale_Return",
-
-//         // old sale_return_items.id
-//         referenceId: old.id,
-//       });
-//     }
-//     // =========================================================
-//     // 19. DELETE OLD RETURN ITEMS
-//     // =========================================================
-
-//     await connection.query(
-//       `DELETE FROM sale_return_items
-//        WHERE Sale_Return_Id = ?`,
-//       [Sale_Return_Id]
-//     );
-
-//     // =========================================================
-//     // 20. REINSERT
-//     // =========================================================
-//     for (const line of resolvedLines) {
-
-//       const [srItemResult] = await connection.query(
-//         `INSERT INTO sale_return_items
-//     (
-//       Sale_Return_Id,
-//       Item_Id,
-//       Quantity,
-//       Sale_Price,
-//       Discount_On_Sale_Price,
-//       Discount_Type_On_Sale_Price,
-//       Tax_Type,
-//       Tax_Amount,
-//       Amount
-//     )
-//     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//         [
-//           Sale_Return_Id,
-//           line.Item_Id,
-//           line.Quantity,
-//           line.Sale_Price,
-//           line.Discount_On_Sale_Price,
-//           line.Discount_Type_On_Sale_Price,
-//           line.Tax_Type,
-//           line.Tax_Amount,
-//           line.Amount,
-//         ]
-//       );
-
-//       const saleReturnItemId = srItemResult.insertId;
-
-//       await recordItemLedger({
-//         connection,
-
-//         itemId: line.Item_Id,
-//         txnType: "Sale_Return",
-
-//         referenceId: saleReturnItemId,
-
-//         billId: Number(Sale_Return_Id),
-//         billNumber: Return_Number || null,
-
-//         partyName: Party_Name,
-
-//         quantity: line.Quantity,
-//         rate: line.Sale_Price ?? null,
-
-//         txnDate: Return_Date,
-//       });
-//     }
-
-
-//     // =========================================================
-//     // 22. COMMIT
-//     // =========================================================
-
-//     await connection.commit();
-
-//     return res.status(200).json({
-//       success: true,
-//       message:
-//         "Sale Return updated successfully",
-//       Sale_Return_Id,
-//       totalAmount,
-//       totalPaid,
-//       balanceDue,
-//     });
-
-//   } catch (err) {
-//     if (connection) {
-//       await connection.rollback();
-//     }
-
-//     console.error(
-//       "editSaleReturn:",
-//       err
-//     );
-
-//     next(err);
-
-//   } finally {
-//     if (connection) {
-//       connection.release();
-//     }
-//   }
-// };
 /* ── DELETE ───────────────────────────────────────────────── */
 
 const editSaleReturn = async (req, res, next) => {
@@ -2160,6 +1108,7 @@ const editSaleReturn = async (req, res, next) => {
       Return_Date,
       State_Of_Supply,
       Total_Amount,
+      Round_Off,
       splits,
       items,
     } = req.body;
@@ -2191,6 +1140,7 @@ const editSaleReturn = async (req, res, next) => {
     const totalAmount = Number(Total_Amount) || 0;
     const totalPaid = validSplits.reduce((sum, split) => sum + (Number(split.Amount) || 0), 0);
     const balanceDue = totalAmount - totalPaid;
+    const roundOffValue = Number(Round_Off) || 0
 
     if (totalPaid > totalAmount) {
       await connection.rollback();
@@ -2244,6 +1194,7 @@ const editSaleReturn = async (req, res, next) => {
          Return_Date = ?,
          State_Of_Supply = ?,
          Total_Amount = ?,
+         Round_Off = ?,
          Total_Paid = ?,
          Balance_Due = ?,
          updated_at = NOW()
@@ -2256,6 +1207,7 @@ const editSaleReturn = async (req, res, next) => {
         Return_Date,
         State_Of_Supply || null,
         totalAmount,
+        roundOffValue,
         totalPaid,
         balanceDue,
         Sale_Return_Id,
@@ -2623,21 +1575,7 @@ const editSaleReturn = async (req, res, next) => {
 
     // build stockDelta-based new/old maps in parallel to qty maps
     //const newStockDeltaByItem = new Map();
-    // for (const line of resolvedLines) {
-    //   newStockDeltaByItem.set(
-    //     line.Item_Id,
-    //     (newStockDeltaByItem.get(line.Item_Id) || 0) + line.stockDelta
-    //   );
-    // }
-    // // old items have no stored stockDelta (pre-unit-architecture rows may not),
-    // // fall back to their raw Quantity as their historical stock contribution
-    // const oldStockDeltaByItem = new Map();
-    // for (const old of oldItems) {
-    //   oldStockDeltaByItem.set(
-    //     old.Item_Id,
-    //     (oldStockDeltaByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
-    //   );
-    // }
+
     for (const itemId of allItemIds) {
 
   const newBaseQty =
@@ -2664,21 +1602,6 @@ const editSaleReturn = async (req, res, next) => {
   }
 }
 
-    // for (const itemId of allItemIds) {
-    //   const newDelta = newStockDeltaByItem.get(itemId) || 0;
-    //   const oldDelta = oldStockDeltaByItem.get(itemId) || 0;
-    //   const diff = newDelta - oldDelta;
-
-    //   if (diff !== 0) {
-    //     await connection.query(
-    //       `UPDATE add_item
-    //        SET Stock_Quantity = Stock_Quantity + ?,
-    //            updated_at = NOW()
-    //        WHERE Item_Id = ?`,
-    //       [diff, itemId]
-    //     );
-    //   }
-    // }
 
     // =========================================================
     // 20. REVERSE OLD ITEM LEDGER ENTRIES — unchanged
@@ -2744,24 +1667,23 @@ const editSaleReturn = async (req, res, next) => {
       const saleReturnItemId = srItemResult.insertId;
 
       // 🔹 Item Ledger — unchanged, still uses line.Quantity, NOT stockDelta
-      // await recordItemLedger({
-      //   connection,
+      await syncUnitIdsForItem(
+  connection,
+  line.Item_Id
+);
 
-      //   itemId: line.Item_Id,
-      //   txnType: "Sale_Return",
+await syncUnitIdsForSaleReturnItem(
+  connection,
+  {
+    saleReturnItemRowId: saleReturnItemId,
 
-      //   referenceId: saleReturnItemId,
+    Primary_Unit_Snapshot:line.Primary_Unit_Snapshot,
 
-      //   billId: Number(Sale_Return_Id),
-      //   billNumber: Return_Number || null,
+    Secondary_Unit_Snapshot:line.Secondary_Unit_Snapshot,
 
-      //   partyName: Party_Name,
-
-      //   quantity: line.Quantity,
-      //   rate: line.Sale_Price ?? null,
-
-      //   txnDate: Return_Date,
-      // });
+    Selected_Unit:line.Selected_Unit,
+  }
+);
       await recordItemLedger({
         connection,
 

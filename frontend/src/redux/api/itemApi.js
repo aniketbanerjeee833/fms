@@ -854,43 +854,74 @@ getAllItemUnits: builder.query({
   },
   providesTags: ["Unit"],
 }),
-getAllItemUnitsCursor: builder.query({
-  query: ({
-    cursor = null,
-    search = "",
-    limit = 10,
-  }) => {
-    const params = new URLSearchParams();
+// getAllItemUnitsCursor: builder.query({
+//   query: ({
+//     cursor = null,
+//     search = "",
+//     limit = 10,
+//   }) => {
+//     const params = new URLSearchParams();
 
+//     if (cursor) params.set("cursor", cursor);
+//     if (search) params.set("search", search);
+//     params.set("limit", limit);
+
+//     return `/unit/get-all-units/cursor?${params.toString()}`;
+//   },
+
+//   serializeQueryArgs: ({ queryArgs }) => {
+//     const { search } = queryArgs;
+//     return { search };
+//   },
+
+//   merge: (currentCache, newData, { arg }) => {
+//     if (!arg.cursor) {
+//       return newData;
+//     }
+
+//     currentCache.units.push(...newData.units);
+//     currentCache.nextCursor = newData.nextCursor;
+//     currentCache.hasMore = newData.hasMore;
+//     currentCache.totalUnits = newData.totalUnits;
+//   },
+
+//   forceRefetch: ({
+//     currentArg,
+//     previousArg,
+//   }) =>
+//     currentArg?.cursor !== previousArg?.cursor ||
+//     currentArg?.search !== previousArg?.search,
+
+//   providesTags: ["Unit"],
+// }),
+getAllItemUnitsCursor: builder.query({
+  query: ({ cursor = null, search = "", limit = 10, resetKey = 0 }) => {
+    const params = new URLSearchParams();
     if (cursor) params.set("cursor", cursor);
     if (search) params.set("search", search);
     params.set("limit", limit);
-
     return `/unit/get-all-units/cursor?${params.toString()}`;
   },
 
+  // 🔹 resetKey included here — a new resetKey = a brand new cache entry,
+  //    completely separate from the old accumulated one
   serializeQueryArgs: ({ queryArgs }) => {
-    const { search } = queryArgs;
-    return { search };
+    const { search, resetKey } = queryArgs;
+    return { search, resetKey };
   },
 
   merge: (currentCache, newData, { arg }) => {
-    if (!arg.cursor) {
-      return newData;
-    }
-
+    if (!arg.cursor) return newData;
     currentCache.units.push(...newData.units);
     currentCache.nextCursor = newData.nextCursor;
     currentCache.hasMore = newData.hasMore;
     currentCache.totalUnits = newData.totalUnits;
   },
 
-  forceRefetch: ({
-    currentArg,
-    previousArg,
-  }) =>
-    currentArg?.cursor !== previousArg?.cursor ||
-    currentArg?.search !== previousArg?.search,
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor    !== previousArg?.cursor ||
+    currentArg?.search    !== previousArg?.search ||
+    currentArg?.resetKey  !== previousArg?.resetKey,
 
   providesTags: ["Unit"],
 }),

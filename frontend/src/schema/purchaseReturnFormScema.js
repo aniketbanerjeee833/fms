@@ -297,6 +297,14 @@ export const purchaseReturnFormSchema = z.object({
 
   /* ── Amounts — can legitimately be 0 for an empty return ── */
   Total_Amount: digitsOnly("Total_Amount", false).default(0),
+    Round_Off: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === undefined || val === null) return 0;
+      const n = Number(val);
+      return isNaN(n) ? 0 : n;
+    }),
   Balance_Due: digitsOnly("Balance_Due", false).default(0),
 
   // 🔹 renamed for return context — money coming back to you from the supplier

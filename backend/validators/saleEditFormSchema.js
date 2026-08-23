@@ -41,14 +41,14 @@ const digitsOnly = (fieldName, required = true) =>
         message: "Please select a bank account.",
         path: ["Bank_Account_Id"],
       });
-const priceStringDigits = z
-  .union([z.string(), z.number()])
-  .transform((val) => String(val ?? "").trim())   // normalize everything to string
-  .refine((s) => /^\d+(\.\d{0,2})?$/.test(s), {
-    message: "must be a valid number with up to 2 decimals",
-  })
-  .transform((s) => Number(s))
-  .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
+// const priceStringDigits = z
+//   .union([z.string(), z.number()])
+//   .transform((val) => String(val ?? "").trim())   // normalize everything to string
+//   .refine((s) => /^\d+(\.\d{0,2})?$/.test(s), {
+//     message: "must be a valid number with up to 2 decimals",
+//   })
+//   .transform((s) => Number(s))
+//   .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
  const saleSchema = z.object({
    Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
    
@@ -98,6 +98,14 @@ const priceStringDigits = z
   State_Of_Supply: z.string().nullable().optional(),
   // 🔹 Auto-calculated but cannot be empty
   Total_Amount: digitsOnly("Total_Amount", true),
+   Round_Off: z
+      .union([z.string(), z.number()])
+      .optional()
+      .transform((val) => {
+        if (val === "" || val === undefined || val === null) return 0;
+        const n = Number(val);
+        return isNaN(n) ? 0 : n;
+      }),
   Balance_Due: digitsOnly("Balance_Due", true),
 
   // 🔹 Optional but digits if provided
@@ -196,14 +204,32 @@ splits: z
   .trim()
   .nullable()
   .optional(),
-})
+}).superRefine((data, ctx) => {
+  // =====================================================
+  // CREDIT SALE → PARTY IS MANDATORY
+  // =====================================================
 
-// .refine(
-//     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
-//     {
-//       message: "Please select a bank account.",
-//       path: ["Bank_Account_Id"],
-//     }
-//   );
+  if (
+    data.Sale_Mode === "Credit" &&
+    !data.Party_Name?.trim()
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["Party_Name"],
+      message: "Party name is required for credit sale",
+    });
+  }
+
+  // =====================================================
+  // CASH SALE → PARTY CAN BE BLANK
+  // =====================================================
+  //
+  // No validation needed.
+  //
+  // Cash + blank party
+  // → backend will use "Cash Sale" party
+});
+
+
 
 export default saleSchema;
