@@ -17,7 +17,7 @@ import BankAccountModal from "../../components/Modal/BankAccountModal";
 import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 // import AddUnitModal from "../../components/Modal/AddUnitModal";
 
-import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 import {
@@ -25,7 +25,6 @@ import {
     useGetAllExpenseItemMastersQuery,
     useCreateExpenseMutation,
 } from "../../redux/api/expenseApi";
-import { useDispatch } from "react-redux";
 
 
 
@@ -74,13 +73,13 @@ const emptyRow = () => ({
 export default function AddExpense() {
     const navigate = useNavigate();
     const location = useLocation();
-    const dispatch=useDispatch();
+
 
     /* ───────────────────────── MOCK DATA (replace with API) ───────────────────────── */
     // TODO: const { data: categories } = useGetAllExpenseCategoriesQuery();
     const {
         data: categoryResponse,
-        //isLoading: isCategoryLoading,
+        isLoading: isCategoryLoading,
     } = useGetAllExpenseCategoriesQuery();
 
     const categories = categoryResponse?.categories || [];
@@ -91,7 +90,7 @@ export default function AddExpense() {
 
     const {
         data: itemResponse,
-        //isLoading: isItemLoading,
+        isLoading: isItemLoading,
     } = useGetAllExpenseItemMastersQuery();
 
     const items = itemResponse?.items || [];
@@ -102,14 +101,14 @@ export default function AddExpense() {
 
     const {
         data: partiesResponse,
-        //isLoading: isPartyLoading,
+        isLoading: isPartyLoading,
     } = useGetAllPartiesQuery();
     // console.log("Parties:", partiesResponse);
 
     // TODO: const { data: banks = [] } = useGetAllBankAccountsQuery();
     const {
         data: banks = [],
-        //isLoading: isBankLoading,
+        isLoading: isBankLoading,
     } = useGetAllBankAccountsQuery();
     // console.log("Banks:", banks);
 
@@ -235,8 +234,12 @@ export default function AddExpense() {
         // }
 
         let disc = num(row.Discount_On_Price);
+
         if ((row.Discount_Type_On_Price || "Percentage") === "Percentage") {
             disc = (subtotal * disc) / 100;
+        } else if ((row.Discount_Type_On_Price || "Percentage") === "Amount") {
+            // Amount discount is per unit, so multiply by quantity
+            disc = disc * qty;
         }
 
 
@@ -363,11 +366,6 @@ export default function AddExpense() {
             }
 
             toast.success("Expense created successfully");
-            dispatch(partyApi.util.invalidateTags([
-                      "Party",
-                      "PartyLedger",
-                    ])
-                  );
 
             setTimeout(() => {
                 navigate("/expense/categories");
@@ -845,7 +843,7 @@ export default function AddExpense() {
                                         )}
                                     </div>
                                 )} */}
-                                
+
                                 {gstEnabled && (
                                     <div className="flex items-center w-full gap-3 justify-end">
                                         <span className="whitespace-nowrap">

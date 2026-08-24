@@ -726,7 +726,7 @@ export default function BankAccounts() {
             <div className="px-4 py-3 flex items-center gap-2"
               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}>
               <CreditCard size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <span className="text-xs font-semibold  uppercase tracking-wider">
                 Accounts ({banks.length})
               </span>
             </div>

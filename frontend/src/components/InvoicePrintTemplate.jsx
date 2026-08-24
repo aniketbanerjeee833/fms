@@ -76,47 +76,246 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   // =========================================================
   // TAX
   // =========================================================
+  // const getGstRate = (taxType) => {
+  //   if (!taxType || taxType === "None") return 0;
+  //   const match = taxType.match(/GST([\d.]+)/i);
+  //   return match ? Number(match[1]) : 0;
+  // };
+
+  // const formatRate = (rate) => {
+  //   // Avoid "6.00%" — show "6%" for whole numbers, "0.125%" for fractional
+  //   return Number.isInteger(rate) ? `${rate}%` : `${rate}%`;
+  // };
+
+  // const getTaxAmount = (item) => Number(item?.Tax_Amount || 0);
+
+  // console.log("items", items);
+  // const taxGroups = {};
+  // items.forEach((item) => {
+  //   const gstRate = getGstRate(item.Tax_Type);
+  //   const taxAmt = Number(item.Tax_Amount || 0);
+  //   const halfRate = gstRate / 2;
+  //   const key = String(halfRate); // "2.5", "9", "6" etc.
+
+  //   if (!taxGroups[key]) {
+  //     taxGroups[key] = { halfRate, taxable: 0, cgst: 0, sgst: 0 };
+  //   }
+  //   taxGroups[key].taxable += Number(item.Amount || 0) - taxAmt;
+  //   taxGroups[key].cgst += taxAmt / 2;
+  //   taxGroups[key].sgst += taxAmt / 2;
+  // });
+
+  // const taxGroupList = Object.values(taxGroups).filter((g) => g.halfRate > 0);
+  // const totalTax = items.reduce((s, i) => s + Number(i.Tax_Amount || 0), 0);
+
+
+  // const cgst = totalTax / 2;
+  // const sgst = totalTax / 2;
+  // =========================================================
+  // TAX
+  // =========================================================
+
   const getGstRate = (taxType) => {
-    if (!taxType || taxType === "None") return 0;
-    const match = taxType.match(/GST([\d.]+)/i);
+    if (!taxType || taxType === "None") {
+      return 0;
+    }
+
+    const match = String(taxType).match(
+      /(?:IGST|GST)\s*([\d.]+)/i
+    );
+
     return match ? Number(match[1]) : 0;
   };
 
-  const formatRate = (rate) => {
-    // Avoid "6.00%" — show "6%" for whole numbers, "0.125%" for fractional
-    return Number.isInteger(rate) ? `${rate}%` : `${rate}%`;
+  const isIGST = (taxType) => {
+    return /igst/i.test(String(taxType || ""));
   };
 
-  const getTaxAmount = (item) => Number(item?.Tax_Amount || 0);
+  const formatRate = (rate) => {
+    const n = Number(rate) || 0;
 
-  console.log("items", items);
+    return Number.isInteger(n)
+      ? `${n}%`
+      : `${n}%`;
+  };
+
+  const getTaxAmount = (item) => {
+    return Number(item?.Tax_Amount || 0);
+  };
+
+
+  // =========================================================
+  // BUILD TAX GROUPS
+  // =========================================================
+
   const taxGroups = {};
+
   items.forEach((item) => {
-    const gstRate = getGstRate(item.Tax_Type);
-    const taxAmt = Number(item.Tax_Amount || 0);
-    const halfRate = gstRate / 2;
-    const key = String(halfRate); // "2.5", "9", "6" etc.
+    const taxType = String(item.Tax_Type || "");
+
+    const gstRate = getGstRate(taxType);
+
+    const taxAmount = getTaxAmount(item);
+
+    if (
+      gstRate <= 0 ||
+      taxAmount <= 0 ||
+      taxType === "None"
+    ) {
+      return;
+    }
+
+    const itemIsIGST = isIGST(taxType);
+
+    // Keep GST and IGST separate.
+    //
+    // Example:
+    // GST 5%  -> GST-5
+    // IGST 5% -> IGST-5
+    //
+    const key = `${itemIsIGST ? "IGST" : "GST"}-${gstRate}`;
 
     if (!taxGroups[key]) {
-      taxGroups[key] = { halfRate, taxable: 0, cgst: 0, sgst: 0 };
+      taxGroups[key] = {
+        key,
+
+        rate: gstRate,
+
+        isIGST: itemIsIGST,
+
+        taxable: 0,
+
+        cgst: 0,
+
+        sgst: 0,
+
+        igst: 0,
+      };
     }
-    taxGroups[key].taxable += Number(item.Amount || 0) - taxAmt;
-    taxGroups[key].cgst += taxAmt / 2;
-    taxGroups[key].sgst += taxAmt / 2;
+
+    // Taxable value
+    taxGroups[key].taxable +=
+      Number(item.Amount || 0) - taxAmount;
+
+
+    // =======================================================
+    // IGST
+    // =======================================================
+
+    if (itemIsIGST) {
+      taxGroups[key].igst += taxAmount;
+    }
+
+
+    // =======================================================
+    // NORMAL GST
+    // GST 12% -> CGST 6% + SGST 6%
+    // =======================================================
+
+    else {
+      taxGroups[key].cgst += taxAmount / 2;
+
+      taxGroups[key].sgst += taxAmount / 2;
+    }
   });
 
-  const taxGroupList = Object.values(taxGroups).filter((g) => g.halfRate > 0);
-  const totalTax = items.reduce((s, i) => s + Number(i.Tax_Amount || 0), 0);
-  //const cgstTotal = totalTax / 2;
-  //const sgstTotal = totalTax / 2;
+
+  // =========================================================
+  // TAX GROUP LIST
+  // =========================================================
+
+  const taxGroupList = Object.values(taxGroups)
+    .filter((group) => group.rate > 0)
+    .sort((a, b) => a.rate - b.rate);
+
+
+  // =========================================================
+  // TOTAL TAX
+  // =========================================================
+
   // const totalTax = items.reduce(
-  //   (sum, item) => sum + getTaxAmount(item),
+  //   (sum, item) =>
+  //     sum + Number(item.Tax_Amount || 0),
   //   0
   // );
 
-  const cgst = totalTax / 2;
-  const sgst = totalTax / 2;
 
+  // =========================================================
+  // TOTAL CGST
+  // =========================================================
+
+  const cgst = taxGroupList.reduce(
+    (sum, group) =>
+      sum + Number(group.cgst || 0),
+    0
+  );
+
+
+  // =========================================================
+  // TOTAL SGST
+  // =========================================================
+
+  const sgst = taxGroupList.reduce(
+    (sum, group) =>
+      sum + Number(group.sgst || 0),
+    0
+  );
+
+
+  // =========================================================
+  // TOTAL IGST
+  // =========================================================
+
+  const igst = taxGroupList.reduce(
+    (sum, group) =>
+      sum + Number(group.igst || 0),
+    0
+  );
+
+
+  // =========================================================
+  // TAX COLUMN VISIBILITY
+  // =========================================================
+
+  // At least one normal GST item
+  const hasNormalGst = items.some((item) => {
+    const taxType = String(item.Tax_Type || "");
+
+    return (
+      !isIGST(taxType) &&
+      getGstRate(taxType) > 0 &&
+      Number(item.Tax_Amount || 0) > 0
+    );
+  });
+
+
+  // At least one IGST item
+  const hasIGST = items.some((item) => {
+    const taxType = String(item.Tax_Type || "");
+
+    return (
+      isIGST(taxType) &&
+      getGstRate(taxType) > 0 &&
+      Number(item.Tax_Amount || 0) > 0
+    );
+  });
+
+
+  // Any tax at all
+  const showTaxColumns =
+    hasNormalGst || hasIGST;
+
+
+  // CGST + SGST columns only when
+  // at least one normal GST item exists
+  const showCGSTSGSTColumns =
+    hasNormalGst;
+
+
+  // IGST column only when
+  // at least one IGST item exists
+  const showIGSTColumn =
+    hasIGST;
   // =========================================================
   // QUANTITY
   // =========================================================
@@ -131,7 +330,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     0
   );
 
-const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
+  const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
   //const roundOff = Number(Total_Amount || 0) - itemsSum;
 
   // =========================================================
@@ -273,18 +472,18 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
   const showUnitColumn = items.some(
     (item) => item.Selected_Unit?.trim()
   );
-  const showTaxColumns = items.some(
-    (item) => Number(item.Tax_Amount || 0) > 0
-  );
+  // const showTaxColumns = items.some(
+  //   (item) => Number(item.Tax_Amount || 0) > 0
+  // );
   const hasDiscountColumn = items.some(
     (item) => Number(item.Discount_Amount || 0) > 0
   );
   const hasItems = items.length > 0;
   //const MIN_ROWS = 10;
   //const emptyRows = Math.max(0, MIN_ROWS - items.length);
-  // const showTaxColumns = items.some(
-  //   (item) => Number(getTaxAmount(item)) > 0
-  // );
+  const showTaxableColumns = items.some(
+    (item) => Number(getTaxAmount(item)) > 0
+  );
   //const hasTax = taxGroupList.length > 0;  // true if ANY item has GST
   const getLineDiscount = (item, type) => {
     const price = Number(
@@ -376,14 +575,7 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
 
         <thead>
           <tr>
-            {/* 
-            <th className="invoice-section-header">
-              Bill From
-            </th>
-
-            <th className="invoice-section-header invoice-section-header-right">
-              Bill Details
-            </th> */}
+          
             <th className="invoice-section-header">
               {type === "sale" ? "Bill To" : "Bill From"}
             </th>
@@ -537,13 +729,8 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
               </th>
             )}
 
-            {/* <th
-              className="invoice-table-header"
-              style={{ width: "13%" }}
-            >
-              Taxable amount
-            </th> */}
-            {showTaxColumns && (
+           
+            {showTaxableColumns && (
               <th
                 className="invoice-table-header"
                 style={{ width: "13%" }}
@@ -551,20 +738,7 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                 Taxable Amount
               </th>
             )}
-
-            {/* <th
-              className="invoice-table-header"
-              style={{ width: "10%" }}
-            >
-              CGST
-            </th>
-
-            <th
-              className="invoice-table-header"
-              style={{ width: "10%" }}
-            >
-              SGST
-            </th> */}
+            {/* 
             {showTaxColumns && (
               <>
                 <th className="invoice-table-header" style={{ width: "10%" }}>
@@ -575,6 +749,41 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                   SGST
                 </th>
               </>
+            )} */}
+            {/* =====================================================
+    CGST / SGST HEADERS
+===================================================== */}
+
+            {showCGSTSGSTColumns && (
+              <>
+                <th
+                  className="invoice-table-header"
+                  style={{ width: "10%" }}
+                >
+                  CGST
+                </th>
+
+                <th
+                  className="invoice-table-header"
+                  style={{ width: "10%" }}
+                >
+                  SGST
+                </th>
+              </>
+            )}
+
+
+            {/* =====================================================
+    IGST HEADER
+===================================================== */}
+
+            {showIGSTColumn && (
+              <th
+                className="invoice-table-header"
+                style={{ width: "10%" }}
+              >
+                IGST
+              </th>
             )}
 
             <th
@@ -593,14 +802,49 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
 
           {items.map((item, idx) => {
             const taxAmount = getTaxAmount(item);
-            const gstRate = getGstRate(item.Tax_Type);
-            const halfRate = gstRate / 2;
+            // const gstRate = getGstRate(item.Tax_Type);
+            // const halfRate = gstRate / 2;
 
-            const itemCgst = taxAmount / 2;
-            const itemSgst = taxAmount / 2;
+            // const itemCgst = taxAmount / 2;
+            // const itemSgst = taxAmount / 2;
 
-            const isTaxable = gstRate > 0 && taxAmount > 0;
+            // const isTaxable = gstRate > 0 && taxAmount > 0;
+            const gstRate =
+              getGstRate(item.Tax_Type);
 
+            const itemIsIGST =
+              isIGST(item.Tax_Type);
+
+            const halfRate =
+              gstRate / 2;
+            // =====================================================
+            // NORMAL GST
+            // =====================================================
+
+            const itemCgst =
+              !itemIsIGST
+                ? taxAmount / 2
+                : 0;
+
+            const itemSgst =
+              !itemIsIGST
+                ? taxAmount / 2
+                : 0;
+
+
+            // =====================================================
+            // IGST
+            // =====================================================
+
+            const itemIgst =
+              itemIsIGST
+                ? taxAmount
+                : 0;
+
+
+            const isTaxable =
+              gstRate > 0 &&
+              taxAmount > 0;
 
 
             return (
@@ -654,7 +898,7 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                           : `₹${money(getLineDiscount(item, type))}`
                       )
                     ) : (
-                      "-"
+                      ""
                     )}
                   </td>
                 )}
@@ -682,31 +926,15 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                 {/* <td className="invoice-item-right">
                   ₹ {money(item.Tax_Amount)}
                 </td> */}
-                {showTaxColumns && (
+                {showTaxableColumns && (
                   <td className="invoice-item-right">
                     ₹ {money(item.Tax_Amount)}
                   </td>
                 )}
 
                 {/* CGST — this item's own half-rate, not a shared 9% */}
-                {/* <td className="invoice-item-right">
-                  ₹ {money(itemCgst)}
-                  {isTaxable ? ` (${formatRate(halfRate)})` : ""}
-                </td> */}
 
-
-                {/* <td className="invoice-item-right">
-                  {itemCgst > 0
-                    ? `₹ ${money(itemCgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                    : ""}
-                </td>
-
-                <td className="invoice-item-right">
-                  {itemSgst > 0
-                    ? `₹ ${money(itemSgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                    : ""}
-                </td> */}
-                {showTaxColumns && (
+                {/* {showTaxColumns && (
                   <>
                     <td className="invoice-item-right">
                       {itemCgst > 0
@@ -720,6 +948,43 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                         : ""}
                     </td>
                   </>
+                )} */}
+                {/* =====================================================
+    CGST
+===================================================== */}
+
+                {showCGSTSGSTColumns && (
+                  <>
+                    <td className="invoice-item-right">
+                      {!itemIsIGST && itemCgst > 0
+                        ? `₹ ${money(itemCgst)} (${formatRate(halfRate)})`
+                        : ""}
+                    </td>
+
+
+                    {/* =================================================
+        SGST
+    ================================================= */}
+
+                    <td className="invoice-item-right">
+                      {!itemIsIGST && itemSgst > 0
+                        ? `₹ ${money(itemSgst)} (${formatRate(halfRate)})`
+                        : ""}
+                    </td>
+                  </>
+                )}
+
+
+                {/* =====================================================
+    IGST
+===================================================== */}
+
+                {showIGSTColumn && (
+                  <td className="invoice-item-right">
+                    {itemIsIGST && itemIgst > 0
+                      ? `₹ ${money(itemIgst)} (${formatRate(gstRate)})`
+                      : ""}
+                  </td>
                 )}
 
 
@@ -799,7 +1064,7 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                 )}
               </td>
             )}
-            {showTaxColumns && (
+            {showTaxableColumns && (
               <td className="invoice-total-cell">
                 ₹ {money(
                   items.reduce(
@@ -811,7 +1076,23 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
             )}
 
 
-            {showTaxColumns && (
+            {/* {showTaxColumns && (
+              <>
+                <td className="invoice-total-cell">
+                  ₹ {money(cgst)}
+                </td>
+
+                <td className="invoice-total-cell">
+                  ₹ {money(sgst)}
+                </td>
+              </>
+            )} */}
+
+            {/* =====================================================
+    TOTAL CGST + SGST
+===================================================== */}
+
+            {showCGSTSGSTColumns && (
               <>
                 <td className="invoice-total-cell">
                   ₹ {money(cgst)}
@@ -824,6 +1105,15 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
             )}
 
 
+            {/* =====================================================
+    TOTAL IGST
+===================================================== */}
+
+            {showIGSTColumn && (
+              <td className="invoice-total-cell">
+                ₹ {money(igst)}
+              </td>
+            )}
 
             {/* <td className="invoice-total-cell">
               {hasItems ? `₹ ${money(Total_Amount)}` : ""}
@@ -850,7 +1140,7 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
 
         {/* <div className="invoice-summary-column"> */}
         <div className="invoice-bottom-left">
-          {hasTaxDetails && (
+          {/* {hasTaxDetails && (
             <table
               className="invoice-summary-table"
               style={{ width: "100%" }}
@@ -903,22 +1193,116 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                   ))}
                 </tr>
               </tbody>
-            </table>)}
+            </table>)} */}
+        {showTaxColumns && taxGroupList.length > 0 && (
+  <table
+    className="invoice-summary-table"
+    style={{ width: "100%" }}
+  >
+    <thead>
+      <tr>
+        {/* EXACT SAME HEADING */}
+        <td className="invoice-summary-cell">
+          Tax Details
+        </td>
 
+        {taxGroupList.map((g) => {
+          // IGST 5% → 5%
+          // GST 12% → CGST 6% / SGST 6%
+          const displayRate = g.isIGST
+            ? g.rate
+            : g.rate / 2;
+
+          return (
+            <td
+              key={g.key}
+              className="invoice-summary-cell-right"
+            >
+              {displayRate}%
+            </td>
+          );
+        })}
+      </tr>
+    </thead>
+
+    <tbody>
+
+      {/* =========================
+          CGST
+      ========================== */}
+
+      {hasNormalGst && (
+        <tr>
+          <td className="invoice-summary-cell">
+            CGST
+          </td>
+
+          {taxGroupList.map((g) => (
+            <td
+              key={`cgst-${g.key}`}
+              className="invoice-summary-cell-right"
+            >
+              {g.cgst > 0
+                ? `₹ ${money(g.cgst)}`
+                : ""}
+            </td>
+          ))}
+        </tr>
+      )}
+
+      {/* =========================
+          SGST
+      ========================== */}
+
+      {hasNormalGst && (
+        <tr>
+          <td className="invoice-summary-cell">
+            SGST
+          </td>
+
+          {taxGroupList.map((g) => (
+            <td
+              key={`sgst-${g.key}`}
+              className="invoice-summary-cell-right"
+            >
+              {g.sgst > 0
+                ? `₹ ${money(g.sgst)}`
+                : ""}
+            </td>
+          ))}
+        </tr>
+      )}
+
+      {/* =========================
+          IGST
+      ========================== */}
+
+      {hasIGST && (
+        <tr>
+          <td className="invoice-summary-cell">
+            IGST
+          </td>
+
+          {taxGroupList.map((g) => (
+            <td
+              key={`igst-${g.key}`}
+              className="invoice-summary-cell-right"
+            >
+              {g.igst > 0
+                ? `₹ ${money(g.igst)}`
+                : ""}
+            </td>
+          ))}
+        </tr>
+      )}
+
+    </tbody>
+  </table>
+)}
         </div>
 
 
-        {/* <div>
-            <div className="invoice-words-header">
-              {type === "sale" ? "Invoice Amount In Words" : "Bill Amount In Words"}
-            </div>
 
-            <div className="invoice-words">
-              {amountInWords}
-            </div>
-          </div> */}
-        {/* 
-        </div> */}
 
 
         <div className="invoice-bottom-right">
@@ -953,7 +1337,7 @@ const hasRoundOff = Math.abs(Number(Round_Off || 0)) > 0;
                   </td>
                 </tr>
               )} */}
-             {hasRoundOff && (
+              {hasRoundOff && (
                 <tr>
                   <td className="invoice-summary-cell">
                     Round Off

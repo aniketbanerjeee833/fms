@@ -1,4 +1,4 @@
-import React, { forwardRef, useMemo } from "react";
+import  { forwardRef, useMemo } from "react";
 import "./ExpensePrintTemplate.css";
 
 /* =========================================================
@@ -190,8 +190,12 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
     }, [items]);
 
     const showTax = useMemo(() => {
-        return items.some((item) => getTaxRate(item?.Tax_Type) > 0);
-    }, [items]);
+        return (
+            expense?.With_GST === true ||
+            expense?.With_GST === 1 ||
+            expense?.With_GST === "1"
+        );
+    }, [expense]);
 
     const showIGST = useMemo(() => {
         return items.some((item) => isIGST(item?.Tax_Type));
@@ -298,6 +302,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
             (sum, item) => sum + num(item?.Quantity),
             0
         );
+        
     }, [items]);
 
     /* =======================================================
@@ -330,19 +335,12 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
     ======================================================= */
 
     const totalDiscount = useMemo(() => {
-        return items.reduce((sum, item) => {
-            const price = num(item?.Price);
-            const quantity = num(item?.Quantity);
-            const discount = num(item?.Discount_On_Price);
-
-            const calculatedDiscount =
-                item?.Discount_Type_On_Price === "Percentage"
-                    ? (price * quantity * discount) / 100
-                    : discount * quantity;
-
-            return sum + calculatedDiscount;
-        }, 0);
+        return items.reduce(
+            (sum, item) => sum + num(item?.Discount_Amount),
+            0
+        );
     }, [items]);
+ 
 
 
     /* =======================================================
@@ -405,7 +403,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                         {companyName}
                     </div>
 
-                    <div>
+                    <div className="expense-company-address">
                         {companyAddress}
                     </div>
 
@@ -460,12 +458,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                     {expense.Billing_Address}
                                 </div>
                             )}
-
-                            {expense?.Phone_Number && (
-                                <div>
-                                    Contact No. : {expense.Phone_Number}
-                                </div>
-                            )}
+                            {expense?.Phone_Number && <div>Contact No. : {expense?.Phone_Number}</div>}
 
                             {expense?.GSTIN && (
                                 <div>
@@ -499,12 +492,12 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                 </div>
                             )}
 
-                            {expense?.Bill_Date && (
+                            {/* {expense?.Bill_Date && (
                                 <div>
                                     <strong>Bill Date :</strong>{" "}
                                     {formatDate(expense.Bill_Date)}
                                 </div>
-                            )}
+                            )} */}
 
                             {expense?.State_Of_Supply && (
                                 <div>
@@ -598,7 +591,7 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                         items.map((item, index) => {
 
                             const price = num(item?.Price);
-                            const quantity = num(item?.Quantity);
+                            //const quantity = num(item?.Quantity);
                             const discount = num(item?.Discount_On_Price);
                             const taxAmount = num(item?.Tax_Amount);
                             const amount = num(item?.Amount);
@@ -626,16 +619,11 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
 
                             const discountAmount = num(item?.Discount_Amount);
 
-                            const discountDisplayAmount =
-                                item?.Discount_Type_On_Price === "Percentage"
-                                    ? (price * quantity * discount) / 100
-                                    : discount * quantity;
-
                             const discountText =
                                 discountAmount > 0
                                     ? item?.Discount_Type_On_Price === "Percentage"
-                                        ? `${money(discount)}% (₹${money(discountDisplayAmount)})`
-                                        : `₹${money(discountDisplayAmount)}`
+                                        ? `${money(discount)}% (₹${money(discountAmount)})`
+                                        : `₹${money(discountAmount)}`
                                     : "";
 
                             return (
@@ -831,18 +819,16 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
 
 
             {/* =====================================================
-    BOTTOM GRID
-===================================================== */}
+          BOTTOM GRID
+      ===================================================== */}
 
             <div className="expense-bottom-grid">
 
                 {/* ===================================================
-        LEFT SIDE
-        - GST ON  -> Tax Details
-        - GST OFF -> Empty space
-    =================================================== */}
+            TAX DETAILS
+        =================================================== */}
 
-                {showTax ? (
+                {showTax && (
                     <div className="expense-bottom-left">
 
                         <table className="expense-summary-table">
@@ -912,7 +898,6 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
 
                                 {showIGST && (
                                     <tr>
-
                                         <td className="expense-summary-cell">
                                             IGST
                                         </td>
@@ -927,7 +912,6 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                                     : ""}
                                             </td>
                                         ))}
-
                                     </tr>
                                 )}
 
@@ -936,20 +920,20 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                         </table>
 
                     </div>
-                ) : (
-
-                    /* GST OFF → keep the left 50% empty */
-                    <div className="expense-bottom-left"></div>
-
                 )}
 
 
                 {/* ===================================================
-        RIGHT SIDE
-        AMOUNTS
-    =================================================== */}
+            AMOUNTS
+        =================================================== */}
 
-                <div className="expense-bottom-right">
+                <div
+                    className={
+                        showTax
+                            ? "expense-bottom-right"
+                            : "expense-bottom-right expense-bottom-full"
+                    }
+                >
 
                     <div className="expense-summary-header">
                         Amounts
@@ -959,15 +943,29 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
 
                         <tbody>
 
-                            <tr>
-                                <td className="expense-summary-cell">
-                                    Sub Total
-                                </td>
+                            {showTax && (
+                                <tr>
+                                    <td className="expense-summary-cell">
+                                        Sub Total
+                                    </td>
 
-                                <td className="expense-summary-cell-right">
-                                    ₹{money(totalAmount)}
-                                </td>
-                            </tr>
+                                    <td className="expense-summary-cell-right">
+                                        ₹{money(taxableSubtotal)}
+                                    </td>
+                                </tr>
+                            )}
+
+                            {!showTax && (
+                                <tr>
+                                    <td className="expense-summary-cell">
+                                        Sub Total
+                                    </td>
+
+                                    <td className="expense-summary-cell-right">
+                                        ₹{money(itemSubtotal)}
+                                    </td>
+                                </tr>
+                            )}
 
                             {showRoundOff && (
                                 <tr>
@@ -982,35 +980,26 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                             )}
 
                             <tr>
-
                                 <td className="expense-summary-cell">
-
                                     <div className="expense-bold">
                                         Total
                                     </div>
-
                                     <div>
                                         Paid
                                     </div>
-
                                 </td>
 
                                 <td className="expense-summary-cell-right">
-
                                     <div className="expense-bold">
                                         ₹{money(totalAmount)}
                                     </div>
-
                                     <div>
                                         ₹{money(totalPaid)}
                                     </div>
-
                                 </td>
-
                             </tr>
 
                             <tr>
-
                                 <td className="expense-summary-cell">
                                     Balance
                                 </td>
@@ -1018,7 +1007,6 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
                                 <td className="expense-summary-cell-right">
                                     ₹{money(balanceDue)}
                                 </td>
-
                             </tr>
 
                         </tbody>
@@ -1031,8 +1019,8 @@ const ExpensePrintTemplate = forwardRef(({ expense }, ref) => {
 
 
             {/* =====================================================
-    AMOUNT IN WORDS + EMPTY RIGHT
-===================================================== */}
+          AMOUNT IN WORDS
+      ===================================================== */}
 
             <div className="expense-bottom-grid">
 

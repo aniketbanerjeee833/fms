@@ -1,6 +1,6 @@
 import express from "express";
 import { addInvoice, addSale, editSale, getAllSales, getLatestInvoiceNumber, getSingleInvoice,
-     getSingleSale, printSaleBill, updateInvoice, getSingleNewSaleInvoice,
+     getSingleSale, printSaleBill, updateInvoice,
      getTotalSalesEachDay,
      exportAllSalesReportToExcel,
      deleteSale,
@@ -23,7 +23,7 @@ router.put("/update-invoice/",userAuth,updateInvoice)
 router.get("/get-single-invoice",userAuth,getSingleInvoice)
 
 
-router.get("/get-single-new-sale-invoice",userAuth,getSingleNewSaleInvoice)
+//router.get("/get-single-new-sale-invoice",userAuth,getSingleNewSaleInvoice)
 
 router.get("/get-latest-invoice-number",userAuth,getLatestInvoiceNumber)
 

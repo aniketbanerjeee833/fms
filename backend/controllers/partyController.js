@@ -2216,22 +2216,214 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
     }
 
     /* ── ALL ledger rows, no pagination ── */
-    const [ledgerRows] = await connection.query(
-      `SELECT
-         pl.id, pl.Txn_Type, pl.Source_Id, pl.Direction, pl.Amount,
-         pl.Doc_Number, pl.Balance_Due, pl.Running_Balance, pl.Txn_Date,
-         CASE pl.Txn_Type
-           WHEN 'Sale'     THEN s.Sale_Id
-           WHEN 'Purchase' THEN p.Purchase_Id
-           ELSE pl.Source_Id
-         END AS Formatted_Reference_Id
-       FROM party_ledger pl
-       LEFT JOIN add_sale     s ON pl.Txn_Type = 'Sale'     AND pl.Source_Id = s.id
-       LEFT JOIN add_purchase p ON pl.Txn_Type = 'Purchase' AND pl.Source_Id = p.id
-       ${where}
-       ORDER BY pl.Txn_Date ASC, pl.id ASC`,
-      params
+    // const [ledgerRows] = await connection.query(
+    //   `SELECT
+    //      pl.id, pl.Txn_Type, pl.Source_Id, pl.Direction, pl.Amount,
+    //      pl.Doc_Number, pl.Balance_Due, pl.Running_Balance, pl.Txn_Date,
+    //      CASE pl.Txn_Type
+    //        WHEN 'Sale'     THEN s.Sale_Id
+    //        WHEN 'Purchase' THEN p.Purchase_Id
+    //        ELSE pl.Source_Id
+    //      END AS Formatted_Reference_Id
+    //    FROM party_ledger pl
+    //    LEFT JOIN add_sale     s ON pl.Txn_Type = 'Sale'     AND pl.Source_Id = s.id
+    //    LEFT JOIN add_purchase p ON pl.Txn_Type = 'Purchase' AND pl.Source_Id = p.id
+    //    ${where}
+    //    ORDER BY pl.Txn_Date ASC, pl.id ASC`,
+    //   params
+    // );
+    // ============================================================
+// PAYMENT SPLITS
+// ============================================================
+const [ledgerRows] = await connection.query(
+  `
+  SELECT
+    pl.id,
+    pl.Txn_Type,
+    pl.Source_Id,
+    pl.Direction,
+    pl.Amount,
+    pl.Doc_Number,
+    pl.Balance_Due,
+    pl.Running_Balance,
+    pl.Txn_Date,
+
+    CASE pl.Txn_Type
+      WHEN 'Sale'
+        THEN s.Sale_Id
+
+      WHEN 'Purchase'
+        THEN p.Purchase_Id
+
+      WHEN 'Sale Return'
+        THEN sr.Return_Number
+
+      WHEN 'Purchase Return'
+        THEN pr.Return_Number
+
+      WHEN 'Payment In'
+        THEN pi.Receipt_No
+
+      WHEN 'Payment Out'
+        THEN po.Receipt_No
+
+      WHEN 'Expense'
+        THEN e.Expense_Number
+
+      ELSE pl.Source_Id
+    END AS Formatted_Reference_Id,
+    CASE
+  WHEN pl.Txn_Type = 'Sale'
+    THEN s.Total_Received
+
+  WHEN pl.Txn_Type = 'Purchase Return'
+    THEN pr.Total_Received
+
+  WHEN pl.Txn_Type = 'Payment In'
+    THEN pi.Received
+
+  ELSE 0
+END AS Total_Received_DB,
+
+CASE
+  WHEN pl.Txn_Type = 'Purchase'
+    THEN p.Total_Paid
+
+  WHEN pl.Txn_Type = 'Sale Return'
+    THEN sr.Total_Paid
+
+  WHEN pl.Txn_Type = 'Payment Out'
+    THEN po.Paid
+
+  WHEN pl.Txn_Type = 'Expense'
+    THEN e.Total_Paid
+
+  ELSE 0
+END AS Total_Paid_DB
+
+  FROM party_ledger pl
+
+  LEFT JOIN add_sale s
+    ON pl.Txn_Type = 'Sale'
+    AND pl.Source_Id = s.id
+
+  LEFT JOIN add_purchase p
+    ON pl.Txn_Type = 'Purchase'
+    AND pl.Source_Id = p.id
+
+  LEFT JOIN sale_return sr
+    ON pl.Txn_Type = 'Sale Return'
+    AND pl.Source_Id = sr.id
+
+  LEFT JOIN purchase_return pr
+    ON pl.Txn_Type = 'Purchase Return'
+    AND pl.Source_Id = pr.id
+
+  LEFT JOIN payment_in pi
+    ON pl.Txn_Type = 'Payment In'
+    AND pl.Source_Id = pi.id
+
+  LEFT JOIN payment_out po
+    ON pl.Txn_Type = 'Payment Out'
+    AND pl.Source_Id = po.id
+
+  LEFT JOIN expenses e
+    ON pl.Txn_Type = 'Expense'
+    AND pl.Source_Id = e.id
+
+  ${where}
+
+  ORDER BY
+    pl.Txn_Date ASC,
+    pl.id ASC
+  `,
+  params
+);
+const sourceTypeMap = {
+  Sale: "Sale",
+  Purchase: "Purchase",
+  "Sale Return": "Sale_Return",
+  "Purchase Return": "Purchase_Return",
+  "Payment In": "Payment_In",
+  "Payment Out": "Payment_Out",
+  Expense: "Expense",
+};
+
+const sourcePairs = ledgerRows
+  .filter((txn) => txn.Source_Id)
+  .map((txn) => ({
+    sourceType:
+      sourceTypeMap[txn.Txn_Type] || txn.Txn_Type,
+    sourceId: txn.Source_Id,
+  }));
+
+const uniquePairs = Array.from(
+  new Map(
+    sourcePairs.map((item) => [
+      `${item.sourceType}_${item.sourceId}`,
+      item,
+    ])
+  ).values()
+);
+
+let paymentSplitMap = {};
+
+if (uniquePairs.length > 0) {
+  const conditions = uniquePairs
+    .map(
+      () =>
+        `(ps.Source_Type = ? AND ps.Source_Id = ?)`
+    )
+    .join(" OR ");
+
+  const splitParams = [];
+
+  uniquePairs.forEach((item) => {
+    splitParams.push(
+      item.sourceType,
+      item.sourceId
     );
+  });
+
+  const [splits] = await connection.query(
+    `
+    SELECT
+      ps.Source_Type,
+      ps.Source_Id,
+      ps.Payment_Type,
+      ps.Amount,
+      ba.Account_Display_Name
+
+    FROM payment_splits ps
+
+    LEFT JOIN bank_accounts ba
+      ON ba.id = ps.Bank_Account_Id
+
+    WHERE ${conditions}
+
+    ORDER BY ps.id ASC
+    `,
+    splitParams
+  );
+
+  splits.forEach((split) => {
+    const key =
+      `${split.Source_Type}_${split.Source_Id}`;
+
+    if (!paymentSplitMap[key]) {
+      paymentSplitMap[key] = [];
+    }
+
+    const label =
+      split.Payment_Type === "Bank"
+        ? split.Account_Display_Name || "Bank"
+        : split.Payment_Type || "Unknown";
+
+    paymentSplitMap[key].push(
+      `${label} ₹${Number(split.Amount || 0).toFixed(2)}`
+    );
+  });
+}
 
     /* ── SUMMARY — all-time (not filtered by date range, same as detail page) ── */
     // const [[purchaseSummary]] = await connection.query(
@@ -2282,7 +2474,8 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Party Ledger");
 
-    const LAST_COL = "G";
+    // const LAST_COL = "G";
+    const LAST_COL = "H";
 
     // sheet.columns = [
     //   { key: "date", width: 14 },     // A Date
@@ -2301,6 +2494,7 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
       { key: "received", width: 16 },
       { key: "paid", width: 16 },
       { key: "balance", width: 16 },
+      { key: "paymentDetails", width: 35 }
     ];
 
     /* ── ROW 1: Title ── */
@@ -2362,6 +2556,7 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
       "Received",
       "Paid",
       "Balance Due",
+       "Payment Details",
     ].forEach((h, i) => {
       const cell = ledgerHeaderRow.getCell(i + 1);
       cell.value = h;
@@ -2376,9 +2571,18 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
     const FIRST_DATA_ROW = cursorRow + 1;
     cursorRow += 1;
 
+    // ledgerRows.forEach((txn) => {
+    //   const row = sheet.getRow(cursorRow);
+    //   const amount = Number(txn.Amount || 0);
     ledgerRows.forEach((txn) => {
-      const row = sheet.getRow(cursorRow);
-      const amount = Number(txn.Amount || 0);
+  const row = sheet.getRow(cursorRow);
+  const amount = Number(txn.Amount || 0);
+
+  const sourceType =sourceTypeMap[txn.Txn_Type] || txn.Txn_Type;
+
+  const splitKey =`${sourceType}_${txn.Source_Id}`;
+
+  const paymentDetails =paymentSplitMap[splitKey]?.join(" + ") || "-";
 
       row.getCell(1).value = txn.Txn_Date
         ? new Date(txn.Txn_Date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
@@ -2391,9 +2595,13 @@ const exportSinglePartyDetailsReportToExcel = async (req, res, next) => {
 
       // Credit = money received; Debit = money paid
       row.getCell(4).value = amount;
-      row.getCell(5).value = txn.Direction === "Credit" ? amount : "";
-      row.getCell(6).value = txn.Direction === "Debit" ? amount : "";
+      row.getCell(5).value =Number(txn.Total_Received_DB || 0) || "";
+
+row.getCell(6).value =Number(txn.Total_Paid_DB || 0) || "";
+      // row.getCell(5).value = txn.Direction === "Credit" ? amount : "";
+      // row.getCell(6).value = txn.Direction === "Debit" ? amount : "";
       row.getCell(7).value = Number(txn.Balance_Due || 0);
+      row.getCell(8).value =paymentDetails;
 
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         cell.font = { name: "Calibri", size: 10 };

@@ -3,7 +3,7 @@ import db from "../config/db.js";
 
 // Runs every 30 minutes
 function clearExpiredSessions() {
-cron.schedule("*/30 * * * *", async () => {
+cron.schedule("0 0 * * *", async () => {
   try {
     const [result] = await db.query(`DELETE FROM sessions WHERE expires_at < NOW()`);
     if (result.affectedRows > 0) {

@@ -1,17 +1,19 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
-import {  useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
- 
+  LayoutDashboard,
   Search,
   MoreVertical,
- 
+  SquarePen,
   ChevronRight,
   Receipt,
   Tags,
   Eye,
   Trash2,
   Printer,
+  FileSpreadsheet,
+  PrinterIcon
 } from "lucide-react";
 
 import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
@@ -136,8 +138,7 @@ export default function ExpensesByCategories() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
-const rightCategoryRef = useRef(selectedCategoryId );
-const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? rightCursor : null;
+
   const {
     data: expenseResponse,
     isLoading: isExpensesLoading,
@@ -145,7 +146,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
   } = useGetExpensesByCategoryQuery(
     {
       categoryId: selectedCategoryId,
-      cursor: effectiveRightCursor,
+      cursor: rightCursor,
       search: txnSearch,
     },
     {
@@ -413,7 +414,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
             >
               <Tags size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <span className="text-xs font-semibold  uppercase tracking-wider">
                 Categories ({filteredCategories.length})
               </span>
             </div>

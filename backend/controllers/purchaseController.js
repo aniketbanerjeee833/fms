@@ -1803,7 +1803,7 @@ for (const item of items) {
         `
         INSERT IGNORE INTO item_unit_conversions
         (
-          Item_Id,
+          
           Primary_Unit,
           Secondary_Unit,
           Conversion_Rate
@@ -1811,7 +1811,7 @@ for (const item of items) {
         VALUES (?, ?, ?, ?)
         `,
         [
-          Item_Id,
+          
           primaryUnit,
           secondaryUnit,
           conversionRate,
@@ -1924,27 +1924,7 @@ for (const item of items) {
   // EXISTING ITEM
   // ═════════════════════════════════════════════════════
 
-  //   else {
-
-  // // ADD THIS ↓↓↓
-
-  // const oldPurchaseLine = oldItems.find(
-  //   (old) => String(old.Item_Id) === String(Item_Id)
-  // );
-
-  // const oldPrimary =
-  //   oldPurchaseLine?.Primary_Unit_Snapshot || null;
-
-  // const oldSecondary =
-  //   oldPurchaseLine?.Secondary_Unit_Snapshot || null;
-
-  // const oldSelected =
-  //   oldPurchaseLine?.Selected_Unit || null;
-
-  // const oldUsedSecondary =
-  //   oldPurchaseLine &&
-  //   oldSecondary &&
-  //   oldSelected === oldSecondary;
+ 
   else {
 
   // =====================================================
@@ -2044,8 +2024,7 @@ for (const item of items) {
 
     resolvedSelectedUnit = Selected_Unit;
 
-    const qty =
-      normalizeNumber(Quantity) ?? 0;
+    const qty =normalizeNumber(Quantity) ?? 0;
 
     // User selected primary KG
     if (Selected_Unit === oldPrimary) {
@@ -2054,35 +2033,45 @@ for (const item of items) {
 
     // User selected secondary GM
     else {
-      const [[conversion]] =
-        await connection.query(
-          `
-          SELECT Conversion_Rate
-          FROM item_unit_conversions
-          WHERE Item_Id = ?
-            AND Primary_Unit = ?
-            AND Secondary_Unit = ?
-          ORDER BY id DESC
-          LIMIT 1
-          `,
-          [
-            Item_Id,
-            oldPrimary,
-            oldSecondary,
-          ]
-        );
+      // const [[conversion]] =
+      //   await connection.query(
+      //     `
+      //     SELECT Conversion_Rate
+      //     FROM item_unit_conversions
+      //     WHERE  Primary_Unit = ?
+      //       AND Secondary_Unit = ?
+      //     ORDER BY id DESC
+      //     LIMIT 1
+      //     `,
+      //     [
+            
+      //       oldPrimary,
+      //       oldSecondary,
+      //     ]
+      //   );
 
+      // const rate =
+      //   Number(conversion?.Conversion_Rate) || 0;
+
+      // if (rate <= 0) {
+      //   throw new Error(
+      //     `Conversion rate not found for ${oldPrimary} → ${oldSecondary}.`
+      //   );
+      // }
+
+      // quantityInBaseUnit =
+      //   qty / rate;
       const rate =
-        Number(conversion?.Conversion_Rate) || 0;
+      Number(dbItemRow?.Conversion_Rate) || 0;
 
-      if (rate <= 0) {
-        throw new Error(
-          `Conversion rate not found for ${oldPrimary} → ${oldSecondary}.`
-        );
-      }
+    if (rate <= 0) {
+      throw new Error(
+        `Conversion rate not found for ${oldPrimary} → ${oldSecondary}.`
+      );
+    }
 
-      quantityInBaseUnit =
-        qty / rate;
+    quantityInBaseUnit =
+      qty / rate;
     }
   }
 
@@ -2315,33 +2304,45 @@ for (const old of oldItems) {
       snapSecondary &&
       selectedUnit === snapSecondary
     ) {
-      const [[conversionRow]] =
-        await connection.query(
-          `
-          SELECT Conversion_Rate
-          FROM item_unit_conversions
-          WHERE Primary_Unit = ?
-            AND Secondary_Unit = ?
-          ORDER BY id DESC
-          LIMIT 1
-          `,
-          [
+      // const [[conversionRow]] =await connection.query(
+      //     `
+      //     SELECT Conversion_Rate
+      //     FROM item_unit_conversions
+      //     WHERE Primary_Unit = ?
+      //       AND Secondary_Unit = ?
+      //     ORDER BY id DESC
+      //     LIMIT 1
+      //     `,
+      //     [
             
-            snapPrimary,
-            snapSecondary,
-          ]
-        );
+      //       snapPrimary,
+      //       snapSecondary,
+      //     ]
+      //   );
 
-      const conversionRate =
-        Number(conversionRow?.Conversion_Rate) || 0;
+      // const conversionRate =Number(conversionRow?.Conversion_Rate) || 0;
 
-      if (conversionRate > 0) {
-        baseQty =
-          rawQty / conversionRate;
-      }
-      // If conversion cannot be found,
-      // don't crash the user's edit.
-      // Keep rawQty as fallback.
+      // if (conversionRate > 0) {
+      //   baseQty =rawQty / conversionRate;
+      // }
+      const [[itemMaster]] = await connection.query(
+  `
+  SELECT Conversion_Rate
+  FROM add_item
+  WHERE Item_Id = ?
+  LIMIT 1
+  `,
+  [old.Item_Id]
+);
+
+const conversionRate =
+  Number(itemMaster?.Conversion_Rate) || 0;
+
+if (conversionRate > 0) {
+  baseQty =
+    rawQty / conversionRate;
+}
+     
     }
   }
 

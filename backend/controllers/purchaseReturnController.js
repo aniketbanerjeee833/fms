@@ -466,9 +466,9 @@ const getPurchaseReturnById = async (req, res, next) => {
       // CURRENT MASTER
       // =======================================================
 
-      const currentPrimary =it.Current_Primary_Unit || null;
+      const currentPrimary = it.Current_Primary_Unit || null;
 
-      const currentSecondary =it.Current_Secondary_Unit || null;
+      const currentSecondary = it.Current_Secondary_Unit || null;
       const price = Number(it.Purchase_Price || 0);
       let discountAmount = 0;
 
@@ -1821,30 +1821,48 @@ const editPurchaseReturn = async (req, res, next) => {
           oldSelected === oldSecondary
         ) {
 
-          const [[conversion]] =
+          // const [[conversion]] =
+          //   await connection.query(
+          //     `
+          // SELECT Conversion_Rate
+          // FROM item_unit_conversions
+          // WHERE  Primary_Unit = ?
+          //   AND Secondary_Unit = ?
+          // ORDER BY id DESC
+          // LIMIT 1
+          // `,
+          //     [
+
+          //       oldPrimary,
+          //       oldSecondary,
+          //     ]
+          //   );
+
+          // const conversionRate =
+          //   Number(conversion?.Conversion_Rate) || 0;
+
+          // if (
+          //   Number.isFinite(conversionRate) &&
+          //   conversionRate > 0
+          // ) {
+          //   oldBaseQty =
+          //     rawQty / conversionRate;
+          // }
+          const [[itemMaster]] =
             await connection.query(
               `
-          SELECT Conversion_Rate
-          FROM item_unit_conversions
-          WHERE  Primary_Unit = ?
-            AND Secondary_Unit = ?
-          ORDER BY id DESC
-          LIMIT 1
-          `,
-              [
-               
-                oldPrimary,
-                oldSecondary,
-              ]
+            SELECT Conversion_Rate
+            FROM add_item
+            WHERE Item_Id = ?
+            LIMIT 1
+              `,
+              [old.Item_Id]
             );
 
           const conversionRate =
-            Number(conversion?.Conversion_Rate) || 0;
+            Number(itemMaster?.Conversion_Rate) || 0;
 
-          if (
-            Number.isFinite(conversionRate) &&
-            conversionRate > 0
-          ) {
+          if (conversionRate > 0) {
             oldBaseQty =
               rawQty / conversionRate;
           }

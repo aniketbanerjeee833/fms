@@ -9,7 +9,8 @@ import {
   Eye,
   Trash2,
   Printer,
-
+  FileSpreadsheet,
+  PrinterIcon
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
@@ -511,7 +512,7 @@ export default function ExpensesByItems() {
               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
             >
               <Package size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <span className="text-xs font-semibold  uppercase tracking-wider">
                 Items ({totalItems})
               </span>
             </div>

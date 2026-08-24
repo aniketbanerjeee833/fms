@@ -210,51 +210,51 @@ const getSaleReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
-  //   const [items] = await connection.query(
-  //     `
-  // SELECT
-  //     sri.id,
-     
-  //     sri.Item_Id,
+    //   const [items] = await connection.query(
+    //     `
+    // SELECT
+    //     sri.id,
 
-  //     i.Item_Name,
-  //     i.Item_HSN,
-  //     i.Item_Unit,
-  //     i.Item_Category,
+    //     sri.Item_Id,
 
-  //     -- CURRENT MASTER
-  //     i.Primary_Unit AS Current_Primary_Unit,
-  //     i.Secondary_Unit AS Current_Secondary_Unit,
-  //     i.Conversion_Rate,
+    //     i.Item_Name,
+    //     i.Item_HSN,
+    //     i.Item_Unit,
+    //     i.Item_Category,
 
-  //     sri.Quantity,
+    //     -- CURRENT MASTER
+    //     i.Primary_Unit AS Current_Primary_Unit,
+    //     i.Secondary_Unit AS Current_Secondary_Unit,
+    //     i.Conversion_Rate,
 
-  //     -- HISTORICAL SNAPSHOT
-  //     sri.Primary_Unit_Snapshot,
-  //     sri.Secondary_Unit_Snapshot,
-  //     sri.Selected_Unit,
+    //     sri.Quantity,
 
-  //     sri.Sale_Price,
-  //     sri.Discount_On_Sale_Price,
-  //     sri.Discount_Type_On_Sale_Price,
-  //     sri.Tax_Amount,
-  //     sri.Tax_Type,
-  //     sri.Amount,
-  //     sri.created_at
+    //     -- HISTORICAL SNAPSHOT
+    //     sri.Primary_Unit_Snapshot,
+    //     sri.Secondary_Unit_Snapshot,
+    //     sri.Selected_Unit,
 
-  // FROM sale_return_items sri
+    //     sri.Sale_Price,
+    //     sri.Discount_On_Sale_Price,
+    //     sri.Discount_Type_On_Sale_Price,
+    //     sri.Tax_Amount,
+    //     sri.Tax_Type,
+    //     sri.Amount,
+    //     sri.created_at
 
-  // LEFT JOIN add_item i
-  //   ON sri.Item_Id = i.Item_Id
+    // FROM sale_return_items sri
 
-  // WHERE sri.Sale_Return_Id = ?
+    // LEFT JOIN add_item i
+    //   ON sri.Item_Id = i.Item_Id
 
-  // ORDER BY sri.created_at DESC
-  // `,
-  //     [Sale_Return_Id]
-  //   );
-  const [items] = await connection.query(
-  `
+    // WHERE sri.Sale_Return_Id = ?
+
+    // ORDER BY sri.created_at DESC
+    // `,
+    //     [Sale_Return_Id]
+    //   );
+    const [items] = await connection.query(
+      `
   SELECT
       sri.id,
 
@@ -303,8 +303,8 @@ const getSaleReturnById = async (req, res, next) => {
 
   ORDER BY sri.created_at DESC
   `,
-  [Sale_Return_Id]
-);
+      [Sale_Return_Id]
+    );
 
     // =========================================================
     // 3. FETCH ALL UNITS (for edit dropdown — same as purchase)
@@ -337,9 +337,9 @@ const getSaleReturnById = async (req, res, next) => {
       // CURRENT MASTER
       // =======================================================
 
-      const currentPrimary =it.Current_Primary_Unit || null;
+      const currentPrimary = it.Current_Primary_Unit || null;
 
-      const currentSecondary =it.Current_Secondary_Unit || null;
+      const currentSecondary = it.Current_Secondary_Unit || null;
       const price = Number(it.Sale_Price || 0);
       let discountAmount = 0;
 
@@ -443,17 +443,17 @@ const getSaleReturnById = async (req, res, next) => {
         Primary_Unit: oldPrimary,
         Secondary_Unit: oldSecondary,
         Selected_Unit: oldSelected,
-           Conversion_Rate:it.Conversion_Rate !== null
-    ? Number(it.Conversion_Rate)
-    : 0,
+        Conversion_Rate: it.Conversion_Rate !== null
+          ? Number(it.Conversion_Rate)
+          : 0,
         // Dropdown
         Available_Units: availableUnits,
 
         Sale_Price: it.Sale_Price,
 
-        Discount_On_Sale_Price:it.Discount_On_Sale_Price,
+        Discount_On_Sale_Price: it.Discount_On_Sale_Price,
 
-        Discount_Type_On_Sale_Price:it.Discount_Type_On_Sale_Price,
+        Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price,
 
         Tax_Type: it.Tax_Type,
 
@@ -640,7 +640,7 @@ const createSaleReturn = async (req, res, next) => {
 
     const totalAmount = Number(Total_Amount) || 0;
     const balanceDue = totalAmount - totalPaid;
-     const roundOffValue = Number(Round_Off) || 0
+    const roundOffValue = Number(Round_Off) || 0
 
     // =========================================================
     // 5. TOTAL VALIDATION
@@ -965,22 +965,22 @@ const createSaleReturn = async (req, res, next) => {
 
       const srItemId = srItemResult.insertId;
       await syncUnitIdsForItem(
-  connection,
-  Item_Id
-);
+        connection,
+        Item_Id
+      );
 
-await syncUnitIdsForSaleReturnItem(
-  connection,
-  {
-    saleReturnItemRowId: srItemId,
+      await syncUnitIdsForSaleReturnItem(
+        connection,
+        {
+          saleReturnItemRowId: srItemId,
 
-    Primary_Unit_Snapshot:snapshot.Primary_Unit_Snapshot,
+          Primary_Unit_Snapshot: snapshot.Primary_Unit_Snapshot,
 
-    Secondary_Unit_Snapshot:snapshot.Secondary_Unit_Snapshot,
+          Secondary_Unit_Snapshot: snapshot.Secondary_Unit_Snapshot,
 
-    Selected_Unit:resolvedSelectedUnit,
-  }
-);
+          Selected_Unit: resolvedSelectedUnit,
+        }
+      );
 
       // =========================================================
       // 15. STOCK
@@ -1519,31 +1519,49 @@ const editSaleReturn = async (req, res, next) => {
           oldSelected === oldSecondary
         ) {
 
-          const [[conversion]] =
+          // const [[conversion]] =
+          //   await connection.query(
+          //     `
+          // SELECT Conversion_Rate
+          // FROM item_unit_conversions
+          // WHERE Item_Id = ?
+          //   AND Primary_Unit = ?
+          //   AND Secondary_Unit = ?
+          // ORDER BY id DESC
+          // LIMIT 1
+          // `,
+          //     [
+          //       old.Item_Id,
+          //       oldPrimary,
+          //       oldSecondary,
+          //     ]
+          //   );
+
+          // const conversionRate =
+          //   Number(conversion?.Conversion_Rate) || 0;
+
+          // if (
+          //   Number.isFinite(conversionRate) &&
+          //   conversionRate > 0
+          // ) {
+          //   oldBaseQty =
+          //     rawQty / conversionRate;
+          // }
+          const [[itemMaster]] =
             await connection.query(
               `
-          SELECT Conversion_Rate
-          FROM item_unit_conversions
-          WHERE Item_Id = ?
-            AND Primary_Unit = ?
-            AND Secondary_Unit = ?
-          ORDER BY id DESC
-          LIMIT 1
-          `,
-              [
-                old.Item_Id,
-                oldPrimary,
-                oldSecondary,
-              ]
+              SELECT Conversion_Rate
+              FROM add_item
+              WHERE Item_Id = ?
+              LIMIT 1
+              `,
+              [old.Item_Id]
             );
 
           const conversionRate =
-            Number(conversion?.Conversion_Rate) || 0;
+            Number(itemMaster?.Conversion_Rate) || 0;
 
-          if (
-            Number.isFinite(conversionRate) &&
-            conversionRate > 0
-          ) {
+          if (conversionRate > 0) {
             oldBaseQty =
               rawQty / conversionRate;
           }
@@ -1578,29 +1596,29 @@ const editSaleReturn = async (req, res, next) => {
 
     for (const itemId of allItemIds) {
 
-  const newBaseQty =
-    newQtyByItem.get(itemId) || 0;
+      const newBaseQty =
+        newQtyByItem.get(itemId) || 0;
 
-  const oldBaseQty =
-    oldQtyByItem.get(itemId) || 0;
+      const oldBaseQty =
+        oldQtyByItem.get(itemId) || 0;
 
-  const diff =
-    newBaseQty - oldBaseQty;
+      const diff =
+        newBaseQty - oldBaseQty;
 
-  if (diff !== 0) {
+      if (diff !== 0) {
 
-    await connection.query(
-      `
+        await connection.query(
+          `
       UPDATE add_item
       SET
         Stock_Quantity = Stock_Quantity + ?,
         updated_at = NOW()
       WHERE Item_Id = ?
       `,
-      [diff, itemId]
-    );
-  }
-}
+          [diff, itemId]
+        );
+      }
+    }
 
 
     // =========================================================
@@ -1668,22 +1686,22 @@ const editSaleReturn = async (req, res, next) => {
 
       // 🔹 Item Ledger — unchanged, still uses line.Quantity, NOT stockDelta
       await syncUnitIdsForItem(
-  connection,
-  line.Item_Id
-);
+        connection,
+        line.Item_Id
+      );
 
-await syncUnitIdsForSaleReturnItem(
-  connection,
-  {
-    saleReturnItemRowId: saleReturnItemId,
+      await syncUnitIdsForSaleReturnItem(
+        connection,
+        {
+          saleReturnItemRowId: saleReturnItemId,
 
-    Primary_Unit_Snapshot:line.Primary_Unit_Snapshot,
+          Primary_Unit_Snapshot: line.Primary_Unit_Snapshot,
 
-    Secondary_Unit_Snapshot:line.Secondary_Unit_Snapshot,
+          Secondary_Unit_Snapshot: line.Secondary_Unit_Snapshot,
 
-    Selected_Unit:line.Selected_Unit,
-  }
-);
+          Selected_Unit: line.Selected_Unit,
+        }
+      );
       await recordItemLedger({
         connection,
 
@@ -1743,7 +1761,7 @@ await syncUnitIdsForSaleReturnItem(
     }
   }
 };
- const deleteSaleReturn = async (req, res, next) => {
+const deleteSaleReturn = async (req, res, next) => {
   let connection;
 
   try {
@@ -2176,8 +2194,8 @@ const exportSaleReturnReportToExcel = async (req, res, next) => {
       const excelRow = sheet.addRow([
         row.Return_Date
           ? new Date(
-              row.Return_Date
-            ).toLocaleDateString("en-IN")
+            row.Return_Date
+          ).toLocaleDateString("en-IN")
           : "",
         row.Return_Number || "",
         row.Invoice_Number || "",
@@ -2251,8 +2269,8 @@ const exportSaleReturnReportToExcel = async (req, res, next) => {
       fromDate && toDate
         ? `SaleReturnReport_${fromDate}_to_${toDate}`
         : `SaleReturnReport_${new Date()
-            .toISOString()
-            .slice(0, 10)}`;
+          .toISOString()
+          .slice(0, 10)}`;
 
     res.setHeader(
       "Content-Type",
@@ -2359,7 +2377,7 @@ const exportSaleReturnReportToExcel = async (req, res, next) => {
 
 //         p.Party_Name,
 //         p.GSTIN
-        
+
 
 //       FROM sale_return sr
 
@@ -2683,7 +2701,7 @@ const getSaleReturnPrintReport = async (
       whereClause,
       params
     );
-console.log("saleReturns", saleReturns.length);
+    console.log("saleReturns", saleReturns.length);
     return res.status(200).json({
       success: true,
       totalSaleReturns:

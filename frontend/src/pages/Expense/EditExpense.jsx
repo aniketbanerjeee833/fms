@@ -18,7 +18,7 @@ import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 // import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 
-import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
 import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 import {
@@ -27,7 +27,6 @@ import {
     useGetExpenseByIdQuery,
     useEditExpenseMutation,
 } from "../../redux/api/expenseApi";
-import { useDispatch } from "react-redux";
 
 
 
@@ -77,7 +76,7 @@ export default function EditExpense() {
     const navigate = useNavigate();
     const location = useLocation();
     const { id } = useParams();
-    const dispatch=useDispatch();
+
     // NEW 
     const getBackDestination = () => {
         const from = location.state?.from;
@@ -149,7 +148,7 @@ export default function EditExpense() {
     // TODO: const { data: categories } = useGetAllExpenseCategoriesQuery();
     const {
         data: categoryResponse,
-        //isLoading: isCategoryLoading,
+        isLoading: isCategoryLoading,
     } = useGetAllExpenseCategoriesQuery();
 
     const categories = categoryResponse?.categories || [];
@@ -160,7 +159,7 @@ export default function EditExpense() {
 
     const {
         data: itemResponse,
-        //isLoading: isItemLoading,
+        isLoading: isItemLoading,
     } = useGetAllExpenseItemMastersQuery();
 
     const items = itemResponse?.items || [];
@@ -171,14 +170,14 @@ export default function EditExpense() {
 
     const {
         data: partiesResponse,
-        //isLoading: isPartyLoading,
+        isLoading: isPartyLoading,
     } = useGetAllPartiesQuery();
     // console.log("Parties:", partiesResponse);
 
     // TODO: const { data: banks = [] } = useGetAllBankAccountsQuery();
     const {
         data: banks = [],
-        //isLoading: isBankLoading,
+        isLoading: isBankLoading,
     } = useGetAllBankAccountsQuery();
     // console.log("Banks:", banks);
 
@@ -199,7 +198,7 @@ export default function EditExpense() {
 
     const {
         data: expenseResponse,
-        //isLoading: isExpenseLoading,
+        isLoading: isExpenseLoading,
     } = useGetExpenseByIdQuery(id);
 
 
@@ -306,12 +305,12 @@ export default function EditExpense() {
 
         const expense = expenseResponse.expense;
 
-        // console.log("Expense ID:", expense.id);
-        // console.log("Expense:", expense);
-        // console.log("Items:", expense.items);
-        // console.log("Splits:", expense.splits);
-        // console.log("Items Length:", expense.items?.length);
-        // console.log("Splits Length:", expense.splits?.length);
+        console.log("Expense ID:", expense.id);
+        console.log("Expense:", expense);
+        console.log("Items:", expense.items);
+        console.log("Splits:", expense.splits);
+        console.log("Items Length:", expense.items?.length);
+        console.log("Splits Length:", expense.splits?.length);
 
         reset({
             Category_Name: expense.Category_Name || "",
@@ -414,8 +413,12 @@ export default function EditExpense() {
         // }
 
         let disc = num(row.Discount_On_Price);
+
         if ((row.Discount_Type_On_Price || "Percentage") === "Percentage") {
             disc = (subtotal * disc) / 100;
+        } else if ((row.Discount_Type_On_Price || "Percentage") === "Amount") {
+            // Amount discount is per unit, so multiply by quantity
+            disc = disc * qty;
         }
 
 
@@ -553,11 +556,7 @@ export default function EditExpense() {
             }
 
             toast.success("Expense updated successfully");
-              dispatch(partyApi.util.invalidateTags([
-                                  "Party",
-                                  "PartyLedger",
-                                ])
-                              );
+
             // NEW
             setTimeout(() => {
                 const dest = getBackDestination();

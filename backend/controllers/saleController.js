@@ -1,12 +1,11 @@
 
 import db from "../config/db.js"; // mysql2/promise db
 import { sanitizeObject } from "../utils/sanitizeInput.js";
-import { saleNewItemFormSchema } from "../validators/saleNewItemFormSchema.js";
+
 import saleSchema from "../validators/saleSchema.js";
 import PdfPrinter from "pdfmake";
 import ExcelJS from "exceljs";
-import { recordBankTransaction } from "../utils/bankAccountHelper.js";
-import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { recordItemLedger, reverseItemLedger } from "../utils/itemLedgerHelper.js";
@@ -959,16 +958,16 @@ const addSale = async (req, res, next) => {
       );
 
       await syncUnitIdsForItem(
-  connection,
-  Item_Id
-);
+        connection,
+        Item_Id
+      );
 
-await syncUnitIdsForSaleItem(connection, {
-  saleItemRowId: saleItemIdNum,
-  Primary_Unit_Snapshot:snapshot.Primary_Unit_Snapshot,
-  Secondary_Unit_Snapshot:snapshot.Secondary_Unit_Snapshot,
-  Selected_Unit:resolvedSelectedUnit,
-});
+      await syncUnitIdsForSaleItem(connection, {
+        saleItemRowId: saleItemIdNum,
+        Primary_Unit_Snapshot: snapshot.Primary_Unit_Snapshot,
+        Secondary_Unit_Snapshot: snapshot.Secondary_Unit_Snapshot,
+        Selected_Unit: resolvedSelectedUnit,
+      });
       await recordItemLedger({
         connection,
         itemId: Item_Id,
@@ -1014,323 +1013,7 @@ await syncUnitIdsForSaleItem(connection, {
     }
   }
 };
-const addNewSale = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-    // console.log(req.body);
-    // 1️⃣ Sanitize + validate
-    const cleanData = sanitizeObject(req.body);
-    const validation = saleNewItemFormSchema.safeParse(cleanData);
-    if (!validation.success) {
-      await connection.rollback();
-      return res.status(400).json({ errors: validation.error.errors });
-    }
 
-    const {
-      Party_Name,
-      Invoice_Number,
-      Invoice_Date,
-      State_Of_Supply,
-      Total_Amount,
-      GSTIN,
-      Total_Received,
-      Balance_Due,
-      Payment_Type,
-      Reference_Number,
-      items,
-    } = validation.data;
-
-    //  const {
-    //   Party_Name,
-    //   Invoice_Number,
-    //   Invoice_Date,
-    //   State_Of_Supply,
-    //   Total_Amount,
-    //   GSTIN,
-    //   Total_Received,
-    //   Balance_Due,
-    //   Payment_Type,
-    //   Reference_Number,
-    //   items,
-    // } = req.body;
-
-    if (
-      !Party_Name ||
-      !Invoice_Number ||
-      !Invoice_Date ||
-      !State_Of_Supply ||
-      !Array.isArray(items) ||
-      items.length === 0
-    ) {
-      await connection.rollback();
-      return res.status(400).json({
-        message: "Star marked fields missing or items empty",
-      });
-    }
-    //     const itemNameSet = new Set();
-    //     for (const item of items) {
-    //   const itemName = item.Item_Name?.trim().toLowerCase();
-
-    //   if (!itemName) {
-    //     await connection.rollback();
-    //     return res.status(400).json({ message: "Item name missing." });
-    //   }
-
-    //   if (itemNameSet.has(itemName)) {
-    //     await connection.rollback();
-    //     return res.status(400).json({
-    //       message: `Duplicate item detected: '${item.Item_Name}'. Each item must appear only once.`,
-    //     });
-    //   }
-
-    //   itemNameSet.add(itemName);
-    // }
-    const itemNameSet = new Set();
-
-    for (const item of items) {
-      const itemName = item.Item_Name?.trim().toLowerCase();
-
-      if (!itemName) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Item name missing." });
-      }
-
-      if (itemNameSet.has(itemName)) {
-        await connection.rollback();
-        return res.status(400).json({
-          message: `Duplicate item detected: '${item.Item_Name}'`,
-        });
-      }
-
-      itemNameSet.add(itemName);
-    }
-
-    // 2️⃣ Validate unique invoice number
-    const [existingInvoice] = await connection.query(
-      "SELECT Invoice_Number FROM add_new_sale WHERE Invoice_Number = ? LIMIT 1",
-      [Invoice_Number]
-    );
-    if (existingInvoice.length > 0) {
-      await connection.rollback();
-      return res
-        .status(400)
-        .json({ message: "Invoice number already exists, please use a new one." });
-    }
-
-    // 3️⃣ Fetch Party_Id
-    const [partyRows] = await connection.query(
-      "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
-      [Party_Name]
-    );
-    if (partyRows.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ message: "Party not found." });
-    }
-    const Party_Id = partyRows[0].Party_Id;
-
-    // 4️⃣ Generate new Sale_Id
-    const [lastSale] = await connection.query(
-      "SELECT Sale_Id FROM  add_new_sale ORDER BY id DESC LIMIT 1"
-    );
-    // let newSaleId = "SAL001";
-    // if (lastSale.length > 0) {
-    //   const num = parseInt(lastSale[0].Sale_Id.replace("SAL", "")) + 1;
-    //   newSaleId = "SAL" + num.toString().padStart(3, "0");
-    // }
-
-    let nextSaleNum = 1;
-    // if (lastHotel.length > 0) {
-    //   nextHotelNum = Number(lastHotel[0].hotel_id.replace(/\D/g, "")) + 1;
-    // }
-    if (lastSale.length > 0) {
-      // const num = parseInt(lastSale[0].Sale_Id.replace("SAL", "")) + 1;
-      // newSaleId = "SAL" + num.toString().padStart(3, "0");
-      nextSaleNum = parseInt(lastSale[0].Sale_Id.replace(/\D/g, "")) + 1;
-    }
-    const newSaleId = "SALS" + nextSaleNum.toString().padStart(4, "0");
-
-    const [fy] = await connection.query(
-      `SELECT Financial_Year 
-       FROM financial_year 
-       WHERE Current_Financial_Year = 1
-       LIMIT 1`
-    );
-
-    if (fy.length === 0) {
-      await connection.rollback();
-      return res.status(400).json({
-        message: "No active financial year found. Please set one in settings.",
-      });
-    }
-
-    const activeFY = fy[0].Financial_Year; // Example: "2025-2026"
-    // 5️⃣ Insert into add_sale
-    const totalAmount = Number(Total_Amount) || 0;
-    const totalReceived =
-      Total_Received === "" || Total_Received === undefined
-        ? 0
-        : Number(Total_Received);
-
-    const balanceDue =
-      Balance_Due === "" || Balance_Due === undefined
-        ? totalAmount - totalReceived
-        : Number(Balance_Due);
-    await connection.query(
-      `INSERT INTO add_new_sale
-       (Party_Id, Sale_Id, Invoice_Number, Invoice_Date,financial_year, State_Of_Supply,
-        Total_Amount, Total_Received, Balance_Due, Payment_Type, Reference_Number, 
-        created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, NOW(), NOW())`,
-      [
-        Party_Id,
-        newSaleId,
-        Invoice_Number,
-        Invoice_Date,
-        activeFY,
-        State_Of_Supply,
-        totalAmount,
-        totalReceived,
-        balanceDue,
-        cleanValue(Payment_Type),
-        cleanValue(Reference_Number),
-      ]
-    );
-
-
-    const [maxRow] = await connection.query(
-      "SELECT MAX(CAST(SUBSTRING(Sale_Items_Id, 5) AS UNSIGNED)) AS maxNum FROM add_new_sale_items"
-    );
-    let nextSaleItemNum = (maxRow[0]?.maxNum || 0) + 1;
-
-    // 7️⃣ Insert each sale item
-    for (const item of items) {
-      const {
-        Item_Name,
-        Item_HSN,
-        Item_Image,
-        Item_Category,
-        Quantity,
-        Item_Unit,
-        Sale_Price,
-        Discount_On_Sale_Price,
-        Discount_Type_On_Sale_Price,
-        Tax_Type,
-        Tax_Amount,
-        Amount,
-      } = item;
-
-      let Item_Id;
-      // Ensure item exists
-      const [itemRows] = await connection.query(
-        "SELECT * FROM add_item_sale WHERE Item_Name = ? LIMIT 1",
-        [Item_Name]
-      );
-      if (itemRows.length === 0) {
-        const [lastItem] = await connection.query(
-          "SELECT Item_Id FROM add_item_sale ORDER BY id DESC LIMIT 1"
-        );
-
-        let newItemId = "ITMS001";
-        if (lastItem.length > 0) {
-          const lastNum = parseInt(lastItem[0].Item_Id.replace("ITMS", "")) + 1;
-          newItemId = "ITMS" + lastNum.toString().padStart(4, "0");
-        }
-
-        await connection.execute(
-          `INSERT INTO add_item_sale 
-           (Item_Id, Item_Name, Item_HSN, Item_Unit, Item_Image, 
-           Item_Category, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          [
-            newItemId,
-            Item_Name,
-            Item_HSN || "",
-            Item_Unit || "",
-            cleanValue(Item_Image),
-            Item_Category || ""
-
-          ]
-        );
-
-        Item_Id = newItemId;
-      } else {
-        // Existing item → update stock
-        const existingItem = itemRows[0];
-        Item_Id = existingItem.Item_Id;
-
-        if (
-          existingItem.Item_HSN &&
-          Item_HSN &&
-          existingItem.Item_HSN.trim() !== Item_HSN.trim()
-        ) {
-          await connection.rollback();
-          return res.status(400).json({
-            message: `Item '${Item_Name}' already exists with different HSN (${existingItem.Item_HSN}).`,
-          });
-        }
-
-        await connection.execute(
-          `UPDATE add_item_sale
-           SET  updated_at = NOW()
-           WHERE Item_Id = ?`,
-          [Item_Id]
-        );
-      }
-
-
-
-      // // Generate new sale item id safely
-      const newSaleItemId = "SITS" + nextSaleItemNum.toString().padStart(4, "0");
-      nextSaleItemNum++;
-
-      // Insert into add_sale_items
-      await connection.query(
-        `INSERT INTO add_new_sale_items 
-         (Sale_Items_Id, Sale_Id, Item_Id, Quantity, Sale_Price, 
-          Discount_On_Sale_Price, Discount_Type_On_Sale_Price, 
-          Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          newSaleItemId,
-          newSaleId,
-          Item_Id,
-          normalizeNumber(Quantity),
-          normalizeNumber(Sale_Price),
-          cleanDiscount(Discount_On_Sale_Price),
-          cleanValue(Discount_Type_On_Sale_Price),
-          cleanValue(Tax_Type),
-          normalizeNumber(Tax_Amount),
-          normalizeNumber(Amount),
-        ]
-      );
-    }
-
-    // 8️⃣ Commit everything
-    await connection.commit();
-
-    return res.status(201).json({
-      success: true,
-      message: "Sale and items added successfully",
-      saleId: newSaleId,
-    });
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Error adding sale:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message || "Something went wrong",
-    });
-    // return res.status(500).json({
-    //   success: false,
-    //   message: "Duplicate entry detected. Please use unique values.",
-    //   stack: err.stack,
-    // });
-  } finally {
-    if (connection) connection.release();
-  }
-};
 const addInvoice = async (req, res, next) => {
 
   let connection;
@@ -1396,92 +1079,6 @@ const getSingleInvoice = async (req, res, next) => {
   try {
     connection = await db.getConnection();
     const [rows] = await db.query("SELECT * FROM add_invoice");
-
-    // 🧠 If no invoice exists yet (first-time user)
-    if (rows.length === 0) {
-      return res.status(200).json({
-        success: true,
-        invoice: null,
-        message: "No invoice found. You can create your first invoice prefix.",
-      });
-    }
-
-    // ✅ Return the existing invoice (only one per user)
-    return res.status(200).json({
-      success: true,
-      invoice: rows[0],
-    });
-  } catch (err) {
-    if (connection) connection.release();
-    console.error("❌ Error getting invoice:", err);
-    next(err);
-    //return res.status(500).json({ message: "Internal Server Error" });
-  } finally {
-    if (connection) connection.release();
-  }
-};
-const addNewSaleInvoice = async (req, res, next) => {
-
-  let connection;
-  try {
-    const { Invoice_Name } = req.body;
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-    const newInvoice = await db.execute(
-      `INSERT INTO add_new_sale_invoice (Invoice_Name, created_at, updated_at) VALUES (?, NOW(), NOW())`,
-      [Invoice_Name]
-    );
-    await connection.commit();
-    return res.status(201).json(
-      {
-        success: true,
-        message: "Invoice added successfully",
-        invoiceId: newInvoice[0].insertId,
-      }
-    )
-  }
-  catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Error adding invoice:", err);
-    next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
-  } finally {
-    if (connection) connection.release();
-  }
-}
-const updateNewSaleInvoice = async (req, res, next) => {
-
-  let connection;
-  try {
-    const { Invoice_Name, id } = req.body;
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-    const newInvoice = await db.execute(
-      `UPDATE add_new_sale_invoice SET Invoice_Name=? WHERE id=?`,
-      [Invoice_Name, id]
-    );
-    await connection.commit();
-    return res.status(201).json(
-      {
-        success: true,
-        message: "Invoice updated successfully",
-        invoiceId: newInvoice[0].insertId,
-      }
-    )
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Error updating invoice:", err);
-    next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
-  } finally {
-    if (connection) connection.release();
-  }
-}
-const getSingleNewSaleInvoice = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
-    const [rows] = await db.query("SELECT * FROM add_new_sale_invoice");
 
     // 🧠 If no invoice exists yet (first-time user)
     if (rows.length === 0) {
@@ -1848,115 +1445,115 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-const getAllNewSales = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
+// const getAllNewSales = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = 10;
+//     const offset = (page - 1) * limit;
 
-    const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
-    const fromDate = req.query.fromDate || null;
-    const toDate = req.query.toDate || null;
+//     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
+//     const fromDate = req.query.fromDate || null;
+//     const toDate = req.query.toDate || null;
 
-    console.log("🔍 Params =>", { page, search, fromDate, toDate });
+//     console.log("🔍 Params =>", { page, search, fromDate, toDate });
 
-    let whereClauses = [];
-    let params = [];
+//     let whereClauses = [];
+//     let params = [];
 
-    // 🔎 Search
-    if (search) {
-      whereClauses.push(`
-        (LOWER(a.Party_Name) LIKE ? 
-         OR LOWER(s.Payment_Type) LIKE ? 
-         OR CAST(s.Balance_Due AS CHAR) LIKE ?
-         OR LOWER(s.Total_Amount) LIKE ?)
-      `);
-      const like = `%${search}%`;
-      params.push(like, like, like, like);
-    }
+//     // 🔎 Search
+//     if (search) {
+//       whereClauses.push(`
+//         (LOWER(a.Party_Name) LIKE ? 
+//          OR LOWER(s.Payment_Type) LIKE ? 
+//          OR CAST(s.Balance_Due AS CHAR) LIKE ?
+//          OR LOWER(s.Total_Amount) LIKE ?)
+//       `);
+//       const like = `%${search}%`;
+//       params.push(like, like, like, like);
+//     }
 
-    // 📅 Date Range
-    // if (fromDate && toDate) {
-    //   whereClauses.push("DATE(s.created_at) BETWEEN ? AND ?");
-    //   params.push(fromDate, toDate);
-    // } else if (fromDate) {
-    //   whereClauses.push("DATE(s.created_at) >= ?");
-    //   params.push(fromDate);
-    // } else if (toDate) {
-    //   whereClauses.push("DATE(s.created_at) <= ?");
-    //   params.push(toDate);
-    // }
-    if (fromDate && toDate) {
-      whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
-      params.push(
-        `${fromDate} 00:00:00`,
-        `${toDate} 23:59:59`
-      );
-    } else if (fromDate) {
-      whereClauses.push(`s.Invoice_Date >= ?`);
-      params.push(`${fromDate} 00:00:00`);
-    } else if (toDate) {
-      whereClauses.push(`s.Invoice_Date <= ?`);
-      params.push(`${toDate} 23:59:59`);
-    }
-    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+//     // 📅 Date Range
+//     // if (fromDate && toDate) {
+//     //   whereClauses.push("DATE(s.created_at) BETWEEN ? AND ?");
+//     //   params.push(fromDate, toDate);
+//     // } else if (fromDate) {
+//     //   whereClauses.push("DATE(s.created_at) >= ?");
+//     //   params.push(fromDate);
+//     // } else if (toDate) {
+//     //   whereClauses.push("DATE(s.created_at) <= ?");
+//     //   params.push(toDate);
+//     // }
+//     if (fromDate && toDate) {
+//       whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
+//       params.push(
+//         `${fromDate} 00:00:00`,
+//         `${toDate} 23:59:59`
+//       );
+//     } else if (fromDate) {
+//       whereClauses.push(`s.Invoice_Date >= ?`);
+//       params.push(`${fromDate} 00:00:00`);
+//     } else if (toDate) {
+//       whereClauses.push(`s.Invoice_Date <= ?`);
+//       params.push(`${toDate} 23:59:59`);
+//     }
+//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
-    // 🧠 Main Paginated Query
-    const query = `
-      SELECT s.*, a.Party_Name
-      FROM add_new_sale s
-      LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-      ${whereSQL}
-      ORDER BY GREATEST(s.updated_at, s.created_at) DESC 
-      LIMIT ? OFFSET ?
-    `;
-    params.push(limit, offset);
+//     // 🧠 Main Paginated Query
+//     const query = `
+//       SELECT s.*, a.Party_Name
+//       FROM add_new_sale s
+//       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+//       ${whereSQL}
+//       ORDER BY GREATEST(s.updated_at, s.created_at) DESC 
+//       LIMIT ? OFFSET ?
+//     `;
+//     params.push(limit, offset);
 
-    const [rows] = await db.query(query, params);
+//     const [rows] = await db.query(query, params);
 
-    //const [rows] = await db.query(query, params);
+//     //const [rows] = await db.query(query, params);
 
 
-    // const [rows] = await db.query(
-    //   `SELECT s.*, a.Party_Name 
-    //    FROM add_sale s
-    //    LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-    //    ORDER BY s.created_at DESC
-    //    LIMIT ? OFFSET ?`,
-    //   [limit, offset]
-    // );
-    const [count] = await db.query(
-      `
-      SELECT COUNT(*) AS total
-      FROM add_new_sale s
-      LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-      ${whereSQL}
-      `,
-      params.slice(0, params.length - 2)
-    );
+//     // const [rows] = await db.query(
+//     //   `SELECT s.*, a.Party_Name 
+//     //    FROM add_sale s
+//     //    LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+//     //    ORDER BY s.created_at DESC
+//     //    LIMIT ? OFFSET ?`,
+//     //   [limit, offset]
+//     // );
+//     const [count] = await db.query(
+//       `
+//       SELECT COUNT(*) AS total
+//       FROM add_new_sale s
+//       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+//       ${whereSQL}
+//       `,
+//       params.slice(0, params.length - 2)
+//     );
 
-    // const [count] = await db.query(
-    //   `SELECT COUNT(*) AS total FROM add_sale`
-    // )
-    return res.status(200).json({
-      currentPage: page,
-      totalPages: Math.ceil(count[0].total / limit),
-      totalSales: count[0].total,
-      sales: rows,
-    });
+//     // const [count] = await db.query(
+//     //   `SELECT COUNT(*) AS total FROM add_sale`
+//     // )
+//     return res.status(200).json({
+//       currentPage: page,
+//       totalPages: Math.ceil(count[0].total / limit),
+//       totalSales: count[0].total,
+//       sales: rows,
+//     });
 
-    //return res.status(200).json(rows);
-  } catch (err) {
-    if (connection) connection.release();
-    console.error("❌ Error fetching purchases:", err);
-    next(err);
-    // return res.status(500).json({ message: "Internal Server Error" });
-  } finally {
-    if (connection) connection.release();
-  }
-};
+//     //return res.status(200).json(rows);
+//   } catch (err) {
+//     if (connection) connection.release();
+//     console.error("❌ Error fetching purchases:", err);
+//     next(err);
+//     // return res.status(500).json({ message: "Internal Server Error" });
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 //     (
 //   SELECT pa.Address_Text
 //   FROM add_party_addresses pa
@@ -2052,50 +1649,50 @@ const getSingleSale = async (req, res, next) => {
     console.log(saleHeader)
 
 
-  //   const [items] = await connection.query(
-  //     `
-  // SELECT
-  //   si.Sale_Items_Id,
-  //   si.Item_Id,
+    //   const [items] = await connection.query(
+    //     `
+    // SELECT
+    //   si.Sale_Items_Id,
+    //   si.Item_Id,
 
-  //   i.Item_Name,
-  //   i.Item_HSN,
-  //   i.Item_Unit,
-  //   i.Item_Category,
+    //   i.Item_Name,
+    //   i.Item_HSN,
+    //   i.Item_Unit,
+    //   i.Item_Category,
 
-  //   -- CURRENT ITEM MASTER
-  //   i.Primary_Unit AS Current_Primary_Unit,
-  //   i.Secondary_Unit AS Current_Secondary_Unit,
-  //    i.Conversion_Rate,
+    //   -- CURRENT ITEM MASTER
+    //   i.Primary_Unit AS Current_Primary_Unit,
+    //   i.Secondary_Unit AS Current_Secondary_Unit,
+    //    i.Conversion_Rate,
 
-  //   si.Quantity,
+    //   si.Quantity,
 
-  //   -- HISTORICAL SALE SNAPSHOT
-  //   si.Primary_Unit_Snapshot,
-  //   si.Secondary_Unit_Snapshot,
-  //   si.Selected_Unit,
+    //   -- HISTORICAL SALE SNAPSHOT
+    //   si.Primary_Unit_Snapshot,
+    //   si.Secondary_Unit_Snapshot,
+    //   si.Selected_Unit,
 
-  //   si.Sale_Price,
-  //   si.Discount_On_Sale_Price,
-  //   si.Discount_Type_On_Sale_Price,
-  //   si.Tax_Amount,
-  //   si.Tax_Type,
-  //   si.Amount,
-  //   si.created_at
+    //   si.Sale_Price,
+    //   si.Discount_On_Sale_Price,
+    //   si.Discount_Type_On_Sale_Price,
+    //   si.Tax_Amount,
+    //   si.Tax_Type,
+    //   si.Amount,
+    //   si.created_at
 
-  // FROM ${saleItemTable} si
+    // FROM ${saleItemTable} si
 
-  // LEFT JOIN ${itemTable} i
-  //   ON si.Item_Id = i.Item_Id
+    // LEFT JOIN ${itemTable} i
+    //   ON si.Item_Id = i.Item_Id
 
-  // WHERE si.Sale_Id = ?
+    // WHERE si.Sale_Id = ?
 
-  // ORDER BY si.created_at DESC
-  // `,
-  //     [saleId]
-  //   );
+    // ORDER BY si.created_at DESC
+    // `,
+    //     [saleId]
+    //   );
     const [items] = await connection.query(
-  `
+      `
   SELECT
     si.Sale_Items_Id,
     si.Item_Id,
@@ -2143,8 +1740,8 @@ const getSingleSale = async (req, res, next) => {
 
   ORDER BY si.created_at DESC
   `,
-  [saleId]
-);
+      [saleId]
+    );
 
     // if (!items.length) {
     //   return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
@@ -3092,7 +2689,7 @@ const editSale = async (req, res, next) => {
       }
     }
     const totalAmount = Number(Total_Amount) || 0;
-     const roundOffValue = Number(Round_Off) || 0
+    const roundOffValue = Number(Round_Off) || 0
     let validSplits = [];
 
     if (totalAmount > 0) {
@@ -3559,7 +3156,7 @@ const editSale = async (req, res, next) => {
         saleId,
       ]
     );
-   
+
 
 
 
@@ -4052,35 +3649,49 @@ const editSale = async (req, res, next) => {
             oldSecondary
           ) {
 
-            const [[conversion]] =
-              await connection.query(
-                `
-              SELECT Conversion_Rate
-              FROM item_unit_conversions
-              WHERE  Primary_Unit = ?
-                AND Secondary_Unit = ?
-              ORDER BY id DESC
-              LIMIT 1
-            `,
-                [
-                 
-                  oldPrimary,
-                  oldSecondary,
-                ]
-              );
+            // const [[conversion]] =
+            //   await connection.query(
+            //     `
+            //   SELECT Conversion_Rate
+            //   FROM item_unit_conversions
+            //   WHERE  Primary_Unit = ?
+            //     AND Secondary_Unit = ?
+            //   ORDER BY id DESC
+            //   LIMIT 1
+            // `,
+            //     [
+
+            //       oldPrimary,
+            //       oldSecondary,
+            //     ]
+            //   );
 
 
+            // const conversionRate =
+            //   Number(
+            //     conversion?.Conversion_Rate
+            //   );
+
+
+            // if (
+            //   !Number.isFinite(conversionRate) ||
+            //   conversionRate <= 0
+            // ) {
+
+            //   await connection.rollback();
+
+            //   return res.status(400).json({
+            //     success: false,
+            //     message:
+            //       `Conversion rate not found for ` +
+            //       `"${oldPrimary}" to "${oldSecondary}" ` +
+            //       `for item "${item.Item_Name}".`,
+            //   });
+            // }
             const conversionRate =
-              Number(
-                conversion?.Conversion_Rate
-              );
+              Number(dbItemRow?.Conversion_Rate) || 0;
 
-
-            if (
-              !Number.isFinite(conversionRate) ||
-              conversionRate <= 0
-            ) {
-
+            if (conversionRate <= 0) {
               await connection.rollback();
 
               return res.status(400).json({
@@ -4093,8 +3704,7 @@ const editSale = async (req, res, next) => {
             }
 
 
-            stockDelta =
-              quantity / conversionRate;
+            stockDelta = quantity / conversionRate;
 
           } else {
 
@@ -4324,28 +3934,39 @@ const editSale = async (req, res, next) => {
           oldSelected === oldSecondary
         ) {
 
-          const [[conversion]] =
+          // const [[conversion]] =
+          //   await connection.query(
+          //     `
+          // SELECT Conversion_Rate
+          // FROM item_unit_conversions
+          // WHERE Primary_Unit = ?
+          //   AND Secondary_Unit = ?
+          // ORDER BY id DESC
+          // LIMIT 1
+          // `,
+          //     [
+
+          //       oldPrimary,
+          //       oldSecondary,
+          //     ]
+          //   );
+          const [[itemMaster]] =
             await connection.query(
               `
-          SELECT Conversion_Rate
-          FROM item_unit_conversions
-          WHERE Primary_Unit = ?
-            AND Secondary_Unit = ?
-          ORDER BY id DESC
-          LIMIT 1
-          `,
-              [
-               
-                oldPrimary,
-                oldSecondary,
-              ]
+    SELECT Conversion_Rate
+    FROM add_item
+    WHERE Item_Id = ?
+    LIMIT 1
+    `,
+              [old.Item_Id]
             );
 
-
+          // const conversionRate =
+          //   Number(
+          //     conversion?.Conversion_Rate
+          //   );
           const conversionRate =
-            Number(
-              conversion?.Conversion_Rate
-            );
+  Number(itemMaster?.Conversion_Rate) || 0;
 
 
           if (
@@ -4612,14 +4233,14 @@ const editSale = async (req, res, next) => {
           id,
         ]
       );
-await syncUnitIdsForItem(connection,line.Item_Id);
+      await syncUnitIdsForItem(connection, line.Item_Id);
 
-await syncUnitIdsForSaleItem(connection, {
-  saleItemRowId: id,
-  Primary_Unit_Snapshot:line.snapshot.Primary_Unit_Snapshot,
-  Secondary_Unit_Snapshot:line.snapshot.Secondary_Unit_Snapshot,
-  Selected_Unit:line.resolvedSelectedUnit,
-});
+      await syncUnitIdsForSaleItem(connection, {
+        saleItemRowId: id,
+        Primary_Unit_Snapshot: line.snapshot.Primary_Unit_Snapshot,
+        Secondary_Unit_Snapshot: line.snapshot.Secondary_Unit_Snapshot,
+        Selected_Unit: line.resolvedSelectedUnit,
+      });
 
       // =====================================================
       // ITEM LEDGER
@@ -4629,7 +4250,7 @@ await syncUnitIdsForSaleItem(connection, {
       // 500 gm => Stock_Delta 0.5 Kg
       // =====================================================
 
-   
+
       await recordItemLedger({
         connection,
         itemId: line.Item_Id,
@@ -4928,236 +4549,7 @@ const deleteSale = async (req, res, next) => {
   }
 };
 
-const editNewSale = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
-    const { Sale_Id: saleId } = req.params;
-
-    // 1️⃣ Check if sale exists
-    const [existingSale] = await connection.query(
-      "SELECT * FROM add_new_sale WHERE Sale_Id = ?",
-      [saleId]
-    );
-    if (existingSale.length === 0) {
-      return res.status(404).json({ message: "No such Sale found." });
-    }
-
-    // 2️⃣ Validate & sanitize request
-    const cleanData = sanitizeObject(req.body);
-    const validation = saleNewItemFormSchema.safeParse(cleanData);
-    if (!validation.success) {
-      return res.status(400).json({ errors: validation.error.errors });
-    }
-
-    const {
-      Party_Name,
-      Invoice_Number,
-      Invoice_Date,
-      State_Of_Supply,
-      Total_Amount,
-      Total_Received,
-      Balance_Due,
-      Payment_Type,
-      Reference_Number,
-      items,
-    } = validation.data;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "No sale items provided." });
-    }
-
-    await connection.beginTransaction();
-
-    // 3️⃣ Prevent duplicate item names
-    const seenItems = new Set();
-    for (const item of items) {
-      const name = item.Item_Name?.trim().toLowerCase();
-      if (!name) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Item name missing." });
-      }
-      if (seenItems.has(name)) {
-        await connection.rollback();
-        return res.status(400).json({
-          message: `Duplicate item '${item.Item_Name}' found. Please ensure each item appears only once.`,
-        });
-      }
-      seenItems.add(name);
-    }
-
-    // 4️⃣ Restore previous stock before re-updating sale
-    const [oldItems] = await connection.query(
-      "SELECT Item_Id, Quantity FROM add_sale_items WHERE Sale_Id = ?",
-      [saleId]
-    );
-
-
-    for (const old of oldItems) {
-      if (old.Item_Id === null || old.Item_Id === undefined) {
-        await connection.rollback();
-        return res.status(400).json({ message: "Invalid Item_Id in old sale items." });
-      }
-
-      await connection.query(
-        `UPDATE add_item_sale 
-         SET updated_at = NOW() 
-         WHERE Item_Id = ?`,
-        [old.Item_Id]
-      );
-
-
-    }
-    const totalAmount = Number(Total_Amount) || 0;
-    const totalReceived =
-      Total_Received === "" || Total_Received === undefined
-        ? 0
-        : Number(Total_Received);
-
-    const balanceDue =
-      Balance_Due === "" || Balance_Due === undefined
-        ? totalAmount - totalReceived
-        : Number(Balance_Due);
-    // 5️⃣ Update sale master record
-    await connection.query(
-      `UPDATE add_new_sale SET 
-        Party_Id = (SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1),
-        Invoice_Number = ?, 
-        Invoice_Date = ?, 
-        State_Of_Supply = ?, 
-        Total_Amount = ?, 
-        Total_Received = ?, 
-        Balance_Due = ?, 
-        Payment_Type = ?, 
-        Reference_Number = ?, 
-        updated_at = NOW()
-       WHERE Sale_Id = ?`,
-      [
-        Party_Name,
-        Invoice_Number,
-        Invoice_Date,
-        State_Of_Supply,
-        totalAmount,
-        totalReceived,
-        balanceDue,
-        cleanValue(Payment_Type),
-        cleanValue(Reference_Number),
-        saleId,
-      ]
-    );
-
-    // 6️⃣ Fetch old sale items for reference
-    const [oldSaleItems] = await connection.query(
-      "SELECT Sale_Items_Id, Item_Id, Quantity, created_at FROM add_new_sale_items WHERE Sale_Id = ?",
-      [saleId]
-    );
-    const oldSaleItemMap = new Map();
-    for (const old of oldSaleItems) {
-      oldSaleItemMap.set(old.Item_Id, old);
-    }
-    const [maxIdRow] = await connection.query(
-      "SELECT MAX(CAST(SUBSTRING(Sale_Items_Id, 5) AS UNSIGNED)) AS maxNum FROM add_new_sale_items"
-    );
-    let nextSaleItemNum = (maxIdRow[0]?.maxId || 0) + 1;
-    console.log(nextSaleItemNum);
-    // Delete all old sale items (we’ll reinsert)
-    await connection.query("DELETE FROM add_new_sale_items WHERE Sale_Id = ?", [saleId]);
-
-
-
-    // 8️⃣ Reinsert sale items & adjust stock
-    for (const item of items) {
-      const [dbItem] = await connection.query(
-        "SELECT Item_Id FROM add_item_sale WHERE Item_Name = ? LIMIT 1",
-        [item.Item_Name]
-      );
-
-      const Item_Id = dbItem[0]?.Item_Id;
-
-      console.log("Item_Id:", Item_Id);
-
-
-      if (!Item_Id) {
-        await connection.rollback();
-        return res
-          .status(404)
-          .json({ message: `Item '${item.Item_Name}' not found.` });
-      }
-      const [purchaseTax] = await connection.query(
-        `SELECT Tax_Type 
-     FROM add_purchase_items 
-     WHERE Item_Id = ? 
-     ORDER BY id DESC 
-     LIMIT 1`,
-        [Item_Id]
-      );
-
-      // 3️⃣ Use trusted tax type or fallback to frontend value
-      const taxTypeFromDB = purchaseTax[0]?.Tax_Type;
-      const safeTaxType = taxTypeFromDB || item.Tax_Type || "None";
-      // Reuse old Sale_Items_Id if exists, else generate new one
-      const oldData = oldSaleItemMap.get(Item_Id);
-      let Sale_Items_Id;
-      let createdAt;
-
-      if (oldData) {
-        Sale_Items_Id = oldData.Sale_Items_Id;
-        createdAt = oldData.created_at;
-      } else {
-        Sale_Items_Id = "SIT" + nextSaleItemNum.toString().padStart(3, "0");
-        nextSaleItemNum++;
-        createdAt = new Date().toISOString().slice(0, 19).replace("T", " ");
-      }
-      console.log(Sale_Items_Id);
-      const taxType = item.Tax_Type || "None";
-      // Insert the updated/new sale item
-      await connection.query(
-        `INSERT INTO add_new_sale_items 
-         (Sale_Items_Id, Sale_Id, Item_Id, Quantity, Sale_Price, 
-          Discount_On_Sale_Price, Discount_Type_On_Sale_Price, 
-          Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          Sale_Items_Id,
-          saleId,
-          Item_Id,
-          normalizeNumber(item.Quantity),
-          normalizeNumber(item.Sale_Price),
-          cleanDiscount(item.Discount_On_Sale_Price),
-          cleanValue(item.Discount_Type_On_Sale_Price),
-          cleanValue(safeTaxType),
-          normalizeNumber(item.Tax_Amount),
-          normalizeNumber(item.Amount),
-          createdAt,
-        ]
-      );
-
-      // Update stock (deduct sold quantity)
-
-      await connection.query(
-        `UPDATE add_item_sale 
-         SET updated_at = NOW()
-         WHERE Item_Id = ?`,
-        [Item_Id]
-      );
-
-
-    }
-
-    await connection.commit();
-    return res.status(200).json({
-      success: true,
-      message: "Sale updated successfully",
-      saleId,
-    });
-  } catch (err) {
-    if (connection) await connection.rollback();
-    console.error("❌ Error editing sale:", err);
-    return res.status(500).json({ message: "Internal Server Error" });
-  } finally {
-    if (connection) connection.release();
-  }
-};
+;
 const getLatestInvoiceNumber = async (req, res, next) => {
   let connection;
   try {
@@ -5300,41 +4692,7 @@ const getNewSaleLatestInvoiceNumber = async (req, res, next) => {
   }
 };
 
-const getTotalNewSalesEachDay = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
 
-    // ✅ Correct SQL: group by date, count total sales per day
-    const [rows] = await connection.query(
-      `
-      SELECT 
-        DATE_FORMAT(created_at, '%Y-%m-%d') AS sale_date,
-        COUNT(*) AS total_new_sales
-      FROM add_new_sale
-      GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
-      ORDER BY sale_date ASC;
-      `
-    );
-
-    // ✅ Format response
-    const result = rows.map((r) => ({
-      date: r.sale_date,
-      total_new_sales: r.total_new_sales,
-    }));
-
-    return res.status(200).json({
-      success: true,
-      data: result,
-    });
-  } catch (err) {
-    if (connection) connection.release();
-    console.error("❌ Error getting total new sales by day:", err);
-    next(err);
-  } finally {
-    if (connection) connection.release();
-  }
-};
 
 const getTotalSalesEachDay = async (req, res, next) => {
   let connection;
@@ -5439,7 +4797,7 @@ const getTotalSalesEachDay = async (req, res, next) => {
 
 //         p.Party_Name,
 //         p.GSTIN,
-     
+
 
 //         tc.Title AS Terms_Conditions_Title
 
@@ -5720,7 +5078,7 @@ const getTotalSalesEachDay = async (req, res, next) => {
 //     }
 //   }
 // };
-const getSalesPrintReport = async (req, res,next) => {
+const getSalesPrintReport = async (req, res, next) => {
   let connection;
 
   try {
@@ -5748,7 +5106,7 @@ const getSalesPrintReport = async (req, res,next) => {
       params.push(
         `%${search}%`,
         `%${search}%`,
-         `%${search}%`,
+        `%${search}%`,
         `%${search}%`
       );
     }
@@ -5763,22 +5121,22 @@ const getSalesPrintReport = async (req, res,next) => {
       params.push(toDate);
     }
 
-    
-const {
-  invoices,
-  summary,
-} = await getSalesForPrint(
-  connection,
-  whereClause,
-  params
-);
 
-  return res.status(200).json({
-  success: true,
-  totalInvoices: invoices.length,
-  invoices,
-  summary,
-});
+    const {
+      invoices,
+      summary,
+    } = await getSalesForPrint(
+      connection,
+      whereClause,
+      params
+    );
+
+    return res.status(200).json({
+      success: true,
+      totalInvoices: invoices.length,
+      invoices,
+      summary,
+    });
   } catch (error) {
     console.error(
       "Sales Print Report Error:",
@@ -5799,64 +5157,8 @@ const {
   }
 };
 export {
-  addSale, addNewSale, getAllSales, exportAllSalesReportToExcel, getAllNewSales, getSingleSale, getLatestInvoiceNumber,
-  addInvoice, updateInvoice, getSingleInvoice,
-  addNewSaleInvoice, updateNewSaleInvoice, getSingleNewSaleInvoice, getNewSaleLatestInvoiceNumber,
-  printSaleBill, editSale, deleteSale, editNewSale, getTotalNewSalesEachDay, getTotalSalesEachDay, getSalesPrintReport
+  addSale,  getAllSales, exportAllSalesReportToExcel, getSingleSale, getLatestInvoiceNumber,
+  addInvoice, updateInvoice, getSingleInvoice, getNewSaleLatestInvoiceNumber,
+  printSaleBill, editSale, deleteSale, getTotalSalesEachDay, getSalesPrintReport
 };
 
-// const getTotalSalesEachDay = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     // 1️⃣ Get active financial year
-//     const [fy] = await connection.query(
-//       `SELECT Financial_Year
-//        FROM financial_year
-//        WHERE Current_Financial_Year = 1
-//        LIMIT 1`
-//     );
-
-//     if (!fy.length) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "No active financial year found.",
-//       });
-//     }
-
-//     const activeFY = fy[0].Financial_Year;
-
-//     // 2️⃣ Get sales count per day inside financial year
-//     const [rows] = await connection.query(
-//       `
-//       SELECT
-//         DATE_FORMAT(Invoice_Date, '%Y-%m-%d') AS sale_date,
-//         COUNT(*) AS total_sales
-//       FROM add_sale
-//       WHERE Financial_Year = ?
-//       GROUP BY DATE_FORMAT(Invoice_Date, '%Y-%m-%d')
-//       ORDER BY sale_date ASC;
-//       `,
-//       [activeFY]
-//     );
-
-//     // 3️⃣ Format output
-//     const result = rows.map((r) => ({
-//       date: r.sale_date,
-//       total_sales: r.total_sales,
-//     }));
-
-//     return res.status(200).json({
-//       success: true,
-//       financialYear: activeFY,
-//       data: result,
-//     });
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error getting total sales each day:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };

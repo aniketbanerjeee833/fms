@@ -407,7 +407,7 @@ const MobileSideMenu = ({ onClose }) => {
                  Reports
                  </span>
             </NavLink> */}
-            {
+            {/* {
               renderMenu(
                 "Reports",
                 <ClipboardMinus size={20} />,
@@ -415,7 +415,7 @@ const MobileSideMenu = ({ onClose }) => {
                   { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
                   { to: "/reports/balance-sheet", text: "Balance Sheet" },
                 ]
-              )}
+              )} */}
           </ul>
         </div>
       </div>

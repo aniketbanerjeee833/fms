@@ -1,4 +1,4 @@
-import db from "../config/db.js";
+
 import { syncUnitIdForLedgerRow } from "../helpers/unitSyncHelper.js";
 
 /*

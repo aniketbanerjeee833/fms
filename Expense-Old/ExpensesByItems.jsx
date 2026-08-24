@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useReactToPrint } from "react-to-print";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -7,16 +8,21 @@ import {
   Package,
   Eye,
   Trash2,
-  Copy,
-  FileText,
   Printer,
-  History,
+
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
+
 import {
   useGetAllExpenseItemMastersCursorQuery,
   useGetExpenseItemUsageQuery,
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+  useDeleteExpenseItemMasterMutation
 } from "../../redux/api/expenseApi";
 
 const fmt = (n) =>
@@ -41,6 +47,10 @@ export default function ExpensesByItems() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  /* ── EXPENSE PRINT ── */
+  const [printExpenseId, setPrintExpenseId] = useState(null);
+  const printRef = useRef(null);
+
   // ── state now lives in the URL ──
   const selectedItemId = searchParams.get("itemId") || null;
   const itemSearch = searchParams.get("q") || "";
@@ -50,6 +60,7 @@ export default function ExpensesByItems() {
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   /* ── helpers for merging into existing search params ── */
   const setSelectedItemId = (id) => {
@@ -98,7 +109,6 @@ export default function ExpensesByItems() {
   });
 
   const items = itemResponse?.items || [];
-  console.log(items);
   const totalItems = itemResponse?.totalItems || 0;
   const itemsHasMore = itemResponse?.hasMore ?? false;
   const itemsNextCursor = itemResponse?.nextCursor ?? null;
@@ -145,44 +155,138 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
- const rightCategoryRef = useRef(selectedItemId);
 
-// If the category just changed (ref hasn't caught up yet), force cursor to null
-// on THIS render — don't wait for the effect below to run on the next tick.
-const effectiveRightCursor =rightCategoryRef.current === selectedItemId ? rightCursor : null;
-  // const {
-  //   data: usageResponse,
-  //   isLoading: isUsageLoading,
-  //   isFetching: isUsageFetching,
-  // } = useGetExpenseItemUsageQuery(
-  //   { masterItemId: selectedItemId, cursor: rightCursor },
-  //   { skip: !selectedItemId }
-  // );
   const {
-  data: usageResponse,
-  isLoading: isUsageLoading,
-  isFetching: isUsageFetching,
-} = useGetExpenseItemUsageQuery(
-  {
-    masterItemId: selectedItemId,
-    cursor: effectiveRightCursor,
-    search: txnSearch, // ← add
-  },
-  {
-    skip: !selectedItemId,
-  }
-);
+    data: usageResponse,
+    isLoading: isUsageLoading,
+    isFetching: isUsageFetching,
+  } = useGetExpenseItemUsageQuery(
+    {
+      masterItemId: selectedItemId,
+      cursor: rightCursor,
+      search: txnSearch, // ← add
+    },
+    {
+      skip: !selectedItemId,
+    }
+  );
+
+  const [deleteExpense, { isLoading: isDeletingExpense }] =
+    useDeleteExpenseMutation();
+
+  const [deleteExpenseItem, { isLoading: isDeletingExpenseItem }] =
+    useDeleteExpenseItemMasterMutation();
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      /* =====================================================
+         DELETE EXPENSE ITEM MASTER
+      ===================================================== */
+      if (deleteTarget.type === "item") {
+
+        // Reset left-side pagination
+        setLeftCursor(null);
+
+        const res = await deleteExpenseItem({
+          id: deleteTarget.itemId,
+        }).unwrap();
+
+        toast.success(
+          res?.message || "Expense item deleted successfully"
+        );
+
+        // If the deleted item was selected,
+        // clear selection so another item can be selected.
+        if (
+          String(selectedItemId) ===
+          String(deleteTarget.itemId)
+        ) {
+          setSelectedItemId(null);
+        }
+
+        setMenuOpen(null);
+        setDeleteTarget(null);
+
+        return;
+      }
+
+      /* =====================================================
+         DELETE EXPENSE TRANSACTION
+      ===================================================== */
+      setRightCursor(null);
+
+      const res = await deleteExpense({
+        id: deleteTarget.expenseId,
+      }).unwrap();
+
+      toast.success(
+        res?.message || "Expense deleted successfully"
+      );
+
+      setDeleteTarget(null);
+
+    } catch (error) {
+      console.error("Failed to delete:", error);
+
+      toast.error(
+        error?.data?.message ||
+        "Failed to delete. Please try again."
+      );
+
+      // Close the confirmation modal even when deletion fails
+      setDeleteTarget(null);
+
+    }
+  };
+
+  /* ── EXPENSE PRINT DATA ── */
+
+  const {
+    data: printExpenseData,
+    isFetching: isPrintExpenseFetching,
+  } = useGetExpenseByIdQuery(printExpenseId, {
+    skip: !printExpenseId,
+  });
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+
+    documentTitle: printExpenseId
+      ? `Expense-${printExpenseId}`
+      : "Expense",
+
+    onAfterPrint: () => {
+      setPrintExpenseId(null);
+    },
+  });
+
+  useEffect(() => {
+    if (
+      printExpenseData?.expense &&
+      printExpenseId &&
+      !isPrintExpenseFetching
+    ) {
+      handlePrint();
+    }
+  }, [
+    printExpenseData,
+    printExpenseId,
+    isPrintExpenseFetching,
+    handlePrint,
+  ]);
+
 
   const itemUsage = usageResponse?.usage || [];
 
   const usageHasMore = usageResponse?.hasMore ?? false;
   const usageNextCursor = usageResponse?.nextCursor ?? null;
-  console.log(itemUsage)
+
   /* reset right cursor when selected item changes */
-useEffect(() => {
-  rightCategoryRef.current = selectedItemId;
-  setRightCursor(null);
-}, [selectedItemId, txnSearch]);
+  useEffect(() => {
+    setRightCursor(null);
+  }, [selectedItemId, txnSearch]);
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -271,7 +375,8 @@ useEffect(() => {
           0
         ),
         transactions: usageForThisItem.map((u) => ({
-          id: u.id,
+          id: u.id,                    // expense item/usage ID
+          expenseId: u.Expense_Id,     // actual expense ID
           date: u.Expense_Date,
           expNo: u.Expense_Number,
           party: u.Party_Name || "—",
@@ -285,7 +390,7 @@ useEffect(() => {
 
   const selectedItem =
     itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
-  console.log("selectedItem", selectedItem);
+
   /* transaction search still client-side filters the currently-loaded
      page(s) of usage rows — server-side date filter is separate (date param) */
   // const filteredTransactions = useMemo(() => {
@@ -296,9 +401,8 @@ useEffect(() => {
   //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
   //   );
   // }, [selectedItem, txnSearch]);
-  // const filteredTransactions =
-  // selectedItem?.transactions || [];
-   const filteredTransactions =selectedItem?.transactions || [];
+  const filteredTransactions =
+    selectedItem?.transactions || [];
 
   const fmtDate = (d) =>
     d
@@ -529,9 +633,22 @@ useEffect(() => {
                           >
                             View/Edit
                           </button>
-                          <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500">
+
+                          <button
+                            className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+                            onClick={() => {
+                              setDeleteTarget({
+                                type: "item",
+                                itemId: item.id,
+                                itemName: item.name,
+                              });
+
+                              setMenuOpen(null);
+                            }}
+                          >
                             Delete
                           </button>
+
                         </div>
                       )}
                     </div>
@@ -607,32 +724,82 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* ── SEARCH TRANSACTIONS ── */}
-              <div className="px-1 py-2" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
-                  <Search
-                    size={16}
+              {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+              <div
+                className="px-1 py-2"
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+
+                  {/* SEARCH */}
+                  <div
+                    className="relative"
                     style={{
-                      position: "absolute",
-                      left: 10,
-                      top: 10,
-                      color: "#94a3b8",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={txnSearch}
-                    onChange={(e) => handleTxnSearchChange(e.target.value)}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{
+                      width: "40%",
+                      minWidth: 220,
+                      maxWidth: 300,
                       height: 36,
-                      paddingLeft: 34,
-                      paddingRight: 10,
-                      borderColor: "#dbe3ea",
                     }}
-                  />
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={txnSearch}
+                      onChange={(e) => handleTxnSearchChange(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                      }}
+                    />
+                  </div>
+
+                  {/* EXCEL + PRINT BUTTONS */}
+                  <div className="flex items-center gap-2">
+
+                    {/* EXCEL */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+                      title="Export to Excel"
+                    >
+                      <FileSpreadsheet
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                    {/* PRINT */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
+                      title="Print Reports"
+                    >
+                      <PrinterIcon
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                  </div>
+
                 </div>
               </div>
 
@@ -645,7 +812,7 @@ useEffect(() => {
                         <th
                           key={h}
                           //className="text-left py-2 px-3 "
-                          style={{  textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace:"nowrap" }}
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
                         >
                           {h}
                         </th>
@@ -667,6 +834,7 @@ useEffect(() => {
                       </tr>
                     ) : (
                       filteredTransactions.map((txn) => (
+
                         <tr
                           key={txn.id}
                           style={{
@@ -676,30 +844,38 @@ useEffect(() => {
                           }}
                           //style={{ borderBottom: "1px solid #f1f5f9" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
+
                           onDoubleClick={() => {
-                            navigate(`/expense/edit/${txn.id}`, {
-                              state: {
-                                from: location.pathname,
-                                itemId: selectedItemId,
-                                txnSearch,
-                                itemSearch,
+                            navigate(
+                              {
+                                pathname: `/expense/edit/${txn.expenseId}`,
+                                search: searchParams.toString(),
                               },
-                            });
+                              {
+                                state: {
+                                  from: "expense-items",
+                                  itemId: selectedItemId,
+                                  txnSearch,
+                                  itemSearch,
+                                },
+                              }
+                            );
                           }}
+
                         >
-                          <td  style={{ whiteSpace: "nowrap" }}>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
                           <td >{txn.expNo || "—"}</td>
                           <td >{txn.party || "—"}</td>
                           <td >{txn.paymentType || "—"}</td>
-                          <td  style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.amount)}
                           </td>
-                          <td  style={{ whiteSpace: "nowrap" }}>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.balance)}
                           </td>
-                          <td  style={{ position: "relative" }}>
+                          <td style={{ position: "relative" }}>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -738,32 +914,36 @@ useEffect(() => {
                                     key={key}
                                     className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
                                     style={{ color: danger ? "#dc2626" : "#374151" }}
-                                    onClick={() => {
+                                    onClick={async () => {
                                       setRowMenuOpen(null);
 
                                       if (key === "view") {
-                                        navigate(`/expense/edit/${txn.id}`, {
-                                          state: {
-                                            from: location.pathname,
-                                            itemId: selectedItemId,
-                                            txnSearch,
-                                            itemSearch,
+                                        navigate(
+                                          {
+                                            pathname: `/expense/edit/${txn.expenseId}`,
+                                            search: searchParams.toString(),
                                           },
-                                        });
+                                          {
+                                            state: {
+                                              from: "expense-items",
+                                              itemId: selectedItemId,
+                                              txnSearch,
+                                              itemSearch,
+                                            },
+                                          }
+                                        );
                                       }
-                                      // if (key === "preview") {
-                                      //   navigate(`/expense/preview/${txn.id}`, {
-                                      //     state: {
-                                      //       from: location.pathname,
-                                      //       itemId: selectedItemId,
-                                      //       txnSearch,
-                                      //       itemSearch,
-                                      //     },
-                                      //   });
-                                      // }
+
+                                      if (key === "delete") {
+                                        setDeleteTarget({
+                                          expenseId: txn.expenseId,
+                                        });
+
+                                        return;
+                                      }
+
                                       if (key === "print") {
-                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
-                                        window.open(url, "_blank");
+                                        setPrintExpenseId(txn.expenseId);
                                       }
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
@@ -812,6 +992,44 @@ useEffect(() => {
             setEditingItem(null);
           }}
         />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={
+            deleteTarget.type === "item"
+              ? "Delete Expense Item"
+              : "Delete Expense"
+          }
+          message={
+            deleteTarget.type === "item"
+              ? `Are you sure you want to delete "${deleteTarget.itemName}"? This action cannot be undone.`
+              : "Are you sure you want to delete this expense? This action cannot be undone."
+          }
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={
+            deleteTarget.type === "item"
+              ? isDeletingExpenseItem
+              : isDeletingExpense
+          }
+        />
+      )}
+
+      {/* ── EXPENSE PRINT TEMPLATE ── */}
+      {printExpenseData?.expense && (
+        <div
+          style={{
+            position: "absolute",
+            left: "-99999px",
+            top: 0,
+          }}
+        >
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        </div>
       )}
 
     </>

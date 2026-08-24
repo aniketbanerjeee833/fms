@@ -1,24 +1,29 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useReactToPrint } from "react-to-print";
+import {  useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
-  LayoutDashboard,
+ 
   Search,
   MoreVertical,
-  SquarePen,
+ 
   ChevronRight,
   Receipt,
   Tags,
   Eye,
   Trash2,
-  Copy,
-  FileText,
   Printer,
-  History
 } from "lucide-react";
+
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
 
 import {
   useGetAllExpenseCategoriesQuery,
-  useGetExpensesByCategoryQuery,   // ✅ add
+  useGetExpensesByCategoryQuery,
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+  useDeleteExpenseCategoryMutation
 } from "../../redux/api/expenseApi";
 
 import EditExpenseCategoryModal from "../../components/Modal/EditExpenseCategoryModal";
@@ -35,16 +40,16 @@ export default function ExpensesByCategories() {
   const ROW_ACTIONS = [
     { key: "view", label: "View/Edit", icon: Eye },
     { key: "delete", label: "Delete", icon: Trash2, danger: true },
-    { key: "duplicate", label: "Duplicate", icon: Copy },
-    { key: "pdf", label: "Open PDF", icon: FileText },
-    { key: "preview", label: "Preview", icon: Eye },
     { key: "print", label: "Print", icon: Printer },
-    { key: "history", label: "View History", icon: History },
   ];
 
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  /* ── EXPENSE PRINT ── */
+  const [printExpenseId, setPrintExpenseId] = useState(null);
+  const printRef = useRef(null);
 
   // ── state now lives in the URL, same pattern as ExpensesByItems ──
   const selectedCategoryId = searchParams.get("categoryId") || null;
@@ -55,6 +60,7 @@ export default function ExpensesByCategories() {
   const [transactionMenu, setTransactionMenu] = useState(null);
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   /* ── helpers for merging into existing search params ── */
   const setSelectedCategoryId = (id) => {
@@ -90,14 +96,47 @@ export default function ExpensesByCategories() {
   const { data: categoryResponse } = useGetAllExpenseCategoriesQuery();
   const categories = categoryResponse?.categories || [];
 
+  /* ── EXPENSE PRINT DATA ── */
+
+  const {
+    data: printExpenseData,
+    isFetching: isPrintExpenseFetching,
+  } = useGetExpenseByIdQuery(printExpenseId, {
+    skip: !printExpenseId,
+  });
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+
+    documentTitle: printExpenseId
+      ? `Expense-${printExpenseId}`
+      : "Expense",
+
+    onAfterPrint: () => {
+      setPrintExpenseId(null);
+    },
+  });
+
+  useEffect(() => {
+    if (
+      printExpenseData?.expense &&
+      printExpenseId &&
+      !isPrintExpenseFetching
+    ) {
+      handlePrint();
+    }
+  }, [
+    printExpenseData,
+    printExpenseId,
+    isPrintExpenseFetching,
+    handlePrint,
+  ]);
+
   /* ── RIGHT SIDE — cursor-based infinite scroll (transactions) ── */
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
- const rightCategoryRef = useRef(selectedCategoryId );
-
-// If the category just changed (ref hasn't caught up yet), force cursor to null
-// on THIS render — don't wait for the effect below to run on the next tick.
+const rightCategoryRef = useRef(selectedCategoryId );
 const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? rightCursor : null;
   const {
     data: expenseResponse,
@@ -117,6 +156,64 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
   const categoryExpenses = expenseResponse?.expenses || [];
   const expensesHasMore = expenseResponse?.hasMore ?? false;
   const expensesNextCursor = expenseResponse?.nextCursor ?? null;
+
+  const [deleteExpense, { isLoading: isDeletingExpense }] =
+    useDeleteExpenseMutation();
+
+  const [deleteExpenseCategory, { isLoading: isDeletingCategory }] =
+    useDeleteExpenseCategoryMutation();
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      // DELETE CATEGORY
+      if (deleteTarget.type === "category") {
+        const res = await deleteExpenseCategory({
+          id: deleteTarget.categoryId,
+        }).unwrap();
+
+        toast.success(
+          res?.message || "Expense category deleted successfully"
+        );
+
+        // If deleted category was selected, clear it
+        if (
+          String(selectedCategoryId) ===
+          String(deleteTarget.categoryId)
+        ) {
+          setSelectedCategoryId(null);
+        }
+
+        setMenuOpen(null);
+        setDeleteTarget(null);
+
+        return;
+      }
+
+      // DELETE EXPENSE
+      const res = await deleteExpense({
+        id: deleteTarget.expenseId,
+      }).unwrap();
+
+      toast.success(
+        res?.message || "Expense deleted successfully"
+      );
+
+      setDeleteTarget(null);
+
+    } catch (error) {
+      console.error("Failed to delete:", error);
+
+      toast.error(
+        error?.data?.message ||
+        "Failed to delete. Please try again."
+      );
+
+      // Close modal even when deletion fails
+      setDeleteTarget(null);
+    }
+  };
 
   const categoriesWithTotals = useMemo(() => {
     return categories.map((category) => {
@@ -196,7 +293,6 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
 
   /* reset right cursor when selected category or txn search changes */
   useEffect(() => {
-    rightCategoryRef.current = selectedCategoryId;
     setRightCursor(null);
   }, [selectedCategoryId, txnSearch]);
 
@@ -406,12 +502,23 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                         >
                           View/Edit
                         </button>
+
                         <button
                           type="button"
                           className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
+                          onClick={() => {
+                            setDeleteTarget({
+                              type: "category",
+                              categoryId: category.id,
+                              categoryName: category.name,
+                            });
+
+                            setMenuOpen(null);
+                          }}
                         >
                           Delete
                         </button>
+
                       </div>
                     )}
                   </div>
@@ -464,21 +571,82 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                 </div>
               </div>
 
-              {/* ── SEARCH TRANSACTIONS ── */}
-              <div className="px-1 py-2" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
-                  <Search
-                    size={16}
-                    style={{ position: "absolute", left: 10, top: 10, color: "#94a3b8", pointerEvents: "none" }}
-                  />
-                  <input
-                    type="text"
-                    value={txnSearch}
-                    onChange={(e) => handleTxnSearchChange(e.target.value)}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{ height: 36, paddingLeft: 34, paddingRight: 10, borderColor: "#dbe3ea" }}
-                  />
+              {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+              <div
+                className="px-1 py-2"
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+
+                  {/* SEARCH */}
+                  <div
+                    className="relative"
+                    style={{
+                      width: "40%",
+                      minWidth: 220,
+                      maxWidth: 300,
+                      height: 36,
+                    }}
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={txnSearch}
+                      onChange={(e) => handleTxnSearchChange(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                      }}
+                    />
+                  </div>
+
+                  {/* EXCEL + PRINT BUTTONS */}
+                  <div className="flex items-center gap-2">
+
+                    {/* EXCEL */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+                      title="Export to Excel"
+                    >
+                      <FileSpreadsheet
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                    {/* PRINT */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
+                      title="Print Reports"
+                    >
+                      <PrinterIcon
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                  </div>
+
                 </div>
               </div>
 
@@ -491,7 +659,7 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                         <th
                           key={index}
                           className="text-left py-2 px-3"
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace:"nowrap" }}
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
                         >
                           {h}
                         </th>
@@ -518,14 +686,20 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                           style={{ borderBottom: "1px solid #f1f5f9", position: "relative", cursor: "pointer" }}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                           onDoubleClick={() => {
-                            navigate(`/expense/edit/${txn.id}`, {
-                              state: {
-                                from: location.pathname,
-                                categoryId: selectedCategoryId,
-                                txnSearch,
-                                categorySearch,
+                            navigate(
+                              {
+                                pathname: `/expense/edit/${txn.id}`,
+                                search: searchParams.toString(),
                               },
-                            });
+                              {
+                                state: {
+                                  from: "expense-categories",
+                                  categoryId: selectedCategoryId,
+                                  txnSearch,
+                                  categorySearch,
+                                },
+                              }
+                            );
                           }}
                         >
                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
@@ -564,34 +738,38 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
                                         type="button"
                                         className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
                                         style={{ color: danger ? "#dc2626" : "#374151" }}
+
                                         onClick={() => {
                                           setTransactionMenu(null);
 
                                           if (key === "view") {
-                                            navigate(`/expense/edit/${txn.id}`, {
-                                              state: {
-                                                from: location.pathname,
-                                                categoryId: selectedCategoryId,
-                                                txnSearch,
-                                                categorySearch,
+                                            navigate(
+                                              {
+                                                pathname: `/expense/edit/${txn.id}`,
+                                                search: searchParams.toString(),
                                               },
-                                            });
+                                              {
+                                                state: {
+                                                  from: "expense-categories",
+                                                  categoryId: selectedCategoryId,
+                                                  txnSearch,
+                                                  categorySearch,
+                                                },
+                                              }
+                                            );
                                           }
 
-                                          if (key === "preview") {
-                                            navigate(`/expense/preview/${txn.id}`, {
-                                              state: {
-                                                from: location.pathname,
-                                                categoryId: selectedCategoryId,
-                                                txnSearch,
-                                                categorySearch,
-                                              },
+                                          if (key === "delete") {
+                                            setDeleteTarget({
+                                              type: "expense",
+                                              expenseId: txn.id,
                                             });
+
+                                            return;
                                           }
 
                                           if (key === "print") {
-                                            const url = `/expense/preview/${txn.id}?autoPrint=1`;
-                                            window.open(url, "_blank");
+                                            setPrintExpenseId(txn.id);
                                           }
                                         }}
                                         onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
@@ -643,6 +821,45 @@ const effectiveRightCursor =rightCategoryRef.current === selectedCategoryId  ? r
           }}
         />
       )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={
+            deleteTarget.type === "category"
+              ? "Delete Expense Category"
+              : "Delete Expense"
+          }
+          message={
+            deleteTarget.type === "category"
+              ? `Are you sure you want to delete "${deleteTarget.categoryName}"? This action cannot be undone.`
+              : "Are you sure you want to delete this expense? This action cannot be undone."
+          }
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={
+            deleteTarget.type === "category"
+              ? isDeletingCategory
+              : isDeletingExpense
+          }
+        />
+      )}
+
+      {/* ── EXPENSE PRINT TEMPLATE ── */}
+      {printExpenseData?.expense && (
+        <div
+          style={{
+            position: "absolute",
+            left: "-99999px",
+            top: 0,
+          }}
+        >
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        </div>
+      )}
+
     </>
   );
 }

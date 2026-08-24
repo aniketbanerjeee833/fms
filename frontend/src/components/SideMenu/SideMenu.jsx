@@ -324,7 +324,7 @@ if (
                  Reports
                  </span>
             </NavLink> */}
-                  {
+                  {/* {
   renderMenu(
     "Reports",
     <ClipboardMinus size={20} />,
@@ -332,7 +332,7 @@ if (
       { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
        { to: "/reports/balance-sheet", text: "Balance Sheet" },
     ]
-  )}
+  )} */}
         </ul>
       </div>
     </>

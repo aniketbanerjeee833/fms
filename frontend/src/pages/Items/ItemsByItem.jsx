@@ -189,7 +189,7 @@ export default function ItemsByItem() {
         },
         {
             skip: !selectedItemId,
-        }
+        },
     );
 
     const transactions = billsResponse?.transactions || [];
