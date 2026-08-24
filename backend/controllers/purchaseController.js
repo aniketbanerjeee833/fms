@@ -2848,103 +2848,132 @@ const getSinglePurchase = async (req, res, next) => {
     //
     // =========================================================
 //worked
-  //   const [items] = await connection.query(
-  //     `
-  //    SELECT
-  // pi.Purchase_Items_Id,
-  // pi.Item_Id,
+  
+//   const [items] = await connection.query(
+//     `
+//    SELECT
+//   pi.Purchase_Items_Id,
+//   pi.Item_Id,
 
-  // i.Item_Name,
-  // i.Item_HSN,
-  // i.Item_Unit,
-  // i.Item_Category,
+//   i.Item_Name,
+//   i.Item_HSN,
+//   i.Item_Unit,
+//   i.Item_Category,
 
-  // -- CURRENT MASTER
-  // i.Primary_Unit AS Current_Primary_Unit,
-  // i.Secondary_Unit AS Current_Secondary_Unit,
-  //      i.Conversion_Rate,
-  // pi.Quantity,
+//   i.Primary_Unit AS Current_Primary_Unit,
+//   i.Secondary_Unit AS Current_Secondary_Unit,
+//   i.Conversion_Rate,
 
-  // -- HISTORICAL SNAPSHOT
-  // pi.Primary_Unit_Snapshot,
-  // pi.Secondary_Unit_Snapshot,
-  // pi.Selected_Unit,
+//   pi.Quantity,
 
-  // pi.Purchase_Price,
-  // pi.Discount_On_Purchase_Price,
-  // pi.Discount_Type_On_Purchase_Price,
-  // pi.Tax_Amount,
-  // pi.Tax_Type,
-  // pi.Amount,
-  // pi.created_at
+//   -- IDs
+//   pi.Primary_Unit_Snapshot_Id,
+//   pi.Secondary_Unit_Snapshot_Id,
+//   pi.Selected_Unit_Id,
 
-  //     FROM add_purchase_items pi
+//   -- Names from unit master
+//   pu.Unit_Shorthand AS Primary_Unit_Snapshot,
+//   su.Unit_Shorthand AS Secondary_Unit_Snapshot,
+//   sel.Unit_Shorthand AS Selected_Unit,
 
-  //     LEFT JOIN add_item i
-  //       ON pi.Item_Id = i.Item_Id
+//   pi.Purchase_Price,
+//   pi.Discount_On_Purchase_Price,
+//   pi.Discount_Type_On_Purchase_Price,
+//   pi.Tax_Amount,
+//   pi.Tax_Type,
+//   pi.Amount,
+//   pi.created_at
 
-  //     WHERE pi.Purchase_Id = ?
+// FROM add_purchase_items pi
 
-  //     ORDER BY pi.created_at DESC
-  //     `,
-  //     [purchaseId]
-  //   );
-  const [items] = await connection.query(
-    `
-   SELECT
-  pi.Purchase_Items_Id,
-  pi.Item_Id,
+// LEFT JOIN add_item i
+//   ON pi.Item_Id = i.Item_Id
 
-  i.Item_Name,
-  i.Item_HSN,
-  i.Item_Unit,
-  i.Item_Category,
+// LEFT JOIN units pu
+//   ON pi.Primary_Unit_Snapshot_Id = pu.id
 
-  i.Primary_Unit AS Current_Primary_Unit,
-  i.Secondary_Unit AS Current_Secondary_Unit,
-  i.Conversion_Rate,
+// LEFT JOIN units su
+//   ON pi.Secondary_Unit_Snapshot_Id = su.id
 
-  pi.Quantity,
+// LEFT JOIN units sel
+//   ON pi.Selected_Unit_Id = sel.id
 
-  -- IDs
-  pi.Primary_Unit_Snapshot_Id,
-  pi.Secondary_Unit_Snapshot_Id,
-  pi.Selected_Unit_Id,
+// WHERE pi.Purchase_Id = ?
 
-  -- Names from unit master
-  pu.Unit_Shorthand AS Primary_Unit_Snapshot,
-  su.Unit_Shorthand AS Secondary_Unit_Snapshot,
-  sel.Unit_Shorthand AS Selected_Unit,
+// ORDER BY pi.created_at DESC`
+//     ,
+//     [purchaseId]
+//   );
+const [items] = await connection.query(
+  `
+  SELECT
+    pi.Purchase_Items_Id,
+    pi.Item_Id,
 
-  pi.Purchase_Price,
-  pi.Discount_On_Purchase_Price,
-  pi.Discount_Type_On_Purchase_Price,
-  pi.Tax_Amount,
-  pi.Tax_Type,
-  pi.Amount,
-  pi.created_at
+    i.Item_Name,
+    i.Item_HSN,
+    i.Item_Category,
 
-FROM add_purchase_items pi
+    -- CURRENT ITEM UNIT FROM ID
+    iu.Unit_Shorthand AS Item_Unit,
 
-LEFT JOIN add_item i
-  ON pi.Item_Id = i.Item_Id
+    i.Conversion_Rate,
 
-LEFT JOIN units pu
-  ON pi.Primary_Unit_Snapshot_Id = pu.id
+    pi.Quantity,
 
-LEFT JOIN units su
-  ON pi.Secondary_Unit_Snapshot_Id = su.id
+    -- SNAPSHOT IDS
+    pi.Primary_Unit_Snapshot_Id,
+    pi.Secondary_Unit_Snapshot_Id,
+    pi.Selected_Unit_Id,
 
-LEFT JOIN units sel
-  ON pi.Selected_Unit_Id = sel.id
+    -- HISTORICAL TRANSACTION UNITS
+    pu.Unit_Shorthand AS Primary_Unit_Snapshot,
+    su.Unit_Shorthand AS Secondary_Unit_Snapshot,
+    sel.Unit_Shorthand AS Selected_Unit,
 
-WHERE pi.Purchase_Id = ?
+    -- CURRENT MASTER UNITS
+    cpu.Unit_Shorthand AS Current_Primary_Unit,
+    csu.Unit_Shorthand AS Current_Secondary_Unit,
 
-ORDER BY pi.created_at DESC`
-    ,
-    [purchaseId]
-  );
+    pi.Purchase_Price,
+    pi.Discount_On_Purchase_Price,
+    pi.Discount_Type_On_Purchase_Price,
+    pi.Tax_Amount,
+    pi.Tax_Type,
+    pi.Amount,
+    pi.created_at
 
+  FROM add_purchase_items pi
+
+  LEFT JOIN add_item i
+    ON pi.Item_Id = i.Item_Id
+
+  -- HISTORICAL UNIT IDs
+  LEFT JOIN units pu
+    ON pi.Primary_Unit_Snapshot_Id = pu.id
+
+  LEFT JOIN units su
+    ON pi.Secondary_Unit_Snapshot_Id = su.id
+
+  LEFT JOIN units sel
+    ON pi.Selected_Unit_Id = sel.id
+
+  -- CURRENT MASTER UNIT IDs
+  LEFT JOIN units cpu
+    ON i.Primary_Unit_Id = cpu.id
+
+  LEFT JOIN units csu
+    ON i.Secondary_Unit_Id = csu.id
+
+  LEFT JOIN units iu
+    ON i.Item_Unit_Id = iu.id
+
+  WHERE pi.Purchase_Id = ?
+
+  ORDER BY pi.created_at DESC
+  `,
+  [purchaseId]
+);
 //WILL WORK 
 // const [items] = await connection.query(
 //   `

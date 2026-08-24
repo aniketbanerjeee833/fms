@@ -20,7 +20,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
   onRefreshTab }) {
   const dropdownRef = useRef(null);
   const dispatch = useDispatch()
-
+    console.log("editingItem", editingItem);
 
   const {
     register,
@@ -194,7 +194,9 @@ const toLocalDateString = (dateString) => {
   };
   const formValues = watch();
   console.log(formValues, "formValues")
+  console.log(errors)
   const onSubmit = async () => {
+     console.log("editingItem", editingItem);
     if (!editingItem) return;
     const payload = {
       ...formValues,
@@ -207,6 +209,8 @@ const toLocalDateString = (dateString) => {
       payload.Min_Stock = null;
       payload.Location = null;
     }
+
+  console.log("EDIT ITEM PAYLOAD:", payload);
     const oldType = itemDetails.Item_Type;
     const newType = payload.Item_Type;
 

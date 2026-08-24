@@ -1616,14 +1616,18 @@ const getSingleSale = async (req, res, next) => {
     p.State,
     p.Phone_Number,
     
-          (
-  SELECT pa.Address_Text
-  FROM add_party_addresses pa
-  WHERE pa.Party_Id = s.Party_Id
-    AND pa.Address_Type = 'Billing'
-    AND pa.Is_Default = 1
-) AS Billing_Address,
-
+     COALESCE(
+       NULLIF(s.Billing_Address, ''),
+       (
+         SELECT pa.Address_Text
+         FROM add_party_addresses pa
+         WHERE pa.Party_Id = s.Party_Id
+           AND pa.Address_Type = 'Billing'
+           AND pa.Is_Default = 1
+         ORDER BY pa.id ASC
+         LIMIT 1
+       )
+     ) AS Billing_Address,
 
      -- Title only exists when this invoice is linked
      -- to a master Terms & Conditions template
@@ -1649,62 +1653,73 @@ const getSingleSale = async (req, res, next) => {
     console.log(saleHeader)
 
 
-    //   const [items] = await connection.query(
-    //     `
-    // SELECT
-    //   si.Sale_Items_Id,
-    //   si.Item_Id,
+ 
+  //   const [items] = await connection.query(
+  //     `
+  // SELECT
+  //   si.Sale_Items_Id,
+  //   si.Item_Id,
 
-    //   i.Item_Name,
-    //   i.Item_HSN,
-    //   i.Item_Unit,
-    //   i.Item_Category,
+  //   i.Item_Name,
+  //   i.Item_HSN,
+  //   i.Item_Unit,
+  //   i.Item_Category,
 
-    //   -- CURRENT ITEM MASTER
-    //   i.Primary_Unit AS Current_Primary_Unit,
-    //   i.Secondary_Unit AS Current_Secondary_Unit,
-    //    i.Conversion_Rate,
+  //   -- CURRENT ITEM MASTER
+  //   i.Primary_Unit AS Current_Primary_Unit,
+  //   i.Secondary_Unit AS Current_Secondary_Unit,
+  //   i.Conversion_Rate,
 
-    //   si.Quantity,
+  //   si.Quantity,
 
-    //   -- HISTORICAL SALE SNAPSHOT
-    //   si.Primary_Unit_Snapshot,
-    //   si.Secondary_Unit_Snapshot,
-    //   si.Selected_Unit,
+  //   -- HISTORICAL SALE SNAPSHOT (FROM IDS)
+  //   pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+  //   pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+  //   pu3.Unit_Shorthand AS Selected_Unit,
 
-    //   si.Sale_Price,
-    //   si.Discount_On_Sale_Price,
-    //   si.Discount_Type_On_Sale_Price,
-    //   si.Tax_Amount,
-    //   si.Tax_Type,
-    //   si.Amount,
-    //   si.created_at
+  //   si.Sale_Price,
+  //   si.Discount_On_Sale_Price,
+  //   si.Discount_Type_On_Sale_Price,
+  //   si.Tax_Amount,
+  //   si.Tax_Type,
+  //   si.Amount,
+  //   si.created_at
 
-    // FROM ${saleItemTable} si
+  // FROM ${saleItemTable} si
 
-    // LEFT JOIN ${itemTable} i
-    //   ON si.Item_Id = i.Item_Id
+  // LEFT JOIN ${itemTable} i
+  //   ON si.Item_Id = i.Item_Id
 
-    // WHERE si.Sale_Id = ?
+  // LEFT JOIN units pu1
+  //   ON pu1.id = si.Primary_Unit_Snapshot_Id
 
-    // ORDER BY si.created_at DESC
-    // `,
-    //     [saleId]
-    //   );
-    const [items] = await connection.query(
-      `
+  // LEFT JOIN units pu2
+  //   ON pu2.id = si.Secondary_Unit_Snapshot_Id
+
+  // LEFT JOIN units pu3
+  //   ON pu3.id = si.Selected_Unit_Id
+
+  // WHERE si.Sale_Id = ?
+
+  // ORDER BY si.created_at DESC
+  // `,
+  //     [saleId]
+  //   );
+const [items] = await connection.query(
+  `
   SELECT
     si.Sale_Items_Id,
     si.Item_Id,
 
     i.Item_Name,
     i.Item_HSN,
-    i.Item_Unit,
     i.Item_Category,
 
-    -- CURRENT ITEM MASTER
-    i.Primary_Unit AS Current_Primary_Unit,
-    i.Secondary_Unit AS Current_Secondary_Unit,
+    -- CURRENT ITEM MASTER UNITS FROM IDs
+    iu.Unit_Shorthand AS Item_Unit,
+    cpu.Unit_Shorthand AS Current_Primary_Unit,
+    csu.Unit_Shorthand AS Current_Secondary_Unit,
+
     i.Conversion_Rate,
 
     si.Quantity,
@@ -1727,6 +1742,7 @@ const getSingleSale = async (req, res, next) => {
   LEFT JOIN ${itemTable} i
     ON si.Item_Id = i.Item_Id
 
+  -- HISTORICAL TRANSACTION UNITS
   LEFT JOIN units pu1
     ON pu1.id = si.Primary_Unit_Snapshot_Id
 
@@ -1736,13 +1752,22 @@ const getSingleSale = async (req, res, next) => {
   LEFT JOIN units pu3
     ON pu3.id = si.Selected_Unit_Id
 
+  -- CURRENT MASTER UNITS
+  LEFT JOIN units cpu
+    ON i.Primary_Unit_Id = cpu.id
+
+  LEFT JOIN units csu
+    ON i.Secondary_Unit_Id = csu.id
+
+  LEFT JOIN units iu
+    ON i.Item_Unit_Id = iu.id
+
   WHERE si.Sale_Id = ?
 
   ORDER BY si.created_at DESC
   `,
-      [saleId]
-    );
-
+  [saleId]
+);
     // if (!items.length) {
     //   return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
     // }

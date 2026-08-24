@@ -199,8 +199,7 @@ export default function ItemsByItem() {
 
 
 
-    const selectedItemMeta =
-        items.find(
+    const selectedItemMeta =items.find(
             (it) => String(it.Item_Id) === String(selectedItemId)
         ) || null;
     useEffect(() => {
@@ -596,6 +595,7 @@ export default function ItemsByItem() {
             setDeleteItemTarget(null);
         }
     };
+    console.log("selectedItemMeta", selectedItemMeta);
     return (
         <>
             <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>

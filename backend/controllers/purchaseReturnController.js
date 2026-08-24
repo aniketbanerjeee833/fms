@@ -208,63 +208,7 @@ const getAllPurchaseReturns = async (req, res, next) => {
 };
 
 /* ── GET SINGLE ──────────────────────────────────────────── */
-// const getPurchaseReturnById = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const { Purchase_Return_Id } = req.params;
 
-//     const [[header]] = await connection.query(
-//       `SELECT pr.*, a.Party_Name,a.GSTIN
-//        FROM purchase_return pr
-//        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
-//        WHERE pr.id = ?`,
-//       [Purchase_Return_Id]
-//     );
-
-//     if (!header) {
-//       return res.status(404).json({ success: false, message: "Purchase Return not found" });
-//     }
-
-//     // const [items] = await connection.query(
-//     //   `SELECT pri.*, ai.Item_Name AS Item_Name_Ref
-//     //    FROM purchase_return_items pri
-//     //    LEFT JOIN add_item ai ON ai.Item_Id = pri.Item_Id
-//     //    WHERE pri.Purchase_Return_Id = ?`,
-//     //   [Purchase_Return_Id]
-//     // );
-//     const [items] = await connection.query(
-//       `SELECT pri.*,
-//               ai.Item_Name AS Item_Name,
-//               ai.Item_HSN  AS Item_HSN,
-//               ai.Item_Unit AS Item_Unit,
-//               ai.Item_Category AS Item_Category
-//        FROM purchase_return_items pri
-//        LEFT JOIN add_item ai ON ai.Item_Id = pri.Item_Id
-//        WHERE pri.Purchase_Return_Id = ?`,
-//       [Purchase_Return_Id]
-//     );
-
-//     // fetch splits with bank display name
-//     const [splits] = await connection.query(
-//       `SELECT ps.*, ba.Account_Display_Name
-//        FROM payment_splits ps
-//        LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//        WHERE ps.Source_Type = 'Purchase_Return' AND ps.Source_Id = ?
-//        ORDER BY ps.id ASC`,
-//       [Purchase_Return_Id]
-//     );
-
-//     return res.status(200).json({
-//       success: true,
-//       purchaseReturn: { ...header, items, splits },
-//     });
-//   } catch (err) {
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 // (
 //   SELECT pa.Address_Text
 //   FROM add_party_addresses pa
@@ -336,86 +280,97 @@ const getPurchaseReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
-    //   const [items] = await connection.query(
-    //     `
-    // SELECT
-    //     pri.id,
+   
+  //   const [items] = await connection.query(
+  //     `
+  // SELECT
+  //     pri.id,
 
-    //     pri.Item_Id,
+  //     pri.Item_Id,
 
-    //     i.Item_Name,
-    //     i.Item_HSN,
-    //     i.Item_Unit,
-    //     i.Item_Category,
+  //     i.Item_Name,
+  //     i.Item_HSN,
+  //     i.Item_Unit,
+  //     i.Item_Category,
 
-    //     -- CURRENT MASTER
-    //     i.Primary_Unit AS Current_Primary_Unit,
-    //     i.Secondary_Unit AS Current_Secondary_Unit,
-    //      i.Conversion_Rate,
+  //     -- CURRENT MASTER
+  //     i.Primary_Unit AS Current_Primary_Unit,
+  //     i.Secondary_Unit AS Current_Secondary_Unit,
+  //     i.Conversion_Rate,
 
-    //     pri.Quantity,
+  //     pri.Quantity,
 
-    //     -- HISTORICAL SNAPSHOT
-    //     pri.Primary_Unit_Snapshot,
-    //     pri.Secondary_Unit_Snapshot,
-    //     pri.Selected_Unit,
+  //     -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
+  //     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+  //     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+  //     pu3.Unit_Shorthand AS Selected_Unit,
 
-    //     pri.Purchase_Price,
-    //     pri.Discount_On_Purchase_Price,
-    //     pri.Discount_Type_On_Purchase_Price,
-    //     pri.Tax_Amount,
-    //     pri.Tax_Type,
-    //     pri.Amount,
-    //     pri.created_at
+  //     pri.Purchase_Price,
+  //     pri.Discount_On_Purchase_Price,
+  //     pri.Discount_Type_On_Purchase_Price,
+  //     pri.Tax_Amount,
+  //     pri.Tax_Type,
+  //     pri.Amount,
+  //     pri.created_at
 
-    // FROM purchase_return_items pri
+  // FROM purchase_return_items pri
 
-    // LEFT JOIN add_item i
-    //   ON pri.Item_Id = i.Item_Id
+  // LEFT JOIN add_item i
+  //   ON pri.Item_Id = i.Item_Id
 
-    // WHERE pri.Purchase_Return_Id = ?
+  // LEFT JOIN units pu1
+  //   ON pu1.id = pri.Primary_Unit_Snapshot_Id
 
-    // ORDER BY pri.created_at DESC
-    // `,
-    //     [Purchase_Return_Id]
-    //   );
-    const [items] = await connection.query(
-      `
+  // LEFT JOIN units pu2
+  //   ON pu2.id = pri.Secondary_Unit_Snapshot_Id
+
+  // LEFT JOIN units pu3
+  //   ON pu3.id = pri.Selected_Unit_Id
+
+  // WHERE pri.Purchase_Return_Id = ?
+
+  // ORDER BY pri.created_at DESC
+  // `,
+  //     [Purchase_Return_Id]
+  //   );
+  const [items] = await connection.query(
+  `
   SELECT
-      pri.id,
+    pri.id,
+    pri.Item_Id,
 
-      pri.Item_Id,
+    i.Item_Name,
+    i.Item_HSN,
+    i.Item_Category,
 
-      i.Item_Name,
-      i.Item_HSN,
-      i.Item_Unit,
-      i.Item_Category,
+    -- CURRENT MASTER UNITS FROM IDs
+    iu.Unit_Shorthand AS Item_Unit,
+    cpu.Unit_Shorthand AS Current_Primary_Unit,
+    csu.Unit_Shorthand AS Current_Secondary_Unit,
 
-      -- CURRENT MASTER
-      i.Primary_Unit AS Current_Primary_Unit,
-      i.Secondary_Unit AS Current_Secondary_Unit,
-      i.Conversion_Rate,
+    i.Conversion_Rate,
 
-      pri.Quantity,
+    pri.Quantity,
 
-      -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
-      pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
-      pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
-      pu3.Unit_Shorthand AS Selected_Unit,
+    -- HISTORICAL SNAPSHOT UNITS FROM IDS
+    pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+    pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+    pu3.Unit_Shorthand AS Selected_Unit,
 
-      pri.Purchase_Price,
-      pri.Discount_On_Purchase_Price,
-      pri.Discount_Type_On_Purchase_Price,
-      pri.Tax_Amount,
-      pri.Tax_Type,
-      pri.Amount,
-      pri.created_at
+    pri.Purchase_Price,
+    pri.Discount_On_Purchase_Price,
+    pri.Discount_Type_On_Purchase_Price,
+    pri.Tax_Amount,
+    pri.Tax_Type,
+    pri.Amount,
+    pri.created_at
 
   FROM purchase_return_items pri
 
   LEFT JOIN add_item i
     ON pri.Item_Id = i.Item_Id
 
+  -- HISTORICAL SNAPSHOT UNITS
   LEFT JOIN units pu1
     ON pu1.id = pri.Primary_Unit_Snapshot_Id
 
@@ -425,12 +380,22 @@ const getPurchaseReturnById = async (req, res, next) => {
   LEFT JOIN units pu3
     ON pu3.id = pri.Selected_Unit_Id
 
+  -- CURRENT MASTER UNITS
+  LEFT JOIN units cpu
+    ON i.Primary_Unit_Id = cpu.id
+
+  LEFT JOIN units csu
+    ON i.Secondary_Unit_Id = csu.id
+
+  LEFT JOIN units iu
+    ON i.Item_Unit_Id = iu.id
+
   WHERE pri.Purchase_Return_Id = ?
 
   ORDER BY pri.created_at DESC
   `,
-      [Purchase_Return_Id]
-    );
+  [Purchase_Return_Id]
+);
 
     // =========================================================
     // 3. FETCH ALL UNITS (for edit dropdown — same as purchase)

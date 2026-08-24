@@ -6,7 +6,7 @@ const db = mysql.createPool({
   user: "root",
   password: "", // your DB password
 //database: "finance-reseller-accounts-management",
-database: "ancotechvation_finance-reseller-accounts-management",
+database: "ancotechvation_techeasy",
 });
 
 // Test connection once at startup

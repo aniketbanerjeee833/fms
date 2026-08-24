@@ -102,6 +102,7 @@ const decimalNumber = (fieldName, decimals = 6) =>
 Item_Unit: z
   .string()
   .trim()
+  .nullable()
   .optional()
   .default(""),
     // =====================================================

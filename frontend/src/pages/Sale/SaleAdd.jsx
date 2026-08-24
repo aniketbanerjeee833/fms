@@ -137,7 +137,7 @@ export default function SaleAdd() {
   const [showGSTIN, setShowGSTIN] = useState("");
   console.log(latestInvoiceNumber, "latestInvoiceNumber");
 
- 
+
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
@@ -287,7 +287,7 @@ export default function SaleAdd() {
       Invoice_Date: today,
       State_Of_Supply: "",
       Total_Amount: "",
-      Round_Off: "",   
+      Round_Off: "",
       Balance_Due: "",
       Total_Received: "",
       Terms_Conditions_Id: null,
@@ -654,7 +654,7 @@ export default function SaleAdd() {
         sum + (Number(split.Amount) || 0),
       0
     );
- 
+
     // =========================================================
     // 5. BALANCE DUE
     // =========================================================
@@ -1102,35 +1102,7 @@ export default function SaleAdd() {
                             + Add Party
                           </span>
 
-                          {/* {parties?.parties
-                            ?.filter(
-                              (party) =>
-                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                                party?.Phone_Number?.includes(partySearch)
-                            )
-                            .map((party, i) => (
-                              <div
-                                key={i}
-                                onClick={() => {
-                                  setPartySearch(party.Party_Name);
-                                  //setValue("Phone_Number", party.Phone_Number || "", { shouldValidate: true, shouldDirty: true });
-                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                                  const defaultBilling = party.addresses?.find(
-                                    (a) => a.Address_Type === "Billing" && a.Is_Default
-                                  );
-                                  setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
-                                  setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
 
-                                  setCurrentPartyDetails(party);
-
-                                  setOpen(false);
-                                }}
-                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                              >
-                                {party.Party_Name} ({party.Phone_Number})
-                              </div>
-                            ))} */}
                           {parties?.parties
                             ?.filter(
                               (party) =>
@@ -1244,24 +1216,7 @@ export default function SaleAdd() {
                       <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
                     )}
                   </div>
-                  {/* {(saleMode === "Cash" || (saleMode === "Credit" && currentPartyDetails?.Billing_Name)) && (
-                    <div className="flex flex-col gap-2">
-                      <span className="whitespace-nowrap active">
-                        {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name"}
-                      </span>
-                      <input
-                        type="text"
-                        id="Billing_Name"
-                        {...register("Billing_Name")}
-                        placeholder="Billing Name"
-                        className="w-full outline-none border-b-2 text-gray-900"
-                        style={{ marginBottom: 0 }}
-                      />
-                      {errors?.Billing_Name && (
-                        <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
-                      )}
-                    </div>
-                  )} */}
+
 
                   {currentPartyDetails?.Party_Name !== "Cash Sale" && (<div className="flex flex-col gap-2">
                     <span className="whitespace-nowrap active">
@@ -1320,10 +1275,10 @@ export default function SaleAdd() {
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}
                   {/* ── ROW 2: Billing Address + GSTIN ── */}
-                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (
+                  {/* {currentPartyDetails?.Party_Name !== "Cash Sale" && (
                     <div >
 
-                      {/* Billing Address */}
+                    
                       <div className="flex flex-col gap-2">
                         <span className="active">Billing Address</span>
                         <textarea
@@ -1334,7 +1289,7 @@ export default function SaleAdd() {
                           style={{ minHeight: "80px" }}
                         />
 
-                        {/* Address has content — show Remove / Change */}
+                      
                         {watch("Billing_Address") && currentPartyDetails && (
                           <div className="flex justify-end gap-3 mt-1">
                             <button
@@ -1373,7 +1328,7 @@ export default function SaleAdd() {
                           </div>
                         )}
 
-                        {/* Address was just removed — offer to pick one from the party instead */}
+                       
                         {!watch("Billing_Address") && currentPartyDetails && (
                           <div className="flex justify-end mt-1">
                             <button
@@ -1394,6 +1349,103 @@ export default function SaleAdd() {
                         )}
                       </div>
 
+                    </div>
+                  )} */}
+                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (
+                    <div>
+                      {/* Billing Address */}
+                      <div className="flex flex-col gap-2">
+                        <span className="active">Billing Address</span>
+
+                        {(() => {
+                          // 🔹 check if party has ANY billing address saved
+                          const hasPartyBillingAddress = currentPartyDetails?.addresses?.some(
+                            (addr) => addr.Address_Type === "Billing"
+                          );
+
+                          return (
+                            <textarea
+                              {...register("Billing_Address")}
+                              rows={5}
+                              placeholder="Billing Address"
+                              readOnly={hasPartyBillingAddress}   // 🔹 readonly if party has a saved address
+                              // onClick={() => {
+                              //   if (hasPartyBillingAddress) {
+                              //     setShowEditPartyModal(true);   // clicking a readonly field opens the modal too
+                              //   }
+                              // }}
+                              className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none"
+                              style={{
+                                minHeight: "80px",
+                                backgroundColor: hasPartyBillingAddress ? "#f9fafb" : "white",
+                                cursor: hasPartyBillingAddress ? "pointer" : "text",
+                              }}
+                            />
+                          );
+                        })()}
+
+                        {/* Address has content — show Remove / Change (only when party HAS a saved address) */}
+                        {watch("Billing_Address") &&
+                          currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && (
+                            <div className="flex justify-end gap-3 mt-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setValue("Billing_Address", "", {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  })
+                                }
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#ef4444",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                }}
+                              >
+                                Remove
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setShowEditPartyModal(true)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#4CA1AF",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Change
+                              </button>
+                            </div>
+                          )}
+
+                        {/* Address was just removed OR party has a saved address but field is empty
+                            — offer to pick one from the party */}
+                        {!watch("Billing_Address") &&
+                          currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && (
+                            <div className="flex justify-end mt-1">
+                              <button
+                                type="button"
+                                onClick={() => setShowEditPartyModal(true)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#4CA1AF",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Select Billing Address
+                              </button>
+                            </div>
+                          )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2741,7 +2793,7 @@ export default function SaleAdd() {
                     </tr>
                   ))}
                 </tbody>
-                  <tfoot>
+                <tfoot>
                   <tr>
                     <td colSpan={2}></td>
                     <td>Total</td>

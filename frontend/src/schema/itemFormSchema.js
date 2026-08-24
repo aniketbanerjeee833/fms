@@ -111,6 +111,7 @@ export const itemFormSchema = z
 Item_Unit: z
   .string()
   .trim()
+  .nullable()
   .optional()
   .default(""),
     // =====================================================

@@ -210,86 +210,96 @@ const getSaleReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
-    //   const [items] = await connection.query(
-    //     `
-    // SELECT
-    //     sri.id,
+  //   const [items] = await connection.query(
+  //     `
+  // SELECT
+  //     sri.id,
 
-    //     sri.Item_Id,
+  //     sri.Item_Id,
 
-    //     i.Item_Name,
-    //     i.Item_HSN,
-    //     i.Item_Unit,
-    //     i.Item_Category,
+  //     i.Item_Name,
+  //     i.Item_HSN,
+  //     i.Item_Unit,
+  //     i.Item_Category,
 
-    //     -- CURRENT MASTER
-    //     i.Primary_Unit AS Current_Primary_Unit,
-    //     i.Secondary_Unit AS Current_Secondary_Unit,
-    //     i.Conversion_Rate,
+  //     -- CURRENT MASTER
+  //     i.Primary_Unit AS Current_Primary_Unit,
+  //     i.Secondary_Unit AS Current_Secondary_Unit,
+  //     i.Conversion_Rate,
 
-    //     sri.Quantity,
+  //     sri.Quantity,
 
-    //     -- HISTORICAL SNAPSHOT
-    //     sri.Primary_Unit_Snapshot,
-    //     sri.Secondary_Unit_Snapshot,
-    //     sri.Selected_Unit,
+  //     -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
+  //     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+  //     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+  //     pu3.Unit_Shorthand AS Selected_Unit,
 
-    //     sri.Sale_Price,
-    //     sri.Discount_On_Sale_Price,
-    //     sri.Discount_Type_On_Sale_Price,
-    //     sri.Tax_Amount,
-    //     sri.Tax_Type,
-    //     sri.Amount,
-    //     sri.created_at
+  //     sri.Sale_Price,
+  //     sri.Discount_On_Sale_Price,
+  //     sri.Discount_Type_On_Sale_Price,
+  //     sri.Tax_Amount,
+  //     sri.Tax_Type,
+  //     sri.Amount,
+  //     sri.created_at
 
-    // FROM sale_return_items sri
+  // FROM sale_return_items sri
 
-    // LEFT JOIN add_item i
-    //   ON sri.Item_Id = i.Item_Id
+  // LEFT JOIN add_item i
+  //   ON sri.Item_Id = i.Item_Id
 
-    // WHERE sri.Sale_Return_Id = ?
+  // LEFT JOIN units pu1
+  //   ON pu1.id = sri.Primary_Unit_Snapshot_Id
 
-    // ORDER BY sri.created_at DESC
-    // `,
-    //     [Sale_Return_Id]
-    //   );
-    const [items] = await connection.query(
-      `
+  // LEFT JOIN units pu2
+  //   ON pu2.id = sri.Secondary_Unit_Snapshot_Id
+
+  // LEFT JOIN units pu3
+  //   ON pu3.id = sri.Selected_Unit_Id
+
+  // WHERE sri.Sale_Return_Id = ?
+
+  // ORDER BY sri.created_at DESC
+  // `,
+  //     [Sale_Return_Id]
+  //   );
+  const [items] = await connection.query(
+  `
   SELECT
-      sri.id,
+    sri.id,
+    sri.Item_Id,
 
-      sri.Item_Id,
+    i.Item_Name,
+    i.Item_HSN,
+    i.Item_Category,
 
-      i.Item_Name,
-      i.Item_HSN,
-      i.Item_Unit,
-      i.Item_Category,
+    -- CURRENT MASTER UNITS FROM IDs
+    iu.Unit_Shorthand AS Item_Unit,
+    cpu.Unit_Shorthand AS Current_Primary_Unit,
+    csu.Unit_Shorthand AS Current_Secondary_Unit,
 
-      -- CURRENT MASTER
-      i.Primary_Unit AS Current_Primary_Unit,
-      i.Secondary_Unit AS Current_Secondary_Unit,
-      i.Conversion_Rate,
+    i.Conversion_Rate,
 
-      sri.Quantity,
+    sri.Quantity,
 
-      -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
-      pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
-      pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
-      pu3.Unit_Shorthand AS Selected_Unit,
+    -- HISTORICAL SNAPSHOT UNITS FROM IDS
+    pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+    pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+    pu3.Unit_Shorthand AS Selected_Unit,
 
-      sri.Sale_Price,
-      sri.Discount_On_Sale_Price,
-      sri.Discount_Type_On_Sale_Price,
-      sri.Tax_Amount,
-      sri.Tax_Type,
-      sri.Amount,
-      sri.created_at
+    sri.Sale_Price,
+    sri.Discount_On_Sale_Price,
+    sri.Discount_Type_On_Sale_Price,
+    sri.Tax_Amount,
+    sri.Tax_Type,
+    sri.Amount,
+    sri.created_at
 
   FROM sale_return_items sri
 
   LEFT JOIN add_item i
     ON sri.Item_Id = i.Item_Id
 
+  -- HISTORICAL SNAPSHOT UNITS
   LEFT JOIN units pu1
     ON pu1.id = sri.Primary_Unit_Snapshot_Id
 
@@ -299,12 +309,22 @@ const getSaleReturnById = async (req, res, next) => {
   LEFT JOIN units pu3
     ON pu3.id = sri.Selected_Unit_Id
 
+  -- CURRENT MASTER UNITS
+  LEFT JOIN units cpu
+    ON i.Primary_Unit_Id = cpu.id
+
+  LEFT JOIN units csu
+    ON i.Secondary_Unit_Id = csu.id
+
+  LEFT JOIN units iu
+    ON i.Item_Unit_Id = iu.id
+
   WHERE sri.Sale_Return_Id = ?
 
   ORDER BY sri.created_at DESC
   `,
-      [Sale_Return_Id]
-    );
+  [Sale_Return_Id]
+);
 
     // =========================================================
     // 3. FETCH ALL UNITS (for edit dropdown — same as purchase)
