@@ -400,6 +400,7 @@ const createExpense = async (req, res, next) => {
       State_Of_Supply,
 
       Total_Amount,
+      Round_Off,
       // Total_Paid, // ❌ don't trust frontend
 
       splits,
@@ -555,8 +556,8 @@ const createExpense = async (req, res, next) => {
         0
       );
 
-    const balanceDue =
-      totalAmount - totalPaid;
+    const balanceDue =totalAmount - totalPaid;
+    const roundOffValue = Number(Round_Off) || 0
 
     // =========================================================
     // 7. VALIDATE SURVIVING SPLITS
@@ -617,6 +618,7 @@ const createExpense = async (req, res, next) => {
            Party_Id,
            State_Of_Supply,
            Total_Amount,
+           Round_Off,
            Total_Paid,
            Balance_Due,
            financial_year,
@@ -625,7 +627,7 @@ const createExpense = async (req, res, next) => {
          )
          VALUES (
            ?, ?, ?, ?, ?, ?,
-           ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?, ?,
            NOW(), NOW()
          )`,
         [
@@ -644,6 +646,7 @@ const createExpense = async (req, res, next) => {
           State_Of_Supply || null,
 
           totalAmount,
+          roundOffValue,
 
           totalPaid,
 
@@ -653,8 +656,7 @@ const createExpense = async (req, res, next) => {
         ]
       );
 
-    const expenseId =
-      expenseResult.insertId;
+    const expenseId =expenseResult.insertId;
 
     // =========================================================
     // 10. TRANSACTION DATE
@@ -771,8 +773,7 @@ const createExpense = async (req, res, next) => {
 
           return res.status(400).json({
             success: false,
-            message:
-              "Please enter an item name for the row.",
+            message:"Please enter an item name for the row.",
           });
         }
 
@@ -873,7 +874,7 @@ const createExpense = async (req, res, next) => {
     }
 
     console.error(
-      "❌ Create expense error:",
+      " Create expense error:",
       err
     );
 
@@ -910,6 +911,7 @@ const editExpense = async (req, res, next) => {
       State_Of_Supply,
 
       Total_Amount,
+      Round_Off,
 
       splits,
       items,
@@ -1055,8 +1057,7 @@ const editExpense = async (req, res, next) => {
     // Do NOT trust Total_Paid from frontend.
     // =========================================================
 
-    const totalAmount =
-      Number(Total_Amount) || 0;
+    const totalAmount =Number(Total_Amount) || 0;
 
     const totalPaid =
       validSplits.reduce(
@@ -1065,8 +1066,8 @@ const editExpense = async (req, res, next) => {
         0
       );
 
-    const balanceDue =
-      totalAmount - totalPaid;
+    const balanceDue =totalAmount - totalPaid;
+    const roundOffValue = Number(Round_Off) || 0
 
     // =========================================================
     // 9. VALIDATE SURVIVING SPLITS
@@ -1109,6 +1110,7 @@ const editExpense = async (req, res, next) => {
          Party_Id = ?,
          State_Of_Supply = ?,
          Total_Amount = ?,
+         Round_Off = ?,
          Total_Paid = ?,
          Balance_Due = ?,
          updated_at = NOW()
@@ -1125,6 +1127,7 @@ const editExpense = async (req, res, next) => {
         State_Of_Supply || null,
 
         totalAmount,
+        roundOffValue,
         totalPaid,
         balanceDue,
 

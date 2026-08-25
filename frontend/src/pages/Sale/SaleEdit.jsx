@@ -805,7 +805,7 @@ const handleAddRow = () => {
         const discount =
           item.Discount_Type_On_Sale_Price === "Percentage"
             ? (subtotal * discountRaw) / 100
-            : discountRaw;
+            : discountRaw * qty;
 
         acc.totalQty += qty;
         acc.totalDiscount += discount;

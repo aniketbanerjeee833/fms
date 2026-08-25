@@ -854,7 +854,7 @@ export default function SaleAdd() {
         const discount =
           item.Discount_Type_On_Sale_Price === "Percentage"
             ? (subtotal * discountRaw) / 100
-            : discountRaw;
+            : discountRaw * qty;
 
         acc.totalQty += qty;
         acc.totalDiscount += discount;
@@ -914,11 +914,12 @@ export default function SaleAdd() {
   ">
 
             {/* LEFT HEADER */}
-            <div className="w-full sm:w-auto">
-              <h4 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2 mt-4">Add New Sale</h4>
-              <div className="flex items-center gap-3 mb-4">
+            <div className="w-full sm:w-auto mt-4">
+
+              <div className="flex  gap-3 mb-4">
+                <h4 className="text-xl sm:text-2xl font-bold  sm:mb-2 mt-2">Add New Sale</h4>
                 {/* <span className="text-sm font-medium text-gray-700">Sale Mode:</span> */}
-                <div className="flex rounded-md border border-gray-300 overflow-hidden">
+                {/* <div className="flex rounded-md border border-gray-300 overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setValue("Sale_Mode", "Credit", { shouldDirty: true })}
@@ -945,6 +946,68 @@ export default function SaleAdd() {
                   >
                     Cash
                   </button>
+                </div> */}
+                <div
+                  className="flex items-center gap-3 cursor-pointer select-none whitespace-nowrap"
+                  onClick={() => {
+                    const nextMode =
+                      saleMode === "Credit" ? "Cash" : "Credit";
+
+                    setValue("Sale_Mode", nextMode, {
+                      shouldDirty: true,
+                      shouldValidate: true
+                    });
+                  }}
+                >
+                  {/* Credit */}
+                  <span
+                    style={{
+                      color: "#4CA1AF",
+                      fontWeight: 600,
+                      fontSize: 14
+                    }}
+                  >
+                    Credit
+                  </span>
+
+                  {/* Toggle */}
+                  <div
+                    style={{
+                      width: 52,
+                      height: 28,
+                      borderRadius: 50,
+                      background: "#4CA1AF",
+                      position: "relative",
+                      cursor: "pointer",
+                      transition: "all .35s ease",
+                      boxShadow: "0 0 8px rgba(76,161,175,.35)"
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 3,
+                        left: saleMode === "Credit" ? 27 : 3,
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        transition: "all .35s ease",
+                        boxShadow: "0 3px 8px rgba(0,0,0,.25)"
+                      }}
+                    />
+                  </div>
+
+                  {/* Cash */}
+                  <span
+                    style={{
+                      color: "#4CA1AF",
+                      fontWeight: 600,
+                      fontSize: 14
+                    }}
+                  >
+                    Cash
+                  </span>
                 </div>
               </div>
               {/* <p className="text-gray-500 mb-2 sm:mb-4">

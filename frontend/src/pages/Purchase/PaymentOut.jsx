@@ -242,7 +242,7 @@ export default function PaymentOut() {
                                 className="text-white px-4 py-2 rounded-md sm:hidden"
                                 onClick={() => setModal({ open: true, mode: "add", data: null })}
                             >
-                                Add Payment Out
+                                + Add Payment Out
                             </button>
                         </div>
 
@@ -327,7 +327,7 @@ export default function PaymentOut() {
                                     //   onClick={() => navigate("/paymentOut/add")}
                                     onClick={() => setModal({ open: true, mode: "add", data: null })}
                                 >
-                                    Add  Payment Out
+                                    + Add  Payment Out
                                 </button>
                             </div>
                         </div>

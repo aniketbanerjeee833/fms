@@ -250,7 +250,8 @@ const addItem = async (req, res, next) => {
     const primaryUnit = Primary_Unit || null;
 
     const secondaryUnit = Secondary_Unit || null;
-    const itemUnit = Item_Unit || primaryUnit || null;
+    const itemUnit = Item_Unit ?? primaryUnit ?? "";
+    // const itemUnit = Item_Unit || primaryUnit || null;
 
     const conversionRate = secondaryUnit
       ? Conversion_Rate ?? null

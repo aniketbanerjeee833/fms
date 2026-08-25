@@ -542,7 +542,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
         </div>
 
         {/* search bar — right side, persisted as ?txnSearch= */}
-        <div className="flex justify-end">
+        <div className="flex justify-start sm:justify-end">
 
           <div
             className="relative"
@@ -584,7 +584,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
         </div>
 
       </div>
-      <div className="flex justify-end gap-2 mr-2">
+      <div className="flex justify-end sm: mt-4 gap-2 mr-2">
         <button
           type="button"
           onClick={handleExportPartyReportExcel}
@@ -614,6 +614,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       </div>
 
       {/* ── LEDGER TABLE ── */}
+     
       <div className="table-responsive table-desi">
         <table className="w-full min-w-[500px]">
           <thead>
@@ -830,6 +831,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           </div>
         )}
       </div>
+     
 
       {/* ── MODALS ── */}
       {modalState.open && modalState.type === "Payment_In" && (

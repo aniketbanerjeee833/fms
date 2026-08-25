@@ -698,7 +698,7 @@ export default function BankAccounts() {
             {/* Add Bank button — wire to your modal */}
             <button
               type="button"
-              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              className="text-white px-4 py-2 rounded-md text-white"
               style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
               onClick={() => setBankModal({ open: true, mode: "add", data: null })}
             >

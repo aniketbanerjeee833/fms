@@ -446,7 +446,7 @@ export default function ExpensesByItems() {
                     from: location.pathname,
                   },
                 })}
-              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              className="text-white px-4 py-2 rounded-md"
               style={{
                 backgroundColor: "#4CA1AF",
                 outline: "none",
@@ -682,7 +682,7 @@ export default function ExpensesByItems() {
             <div className="flex flex-col h-full">
 
               {/* ── ITEM SUMMARY CARD ── */}
-              {selectedItem && (
+              {/* {selectedItem && (
                 <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div
@@ -722,6 +722,89 @@ export default function ExpensesByItems() {
                       </p>
                     </div>
                   </div>
+                </div>
+              )} */}
+              {selectedItem && (
+                <div className="rounded-xl p-2 mb-2">
+
+                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+
+    {/* Item Name */}
+    <div className="flex items-center gap-3 min-w-0">
+        <div
+            className="flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{
+                width: 44,
+                height: 44,
+                backgroundColor: "#4CA1AF22"
+            }}
+        >
+            <Package
+                size={22}
+                style={{ color: "#4CA1AF" }}
+            />
+        </div>
+
+        <div className="min-w-0">
+            <h6
+                className="font-bold text-gray-900 break-words"
+                style={{
+                    fontSize: 18,
+                    margin: 0
+                }}
+            >
+                {selectedItem?.name}
+            </h6>
+
+            <p className="text-gray-500 text-sm mt-0.5">
+                Expense Item
+            </p>
+        </div>
+    </div>
+
+    {/* Total + Balance */}
+    <div className="flex items-center gap-6 text-right shrink-0">
+
+        {/* Total */}
+        <div>
+            <p className="text-xs uppercase text-gray-400 mb-1">
+                Total
+            </p>
+
+            <p
+                className="font-bold"
+                style={{
+                    color: "#4CA1AF",
+                    fontSize: 18
+                }}
+            >
+                ₹ {(selectedItem?.total ?? 0).toLocaleString()}
+            </p>
+        </div>
+
+        {/* Balance */}
+        <div>
+            <p className="text-xs uppercase text-gray-400 mb-1">
+                Balance
+            </p>
+
+            <p
+                className="font-bold"
+                style={{
+                    color:
+                        (selectedItem?.balance ?? 0) > 0
+                            ? "#dc2626"
+                            : "#16a34a",
+                    fontSize: 18
+                }}
+            >
+                ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
+            </p>
+        </div>
+
+    </div>
+
+</div>
                 </div>
               )}
 

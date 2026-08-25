@@ -215,7 +215,7 @@ export default function AllPurchaseList() {
                 className="text-white px-4 py-2 rounded-md sm:hidden"
                 onClick={() => navigate("/purchase/add")}
               >
-                Add Purchase
+                + Add Purchase
               </button>
             </div>
 
@@ -299,7 +299,7 @@ export default function AllPurchaseList() {
                   className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
                   onClick={() => navigate("/purchase/add")}
                 >
-                  Add  Purchase
+                  + Add  Purchase
                 </button>
               </div>
             </div>

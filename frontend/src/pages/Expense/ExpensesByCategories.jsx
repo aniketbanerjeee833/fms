@@ -359,7 +359,7 @@ export default function ExpensesByCategories() {
                   state: { from: location.pathname },
                 })
               }
-              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              className="text-white px-4 py-2 rounded-md"
               style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
             >
               + Add Expense
@@ -533,7 +533,7 @@ export default function ExpensesByCategories() {
             <div className="flex flex-col h-full">
 
               {/* ── CATEGORY SUMMARY CARD ── */}
-              <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div
                     className="flex items-center justify-center rounded-xl"
@@ -570,7 +570,85 @@ export default function ExpensesByCategories() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> */}
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+
+    {/* Category Name */}
+    <div className="flex items-center gap-3 min-w-0">
+        <div
+            className="flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{
+                width: 44,
+                height: 44,
+                backgroundColor: "#4CA1AF22"
+            }}
+        >
+            <Receipt
+                size={22}
+                style={{ color: "#4CA1AF" }}
+            />
+        </div>
+
+        <div className="min-w-0">
+            <h6
+                className="font-bold text-gray-900 break-words"
+                style={{
+                    fontSize: 18,
+                    margin: 0
+                }}
+            >
+                {selectedCategory?.name}
+            </h6>
+
+            <p className="text-gray-500 text-sm mt-0.5">
+                {selectedCategory?.type}
+            </p>
+        </div>
+    </div>
+
+    {/* Total + Balance */}
+    <div className="flex items-center gap-6 text-right shrink-0">
+
+        {/* Total */}
+        <div>
+            <p className="text-xs uppercase text-gray-400 mb-1">
+                Total
+            </p>
+
+            <p
+                className="font-bold"
+                style={{
+                    color: "#4CA1AF",
+                    fontSize: 18
+                }}
+            >
+                ₹ {(selectedCategory?.total ?? 0).toLocaleString()}
+            </p>
+        </div>
+
+        {/* Balance */}
+        <div>
+            <p className="text-xs uppercase text-gray-400 mb-1">
+                Balance
+            </p>
+
+            <p
+                className="font-bold"
+                style={{
+                    color:
+                        (selectedCategory?.balance ?? 0) > 0
+                            ? "#dc2626"
+                            : "#16a34a",
+                    fontSize: 18
+                }}
+            >
+                ₹ {(selectedCategory?.balance ?? 0).toLocaleString()}
+            </p>
+        </div>
+
+    </div>
+
+</div>
 
               {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
               <div

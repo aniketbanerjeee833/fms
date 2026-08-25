@@ -195,33 +195,39 @@ export default function AddItemModal({ onClose, onSave, defaultItemType = "Produ
                         </div>
                     </div> */}
                     {/* ── Product / Service toggle ── */}
-                    <style>{`
+ <style>{`
   .item-toggle {
     position: relative;
-    width: 44px; height: 24px;
-    background: #d1d5db;
+    width: 44px;
+    height: 24px;
+    background: #4CA1AF;
     border-radius: 999px;
     cursor: pointer;
     transition: background 0.2s;
     flex-shrink: 0;
   }
-  .item-toggle.on { background: #4CA1AF; }
+
   .item-toggle::after {
     content: "";
     position: absolute;
-    top: 3px; left: 3px;
-    width: 18px; height: 18px;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
     background: white;
     border-radius: 50%;
     transition: transform 0.2s;
     box-shadow: 0 1px 3px rgba(0,0,0,.15);
   }
-  .item-toggle.on::after { transform: translateX(20px); }
+
+  .item-toggle.on::after {
+    transform: translateX(20px);
+  }
 `}</style>
 
                     <div className="flex items-center gap-3 mb-4">
                         {/* <span className="text-sm font-medium text-gray-700">Item Type</span> */}
-                        <span className={`text-sm ${itemType === "Product" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
+                        {/* <span className={`text-sm ${itemType === "Product" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
                             Product
                         </span>
                         <div
@@ -235,6 +241,32 @@ export default function AddItemModal({ onClose, onSave, defaultItemType = "Produ
                             }}
                         />
                         <span className={`text-sm ${itemType === "Service" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
+                            Service
+                        </span> */}
+                        <span className="text-sm font-medium" style={{ color: "#4CA1AF" }}>
+                            Product
+                        </span>
+
+                        <div
+                            className={`item-toggle ${itemType === "Service" ? "on" : ""}`}
+                            onClick={() => {
+                                const next =
+                                    itemType === "Product"
+                                        ? "Service"
+                                        : "Product";
+
+                                setValue("Item_Type", next, {
+                                    shouldValidate: true,
+                                    shouldDirty: true
+                                });
+
+                                if (next === "Service" && activeTab === "Stock") {
+                                    setActiveTab("Items");
+                                }
+                            }}
+                        />
+
+                        <span className="text-sm font-medium" style={{ color: "#4CA1AF" }}>
                             Service
                         </span>
                     </div>

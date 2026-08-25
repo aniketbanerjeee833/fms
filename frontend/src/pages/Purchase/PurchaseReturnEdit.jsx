@@ -700,7 +700,7 @@ const handleDeleteRow = (i) => {
         const discount =
           item.Discount_Type_On_Purchase_Price === "Percentage"
             ? (subtotal * discountRaw) / 100
-            : discountRaw;
+            : discountRaw * qty;
 
         acc.totalQty += qty;
         acc.totalDiscount += discount;

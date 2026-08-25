@@ -199,9 +199,9 @@ export default function ItemsByItem() {
 
 
 
-    const selectedItemMeta =items.find(
-            (it) => String(it.Item_Id) === String(selectedItemId)
-        ) || null;
+    const selectedItemMeta = items.find(
+        (it) => String(it.Item_Id) === String(selectedItemId)
+    ) || null;
     useEffect(() => {
         if (!items.length || selectedItemId) return;
 
@@ -636,10 +636,11 @@ export default function ItemsByItem() {
                         <button
                             type="button"
                             onClick={() => setShowAddItemModal(true)}
-                            className="w-full sm:w-auto text-white px-4 py-2 rounded-md text-sm font-medium"
+                            className="sm:w-auto text-white px-4 py-2 rounded-md"
                             style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
                         >
                             + Add {itemTypeTab === "Service" ? "Service" : "Item"}
+
                         </button>
                     </div>
                 </div>
@@ -860,7 +861,7 @@ export default function ItemsByItem() {
                             {selectedItemMeta && (
                                 <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
 
-                                    <div className="flex items-center justify-between gap-4 min-w-0">
+                                    {/* <div className="flex items-center justify-between gap-4 min-w-0">
 
                                         <div className="flex items-center gap-4 flex-1 min-w-0">
 
@@ -895,9 +896,7 @@ export default function ItemsByItem() {
                                                         selectedItemMeta.Item_Name}
                                                 </h6>
 
-                                                {/* <p className="text-gray-600 text-sm mt-0.5">
-                                                    {selectedItemMeta.Item_Category || "N/A"}
-                                                </p> */}
+                                               
                                                 {selectedItemMeta.Item_Category &&
                                                     selectedItemMeta.Item_Category.trim() !== "" && (
                                                         <p className="text-gray-600 text-sm mt-0.5">
@@ -923,25 +922,177 @@ export default function ItemsByItem() {
                                             + Adjust Item
                                         </button>)}
 
-                                    </div>
+                                    </div> */}
+                                    <div className="grid grid-cols-[1fr_auto] items-start gap-3 min-w-0">
 
-                                    <div className="flex items-center justify-between">
 
-                                        {/* <div>
-                                            <p className="text-xs  mb-0.5" style={{ fontSize: 13, color: "#4CA1AF" }}>
-                                                SALE PRICE: ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta.Sale_Price)}
-                                            </p>
-                                            {!isService && (
-                                                <p className="text-xs " style={{ fontSize: 13, color: "#4CA1AF" }}>
-                                                    PURCHASE PRICE: ₹{" "}
-                                                    {fmt(
-                                                        liveItem?.Purchase_Price ??
-                                                        selectedItemMeta.Purchase_Price
+                                        <div className="flex items-center gap-4 min-w-0">
+
+                                            <div
+                                                className="flex items-center justify-center rounded-xl flex-shrink-0"
+                                                style={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    backgroundColor: "#4CA1AF22"
+                                                }}
+                                            >
+                                                <Package
+                                                    size={22}
+                                                    style={{ color: "#4CA1AF" }}
+                                                />
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <h6
+                                                    className="font-bold text-black break-words whitespace-normal"
+                                                    style={{
+                                                        fontSize: 15,
+                                                        margin: 0
+                                                    }}
+                                                >
+                                                    {liveItem?.Item_Name ||
+                                                        selectedItemMeta.Item_Name}
+                                                </h6>
+
+                                                {selectedItemMeta.Item_Category &&
+                                                    selectedItemMeta.Item_Category.trim() !== "" && (
+                                                        <p className="text-gray-600 text-sm mt-0.5">
+                                                            {selectedItemMeta.Item_Category}
+                                                        </p>
                                                     )}
+                                            </div>
+
+                                        </div>
+
+
+                                        {itemTypeTab === "Product" && (
+                                            <button
+                                                type="button"
+                                                onClick={handleAdjustItem}
+                                                className="text-white px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap"
+                                                style={{
+                                                    backgroundColor: "#4CA1AF",
+                                                    outline: "none",
+                                                    boxShadow: "none"
+                                                }}
+                                            >
+                                                + Adjust Item
+                                            </button>
+                                        )}
+
+                                    </div>
+                                    <div className="
+                                                grid grid-cols-2 gap-x-4 gap-y-3 mt-3
+                                                sm:flex sm:items-center sm:justify-between
+                                                ">
+
+                                        {/* Sale + Purchase Price */}
+                                        <div className="contents sm:block">
+                                            <div>
+                                                <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
+                                                    SALE PRICE:{" "}
+                                                    <span style={{ color: "#4CA1AF" }}>
+                                                        ₹ {fmt(
+                                                            liveItem?.Sale_Price ??
+                                                            selectedItemMeta.Sale_Price
+                                                        )}
+                                                    </span>
                                                 </p>
+                                            </div>
+
+                                            {!isService && (
+                                                <div>
+                                                    <p className="text-xs" style={{ fontSize: 13 }}>
+                                                        PURCHASE PRICE:{" "}
+                                                        <span style={{ color: "#4CA1AF" }}>
+                                                            ₹ {fmt(
+                                                                liveItem?.Purchase_Price ??
+                                                                selectedItemMeta.Purchase_Price
+                                                            )}
+                                                        </span>
+                                                    </p>
+                                                </div>
                                             )}
-                                           
-                                        </div> */}
+                                        </div>
+
+                                        {/* Stock */}
+                                        
+                                        {!isService && (
+                                            <div className="col-span-1 sm:col-span-1 text-left">
+                                                <p className="text-xs uppercase text-black mb-1">
+                                                    Stock
+                                                </p>
+
+                                                <p
+                                                    className="font-bold"
+                                                    style={{
+                                                        color:
+                                                            (liveItem?.Stock_Quantity ??
+                                                                selectedItemMeta.Stock_Quantity) < 0
+                                                                ? "#dc2626"
+                                                                : "#4CA1AF",
+                                                        fontSize: 15
+                                                    }}
+                                                >
+                                                    {liveItem?.Stock_Quantity ??
+                                                        selectedItemMeta.Stock_Quantity}{" "}
+                                                    {selectedItemMeta.Primary_Unit ||
+                                                        selectedItemMeta.Item_Unit ||
+                                                        ""}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Search */}
+                                        <div
+                                            className="
+                                                col-span-1 relative w-full sm:col-span-1 sm:w-[220px] sm:max-w-[220px]"
+                                            style={{ height: 56 }}
+                                        >
+                                            <Search
+                                                size={14}
+                                                style={{
+                                                    position: "absolute",
+                                                    left: 10,
+                                                    top: 15,
+                                                    color: "#94a3b8",
+                                                    pointerEvents: "none"
+                                                }}
+                                            />
+
+                                            <input
+                                                type="text"
+                                                value={txnSearch}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+
+                                                    const next = new URLSearchParams(searchParams);
+
+                                                    if (value) {
+                                                        next.set("txnSearch", value);
+                                                    } else {
+                                                        next.delete("txnSearch");
+                                                    }
+
+                                                    setSearchParams(next, {
+                                                        replace: true
+                                                    });
+                                                }}
+                                                placeholder="Search"
+                                                className="w-full h-full border rounded-md text-sm outline-none"
+                                                style={{
+                                                    paddingLeft: 34,
+                                                    paddingRight: 10,
+                                                    borderColor: "#000000",
+                                                    boxSizing: "border-box",
+                                                    marginTop: "0px"
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    {/* <div className="flex items-center justify-between">
+
+                                       
                                         <div>
                                             <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
                                                 SALE PRICE:{" "}
@@ -1045,7 +1196,7 @@ export default function ItemsByItem() {
 
                                         </div>
 
-                                    </div>
+                                    </div> */}
 
                                 </div>
                             )}

@@ -20,7 +20,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
   onRefreshTab }) {
   const dropdownRef = useRef(null);
   const dispatch = useDispatch()
-    console.log("editingItem", editingItem);
+  console.log("editingItem", editingItem);
 
   const {
     register,
@@ -35,7 +35,7 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
     resolver: zodResolver(itemFormSchema)
 
   })
-const toLocalDateString = (dateString) => {
+  const toLocalDateString = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
     const year = date.getFullYear();
@@ -108,7 +108,7 @@ const toLocalDateString = (dateString) => {
       // As_Of_Date:
       //   itemDetails.As_Of_Date ??
       //   new Date().toISOString().slice(0, 10),
-         As_Of_Date:toLocalDateString(itemDetails.As_Of_Date),
+      As_Of_Date: toLocalDateString(itemDetails.As_Of_Date),
       Min_Stock: itemDetails.Min_Stock ?? "",
       Location: itemDetails.Location ?? "",
     });
@@ -196,7 +196,7 @@ const toLocalDateString = (dateString) => {
   console.log(formValues, "formValues")
   console.log(errors)
   const onSubmit = async () => {
-     console.log("editingItem", editingItem);
+    console.log("editingItem", editingItem);
     if (!editingItem) return;
     const payload = {
       ...formValues,
@@ -210,7 +210,7 @@ const toLocalDateString = (dateString) => {
       payload.Location = null;
     }
 
-  console.log("EDIT ITEM PAYLOAD:", payload);
+    console.log("EDIT ITEM PAYLOAD:", payload);
     const oldType = itemDetails.Item_Type;
     const newType = payload.Item_Type;
 
@@ -348,34 +348,39 @@ const toLocalDateString = (dateString) => {
             </div>
 
           </div> */}
-           {/* // .item-toggle.disabled { cursor: not-allowed; opacity: 0.5; } */}
+          {/* // .item-toggle.disabled { cursor: not-allowed; opacity: 0.5; } */}
           <style>{`
   .item-toggle {
     position: relative;
-    width: 44px; height: 24px;
-    background: #d1d5db;
+    width: 44px;
+    height: 24px;
+    background: #4CA1AF;
     border-radius: 999px;
     cursor: pointer;
     transition: background 0.2s;
     flex-shrink: 0;
   }
-  .item-toggle.on { background: #4CA1AF; }
- 
+
   .item-toggle::after {
     content: "";
     position: absolute;
-    top: 3px; left: 3px;
-    width: 18px; height: 18px;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
     background: white;
     border-radius: 50%;
     transition: transform 0.2s;
     box-shadow: 0 1px 3px rgba(0,0,0,.15);
   }
-  .item-toggle.on::after { transform: translateX(20px); }
+
+  .item-toggle.on::after {
+    transform: translateX(20px);
+  }
 `}</style>
 
           <div className="flex items-center gap-3 mb-2">
-            <span className={`text-sm ${itemType === "Product" ? "font-medium text-gray-700" : "text-gray-400"}`}>
+            {/* <span className={`text-sm ${itemType === "Product" ? "font-medium text-gray-700" : "text-gray-400"}`}>
               Product
             </span>
             <div
@@ -384,11 +389,7 @@ const toLocalDateString = (dateString) => {
               
               `}
               onClick={() => {
-                // ${itemDetails?.Stock_Quantity ? "disabled" : ""}
-                // lock the toggle once the item already has stock history — switching
-                // Product ↔ Service after transactions exist would make past
-                // quantity/stock data meaningless
-                //if (itemDetails?.Stock_Quantity) return;
+              
 
                 const next = itemType === "Product" ? "Service" : "Product";
                 setValue("Item_Type", next, { shouldValidate: true, shouldDirty: true });
@@ -398,6 +399,39 @@ const toLocalDateString = (dateString) => {
               }}
             />
             <span className={`text-sm ${itemType === "Service" ? "font-medium text-gray-700" : "font-medium text-gray-700"}`}>
+              Service
+            </span> */}
+            <span
+              className="text-sm font-medium"
+              style={{ color: "#4CA1AF" }}
+            >
+              Product
+            </span>
+
+            <div
+              className={`item-toggle ${itemType === "Service" ? "on" : ""
+                }`}
+              onClick={() => {
+                const next =
+                  itemType === "Product"
+                    ? "Service"
+                    : "Product";
+
+                setValue("Item_Type", next, {
+                  shouldValidate: true,
+                  shouldDirty: true
+                });
+
+                if (next === "Service" && activeTab === "Stock") {
+                  setActiveTab("Items");
+                }
+              }}
+            />
+
+            <span
+              className="text-sm font-medium"
+              style={{ color: "#4CA1AF" }}
+            >
               Service
             </span>
           </div>

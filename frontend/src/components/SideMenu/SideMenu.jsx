@@ -236,7 +236,7 @@ if (
         }}
       >
         <ul
-        className="collapsible"
+        //className="collapsible"
           // className="collapsible"
           style={{
             height: "100%",
@@ -344,3 +344,194 @@ if (
 export default SideMenu;
 
 
+// import { useState } from "react";
+// import { NavLink, useLocation } from "react-router-dom";
+// import {
+//   DollarSign, ShoppingBag, Wallet, CalendarDays,
+//   Settings, ClipboardMinus, ChevronDown, LayoutDashboard,
+//   ShoppingCart,
+// } from "lucide-react";
+
+// export default function Sidebar() {
+//   const location = useLocation();
+//   const [openMenu, setOpenMenu] = useState(null);
+
+//   const ACCENT = "#4CA1AF";
+//   const BG_DARK = "#111827";
+//   const BG_HOVER = "#1f2937";
+//   const TEXT_MUTED = "#9ca3af";
+
+//   // 🔹 auto-open the group containing the current route on load
+//   const isGroupActive = (items) => items.some((i) => location.pathname.startsWith(i.to));
+
+//   const renderMenu = (title, icon, items) => {
+//     const isOpen = openMenu === title || (openMenu === null && isGroupActive(items));
+//     const active = isGroupActive(items);
+
+//     return (
+//       <div style={{ marginBottom: 2 }}>
+//         <button
+//           onClick={() => setOpenMenu(isOpen ? "__none__" : title)}
+//           style={{
+//             width: "100%",
+//             display: "flex",
+//             alignItems: "center",
+//             justifyContent: "space-between",
+//             padding: "10px 14px",
+//             background: "transparent",
+//             border: "none",
+//             cursor: "pointer",
+//             borderRadius: 10,
+//             color: active ? "#fff" : TEXT_MUTED,
+//             fontWeight: 600,
+//             fontSize: 13.5,
+//           }}
+//           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = BG_HOVER)}
+//           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+//         >
+//           <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+//             <span style={{ color: active ? ACCENT : TEXT_MUTED, display: "flex" }}>{icon}</span>
+//             {title}
+//           </span>
+//           <ChevronDown
+//             size={15}
+//             style={{
+//               transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+//               transition: "transform 0.2s ease",
+//               color: TEXT_MUTED,
+//             }}
+//           />
+//         </button>
+
+//         <div
+//           style={{
+//             maxHeight: isOpen ? items.length * 40 + 8 : 0,
+//             overflow: "hidden",
+//             transition: "max-height 0.25s ease",
+//           }}
+//         >
+//           <div style={{ paddingLeft: 20, paddingTop: 4, paddingBottom: 4, borderLeft: `2px solid #1f2937`, marginLeft: 24 }}>
+//             {items.map((item) => (
+//               <NavLink
+//                 key={item.to}
+//                 to={item.to}
+//                 onClick={() => setOpenMenu(null)}
+//                 style={({ isActive }) => ({
+//                   display: "block",
+//                   padding: "8px 14px",
+//                   borderRadius: 8,
+//                   fontSize: 13,
+//                   textDecoration: "none",
+//                   color: isActive ? "#fff" : TEXT_MUTED,
+//                   backgroundColor: isActive ? ACCENT : "transparent",
+//                   fontWeight: isActive ? 600 : 400,
+//                   marginBottom: 2,
+//                   transition: "background-color 0.15s, color 0.15s",
+//                 })}
+//                 onMouseEnter={(e) => {
+//                   if (!location.pathname.startsWith(item.to)) e.currentTarget.style.backgroundColor = BG_HOVER;
+//                 }}
+//                 onMouseLeave={(e) => {
+//                   if (!location.pathname.startsWith(item.to)) e.currentTarget.style.backgroundColor = "transparent";
+//                 }}
+//               >
+//                 {item.text.trim()}
+//               </NavLink>
+//             ))}
+//           </div>
+//         </div>
+//       </div>
+//     );
+//   };
+
+//   return (
+//     // <aside
+//     //   style={{
+//     //     width: 250,
+//     //     height: "100vh",
+//     //     position: "sticky",
+//     //     top: 0,
+//     //     backgroundColor: BG_DARK,
+//     //     display: "flex",
+//     //     flexDirection: "column",
+//     //     borderRight: "1px solid #1f2937",
+//     //   }}
+//     // >
+//           <div
+//         className="sb2-13"
+//         style={{
+//           height: "100%",
+//           backgroundColor: BG_DARK,
+//           display: "flex",
+//           flexDirection: "column",
+         
+//         }}
+//       >
+//       {/* Brand header */}
+//       {/* <div style={{ padding: "20px 16px", borderBottom: "1px solid #1f2937" }}>
+//         <span style={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>
+//           ANCO<span style={{ color: ACCENT }}>Books</span>
+//         </span>
+//       </div> */}
+
+//       {/* Scrollable nav */}
+//       <div style={{ flex: 1, overflowY: "auto", padding: "12px 8px" }}>
+//         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+//             <NavLink
+//     to="/home"
+//     onClick={() => setOpenMenu(null)}
+//     style={({ isActive }) => ({
+//       display: "flex",
+//       alignItems: "center",
+//       gap: 10,
+//       padding: "10px 14px",
+//       borderRadius: 10,
+//       textDecoration: "none",
+//       fontSize: 13.5,
+//       fontWeight: isActive ? 600 : 500,
+//       color: isActive ? "#fff" : "#9ca3af",
+//       backgroundColor: isActive ? "#4CA1AF" : "transparent",
+//       marginBottom: 4,
+//     })}
+//   >
+//     <LayoutDashboard size={19} />
+//     Dashboard
+//   </NavLink>
+//                 {renderMenu("Purchase", <ShoppingCart size={20} />, [
+           
+//             //{ to: "/purchase/add", text: "Add Purchase" },
+//              { to: "/purchase/all-purchases", text: "  Purchase Bills " },
+//               { to: "/purchase/return", text: "Purchase Return" },
+//             { to: "/purchase/payment-out", text: "Payment Out" },
+           
+//           ])}
+//           {renderMenu("Sales", <DollarSign size={19} />, [
+//             { to: "/sale/all-sales", text: "Sale Invoices" },
+//             { to: "/sale/invoice", text: "Invoice" },
+//             { to: "/sale/return", text: "Sale Return" },
+//             { to: "/sale/payment-in", text: "Payment In" },
+//           ])}
+
+//           {renderMenu("Cash and Bank", <Wallet size={19} />, [
+//             { to: "/cash-bank/cash-in-hand", text: "Cash In Hand" },
+//             { to: "/cash-bank/bank-accounts", text: "Bank Accounts" },
+//           ])}
+
+//           {renderMenu("Expense", <CalendarDays size={19} />, [
+//             { to: "/expense/categories", text: "Categories" },
+//             { to: "/expense/items", text: "Items" },
+//           ])}
+
+//           {/* {renderMenu("Reports", <ClipboardMinus size={19} />, [
+//             { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
+//             { to: "/reports/balance-sheet", text: "Balance Sheet" },
+//           ])} */}
+
+//           {renderMenu("Settings", <Settings size={19} />, [
+//             { to: "/financial-year/add", text: "Financial Year" },
+//           ])}
+//         </ul>
+//       </div>
+//     </div>
+//   );
+// }

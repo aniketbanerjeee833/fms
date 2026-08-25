@@ -189,7 +189,7 @@ useEffect(() => {
                 className="text-white px-4 py-2 rounded-md sm:hidden"
                 onClick={() => navigate("/sale/add")}
               >
-                Add Sale
+                + Add Sale
               </button>
             </div>
 
@@ -270,7 +270,7 @@ useEffect(() => {
                   className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
                   onClick={() => navigate("/sale/add")}
                 >
-                  Add Sale
+                  + Add Sale
                 </button>
               </div>
             </div>

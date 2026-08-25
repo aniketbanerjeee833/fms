@@ -164,7 +164,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
         const res = await updateParty({ Party_Id: partyDetails.Party_Id, body: data }).unwrap();
         if (!res?.success) { toast.error("Failed to update party"); return; }
         toast.success("Party updated successfully!");
-        dispatch(partyApi.util.invalidateTags(["Party","PartyLedger"]));
+        dispatch(partyApi.util.invalidateTags(["Party", "PartyLedger"]));
         onSave?.(res);      // ⭐ ADD THIS
         onClose();
 
@@ -173,7 +173,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
         console.log("addParty res", res);
         if (!res?.success) { toast.error("Failed to add party"); return; }
         toast.success("Party added successfully!");
-         dispatch(partyApi.util.invalidateTags(["Party","PartyLedger"]));
+        dispatch(partyApi.util.invalidateTags(["Party", "PartyLedger"]));
         //onSave(res?.Party_Name);
         onSave(res);
       }
@@ -181,12 +181,12 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
       dispatch(saleApi.util.invalidateTags(["Sale"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
     } catch (err) {
       toast.error(err?.data?.message || err?.message || "Something went wrong");
     }
@@ -339,7 +339,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                     </button>
                   </div>
 
-                  {addressFields.map((field, i) => {
+                  {/* {addressFields.map((field, i) => {
                     if (field.Address_Type !== "Billing") return null;
                     const isDefault = defaultBillingIdx === i;
                     return (
@@ -362,16 +362,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                           {...register(`addresses.${i}.Address_Text`)}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        {/* <textarea rows={2} placeholder="Billing Address"
-                          style={{  flex: 1, border: "none", background: "transparent", outline: "none",
-                             fontSize: 13,minHeight: "44px" }}
-                          {...register(`addresses.${i}.Address_Text`)}
-                          onClick={(e) => e.stopPropagation()}
-                          onInput={(e) => {
-                            e.currentTarget.style.height = "auto";
-                            e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`;
-                          }}
-                        /> */}
+                       
                         {addressFields.filter((f) => f.Address_Type === "Billing").length > 1 && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); removeAddress(i); }}
                             style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}>✕</button>
@@ -381,7 +372,82 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                         )}
                       </div>
                     );
-                  })}
+                  })} */}
+                  <div className="max-h-64 overflow-y-auto pr-1">
+                    {addressFields.map((field, i) => {
+                      if (field.Address_Type !== "Billing") return null;
+
+                      const isDefault = defaultBillingIdx === i;
+
+                      return (
+                        <div
+                          key={field.id}
+                          onClick={() => handleDefaultBilling(i)}
+                          className="flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all mb-2"
+                          style={{
+                            borderColor: isDefault ? ACCENT : "#e5e7eb",
+                            backgroundColor: isDefault ? "#eaf6f7" : "white"
+                          }}
+                        >
+                          <div
+                            className="flex-shrink-0 rounded-full"
+                            style={{
+                              width: 10,
+                              height: 10,
+                              backgroundColor: isDefault ? ACCENT : "#d1d5db",
+                              marginTop: 6
+                            }}
+                          />
+
+                          <textarea
+                            rows={3}
+                            placeholder="Billing Address"
+                            className="flex-1 min-h-[70px] resize-y"
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              outline: "none",
+                              fontSize: 13
+                            }}
+                            {...register(`addresses.${i}.Address_Text`)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+
+                          {addressFields.filter(
+                            (f) => f.Address_Type === "Billing"
+                          ).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeAddress(i);
+                                }}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#ef4444",
+                                  cursor: "pointer"
+                                }}
+                              >
+                                ✕
+                              </button>
+                            )}
+
+                          {isDefault && (
+                            <span
+                              className="text-xs font-medium flex-shrink-0"
+                              style={{
+                                color: ACCENT,
+                                marginTop: 4
+                              }}
+                            >
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* col 3 — Shipping Addresses */}
@@ -395,29 +461,81 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                     </button>
                   </div>
 
-                  {addressFields.map((field, i) => {
-                    if (field.Address_Type !== "Shipping") return null;
-                    const isDefault = defaultShippingIdx === i;
-                    return (
-                      <div key={field.id}
-                        onClick={() => handleDefaultShipping(i)}
-                        className="flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all"
-                        style={{ borderColor: isDefault ? ACCENT : "#e5e7eb", backgroundColor: isDefault ? "#eaf6f7" : "white" }}>
-                        <div className="flex-shrink-0 rounded-full"
-                          style={{ width: 10, height: 10, backgroundColor: isDefault ? ACCENT : "#d1d5db", marginTop: 6 }} />
-                        <textarea rows={2} placeholder="Shipping Address"
-                          style={{ resize: "none", flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13 }}
-                          {...register(`addresses.${i}.Address_Text`)}
-                          onClick={(e) => e.stopPropagation()} />
-                        <button type="button"
-                          onClick={(e) => { e.stopPropagation(); removeAddress(i); }}
-                          style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "2px 4px", flexShrink: 0 }}>✕</button>
-                        {isDefault && (
-                          <span className="text-xs font-medium flex-shrink-0" style={{ color: ACCENT, marginTop: 4 }}>Default</span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  <div className="max-h-64 overflow-y-auto pr-1">
+                    {addressFields.map((field, i) => {
+                      if (field.Address_Type !== "Shipping") return null;
+
+                      const isDefault = defaultShippingIdx === i;
+
+                      return (
+                        <div
+                          key={field.id}
+                          onClick={() => handleDefaultShipping(i)}
+                          className="flex items-start gap-2 p-2 rounded-md border cursor-pointer transition-all mb-2"
+                          style={{
+                            borderColor: isDefault ? ACCENT : "#e5e7eb",
+                            backgroundColor: isDefault ? "#eaf6f7" : "white"
+                          }}
+                        >
+                          <div
+                            className="flex-shrink-0 rounded-full"
+                            style={{
+                              width: 10,
+                              height: 10,
+                              backgroundColor: isDefault ? ACCENT : "#d1d5db",
+                              marginTop: 6
+                            }}
+                          />
+
+                          <textarea
+                            rows={3}
+                            placeholder="Shipping Address"
+                            className="flex-1 min-h-[70px] resize-y"
+                            style={{
+                              
+                              
+                              border: "none",
+                              background: "transparent",
+                              outline: "none",
+                              fontSize: 13
+                            }}
+                            {...register(`addresses.${i}.Address_Text`)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeAddress(i);
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ef4444",
+                              cursor: "pointer",
+                              padding: "2px 4px",
+                              flexShrink: 0
+                            }}
+                          >
+                            ✕
+                          </button>
+
+                          {isDefault && (
+                            <span
+                              className="text-xs font-medium flex-shrink-0"
+                              style={{
+                                color: ACCENT,
+                                marginTop: 4
+                              }}
+                            >
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}

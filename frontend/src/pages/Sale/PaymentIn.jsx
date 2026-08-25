@@ -236,7 +236,7 @@ export default function PaymentIn() {
                                 className="text-white px-4 py-2 rounded-md sm:hidden"
                                 onClick={() => setModal({ open: true, mode: "add", data: null })}
                             >
-                                Add Payment In
+                                + Add Payment In
                             </button>
                         </div>
 
@@ -317,7 +317,7 @@ export default function PaymentIn() {
                                     className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
                                     onClick={() => setModal({ open: true, mode: "add", data: null })}
                                 >
-                                    Add  Payment In
+                                    + Add  Payment In
                                 </button>
                             </div>
                         </div>
