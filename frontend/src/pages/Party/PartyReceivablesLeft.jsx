@@ -191,9 +191,9 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
     skip: printTarget.type !== "Payment_Out" || !printTarget.id,
   })
-    const { data: printExpenseData } = useGetExpenseByIdQuery(printTarget.id, {
-      skip: printTarget.type !== "Expense" || !printTarget.id,
-    });
+  const { data: printExpenseData } = useGetExpenseByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Expense" || !printTarget.id,
+  });
   const printReady =
     (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
     (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
@@ -337,7 +337,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
   const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
   const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
-   const [deleteExpense, { isLoading: isDeletingExpense }] = useDeleteExpenseMutation();
+  const [deleteExpense, { isLoading: isDeletingExpense }] = useDeleteExpenseMutation();
   const isDeleting =
     isDeletingSale ||
     isDeletingPurchase ||
@@ -346,92 +346,92 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     isDeletingPaymentIn ||
     isDeletingPaymentOut ||
     isDeletingExpense;
- const handleConfirmDelete = async () => {
-     if (!deleteTarget) return;
- 
-     try {
-       let res;
- 
-       switch (deleteTarget.Txn_Type) {
-         case "Sale":
-           res = await deleteSale(deleteTarget.Id).unwrap();
-           break;
- 
-         case "Purchase":
-           res = await deletePurchase(
-             deleteTarget.Id
-           ).unwrap();
-           break;
- 
-         case "Expense":
-           res = await deleteExpense({
-             id: deleteTarget.Id,
-           }).unwrap();
-           break;
- 
-         case "Sale_Return":
-           res = await deleteSaleReturn(deleteTarget.Id).unwrap();
-           break;
- 
-         case "Purchase_Return":
-           res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
-           break;
- 
-         case "Payment_In":
-           res = await deletePaymentIn(deleteTarget.Id).unwrap();
-           break;
- 
-         case "Payment_Out":
-           res = await deletePaymentOut(deleteTarget.Id).unwrap();
-           break;
- 
-         default:
-           toast.error(
-             "Unknown transaction type — cannot delete"
-           );
-           return;
-       }
- 
-       toast.success(res?.message || "Deleted successfully");
- 
-       setDeleteTarget(null);
- 
-       dispatch(
-         partyApi.util.invalidateTags([
-           "Party",
-           "PartyLedger"
-         ])
-       );
-       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-       dispatch(
-         bankAccountApi.util.invalidateTags(["BankAccount"])
-       )
-       dispatch(saleApi.util.invalidateTags(["Sale"]));
-       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-       dispatch(
-         itemApi.util.invalidateTags([
-           "Item",
-           "ItemLedger",
-         ])
-       );
-     } catch (err) {
- 
-       console.error(
-         "❌ Delete error:",
-         err
-       );
- 
-       toast.error(
-         err?.data?.message ||
-         "Failed to delete"
-       );
-       setDeleteTarget(null);
- 
-       // IMPORTANT:
-       // Don't close modal here.
-       // User should see the error and can close it manually.
-     }
-   };
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      let res;
+
+      switch (deleteTarget.Txn_Type) {
+        case "Sale":
+          res = await deleteSale(deleteTarget.Id).unwrap();
+          break;
+
+        case "Purchase":
+          res = await deletePurchase(
+            deleteTarget.Id
+          ).unwrap();
+          break;
+
+        case "Expense":
+          res = await deleteExpense({
+            id: deleteTarget.Id,
+          }).unwrap();
+          break;
+
+        case "Sale_Return":
+          res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+          break;
+
+        case "Purchase_Return":
+          res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+          break;
+
+        case "Payment_In":
+          res = await deletePaymentIn(deleteTarget.Id).unwrap();
+          break;
+
+        case "Payment_Out":
+          res = await deletePaymentOut(deleteTarget.Id).unwrap();
+          break;
+
+        default:
+          toast.error(
+            "Unknown transaction type — cannot delete"
+          );
+          return;
+      }
+
+      toast.success(res?.message || "Deleted successfully");
+
+      setDeleteTarget(null);
+
+      dispatch(
+        partyApi.util.invalidateTags([
+          "Party",
+          "PartyLedger"
+        ])
+      );
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(
+        bankAccountApi.util.invalidateTags(["BankAccount"])
+      )
+      dispatch(saleApi.util.invalidateTags(["Sale"]));
+      dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+      dispatch(
+        itemApi.util.invalidateTags([
+          "Item",
+          "ItemLedger",
+        ])
+      );
+    } catch (err) {
+
+      console.error(
+        "❌ Delete error:",
+        err
+      );
+
+      toast.error(
+        err?.data?.message ||
+        "Failed to delete"
+      );
+      setDeleteTarget(null);
+
+      // IMPORTANT:
+      // Don't close modal here.
+      // User should see the error and can close it manually.
+    }
+  };
   const handleBulkPrint = useReactToPrint({
     contentRef: bulkPartyPrintRef,
     documentTitle: `Party-Report`,
@@ -649,33 +649,82 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
               ledger.map((row, idx) => {
                 const meta = PARTY_TYPE_META[row.Txn_Type] ?? { label: row.Txn_Type, color: "#6b7280" };
                 const refId =
-                 row.Sale_Id || row.Purchase_Id || row.Expense_Id ||
+                  row.Sale_Id || row.Purchase_Id || row.Expense_Id ||
                   row.Sale_Return_Id || row.Purchase_Return_Id ||
                   row.Payment_In_Id || row.Payment_Out_Id;
 
                 const transactionId = row.Formatted_Reference_Id || refId;
                 const menuId = `${row.Txn_Type}-${transactionId || idx}`;
-
+                const isHighlighted = String(searchParams.get("highlightTxn")) === String(transactionId);
                 return (
+                  // <tr
+                  //   key={`${row.Txn_Type}-${refId}-${idx}`}
+                  //   onDoubleClick={() => {
+                  //     if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+                  //       openModal(row.Txn_Type, transactionId);
+                  //       return;
+                  //     }
+                  //     const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+                  //     if (route) {
+                  //       navigate(
+                  //         {
+                  //           pathname: `/${route}/edit/${transactionId}`,
+                  //           search: searchParams.toString(),
+                  //         },
+                  //         { state: { from: "party-receivables", partyId } }
+                  //       );
+                  //     }
+                  //   }}
+                  //   style={{ cursor: "pointer" }}
+                  // >
                   <tr
                     key={`${row.Txn_Type}-${refId}-${idx}`}
+
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("highlightTxn", transactionId);
+
+                      setSearchParams(params, { replace: true });
+                    }}
+
                     onDoubleClick={() => {
                       if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+
+                        setSearchParams(params, { replace: true });
+
                         openModal(row.Txn_Type, transactionId);
                         return;
                       }
+
                       const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
                       if (route) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+
                         navigate(
                           {
                             pathname: `/${route}/edit/${transactionId}`,
-                            search: searchParams.toString(),
+                            search: params.toString(),
                           },
-                          { state: { from: "party-receivables", partyId } }
+                          {
+                            state: {
+                              from: "party-receivables",
+                              partyId,
+                            },
+                          }
                         );
                       }
                     }}
-                    style={{ cursor: "pointer" }}
+
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor: isHighlighted
+                        ? "#4CA1AF22"
+                        : "transparent",
+                    }}
                   >
                     <td>{idx + 1}.</td>
                     <td>
@@ -754,8 +803,18 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               style={{ color: "#374151" }}
                               onClick={() => {
                                 setRowMenuOpen(null);
+
+                                const params = new URLSearchParams(searchParams);
+                                params.set("highlightTxn", transactionId);
+
+                                setSearchParams(params, { replace: true });
+
                                 openModal(row.Txn_Type, transactionId);
                               }}
+                            // onClick={() => {
+                            //   setRowMenuOpen(null);
+                            //   openModal(row.Txn_Type, transactionId);
+                            // }}
                             >
                               <Eye size={13} style={{ color: "#4CA1AF" }} />
                               View / Edit
@@ -764,9 +823,13 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                             <NavLink
                               to={{
                                 pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
-                                search: searchParams.toString(),
+                                search: (() => {
+                                  const params = new URLSearchParams(searchParams);
+                                  params.set("highlightTxn", transactionId);
+                                  return params.toString();
+                                })(),
                               }}
-                               state={{
+                              state={{
                                 from: "party-receivables",
                                 partyId,
                               }}
@@ -898,12 +961,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         )}
-          {printTarget.type === "Expense" && printExpenseData?.expense && (
-                  <ExpensePrintTemplate
-                    ref={printRef}
-                    expense={printExpenseData.expense}
-                  />
-                )}
+        {printTarget.type === "Expense" && printExpenseData?.expense && (
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        )}
 
         {/* SALE RETURN — Credit Note */}
         {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (

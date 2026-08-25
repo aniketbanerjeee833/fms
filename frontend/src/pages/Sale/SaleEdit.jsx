@@ -142,7 +142,7 @@ export default function SaleEdit() {
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   const [showModal, setShowModal] = useState(false);
-   const [isRoundOff, setIsRoundOff] = useState(false);
+  const [isRoundOff, setIsRoundOff] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
 
@@ -170,7 +170,7 @@ export default function SaleEdit() {
       Invoice_Date: "",
       State_Of_Supply: "",
       Total_Amount: "",
-      Round_Off: "",   
+      Round_Off: "",
       Balance_Due: "",
       Total_Received: "",
       Terms_Conditions_Id: null,
@@ -278,7 +278,7 @@ export default function SaleEdit() {
     name: "splits",
   });
 
-const handleAddCategory = async () => {
+  const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {
       return
@@ -315,13 +315,13 @@ const handleAddCategory = async () => {
       }
     }
   };
-  
+
 
   // const handleDeleteRow = (i) => {
   //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
   //   remove(i); // remove from form
   // };
- 
+
   const itemsValues = watch("items");   // watch all item rows
   const totalReceived = watch("Total_Received"); // watch Total_Received
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
@@ -388,7 +388,7 @@ const handleAddCategory = async () => {
       setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
     }
   };
-const handleAddRow = () => {
+  const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
       ...prev.map((row) => ({
@@ -453,29 +453,29 @@ const handleAddRow = () => {
     }
   };
 
-//  const handleDeleteRow = (i) => {
-//     // 1. get current items BEFORE removal
-//     const currentItems = watch("items");
+  //  const handleDeleteRow = (i) => {
+  //     // 1. get current items BEFORE removal
+  //     const currentItems = watch("items");
 
-//     // 2. calculate new total excluding the deleted row
-//     const newTotal = currentItems.reduce((sum, row, idx) => {
-//       if (idx === i) return sum;                    // skip deleted row
-//       return sum + parseFloat(row.Amount || 0);
-//     }, 0);
+  //     // 2. calculate new total excluding the deleted row
+  //     const newTotal = currentItems.reduce((sum, row, idx) => {
+  //       if (idx === i) return sum;                    // skip deleted row
+  //       return sum + parseFloat(row.Amount || 0);
+  //     }, 0);
 
-//     const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
-//     const newBalanceDue = newTotal - currentTotalReceived;
+  //     const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+  //     const newBalanceDue = newTotal - currentTotalReceived;
 
-//     // 3. remove from UI state and form
-//     setRows((prev) => prev.filter((_, idx) => idx !== i));
-//     remove(i);
+  //     // 3. remove from UI state and form
+  //     setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //     remove(i);
 
-//     // 4. update totals
-//     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-//     setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-//   };
+  //     // 4. update totals
+  //     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+  //     setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  //   };
 
-  
+
   const handleItemSelect = (it, i) => {
     console.log("Selected Item:", it, "at row", i);
     setRows((prev) => {
@@ -791,7 +791,7 @@ const handleAddRow = () => {
 
   }, [salePartyName, parties?.parties]);
 
-   const calculateTotals = (items = []) => {
+  const calculateTotals = (items = []) => {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
@@ -1146,26 +1146,54 @@ const handleAddRow = () => {
           search: location.search,
         });
       }
-
       else if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
+
+        //params.set("itemId", Item_Id);
+
         navigate({
           pathname: "/items/all-items",
-          search: `?itemId=${Item_Id}`,
+          search: location.search,
         });
       }
+      // else if (from === "items-by-item") {
+      //   navigate({
+      //     pathname: "/items/all-items",
+      //     search: `?itemId=${Item_Id}`,
+      //   });
+      // }
 
+      // else if (from === "bank-accounts") {
+      //   navigate({
+      //     pathname: "/cash-bank/bank-accounts",
+      //     search: `?bankId=${bankId}`,
+      //   });
+      // }
       else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
         navigate({
-          pathname: "/cash-bank/bank-accounts",
-          search: `?bankId=${bankId}`,
+          pathname: `/cash-bank/bank-accounts`,
+          search: location.search,
         });
       }
 
+      // else if (from === "cash-in-hand") {
+      //   navigate({
+      //     pathname: "/cash-bank/cash-in-hand",
+      //   });
+      // }
       else if (from === "cash-in-hand") {
         navigate({
           pathname: "/cash-bank/cash-in-hand",
+          search: location.search,
         });
       }
+      // else if (from === "cash-in-hand") {
+      //   navigate({
+      //     pathname: "/cash-bank/cash-in-hand",
+      //     search: location.search,
+      //   });
+      // }
 
       else {
         navigate({
@@ -1266,16 +1294,33 @@ const handleAddRow = () => {
 
                   }
                   else if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
+
+                    //params.set("itemId", Item_Id);
+
                     navigate({
                       pathname: "/items/all-items",
-                      search: `?itemId=${Item_Id}`,
+                      search: location.search,
                     });
                   }
+                  // else if (from === "items-by-item") {
+                  //   navigate({
+                  //     pathname: "/items/all-items",
+                  //     search: `?itemId=${Item_Id}`,
+                  //   });
+                  // }
+                  // else if (from === "bank-accounts") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/bank-accounts`,
+                  //     search: `?bankId=${bankId}`,
+                  //   });
+                  // }
                   else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
                       pathname: `/cash-bank/bank-accounts`,
-                      search: `?bankId=${bankId}`,
+                      search: location.search,
                     });
                   }
                   else if (from === "party-details") {
@@ -1286,13 +1331,25 @@ const handleAddRow = () => {
                       // search: `?partyId=${partyId}`,
                     });
                   }
-                  else if (from === "cash-in-hand") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
-                    navigate({
-                      pathname: `/cash-bank/cash-in-hand`,
+                  // else if (from === "cash-in-hand") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/cash-in-hand`,
 
+                  //   });
+                  // }
+                  else if (from === "cash-in-hand") {
+                    navigate({
+                      pathname: "/cash-bank/cash-in-hand",
+                      search: location.search,
                     });
                   }
+                  // else if (from === "cash-in-hand") {
+                  //   navigate({
+                  //     pathname: "/cash-bank/cash-in-hand",
+                  //     search: location.search,
+                  //   });
+                  // }
                   else if (from === "item-sales-purchases-details") {
                     navigate({
                       pathname: `/item/item-sales-purchases-details/${Item_Id}`,
@@ -1541,7 +1598,7 @@ const handleAddRow = () => {
                       )}
                     </div>
 
-                 
+
                     {showPartyModal && (
                       <PartyAddModal
                         onClose={() => setShowPartyModal(false)}
@@ -1720,7 +1777,7 @@ const handleAddRow = () => {
 
                     </div>
                   )} */}
-                   {currentPartyDetails?.Party_Name !== "Cash Sale" && (
+                  {currentPartyDetails?.Party_Name !== "Cash Sale" && (
                     <div>
                       {/* Billing Address */}
                       <div className="flex flex-col gap-2">
@@ -2343,7 +2400,7 @@ const handleAddRow = () => {
                                       <tr
                                         key={idx}
                                         onClick={() => {
-                                          if (it.Stock_Quantity <= 0 &&  it.Item_Type!=="Service") {
+                                          if (it.Stock_Quantity <= 0 && it.Item_Type !== "Service") {
                                             // show confirmation modal instead of directly adding
                                             setConfirmModal({ open: true, item: it, rowIndex: i });
                                             return;
@@ -2421,7 +2478,7 @@ const handleAddRow = () => {
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
                                         </td> */}
-                                         <td className="px-3 py-2 text-gray-600">
+                                        <td className="px-3 py-2 text-gray-600">
                                           {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
                                         </td>
 
@@ -3176,9 +3233,9 @@ const handleAddRow = () => {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount);
                               setValue(`items.${i}.Amount`, Amount);
-                                // setValue("Total_Amount", Total_Amount);
-                                // setValue("Balance_Due", Balance_Due);
-                                syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount);
+                              // setValue("Balance_Due", Balance_Due);
+                              syncTotalsAfterItemChange();
                             }}
 
 
@@ -3200,7 +3257,7 @@ const handleAddRow = () => {
                             className="form-control"
                             style={{ width: "50%", marginBottom: "0px" }}
                             {...register(`items.${i}.Discount_On_Sale_Price`)}
-                            
+
                             onInput={(e) => {
                               let val = e.target.value;
 

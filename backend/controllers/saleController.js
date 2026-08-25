@@ -1151,13 +1151,13 @@ const getAllSales = async (req, res, next) => {
     }
 
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
+    //ORDER BY s.created_at DESC
     const [rows] = await connection.query(
       `SELECT s.*, a.Party_Name
        FROM add_sale s
        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
        ${whereSQL}
-       ORDER BY s.created_at DESC
+       ORDER BY s.Invoice_Date DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );

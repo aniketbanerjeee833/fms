@@ -132,13 +132,13 @@ export default function SaleReturndEdit() {
   const [showBankModal, setShowBankModal] = useState(false);;
   //console.log(latestInvoiceNumber,"latestInvoiceNumber");
 
- 
+
 
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
   // const [newUnitKey, setNewUnitKey] = useState("");
   // const [newUnitName, setNewUnitName] = useState("");
-   const [isRoundOff, setIsRoundOff]= useState(false)
+  const [isRoundOff, setIsRoundOff] = useState(false)
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   console.log(itemUnits, "itemUnits");
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
@@ -354,7 +354,7 @@ export default function SaleReturndEdit() {
       Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
- const getRawTotal = () => {
+  const getRawTotal = () => {
     return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
   };
 
@@ -440,43 +440,43 @@ export default function SaleReturndEdit() {
   //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
   // };
 
-const handleDeleteRow = (i) => {
-  // 1. get current items BEFORE removal
-  const currentItems = watch("items");
+  const handleDeleteRow = (i) => {
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
 
-  // 2. calculate new raw total excluding the deleted row
-  const newRawTotal = currentItems.reduce((sum, row, idx) => {
-    if (idx === i) return sum;
-    return sum + parseFloat(row.Amount || 0);
-  }, 0);
+    // 2. calculate new raw total excluding the deleted row
+    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
 
-  const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
 
-  // 3. remove from UI state and form
-  setRows((prev) => prev.filter((_, idx) => idx !== i));
-  remove(i);
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
 
-  // 4. update totals — respecting Round Off if active
-  if (isRoundOff) {
-    const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-    const newTotal = newRawTotal + currentRoundOff;
-    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-  } else {
-    setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-  }
+    // 4. update totals — respecting Round Off if active
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      const newTotal = newRawTotal + currentRoundOff;
+      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
 
-  // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
-  // if (isTotalPaid) {
-  //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
-  //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-  //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
-  //   if ((watch("splits") || []).length === 1) {
-  //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-  //   }
-  // }
-};
+    // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
+    // if (isTotalPaid) {
+    //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
+    //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
+    //   if ((watch("splits") || []).length === 1) {
+    //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    //   }
+    // }
+  };
   const formValues = watch();
 
 
@@ -652,7 +652,7 @@ const handleDeleteRow = (i) => {
         Amount: item.Amount || "",
       }));
       setRows(prefilledRows)
-        const roundOffFromDb = Number(sale.saleReturn?.Round_Off) || 0;
+      const roundOffFromDb = Number(sale.saleReturn?.Round_Off) || 0;
 
       //  checkbox reflects whether a real round-off was applied
       setIsRoundOff(roundOffFromDb !== 0);
@@ -711,7 +711,7 @@ const handleDeleteRow = (i) => {
       setShowGSTIN(sale.GSTIN ? String(sale.GSTIN) : "");
     }
   }, [sale]);
-    const calculateTotals = (items = []) => {
+  const calculateTotals = (items = []) => {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
@@ -807,12 +807,12 @@ const handleDeleteRow = (i) => {
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-       if (splitsWatch.length > 1) {
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+    if (splitsWatch.length > 1) {
+      setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 
@@ -952,12 +952,12 @@ const handleDeleteRow = (i) => {
 
 
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         cashInHandApi.util.invalidateTags([
@@ -988,12 +988,22 @@ const handleDeleteRow = (i) => {
       // =======================================================
       // 8. NAVIGATION
       // =======================================================
-      if (from === "items-by-item") {
-        navigate({
-          pathname: "/items/all-items",
-          search: `?itemId=${Item_Id}`,
-        });
-      }
+      // if (from === "items-by-item") {
+      //   navigate({
+      //     pathname: "/items/all-items",
+      //     search: `?itemId=${Item_Id}`,
+      //   });
+      // }
+           if (from === "items-by-item") {
+  //const params = new URLSearchParams(location.search);
+
+  //params.set("itemId", Item_Id);
+
+  navigate({
+    pathname: "/items/all-items",
+    search: location.search,
+  });
+}
       else if (from === "all-sale-return-list") {
         navigate({
           pathname: "/sale/return",
@@ -1014,12 +1024,17 @@ const handleDeleteRow = (i) => {
           search: `?bankId=${bankId}`,
         });
       }
-
       else if (from === "cash-in-hand") {
         navigate({
           pathname: "/cash-bank/cash-in-hand",
+          search: location.search,
         });
       }
+      // else if (from === "cash-in-hand") {
+      //   navigate({
+      //     pathname: "/cash-bank/cash-in-hand",
+      //   });
+      // }
 
       else {
         navigate({
@@ -1096,12 +1111,22 @@ const handleDeleteRow = (i) => {
               <button
                 type="button"
                 onClick={() => {
-                  if (from === "items-by-item") {
-                    navigate({
-                      pathname: "/items/all-items",
-                      search: `?itemId=${Item_Id}`,
-                    });
-                  }
+                       if (from === "items-by-item") {
+  //const params = new URLSearchParams(location.search);
+
+  //params.set("itemId", Item_Id);
+
+  navigate({
+    pathname: "/items/all-items",
+    search: location.search,
+  });
+}
+                  // if (from === "items-by-item") {
+                  //   navigate({
+                  //     pathname: "/items/all-items",
+                  //     search: `?itemId=${Item_Id}`,
+                  //   });
+                  // }
                   else if (from === "party-receivables") {
                     navigate({
                       pathname: `/party/receivables`,
@@ -1139,12 +1164,18 @@ const handleDeleteRow = (i) => {
                     });
                   }
                   else if (from === "cash-in-hand") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
-                      pathname: `/cash-bank/cash-in-hand`,
-
+                      pathname: "/cash-bank/cash-in-hand",
+                      search: location.search,
                     });
                   }
+                  // else if (from === "cash-in-hand") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/cash-in-hand`,
+
+                  //   });
+                  // }
                   else {
                     navigate({
                       pathname: "/sale/return",
@@ -1916,7 +1947,7 @@ const handleDeleteRow = (i) => {
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
                                         </td> */}
-                                         <td className="px-3 py-2 text-gray-600">
+                                        <td className="px-3 py-2 text-gray-600">
                                           {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
                                         </td>
 
@@ -2371,27 +2402,27 @@ const handleDeleteRow = (i) => {
                                       }}
                                     />
                                     {!hasPrimary && !hasSecondary && (
-                                        <div
-                                          onClick={() => {
-                                            setActiveUnitRow(i);
-                                            setShowAddUnitModal(true);
+                                      <div
+                                        onClick={() => {
+                                          setActiveUnitRow(i);
+                                          setShowAddUnitModal(true);
 
-                                            handleRowChange(i, "unitOpen", false);
-                                            handleRowChange(i, "unitSearch", "");
-                                          }}
-                                          style={{
-                                            padding: "8px 10px",
-                                            borderBottom: "1px solid #e5e7eb",
-                                            cursor: "pointer",
-                                            fontSize: 12,
-                                            fontWeight: 600,
-                                            color: "#4CA1AF",
-                                            background: "#f8fafc",
-                                          }}
-                                        >
-                                          + Add Unit
-                                        </div>
-                                      )}
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+                                        }}
+                                        style={{
+                                          padding: "8px 10px",
+                                          borderBottom: "1px solid #e5e7eb",
+                                          cursor: "pointer",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#4CA1AF",
+                                          background: "#f8fafc",
+                                        }}
+                                      >
+                                        + Add Unit
+                                      </div>
+                                    )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -2844,7 +2875,7 @@ const handleDeleteRow = (i) => {
                     </tr>
                   ))}
                 </tbody>
-                 <tfoot>
+                <tfoot>
                   <tr>
                     <td colSpan={2}></td>
                     <td>Total</td>
@@ -2904,7 +2935,7 @@ const handleDeleteRow = (i) => {
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
 
-                          
+
                           <PaymentTypeSelect
                             value={
                               paymentType === "Bank"
@@ -3144,7 +3175,7 @@ const handleDeleteRow = (i) => {
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div> */}
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"

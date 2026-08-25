@@ -58,7 +58,7 @@ export default function PaymentIn() {
 
     const [triggerPaymentInReport, { data: bulkPaymentInReportData, isFetching: isBulkFetching }] =
         useLazyGetPaymentInPrintReportQuery();
-        console.log(bulkPaymentInReportData);
+    console.log(bulkPaymentInReportData);
     const handlePageChange = (newPage) => {
         setSearchParams({
             page: newPage,
@@ -209,7 +209,7 @@ export default function PaymentIn() {
             handleBulkPrint();
         }
     }, [bulkPaymentInReportData, showPaymentInBulkPrintPreview]);
-    
+
     return (
         <>
             <div className="flex flex-col bg-white">
@@ -375,7 +375,7 @@ export default function PaymentIn() {
 
                     </div>
                     <div className="flex justify-end sm: mt-4 gap-2">
-                        
+
                         <button
                             type="button"
                             onClick={handleExportPaymentInReportExcel}
@@ -426,175 +426,216 @@ export default function PaymentIn() {
                                 </thead>
                                 <tbody>
                                     {paymentInData && paymentInData?.paymentIns?.length > 0 ? (
-                                        paymentInData?.paymentIns?.map((paymentIn, idx) => (
-                                            <tr
-                                                key={paymentIn?.id}
-                                                onDoubleClick={() => {
-                                                    setModal({
-                                                        open: true,
-                                                        mode: "edit",
-                                                        data: paymentIn,
-                                                    });
-                                                }}
-                                                style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
-                                            >
-                                                <td>
-                                                    {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.
-                                                </td>
+                                        paymentInData?.paymentIns?.map((paymentIn, idx) => {
+                                            const isHighlighted = String(searchParams.get("highlightTxn")) === String(paymentIn?.id);
 
-                                                <td>
-                                                    {paymentIn?.Payment_Date
-                                                        ? new Date(paymentIn?.Payment_Date).toLocaleDateString("en-IN", {
-                                                            day: "numeric",
-                                                            month: "numeric",
-                                                            year: "numeric",
-                                                        })
-                                                        : "N/A"}
-                                                </td>
-                                                <td>{paymentIn?.Party_Name || "N/A"}</td>
-                                                <td>
-                                                    {paymentIn?.Payment_Type_Display || "N/A"}
-                                                </td>
+                                            return (
+                                                <tr
+                                                    key={paymentIn?.id}
 
-                                                <td>{paymentIn?.Received || "N/A"}</td>
+                                                    onClick={() => {
+                                                        const params = new URLSearchParams(searchParams);
 
-                                                <td
-                                                    className="py-2 px-2"
+                                                        params.set(
+                                                            "highlightTxn",
+                                                            paymentIn?.id
+                                                        );
+
+                                                        setSearchParams(params, { replace: true });
+                                                    }}
+
+                                                    onDoubleClick={() => {
+                                                        const params = new URLSearchParams(searchParams);
+
+                                                        params.set(
+                                                            "highlightTxn",
+                                                            paymentIn?.id
+                                                        );
+
+                                                        setSearchParams(params, { replace: true });
+
+                                                        setModal({
+                                                            open: true,
+                                                            mode: "edit",
+                                                            data: paymentIn,
+                                                        });
+                                                    }}
+
                                                     style={{
-                                                        position: "relative",
-                                                        width: 50,
-                                                        textAlign: "center"
+                                                        cursor: "pointer",
+                                                        borderBottom: "1px solid #f1f5f9",
+                                                        backgroundColor: isHighlighted
+                                                            ? "#4CA1AF22"
+                                                            : "transparent",
                                                     }}
                                                 >
-                                                    {/* THREE DOT BUTTON */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
+                                                    <td>
+                                                        {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.
+                                                    </td>
 
-                                                            setRowMenuOpen(
-                                                                rowMenuOpen === paymentIn?.id
-                                                                    ? null
-                                                                    : paymentIn?.id
-                                                            );
-                                                        }}
-                                                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                    <td>
+                                                        {paymentIn?.Payment_Date
+                                                            ? new Date(paymentIn?.Payment_Date).toLocaleDateString("en-IN", {
+                                                                day: "numeric",
+                                                                month: "numeric",
+                                                                year: "numeric",
+                                                            })
+                                                            : "N/A"}
+                                                    </td>
+                                                    <td>{paymentIn?.Party_Name || "N/A"}</td>
+                                                    <td>
+                                                        {paymentIn?.Payment_Type_Display || "N/A"}
+                                                    </td>
+
+                                                    <td>{paymentIn?.Received || "N/A"}</td>
+
+                                                    <td
+                                                        className="py-2 px-2"
                                                         style={{
-                                                            backgroundColor: "transparent",
-                                                            border: "none",
-                                                            cursor: "pointer"
+                                                            position: "relative",
+                                                            width: 50,
+                                                            textAlign: "center"
                                                         }}
-                                                        title="More"
                                                     >
-                                                        <MoreVertical
-                                                            size={16}
-                                                            style={{ color: "#374151" }}
-                                                        />
-                                                    </button>
+                                                        {/* THREE DOT BUTTON */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
 
-                                                    {/* THREE DOT MENU */}
-                                                    {rowMenuOpen === paymentIn?.id && (
-                                                        <div
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="absolute bg-white shadow-lg rounded-md"
-                                                            style={{
-                                                                right: 0,
-                                                                top: 32,
-                                                                width: 150,
-                                                                zIndex: 100,
-                                                                border: "1px solid #e2e8f0",
-                                                                overflow: "hidden"
+                                                                setRowMenuOpen(
+                                                                    rowMenuOpen === paymentIn?.id
+                                                                        ? null
+                                                                        : paymentIn?.id
+                                                                );
                                                             }}
+                                                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                            style={{
+                                                                backgroundColor: "transparent",
+                                                                border: "none",
+                                                                cursor: "pointer"
+                                                            }}
+                                                            title="More"
                                                         >
+                                                            <MoreVertical
+                                                                size={16}
+                                                                style={{ color: "#374151" }}
+                                                            />
+                                                        </button>
 
-                                                            {/* VIEW / EDIT */}
-                                                            <button
-                                                                type="button"
-                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                        {/* THREE DOT MENU */}
+                                                        {rowMenuOpen === paymentIn?.id && (
+                                                            <div
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="absolute bg-white shadow-lg rounded-md"
                                                                 style={{
-                                                                    color: "#374151",
-                                                                    backgroundColor: "transparent",
-                                                                    border: "none",
-                                                                    cursor: "pointer"
-                                                                }}
-                                                                onClick={() => {
-                                                                    setRowMenuOpen(null);
-
-                                                                    setModal({
-                                                                        open: true,
-                                                                        mode: "edit",
-                                                                        data: paymentIn,
-                                                                    });
+                                                                    right: 0,
+                                                                    top: 32,
+                                                                    width: 150,
+                                                                    zIndex: 100,
+                                                                    border: "1px solid #e2e8f0",
+                                                                    overflow: "hidden"
                                                                 }}
                                                             >
-                                                                <Eye
-                                                                    size={13}
-                                                                    style={{ color: "#4CA1AF" }}
-                                                                />
 
-                                                                View / Edit
-                                                            </button>
+                                                                {/* VIEW / EDIT */}
+                                                                <button
+                                                                    type="button"
+                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                    style={{
+                                                                        color: "#374151",
+                                                                        backgroundColor: "transparent",
+                                                                        border: "none",
+                                                                        cursor: "pointer"
+                                                                    }}
+                                                                    onClick={() => {
+                                                                        setRowMenuOpen(null);
 
-                                                            {/* PRINT */}
-                                                            <button
-                                                                type="button"
-                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                style={{
-                                                                    color: "#374151",
-                                                                    backgroundColor: "transparent",
-                                                                    border: "none",
-                                                                    cursor: "pointer"
-                                                                }}
-                                                                onClick={() => {
-                                                                    setRowMenuOpen(null);
-                                                                    setPrintPaymentInId(paymentIn?.id)
-                                                                    //handlePrint(purchase);
-                                                                }}
-                                                            // onClick={() => {
-                                                            //     setRowMenuOpen(null);
-                                                            //     handlePrint(paymentIn);
-                                                            // }}
-                                                            >
-                                                                <Printer
-                                                                    size={13}
-                                                                    style={{ color: "#4CA1AF" }}
-                                                                />
+                                                                        const params = new URLSearchParams(searchParams);
 
-                                                                Print
-                                                            </button>
+                                                                        params.set(
+                                                                            "highlightTxn",
+                                                                            paymentIn?.id
+                                                                        );
 
-                                                            {/* DELETE */}
-                                                            <button
-                                                                type="button"
-                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                                                style={{
-                                                                    cursor: "pointer",
-                                                                    color: "#dc2626",
-                                                                    backgroundColor: "transparent",
-                                                                    border: "none"
-                                                                }}
-                                                                onClick={() => {
-                                                                    setRowMenuOpen(null);
+                                                                        setSearchParams(params, { replace: true });
 
-                                                                    setDeleteTarget({
-                                                                        Payment_In_Id: paymentIn?.id,
-                                                                    });
-                                                                }}
-                                                            >
-                                                                <Trash2
-                                                                    size={13}
-                                                                    style={{ color: "#dc2626" }}
-                                                                />
+                                                                        setModal({
+                                                                            open: true,
+                                                                            mode: "edit",
+                                                                            data: paymentIn,
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    <Eye
+                                                                        size={13}
+                                                                        style={{ color: "#4CA1AF" }}
+                                                                    />
 
-                                                                Delete
-                                                            </button>
+                                                                    View / Edit
+                                                                </button>
 
-                                                        </div>
-                                                    )}
-                                                </td>
+                                                                {/* PRINT */}
+                                                                <button
+                                                                    type="button"
+                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                    style={{
+                                                                        color: "#374151",
+                                                                        backgroundColor: "transparent",
+                                                                        border: "none",
+                                                                        cursor: "pointer"
+                                                                    }}
+                                                                    onClick={() => {
+                                                                        setRowMenuOpen(null);
+                                                                        setPrintPaymentInId(paymentIn?.id)
+                                                                        //handlePrint(purchase);
+                                                                    }}
+                                                                // onClick={() => {
+                                                                //     setRowMenuOpen(null);
+                                                                //     handlePrint(paymentIn);
+                                                                // }}
+                                                                >
+                                                                    <Printer
+                                                                        size={13}
+                                                                        style={{ color: "#4CA1AF" }}
+                                                                    />
 
-                                            </tr>
-                                        ))
+                                                                    Print
+                                                                </button>
+
+                                                                {/* DELETE */}
+                                                                <button
+                                                                    type="button"
+                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                    style={{
+                                                                        cursor: "pointer",
+                                                                        color: "#dc2626",
+                                                                        backgroundColor: "transparent",
+                                                                        border: "none"
+                                                                    }}
+                                                                    onClick={() => {
+                                                                        setRowMenuOpen(null);
+
+                                                                        setDeleteTarget({
+                                                                            Payment_In_Id: paymentIn?.id,
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    <Trash2
+                                                                        size={13}
+                                                                        style={{ color: "#dc2626" }}
+                                                                    />
+
+                                                                    Delete
+                                                                </button>
+
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                </tr>
+                                            )
+                                        })
                                     ) : (
                                         <tr>
                                             <td className="mx-auto text-center" colSpan={6}>
@@ -762,16 +803,16 @@ export default function PaymentIn() {
             )}
 
             {bulkPaymentInReportData?.paymentIns?.length > 0 && (
-              <div style={{ display: "none" }}>
-                <PaymentInOutBulkReportPrintTemplate
-                  ref={bulkPaymentInPrintRef}
-                  type="in"
-                  data={bulkPaymentInReportData?.paymentIns || []} 
-                  //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
-                  fromDate={fromDate}
-                  toDate={toDate}
-                />
-              </div>
+                <div style={{ display: "none" }}>
+                    <PaymentInOutBulkReportPrintTemplate
+                        ref={bulkPaymentInPrintRef}
+                        type="in"
+                        data={bulkPaymentInReportData?.paymentIns || []}
+                        //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
+                        fromDate={fromDate}
+                        toDate={toDate}
+                    />
+                </div>
             )}
 
         </>

@@ -157,33 +157,76 @@ export default function CashInHand() {
             toDate,
         });
     };
-
     const handleTransactionEdit = (row) => {
         if (!row?.Formatted_Reference_Id) return;
 
-        // Payment In / Payment Out open their edit modals
+        // Payment In / Payment Out → modal
         if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+            const params = new URLSearchParams(searchParams);
+
+            params.set("highlightTxn", row.id);
+
+            setSearchParams(params, { replace: true });
+
             openModal(
                 row.Txn_Type,
                 row.Formatted_Reference_Id
             );
+
             return;
         }
 
-        // Other transactions open their edit page
+        // Other transactions → edit page
         const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
 
         if (!route) return;
 
+        const params = new URLSearchParams(searchParams);
+
+        // KEEP existing page/search/fromDate/toDate
+        // and only add the highlighted transaction
+        params.set("highlightTxn", row.id);
+
         navigate(
-            `/${route}/edit/${row.Formatted_Reference_Id}`,
+            {
+                pathname: `/${route}/edit/${row.Formatted_Reference_Id}`,
+                search: `?${params.toString()}`,
+            },
             {
                 state: {
-                    from: "cash-in-hand"
-                }
+                    from: "cash-in-hand",
+                    highlightTxn: row.id,
+                },
             }
         );
     };
+
+    // const handleTransactionEdit = (row) => {
+    //     if (!row?.Formatted_Reference_Id) return;
+
+    //     // Payment In / Payment Out open their edit modals
+    //     if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+    //         openModal(
+    //             row.Txn_Type,
+    //             row.Formatted_Reference_Id
+    //         );
+    //         return;
+    //     }
+
+    //     // Other transactions open their edit page
+    //     const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
+    //     if (!route) return;
+
+    //     navigate(
+    //         `/${route}/edit/${row.Formatted_Reference_Id}`,
+    //         {
+    //             state: {
+    //                 from: "cash-in-hand"
+    //             }
+    //         }
+    //     );
+    // };
 
     const handleNextPage = () => {
         setSearchParams({
@@ -505,12 +548,50 @@ export default function CashInHand() {
                                                     color: "#6b7280",
                                                     dir: row.Direction === "Credit" ? "in" : "out",
                                                 };
+                                            const isHighlighted =
+                                                String(searchParams.get("highlightTxn")) ===
+                                                String(row.id);
+                                            //const isHighlighted = String(searchParams.get("highlightTxn")) === String(row.Formatted_Reference_Id);
 
                                             return (
+                                                // <tr
+                                                //     key={idx}
+                                                //     onDoubleClick={() => handleTransactionEdit(row)}
+                                                //     className="cursor-pointer"
+                                                // >
                                                 <tr
                                                     key={idx}
-                                                    onDoubleClick={() => handleTransactionEdit(row)}
+
+                                                    onClick={() => {
+                                                        const params = new URLSearchParams(searchParams);
+
+                                                        params.set(
+                                                            "highlightTxn",
+                                                            row.id
+                                                        );
+
+                                                        setSearchParams(params, { replace: true });
+                                                    }}
+
+                                                    onDoubleClick={() => {
+                                                        const params = new URLSearchParams(searchParams);
+
+                                                        params.set(
+                                                            "highlightTxn",
+                                                            row.id
+                                                        );
+
+                                                        setSearchParams(params, { replace: true });
+
+                                                        handleTransactionEdit(row);
+                                                    }}
+
                                                     className="cursor-pointer"
+                                                    style={{
+                                                        backgroundColor: isHighlighted
+                                                            ? "#4CA1AF22"
+                                                            : "transparent",
+                                                    }}
                                                 >
                                                     <td>
                                                         {(cashInHand?.currentPage - 1) * 10 + (idx + 1)}.
@@ -587,8 +668,25 @@ export default function CashInHand() {
                                                                             type="button"
                                                                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                                                                             style={{ color: "#374151" }}
+                                                                            // onClick={() => {
+                                                                            //     setRowMenuOpen(null);
+                                                                            //     openModal(
+                                                                            //         row.Txn_Type,
+                                                                            //         row.Formatted_Reference_Id
+                                                                            //     );
+                                                                            // }}
                                                                             onClick={() => {
                                                                                 setRowMenuOpen(null);
+
+                                                                                const params = new URLSearchParams(searchParams);
+
+                                                                                params.set(
+                                                                                    "highlightTxn",
+                                                                                    row.id
+                                                                                );
+
+                                                                                setSearchParams(params, { replace: true });
+
                                                                                 openModal(
                                                                                     row.Txn_Type,
                                                                                     row.Formatted_Reference_Id
@@ -603,8 +701,23 @@ export default function CashInHand() {
                                                                         </button>
                                                                     ) : (
                                                                         <NavLink
-                                                                            to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
-                                                                            state={{ from: "cash-in-hand" }}
+                                                                            to={{
+                                                                                pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                                                                                search: (() => {
+                                                                                    const params = new URLSearchParams(searchParams);
+
+                                                                                    params.set(
+                                                                                        "highlightTxn",
+                                                                                        row.id
+                                                                                    );
+
+                                                                                    return `?${params.toString()}`;
+                                                                                })(),
+                                                                            }}
+                                                                            state={{
+                                                                                from: "cash-in-hand",
+                                                                                highlightTxn: row.id,
+                                                                            }}
                                                                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                                                                             style={{
                                                                                 color: "#374151",
@@ -618,6 +731,28 @@ export default function CashInHand() {
                                                                             />
                                                                             View / Edit
                                                                         </NavLink>
+                                                                        // <NavLink
+                                                                        //     to={{
+                                                                        //         pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                                                                        //         search: `?highlightTxn=${encodeURIComponent(row.id)}`,
+                                                                        //     }}
+                                                                        //     state={{
+                                                                        //         from: "cash-in-hand",
+                                                                        //         highlightTxn: row.id,
+                                                                        //     }}
+                                                                        //     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        //     style={{
+                                                                        //         color: "#374151",
+                                                                        //         textDecoration: "none",
+                                                                        //     }}
+                                                                        //     onClick={() => setRowMenuOpen(null)}
+                                                                        // >
+                                                                        //     <Eye
+                                                                        //         size={13}
+                                                                        //         style={{ color: "#4CA1AF" }}
+                                                                        //     />
+                                                                        //     View / Edit
+                                                                        // </NavLink>
                                                                     )
                                                                 )}
 

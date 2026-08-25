@@ -10,6 +10,7 @@ import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { saleApi } from "../../redux/api/saleApi";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { itemApi } from "../../redux/api/itemApi";
+import { Trash2 } from "lucide-react";
 
 const ACCENT = "#4CA1AF";
 
@@ -426,10 +427,15 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                                   background: "none",
                                   border: "none",
                                   color: "#ef4444",
-                                  cursor: "pointer"
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: 4,
                                 }}
+                                title="Delete address"
                               >
-                                ✕
+                                <Trash2 size={12} />
                               </button>
                             )}
 
@@ -492,8 +498,8 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                             placeholder="Shipping Address"
                             className="flex-1 min-h-[70px] resize-y"
                             style={{
-                              
-                              
+
+
                               border: "none",
                               background: "transparent",
                               outline: "none",
@@ -503,23 +509,26 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                             onClick={(e) => e.stopPropagation()}
                           />
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeAddress(i);
-                            }}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "#ef4444",
-                              cursor: "pointer",
-                              padding: "2px 4px",
-                              flexShrink: 0
-                            }}
-                          >
-                            ✕
-                          </button>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeAddress(i);
+                                }}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#ef4444",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: 4,
+                                }}
+                                title="Delete address"
+                              >
+                                <Trash2 size={12} />
+                              </button>
 
                           {isDefault && (
                             <span

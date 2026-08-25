@@ -1,10 +1,10 @@
 
-import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   Eye,
   FileSpreadsheet,
-  LayoutDashboard,
+
   MoreVertical,
   Printer,
   PrinterIcon,
@@ -27,7 +27,7 @@ import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurc
 export default function SaleReturn() {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
+  //const location = useLocation();
   const navigate = useNavigate();
   const page = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || "";
@@ -46,16 +46,16 @@ export default function SaleReturn() {
   const [printSaleReturnId, setPrintSaleReturnId] = useState(null);
   const printRef = useRef(null);
   const [showSaleReturnBulkPrintPreview, setShowSaleReturnBulkPrintPreview] = useState(false);
-   
-    const bulkSaleReturnPrintRef = useRef(null);
+
+  const bulkSaleReturnPrintRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
   const { data: printData } = useGetSaleReturnByIdQuery(printSaleReturnId, {
     skip: !printSaleReturnId,
   });
 
-    const [triggerSaleBulkReport, { data: bulkSaleReturnReportData, isFetching: isBulkFetching }] =
+  const [triggerSaleBulkReport, { data: bulkSaleReturnReportData, isFetching: isBulkFetching }] =
     useLazyGetSaleReturnPrintReportQuery();
-    
+
   useEffect(() => {
     const closeRowMenu = () => {
       setRowMenuOpen(null);
@@ -154,13 +154,13 @@ export default function SaleReturn() {
     documentTitle: `Sales-Return-Report-${fromDate || "all"}-to-${toDate || "all"}`,
     onAfterPrint: () => setShowSaleReturnBulkPrintPreview(false),
   });
-   
+
   /* trigger fetch on button click */
   const handlePrintAllClick = async () => {
     await triggerSaleBulkReport({ search: searchTerm, fromDate, toDate });
     setShowSaleReturnBulkPrintPreview(true);
   };
-   
+
   /* fire print once report data has arrived */
   useEffect(() => {
     if (bulkSaleReturnReportData && showSaleReturnBulkPrintPreview) {
@@ -359,166 +359,241 @@ export default function SaleReturn() {
                 </thead>
                 <tbody>
                   {saleReturns && saleReturns?.saleReturns?.length > 0 ? (
-                    saleReturns?.saleReturns?.map((saleReturn, idx) => (
-                      <tr
-                        key={saleReturn?.id}
-                        onDoubleClick={() => {
-                          navigate(
-                            `/sale/return/edit/${saleReturn?.id}${location.search}`,
-                            {
-                              state: {
-                                from: "all-sale-return-list"
+                    saleReturns?.saleReturns?.map((saleReturn, idx) => {
+                      const isHighlighted = String(searchParams.get("highlightTxn")) === String(saleReturn?.id);
+
+
+                      return (
+                        // <tr
+                        //   key={saleReturn?.id}
+                        //   onDoubleClick={() => {
+                        //     navigate(
+                        //       `/sale/return/edit/${saleReturn?.id}${location.search}`,
+                        //       {
+                        //         state: {
+                        //           from: "all-sale-return-list"
+                        //         }
+                        //       }
+                        //     );
+                        //   }}
+                        //   style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
+                        // >
+                        <tr
+                          key={saleReturn?.id}
+
+                          onClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              saleReturn?.id
+                            );
+
+                            setSearchParams(params, { replace: true });
+                          }}
+
+                          onDoubleClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              saleReturn?.id
+                            );
+
+                            navigate(
+                              `/sale/return/edit/${saleReturn?.id}?${params.toString()}`,
+                              {
+                                state: {
+                                  from: "all-sale-return-list",
+                                },
                               }
-                            }
-                          );
-                        }}
-                        style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
-                      >
-                        <td>
-                          {(saleReturns?.currentPage - 1) * 10 + (idx + 1)}.
-                        </td>
-                        <td >
-                          {saleReturn?.Invoice_Date
-                            ? new Date(saleReturn?.Invoice_Date).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "numeric",
-                              year: "numeric",
-                            })
-                            : "N/A"}
-                        </td>
+                            );
+                          }}
 
-                        <td>{saleReturn?.Party_Name || "N/A"}</td>
-
-                        <td>{saleReturn?.Payment_Type_Display || "N/A"}</td>
-                        <td>₹{saleReturn?.Total_Amount || "N/A"}</td>
-                        <td>₹{saleReturn?.Total_Paid || "N/A"}</td>
-                        <td>₹{saleReturn?.Balance_Due || "N/A"}</td>
-
-                        <td
-                          className="py-2 px-2"
                           style={{
-                            position: "relative",
-                            width: 50,
-                            textAlign: "center"
+                            cursor: "pointer",
+                            borderBottom: "1px solid #f1f5f9",
+                            backgroundColor: isHighlighted
+                              ? "#4CA1AF22"
+                              : "transparent",
                           }}
                         >
-                          {/* THREE DOT BUTTON */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          <td>
+                            {(saleReturns?.currentPage - 1) * 10 + (idx + 1)}.
+                          </td>
+                          <td >
+                            {saleReturn?.Invoice_Date
+                              ? new Date(saleReturn?.Invoice_Date).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "numeric",
+                                year: "numeric",
+                              })
+                              : "N/A"}
+                          </td>
 
-                              setRowMenuOpen(
-                                rowMenuOpen === saleReturn?.id
-                                  ? null
-                                  : saleReturn?.id
-                              );
-                            }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          <td>{saleReturn?.Party_Name || "N/A"}</td>
+
+                          <td>{saleReturn?.Payment_Type_Display || "N/A"}</td>
+                          <td>₹{saleReturn?.Total_Amount || "N/A"}</td>
+                          <td>₹{saleReturn?.Total_Paid || "N/A"}</td>
+                          <td>₹{saleReturn?.Balance_Due || "N/A"}</td>
+
+                          <td
+                            className="py-2 px-2"
                             style={{
-                              backgroundColor: "transparent",
-                              border: "none",
-                              cursor: "pointer"
+                              position: "relative",
+                              width: 50,
+                              textAlign: "center"
                             }}
-                            title="More"
                           >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
+                            {/* THREE DOT BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
 
-                          {/* THREE DOT MENU */}
-                          {rowMenuOpen === saleReturn?.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute bg-white shadow-lg rounded-md"
-                              style={{
-                                right: 0,
-                                top: 32,
-                                width: 150,
-                                zIndex: 100,
-                                border: "1px solid #e2e8f0",
-                                overflow: "hidden"
+                                setRowMenuOpen(
+                                  rowMenuOpen === saleReturn?.id
+                                    ? null
+                                    : saleReturn?.id
+                                );
                               }}
+                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer"
+                              }}
+                              title="More"
                             >
+                              <MoreVertical
+                                size={16}
+                                style={{ color: "#374151" }}
+                              />
+                            </button>
 
-                              {/* VIEW / EDIT */}
-                              <NavLink
-                                to={`/sale/return/edit/${saleReturn?.id}${location.search}`}
-                                state={{
-                                  from: "all-sale-return-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                            {/* THREE DOT MENU */}
+                            {rowMenuOpen === saleReturn?.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute bg-white shadow-lg rounded-md"
                                 style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Eye
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                View / Edit
-                              </NavLink>
-
-                              {/* PRINT */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  backgroundColor: "transparent",
-                                  border: "none",
-                                  cursor: "pointer"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-                                  setPrintSaleReturnId(saleReturn.id);
+                                  right: 0,
+                                  top: 32,
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden"
                                 }}
                               >
-                                <Printer
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
 
-                                Print
-                              </button>
+                                {/* VIEW / EDIT */}
+                                {/* <NavLink
+                                  to={`/sale/return/edit/${saleReturn?.id}${location.search}`}
+                                  state={{
+                                    from: "all-sale-return-list"
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration: "none"
+                                  }}
+                                  onClick={() => setRowMenuOpen(null)}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
 
-                              {/* DELETE */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                style={{
-                                  cursor: "pointer",
-                                  color: "#dc2626",
-                                  backgroundColor: "transparent",
-                                  border: "none"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
+                                  View / Edit
+                                </NavLink> */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/sale/return/edit/${saleReturn?.id}`,
+                                    search: (() => {
+                                      const params = new URLSearchParams(searchParams);
 
-                                  setDeleteTarget({
-                                    Sale_Return_Id: saleReturn?.id
-                                  });
-                                }}
-                              >
-                                <Trash2
-                                  size={13}
-                                  style={{ color: "#dc2626" }}
-                                />
+                                      params.set(
+                                        "highlightTxn",
+                                        saleReturn?.id
+                                      );
 
-                                Delete
-                              </button>
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-sale-return-list",
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration: "none",
+                                  }}
+                                  onClick={() => setRowMenuOpen(null)}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
+                                  View / Edit
+                                </NavLink>
 
-                            </div>
-                          )}
-                        </td>
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    cursor: "pointer"
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+                                    setPrintSaleReturnId(saleReturn.id);
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
 
-                      </tr>
-                    ))
+                                  Print
+                                </button>
+
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                  style={{
+                                    cursor: "pointer",
+                                    color: "#dc2626",
+                                    backgroundColor: "transparent",
+                                    border: "none"
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setDeleteTarget({
+                                      Sale_Return_Id: saleReturn?.id
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{ color: "#dc2626" }}
+                                  />
+
+                                  Delete
+                                </button>
+
+                              </div>
+                            )}
+                          </td>
+
+                        </tr>
+                      )
+                    })
                   ) : (
                     <tr>
                       <td className="mx-auto text-center" colSpan={8}>

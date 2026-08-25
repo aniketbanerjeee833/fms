@@ -1,13 +1,15 @@
 import express from "express";
 const router = express.Router();
 
-import {addParty, editParty, exportSinglePartyDetailsReportToExcel, getAllParties, getAllPartiesCursor, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft,
+import {addParty, deleteParty, editParty, exportSinglePartyDetailsReportToExcel, getAllParties, getAllPartiesCursor, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft,
      getAllPayableParties, getAllReceivableParties, getPartyPrintReport, getSinglePartyDetailsSalesPurchases, printSinglePartyDetailsSalesPurchasesReport} from "../controllers/partyController.js"
 import userAuth from "../middleware/userAuth.js";
 
 
 router.post("/add-party",userAuth,addParty)
 router.patch("/edit-party/:Party_Id",userAuth,editParty)
+router.delete("/delete-party/:Party_Id",userAuth,deleteParty)
+// router.delete("/delete-party-address/:Party_Id/:Address_Id",userAuth,deletePartyAddress);
 router.get("/get-all-parties",userAuth,getAllParties)
 router.get("/cursor",userAuth, getAllPartiesCursor);
 router.get("/export-party-report-excel/:Party_Id",userAuth,exportSinglePartyDetailsReportToExcel);

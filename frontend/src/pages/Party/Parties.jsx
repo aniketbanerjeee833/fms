@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
-import { partyApi, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
+import { partyApi, useDeletePartyMutation, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
 import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -91,7 +91,7 @@ const DELETE_CONFIG = {
     title: "Delete Purchase",
     label: "purchase bill",
   },
-   Expense: {
+  Expense: {
     title: "Delete Expense",
     label: "expense",
   },
@@ -185,10 +185,10 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
     skip: printTarget.type !== "Payment_Out" || !printTarget.id,
   })
-    const { data: printExpenseData } = useGetExpenseByIdQuery(printTarget.id, {
-      skip: printTarget.type !== "Expense" || !printTarget.id,
-    });
- const printReady =
+  const { data: printExpenseData } = useGetExpenseByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Expense" || !printTarget.id,
+  });
+  const printReady =
     (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
     (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
     (printTarget.type === "Expense" && printExpenseData?.expense) ||
@@ -614,7 +614,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       </div>
 
       {/* ── LEDGER TABLE ── */}
-     
+
       <div className="table-responsive table-desi">
         <table className="w-full min-w-[500px]">
           <thead>
@@ -651,27 +651,73 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
                 const transactionId = row.Expense_Id || row.Formatted_Reference_Id || refId;
                 const menuId = `${row.Txn_Type}-${transactionId || idx}`;
-
+                const isHighlighted = String(searchParams.get("highlightTxn")) === String(transactionId);
                 return (
+                  // <tr
+                  //   key={`${row.Txn_Type}-${refId}-${idx}`}
+                  //   onDoubleClick={() => {
+                  //     if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+                  //       openModal(row.Txn_Type, transactionId);
+                  //       return;
+                  //     }
+                  //     const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+                  //     if (route) {
+                  //       navigate(
+                  //         {
+                  //           pathname: `/${route}/edit/${transactionId}`,
+                  //           search: searchParams.toString(),
+                  //         },
+                  //         { state: { from: "party-details", partyId } }
+                  //       );
+                  //     }
+                  //   }}
+                  //   style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
+                  // >
                   <tr
                     key={`${row.Txn_Type}-${refId}-${idx}`}
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("highlightTxn", transactionId);
+                      setSearchParams(params, { replace: true });
+                    }}
                     onDoubleClick={() => {
                       if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+                        setSearchParams(params, { replace: true });
+
                         openModal(row.Txn_Type, transactionId);
                         return;
                       }
+
                       const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
                       if (route) {
                         navigate(
                           {
                             pathname: `/${route}/edit/${transactionId}`,
-                            search: searchParams.toString(),
+                            search: (() => {
+                              const params = new URLSearchParams(searchParams);
+                              params.set("highlightTxn", transactionId);
+                              return params.toString();
+                            })(),
                           },
-                          { state: { from: "party-details", partyId } }
+                          {
+                            state: {
+                              from: "party-details",
+                              partyId,
+                            },
+                          }
                         );
                       }
                     }}
-                    style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
+                    style={{
+                      cursor: "pointer",
+                      borderBottom: "1px solid #f1f5f9",
+                      backgroundColor: isHighlighted
+                        ? "#4CA1AF22"
+                        : "transparent",
+                    }}
                   >
                     <td>{idx + 1}.</td>
                     <td>
@@ -743,7 +789,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                           }}
                         >
                           {/* VIEW / EDIT */}
-                          {MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                          {/* {MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
                             <button
                               type="button"
                               className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -761,6 +807,47 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               to={{
                                 pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
                                 search: searchParams.toString(),
+                              }}
+                              state={{
+                                from: "party-details",
+                                partyId,
+                              }}
+                              className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                              style={{ color: "#374151" }}
+                              onClick={() => setRowMenuOpen(null)}
+                            >
+                              <Eye size={13} style={{ color: "#4CA1AF" }} />
+                              View / Edit
+                            </NavLink>
+                          )} */}
+                          {MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                            <button
+                              type="button"
+                              className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                              style={{ color: "#374151" }}
+                              onClick={() => {
+                                setRowMenuOpen(null);
+
+                                const params = new URLSearchParams(searchParams);
+                                params.set("highlightTxn", transactionId);
+
+                                setSearchParams(params, { replace: true });
+
+                                openModal(row.Txn_Type, transactionId);
+                              }}
+                            >
+                              <Eye size={13} style={{ color: "#4CA1AF" }} />
+                              View / Edit
+                            </button>
+                          ) : (
+                            <NavLink
+                              to={{
+                                pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
+                                search: (() => {
+                                  const params = new URLSearchParams(searchParams);
+                                  params.set("highlightTxn", transactionId);
+                                  return params.toString();
+                                })(),
                               }}
                               state={{
                                 from: "party-details",
@@ -831,7 +918,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           </div>
         )}
       </div>
-     
+
 
       {/* ── MODALS ── */}
       {modalState.open && modalState.type === "Payment_In" && (
@@ -893,12 +980,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         )}
-           {printTarget.type === "Expense" && printExpenseData?.expense && (
-                  <ExpensePrintTemplate
-                    ref={printRef}
-                    expense={printExpenseData.expense}
-                  />
-                )}
+        {printTarget.type === "Expense" && printExpenseData?.expense && (
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        )}
 
         {/* SALE RETURN — Credit Note */}
         {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (
@@ -975,7 +1062,8 @@ export default function Parties() {
   const [selectedPartyDetails, setSelectedPartyDetails] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
-
+  const [deletePartyTarget, setDeletePartyTarget] = useState(null);
+  const [deleteParty, { isLoading: isDeletingParty }] = useDeletePartyMutation();
   // ── LEFT SIDE — cursor-based infinite scroll ──
   const [leftCursor, setLeftCursor] = useState(null);
   const leftSentinelRef = useRef(null);
@@ -1087,7 +1175,37 @@ export default function Parties() {
       document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, []);
+  const handleConfirmDeleteParty = async () => {
+    if (!deletePartyTarget) return;
+    console.log("Deleting party:", deletePartyTarget);
+    try {
+      const res = await deleteParty(deletePartyTarget.Party_Id).unwrap();
 
+      toast.success(res?.message || "Item deleted successfully");
+
+      setDeletePartyTarget(null);
+
+      // if the deleted item was the currently selected one, clear selection
+      // so the auto-select effect picks a new first item
+      if (selectedId === deletePartyTarget.Item_Id) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("partyId");
+        setSearchParams(next, { replace: true });
+      }
+
+      // dispatch(
+      //     itemApi.util.invalidateTags([
+      //         { type: "Item", id: "LIST" },
+      //         { type: "ItemsByCategory", id: "LIST" },
+      //         { type: "ItemLedger", id: "LIST" },
+      //     ])
+      // );
+    } catch (err) {
+      console.error("❌ Delete item error:", err);
+      toast.error(err?.data?.message || "Failed to delete item");
+      setDeletePartyTarget(null);
+    }
+  };
   return (
     <>
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
@@ -1274,9 +1392,14 @@ export default function Parties() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setOpenMenuId(null);
+                                  setDeletePartyTarget({ Party_Id: party.Party_Id, Party_Name: party.Party_Name });
                                 }}
+                                // onClick={() => {
+                                //   setOpenMenuId(null);
+                                // }}
                                 className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
                                 style={{ backgroundColor: "transparent" }}
                               >
@@ -1317,26 +1440,34 @@ export default function Parties() {
           </div>
         </div>
       </div>
-
+      {deletePartyTarget && (
+        <DeleteConfirmModal
+          title="Delete Party"
+          message={`Are you sure you want to delete "${deletePartyTarget.Party_Name}"? This action cannot be undone.`}
+          onClose={() => setDeletePartyTarget(null)}
+          onConfirm={handleConfirmDeleteParty}
+          isDeleting={isDeletingParty}
+        />
+      )}
       {partyModal.open && (
         <PartyAddModal
           partyDetails={partyModal.data || {}}
           editingParty={partyModal.mode === "edit"}
           onClose={() => {
-            
+
             setPartyModal({ open: false, mode: "add", data: null });
           }}
           onSave={(res) => {
-      console.log("Saved party:", res);
+            console.log("Saved party:", res);
 
-      setPartyModal({
-        open: false,
-        mode: "add",
-        data: null,
-      });
+            setPartyModal({
+              open: false,
+              mode: "add",
+              data: null,
+            });
 
-      // optionally refetch party list here
-    }}
+            // optionally refetch party list here
+          }}
         />
       )}
     </>

@@ -115,7 +115,7 @@ export default function PurchaseReturndEdit() {
 
   const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
- 
+
   const [activeItemRow, setActiveItemRow] = useState(null);
   const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   const { data: categories } = useGetAllCategoriesQuery()
@@ -305,7 +305,7 @@ export default function PurchaseReturndEdit() {
 
 
 
-  
+
 
 
   const itemsValues = watch("items");   // watch all item rows
@@ -352,7 +352,7 @@ export default function PurchaseReturndEdit() {
       Balance_Due: (totalAmount - num(totalReceived)).toFixed(2),
     };
   };
- const getRawTotal = () => {
+  const getRawTotal = () => {
     return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
   };
 
@@ -411,7 +411,7 @@ export default function PurchaseReturndEdit() {
       Amount: "",
     });
   };
-;
+  ;
 
   // const handleDeleteRow = (i) => {
   //   // 1. get current items BEFORE removal
@@ -435,7 +435,7 @@ export default function PurchaseReturndEdit() {
   //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
   // };
 
-const handleDeleteRow = (i) => {
+  const handleDeleteRow = (i) => {
     // 1. get current items BEFORE removal
     const currentItems = watch("items");
 
@@ -627,7 +627,7 @@ const handleDeleteRow = (i) => {
       setRows(prefilledRows)
 
 
-       const roundOffFromDb = Number(purchase.purchaseReturn?.Round_Off) || 0;
+      const roundOffFromDb = Number(purchase.purchaseReturn?.Round_Off) || 0;
 
       //  checkbox reflects whether a real round-off was applied
       setIsRoundOff(roundOffFromDb !== 0);
@@ -686,7 +686,7 @@ const handleDeleteRow = (i) => {
       setShowGSTIN(purchase.GSTIN ? String(purchase.GSTIN) : "");
     }
   }, [purchase]);
-    const calculateTotals = (items = []) => {
+  const calculateTotals = (items = []) => {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
@@ -785,12 +785,12 @@ const handleDeleteRow = (i) => {
     //   shouldValidate: false,
     //   shouldDirty: true,
     // });
-       if (splitsWatch.length > 1) {
-    setValue("Total_Received", computedTotalReceived.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
-  }
+    if (splitsWatch.length > 1) {
+      setValue("Total_Received", computedTotalReceived.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalReceived]);
   const onSubmit = async (data) => {
@@ -972,12 +972,12 @@ const handleDeleteRow = (i) => {
 
 
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
 
       dispatch(
         cashInHandApi.util.invalidateTags([
@@ -1011,10 +1011,20 @@ const handleDeleteRow = (i) => {
       // =======================================================
       // 12. NAVIGATION
       // =======================================================
+      // if (from === "items-by-item") {
+      //   navigate({
+      //     pathname: "/items/all-items",
+      //     search: `?itemId=${Item_Id}`,
+      //   });
+      // }
       if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
+
+        //params.set("itemId", Item_Id);
+
         navigate({
           pathname: "/items/all-items",
-          search: `?itemId=${Item_Id}`,
+          search: location.search,
         });
       }
       else if (from === "all-purchase-return-list") {
@@ -1031,18 +1041,25 @@ const handleDeleteRow = (i) => {
         });
       }
 
+      // else if (from === "bank-accounts") {
+      //   navigate({
+      //     pathname: "/cash-bank/bank-accounts",
+      //     search: `?bankId=${bankId}`,
+      //   });
+      // }
       else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
         navigate({
-          pathname: "/cash-bank/bank-accounts",
-          search: `?bankId=${bankId}`,
+          pathname: `/cash-bank/bank-accounts`,
+          search: location.search,
         });
       }
 
-      else if (from === "cash-in-hand") {
-        navigate({
-          pathname: "/cash-bank/cash-in-hand",
-        });
-      }
+      // else if (from === "cash-in-hand") {
+      //   navigate({
+      //     pathname: "/cash-bank/cash-in-hand",
+      //   });
+      // }
 
       else {
         navigate({
@@ -1124,11 +1141,21 @@ const handleDeleteRow = (i) => {
                 type="button"
                 onClick={() => {
                   if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
+
+                    //params.set("itemId", Item_Id);
+
                     navigate({
                       pathname: "/items/all-items",
-                      search: `?itemId=${Item_Id}`,
+                      search: location.search,
                     });
                   }
+                  // if (from === "items-by-item") {
+                  //   navigate({
+                  //     pathname: "/items/all-items",
+                  //     search: `?itemId=${Item_Id}`,
+                  //   });
+                  // }
                   else if (from === "party-receivables") {
                     navigate({
                       pathname: `/party/receivables`,
@@ -1158,20 +1185,34 @@ const handleDeleteRow = (i) => {
                       // search: `?partyId=${partyId}`,
                     });
                   }
-
                   else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
                       pathname: `/cash-bank/bank-accounts`,
-                      search: `?bankId=${bankId}`,
-                    });
-                  } else if (from === "cash-in-hand") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
-                    navigate({
-                      pathname: `/cash-bank/cash-in-hand`,
-
+                      search: location.search,
                     });
                   }
+
+                  // else if (from === "bank-accounts") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/bank-accounts`,
+                  //     search: `?bankId=${bankId}`,
+                  //   });
+                  // }
+                  else if (from === "cash-in-hand") {
+                    navigate({
+                      pathname: "/cash-bank/cash-in-hand",
+                      search: location.search,
+                    });
+                  }
+                  // else if (from === "cash-in-hand") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/cash-in-hand`,
+
+                  //   });
+                  // }
                   else {
                     navigate({
                       pathname: "/purchase/return",
@@ -1467,7 +1508,7 @@ const handleDeleteRow = (i) => {
                     style={{ marginBottom: 0, border: "none", width: "50%" }}
                     className="w-full outline-none  text-gray-900
                           invoice-number-class"
-                    //readOnly
+                  //readOnly
                   />
                   {/* {errors?.Invoice_Number && (
                           <p className="text-red-500 text-xs mt-1">
@@ -1943,7 +1984,7 @@ const handleDeleteRow = (i) => {
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
                                         </td> */}
-                                         <td className="px-3 py-2 text-gray-600">
+                                        <td className="px-3 py-2 text-gray-600">
                                           {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
                                         </td>
 
@@ -2403,28 +2444,28 @@ const handleDeleteRow = (i) => {
 
                                       }}
                                     />
-                                     {!hasPrimary && !hasSecondary && (
-                                        <div
-                                          onClick={() => {
-                                            setActiveUnitRow(i);
-                                            setShowAddUnitModal(true);
+                                    {!hasPrimary && !hasSecondary && (
+                                      <div
+                                        onClick={() => {
+                                          setActiveUnitRow(i);
+                                          setShowAddUnitModal(true);
 
-                                            handleRowChange(i, "unitOpen", false);
-                                            handleRowChange(i, "unitSearch", "");
-                                          }}
-                                          style={{
-                                            padding: "8px 10px",
-                                            borderBottom: "1px solid #e5e7eb",
-                                            cursor: "pointer",
-                                            fontSize: 12,
-                                            fontWeight: 600,
-                                            color: "#4CA1AF",
-                                            background: "#f8fafc",
-                                          }}
-                                        >
-                                          + Add Unit
-                                        </div>
-                                      )}
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+                                        }}
+                                        style={{
+                                          padding: "8px 10px",
+                                          borderBottom: "1px solid #e5e7eb",
+                                          cursor: "pointer",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#4CA1AF",
+                                          background: "#f8fafc",
+                                        }}
+                                      >
+                                        + Add Unit
+                                      </div>
+                                    )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -2876,7 +2917,7 @@ const handleDeleteRow = (i) => {
                     </tr>
                   ))}
                 </tbody>
-                 <tfoot>
+                <tfoot>
                   <tr>
                     <td colSpan={2}></td>
                     <td>Total</td>
@@ -2996,7 +3037,7 @@ const handleDeleteRow = (i) => {
                             type="hidden"
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
-                        
+
                           <PaymentTypeSelect
                             value={
                               paymentType === "Bank"
@@ -3236,7 +3277,7 @@ const handleDeleteRow = (i) => {
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
                       />
                     </div> */}
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"

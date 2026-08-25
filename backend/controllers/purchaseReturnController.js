@@ -130,13 +130,13 @@ const getAllPurchaseReturns = async (req, res, next) => {
     }
 
     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
+//ORDER BY pr.created_at DESC
     const [rows] = await connection.query(
       `SELECT pr.*, a.Party_Name
        FROM purchase_return pr
        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
        ${whereSQL}
-       ORDER BY pr.created_at DESC
+       ORDER BY pr.Bill_Date DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );

@@ -35,7 +35,7 @@ export default function AllSaleList() {
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [deleteSale, { isLoading: isDeleting }] = useDeleteSaleMutation();
   const [printSaleId, setPrintSaleId] = useState(null);
-const [showSaleBulkPrintPreview, setShowSaleBulkPrintPreview] = useState(false);
+  const [showSaleBulkPrintPreview, setShowSaleBulkPrintPreview] = useState(false);
   const printRef = useRef(null);
   const bulkSalePrintRef = useRef(null);
 
@@ -51,7 +51,7 @@ const [showSaleBulkPrintPreview, setShowSaleBulkPrintPreview] = useState(false);
   console.log(sales);
 
   const [triggerSaleBulkReport, { data: bulkSaleReportData, isFetching: isBulkFetching }] =
-  useLazyGetSalesPrintReportQuery();
+    useLazyGetSalesPrintReportQuery();
 
   const navigate = useNavigate();
 
@@ -145,24 +145,24 @@ const [showSaleBulkPrintPreview, setShowSaleBulkPrintPreview] = useState(false);
     }
   }, [printData, printSaleId]);
   console.log(sales?.sales);
-const handleBulkPrint = useReactToPrint({
-  contentRef: bulkSalePrintRef,
-  documentTitle: `Sales-Report-${fromDate || "all"}-to-${toDate || "all"}`,
-  onAfterPrint: () => setShowSaleBulkPrintPreview(false),
-});
- 
-/* trigger fetch on button click */
-const handlePrintAllClick = async () => {
-  await triggerSaleBulkReport({ search: searchTerm, fromDate, toDate });
-  setShowSaleBulkPrintPreview(true);
-};
- 
-/* fire print once report data has arrived */
-useEffect(() => {
-  if (bulkSaleReportData && showSaleBulkPrintPreview) {
-    handleBulkPrint();
-  }
-}, [bulkSaleReportData, showSaleBulkPrintPreview]);
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkSalePrintRef,
+    documentTitle: `Sales-Report-${fromDate || "all"}-to-${toDate || "all"}`,
+    onAfterPrint: () => setShowSaleBulkPrintPreview(false),
+  });
+
+  /* trigger fetch on button click */
+  const handlePrintAllClick = async () => {
+    await triggerSaleBulkReport({ search: searchTerm, fromDate, toDate });
+    setShowSaleBulkPrintPreview(true);
+  };
+
+  /* fire print once report data has arrived */
+  useEffect(() => {
+    if (bulkSaleReportData && showSaleBulkPrintPreview) {
+      handleBulkPrint();
+    }
+  }, [bulkSaleReportData, showSaleBulkPrintPreview]);
   return (
     <>
 
@@ -386,193 +386,254 @@ useEffect(() => {
                 </thead>
                 <tbody>
                   {sales && sales?.sales?.length > 0 ? (
-                    sales?.sales?.map((sale, idx) => (
-                      <tr
-                        key={sale?.Sale_Id}
-                        onDoubleClick={() => {
-                          navigate(
-                            `/sale/edit/${sale?.Sale_Id}${location.search}`,
-                            {
-                              state: {
-                                from: "all-sale-list"
+                    sales?.sales?.map((sale, idx) => {
+                      const isHighlighted = String(searchParams.get("highlightTxn")) === String(sale?.Sale_Id);
+                      return (
+                       
+                        <tr
+                          key={sale?.Sale_Id}
+
+                          onClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              sale?.Sale_Id
+                            );
+
+                            setSearchParams(params, { replace: true });
+                          }}
+
+                          onDoubleClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              sale?.Sale_Id
+                            );
+
+                            navigate(
+                              `/sale/edit/${sale?.Sale_Id}?${params.toString()}`,
+                              {
+                                state: {
+                                  from: "all-sale-list",
+                                },
                               }
-                            }
-                          );
-                        }}
-                        style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
-                      >
-                        <td>
-                          {(sales?.currentPage - 1) * 10 + (idx + 1)}.
-                        </td>
-                        <td >
-                          {sale?.Invoice_Date
-                            ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "numeric",
-                              year: "numeric",
-                            })
-                            : "N/A"}
-                        </td>
-                        <td>
-                          {sale?.Invoice_Number
-                            ? sale?.Invoice_Number
-                            : "N/A"}
-                        </td>
-                        <td >{sale?.Party_Name || "N/A"}</td>
-                        <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
+                            );
+                          }}
 
-                        <td>₹{sale?.Total_Amount || "N/A"}</td>
-                        <td>₹{sale?.Balance_Due || "N/A"}</td>
-
-                        <td
-                          className="py-2 px-2"
                           style={{
-                            position: "relative",
-                            width: 50,
-                            textAlign: "center"
+                            cursor: "pointer",
+                            borderBottom: "1px solid #f1f5f9",
+                            backgroundColor: isHighlighted
+                              ? "#4CA1AF22"
+                              : "transparent",
                           }}
                         >
-                          {/* THREE DOT BUTTON */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          <td>
+                            {(sales?.currentPage - 1) * 10 + (idx + 1)}.
+                          </td>
+                          <td >
+                            {sale?.Invoice_Date
+                              ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "numeric",
+                                year: "numeric",
+                              })
+                              : "N/A"}
+                          </td>
+                          <td>
+                            {sale?.Invoice_Number
+                              ? sale?.Invoice_Number
+                              : "N/A"}
+                          </td>
+                          <td >{sale?.Party_Name || "N/A"}</td>
+                          <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
 
-                              setRowMenuOpen(
-                                rowMenuOpen === sale?.Sale_Id
-                                  ? null
-                                  : sale?.Sale_Id
-                              );
-                            }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          <td>₹{sale?.Total_Amount || "N/A"}</td>
+                          <td>₹{sale?.Balance_Due || "N/A"}</td>
+
+                          <td
+                            className="py-2 px-2"
                             style={{
-                              backgroundColor: "transparent",
-                              border: "none",
-                              cursor: "pointer"
+                              position: "relative",
+                              width: 50,
+                              textAlign: "center"
                             }}
-                            title="More"
                           >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
+                            {/* THREE DOT BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
 
-                          {/* THREE DOT MENU */}
-                          {rowMenuOpen === sale?.Sale_Id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute bg-white shadow-lg rounded-md"
-                              style={{
-                                right: 0,
-                                top: 32,
-                                width: 150,
-                                zIndex: 100,
-                                border: "1px solid #e2e8f0",
-                                overflow: "hidden"
+                                setRowMenuOpen(
+                                  rowMenuOpen === sale?.Sale_Id
+                                    ? null
+                                    : sale?.Sale_Id
+                                );
                               }}
+                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer"
+                              }}
+                              title="More"
                             >
+                              <MoreVertical
+                                size={16}
+                                style={{ color: "#374151" }}
+                              />
+                            </button>
 
-                              {/* VIEW / EDIT */}
-                              <NavLink
-                                to={`/sale/edit/${sale?.Sale_Id}${location.search}`}
-                                state={{
-                                  from: "all-sale-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                            {/* THREE DOT MENU */}
+                            {rowMenuOpen === sale?.Sale_Id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute bg-white shadow-lg rounded-md"
                                 style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Eye
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                View / Edit
-                              </NavLink>
-
-
-                              {/* RETURN */}
-                              <NavLink
-                                to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
-                                state={{
-                                  from: "sale-return-list"
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none"
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Undo2
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Return
-                              </NavLink>
-
-
-                              {/* PRINT */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  backgroundColor: "transparent",
-                                  border: "none",
-                                  cursor: "pointer"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-                                  setPrintSaleId(sale.Sale_Id)
+                                  right: 0,
+                                  top: 32,
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden"
                                 }}
                               >
-                                <Printer
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
 
-                                Print
-                              </button>
+                                {/* VIEW / EDIT */}
+                                {/* <NavLink
+                                  to={`/sale/edit/${sale?.Sale_Id}${location.search}`}
+                                  state={{
+                                    from: "all-sale-list"
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration: "none"
+                                  }}
+                                  onClick={() => setRowMenuOpen(null)}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
+
+                                  View / Edit
+                                </NavLink> */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/sale/edit/${sale?.Sale_Id}`,
+                                    search: (() => {
+                                      const params = new URLSearchParams(searchParams);
+
+                                      params.set(
+                                        "highlightTxn",
+                                        sale?.Sale_Id
+                                      );
+
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-sale-list",
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration: "none",
+                                  }}
+                                  onClick={() => setRowMenuOpen(null)}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
+
+                                  View / Edit
+                                </NavLink>
 
 
-                              {/* DELETE */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                style={{
-                                  cursor: "pointer",
-                                  color: "#dc2626",
-                                  backgroundColor: "transparent",
-                                  border: "none"
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
+                                {/* RETURN */}
+                                <NavLink
+                                  to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
+                                  state={{
+                                    from: "sale-return-list"
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration: "none"
+                                  }}
+                                  onClick={() => setRowMenuOpen(null)}
+                                >
+                                  <Undo2
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
 
-                                  setDeleteTarget({
-                                    Sale_Id: sale?.Sale_Id
-                                  });
-                                }}
-                              >
-                                <Trash2
-                                  size={13}
-                                  style={{ color: "#dc2626" }}
-                                />
+                                  Return
+                                </NavLink>
 
-                                Delete
-                              </button>
 
-                            </div>
-                          )}
-                        </td>
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    cursor: "pointer"
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+                                    setPrintSaleId(sale.Sale_Id)
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
 
-                      </tr>
-                    ))
+                                  Print
+                                </button>
+
+
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                  style={{
+                                    cursor: "pointer",
+                                    color: "#dc2626",
+                                    backgroundColor: "transparent",
+                                    border: "none"
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setDeleteTarget({
+                                      Sale_Id: sale?.Sale_Id
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{ color: "#dc2626" }}
+                                  />
+
+                                  Delete
+                                </button>
+
+                              </div>
+                            )}
+                          </td>
+
+                        </tr>
+                      )
+                    })
                   ) : (
                     <tr>
                       <td className="mx-auto text-center" colSpan={8}>
@@ -732,19 +793,19 @@ useEffect(() => {
           />
         </div>
       )}
-   {/* // check what your bulk report response actually wraps invoices in */}
-{bulkSaleReportData?.invoices?.length > 0 && (
-  <div style={{ display: "none" }}>
-    <SalePurchaseBulkReportPrintTemplate
-      ref={bulkSalePrintRef}
-      type="sale"
-      data={bulkSaleReportData?.invoices || []} 
-      //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
-      fromDate={fromDate}
-      toDate={toDate}
-    />
-  </div>
-)}
+      {/* // check what your bulk report response actually wraps invoices in */}
+      {bulkSaleReportData?.invoices?.length > 0 && (
+        <div style={{ display: "none" }}>
+          <SalePurchaseBulkReportPrintTemplate
+            ref={bulkSalePrintRef}
+            type="sale"
+            data={bulkSaleReportData?.invoices || []}
+            //data={bulkSaleReportData}   // 🔹 use .invoices not .sales
+            fromDate={fromDate}
+            toDate={toDate}
+          />
+        </div>
+      )}
     </>
 
   )

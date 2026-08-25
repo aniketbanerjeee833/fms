@@ -508,6 +508,251 @@ const editParty = async (req, res, next) => {
     }
   }
 };
+const deleteParty = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { Party_Id: partyId } = req.params;
+
+    if (!partyId) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Party ID is required.",
+      });
+    }
+
+    // =========================================================
+    // 1. CHECK PARTY EXISTS
+    // =========================================================
+
+    const [[party]] = await connection.query(
+      `
+      SELECT
+        Party_Id,
+        Party_Name
+      FROM add_party
+      WHERE Party_Id = ?
+      LIMIT 1
+      `,
+      [partyId]
+    );
+
+    if (!party) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Party not found.",
+      });
+    }
+
+    // =========================================================
+    // 2. CHECK PARTY TRANSACTIONS
+    // =========================================================
+    //
+    // party_ledger contains Opening Balance, Sales,
+    // Purchases, Payments, etc.
+    //
+    // If ANY ledger entry exists, party has been used.
+    // =========================================================
+
+    const [[ledgerCount]] = await connection.query(
+      `
+      SELECT COUNT(*) AS count
+      FROM party_ledger
+      WHERE Party_Id = ?
+      `,
+      [partyId]
+    );
+
+    if (Number(ledgerCount.count) > 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "This party cannot be deleted because transactions already exist for this party.",
+      });
+    }
+
+    // =========================================================
+    // 3. DELETE PARTY ADDRESSES
+    // =========================================================
+
+    await connection.query(
+      `
+      DELETE FROM add_party_addresses
+      WHERE Party_Id = ?
+      `,
+      [partyId]
+    );
+
+    // =========================================================
+    // 4. DELETE PARTY
+    // =========================================================
+
+    const [deleteResult] = await connection.query(
+      `
+      DELETE FROM add_party
+      WHERE Party_Id = ?
+      `,
+      [partyId]
+    );
+
+    if (deleteResult.affectedRows === 0) {
+      await connection.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Party not found or already deleted.",
+      });
+    }
+
+    // =========================================================
+    // 5. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Party deleted successfully.",
+      Party_Id: partyId,
+    });
+
+  } catch (err) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    console.error("❌ Error deleting party:", err);
+
+    next(err);
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+// const deletePartyAddress = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     const { Party_Id: partyId, Address_Id: addressId } = req.params;
+
+//     if (!partyId || !addressId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Party ID and Address ID are required.",
+//       });
+//     }
+
+//     connection = await db.getConnection();
+//     await connection.beginTransaction();
+
+//     // =========================================================
+//     // 1. CHECK ADDRESS EXISTS AND BELONGS TO THIS PARTY
+//     // =========================================================
+
+//     const [[address]] = await connection.query(
+//       `
+//       SELECT
+//         id,
+//         Party_Id,
+//         Address_Type,
+//         Address_Text,
+//         Is_Default
+//       FROM add_party_addresses
+//       WHERE id = ?
+//         AND Party_Id = ?
+//       LIMIT 1
+//       `,
+//       [addressId, partyId]
+//     );
+
+//     if (!address) {
+//       await connection.rollback();
+
+//       return res.status(404).json({
+//         success: false,
+//         message: "Address not found for this party.",
+//       });
+//     }
+
+//     // =========================================================
+//     // 2. DELETE ADDRESS
+//     // =========================================================
+
+//     await connection.query(
+//       `
+//       DELETE FROM add_party_addresses
+//       WHERE id = ?
+//         AND Party_Id = ?
+//       `,
+//       [addressId, partyId]
+//     );
+
+//     // =========================================================
+//     // 3. IF DELETED ADDRESS WAS DEFAULT,
+//     //    MAKE ANOTHER ADDRESS OF SAME TYPE DEFAULT
+//     // =========================================================
+
+//     if (address.Is_Default === 1) {
+//       const [[nextAddress]] = await connection.query(
+//         `
+//         SELECT id
+//         FROM add_party_addresses
+//         WHERE Party_Id = ?
+//           AND Address_Type = ?
+//         ORDER BY id DESC
+//         LIMIT 1
+//         `,
+//         [partyId, address.Address_Type]
+//       );
+
+//       if (nextAddress) {
+//         await connection.query(
+//           `
+//           UPDATE add_party_addresses
+//           SET Is_Default = 1
+//           WHERE id = ?
+//             AND Party_Id = ?
+//           `,
+//           [nextAddress.id, partyId]
+//         );
+//       }
+//     }
+
+//     await connection.commit();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `${address.Address_Type} address deleted successfully.`,
+//       Address_Id: addressId,
+//       Party_Id: partyId,
+//     });
+
+//   } catch (err) {
+//     if (connection) {
+//       await connection.rollback();
+//     }
+
+//     console.error("❌ Error deleting party address:", err);
+
+//     next(err);
+
+//   } finally {
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// };
 
 // OR p.State LIKE ?
 //         OR p.Email_Id LIKE ?
@@ -3178,7 +3423,7 @@ const transactions = [
   }
 };
 export {
-  addParty, editParty, getAllParties, getAllPartiesCursor, getSinglePartyDetailsSalesPurchases,
+  addParty, editParty, deleteParty, getAllParties, getAllPartiesCursor, getSinglePartyDetailsSalesPurchases,
   printSinglePartyDetailsSalesPurchasesReport, getAllPartiesPayablesLeft, getAllPartiesReceivablesLeft,
   getAllPayableParties, getAllReceivableParties, exportSinglePartyDetailsReportToExcel,getPartyPrintReport
 };

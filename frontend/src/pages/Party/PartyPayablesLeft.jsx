@@ -654,36 +654,57 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
                 const transactionId = row.Formatted_Reference_Id || refId;
                 const menuId = `${row.Txn_Type}-${transactionId || idx}`;
-
+                const isHighlighted = String(searchParams.get("highlightTxn")) === String(transactionId);
                 return (
+
                   <tr
                     key={`${row.Txn_Type}-${refId}-${idx}`}
+
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("highlightTxn", transactionId);
+
+                      setSearchParams(params, { replace: true });
+                    }}
+
                     onDoubleClick={() => {
                       if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+
+                        setSearchParams(params, { replace: true });
+
                         openModal(row.Txn_Type, transactionId);
                         return;
                       }
+
                       const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-                       if (route) {
+
+                      if (route) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+
                         navigate(
                           {
                             pathname: `/${route}/edit/${transactionId}`,
-                            search: searchParams.toString(),
+                            search: params.toString(),
                           },
-                          { state: { from: "party-payables", partyId } }
+                          {
+                            state: {
+                              from: "party-payables",
+                              partyId,
+                            },
+                          }
                         );
                       }
-                      // if (route) {
-                      //   navigate(
-                      //     {
-                      //       pathname: `/${route}/edit/${transactionId}`,
-                      //       search: searchParams.toString(),
-                      //     },
-                      //     { state: { from: "party-details", partyId } }
-                      //   );
-                      // }
                     }}
-                    style={{ cursor: "pointer" }}
+
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor: isHighlighted
+                        ? "#4CA1AF22"
+                        : "transparent",
+                    }}
                   >
                     <td>{idx + 1}.</td>
                     <td>
@@ -760,8 +781,14 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               type="button"
                               className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                               style={{ color: "#374151" }}
-                              onClick={() => {
+                               onClick={() => {
                                 setRowMenuOpen(null);
+
+                                const params = new URLSearchParams(searchParams);
+                                params.set("highlightTxn", transactionId);
+
+                                setSearchParams(params, { replace: true });
+
                                 openModal(row.Txn_Type, transactionId);
                               }}
                             >
@@ -772,7 +799,11 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                             <NavLink
                               to={{
                                 pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
-                                search: searchParams.toString(),
+                                search: (() => {
+                                  const params = new URLSearchParams(searchParams);
+                                  params.set("highlightTxn", transactionId);
+                                  return params.toString();
+                                })(),
                               }}
                               state={{
                                 from: "party-details",
@@ -785,6 +816,22 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               <Eye size={13} style={{ color: "#4CA1AF" }} />
                               View / Edit
                             </NavLink>
+                            // <NavLink
+                            //   to={{
+                            //     pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
+                            //     search: searchParams.toString(),
+                            //   }}
+                            //   state={{
+                            //     from: "party-details",
+                            //     partyId,
+                            //   }}
+                            //   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                            //   style={{ color: "#374151" }}
+                            //   onClick={() => setRowMenuOpen(null)}
+                            // >
+                            //   <Eye size={13} style={{ color: "#4CA1AF" }} />
+                            //   View / Edit
+                            // </NavLink>
                           )}
 
                           {/* PRINT */}

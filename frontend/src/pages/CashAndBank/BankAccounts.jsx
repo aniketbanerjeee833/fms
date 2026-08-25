@@ -136,6 +136,7 @@ const DELETE_CONFIG = {
 function BankDetailPanel({ bankId }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // 🔹 only cursor state needed — no page, no manual ledger array
   const [cursor, setCursor] = useState(null);
@@ -208,34 +209,70 @@ function BankDetailPanel({ bankId }) {
     if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
   }, [handleObserver]);
+const handleTransactionEdit = (row) => {
+  if (!row?.Formatted_Reference_Id) return;
 
-  const handleTransactionEdit = (row) => {
-    if (!row?.Formatted_Reference_Id) return;
-
-    // Payment In / Payment Out open their edit modals
-    if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-      openModal(
-        row.Txn_Type,
-        row.Formatted_Reference_Id
-      );
-      return;
-    }
-
-    // Other transactions open their edit page
-    const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-
-    if (!route) return;
-
-    navigate(
-      `/${route}/edit/${row.Formatted_Reference_Id}`,
-      {
-        state: {
-          from: "bank-accounts",
-          bankId,
-        },
-      }
+  // Payment In / Payment Out open their edit modals
+  if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+    openModal(
+      row.Txn_Type,
+      row.Formatted_Reference_Id
     );
-  };
+    return;
+  }
+
+  // Other transactions open their edit page
+  const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
+  if (!route) return;
+
+  const params = new URLSearchParams(searchParams);
+
+  // Keep the bank selected when coming back
+  params.set("bankId", bankId);
+
+  // Keep this transaction highlighted
+  params.set("highlightTxn", row.id);
+
+  navigate(
+    {
+      pathname: `/${route}/edit/${row.Formatted_Reference_Id}`,
+      search: `?${params.toString()}`,
+    },
+    {
+      state: {
+        from: "bank-accounts",
+      },
+    }
+  );
+};
+  // const handleTransactionEdit = (row) => {
+  //   if (!row?.Formatted_Reference_Id) return;
+
+  //   // Payment In / Payment Out open their edit modals
+  //   if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+  //     openModal(
+  //       row.Txn_Type,
+  //       row.Formatted_Reference_Id
+  //     );
+  //     return;
+  //   }
+
+  //   // Other transactions open their edit page
+  //   const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
+  //   if (!route) return;
+
+  //   navigate(
+  //     `/${route}/edit/${row.Formatted_Reference_Id}`,
+  //     {
+  //       state: {
+  //         from: "bank-accounts",
+  //         bankId,
+  //       },
+  //     }
+  //   );
+  // };
 
   // 🔹 after save/delete — reset cursor to reload from top
   const resetLedger = () => {
@@ -309,12 +346,12 @@ function BankDetailPanel({ bankId }) {
       dispatch(saleApi.util.invalidateTags(["Sale"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
       resetLedger();   // 🔹 reload bank ledger from top
     } catch (err) {
       console.error("❌ Delete error:", err);
@@ -346,7 +383,7 @@ function BankDetailPanel({ bankId }) {
 
   return (
     <div className="flex flex-col overflow-y-auto"
-     style={{
+      style={{
         maxHeight: "calc(100vh - 180px)",
         minWidth: 0
       }}>
@@ -405,11 +442,42 @@ function BankDetailPanel({ bankId }) {
                     color: "#6b7280",
                     dir: row.Direction === "Credit" ? "in" : "out",
                   };
+                const isHighlighted =
+                  String(searchParams.get("highlightTxn")) ===
+                  String(row.id)
                 return (
+                  // <tr
+                  //   key={row.id}
+                  //   onDoubleClick={() => handleTransactionEdit(row)}
+                  //   className="cursor-pointer"
+                  // >
                   <tr
                     key={row.id}
-                    onDoubleClick={() => handleTransactionEdit(row)}
-                    className="cursor-pointer"
+
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+
+                      params.set("highlightTxn", row.id);
+
+                      setSearchParams(params, { replace: true });
+                    }}
+
+                    onDoubleClick={() => {
+                      const params = new URLSearchParams(searchParams);
+
+                      params.set("highlightTxn", row.id);
+
+                      setSearchParams(params, { replace: true });
+
+                      handleTransactionEdit(row);
+                    }}
+
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor: isHighlighted
+                        ? "#4CA1AF22"
+                        : "transparent",
+                    }}
                   >
                     <td>{idx + 1}.</td>
                     <td>{meta.label}</td>
@@ -475,7 +543,7 @@ function BankDetailPanel({ bankId }) {
                         >
 
                           {/* VIEW / EDIT */}
-                          {row.Formatted_Reference_Id && (
+                          {/* {row.Formatted_Reference_Id && (
                             MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
                               <button
                                 type="button"
@@ -502,6 +570,65 @@ function BankDetailPanel({ bankId }) {
                                 state={{
                                   from: "bank-accounts",
                                   bankId
+                                }}
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                  textDecoration: "none",
+                                }}
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </NavLink>
+                            )
+                          )} */}
+                          {row.Formatted_Reference_Id && (
+                            MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{ color: "#374151" }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  const params = new URLSearchParams(searchParams);
+
+                                  params.set("highlightTxn", row.id);
+
+                                  setSearchParams(params, { replace: true });
+
+                                  openModal(
+                                    row.Txn_Type,
+                                    row.Formatted_Reference_Id
+                                  );
+                                }}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </button>
+                            ) : (
+                              <NavLink
+                                to={{
+                                  pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                                  search: (() => {
+                                    const params = new URLSearchParams(searchParams);
+
+                                    params.set("bankId", bankId);
+                                    params.set("highlightTxn", row.id);
+
+                                    return `?${params.toString()}`;
+                                  })(),
+                                }}
+                                state={{
+                                  from: "bank-accounts",
+                                  bankId,
                                 }}
                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                                 style={{

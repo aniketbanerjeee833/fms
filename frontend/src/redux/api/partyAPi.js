@@ -117,11 +117,29 @@ getAllPartiesCursor: builder.query({
         { type: "Party", id: "LIST" },
       ],
     }),
+    deleteParty: builder.mutation({
+  query: (Party_Id ) => ({
+    url: `party/delete-party/${Party_Id}`,
+    method: "DELETE",
+  }),
+  invalidatesTags: (result, error, { Party_Id }) => [
+    { type: "Party", id: Party_Id },
+    { type: "Party", id: "LIST" },
+  ],
+}),
+// deletePartyAddress: builder.mutation({
+//   query: ({ Party_Id, Address_Id }) => ({
+//     url: `party/delete-party-address/${Party_Id}/${Address_Id}`,
+//     method: "DELETE",
+//   }),
 
-    // getSinglePartyDetailsSalesPurchases: builder.query({
-    //   query: ({Party_Id, page}) => `party/get-single-party-details-sales-purchases/${Party_Id}?page=${page}`,
-    //   providesTags: ["Party"],
-    // }),
+//   invalidatesTags: (result, error, { Party_Id }) => [
+//     { type: "Party", id: Party_Id },
+//     { type: "Party", id: "LIST" },
+//   ],
+// }),
+    
+
     getSinglePartyDetailsSalesPurchases: builder.query({
   query: ({
     Party_Id,
@@ -423,6 +441,8 @@ getAllReceivableParties: builder.query({
     useGetAllPartiesQuery,
     useAddPartyMutation,
     useEditPartyMutation,
+    useDeletePartyMutation,
+    //useDeletePartyAddressMutation,
     useGetSinglePartyDetailsSalesPurchasesQuery,
     usePrintSinglePartyDetailsSalesPurchasesReportMutation,
     useGetAllPartiesReceivablesLeftQuery,useGetAllPartiesPayablesLeftQuery,

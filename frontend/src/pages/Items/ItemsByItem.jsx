@@ -292,8 +292,125 @@ export default function ItemsByItem() {
 
 
 
+    // const handleTransactionEdit = (txn) => {
+    //     setRowMenuOpen(null);
+
+    //     if (
+    //         txn?.Txn_Type === "Add_Adjustment" ||
+    //         txn?.Txn_Type === "Reduce_Adjustment"
+    //     ) {
+    //         if (!txn?.Source_Id) {
+    //             console.error(
+    //                 "No Source_Id found for stock adjustment:",
+    //                 txn
+    //             );
+    //             return;
+    //         }
+
+    //         setEditingAdjustment({
+    //             ...txn,
+    //             id: txn.Source_Id,
+    //             Item_Id: txn.Item_Id || selectedItemId,
+    //             Adjustment_Type:
+    //                 txn.Adjustment_Type ||
+    //                 (txn.Txn_Type === "Add_Adjustment"
+    //                     ? "Add"
+    //                     : "Reduce"),
+    //         });
+
+    //         setShowStockAdjustmentModal(true);
+
+    //         return;
+    //     }
+
+    //     if (!txn?.Document_Id) {
+    //         console.error(
+    //             "No Document_Id found for transaction:",
+    //             txn
+    //         );
+    //         return;
+    //     }
+
+    //     const navigationState = {
+    //         from: "items-by-item",
+    //         itemId: selectedItemId,
+    //     };
+
+    //     switch (txn.Txn_Type) {
+
+    //         case "Sale":
+    //             navigate(
+    //                 {
+    //                     pathname: `/sale/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         case "Purchase":
+    //             navigate(
+    //                 {
+    //                     pathname: `/purchase/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         case "Sale_Return":
+    //             navigate(
+    //                 {
+    //                     pathname: `/sale/return/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         case "Purchase_Return":
+    //             navigate(
+    //                 {
+    //                     pathname: `/purchase/return/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         default:
+    //             console.warn(
+    //                 "No edit route configured for transaction type:",
+    //                 txn.Txn_Type
+    //             );
+    //     }
+    // };
     const handleTransactionEdit = (txn) => {
         setRowMenuOpen(null);
+
+        // =========================================================
+        // HIGHLIGHT CURRENT LEDGER ROW
+        // Keep existing search params and add highlightTxn
+        // =========================================================
+
+        const params = new URLSearchParams(searchParams);
+
+        params.set(
+            "highlightTxn",
+            txn.Ledger_Id
+        );
+
+        // =========================================================
+        // STOCK ADJUSTMENT
+        // =========================================================
 
         if (
             txn?.Txn_Type === "Add_Adjustment" ||
@@ -323,6 +440,10 @@ export default function ItemsByItem() {
             return;
         }
 
+        // =========================================================
+        // NORMAL TRANSACTIONS
+        // =========================================================
+
         if (!txn?.Document_Id) {
             console.error(
                 "No Document_Id found for transaction:",
@@ -334,6 +455,7 @@ export default function ItemsByItem() {
         const navigationState = {
             from: "items-by-item",
             itemId: selectedItemId,
+            highlightTxn: txn.Ledger_Id,
         };
 
         switch (txn.Txn_Type) {
@@ -342,7 +464,7 @@ export default function ItemsByItem() {
                 navigate(
                     {
                         pathname: `/sale/edit/${txn.Document_Id}`,
-                        search: searchParams.toString(),
+                        search: `?${params.toString()}`,
                     },
                     {
                         state: navigationState,
@@ -354,7 +476,7 @@ export default function ItemsByItem() {
                 navigate(
                     {
                         pathname: `/purchase/edit/${txn.Document_Id}`,
-                        search: searchParams.toString(),
+                        search: `?${params.toString()}`,
                     },
                     {
                         state: navigationState,
@@ -366,7 +488,7 @@ export default function ItemsByItem() {
                 navigate(
                     {
                         pathname: `/sale/return/edit/${txn.Document_Id}`,
-                        search: searchParams.toString(),
+                        search: `?${params.toString()}`,
                     },
                     {
                         state: navigationState,
@@ -378,7 +500,7 @@ export default function ItemsByItem() {
                 navigate(
                     {
                         pathname: `/purchase/return/edit/${txn.Document_Id}`,
-                        search: searchParams.toString(),
+                        search: `?${params.toString()}`,
                     },
                     {
                         state: navigationState,
@@ -394,19 +516,6 @@ export default function ItemsByItem() {
         }
     };
 
-    // const handleItemAdded = (savedItem) => {
-    //     setShowAddItemModal(false);
-
-    //     if (savedItem?.Item_Id) {
-    //         const next = new URLSearchParams(searchParams);
-
-    //         next.set("itemId", savedItem.Item_Id);
-    //         next.delete("q");
-    //         next.delete("txnSearch");
-
-    //         setSearchParams(next);
-    //     }
-    // };
     const handleItemAdded = (savedItem) => {
         setShowAddItemModal(false);
 
@@ -1016,7 +1125,7 @@ export default function ItemsByItem() {
                                         </div>
 
                                         {/* Stock */}
-                                        
+
                                         {!isService && (
                                             <div className="col-span-1 sm:col-span-1 text-left">
                                                 <p className="text-xs uppercase text-black mb-1">
@@ -1243,147 +1352,221 @@ export default function ItemsByItem() {
                                                 </td>
                                             </tr>
                                         ) : (
-                                            transactions.map((txn, idx) => (
-                                                <tr
-                                                    key={txn.Ledger_Id}
-                                                    onDoubleClick={() => handleTransactionEdit(txn)}
-                                                    style={{
-                                                        borderBottom: "1px solid #f1f5f9",
-                                                        position: "relative",
-                                                        cursor: "pointer",
-                                                    }}
-                                                    className="hover:bg-gray-50 transition-colors"
-                                                >
-                                                    <td>{idx + 1}.</td>
-                                                    <td style={{ whiteSpace: "nowrap" }}>
-                                                        {fmtDate(txn.Txn_Date)}
-                                                    </td>
+                                            transactions.map((txn, idx) => {
+                                                //const isHighlighted = String(searchParams.get("highlightTxn")) === String(txn.Ledger_Id);
+                                                const isHighlighted =
+                                                    String(searchParams.get("highlightTxn")) ===
+                                                    String(txn.Ledger_Id);
+                                                return (
+                                                    // <tr
+                                                    //     key={txn.Ledger_Id}
+                                                    //     onDoubleClick={() => handleTransactionEdit(txn)}
+                                                    //     style={{
+                                                    //         borderBottom: "1px solid #f1f5f9",
+                                                    //         position: "relative",
+                                                    //         cursor: "pointer",
+                                                    //     }}
+                                                    //     className="hover:bg-gray-50 transition-colors"
+                                                    // >
+                                                    <tr
+                                                        key={txn.Ledger_Id}
 
-                                                    <td style={{ whiteSpace: "nowrap" }}>
-                                                        {txn.Number || "—"}
-                                                    </td>
+                                                        // SINGLE CLICK → highlight only
+                                                        onClick={() => {
+                                                            const params = new URLSearchParams(searchParams);
 
-                                                    <td>
-                                                        {txn.Party_Name || "—"}
-                                                    </td>
+                                                            params.set(
+                                                                "highlightTxn",
+                                                                txn.Ledger_Id
+                                                            );
 
-                                                    <td
-                                                        style={{
-                                                            color: txn.Direction === "In" ? "#16a34a" : "#dc2626",
+                                                            setSearchParams(params, { replace: true });
                                                         }}
+
+                                                        // DOUBLE CLICK → highlight + edit
+                                                        onDoubleClick={() => {
+                                                            const params = new URLSearchParams(searchParams);
+
+                                                            params.set(
+                                                                "highlightTxn",
+                                                                txn.Ledger_Id
+                                                            );
+
+                                                            setSearchParams(params, { replace: true });
+
+                                                            handleTransactionEdit(txn);
+                                                        }}
+
+                                                        style={{
+                                                            borderBottom: "1px solid #f1f5f9",
+                                                            position: "relative",
+                                                            cursor: "pointer",
+
+                                                            // HIGHLIGHT
+                                                            backgroundColor: isHighlighted
+                                                                ? "#4CA1AF22"
+                                                                : "transparent",
+                                                        }}
+
+                                                        className="hover:bg-gray-50 transition-colors"
                                                     >
-                                                        {txn.Txn_Type || "—"}
-                                                    </td>
+                                                        <td>{idx + 1}.</td>
+                                                        <td style={{ whiteSpace: "nowrap" }}>
+                                                            {fmtDate(txn.Txn_Date)}
+                                                        </td>
 
-                                                    <td>
-                                                        {fmt(txn.Quantity)}({txn.Selected_Unit})
-                                                    </td>
+                                                        <td style={{ whiteSpace: "nowrap" }}>
+                                                            {txn.Number || "—"}
+                                                        </td>
 
-                                                    <td>
-                                                        {txn.Rate !== null
-                                                            ? `₹ ${fmt(txn.Rate)}`
-                                                            : "—"}
-                                                    </td>
+                                                        <td>
+                                                            {txn.Party_Name || "—"}
+                                                        </td>
 
-                                                    {txn.Txn_Type !== "Opening_Stock" && (
                                                         <td
                                                             style={{
-                                                                position: "relative",
-                                                                width: 50,
-                                                                textAlign: "center",
+                                                                color: txn.Direction === "In" ? "#16a34a" : "#dc2626",
                                                             }}
                                                         >
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
+                                                            {txn.Txn_Type || "—"}
+                                                        </td>
 
-                                                                    setRowMenuOpen(
-                                                                        rowMenuOpen === txn.Ledger_Id
-                                                                            ? null
-                                                                            : txn.Ledger_Id
-                                                                    );
-                                                                }}
-                                                                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                        <td>
+                                                            {fmt(txn.Quantity)}({txn.Selected_Unit})
+                                                        </td>
+
+                                                        <td>
+                                                            {txn.Rate !== null
+                                                                ? `₹ ${fmt(txn.Rate)}`
+                                                                : "—"}
+                                                        </td>
+
+                                                        {txn.Txn_Type !== "Opening_Stock" && (
+                                                            <td
                                                                 style={{
-                                                                    backgroundColor: "transparent",
-                                                                    border: "none",
-                                                                    cursor: "pointer",
+                                                                    position: "relative",
+                                                                    width: 50,
+                                                                    textAlign: "center",
                                                                 }}
-                                                                title="More"
                                                             >
-                                                                <MoreVertical
-                                                                    size={16}
-                                                                    style={{ color: "#374151" }}
-                                                                />
-                                                            </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
 
-                                                            {rowMenuOpen === txn.Ledger_Id && (
-                                                                <div
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    className="absolute bg-white shadow-lg rounded-md"
-                                                                    style={{
-                                                                        right: 10,
-                                                                        top: 36,
-                                                                        width: 150,
-                                                                        zIndex: 100,
-                                                                        border: "1px solid #e2e8f0",
-                                                                        overflow: "hidden",
+                                                                        setRowMenuOpen(
+                                                                            rowMenuOpen === txn.Ledger_Id
+                                                                                ? null
+                                                                                : txn.Ledger_Id
+                                                                        );
                                                                     }}
+                                                                    className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                                    style={{
+                                                                        backgroundColor: "transparent",
+                                                                        border: "none",
+                                                                        cursor: "pointer",
+                                                                    }}
+                                                                    title="More"
                                                                 >
-                                                                    <button
-                                                                        type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                    <MoreVertical
+                                                                        size={16}
                                                                         style={{ color: "#374151" }}
-                                                                        onClick={() => handleTransactionEdit(txn)}
-                                                                    >
-                                                                        <Eye size={13} style={{ color: "#4CA1AF" }} />
-                                                                        View / Edit
-                                                                    </button>
+                                                                    />
+                                                                </button>
 
-                                                                    {![
-                                                                        "Add_Adjustment",
-                                                                        "Reduce_Adjustment",
-                                                                        "Opening Stock"
-                                                                    ].includes(txn.Txn_Type) && (<button
-                                                                        type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                        style={{ color: "#374151" }}
-                                                                        onClick={() => {
-                                                                            setRowMenuOpen(null);
-                                                                            handlePrintClick(txn, txn.Document_Id);
+                                                                {rowMenuOpen === txn.Ledger_Id && (
+                                                                    <div
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="absolute bg-white shadow-lg rounded-md"
+                                                                        style={{
+                                                                            right: 10,
+                                                                            top: 36,
+                                                                            width: 150,
+                                                                            zIndex: 100,
+                                                                            border: "1px solid #e2e8f0",
+                                                                            overflow: "hidden",
                                                                         }}
                                                                     >
-                                                                        <Printer size={13} style={{ color: "#4CA1AF" }} />
-                                                                        Print
-                                                                    </button>)}
+                                                                        {/* <button
+                                                                            type="button"
+                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                            style={{ color: "#374151" }}
+                                                                            onClick={() => handleTransactionEdit(txn)}
+                                                                        >
+                                                                            <Eye size={13} style={{ color: "#4CA1AF" }} />
+                                                                            View / Edit
+                                                                        </button> */}
+                                                                        <button
+                                                                            type="button"
+                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                            style={{ color: "#374151" }}
+                                                                            onClick={() => {
+                                                                                setRowMenuOpen(null);
 
-                                                                    <button
-                                                                        type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                                                        title="Delete transaction"
-                                                                        style={{ cursor: "pointer", color: "#dc2626" }}
-                                                                        onClick={() =>
-                                                                            setDeleteTarget({
-                                                                                Id:
-                                                                                    txn.Txn_Type === "Add_Adjustment" ||
-                                                                                        txn.Txn_Type === "Reduce_Adjustment"
-                                                                                        ? txn.Source_Id
-                                                                                        : txn.Document_Id,
-                                                                                Txn_Type: txn.Txn_Type,
-                                                                            })
-                                                                        }
-                                                                    >
-                                                                        <Trash2 size={13} style={{ color: "#dc2626" }} />
-                                                                        Delete
-                                                                    </button>
-                                                                </div>
-                                                            )}
+                                                                                const params = new URLSearchParams(searchParams);
 
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            ))
+                                                                                params.set(
+                                                                                    "highlightTxn",
+                                                                                    txn.Ledger_Id
+                                                                                );
+
+                                                                                setSearchParams(params, { replace: true });
+
+                                                                                handleTransactionEdit(txn);
+                                                                            }}
+                                                                        >
+                                                                            <Eye
+                                                                                size={13}
+                                                                                style={{ color: "#4CA1AF" }}
+                                                                            />
+
+                                                                            View / Edit
+                                                                        </button>
+
+                                                                        {![
+                                                                            "Add_Adjustment",
+                                                                            "Reduce_Adjustment",
+                                                                            "Opening Stock"
+                                                                        ].includes(txn.Txn_Type) && (<button
+                                                                            type="button"
+                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                            style={{ color: "#374151" }}
+                                                                            onClick={() => {
+                                                                                setRowMenuOpen(null);
+                                                                                handlePrintClick(txn, txn.Document_Id);
+                                                                            }}
+                                                                        >
+                                                                            <Printer size={13} style={{ color: "#4CA1AF" }} />
+                                                                            Print
+                                                                        </button>)}
+
+                                                                        <button
+                                                                            type="button"
+                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                            title="Delete transaction"
+                                                                            style={{ cursor: "pointer", color: "#dc2626" }}
+                                                                            onClick={() =>
+                                                                                setDeleteTarget({
+                                                                                    Id:
+                                                                                        txn.Txn_Type === "Add_Adjustment" ||
+                                                                                            txn.Txn_Type === "Reduce_Adjustment"
+                                                                                            ? txn.Source_Id
+                                                                                            : txn.Document_Id,
+                                                                                    Txn_Type: txn.Txn_Type,
+                                                                                })
+                                                                            }
+                                                                        >
+                                                                            <Trash2 size={13} style={{ color: "#dc2626" }} />
+                                                                            Delete
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                )
+                                            })
                                         )}
                                     </tbody>
                                 </table>

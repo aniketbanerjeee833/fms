@@ -747,7 +747,7 @@ export default function PurchaseEdit() {
         Quantity: item.Quantity || "",
 
         Item_Unit: item.Item_Unit || "",
-       
+
         Purchase_Price: item.Purchase_Price || "",
 
         Discount_On_Purchase_Price: item.Discount_On_Purchase_Price || "",
@@ -758,7 +758,7 @@ export default function PurchaseEdit() {
         Tax_Amount: item.Tax_Amount || "",
         Amount: item.Amount || "",
       }));
-  
+
       setRows(prefilledRows)
       const roundOffFromDb = Number(purchase.billPurchaseDetails?.Round_Off) || 0;
 
@@ -808,7 +808,7 @@ export default function PurchaseEdit() {
       setShowGSTIN(purchase.GSTIN || "");   // ✅ only UI update
     }
   }, [purchase]);
-const totals = calculateTotals(itemsValues);
+  const totals = calculateTotals(itemsValues);
 
 
   const onSubmit = async (data) => {
@@ -1026,17 +1026,34 @@ const totals = calculateTotals(itemsValues);
         );
       }
       else if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
+
+        //params.set("itemId", Item_Id);
+
         navigate({
           pathname: "/items/all-items",
-          search: `?itemId=${Item_Id}`,
+          search: location.search,
         });
       }
+      // else if (from === "items-by-item") {
+      //   navigate({
+      //     pathname: "/items/all-items",
+      //     search: `?itemId=${Item_Id}`,
+      //   });
+      // }
       else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
         navigate({
-          pathname: "/cash-bank/bank-accounts",
-          search: `?bankId=${bankId}`,
+          pathname: `/cash-bank/bank-accounts`,
+          search: location.search,
         });
       }
+      // else if (from === "bank-accounts") {
+      //   navigate({
+      //     pathname: "/cash-bank/bank-accounts",
+      //     search: `?bankId=${bankId}`,
+      //   });
+      // }
 
       else if (from === "party-details") {
         navigate({
@@ -1048,6 +1065,7 @@ const totals = calculateTotals(itemsValues);
       else if (from === "cash-in-hand") {
         navigate({
           pathname: "/cash-bank/cash-in-hand",
+          search: location.search,
         });
       }
 
@@ -1159,21 +1177,38 @@ const totals = calculateTotals(itemsValues);
                       search: location.search,
                     })
                   }
-                  else if (from === "items-by-item") {
+                  // else if (from === "items-by-item") {
 
+
+                  //   navigate({
+                  //     pathname: "/items/all-items",
+                  //     search: `?itemId=${Item_Id}`,
+                  //   });
+                  // }
+                  else if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
+
+                    //params.set("itemId", Item_Id);
 
                     navigate({
                       pathname: "/items/all-items",
-                      search: `?itemId=${Item_Id}`,
+                      search: location.search,
                     });
                   }
                   else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
                       pathname: `/cash-bank/bank-accounts`,
-                      search: `?bankId=${bankId}`,
-                    })
+                      search: location.search,
+                    });
                   }
+                  // else if (from === "bank-accounts") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/bank-accounts`,
+                  //     search: `?bankId=${bankId}`,
+                  //   })
+                  // }
                   else if (from === "party-details") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
@@ -1183,12 +1218,18 @@ const totals = calculateTotals(itemsValues);
                     });
                   }
                   else if (from === "cash-in-hand") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
-                      pathname: `/cash-bank/cash-in-hand`,
-
+                      pathname: "/cash-bank/cash-in-hand",
+                      search: location.search,
                     });
                   }
+                  // else if (from === "cash-in-hand") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/cash-in-hand`,
+
+                  //   });
+                  // }
                   else {
                     navigate({
                       pathname: "/purchase/all-purchases",
@@ -2838,7 +2879,7 @@ const totals = calculateTotals(itemsValues);
                   + Add Row
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
 
                 {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
