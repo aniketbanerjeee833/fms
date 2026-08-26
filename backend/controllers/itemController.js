@@ -6352,15 +6352,15 @@ const editItemUnit = async (req, res, next) => {
       });
     }
 
-    if (Number(existingUnit.Is_Used) === 1) {
-      await connection.rollback();
+    // if (Number(existingUnit.Is_Used) === 1) {
+    //   await connection.rollback();
 
-      return res.status(400).json({
-        success: false,
-        message:
-          "This unit has already been used in transactions and cannot be edited.",
-      });
-    }
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "This unit has already been used in transactions and cannot be edited.",
+    //   });
+    // }
 
     // Duplicate check (case-insensitive)
     // const [duplicate] = await connection.query(

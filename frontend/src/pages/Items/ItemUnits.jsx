@@ -271,7 +271,8 @@ export default function ItemUnits() {
                                         //     setUnitMenuOpen(null);
                                         // }}
                                         onDoubleClick={() => {
-                                            if (Number(unit.Is_System) === 1 ||  Number(unit.Is_Used) === 1) return;
+                                            //  ||  Number(unit.Is_Used) === 1
+                                            if (Number(unit.Is_System) === 1) return;
 
                                             handleSelectUnit(unit);
                                             setEditingUnit(unit);
@@ -323,7 +324,8 @@ export default function ItemUnits() {
 
                                         {/* SHOW MENU ONLY WHEN System = 0 AND Is_Used = 0 */}
                                         {/* Number(unit.Is_Used) === 0 && */}
-                                        {Number(unit.Is_System) === 0 && Number(unit.Is_Used) === 0 &&
+                                        {/* Number(unit.Is_Used) === 0 && */}
+                                        {Number(unit.Is_System) === 0 && 
                                             (
                                                 <div
                                                     style={{ position: "relative" }}
