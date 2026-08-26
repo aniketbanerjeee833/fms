@@ -1236,6 +1236,22 @@ VALUES
       //
       // Therefore stock decreases.
       // =======================================================
+            await connection.execute(
+  `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+  [
+    resolvedSelectedUnit || null,
+    snapshot.Primary_Unit_Snapshot || null,
+    snapshot.Secondary_Unit_Snapshot || null,
+    Item_Id,
+  ]
+);
       await syncUnitIdsForItem(
         connection,
         Item_Id
@@ -1786,33 +1802,7 @@ const editPurchaseReturn = async (req, res, next) => {
           oldSelected === oldSecondary
         ) {
 
-          // const [[conversion]] =
-          //   await connection.query(
-          //     `
-          // SELECT Conversion_Rate
-          // FROM item_unit_conversions
-          // WHERE  Primary_Unit = ?
-          //   AND Secondary_Unit = ?
-          // ORDER BY id DESC
-          // LIMIT 1
-          // `,
-          //     [
-
-          //       oldPrimary,
-          //       oldSecondary,
-          //     ]
-          //   );
-
-          // const conversionRate =
-          //   Number(conversion?.Conversion_Rate) || 0;
-
-          // if (
-          //   Number.isFinite(conversionRate) &&
-          //   conversionRate > 0
-          // ) {
-          //   oldBaseQty =
-          //     rawQty / conversionRate;
-          // }
+        
           const [[itemMaster]] =
             await connection.query(
               `
@@ -1919,7 +1909,22 @@ const editPurchaseReturn = async (req, res, next) => {
 
       const prItemId = insertResult.insertId;
 
-
+    await connection.execute(
+  `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+  [
+    line.resolvedSelectedUnit || null,
+    line.Primary_Unit_Snapshot || null,
+    line.Secondary_Unit_Snapshot || null,
+    line.Item_Id,
+  ]
+);
       await syncUnitIdsForItem(
         connection,
         line.Item_Id

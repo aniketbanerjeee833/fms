@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Users, Package, ShoppingCart, DollarSign, X, CalendarDays, ClipboardMinus, Wallet, LayoutDashboard, Settings } from 'lucide-react'
+import { Users, Package, ShoppingCart, X, CalendarDays, ClipboardMinus, Wallet, LayoutDashboard, Settings, IndianRupee } from 'lucide-react'
 
 import "./MobileSideMenu.css";
 const MobileSideMenu = ({ onClose }) => {
@@ -213,8 +213,15 @@ const MobileSideMenu = ({ onClose }) => {
           overflowY: "auto",
           boxShadow: "2px 0 8px rgba(0,0,0,0.2)",
           paddingTop: "20px",
+          backgroundColor: "#f4f7f9",
         }}>
-        <div className="sb2-12 flex items-center justify-center  ">
+        <div className="sb2-12 flex items-center justify-center"
+          style={{
+         
+           backgroundColor: "#f4f7f9",
+         
+        }}
+        >
 
           <X onClick={onClose}
             style={{
@@ -228,12 +235,12 @@ const MobileSideMenu = ({ onClose }) => {
 
             }} />
 
-          <ul className="flex flex-col items-center">
+          {/* <ul className="flex flex-col items-center">
 
             <li className="mt-4">
               <h5>Inventory Management</h5>
             </li>
-          </ul>
+          </ul> */}
         </div>
 
         {/* Sidebar Navigation */}
@@ -243,6 +250,7 @@ const MobileSideMenu = ({ onClose }) => {
             height: "100%",
             display: "flex",
             flexDirection: "column",
+            backgroundColor: "#f4f7f9",
 
           }}
         >
@@ -366,8 +374,7 @@ const MobileSideMenu = ({ onClose }) => {
 
             ])}
 
-
-            {renderMenu("Sales", <DollarSign size={20} />, [
+            {renderMenu("Sales", <IndianRupee size={20} />, [
               { to: "/sale/all-sales", text: "  Sale Invoices" },
               { to: "/sale/invoice", text: " Invoice" },
               //{ to: "/sale/add", text: "Add Sale" },

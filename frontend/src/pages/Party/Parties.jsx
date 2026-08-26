@@ -150,6 +150,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const [showPartyBulkPrintReview, setShowPartyBulkPrintPreview] = useState(false);
 
   const bulkPartyPrintRef = useRef(null);
+  //const transactionListRef = useRef(null);
   // const[selecedSales,setSelectedSales]= useState(null);
   const [printTarget, setPrintTarget] = useState({ type: null, id: null });
 
@@ -251,6 +252,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
     observerRef.current = new IntersectionObserver(handleObserver, {
+      //root: transactionListRef.current,
       root: null,
       rootMargin: "0px",
       threshold: 0.1,
@@ -429,6 +431,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     }
   }, [bulkPartyPrintReportData, showPartyBulkPrintReview]);
 
+
+
   if (!partyId) {
     return (
       <div
@@ -476,12 +480,22 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
 
   return (
-    <div className="flex flex-col  overflow-y-auto"
-      style={{
-        maxHeight: "calc(100vh - 180px)",
-        minWidth: 0
-      }}
-    >
+    // <div className="flex flex-col"
+    //   // style={{
+    //   //   //maxHeight: "calc(100vh - 180px)",
+    //   //   minWidth: 0
+    //   // }}
+
+
+    // >
+    <div
+    className="flex flex-col"
+    style={{
+      height: "100%",
+      minHeight: 0,
+      overflow: "hidden",
+    }}
+  >
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -615,7 +629,18 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
       {/* ── LEDGER TABLE ── */}
 
-      <div className="table-responsive table-desi">
+      <div className="table-responsive table-desi"
+        //ref={transactionListRef}
+        // style={{
+        //   maxHeight: "calc(100vh - 180px)",
+        //   overflowY: "auto",
+        // }}
+        style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+      }}
+      >
         <table className="w-full min-w-[500px]">
           <thead>
             <tr>
@@ -674,6 +699,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                   //   style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
                   // >
                   <tr
+                    //id={`txn-${transactionId}`}
                     key={`${row.Txn_Type}-${refId}-${idx}`}
                     onClick={() => {
                       const params = new URLSearchParams(searchParams);
@@ -693,6 +719,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                       const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
 
                       if (route) {
+
                         navigate(
                           {
                             pathname: `/${route}/edit/${transactionId}`,
@@ -710,7 +737,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                           }
                         );
                       }
-                    }}
+                    }
+                    }
                     style={{
                       cursor: "pointer",
                       borderBottom: "1px solid #f1f5f9",
@@ -1208,7 +1236,12 @@ export default function Parties() {
   };
   return (
     <>
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+    <div className="flex flex-col bg-white" 
+    style={{ height: "100vh", overflow: "hidden" }}
+    >
+
+      {/* <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}> */}
+
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
           <div className="flex flex-row justify-between items-center">
@@ -1228,14 +1261,26 @@ export default function Parties() {
         </div>
 
         {/* ── SPLIT LAYOUT ── */}
-        <div className="flex flex-col lg:flex-row gap-0" style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}>
+        <div
+          //  className="flex flex-col lg:flex-row gap-0" 
+          //  style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+          className="flex flex-col lg:flex-row gap-0 min-h-0 overflow-hidden"
+          style={{
+            flex: 1,
+            minHeight:0,
+            height: "calc(100vh - 180px)",
+            borderTop: "1px solid #e2e8f0",
+          }}
+        >
           {/* ══ LEFT — 30% — party list ══ */}
           <div
             className="w-full lg:w-[30%] overflow-y-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
-              minHeight: "500px",
-              maxHeight: "calc(100vh - 180px)",
+              height: "100%",
+              minHeight:0,
+              //minHeight: "500px",
+              //maxHeight: "calc(100vh - 180px)",
             }}
           >
             {/* search */}
@@ -1435,7 +1480,11 @@ export default function Parties() {
           {/* <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
             <PartyDetailPanel partyId={selectedId} key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div> */}
-          <div className="w-full lg:w-[70%] p-1" >
+          <div
+            //className="w-full lg:w-[70%] p-1" 
+            className="w-full lg:w-[70%] p-1 overflow-y-auto"
+             style={{ height: "100%", minHeight: 0 }}
+          >
             <PartyDetailPanel partyId={selectedId} key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div>
         </div>

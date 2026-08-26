@@ -375,9 +375,11 @@ export default function CashInHand() {
     return (
         <>
 
-            <div className="flex flex-col bg-white ">
+            <div className="flex flex-col bg-white"
+              style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
+            >
 
-                <div className="inn-title">
+                <div className="inn-title" style={{ flexShrink: 0 }}>
                     <div className="flex flex-col sm:flex-col lg:flex-row justify-between lg:items-center">
 
                         <div className="flex flex-row justify-between items-center mb-4 sm:mb-4">
@@ -514,7 +516,12 @@ export default function CashInHand() {
                 </div>
 
 
-                <div className="tab-inn">
+                {/* <div className="tab-inn"
+                style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
+                > */}
+                <div className="tab-inn"
+                style={{ flex: 1, minHeight: 0, overflow: "hidden" }}
+                > 
                     <div className="table-responsive table-desi">
                         {isLoading ? (
                             <p className="text-center mt-4">Fetching ...</p>

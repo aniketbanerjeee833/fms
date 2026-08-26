@@ -956,7 +956,22 @@ const addSale = async (req, res, next) => {
         `UPDATE add_sale_items SET Sale_Items_Id = ? WHERE id = ?`,
         [newSaleItemId, saleItemIdNum]
       );
-
+          await connection.execute(
+  `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+  [
+    resolvedSelectedUnit || null,
+    snapshot.Primary_Unit_Snapshot || null,
+    snapshot.Secondary_Unit_Snapshot || null,
+    Item_Id,
+  ]
+);
       await syncUnitIdsForItem(
         connection,
         Item_Id
@@ -1653,60 +1668,60 @@ const getSingleSale = async (req, res, next) => {
     console.log(saleHeader)
 
 
- 
-  //   const [items] = await connection.query(
-  //     `
-  // SELECT
-  //   si.Sale_Items_Id,
-  //   si.Item_Id,
 
-  //   i.Item_Name,
-  //   i.Item_HSN,
-  //   i.Item_Unit,
-  //   i.Item_Category,
+    //   const [items] = await connection.query(
+    //     `
+    // SELECT
+    //   si.Sale_Items_Id,
+    //   si.Item_Id,
 
-  //   -- CURRENT ITEM MASTER
-  //   i.Primary_Unit AS Current_Primary_Unit,
-  //   i.Secondary_Unit AS Current_Secondary_Unit,
-  //   i.Conversion_Rate,
+    //   i.Item_Name,
+    //   i.Item_HSN,
+    //   i.Item_Unit,
+    //   i.Item_Category,
 
-  //   si.Quantity,
+    //   -- CURRENT ITEM MASTER
+    //   i.Primary_Unit AS Current_Primary_Unit,
+    //   i.Secondary_Unit AS Current_Secondary_Unit,
+    //   i.Conversion_Rate,
 
-  //   -- HISTORICAL SALE SNAPSHOT (FROM IDS)
-  //   pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
-  //   pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
-  //   pu3.Unit_Shorthand AS Selected_Unit,
+    //   si.Quantity,
 
-  //   si.Sale_Price,
-  //   si.Discount_On_Sale_Price,
-  //   si.Discount_Type_On_Sale_Price,
-  //   si.Tax_Amount,
-  //   si.Tax_Type,
-  //   si.Amount,
-  //   si.created_at
+    //   -- HISTORICAL SALE SNAPSHOT (FROM IDS)
+    //   pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+    //   pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+    //   pu3.Unit_Shorthand AS Selected_Unit,
 
-  // FROM ${saleItemTable} si
+    //   si.Sale_Price,
+    //   si.Discount_On_Sale_Price,
+    //   si.Discount_Type_On_Sale_Price,
+    //   si.Tax_Amount,
+    //   si.Tax_Type,
+    //   si.Amount,
+    //   si.created_at
 
-  // LEFT JOIN ${itemTable} i
-  //   ON si.Item_Id = i.Item_Id
+    // FROM ${saleItemTable} si
 
-  // LEFT JOIN units pu1
-  //   ON pu1.id = si.Primary_Unit_Snapshot_Id
+    // LEFT JOIN ${itemTable} i
+    //   ON si.Item_Id = i.Item_Id
 
-  // LEFT JOIN units pu2
-  //   ON pu2.id = si.Secondary_Unit_Snapshot_Id
+    // LEFT JOIN units pu1
+    //   ON pu1.id = si.Primary_Unit_Snapshot_Id
 
-  // LEFT JOIN units pu3
-  //   ON pu3.id = si.Selected_Unit_Id
+    // LEFT JOIN units pu2
+    //   ON pu2.id = si.Secondary_Unit_Snapshot_Id
 
-  // WHERE si.Sale_Id = ?
+    // LEFT JOIN units pu3
+    //   ON pu3.id = si.Selected_Unit_Id
 
-  // ORDER BY si.created_at DESC
-  // `,
-  //     [saleId]
-  //   );
-const [items] = await connection.query(
-  `
+    // WHERE si.Sale_Id = ?
+
+    // ORDER BY si.created_at DESC
+    // `,
+    //     [saleId]
+    //   );
+    const [items] = await connection.query(
+      `
   SELECT
     si.Sale_Items_Id,
     si.Item_Id,
@@ -1766,8 +1781,8 @@ const [items] = await connection.query(
 
   ORDER BY si.created_at DESC
   `,
-  [saleId]
-);
+      [saleId]
+    );
     // if (!items.length) {
     //   return res.status(404).json({ success: false, message: "No sale items found for this invoice." });
     // }
@@ -3991,7 +4006,7 @@ const editSale = async (req, res, next) => {
           //     conversion?.Conversion_Rate
           //   );
           const conversionRate =
-  Number(itemMaster?.Conversion_Rate) || 0;
+            Number(itemMaster?.Conversion_Rate) || 0;
 
 
           if (
@@ -4256,6 +4271,22 @@ const editSale = async (req, res, next) => {
         [
           newId,
           id,
+        ]
+      );
+      await connection.execute(
+        `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+        [
+          line.resolvedSelectedUnit || null,
+          line.snapshot.Primary_Unit_Snapshot || null,
+          line.snapshot.Secondary_Unit_Snapshot || null,
+          line.Item_Id,
         ]
       );
       await syncUnitIdsForItem(connection, line.Item_Id);
@@ -5182,7 +5213,7 @@ const getSalesPrintReport = async (req, res, next) => {
   }
 };
 export {
-  addSale,  getAllSales, exportAllSalesReportToExcel, getSingleSale, getLatestInvoiceNumber,
+  addSale, getAllSales, exportAllSalesReportToExcel, getSingleSale, getLatestInvoiceNumber,
   addInvoice, updateInvoice, getSingleInvoice, getNewSaleLatestInvoiceNumber,
   printSaleBill, editSale, deleteSale, getTotalSalesEachDay, getSalesPrintReport
 };

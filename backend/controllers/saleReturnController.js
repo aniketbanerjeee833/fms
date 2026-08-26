@@ -210,60 +210,60 @@ const getSaleReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
-  //   const [items] = await connection.query(
-  //     `
-  // SELECT
-  //     sri.id,
+    //   const [items] = await connection.query(
+    //     `
+    // SELECT
+    //     sri.id,
 
-  //     sri.Item_Id,
+    //     sri.Item_Id,
 
-  //     i.Item_Name,
-  //     i.Item_HSN,
-  //     i.Item_Unit,
-  //     i.Item_Category,
+    //     i.Item_Name,
+    //     i.Item_HSN,
+    //     i.Item_Unit,
+    //     i.Item_Category,
 
-  //     -- CURRENT MASTER
-  //     i.Primary_Unit AS Current_Primary_Unit,
-  //     i.Secondary_Unit AS Current_Secondary_Unit,
-  //     i.Conversion_Rate,
+    //     -- CURRENT MASTER
+    //     i.Primary_Unit AS Current_Primary_Unit,
+    //     i.Secondary_Unit AS Current_Secondary_Unit,
+    //     i.Conversion_Rate,
 
-  //     sri.Quantity,
+    //     sri.Quantity,
 
-  //     -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
-  //     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
-  //     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
-  //     pu3.Unit_Shorthand AS Selected_Unit,
+    //     -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
+    //     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+    //     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+    //     pu3.Unit_Shorthand AS Selected_Unit,
 
-  //     sri.Sale_Price,
-  //     sri.Discount_On_Sale_Price,
-  //     sri.Discount_Type_On_Sale_Price,
-  //     sri.Tax_Amount,
-  //     sri.Tax_Type,
-  //     sri.Amount,
-  //     sri.created_at
+    //     sri.Sale_Price,
+    //     sri.Discount_On_Sale_Price,
+    //     sri.Discount_Type_On_Sale_Price,
+    //     sri.Tax_Amount,
+    //     sri.Tax_Type,
+    //     sri.Amount,
+    //     sri.created_at
 
-  // FROM sale_return_items sri
+    // FROM sale_return_items sri
 
-  // LEFT JOIN add_item i
-  //   ON sri.Item_Id = i.Item_Id
+    // LEFT JOIN add_item i
+    //   ON sri.Item_Id = i.Item_Id
 
-  // LEFT JOIN units pu1
-  //   ON pu1.id = sri.Primary_Unit_Snapshot_Id
+    // LEFT JOIN units pu1
+    //   ON pu1.id = sri.Primary_Unit_Snapshot_Id
 
-  // LEFT JOIN units pu2
-  //   ON pu2.id = sri.Secondary_Unit_Snapshot_Id
+    // LEFT JOIN units pu2
+    //   ON pu2.id = sri.Secondary_Unit_Snapshot_Id
 
-  // LEFT JOIN units pu3
-  //   ON pu3.id = sri.Selected_Unit_Id
+    // LEFT JOIN units pu3
+    //   ON pu3.id = sri.Selected_Unit_Id
 
-  // WHERE sri.Sale_Return_Id = ?
+    // WHERE sri.Sale_Return_Id = ?
 
-  // ORDER BY sri.created_at DESC
-  // `,
-  //     [Sale_Return_Id]
-  //   );
-  const [items] = await connection.query(
-  `
+    // ORDER BY sri.created_at DESC
+    // `,
+    //     [Sale_Return_Id]
+    //   );
+    const [items] = await connection.query(
+      `
   SELECT
     sri.id,
     sri.Item_Id,
@@ -323,8 +323,8 @@ const getSaleReturnById = async (req, res, next) => {
 
   ORDER BY sri.created_at DESC
   `,
-  [Sale_Return_Id]
-);
+      [Sale_Return_Id]
+    );
 
     // =========================================================
     // 3. FETCH ALL UNITS (for edit dropdown — same as purchase)
@@ -984,6 +984,22 @@ const createSaleReturn = async (req, res, next) => {
       );
 
       const srItemId = srItemResult.insertId;
+      await connection.execute(
+        `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+        [
+          resolvedSelectedUnit || null,
+          snapshot.Primary_Unit_Snapshot || null,
+          snapshot.Secondary_Unit_Snapshot || null,
+          Item_Id,
+        ]
+      );
       await syncUnitIdsForItem(
         connection,
         Item_Id
@@ -1705,6 +1721,22 @@ const editSaleReturn = async (req, res, next) => {
       const saleReturnItemId = srItemResult.insertId;
 
       // 🔹 Item Ledger — unchanged, still uses line.Quantity, NOT stockDelta
+      await connection.execute(
+        `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+        [
+          line.resolvedSelectedUnit || null,
+          line.Primary_Unit_Snapshot || null,
+          line.Secondary_Unit_Snapshot || null,
+          line.Item_Id,
+        ]
+      );
       await syncUnitIdsForItem(
         connection,
         line.Item_Id

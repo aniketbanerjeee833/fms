@@ -121,7 +121,7 @@ export default function Dashboard() {
  
   const series = data?.series || [];
   const totalSales = data?.totalSales || 0;
-  const percentChange = data?.percentChange ?? 0;
+  //const percentChange = data?.percentChange ?? 0;
   //const isPositive = percentChange >= 0;
  
   const chartData = useMemo(
@@ -340,7 +340,13 @@ export default function Dashboard() {
     <>
      
 
-      <div className="flex flex-col bg-white">
+      <div className="flex flex-col bg-white"
+    //    style={{
+    //   height: "100%",
+    //   minHeight: 0,
+    //   overflow: "hidden",
+    // }}
+      >
         {/* Header */}
 
 

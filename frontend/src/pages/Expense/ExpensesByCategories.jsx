@@ -12,8 +12,7 @@ import {
   Eye,
   Trash2,
   Printer,
-  FileSpreadsheet,
-  PrinterIcon
+ 
 } from "lucide-react";
 
 import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
@@ -138,6 +137,9 @@ export default function ExpensesByCategories() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
+    const categoryRef = useRef(selectedCategoryId);
+    
+    const effectiveCursor = categoryRef.current === selectedCategoryId ? rightCursor : null;
 
   const {
     data: expenseResponse,
@@ -146,7 +148,8 @@ export default function ExpensesByCategories() {
   } = useGetExpensesByCategoryQuery(
     {
       categoryId: selectedCategoryId,
-      cursor: rightCursor,
+      cursor: effectiveCursor,
+      //cursor: rightCursor,
       search: txnSearch,
     },
     {
@@ -249,7 +252,7 @@ export default function ExpensesByCategories() {
     categoriesWithTotals[0];
 
   const filteredTransactions = selectedCategory?.transactions || [];
-
+  const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
   // 🔹 left side stays CLIENT-SIDE filtered — no server search param for categories
   const filteredCategories = useMemo(() => {
     return categoriesWithTotals.filter((item) =>
@@ -293,9 +296,13 @@ export default function ExpensesByCategories() {
   }, [categories, selectedCategoryId, navigate, location.pathname, location.state]);
 
   /* reset right cursor when selected category or txn search changes */
-  useEffect(() => {
-    setRightCursor(null);
-  }, [selectedCategoryId, txnSearch]);
+   useEffect(() => {
+          categoryRef.current = selectedCategoryId;
+          setRightCursor(null);
+      }, [selectedCategoryId, txnSearch]);
+  // useEffect(() => {
+  //   setRightCursor(null);
+  // }, [selectedCategoryId, txnSearch]);
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -342,7 +349,14 @@ export default function ExpensesByCategories() {
 
   return (
     <>
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col bg-white"
+        style={{ minHeight: "100vh" }}
+    //      style={{
+    //  height: "100vh",
+    //   //minHeight: 0,
+    //   overflow: "hidden",
+    // }}
+      >
 
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
@@ -375,12 +389,15 @@ export default function ExpensesByCategories() {
 
           {/* ══ LEFT — 30% — category list (client-side filtered) ══ */}
           <div
-            className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+            className="w-full lg:w-[30%] overflow-y-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
               minHeight: "500px",
               maxHeight: "calc(100vh - 180px)",
-              boxSizing: "border-box",
+              //borderRight: "1px solid #e2e8f0",
+              //height: "100%",
+              //minHeight: 0,
+              //boxSizing: "border-box",
             }}
           >
             {/* search */}
@@ -529,7 +546,18 @@ export default function ExpensesByCategories() {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
+          <div className="w-full lg:w-[70%] p-1"
+            style={{ maxHeight: "calc(100vh - 180px)" }}
+            //style={{ height: "100%", minHeight: 0 }}
+          //     style={{
+          //   height: "100%",
+          //   minHeight: 0,
+          //   overflow: "hidden",   // was overflow-y-auto — remove, this is not the scroll container
+          //   display: "flex",
+          //   flexDirection: "column"
+           
+          // }}
+          >
             <div className="flex flex-col h-full">
 
               {/* ── CATEGORY SUMMARY CARD ── */}
@@ -573,82 +601,82 @@ export default function ExpensesByCategories() {
               </div> */}
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
 
-    {/* Category Name */}
-    <div className="flex items-center gap-3 min-w-0">
-        <div
-            className="flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{
-                width: 44,
-                height: 44,
-                backgroundColor: "#4CA1AF22"
-            }}
-        >
-            <Receipt
-                size={22}
-                style={{ color: "#4CA1AF" }}
-            />
-        </div>
+                {/* Category Name */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="flex items-center justify-center rounded-xl flex-shrink-0"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      backgroundColor: "#4CA1AF22"
+                    }}
+                  >
+                    <Receipt
+                      size={22}
+                      style={{ color: "#4CA1AF" }}
+                    />
+                  </div>
 
-        <div className="min-w-0">
-            <h6
-                className="font-bold text-gray-900 break-words"
-                style={{
-                    fontSize: 18,
-                    margin: 0
-                }}
-            >
-                {selectedCategory?.name}
-            </h6>
+                  <div className="min-w-0">
+                    <h6
+                      className="font-bold text-gray-900 break-words"
+                      style={{
+                        fontSize: 18,
+                        margin: 0
+                      }}
+                    >
+                      {selectedCategory?.name}
+                    </h6>
 
-            <p className="text-gray-500 text-sm mt-0.5">
-                {selectedCategory?.type}
-            </p>
-        </div>
-    </div>
+                    <p className="text-gray-500 text-sm mt-0.5">
+                      {selectedCategory?.type}
+                    </p>
+                  </div>
+                </div>
 
-    {/* Total + Balance */}
-    <div className="flex items-center gap-6 text-right shrink-0">
+                {/* Total + Balance */}
+                <div className="flex items-center gap-6 text-right shrink-0">
 
-        {/* Total */}
-        <div>
-            <p className="text-xs uppercase text-gray-400 mb-1">
-                Total
-            </p>
+                  {/* Total */}
+                  <div>
+                    <p className="text-xs uppercase text-gray-400 mb-1">
+                      Total
+                    </p>
 
-            <p
-                className="font-bold"
-                style={{
-                    color: "#4CA1AF",
-                    fontSize: 18
-                }}
-            >
-                ₹ {(selectedCategory?.total ?? 0).toLocaleString()}
-            </p>
-        </div>
+                    <p
+                      className="font-bold"
+                      style={{
+                        color: "#4CA1AF",
+                        fontSize: 18
+                      }}
+                    >
+                      ₹ {(selectedCategory?.total ?? 0).toLocaleString()}
+                    </p>
+                  </div>
 
-        {/* Balance */}
-        <div>
-            <p className="text-xs uppercase text-gray-400 mb-1">
-                Balance
-            </p>
+                  {/* Balance */}
+                  <div>
+                    <p className="text-xs uppercase text-gray-400 mb-1">
+                      Balance
+                    </p>
 
-            <p
-                className="font-bold"
-                style={{
-                    color:
-                        (selectedCategory?.balance ?? 0) > 0
+                    <p
+                      className="font-bold"
+                      style={{
+                        color:
+                          (selectedCategory?.balance ?? 0) > 0
                             ? "#dc2626"
                             : "#16a34a",
-                    fontSize: 18
-                }}
-            >
-                ₹ {(selectedCategory?.balance ?? 0).toLocaleString()}
-            </p>
-        </div>
+                        fontSize: 18
+                      }}
+                    >
+                      ₹ {(selectedCategory?.balance ?? 0).toLocaleString()}
+                    </p>
+                  </div>
 
-    </div>
+                </div>
 
-</div>
+              </div>
 
               {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
               <div
@@ -730,7 +758,13 @@ export default function ExpensesByCategories() {
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div className="table-responsive table-desi">
+              <div className="table-responsive table-desi"
+                // style={{
+                //   flex: 1,
+                //   minHeight: 0,
+                //   overflowY: "auto",
+                // }}
+              >
                 <table className="w-full min-w-[600px]">
                   <thead>
                     <tr>
@@ -760,15 +794,53 @@ export default function ExpensesByCategories() {
                       </tr>
                     ) : (
                       filteredTransactions.map((txn) => (
+                        // <tr
+                        //   key={txn.id}
+                        //   style={{ borderBottom: "1px solid #f1f5f9", position: "relative", cursor: "pointer" }}
+                        //   className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        //   onDoubleClick={() => {
+                        //     navigate(
+                        //       {
+                        //         pathname: `/expense/edit/${txn.id}`,
+                        //         search: searchParams.toString(),
+                        //       },
+                        //       {
+                        //         state: {
+                        //           from: "expense-categories",
+                        //           categoryId: selectedCategoryId,
+                        //           txnSearch,
+                        //           categorySearch,
+                        //         },
+                        //       }
+                        //     );
+                        //   }}
+                        // >
                         <tr
                           key={txn.id}
-                          style={{ borderBottom: "1px solid #f1f5f9", position: "relative", cursor: "pointer" }}
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+
+                          onClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              String(txn.id)
+                            );
+
+                            setSearchParams(params, { replace: true });
+                          }}
+
                           onDoubleClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              String(txn.id)
+                            );
+
                             navigate(
                               {
                                 pathname: `/expense/edit/${txn.id}`,
-                                search: searchParams.toString(),
+                                search: params.toString(),
                               },
                               {
                                 state: {
@@ -780,6 +852,18 @@ export default function ExpensesByCategories() {
                               }
                             );
                           }}
+
+                          style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            position: "relative",
+                            cursor: "pointer",
+
+                            backgroundColor: isHighlighted(txn.id)
+                              ? "#4CA1AF22"
+                              : "transparent",
+                          }}
+
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
                         >
                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
@@ -821,11 +905,34 @@ export default function ExpensesByCategories() {
                                         onClick={() => {
                                           setTransactionMenu(null);
 
+                                          // if (key === "view") {
+                                          //   navigate(
+                                          //     {
+                                          //       pathname: `/expense/edit/${txn.id}`,
+                                          //       search: searchParams.toString(),
+                                          //     },
+                                          //     {
+                                          //       state: {
+                                          //         from: "expense-categories",
+                                          //         categoryId: selectedCategoryId,
+                                          //         txnSearch,
+                                          //         categorySearch,
+                                          //       },
+                                          //     }
+                                          //   );
+                                          // }
                                           if (key === "view") {
+                                            const params = new URLSearchParams(searchParams);
+
+                                            params.set(
+                                              "highlightTxn",
+                                              String(txn.id)
+                                            );
+
                                             navigate(
                                               {
                                                 pathname: `/expense/edit/${txn.id}`,
-                                                search: searchParams.toString(),
+                                                search: params.toString(),
                                               },
                                               {
                                                 state: {

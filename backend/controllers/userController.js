@@ -618,3 +618,35 @@ const logoutUser = async (req, res,next) => {
 
 
 export { registerUser, loginUser, getUser, logoutUser };
+
+// import bcrypt from "bcrypt";
+
+// const hashPassword = async (req, res, next) => {
+//   try {
+//     const { password } = req.body;
+
+//     if (!password) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Password is required",
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     return res.status(200).json({
+//       success: true,
+//       password,
+//       hashedPassword,
+//     });
+//   } catch (err) {
+//     console.error("❌ Password hashing error:", err);
+//     next(err);
+//   }
+// };
+
+// export default hashPassword;
+
+// const router = express.Router();
+
+// router.post("/hash", hashPassword);

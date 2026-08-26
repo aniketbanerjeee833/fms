@@ -156,7 +156,9 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
-
+  const itemRef = useRef(selectedItemId);
+  
+      const effectiveCursor = itemRef.current === selectedItemId ? rightCursor : null;
   const {
     data: usageResponse,
     isLoading: isUsageLoading,
@@ -164,7 +166,8 @@ export default function ExpensesByItems() {
   } = useGetExpenseItemUsageQuery(
     {
       masterItemId: selectedItemId,
-      cursor: rightCursor,
+      cursor: effectiveCursor,
+      //cursor: rightCursor,
       search: txnSearch, // ← add
     },
     {
@@ -285,9 +288,13 @@ export default function ExpensesByItems() {
   const usageNextCursor = usageResponse?.nextCursor ?? null;
 
   /* reset right cursor when selected item changes */
-  useEffect(() => {
-    setRightCursor(null);
-  }, [selectedItemId, txnSearch]);
+  // useEffect(() => {
+  //   setRightCursor(null);
+  // }, [selectedItemId, txnSearch]);
+ useEffect(() => {
+        itemRef.current = selectedItemId;
+        setRightCursor(null);
+    }, [selectedItemId, txnSearch]);
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -402,8 +409,8 @@ export default function ExpensesByItems() {
   //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
   //   );
   // }, [selectedItem, txnSearch]);
-  const filteredTransactions =
-    selectedItem?.transactions || [];
+  const filteredTransactions = selectedItem?.transactions || [];
+  const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
 
   const fmtDate = (d) =>
     d
@@ -727,84 +734,84 @@ export default function ExpensesByItems() {
               {selectedItem && (
                 <div className="rounded-xl p-2 mb-2">
 
-                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
 
-    {/* Item Name */}
-    <div className="flex items-center gap-3 min-w-0">
-        <div
-            className="flex items-center justify-center rounded-xl flex-shrink-0"
-            style={{
-                width: 44,
-                height: 44,
-                backgroundColor: "#4CA1AF22"
-            }}
-        >
-            <Package
-                size={22}
-                style={{ color: "#4CA1AF" }}
-            />
-        </div>
+                    {/* Item Name */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="flex items-center justify-center rounded-xl flex-shrink-0"
+                        style={{
+                          width: 44,
+                          height: 44,
+                          backgroundColor: "#4CA1AF22"
+                        }}
+                      >
+                        <Package
+                          size={22}
+                          style={{ color: "#4CA1AF" }}
+                        />
+                      </div>
 
-        <div className="min-w-0">
-            <h6
-                className="font-bold text-gray-900 break-words"
-                style={{
-                    fontSize: 18,
-                    margin: 0
-                }}
-            >
-                {selectedItem?.name}
-            </h6>
+                      <div className="min-w-0">
+                        <h6
+                          className="font-bold text-gray-900 break-words"
+                          style={{
+                            fontSize: 18,
+                            margin: 0
+                          }}
+                        >
+                          {selectedItem?.name}
+                        </h6>
 
-            <p className="text-gray-500 text-sm mt-0.5">
-                Expense Item
-            </p>
-        </div>
-    </div>
+                        <p className="text-gray-500 text-sm mt-0.5">
+                          Expense Item
+                        </p>
+                      </div>
+                    </div>
 
-    {/* Total + Balance */}
-    <div className="flex items-center gap-6 text-right shrink-0">
+                    {/* Total + Balance */}
+                    <div className="flex items-center gap-6 text-right shrink-0">
 
-        {/* Total */}
-        <div>
-            <p className="text-xs uppercase text-gray-400 mb-1">
-                Total
-            </p>
+                      {/* Total */}
+                      <div>
+                        <p className="text-xs uppercase text-gray-400 mb-1">
+                          Total
+                        </p>
 
-            <p
-                className="font-bold"
-                style={{
-                    color: "#4CA1AF",
-                    fontSize: 18
-                }}
-            >
-                ₹ {(selectedItem?.total ?? 0).toLocaleString()}
-            </p>
-        </div>
+                        <p
+                          className="font-bold"
+                          style={{
+                            color: "#4CA1AF",
+                            fontSize: 18
+                          }}
+                        >
+                          ₹ {(selectedItem?.total ?? 0).toLocaleString()}
+                        </p>
+                      </div>
 
-        {/* Balance */}
-        <div>
-            <p className="text-xs uppercase text-gray-400 mb-1">
-                Balance
-            </p>
+                      {/* Balance */}
+                      <div>
+                        <p className="text-xs uppercase text-gray-400 mb-1">
+                          Balance
+                        </p>
 
-            <p
-                className="font-bold"
-                style={{
-                    color:
-                        (selectedItem?.balance ?? 0) > 0
-                            ? "#dc2626"
-                            : "#16a34a",
-                    fontSize: 18
-                }}
-            >
-                ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
-            </p>
-        </div>
+                        <p
+                          className="font-bold"
+                          style={{
+                            color:
+                              (selectedItem?.balance ?? 0) > 0
+                                ? "#dc2626"
+                                : "#16a34a",
+                            fontSize: 18
+                          }}
+                        >
+                          ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
+                        </p>
+                      </div>
 
-    </div>
+                    </div>
 
-</div>
+                  </div>
                 </div>
               )}
 
@@ -917,23 +924,63 @@ export default function ExpensesByItems() {
                         </td>
                       </tr>
                     ) : (
+
                       filteredTransactions.map((txn) => (
 
+                        // <tr
+                        //   key={txn.id}
+                        //   style={{
+                        //     borderBottom: "1px solid #f1f5f9",
+                        //     position: "relative",
+                        //     cursor: "pointer",
+                        //   }}
+                        //   //style={{ borderBottom: "1px solid #f1f5f9" }}
+                        //   className="hover:bg-gray-50 transition-colors cursor-pointer"
+
+                        //   onDoubleClick={() => {
+                        //     navigate(
+                        //       {
+                        //         pathname: `/expense/edit/${txn.expenseId}`,
+                        //         search: searchParams.toString(),
+                        //       },
+                        //       {
+                        //         state: {
+                        //           from: "expense-items",
+                        //           itemId: selectedItemId,
+                        //           txnSearch,
+                        //           itemSearch,
+                        //         },
+                        //       }
+                        //     );
+                        //   }}
+
+                        // >
                         <tr
                           key={txn.id}
-                          style={{
-                            borderBottom: "1px solid #f1f5f9",
-                            position: "relative",
-                            cursor: "pointer",
+
+                          onClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              String(txn.expenseId)
+                            );
+
+                            setSearchParams(params, { replace: true });
                           }}
-                          //style={{ borderBottom: "1px solid #f1f5f9" }}
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
 
                           onDoubleClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              String(txn.expenseId)
+                            );
+
                             navigate(
                               {
                                 pathname: `/expense/edit/${txn.expenseId}`,
-                                search: searchParams.toString(),
+                                search: params.toString(),
                               },
                               {
                                 state: {
@@ -946,6 +993,17 @@ export default function ExpensesByItems() {
                             );
                           }}
 
+                          style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            position: "relative",
+                            cursor: "pointer",
+
+                            backgroundColor: isHighlighted(txn.expenseId)
+                              ? "#4CA1AF22"
+                              : "transparent",
+                          }}
+
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
                         >
                           <td style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
@@ -1001,11 +1059,34 @@ export default function ExpensesByItems() {
                                     onClick={async () => {
                                       setRowMenuOpen(null);
 
+                                      // if (key === "view") {
+                                      //   navigate(
+                                      //     {
+                                      //       pathname: `/expense/edit/${txn.expenseId}`,
+                                      //       search: searchParams.toString(),
+                                      //     },
+                                      //     {
+                                      //       state: {
+                                      //         from: "expense-items",
+                                      //         itemId: selectedItemId,
+                                      //         txnSearch,
+                                      //         itemSearch,
+                                      //       },
+                                      //     }
+                                      //   );
+                                      // }
                                       if (key === "view") {
+                                        const params = new URLSearchParams(searchParams);
+
+                                        params.set(
+                                          "highlightTxn",
+                                          String(txn.expenseId)
+                                        );
+
                                         navigate(
                                           {
                                             pathname: `/expense/edit/${txn.expenseId}`,
-                                            search: searchParams.toString(),
+                                            search: params.toString(),
                                           },
                                           {
                                             state: {

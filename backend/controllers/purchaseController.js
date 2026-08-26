@@ -997,6 +997,22 @@ try {
         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
         [newPurchaseItemId, pitId]
       );
+      await connection.execute(
+  `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+  [
+    resolvedSelectedUnit || null,
+    snapshot.Primary_Unit_Snapshot || null,
+    snapshot.Secondary_Unit_Snapshot || null,
+    Item_Id,
+  ]
+);
      await syncUnitIdsForItem(connection, Item_Id);
 await syncUnitIdsForPurchaseItem(connection, {
   purchaseItemRowId: pitId,
@@ -2441,6 +2457,22 @@ for (const itemId of allItemIds) {
         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
         ["PIT" + id.toString().padStart(3, "0"), id]
       );
+      await connection.execute(
+  `
+  UPDATE add_item
+  SET
+    Item_Unit = ?,
+    Primary_Unit = ?,
+    Secondary_Unit = ?
+  WHERE Item_Id = ?
+  `,
+  [
+    line.resolvedSelectedUnit || null,
+    line.snapshot.Primary_Unit_Snapshot || null,
+    line.snapshot.Secondary_Unit_Snapshot || null,
+    line.Item_Id,
+  ]
+);
 
       await syncUnitIdsForItem(connection,line.Item_Id);
 

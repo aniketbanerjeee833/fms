@@ -1,7 +1,7 @@
 import  { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet } from 'lucide-react'
+import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet, IndianRupee } from 'lucide-react'
 
 const REACT_APP_API_URL = "http://localhost:4000";
 
@@ -216,7 +216,14 @@ if (
   return (
     <>
       {/* Sidebar Header */}
-      <div  className="sb2-12 flex items-center justify-center  ">
+      <div 
+       className="sb2-12 flex items-center justify-center"
+         style={{
+         
+           backgroundColor: "#f4f7f9",
+         
+        }}
+       >
         {/* <ul className="flex flex-col items-center">
         
           <li className="mt-4">
@@ -232,6 +239,7 @@ if (
           height: "100%",
           display: "flex",
           flexDirection: "column",
+           backgroundColor: "#f4f7f9",
          
         }}
       >
@@ -244,6 +252,7 @@ if (
             flexDirection: "column",
             margin: 0,
             padding: 0,
+            
           }}
         >
            <NavLink
@@ -284,7 +293,7 @@ if (
           ])}
 
          
-               {renderMenu("Sales", <DollarSign size={20} />, [
+               {renderMenu("Sales", <IndianRupee size={20} />, [
             { to: "/sale/all-sales", text: "  Sale Invoices" },
            {to: "/sale/invoice", text: " Invoice" },
             //{ to: "/sale/add", text: "Add Sale" },

@@ -16,7 +16,13 @@ export default function Layout({ children }) {
         </div>
 
         {/* Main content */}
-        <div className="sb2-2">{children}</div>
+        {/* <div className="sb2-2">{children}</div> */}
+        <div className="sb2-2 "
+        style={{
+          
+          overflow: "hidden"
+        }}
+        >{children}</div>
       </div>
     </div>
     </>

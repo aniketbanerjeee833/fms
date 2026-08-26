@@ -142,6 +142,9 @@ function BankDetailPanel({ bankId }) {
   const [cursor, setCursor] = useState(null);
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
+    const itemRef = useRef(bankId);
+  
+      const effectiveCursor = itemRef.current === bankId ? cursor : null;
 
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
@@ -166,7 +169,8 @@ function BankDetailPanel({ bankId }) {
   const { data: banks = [] } = useGetAllBankAccountsQuery();
 
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
-    { Bank_Account_Id: bankId, cursor },
+    //{ Bank_Account_Id: bankId, cursor },
+    { Bank_Account_Id: bankId, cursor: effectiveCursor },
     { skip: !bankId }
   );
 
@@ -179,9 +183,13 @@ function BankDetailPanel({ bankId }) {
 
   // 🔹 reset cursor when bank changes
 
-  useEffect(() => {
-    setCursor(null);
-  }, [bankId]);
+  // useEffect(() => {
+  //   setCursor(null);
+  // }, [bankId]);
+      useEffect(() => {
+          itemRef.current = bankId;
+          setCursor(null);
+      }, [bankId]);
 
   // 🔹 intersection observer
   const handleObserver = useCallback(

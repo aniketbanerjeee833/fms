@@ -166,7 +166,9 @@ export default function AllSaleList() {
   return (
     <>
 
-      <div className="flex flex-col bg-white ">
+      <div className="flex flex-col bg-white "
+      //style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
+      >
 
         <div className="inn-title">
           <div className="flex flex-col sm:flex-col lg:flex-row justify-between lg:items-center">
@@ -362,9 +364,13 @@ export default function AllSaleList() {
 
           </div>
         </div>
-
-        <div className="tab-inn">
-          <div className="table-responsive table-desi">
+        
+        <div className="tab-inn"
+        //style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
+        >
+          <div className="table-responsive table-desi"
+           //style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}
+          >
             {isLoading ? (
               <p className="text-center mt-4">Fetching sales...</p>
             ) : sales?.length === 0 ? (

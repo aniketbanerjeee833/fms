@@ -877,20 +877,7 @@ export default function SaleAdd() {
 
   return (
     <>
-      {/* <div className="sb2-2-2">
-        <ul>
-        
-          <NavLink style={{ display: "flex", flexDirection: "row" }}
-            to="/home"
-
-          >
-            <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-           
-            Dashboard
-          </NavLink>
-
-        </ul>
-      </div> */}
+     
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -902,7 +889,7 @@ export default function SaleAdd() {
       <div style={{ padding: "20px" }}
         className="flex flex-col bg-white ">
 
-        <div className="inn-title w-full px-2 py-3">
+        <div style={{ marginTop: "2rem" }} className="inn-title w-full px-2 py-3">
 
           <div className="
     flex flex-col sm:flex-row 
