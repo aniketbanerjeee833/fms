@@ -736,17 +736,19 @@ moveItemsToCategory: builder.mutation({
   forceRefetch: ({ currentArg, previousArg }) =>
     currentArg?.cursor !== previousArg?.cursor ||
     currentArg?.search !== previousArg?.search ||
-    currentArg?.type !== previousArg?.type,
+    currentArg?.type !== previousArg?.type||
+    currentArg?.limit !== previousArg?.limit,   // 👈 added
 
   providesTags: [{ type: "ItemLedger", id: "LIST" }],
 }),
 
     getItemBills: builder.query({
-      query: ({ Item_Id, cursor = null, search = "", date = "" }) => {
+      query: ({ Item_Id, cursor = null, search = "", date = "",limit = 10 }) => {
         const params = new URLSearchParams();
         if (cursor) params.set("cursor", cursor);
         if (search?.trim()) params.set("search", search.trim());
         if (date) params.set("date", date);
+        params.set("limit", limit);   
         return `item/${Item_Id}/bills?${params.toString()}`;
       },
       serializeQueryArgs: ({ queryArgs }) => {
@@ -768,7 +770,8 @@ moveItemsToCategory: builder.mutation({
         currentArg?.cursor !== previousArg?.cursor ||
         currentArg?.search !== previousArg?.search ||
         currentArg?.date !== previousArg?.date ||
-        currentArg?.Item_Id !== previousArg?.Item_Id,
+        currentArg?.Item_Id !== previousArg?.Item_Id||
+    currentArg?.limit !== previousArg?.limit,
       /* already correctly scoped by Item_Id — no change needed */
       providesTags: (result, error, arg) => [
         { type: "ItemLedger", id: arg.Item_Id },

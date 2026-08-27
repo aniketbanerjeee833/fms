@@ -148,6 +148,7 @@ export default function AddExpense() {
     // const [activeUnitRow, setActiveUnitRow] = useState(null);
 
     const [originalTotal, setOriginalTotal] = useState(null);
+    const [isRoundOff, setIsRoundOff] = useState(false);
     const [showBankModal, setShowBankModal] = useState(false);
     const [activeSplitRow, setActiveSplitRow] = useState(null); // which split row triggered "+ Add Bank A/C"
     const [showSplitBox, setShowSplitBox] = useState(false);
@@ -219,6 +220,97 @@ export default function AddExpense() {
     const splitsValues = watch("splits") || [];
     const totalAmountWatch = watch("Total_Amount");
 
+    /* ───────────────────────── ITEM TABLE TOTALS ───────────────────────── */
+
+    const calculateTotals = (items = []) => {
+        return items.reduce(
+            (acc, row) => {
+                const qty = Number(row.Quantity) || 0;
+                const price = Number(row.Price) || 0;
+
+                const subtotal = price * qty;
+
+                let discount = Number(row.Discount_On_Price) || 0;
+
+                if (
+                    (row.Discount_Type_On_Price || "Percentage") ===
+                    "Percentage"
+                ) {
+                    discount = (subtotal * discount) / 100;
+                } else if (
+                    (row.Discount_Type_On_Price || "Percentage") ===
+                    "Amount"
+                ) {
+                    // Amount discount is per unit
+                    discount = discount * qty;
+                }
+
+                const afterDiscount = Math.max(
+                    0,
+                    subtotal - discount
+                );
+
+                const taxPercent =
+                    TAX_RATES[row.Tax_Type] ?? 0;
+
+                const taxAmount =
+                    (afterDiscount * taxPercent) / 100;
+
+                const finalAmount = afterDiscount + taxAmount;
+
+                return {
+                    totalQty: acc.totalQty + qty,
+                    totalDiscount:
+                        acc.totalDiscount + discount,
+                    totalTaxAmount:
+                        acc.totalTaxAmount + taxAmount,
+                    totalAmount:
+                        acc.totalAmount + finalAmount,
+                };
+            },
+            {
+                totalQty: 0,
+                totalDiscount: 0,
+                totalTaxAmount: 0,
+                totalAmount: 0,
+            }
+        );
+    };
+
+    const itemTotals = calculateTotals(itemsValues || []);
+
+    const getRawTotal = () => {
+        return (itemsValues || []).reduce(
+            (sum, item) => sum + (Number(item.Amount) || 0),
+            0
+        );
+    };
+
+    const applyRoundOff = (roundOffValue) => {
+        const rawTotal = getRawTotal();
+        const totalPaid = Number(watch("Total_Paid")) || 0;
+        const newTotal = rawTotal + roundOffValue;
+
+        setValue(
+            "Total_Amount",
+            newTotal.toFixed(2),
+            {
+                shouldValidate: true,
+                shouldDirty: true,
+            }
+        );
+
+        setValue(
+            "Balance_Due",
+            (newTotal - totalPaid).toFixed(2),
+            {
+                shouldValidate: true,
+                shouldDirty: true,
+            }
+        );
+    };
+
+
     /* ───────────────────────── ROW CALCULATIONS ───────────────────────── */
     const calculateRowAmount = (row, index, items) => {
         const price = num(row.Price);
@@ -262,22 +354,95 @@ export default function AddExpense() {
 
     const recalcRow = (index, patch) => {
         const updatedRow = { ...itemsValues[index], ...patch };
-        const { Tax_Amount, Amount, Total_Amount } = calculateRowAmount(updatedRow, index, itemsValues);
-        Object.entries(patch).forEach(([key, val]) =>
-            setValue(`items.${index}.${key}`, val, { shouldValidate: true, shouldDirty: true })
+
+        const { Tax_Amount, Amount } = calculateRowAmount(
+            updatedRow,
+            index,
+            itemsValues
         );
-        setValue(`items.${index}.Tax_Amount`, Tax_Amount, { shouldDirty: true });
-        setValue(`items.${index}.Amount`, Amount, { shouldDirty: true });
-        setValue("Total_Amount", Total_Amount, { shouldDirty: true });
+
+        Object.entries(patch).forEach(([key, val]) =>
+            setValue(
+                `items.${index}.${key}`,
+                val,
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            )
+        );
+
+        setValue(
+            `items.${index}.Tax_Amount`,
+            Tax_Amount,
+            { shouldDirty: true }
+        );
+
+        setValue(
+            `items.${index}.Amount`,
+            Amount,
+            { shouldDirty: true }
+        );
+
+        // Recalculate total after the current row has changed
+        const updatedItems = [...itemsValues];
+
+        updatedItems[index] = {
+            ...updatedItems[index],
+            ...patch,
+            Tax_Amount,
+            Amount,
+        };
+
+        const rawTotal = updatedItems.reduce(
+            (sum, item) => sum + (Number(item.Amount) || 0),
+            0
+        );
+
+        const roundOffValue = isRoundOff
+            ? Number(watch("Round_Off")) || 0
+            : 0;
+
+        const finalTotal = rawTotal + roundOffValue;
+
+        setValue(
+            "Total_Amount",
+            finalTotal.toFixed(2),
+            {
+                shouldValidate: true,
+                shouldDirty: true,
+            }
+        );
     };
 
     const handleAddRow = () => append(emptyRow());
 
     const handleDeleteRow = (i) => {
-        const remaining = itemsValues.filter((_, idx) => idx !== i);
-        const newTotal = remaining.reduce((sum, r) => sum + num(r.Amount), 0);
+        const remaining = itemsValues.filter(
+            (_, idx) => idx !== i
+        );
+
+        const newRawTotal = remaining.reduce(
+            (sum, row) => sum + num(row.Amount),
+            0
+        );
+
         remove(i);
-        setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+
+        const roundOffValue = isRoundOff
+            ? Number(watch("Round_Off")) || 0
+            : 0;
+
+        const newTotal = newRawTotal + roundOffValue;
+
+        setValue(
+            "Total_Amount",
+            newTotal.toFixed(2),
+            {
+                shouldValidate: true,
+                shouldDirty: true,
+            }
+        );
     };
 
     /* ───────────────────────── PAYMENT SPLITS (mirrors PurchaseAdd) ───────────────────────── */
@@ -318,14 +483,41 @@ export default function AddExpense() {
     /* ───────────────────────── ROUND OFF ───────────────────────── */
     const handleRoundOffToggle = (e) => {
         const isChecked = e.target.checked;
-        const totalAmount = parseFloat(totalAmountWatch);
-        if (!totalAmount || isNaN(totalAmount)) return;
+
+        setIsRoundOff(isChecked);
+
+        const rawTotal = getRawTotal();
 
         if (isChecked) {
-            setOriginalTotal(totalAmount);
-            setValue("Total_Amount", Math.round(totalAmount).toFixed(2), { shouldValidate: true });
-        } else if (originalTotal !== null) {
-            setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+            const rounded = Math.round(rawTotal);
+
+            const diff = Number(
+                (rounded - rawTotal).toFixed(2)
+            );
+
+            setOriginalTotal(rawTotal);
+
+            setValue(
+                "Round_Off",
+                diff !== 0 ? diff.toFixed(2) : "",
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            );
+
+            applyRoundOff(diff);
+        } else {
+            setValue(
+                "Round_Off",
+                "",
+                {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                }
+            );
+
+            applyRoundOff(0);
         }
     };
 
@@ -346,6 +538,7 @@ export default function AddExpense() {
 
     /* ───────────────────────── SUBMIT ───────────────────────── */
     const onSubmit = async (data) => {
+        // console.log("SUBMITTED ROUND OFF:", data.Round_Off);
 
         try {
 
@@ -895,6 +1088,7 @@ export default function AddExpense() {
                                     </tr>
                                 </thead>
                                 <tbody>
+
                                     {fields.map((field, i) => (
                                         <tr key={field.id}>
                                             <td style={{ textAlign: "center", verticalAlign: "middle" }}>
@@ -1168,6 +1362,66 @@ export default function AddExpense() {
                                         </tr>
                                     ))}
                                 </tbody>
+
+                                <tfoot>
+                                    <tr>
+                                        {/* # */}
+                                        <td></td>
+
+                                        {/* Item */}
+                                        <td >
+                                            Total
+                                        </td>
+
+                                        {/* HSN Code */}
+                                        {gstEnabled && <td></td>}
+
+                                        {/* Quantity */}
+                                        <td
+                                            style={{
+                                                textAlign: "right",
+                                            }}
+                                        >
+                                            {itemTotals.totalQty.toFixed(2)}
+                                        </td>
+
+                                        {/* Price / Unit */}
+                                        <td></td>
+
+                                        {/* Discount */}
+                                        {gstEnabled && (
+                                            <td
+                                                style={{
+                                                    textAlign: "right",
+                                                }}
+                                            >
+                                                ₹{itemTotals.totalDiscount.toFixed(2)}
+                                            </td>
+                                        )}
+
+                                        {/* Tax */}
+                                        <td></td>
+
+                                        {/* Tax Amount */}
+                                        <td
+                                            style={{
+                                                textAlign: "right",
+                                            }}
+                                        >
+                                            ₹{itemTotals.totalTaxAmount.toFixed(2)}
+                                        </td>
+
+                                        {/* Amount */}
+                                        <td
+                                            style={{
+                                                textAlign: "right",
+                                            }}
+                                        >
+                                            ₹{itemTotals.totalAmount.toFixed(2)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+
                             </table>
 
                             <div className="p-2">
@@ -1346,24 +1600,45 @@ export default function AddExpense() {
                                 {/* Round off + Total */}
                                 <div style={{ width: "100%" }} className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2">
                                     <div style={{ width: "100%" }} className="flex justify-between items-start gap-6 w-full mr-4">
+
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="checkbox"
                                                 id="roundOffCheck"
                                                 className="w-4 h-4 cursor-pointer"
+                                                checked={isRoundOff}
                                                 onChange={handleRoundOffToggle}
                                             />
-                                            <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                                            <span className="font-medium whitespace-nowrap">
+                                                Round Off
+                                            </span>
+
                                             <input
                                                 type="text"
                                                 {...register("Round_Off")}
+                                                readOnly={!isRoundOff}
                                                 onChange={(e) => {
-                                                    const val = parseFloat(e.target.value) || 0;
-                                                    const base = originalTotal ?? parseFloat(totalAmountWatch);
-                                                    if (isNaN(base)) return;
-                                                    setValue("Total_Amount", (base + val).toFixed(2));
+                                                    const val = e.target.value;
+
+                                                    setValue(
+                                                        "Round_Off",
+                                                        val,
+                                                        {
+                                                            shouldValidate: true,
+                                                            shouldDirty: true,
+                                                        }
+                                                    );
+
+                                                    const numVal = parseFloat(val) || 0;
+
+                                                    applyRoundOff(numVal);
                                                 }}
-                                                style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                                                style={{
+                                                    marginTop: "10px",
+                                                    width: "60px",
+                                                    height: "1.5rem",
+                                                }}
                                                 className="border border-gray-300 text-right text-sm"
                                             />
                                         </div>

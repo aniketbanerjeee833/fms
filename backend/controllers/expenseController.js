@@ -234,9 +234,10 @@ const getAllExpenseItemMastersCursor = async (req, res, next) => {
       ? parseInt(req.query.cursor, 10)
       : null;
 
-    const limit = req.query.limit
-      ? Math.min(parseInt(req.query.limit, 10), 100)
-      : 10;
+    // const limit = req.query.limit
+    //   ? Math.min(parseInt(req.query.limit, 10), 100)
+    //   : 10;
+     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     const search = req.query.search?.trim() || "";
 
@@ -1537,9 +1538,8 @@ const getExpensesByCategory = async (req, res, next) => {
       ? Number(req.query.cursor)
       : null;
 
-    const search =
-      req.query.search?.trim().toLowerCase() || "";
-
+    const search =req.query.search?.trim().toLowerCase() || "";
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
     const date = req.query.date || "";
 
     const whereClauses = [
@@ -1612,14 +1612,21 @@ const getExpensesByCategory = async (req, res, next) => {
 
       LIMIT ?
       `,
-      [...params, PAGE_SIZE + 1]
+      // [...params, PAGE_SIZE + 1]
+       [...params, limit + 1]
     );
 
+    // const hasMore =
+    //   rows.length > PAGE_SIZE;
+
+    // const pageRows = hasMore
+    //   ? rows.slice(0, PAGE_SIZE)
+    //   : rows;
     const hasMore =
-      rows.length > PAGE_SIZE;
+      rows.length > limit;
 
     const pageRows = hasMore
-      ? rows.slice(0, PAGE_SIZE)
+      ? rows.slice(0, limit)
       : rows;
 
     // Payment Type Display
@@ -1736,7 +1743,7 @@ const getExpenseItemUsage = async (req, res, next) => {
 
     const date = req.query.date || null;
     const search = req.query.search?.trim() || "";
-
+     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
     const whereClauses = [
       `ei.Expense_Item_Master_Id = ?`,
     ];
@@ -1820,13 +1827,20 @@ const getExpenseItemUsage = async (req, res, next) => {
 
       LIMIT ?
       `,
-      [...params, PAGE_SIZE + 1]
+      // [...params, PAGE_SIZE + 1]
+      [...params, limit + 1]
     );
 
-    const hasMore = rows.length > PAGE_SIZE;
+    // const hasMore = rows.length > PAGE_SIZE;
+
+    // const pageRows = hasMore
+    //   ? rows.slice(0, PAGE_SIZE)
+    //   : rows;
+
+      const hasMore = rows.length > limit;
 
     const pageRows = hasMore
-      ? rows.slice(0, PAGE_SIZE)
+      ? rows.slice(0, limit)
       : rows;
 
     // Attach Payment_Type_Display

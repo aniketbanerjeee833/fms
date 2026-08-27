@@ -27,10 +27,11 @@ export const bankAccountApi = createApi({
     //   ],
     // }),
     getBankAccountById: builder.query({
-  query: ({ Bank_Account_Id, cursor = null }) => {
+  query: ({ Bank_Account_Id, cursor = null,limit = 10 }) => {
     //const params = new URLSearchParams({ limit });
     const params = new URLSearchParams();
     if (cursor) params.set("cursor", cursor);
+    params.set("limit", limit);   
     return `/bank/bank-account/${Bank_Account_Id}?${params.toString()}`;
   },
 
@@ -40,30 +41,50 @@ export const bankAccountApi = createApi({
   }),
 
   // 🔹 merge incoming page into existing cache
-  merge: (currentCache, newData) => {
-    if (!currentCache.transactions) {
-      // first page — replace entirely
-      return newData;
+  // merge: (currentCache, newData) => {
+  //   if (!currentCache.transactions) {
+  //     // first page — replace entirely
+  //     return newData;
+  //   }
+  //   // subsequent pages — append, deduplicate by id
+  //   const existingIds = new Set(
+  //     currentCache.transactions.map((t) => t.id)
+  //   );
+  //   const fresh = newData.transactions.filter(
+  //     (t) => !existingIds.has(t.id)
+  //   );
+  //   return {
+  //     ...newData,                              // hasMore, nextCursor, bankAccount, currentBalance
+  //     transactions: [
+  //       ...currentCache.transactions,
+  //       ...fresh,
+  //     ],
+  //   };
+  // },
+  merge: (currentCache, newData, { arg }) => {
+    if (!arg.cursor) {
+        // first page (including the one-shot restore fetch) — always replace
+        return newData;
     }
-    // subsequent pages — append, deduplicate by id
+
     const existingIds = new Set(
-      currentCache.transactions.map((t) => t.id)
+        currentCache.transactions.map((t) => t.id)
     );
     const fresh = newData.transactions.filter(
-      (t) => !existingIds.has(t.id)
+        (t) => !existingIds.has(t.id)
     );
     return {
-      ...newData,                              // hasMore, nextCursor, bankAccount, currentBalance
-      transactions: [
-        ...currentCache.transactions,
-        ...fresh,
-      ],
+        ...newData,
+        transactions: [
+            ...currentCache.transactions,
+            ...fresh,
+        ],
     };
-  },
+},
 
   // 🔹 re-fetch when cursor changes
   forceRefetch: ({ currentArg, previousArg }) =>
-    currentArg?.cursor !== previousArg?.cursor,
+    currentArg?.cursor !== previousArg?.cursor || currentArg?.limit !== previousArg?.limit,
 
   providesTags: (result, error, { Bank_Account_Id }) => [
     { type: "BankAccount", id: Bank_Account_Id },

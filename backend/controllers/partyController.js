@@ -1086,9 +1086,10 @@ const getAllPartiesCursor = async (req, res, next) => {
       ? parseInt(req.query.cursor, 10)
       : null;
 
-    const limit = req.query.limit
-      ? Math.min(parseInt(req.query.limit, 10), 10)
-      : 10;
+    // const limit = req.query.limit
+    //   ? Math.min(parseInt(req.query.limit, 10), 10)
+    //   : 10;
+     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     const search = req.query.search
       ? req.query.search.trim()
@@ -1237,7 +1238,10 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
     connection = await db.getConnection();
 
     const { Party_Id } = req.params;
-    const limit = 10;
+    // caps the one-shot "restore scroll position" fetch (see leftCount/rightCount in sessionStorage)
+      // raise this if a customer's party/item list regularly exceeds it
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
+    // const limit = 10;
     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
     const searchDate = req.query.date || null;
     const normalizedSearch = search.replace(/-/g, "/");

@@ -134,56 +134,6 @@ const editBankAccount = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-// const editBankAccount = async (req, res, next) => {
-//   try {
-//     const { Bank_Account_Id } = req.params;
-//     const {
-//       accountDisplayName,
-//       openingBalance,
-//       asOfDate,
-//       accountNumber,
-//       ifscCode,
-//       upiId,
-//       qrCodeImage,
-//       bankName,
-//       accountHolderName,
-//     } = req.body;
-
-//     if (!accountDisplayName || !accountDisplayName.trim()) {
-//       return res.status(400).json({ success: false, message: "Account Display Name is required" });
-//     }
-
-//     const [existing] = await db.query(`SELECT * FROM bank_accounts WHERE id = ?`, [Bank_Account_Id]);
-//     if (existing.length === 0) {
-//       return res.status(404).json({ success: false, message: "Bank account not found" });
-//     }
-
-//     await db.query(
-//       `UPDATE bank_accounts SET
-//         Account_Display_Name = ?, Opening_Balance = ?, As_Of_Date = ?,
-//         Account_Number = ?, IFSC_Code = ?, UPI_Id = ?, QR_Code_Image = ?,
-//         Bank_Name = ?, Account_Holder_Name = ?
-//        WHERE id = ?`,
-//       [
-//         accountDisplayName.trim(),
-//         openingBalance || 0,
-//         asOfDate || null,
-//         accountNumber || null,
-//         ifscCode || null,
-//         upiId || null,
-//         qrCodeImage || null,
-//         bankName || null,
-//         accountHolderName || null,
-//         Bank_Account_Id,
-//       ]
-//     );
-
-//     res.status(200).json({ success: true, message: "Bank account updated successfully" });
-//   } catch (err) {
-//     console.error("❌ Edit bank account error:", err);
-//     next(err);
-//   }
-// };
 
 /* ═══════════════════════════════════════
    GET ALL BANK ACCOUNTS
@@ -341,7 +291,8 @@ ORDER BY ba.Account_Display_Name;
 const getBankAccountById = async (req, res, next) => {
   try {
     const { Bank_Account_Id } = req.params;
-    const limit = Number(req.query.limit) || 10;
+     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
+    //const limit = Number(req.query.limit) || 10;
 
     // 🔹 decode cursor
     let cursorId = null;

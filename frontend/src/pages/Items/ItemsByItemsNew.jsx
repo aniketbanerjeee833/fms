@@ -1,8 +1,8 @@
 
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
-import {  useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
-   
+    LayoutDashboard,
     Search,
     MoreVertical,
     ChevronRight,
@@ -95,7 +95,7 @@ export default function ItemsByItem() {
     const [leftCursor, setLeftCursor] = useState(null);
     const leftSentinelRef = useRef(null);
     const leftObserverRef = useRef(null);
-    const initialLeftLimit = useRef(Number(sessionStorage.getItem("itemsByItem:leftCount")) || 10);
+
     const {
         data: itemsResponse,
         isLoading,
@@ -104,8 +104,7 @@ export default function ItemsByItem() {
         cursor: leftCursor,
         search: itemSearch,
         type: itemTypeTab,
-        limit: leftCursor ? 10 : initialLeftLimit.current
-        //limit: 10,
+        limit: 10,
     });
 
     const items = itemsResponse?.items || [];
@@ -118,8 +117,6 @@ export default function ItemsByItem() {
     // useEffect(() => {
     //     setLeftCursor(null);
     // }, [itemSearch]);
-
-
     useEffect(() => {
         if (!selectedItemId && items.length > 0) {
             const next = new URLSearchParams(searchParams);
@@ -130,14 +127,9 @@ export default function ItemsByItem() {
     useEffect(() => {
         setLeftCursor(null);
     }, [itemSearch, itemTypeTab]);
-
-
     const handleLeftObserver = useCallback(
-
         (entries) => {
-            //if (isRestoringLeft) return;
             if (
-
                 entries[0].isIntersecting &&
                 itemsHasMore &&
                 itemsNextCursor &&
@@ -183,9 +175,7 @@ export default function ItemsByItem() {
     const itemRef = useRef(selectedItemId);
 
     const effectiveCursor = itemRef.current === selectedItemId ? cursor : null;
-    const initialRightLimit = useRef(
-        Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
-    );
+
     const {
         data: billsResponse,
         isLoading: isBillsLoading,
@@ -196,7 +186,6 @@ export default function ItemsByItem() {
             Item_Id: selectedItemId,
             cursor: effectiveCursor,
             search: txnSearch,
-            limit: effectiveCursor ? 10 : initialRightLimit.current
         },
         {
             skip: !selectedItemId,
@@ -232,9 +221,7 @@ export default function ItemsByItem() {
 
     const handleObserver = useCallback(
         (entries) => {
-            //if(isRestoringRight) return;
             if (
-
                 entries[0].isIntersecting &&
                 hasMore &&
                 nextCursor &&
@@ -249,7 +236,6 @@ export default function ItemsByItem() {
             nextCursor,
             isBillsFetching,
             isBillsLoading,
-
         ]
     );
 
@@ -306,7 +292,107 @@ export default function ItemsByItem() {
 
 
 
+    // const handleTransactionEdit = (txn) => {
+    //     setRowMenuOpen(null);
 
+    //     if (
+    //         txn?.Txn_Type === "Add_Adjustment" ||
+    //         txn?.Txn_Type === "Reduce_Adjustment"
+    //     ) {
+    //         if (!txn?.Source_Id) {
+    //             console.error(
+    //                 "No Source_Id found for stock adjustment:",
+    //                 txn
+    //             );
+    //             return;
+    //         }
+
+    //         setEditingAdjustment({
+    //             ...txn,
+    //             id: txn.Source_Id,
+    //             Item_Id: txn.Item_Id || selectedItemId,
+    //             Adjustment_Type:
+    //                 txn.Adjustment_Type ||
+    //                 (txn.Txn_Type === "Add_Adjustment"
+    //                     ? "Add"
+    //                     : "Reduce"),
+    //         });
+
+    //         setShowStockAdjustmentModal(true);
+
+    //         return;
+    //     }
+
+    //     if (!txn?.Document_Id) {
+    //         console.error(
+    //             "No Document_Id found for transaction:",
+    //             txn
+    //         );
+    //         return;
+    //     }
+
+    //     const navigationState = {
+    //         from: "items-by-item",
+    //         itemId: selectedItemId,
+    //     };
+
+    //     switch (txn.Txn_Type) {
+
+    //         case "Sale":
+    //             navigate(
+    //                 {
+    //                     pathname: `/sale/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         case "Purchase":
+    //             navigate(
+    //                 {
+    //                     pathname: `/purchase/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         case "Sale_Return":
+    //             navigate(
+    //                 {
+    //                     pathname: `/sale/return/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         case "Purchase_Return":
+    //             navigate(
+    //                 {
+    //                     pathname: `/purchase/return/edit/${txn.Document_Id}`,
+    //                     search: searchParams.toString(),
+    //                 },
+    //                 {
+    //                     state: navigationState,
+    //                 }
+    //             );
+    //             break;
+
+    //         default:
+    //             console.warn(
+    //                 "No edit route configured for transaction type:",
+    //                 txn.Txn_Type
+    //             );
+    //     }
+    // };
     const handleTransactionEdit = (txn) => {
         setRowMenuOpen(null);
 
@@ -619,63 +705,6 @@ export default function ItemsByItem() {
         }
     };
     console.log("selectedItemMeta", selectedItemMeta);
-
-    const leftListRef = useRef(null);
-    const rightPanelRef = useRef(null);
-    const selectedItemRowRef = useRef(null);
-const highlightedRowRef = useRef(null);
-    useEffect(() => {
-        const leftEl = leftListRef.current;
-        const rightEl = rightPanelRef.current;
-
-        const saveLeft = () => {
-            sessionStorage.setItem("itemsByItem:leftScroll", leftEl.scrollTop);
-            sessionStorage.setItem("itemsByItem:leftCount", items.length);
-        };
-        const saveRight = () => {
-            console.log("saveRight fired", rightEl.scrollTop, transactions.length);
-            sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
-            sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
-            // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
-            // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
-        };
-
-        leftEl?.addEventListener("scroll", saveLeft);
-        rightEl?.addEventListener("scroll", saveRight);
-
-        return () => {
-            leftEl?.removeEventListener("scroll", saveLeft);
-            rightEl?.removeEventListener("scroll", saveRight);
-        };
-    }, [items.length, transactions.length]);
-
-
-
-const hasRestoredLeftRef = useRef(false);
-
-useLayoutEffect(() => {
-    if (hasRestoredLeftRef.current) return; // only do this once per mount
-    if (isLoading || isItemsFetching) return;
-
-    const savedCount = Number(sessionStorage.getItem("itemsByItem:leftCount")) || 0;
-    if (items.length < savedCount) return;
-
-    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-}, [isLoading, isItemsFetching, items.length, selectedItemId]);
-
-const hasRestoredRightRef = useRef(false);
-
-useLayoutEffect(() => {
-    if (hasRestoredRightRef.current) return;
-    if (isBillsLoading || isBillsFetching) return;
-
-    const savedCount = Number(sessionStorage.getItem("itemsByItem:rightCount")) || 0;
-    if (transactions.length < savedCount) return;
-
-    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredRightRef.current = true;
-}, [isBillsLoading, isBillsFetching, transactions.length]);
     return (
         <>
             <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
@@ -732,12 +761,11 @@ useLayoutEffect(() => {
                 >
 
                     {/* ══ LEFT — 30% — item list (now infinite scroll) ══ */}
-                    <div ref={leftListRef}
+                    <div
                         className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
                         style={{
                             borderRight: "1px solid #e2e8f0",
-                            minHeight: 0, 
-                            //minHeight: "500px",
+                            minHeight: "500px",
                             maxHeight: "calc(100vh - 180px)",
                             boxSizing: "border-box",
                         }}
@@ -802,7 +830,6 @@ useLayoutEffect(() => {
                                     return (
                                         <div
                                             key={item.Item_Id}
-                                            ref={isSelected ? selectedItemRowRef : null}
                                             onClick={() => handleSelectItem(item)}
                                             onDoubleClick={() => {
                                                 handleSelectItem(item);
@@ -930,22 +957,83 @@ useLayoutEffect(() => {
                     </div>
 
                     {/* ══ RIGHT — 70% — detail panel ══ */}
-                    <div ref={rightPanelRef}
+                    <div
                         className="w-full lg:w-[70%] p-1 overflow-y-auto overflow-x-hidden"
                         style={{
                             maxHeight: "calc(100vh - 180px)",
-                            minHeight: 0,      // 👈 add this
                             minWidth: 0
                         }}
                     >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col h-full">
 
                             {/* ── ITEM SUMMARY CARD ── */}
-
-                            {(liveItem || selectedItemMeta) && (
+                            {selectedItemMeta && (
                                 <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
 
+                                    {/* <div className="flex items-center justify-between gap-4 min-w-0">
+
+                                        <div className="flex items-center gap-4 flex-1 min-w-0">
+
+                                            <div
+                                                className="flex items-center justify-center rounded-xl flex-shrink-0"
+                                                style={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    backgroundColor: "#4CA1AF22"
+                                                }}
+                                            >
+                                                <Package
+                                                    size={22}
+                                                    style={{ color: "#4CA1AF" }}
+                                                />
+                                            </div>
+
+                                            <div className="min-w-0">
+
+                                                <h6
+                                                    className="font-bold text-black truncate"
+                                                    style={{
+                                                        fontSize: 15,
+                                                        margin: 0
+                                                    }}
+                                                    title={
+                                                        liveItem?.Item_Name ||
+                                                        selectedItemMeta.Item_Name
+                                                    }
+                                                >
+                                                    {liveItem?.Item_Name ||
+                                                        selectedItemMeta.Item_Name}
+                                                </h6>
+
+                                               
+                                                {selectedItemMeta.Item_Category &&
+                                                    selectedItemMeta.Item_Category.trim() !== "" && (
+                                                        <p className="text-gray-600 text-sm mt-0.5">
+                                                            {selectedItemMeta.Item_Category}
+                                                        </p>
+                                                    )}
+
+                                            </div>
+
+                                        </div>
+
+                                        {itemTypeTab === "Product" && (<button
+                                            type="button"
+                                            onClick={handleAdjustItem}
+                                            className="text-white px-4 py-2 rounded-md text-sm font-medium"
+                                            style={{
+                                                backgroundColor: "#4CA1AF",
+                                                outline: "none",
+                                                boxShadow: "none",
+                                                whiteSpace: "nowrap"
+                                            }}
+                                        >
+                                            + Adjust Item
+                                        </button>)}
+
+                                    </div> */}
                                     <div className="grid grid-cols-[1fr_auto] items-start gap-3 min-w-0">
+
 
                                         <div className="flex items-center gap-4 min-w-0">
 
@@ -957,25 +1045,34 @@ useLayoutEffect(() => {
                                                     backgroundColor: "#4CA1AF22"
                                                 }}
                                             >
-                                                <Package size={22} style={{ color: "#4CA1AF" }} />
+                                                <Package
+                                                    size={22}
+                                                    style={{ color: "#4CA1AF" }}
+                                                />
                                             </div>
 
                                             <div className="min-w-0">
                                                 <h6
                                                     className="font-bold text-black break-words whitespace-normal"
-                                                    style={{ fontSize: 15, margin: 0 }}
+                                                    style={{
+                                                        fontSize: 15,
+                                                        margin: 0
+                                                    }}
                                                 >
-                                                    {liveItem?.Item_Name || selectedItemMeta?.Item_Name}
+                                                    {liveItem?.Item_Name ||
+                                                        selectedItemMeta.Item_Name}
                                                 </h6>
 
-                                                {(liveItem?.Item_Category ?? selectedItemMeta?.Item_Category)?.trim() && (
-                                                    <p className="text-gray-600 text-sm mt-0.5">
-                                                        {liveItem?.Item_Category ?? selectedItemMeta?.Item_Category}
-                                                    </p>
-                                                )}
+                                                {selectedItemMeta.Item_Category &&
+                                                    selectedItemMeta.Item_Category.trim() !== "" && (
+                                                        <p className="text-gray-600 text-sm mt-0.5">
+                                                            {selectedItemMeta.Item_Category}
+                                                        </p>
+                                                    )}
                                             </div>
 
                                         </div>
+
 
                                         {itemTypeTab === "Product" && (
                                             <button
@@ -993,11 +1090,10 @@ useLayoutEffect(() => {
                                         )}
 
                                     </div>
-
                                     <div className="
-            grid grid-cols-2 gap-x-4 gap-y-3 mt-3
-            sm:flex sm:items-center sm:justify-between
-        ">
+                                                grid grid-cols-2 gap-x-4 gap-y-3 mt-3
+                                                sm:flex sm:items-center sm:justify-between
+                                                ">
 
                                         {/* Sale + Purchase Price */}
                                         <div className="contents sm:block">
@@ -1005,7 +1101,10 @@ useLayoutEffect(() => {
                                                 <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
                                                     SALE PRICE:{" "}
                                                     <span style={{ color: "#4CA1AF" }}>
-                                                        ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta?.Sale_Price)}
+                                                        ₹ {fmt(
+                                                            liveItem?.Sale_Price ??
+                                                            selectedItemMeta.Sale_Price
+                                                        )}
                                                     </span>
                                                 </p>
                                             </div>
@@ -1015,7 +1114,10 @@ useLayoutEffect(() => {
                                                     <p className="text-xs" style={{ fontSize: 13 }}>
                                                         PURCHASE PRICE:{" "}
                                                         <span style={{ color: "#4CA1AF" }}>
-                                                            ₹ {fmt(liveItem?.Purchase_Price ?? selectedItemMeta?.Purchase_Price)}
+                                                            ₹ {fmt(
+                                                                liveItem?.Purchase_Price ??
+                                                                selectedItemMeta.Purchase_Price
+                                                            )}
                                                         </span>
                                                     </p>
                                                 </div>
@@ -1023,6 +1125,7 @@ useLayoutEffect(() => {
                                         </div>
 
                                         {/* Stock */}
+
                                         {!isService && (
                                             <div className="col-span-1 sm:col-span-1 text-left">
                                                 <p className="text-xs uppercase text-black mb-1">
@@ -1033,17 +1136,17 @@ useLayoutEffect(() => {
                                                     className="font-bold"
                                                     style={{
                                                         color:
-                                                            (liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity) < 0
+                                                            (liveItem?.Stock_Quantity ??
+                                                                selectedItemMeta.Stock_Quantity) < 0
                                                                 ? "#dc2626"
                                                                 : "#4CA1AF",
                                                         fontSize: 15
                                                     }}
                                                 >
-                                                    {liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity}{" "}
-                                                    {liveItem?.Primary_Unit ||
-                                                        liveItem?.Item_Unit ||
-                                                        selectedItemMeta?.Primary_Unit ||
-                                                        selectedItemMeta?.Item_Unit ||
+                                                    {liveItem?.Stock_Quantity ??
+                                                        selectedItemMeta.Stock_Quantity}{" "}
+                                                    {selectedItemMeta.Primary_Unit ||
+                                                        selectedItemMeta.Item_Unit ||
                                                         ""}
                                                 </p>
                                             </div>
@@ -1051,7 +1154,8 @@ useLayoutEffect(() => {
 
                                         {/* Search */}
                                         <div
-                                            className="col-span-1 relative w-full sm:col-span-1 sm:w-[220px] sm:max-w-[220px]"
+                                            className="
+                                                col-span-1 relative w-full sm:col-span-1 sm:w-[220px] sm:max-w-[220px]"
                                             style={{ height: 56 }}
                                         >
                                             <Search
@@ -1070,6 +1174,7 @@ useLayoutEffect(() => {
                                                 value={txnSearch}
                                                 onChange={(e) => {
                                                     const value = e.target.value;
+
                                                     const next = new URLSearchParams(searchParams);
 
                                                     if (value) {
@@ -1078,7 +1183,9 @@ useLayoutEffect(() => {
                                                         next.delete("txnSearch");
                                                     }
 
-                                                    setSearchParams(next, { replace: true });
+                                                    setSearchParams(next, {
+                                                        replace: true
+                                                    });
                                                 }}
                                                 placeholder="Search"
                                                 className="w-full h-full border rounded-md text-sm outline-none"
@@ -1092,6 +1199,113 @@ useLayoutEffect(() => {
                                             />
                                         </div>
                                     </div>
+                                    {/* <div className="flex items-center justify-between">
+
+                                       
+                                        <div>
+                                            <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
+                                                SALE PRICE:{" "}
+                                                <span style={{ color: "#4CA1AF" }}>
+                                                    ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta.Sale_Price)}
+                                                </span>
+                                            </p>
+
+                                            {!isService && (
+                                                <p className="text-xs" style={{ fontSize: 13 }}>
+                                                    PURCHASE PRICE:{" "}
+                                                    <span style={{ color: "#4CA1AF" }}>
+                                                        ₹ {fmt(
+                                                            liveItem?.Purchase_Price ??
+                                                            selectedItemMeta.Purchase_Price
+                                                        )}
+                                                    </span>
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {!isService && (
+                                            <div className="text-left">
+                                                <p className="text-xs uppercase text-black mb-1">
+                                                    Stock
+                                                </p>
+
+                                                <p
+                                                    className="font-bold"
+                                                    style={{
+                                                        color:
+                                                            (liveItem?.Stock_Quantity ??
+                                                                selectedItemMeta.Stock_Quantity) < 0
+                                                                ? "#dc2626"
+                                                                : "#4CA1AF",
+                                                        fontSize: 15,
+                                                    }}
+                                                >
+                                                    {liveItem?.Stock_Quantity ??
+                                                        selectedItemMeta.Stock_Quantity}
+                                                    {" "}
+                                                    {selectedItemMeta.Primary_Unit ||
+                                                        selectedItemMeta.Item_Unit ||
+                                                        ""}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div
+                                            className="relative"
+                                            style={{
+                                                width: 220,
+                                                minWidth: 0,
+                                                maxWidth: 220,
+                                                height: 36
+                                            }}
+                                        >
+
+                                            <Search
+                                                size={16}
+                                                style={{
+                                                    position: "absolute",
+                                                    left: 10,
+                                                    top: 10,
+                                                    color: "#94a3b8",
+                                                    pointerEvents: "none"
+                                                }}
+                                            />
+
+                                            <input
+                                                type="text"
+                                                value={txnSearch}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+
+                                                    const next = new URLSearchParams(
+                                                        searchParams
+                                                    );
+
+                                                    if (value) {
+                                                        next.set("txnSearch", value);
+                                                    } else {
+                                                        next.delete("txnSearch");
+                                                    }
+
+                                                    setSearchParams(next, {
+                                                        replace: true
+                                                    });
+                                                }}
+                                                placeholder="Search"
+                                                className="w-full h-full border rounded-md text-sm outline-none"
+                                                style={{
+                                                    width: "100%",
+                                                    height: 36,
+                                                    paddingLeft: 34,
+                                                    paddingRight: 10,
+                                                    borderColor: "#000000",
+                                                    boxSizing: "border-box"
+                                                }}
+                                            />
+
+                                        </div>
+
+                                    </div> */}
 
                                 </div>
                             )}
@@ -1156,7 +1370,6 @@ useLayoutEffect(() => {
                                                     // >
                                                     <tr
                                                         key={txn.Ledger_Id}
-                                                        ref={isHighlighted ? highlightedRowRef : null}
 
                                                         // SINGLE CLICK → highlight only
                                                         onClick={() => {

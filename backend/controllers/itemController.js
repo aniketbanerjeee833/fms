@@ -2984,7 +2984,8 @@ const getAllItemsForLedger = async (req, res, next) => {
       ? req.query.search.trim().toLowerCase()
       : "";
 
-    const limit = parseInt(req.query.limit, 10) || 10;
+    //const limit = parseInt(req.query.limit, 10) || 10;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     const cursorId = req.query.cursor
       ? Number(req.query.cursor)
@@ -3557,7 +3558,8 @@ const getItemBills = async (req, res, next) => {
       date = "",
     } = req.query;
 
-    const limit = 10;
+    //const limit = 10;
+     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     // =========================================================
     // 1. VALIDATE ITEM

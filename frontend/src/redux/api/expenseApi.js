@@ -118,7 +118,8 @@ export const expenseApi = createApi({
         previousArg,
       }) =>
         currentArg?.cursor !== previousArg?.cursor ||
-        currentArg?.search !== previousArg?.search,
+        currentArg?.search !== previousArg?.search||
+    currentArg?.limit !== previousArg?.limit,
 
       //providesTags: ["ExpenseItemMaster"],
       providesTags: [{ type: "ExpenseItem", id: "LIST" }]
@@ -201,6 +202,7 @@ export const expenseApi = createApi({
         cursor = null,
         search = "",
         date = "",
+        limit = 10,
       }) => {
         const params = new URLSearchParams();
 
@@ -215,7 +217,7 @@ export const expenseApi = createApi({
         if (date) {
           params.set("date", date);
         }
-
+        params.set("limit", limit);
         return (
           `expense/by-category/${categoryId}` +
           `?${params.toString()}`
@@ -270,8 +272,8 @@ export const expenseApi = createApi({
         previousArg?.search ||
         currentArg?.date !==
         previousArg?.date ||
-        currentArg?.categoryId !==
-        previousArg?.categoryId,
+        currentArg?.categoryId !==previousArg?.categoryId
+        || currentArg?.limit !== previousArg?.limit,
 
       providesTags: [{ type: "Expense", id: "LIST" }],
     }),
@@ -281,6 +283,7 @@ export const expenseApi = createApi({
         cursor = null,
         date = "",
         search = "",
+        limit=10
       }) => {
         const params = new URLSearchParams();
 
@@ -295,6 +298,7 @@ export const expenseApi = createApi({
 
         if (search?.trim())
           params.append("search", search.trim());
+        params.set("limit", limit);
 
         return `expense/item-usage?${params.toString()}`;
       },
@@ -330,7 +334,8 @@ export const expenseApi = createApi({
         currentArg?.cursor !== previousArg?.cursor ||
         currentArg?.date !== previousArg?.date ||
         currentArg?.search !== previousArg?.search || // ← add this
-        currentArg?.masterItemId !== previousArg?.masterItemId,
+        currentArg?.masterItemId !== previousArg?.masterItemId
+        || currentArg?.limit !== previousArg?.limit,
 
 
       providesTags: [{ type: "Expense", id: "LIST" }],

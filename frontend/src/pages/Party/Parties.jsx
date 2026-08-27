@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 import { partyApi, useDeletePartyMutation, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
@@ -139,9 +139,14 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
-
+  const initialRightLimit = useRef(
+  Number(sessionStorage.getItem("partiesByParty:rightCount")) || 10
+    );
   const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
-    { Party_Id: partyId, cursor, search },
+    { Party_Id: partyId, cursor, search
+      ,limit: initialRightLimit.current
+
+     },
     { skip: !partyId }
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
@@ -431,8 +436,43 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     }
   }, [bulkPartyPrintReportData, showPartyBulkPrintReview]);
 
+  
+    const rightPanelRef = useRef(null);
+   
+const highlightedRowRef = useRef(null);
+    useEffect(() => {
+        
+        const rightEl = rightPanelRef.current;
 
+       
+        const saveRight = () => {
+            console.log("saveRight fired", rightEl.scrollTop, ledger.length);
+            sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
+            sessionStorage.setItem("itemsByItem:rightCount", ledger.length);
+            // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
+            // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
+        };
 
+       
+        rightEl?.addEventListener("scroll", saveRight);
+
+        return () => {
+            
+            rightEl?.removeEventListener("scroll", saveRight);
+        };
+    }, [ ledger.length]);
+const hasRestoredRightRef = useRef(false);
+
+useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) return;
+    if (isLoading || isFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("partiesByParty:rightCount")) || 0;
+    if (ledger.length < savedCount) return;
+
+    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredRightRef.current = true;
+}, [isLoading, isFetching, ledger.length]);
   if (!partyId) {
     return (
       <div
@@ -480,18 +520,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
 
   return (
-    // <div className="flex flex-col"
-    //   // style={{
-    //   //   //maxHeight: "calc(100vh - 180px)",
-    //   //   minWidth: 0
-    //   // }}
-
-
-    // >
-    <div
+   
+    <div ref={rightPanelRef}
     className="flex flex-col"
     style={{
       height: "100%",
+       
       minHeight: 0,
       overflow: "hidden",
     }}
@@ -678,29 +712,11 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                 const menuId = `${row.Txn_Type}-${transactionId || idx}`;
                 const isHighlighted = String(searchParams.get("highlightTxn")) === String(transactionId);
                 return (
-                  // <tr
-                  //   key={`${row.Txn_Type}-${refId}-${idx}`}
-                  //   onDoubleClick={() => {
-                  //     if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-                  //       openModal(row.Txn_Type, transactionId);
-                  //       return;
-                  //     }
-                  //     const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-                  //     if (route) {
-                  //       navigate(
-                  //         {
-                  //           pathname: `/${route}/edit/${transactionId}`,
-                  //           search: searchParams.toString(),
-                  //         },
-                  //         { state: { from: "party-details", partyId } }
-                  //       );
-                  //     }
-                  //   }}
-                  //   style={{ cursor: "pointer", borderBottom: "1px solid #f1f5f9", }}
-                  // >
+                 
                   <tr
                     //id={`txn-${transactionId}`}
                     key={`${row.Txn_Type}-${refId}-${idx}`}
+                    ref={isHighlighted ? highlightedRowRef : null}
                     onClick={() => {
                       const params = new URLSearchParams(searchParams);
                       params.set("highlightTxn", transactionId);
@@ -1096,6 +1112,7 @@ export default function Parties() {
   const [leftCursor, setLeftCursor] = useState(null);
   const leftSentinelRef = useRef(null);
   const leftObserverRef = useRef(null);
+  const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByParty:leftCount")) || 10);
 
   const {
     data: partiesData,
@@ -1104,7 +1121,8 @@ export default function Parties() {
   } = useGetAllPartiesCursorQuery({
     cursor: leftCursor,
     search: leftSearch,
-    limit: 10,
+    //limit: 10,
+    limit: leftCursor ? 10 : initialLeftLimit.current
   },
   );
 
@@ -1234,6 +1252,45 @@ export default function Parties() {
       setDeletePartyTarget(null);
     }
   };
+
+  const leftListRef = useRef(null);
+      
+      const selectedItemRowRef = useRef(null);
+  
+      useEffect(() => {
+          const leftEl = leftListRef.current;
+          
+  
+          const saveLeft = () => {
+              sessionStorage.setItem("partiesByParty:leftScroll", leftEl.scrollTop);
+              sessionStorage.setItem("partiesByParty:leftCount", parties.length);
+          };
+         
+  
+          leftEl?.addEventListener("scroll", saveLeft);
+          
+  
+          return () => {
+              leftEl?.removeEventListener("scroll", saveLeft);
+              
+          };
+      }, [parties.length]);
+  
+  
+  
+  const hasRestoredLeftRef = useRef(false);
+  
+  useLayoutEffect(() => {
+      if (hasRestoredLeftRef.current) return; // only do this once per mount
+      if (isLoading || isPartiesFetching) return;
+  
+      const savedCount = Number(sessionStorage.getItem("partiesByParty:leftCount")) || 0;
+      if (parties.length < savedCount) return;
+  
+      selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  }, [isLoading, isPartiesFetching, parties.length, selectedId]);
+  
   return (
     <>
     <div className="flex flex-col bg-white" 
@@ -1273,7 +1330,7 @@ export default function Parties() {
           }}
         >
           {/* ══ LEFT — 30% — party list ══ */}
-          <div
+          <div ref={leftListRef}
             className="w-full lg:w-[30%] overflow-y-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
@@ -1353,6 +1410,7 @@ export default function Parties() {
                   return (
                     <div
                       key={party.Party_Id}
+                      ref={isSelected ? selectedItemRowRef : null}   // 👈 add this
                       onClick={() => handleSelectParty(party.Party_Id)}
                       onDoubleClick={() => {
                         if (party.Party_Name === "Cash Sale") return;

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { useReactToPrint } from "react-to-print";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -9,8 +9,7 @@ import {
   Eye,
   Trash2,
   Printer,
-  FileSpreadsheet,
-  PrinterIcon
+ 
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
@@ -98,6 +97,7 @@ export default function ExpensesByItems() {
   const [leftCursor, setLeftCursor] = useState(null);
   const leftSentinelRef = useRef(null);
   const leftObserverRef = useRef(null);
+  const initialLeftLimit = useRef(Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 10);
 
   const {
     data: itemResponse,
@@ -106,7 +106,8 @@ export default function ExpensesByItems() {
   } = useGetAllExpenseItemMastersCursorQuery({
     cursor: leftCursor,
     search: itemSearch,
-    limit: 10,
+     limit: leftCursor ? 10 : initialLeftLimit.current
+    //limit: 10,
   });
 
   const items = itemResponse?.items || [];
@@ -156,9 +157,10 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
-  const itemRef = useRef(selectedItemId);
-  
-      const effectiveCursor = itemRef.current === selectedItemId ? rightCursor : null;
+    const initialRightLimit = useRef(
+          Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
+      );
+ 
   const {
     data: usageResponse,
     isLoading: isUsageLoading,
@@ -166,9 +168,10 @@ export default function ExpensesByItems() {
   } = useGetExpenseItemUsageQuery(
     {
       masterItemId: selectedItemId,
-      cursor: effectiveCursor,
-      //cursor: rightCursor,
+     
+      cursor: rightCursor,
       search: txnSearch, // ← add
+      limit: initialRightLimit.current
     },
     {
       skip: !selectedItemId,
@@ -288,13 +291,10 @@ export default function ExpensesByItems() {
   const usageNextCursor = usageResponse?.nextCursor ?? null;
 
   /* reset right cursor when selected item changes */
-  // useEffect(() => {
-  //   setRightCursor(null);
-  // }, [selectedItemId, txnSearch]);
- useEffect(() => {
-        itemRef.current = selectedItemId;
-        setRightCursor(null);
-    }, [selectedItemId, txnSearch]);
+  useEffect(() => {
+    setRightCursor(null);
+  }, [selectedItemId, txnSearch]);
+
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -433,6 +433,63 @@ export default function ExpensesByItems() {
     setRowMenuOpen(null);
   };
 
+  
+      const leftListRef = useRef(null);
+      const rightPanelRef = useRef(null);
+      const selectedItemRowRef = useRef(null);
+  const highlightedRowRef = useRef(null);
+      useEffect(() => {
+          const leftEl = leftListRef.current;
+          const rightEl = rightPanelRef.current;
+  
+          const saveLeft = () => {
+              sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
+              sessionStorage.setItem("expensesByExpense:leftCount", items.length);
+          };
+          const saveRight = () => {
+              console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+              sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+              sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
+              // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+              // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
+          };
+  
+          leftEl?.addEventListener("scroll", saveLeft);
+          rightEl?.addEventListener("scroll", saveRight);
+  
+          return () => {
+              leftEl?.removeEventListener("scroll", saveLeft);
+              rightEl?.removeEventListener("scroll", saveRight);
+          };
+      }, [items.length, filteredTransactions.length]);
+  
+  
+  
+  const hasRestoredLeftRef = useRef(false);
+  
+  useLayoutEffect(() => {
+      if (hasRestoredLeftRef.current) return; // only do this once per mount
+      if (isItemsLoading || isItemsFetching) return;
+  
+      const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
+      if (items.length < savedCount) return;
+  
+      selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  }, [isItemsLoading, isItemsFetching, selectedItemId]);
+  const hasRestoredRightRef = useRef(false);
+
+useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) return;
+    if (isUsageLoading || isUsageFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+    if (filteredTransactions.length < savedCount) return;
+
+    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredRightRef.current = true;
+}, [isUsageLoading, isUsageFetching, filteredTransactions.length]);
+
   return (
     <>
       <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
@@ -473,7 +530,7 @@ export default function ExpensesByItems() {
         >
 
           {/* ══ LEFT — 30% — item list ══ */}
-          <div
+          <div ref={leftListRef}
             className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
             style={{
               borderRight: "1px solid #e2e8f0",
@@ -538,6 +595,7 @@ export default function ExpensesByItems() {
                   return (
                     <div
                       key={item.id}
+                       ref={isSelected ? selectedItemRowRef : null}
                       onClick={() => handleSelectItem(item)}
 
                       onDoubleClick={() => {
@@ -682,55 +740,14 @@ export default function ExpensesByItems() {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div
+          <div ref={rightPanelRef}
             className="w-full lg:w-[70%] p-1 overflow-y-auto"
             style={{ maxHeight: "calc(100vh - 180px)" }}
           >
             <div className="flex flex-col h-full">
 
               {/* ── ITEM SUMMARY CARD ── */}
-              {/* {selectedItem && (
-                <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="flex items-center justify-center rounded-xl"
-                      style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
-                    >
-                      <Package size={22} style={{ color: "#4CA1AF" }} />
-                    </div>
-                    <div>
-                      <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
-                        {selectedItem?.name}
-                      </h6>
-                      <p className="text-gray-500 text-sm mt-0.5">
-                        Expense Item
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-8">
-                    <div className="text-right">
-                      <p className="text-xs uppercase text-gray-400 mb-1">Total</p>
-                      <p className="font-bold" style={{ color: "#4CA1AF", fontSize: 18 }}>
-                        ₹ {(selectedItem?.total ?? 0).toLocaleString()}
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-xs uppercase text-gray-400 mb-1">Balance</p>
-                      <p
-                        className="font-bold"
-                        style={{
-                          color: (selectedItem?.balance ?? 0) > 0 ? "#dc2626" : "#16a34a",
-                          fontSize: 18,
-                        }}
-                      >
-                        ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )} */}
+             
               {selectedItem && (
                 <div className="rounded-xl p-2 mb-2">
 
@@ -899,11 +916,11 @@ export default function ExpensesByItems() {
                 <table className="w-full h-full min-w-[700px]" >
                   <thead>
                     <tr >
-                      {["Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
+                      {["Sl No.","Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
                         <th
                           key={h}
                           //className="text-left py-2 px-3 "
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace: "nowrap" }}
                         >
                           {h}
                         </th>
@@ -925,38 +942,12 @@ export default function ExpensesByItems() {
                       </tr>
                     ) : (
 
-                      filteredTransactions.map((txn) => (
+                      filteredTransactions.map((txn,idx) => (
 
-                        // <tr
-                        //   key={txn.id}
-                        //   style={{
-                        //     borderBottom: "1px solid #f1f5f9",
-                        //     position: "relative",
-                        //     cursor: "pointer",
-                        //   }}
-                        //   //style={{ borderBottom: "1px solid #f1f5f9" }}
-                        //   className="hover:bg-gray-50 transition-colors cursor-pointer"
-
-                        //   onDoubleClick={() => {
-                        //     navigate(
-                        //       {
-                        //         pathname: `/expense/edit/${txn.expenseId}`,
-                        //         search: searchParams.toString(),
-                        //       },
-                        //       {
-                        //         state: {
-                        //           from: "expense-items",
-                        //           itemId: selectedItemId,
-                        //           txnSearch,
-                        //           itemSearch,
-                        //         },
-                        //       }
-                        //     );
-                        //   }}
-
-                        // >
+                        
                         <tr
                           key={txn.id}
+                          ref={isHighlighted ? highlightedRowRef : null}
 
                           onClick={() => {
                             const params = new URLSearchParams(searchParams);
@@ -1005,6 +996,7 @@ export default function ExpensesByItems() {
 
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                         >
+                          <td>{idx + 1}.</td>
                           <td style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>

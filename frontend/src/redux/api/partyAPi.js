@@ -87,7 +87,8 @@ getAllPartiesCursor: builder.query({
       // Re-fetch when cursor or search changes
       forceRefetch: ({ currentArg, previousArg }) =>
         currentArg?.cursor !== previousArg?.cursor ||
-        currentArg?.search !== previousArg?.search,
+        currentArg?.search !== previousArg?.search ||
+        currentArg?.limit !== previousArg?.limit, 
  
       providesTags: ["Party"],
     }),
@@ -146,6 +147,7 @@ getAllPartiesCursor: builder.query({
     cursor = null,
     search = "",
     date = "",
+    limit = 10
   }) => {
     const params = new URLSearchParams();
 
@@ -160,6 +162,7 @@ getAllPartiesCursor: builder.query({
     if (date) {
       params.set("date", date);
     }
+    params.set("limit", limit);
 
     return `party/get-single-party-details-sales-purchases/${Party_Id}?${params.toString()}`;
   },
@@ -187,7 +190,8 @@ forceRefetch: ({
   currentArg?.cursor !== previousArg?.cursor ||
   currentArg?.search !== previousArg?.search ||
   currentArg?.date !== previousArg?.date ||
-  currentArg?.Party_Id !== previousArg?.Party_Id,
+  currentArg?.Party_Id !== previousArg?.Party_Id
+  ||currentArg?.limit !== previousArg?.limit,
   //providesTags: ["Party"],
   providesTags: (result, error, arg) => [
  {

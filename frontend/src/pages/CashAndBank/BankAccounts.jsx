@@ -1,15 +1,15 @@
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
 
 import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  LayoutDashboard,
+  
   Building2,
   SquarePen,
   ChevronRight,
-  ArrowUpRight,
+ 
   Eye,
-  ArrowDownLeft,
+ 
   CreditCard,
   Landmark,
   Wallet,
@@ -167,10 +167,14 @@ function BankDetailPanel({ bankId }) {
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
   const { data: partiesList } = useGetAllPartiesQuery();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-
+    const initialRightLimit = useRef(
+    Number(sessionStorage.getItem("banksByBank:rightCount")) || 10
+      );
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
     //{ Bank_Account_Id: bankId, cursor },
-    { Bank_Account_Id: bankId, cursor: effectiveCursor },
+    { Bank_Account_Id: bankId, 
+      cursor: effectiveCursor,
+      limit:effectiveCursor ? 10 : initialRightLimit.current},
     { skip: !bankId }
   );
 
@@ -254,33 +258,7 @@ const handleTransactionEdit = (row) => {
     }
   );
 };
-  // const handleTransactionEdit = (row) => {
-  //   if (!row?.Formatted_Reference_Id) return;
-
-  //   // Payment In / Payment Out open their edit modals
-  //   if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-  //     openModal(
-  //       row.Txn_Type,
-  //       row.Formatted_Reference_Id
-  //     );
-  //     return;
-  //   }
-
-  //   // Other transactions open their edit page
-  //   const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-
-  //   if (!route) return;
-
-  //   navigate(
-  //     `/${route}/edit/${row.Formatted_Reference_Id}`,
-  //     {
-  //       state: {
-  //         from: "bank-accounts",
-  //         bankId,
-  //       },
-  //     }
-  //   );
-  // };
+ 
 
   // 🔹 after save/delete — reset cursor to reload from top
   const resetLedger = () => {
@@ -369,10 +347,46 @@ const handleTransactionEdit = (row) => {
   };
 
   const bank = data?.bankAccount;
+    const rightPanelRef = useRef(null);
+     
+  const highlightedRowRef = useRef(null);
+      useEffect(() => {
+          
+          const rightEl = rightPanelRef.current;
+  
+         
+          const saveRight = () => {
+              console.log("saveRight fired", rightEl.scrollTop, ledger.length);
+              sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
+              sessionStorage.setItem("banksByBank:rightCount", ledger.length);
+              // sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
+              // sessionStorage.setItem("banksByBank:rightCount", transactions.length);
+          };
+  
+         
+          rightEl?.addEventListener("scroll", saveRight);
+  
+          return () => {
+              
+              rightEl?.removeEventListener("scroll", saveRight);
+          };
+      }, [ ledger.length]);
+  const hasRestoredRightRef = useRef(false);
+  
+  useLayoutEffect(() => {
+      if (hasRestoredRightRef.current) return;
+      if (isLoading || isFetching) return;
+  
+      const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
+      if (ledger.length < savedCount) return;
+  
+      highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      hasRestoredRightRef.current = true;
+  }, [isLoading, isFetching, ledger.length]);
 
   if (!bankId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3"
+      <div className="flex flex-col items-center justify-center text-gray-400 gap-3"
         style={{ minHeight: "400px" }}>
         <Landmark size={48} strokeWidth={1.2} />
         <p className="text-base">Select a bank account to view details</p>
@@ -382,7 +396,7 @@ const handleTransactionEdit = (row) => {
 
   if (isLoading && !data) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-400"
+      <div className="flex items-center justify-center  text-gray-400"
         style={{ minHeight: "400px" }}>
         <p>Loading...</p>
       </div>
@@ -390,11 +404,20 @@ const handleTransactionEdit = (row) => {
   }
 
   return (
-    <div className="flex flex-col overflow-y-auto"
+    <div ref={rightPanelRef}
+    className="flex flex-col overflow-y-auto"
+      // style={{
+      //   maxHeight: "calc(100vh - 180px)",
+      //   minWidth: 0
+      // }}
       style={{
-        maxHeight: "calc(100vh - 180px)",
-        minWidth: 0
-      }}>
+      height: "100%",
+       
+      minHeight: 0
+   
+     
+    }}
+      >
 
       {/* bank summary card */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -454,13 +477,10 @@ const handleTransactionEdit = (row) => {
                   String(searchParams.get("highlightTxn")) ===
                   String(row.id)
                 return (
-                  // <tr
-                  //   key={row.id}
-                  //   onDoubleClick={() => handleTransactionEdit(row)}
-                  //   className="cursor-pointer"
-                  // >
+                  
                   <tr
                     key={row.id}
+                    ref={isHighlighted ? highlightedRowRef : null}
 
                     onClick={() => {
                       const params = new URLSearchParams(searchParams);
@@ -810,18 +830,12 @@ export default function BankAccounts() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-      {/* <div className="sb2-2-2">
-        <ul>
-          <li>
-            <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
-              <LayoutDashboard size={20} style={{ marginRight: "8px" }} />
-              Dashboard
-            </NavLink>
-          </li>
-        </ul>
-      </div> */}
+      
 
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col bg-white"
+      style={{ height: "100vh", overflow: "hidden" }}
+      //  style={{ minHeight: "100vh" }}
+       >
 
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
@@ -845,7 +859,11 @@ export default function BankAccounts() {
         {/* ── SPLIT LAYOUT ── */}
         <div
           className="flex flex-col lg:flex-row gap-0"
-          style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+          style={{
+             flex: 1,
+        minHeight: 0,
+        height: "calc(100vh - 180px)",
+             borderTop: "1px solid #e2e8f0" }}
         >
 
           {/* ══ LEFT — 30% — bank list ══ */}
@@ -954,12 +972,14 @@ export default function BankAccounts() {
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           <div
-            className="w-full lg:w-[70%] p-1 overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 180px)" }}
+            className="w-full lg:w-[70%] p-1"
+            //style={{ maxHeight: "calc(100vh - 180px)" }}
+              style={{ height: "100%", minHeight: 0 }}
           >
             <BankDetailPanel
               bankId={selectedId}
               onEdit={handleEdit}
+              key={selectedId}
             />
           </div>
 

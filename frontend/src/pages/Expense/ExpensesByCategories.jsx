@@ -1,11 +1,11 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { useReactToPrint } from "react-to-print";
-import { NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import {  useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
-  LayoutDashboard,
+  
   Search,
   MoreVertical,
-  SquarePen,
+  
   ChevronRight,
   Receipt,
   Tags,
@@ -137,9 +137,12 @@ export default function ExpensesByCategories() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
-    const categoryRef = useRef(selectedCategoryId);
+  const initialRightLimit = useRef(
+            Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 10
+        );
+    // const categoryRef = useRef(selectedCategoryId);
     
-    const effectiveCursor = categoryRef.current === selectedCategoryId ? rightCursor : null;
+    // const effectiveCursor = categoryRef.current === selectedCategoryId ? rightCursor : null;
 
   const {
     data: expenseResponse,
@@ -148,9 +151,10 @@ export default function ExpensesByCategories() {
   } = useGetExpensesByCategoryQuery(
     {
       categoryId: selectedCategoryId,
-      cursor: effectiveCursor,
-      //cursor: rightCursor,
+    
+      cursor: rightCursor,
       search: txnSearch,
+       limit: initialRightLimit.current
     },
     {
       skip: !selectedCategoryId,
@@ -296,13 +300,13 @@ export default function ExpensesByCategories() {
   }, [categories, selectedCategoryId, navigate, location.pathname, location.state]);
 
   /* reset right cursor when selected category or txn search changes */
-   useEffect(() => {
-          categoryRef.current = selectedCategoryId;
-          setRightCursor(null);
-      }, [selectedCategoryId, txnSearch]);
-  // useEffect(() => {
-  //   setRightCursor(null);
-  // }, [selectedCategoryId, txnSearch]);
+  //  useEffect(() => {
+  //         // categoryRef.current = selectedCategoryId;
+  //         setRightCursor(null);
+  //     }, [selectedCategoryId, txnSearch]);
+  useEffect(() => {
+    setRightCursor(null);
+  }, [selectedCategoryId, txnSearch]);
 
   const handleRightObserver = useCallback(
     (entries) => {
@@ -347,6 +351,50 @@ export default function ExpensesByCategories() {
     return () => document.removeEventListener("click", closeMenu);
   }, []);
 
+    
+        const rightPanelRef = useRef(null);
+   
+    const highlightedRowRef = useRef(null);
+        useEffect(() => {
+            
+            const rightEl = rightPanelRef.current;
+    
+            
+            const saveRight = () => {
+                console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+                sessionStorage.setItem("expensesByCategory:rightScroll", rightEl.scrollTop);
+                sessionStorage.setItem("expensesByCategory:rightCount", filteredTransactions.length);
+                // sessionStorage.setItem("expensesByCategory:rightScroll", rightEl.scrollTop);
+                // sessionStorage.setItem("expensesByCategory:rightCount", transactions.length);
+            };
+    
+            
+            rightEl?.addEventListener("scroll", saveRight);
+    
+            return () => {
+
+                rightEl?.removeEventListener("scroll", saveRight);
+            };
+        }, [categories.length, filteredTransactions.length]);
+    
+    
+    
+    
+    
+    
+    const hasRestoredRightRef = useRef(false);
+  
+  useLayoutEffect(() => {
+      if (hasRestoredRightRef.current) return;
+      if (isExpensesLoading || isExpensesFetching) return;
+  
+      const savedCount = Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 0;
+      if (filteredTransactions.length < savedCount) return;
+  
+      highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      hasRestoredRightRef.current = true;
+  }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length]);
+  
   return (
     <>
       <div className="flex flex-col bg-white"
@@ -546,7 +594,8 @@ export default function ExpensesByCategories() {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div className="w-full lg:w-[70%] p-1"
+          <div ref={rightPanelRef}
+          className="w-full lg:w-[70%] p-1"
             style={{ maxHeight: "calc(100vh - 180px)" }}
             //style={{ height: "100%", minHeight: 0 }}
           //     style={{
@@ -768,11 +817,11 @@ export default function ExpensesByCategories() {
                 <table className="w-full min-w-[600px]">
                   <thead>
                     <tr>
-                      {["Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h, index) => (
+                      {["Sl.No", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h, index) => (
                         <th
                           key={index}
                           className="text-left py-2 px-3"
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace: "nowrap" }}
                         >
                           {h}
                         </th>
@@ -793,30 +842,11 @@ export default function ExpensesByCategories() {
                         </td>
                       </tr>
                     ) : (
-                      filteredTransactions.map((txn) => (
-                        // <tr
-                        //   key={txn.id}
-                        //   style={{ borderBottom: "1px solid #f1f5f9", position: "relative", cursor: "pointer" }}
-                        //   className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        //   onDoubleClick={() => {
-                        //     navigate(
-                        //       {
-                        //         pathname: `/expense/edit/${txn.id}`,
-                        //         search: searchParams.toString(),
-                        //       },
-                        //       {
-                        //         state: {
-                        //           from: "expense-categories",
-                        //           categoryId: selectedCategoryId,
-                        //           txnSearch,
-                        //           categorySearch,
-                        //         },
-                        //       }
-                        //     );
-                        //   }}
-                        // >
+                      filteredTransactions.map((txn,idx) => (
+                        
                         <tr
                           key={txn.id}
+                           ref={isHighlighted ? highlightedRowRef : null}
 
                           onClick={() => {
                             const params = new URLSearchParams(searchParams);
@@ -865,6 +895,7 @@ export default function ExpensesByCategories() {
 
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                         >
+                          <td>{idx + 1}.</td>
                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
