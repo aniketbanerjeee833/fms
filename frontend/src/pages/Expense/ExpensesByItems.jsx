@@ -9,7 +9,7 @@ import {
   Eye,
   Trash2,
   Printer,
- 
+
 } from "lucide-react";
 
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
@@ -106,7 +106,7 @@ export default function ExpensesByItems() {
   } = useGetAllExpenseItemMastersCursorQuery({
     cursor: leftCursor,
     search: itemSearch,
-     limit: leftCursor ? 10 : initialLeftLimit.current
+    limit: leftCursor ? 10 : initialLeftLimit.current
     //limit: 10,
   });
 
@@ -157,10 +157,10 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   const rightSentinelRef = useRef(null);
   const rightObserverRef = useRef(null);
-    const initialRightLimit = useRef(
-          Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
-      );
- 
+  const initialRightLimit = useRef(
+    Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
+  );
+
   const {
     data: usageResponse,
     isLoading: isUsageLoading,
@@ -168,7 +168,7 @@ export default function ExpensesByItems() {
   } = useGetExpenseItemUsageQuery(
     {
       masterItemId: selectedItemId,
-     
+
       cursor: rightCursor,
       search: txnSearch, // ← add
       limit: initialRightLimit.current
@@ -433,66 +433,85 @@ export default function ExpensesByItems() {
     setRowMenuOpen(null);
   };
 
-  
-      const leftListRef = useRef(null);
-      const rightPanelRef = useRef(null);
-      const selectedItemRowRef = useRef(null);
+
+  const leftListRef = useRef(null);
+  const rightPanelRef = useRef(null);
+  const selectedItemRowRef = useRef(null);
   const highlightedRowRef = useRef(null);
-      useEffect(() => {
-          const leftEl = leftListRef.current;
-          const rightEl = rightPanelRef.current;
-  
-          const saveLeft = () => {
-              sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
-              sessionStorage.setItem("expensesByExpense:leftCount", items.length);
-          };
-          const saveRight = () => {
-              console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
-              sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
-              sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
-              // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
-              // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
-          };
-  
-          leftEl?.addEventListener("scroll", saveLeft);
-          rightEl?.addEventListener("scroll", saveRight);
-  
-          return () => {
-              leftEl?.removeEventListener("scroll", saveLeft);
-              rightEl?.removeEventListener("scroll", saveRight);
-          };
-      }, [items.length, filteredTransactions.length]);
-  
-  
-  
+  useEffect(() => {
+    const leftEl = leftListRef.current;
+    const rightEl = rightPanelRef.current;
+
+    const saveLeft = () => {
+      sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
+      sessionStorage.setItem("expensesByExpense:leftCount", items.length);
+    };
+    const saveRight = () => {
+      console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+      sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+      sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
+      // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+      // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
+    };
+
+    leftEl?.addEventListener("scroll", saveLeft);
+    rightEl?.addEventListener("scroll", saveRight);
+
+    return () => {
+      leftEl?.removeEventListener("scroll", saveLeft);
+      rightEl?.removeEventListener("scroll", saveRight);
+    };
+  }, [items.length, filteredTransactions.length]);
+
+
+
   const hasRestoredLeftRef = useRef(false);
-  
+
   useLayoutEffect(() => {
-      if (hasRestoredLeftRef.current) return; // only do this once per mount
-      if (isItemsLoading || isItemsFetching) return;
-  
-      const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
-      if (items.length < savedCount) return;
-  
-      selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-      hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+    if (hasRestoredLeftRef.current) return; // only do this once per mount
+    if (isItemsLoading || isItemsFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
+    if (items.length < savedCount) return;
+
+    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
   }, [isItemsLoading, isItemsFetching, selectedItemId]);
   const hasRestoredRightRef = useRef(false);
+  const [isRestoringRight, setIsRestoringRight] = useState(true);
 
-useLayoutEffect(() => {
-    if (hasRestoredRightRef.current) return;
+  // useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) return;
+  //     if (isUsageLoading || isUsageFetching) return;
+
+  //     const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+  //     if (filteredTransactions.length < savedCount) return;
+
+  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //     hasRestoredRightRef.current = true;
+  // }, [isUsageLoading, isUsageFetching, filteredTransactions.length]);
+  useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) {
+      setIsRestoringRight(false);
+      return;
+    }
     if (isUsageLoading || isUsageFetching) return;
 
     const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
-    if (filteredTransactions.length < savedCount) return;
+    // keep waiting only if we might still get more data
+    if (filteredTransactions.length < savedCount && usageHasMore) return;
 
     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
     hasRestoredRightRef.current = true;
-}, [isUsageLoading, isUsageFetching, filteredTransactions.length]);
+    setIsRestoringRight(false); // reveal now, correctly positioned
+  }, [isUsageLoading, isUsageFetching, filteredTransactions.length, usageHasMore]);
 
   return (
     <>
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col bg-white"
+        style={{ height: "100%", minHeight: 0 }}
+      // style={{ minHeight: "100vh" }}
+      >
 
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
@@ -595,7 +614,7 @@ useLayoutEffect(() => {
                   return (
                     <div
                       key={item.id}
-                       ref={isSelected ? selectedItemRowRef : null}
+                      ref={isSelected ? selectedItemRowRef : null}
                       onClick={() => handleSelectItem(item)}
 
                       onDoubleClick={() => {
@@ -740,14 +759,27 @@ useLayoutEffect(() => {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div ref={rightPanelRef}
+          {/* <div ref={rightPanelRef} */}
+          <div
             className="w-full lg:w-[70%] p-1 overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 180px)" }}
+            style={{
+              maxHeight: "calc(100vh - 180px)",
+              minHeight: 0,      // 👈 add this
+              minWidth: 0
+            }}
+          //style={{ maxHeight: "calc(100vh - 180px)" }}
           >
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col"
+              style={{
+                height: "100%",
+
+                minHeight: 0,
+                overflow: "hidden",
+              }}
+            >
 
               {/* ── ITEM SUMMARY CARD ── */}
-             
+
               {selectedItem && (
                 <div className="rounded-xl p-2 mb-2">
 
@@ -912,15 +944,26 @@ useLayoutEffect(() => {
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div className="table-responsive table-desi">
-                <table className="w-full h-full min-w-[700px]" >
+              <div ref={rightPanelRef}
+                className="table-responsive table-desi"
+                style={{
+
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  visibility: isRestoringRight ? "hidden" : "visible",
+                  // if using the placeholder above, also collapse height so it doesn't take double space
+                  // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+                }}
+              >
+                <table className="w-full  min-w-[700px]" >
                   <thead>
                     <tr >
-                      {["Sl No.","Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
+                      {["Sl No.", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
                         <th
                           key={h}
                           //className="text-left py-2 px-3 "
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace: "nowrap" }}
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}
                         >
                           {h}
                         </th>
@@ -942,9 +985,9 @@ useLayoutEffect(() => {
                       </tr>
                     ) : (
 
-                      filteredTransactions.map((txn,idx) => (
+                      filteredTransactions.map((txn, idx) => (
 
-                        
+
                         <tr
                           key={txn.id}
                           ref={isHighlighted ? highlightedRowRef : null}

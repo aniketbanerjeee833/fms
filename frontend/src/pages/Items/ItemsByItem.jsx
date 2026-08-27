@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
-import {  useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-   
+
     Search,
     MoreVertical,
     ChevronRight,
@@ -623,7 +623,7 @@ export default function ItemsByItem() {
     const leftListRef = useRef(null);
     const rightPanelRef = useRef(null);
     const selectedItemRowRef = useRef(null);
-const highlightedRowRef = useRef(null);
+    const highlightedRowRef = useRef(null);
     useEffect(() => {
         const leftEl = leftListRef.current;
         const rightEl = rightPanelRef.current;
@@ -651,34 +651,53 @@ const highlightedRowRef = useRef(null);
 
 
 
-const hasRestoredLeftRef = useRef(false);
+    const hasRestoredLeftRef = useRef(false);
 
-useLayoutEffect(() => {
-    if (hasRestoredLeftRef.current) return; // only do this once per mount
-    if (isLoading || isItemsFetching) return;
+    useLayoutEffect(() => {
+        if (hasRestoredLeftRef.current) return; // only do this once per mount
+        if (isLoading || isItemsFetching) return;
 
-    const savedCount = Number(sessionStorage.getItem("itemsByItem:leftCount")) || 0;
-    if (items.length < savedCount) return;
+        const savedCount = Number(sessionStorage.getItem("itemsByItem:leftCount")) || 0;
+        if (items.length < savedCount) return;
 
-    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-}, [isLoading, isItemsFetching, items.length, selectedItemId]);
+        selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+        hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+    }, [isLoading, isItemsFetching, items.length, selectedItemId]);
 
-const hasRestoredRightRef = useRef(false);
+    const hasRestoredRightRef = useRef(false);
+    const [isRestoringRight, setIsRestoringRight] = useState(true);
+    // useLayoutEffect(() => {
+    //     if (hasRestoredRightRef.current) return;
+    //     if (isBillsLoading || isBillsFetching) return;
 
-useLayoutEffect(() => {
-    if (hasRestoredRightRef.current) return;
-    if (isBillsLoading || isBillsFetching) return;
+    //     const savedCount = Number(sessionStorage.getItem("itemsByItem:rightCount")) || 0;
+    //     if (transactions.length < savedCount) return;
 
-    const savedCount = Number(sessionStorage.getItem("itemsByItem:rightCount")) || 0;
-    if (transactions.length < savedCount) return;
+    //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    //     hasRestoredRightRef.current = true;
+    // }, [isBillsLoading, isBillsFetching, transactions.length]);
+    useLayoutEffect(() => {
+        if (hasRestoredRightRef.current) {
+            setIsRestoringRight(false);
+            return;
+        }
+        if (isBillsLoading || isBillsFetching) return;
 
-    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredRightRef.current = true;
-}, [isBillsLoading, isBillsFetching, transactions.length]);
+        const savedCount = Number(sessionStorage.getItem("itemsByItem:rightCount")) || 0;
+        // keep waiting only if we might still get more data
+        if (transactions.length < savedCount && hasMore) return;
+
+        highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+        hasRestoredRightRef.current = true;
+        setIsRestoringRight(false); // reveal now, correctly positioned
+    }, [isLoading, isBillsFetching, transactions.length, hasMore]);
+
     return (
         <>
-            <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+            <div className="flex flex-col bg-white" 
+              style={{ height: "100vh", overflow: "hidden" }}
+            // style={{ minHeight: "100vh" }}
+            >
                 <div className="flex" style={{ borderBottom: "1px solid #f1f5f9" }}>
                     {["Product", "Service"].map((type) => (
                         <button
@@ -736,7 +755,7 @@ useLayoutEffect(() => {
                         className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
                         style={{
                             borderRight: "1px solid #e2e8f0",
-                            minHeight: 0, 
+                            minHeight: 0,
                             //minHeight: "500px",
                             maxHeight: "calc(100vh - 180px)",
                             boxSizing: "border-box",
@@ -930,7 +949,7 @@ useLayoutEffect(() => {
                     </div>
 
                     {/* ══ RIGHT — 70% — detail panel ══ */}
-                    <div ref={rightPanelRef}
+                    <div
                         className="w-full lg:w-[70%] p-1 overflow-y-auto overflow-x-hidden"
                         style={{
                             maxHeight: "calc(100vh - 180px)",
@@ -938,7 +957,16 @@ useLayoutEffect(() => {
                             minWidth: 0
                         }}
                     >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col"
+                            style={{
+                                height: "100%",
+
+                                minHeight: 0,
+                                overflow: "hidden",
+
+
+                            }}
+                        >
 
                             {/* ── ITEM SUMMARY CARD ── */}
 
@@ -1097,7 +1125,18 @@ useLayoutEffect(() => {
                             )}
 
                             {/* ── ITEM LEDGER TABLE ── */}
-                            <div className="table-responsive table-desi">
+                            <div ref={rightPanelRef}
+                                className="table-responsive table-desi"
+                                style={{
+
+                                    flex: 1,
+                                    minHeight: 0,
+                                    overflowY: "auto",
+                                    visibility: isRestoringRight ? "hidden" : "visible",
+                                    // if using the placeholder above, also collapse height so it doesn't take double space
+                                    // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+                                }}
+                            >
                                 <table className="w-full min-w-[700px]">
                                     <thead>
                                         <tr>

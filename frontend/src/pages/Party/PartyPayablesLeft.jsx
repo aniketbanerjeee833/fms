@@ -475,17 +475,33 @@ const highlightedRowRef = useRef(null);
         };
     }, [ ledger.length]);
 const hasRestoredRightRef = useRef(false);
+ const [isRestoringRight, setIsRestoringRight] = useState(true);
 
-useLayoutEffect(() => {
-    if (hasRestoredRightRef.current) return;
+// useLayoutEffect(() => {
+//     if (hasRestoredRightRef.current) return;
+//     if (isLoading || isFetching) return;
+
+//     const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 0;
+//     if (ledger.length < savedCount) return;
+
+//     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+//     hasRestoredRightRef.current = true;
+// }, [isLoading, isFetching, ledger.length]);
+  useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) {
+        setIsRestoringRight(false);
+        return;
+    }
     if (isLoading || isFetching) return;
 
     const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 0;
-    if (ledger.length < savedCount) return;
+     // keep waiting only if we might still get more data
+    if (ledger.length < savedCount && hasMore) return;
 
     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
     hasRestoredRightRef.current = true;
-}, [isLoading, isFetching, ledger.length]);
+    setIsRestoringRight(false); // reveal now, correctly positioned
+}, [isLoading, isFetching, ledger.length, hasMore]);
   if (!partyId) {
     return (
       <div
@@ -524,7 +540,8 @@ useLayoutEffect(() => {
     document.body.removeChild(a);
   };
   return (
-    <div ref={rightPanelRef}
+    // <div ref={rightPanelRef}
+    <div 
      className="flex flex-col"
       // style={{
       //   maxHeight: "calc(100vh - 180px)",
@@ -668,12 +685,21 @@ useLayoutEffect(() => {
       </div>
 
       {/* ── LEDGER TABLE ── */}
-      <div className="table-responsive table-desi"
-         style={{
+      <div ref={rightPanelRef} className="table-responsive table-desi"
+      //    style={{
+      //   flex: 1,
+      //   minHeight: 0,
+      //   overflowY: "auto",
+      // }}
+           style={{
+        
         flex: 1,
         minHeight: 0,
         overflowY: "auto",
-      }}
+        visibility: isRestoringRight ? "hidden" : "visible",
+        // if using the placeholder above, also collapse height so it doesn't take double space
+       // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+    }}
       >
         <table className="w-full min-w-[500px]">
           <thead>

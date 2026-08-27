@@ -383,22 +383,39 @@ export default function ExpensesByCategories() {
     
     
     const hasRestoredRightRef = useRef(false);
+   const [isRestoringRight, setIsRestoringRight] = useState(true);
+  // useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) return;
+  //     if (isExpensesLoading || isExpensesFetching) return;
   
-  useLayoutEffect(() => {
-      if (hasRestoredRightRef.current) return;
+  //     const savedCount = Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 0;
+  //     if (filteredTransactions.length < savedCount) return;
+  
+  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //     hasRestoredRightRef.current = true;
+  // }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length]);
+
+    useLayoutEffect(() => {
+      if (hasRestoredRightRef.current) {
+        setIsRestoringRight(false);
+        return;
+      }
       if (isExpensesLoading || isExpensesFetching) return;
   
-      const savedCount = Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 0;
-      if (filteredTransactions.length < savedCount) return;
+      const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+      // keep waiting only if we might still get more data
+      if (filteredTransactions.length < savedCount && expensesHasMore) return;
   
       highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
       hasRestoredRightRef.current = true;
-  }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length]);
+      setIsRestoringRight(false); // reveal now, correctly positioned
+    }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length, expensesHasMore]);
   
   return (
     <>
       <div className="flex flex-col bg-white"
-        style={{ minHeight: "100vh" }}
+      style={{ height: "100%", minHeight: 0 }}
+        //style={{ minHeight: "100vh" }}
     //      style={{
     //  height: "100vh",
     //   //minHeight: 0,
@@ -594,9 +611,9 @@ export default function ExpensesByCategories() {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div ref={rightPanelRef}
+          <div 
           className="w-full lg:w-[70%] p-1"
-            style={{ maxHeight: "calc(100vh - 180px)" }}
+            // style={{ maxHeight: "calc(100vh - 180px)" }}
             //style={{ height: "100%", minHeight: 0 }}
           //     style={{
           //   height: "100%",
@@ -606,48 +623,23 @@ export default function ExpensesByCategories() {
           //   flexDirection: "column"
            
           // }}
+           style={{
+              maxHeight: "calc(100vh - 180px)",
+              minHeight: 0,      // 👈 add this
+              minWidth: 0
+            }}
           >
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col"
+               style={{
+                height: "100%",
+
+                minHeight: 0,
+                overflow: "hidden",
+              }}
+            >
 
               {/* ── CATEGORY SUMMARY CARD ── */}
-              {/* <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="flex items-center justify-center rounded-xl"
-                    style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
-                  >
-                    <Receipt size={22} style={{ color: "#4CA1AF" }} />
-                  </div>
-                  <div>
-                    <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
-                      {selectedCategory?.name}
-                    </h6>
-                    <p className="text-gray-500 text-sm mt-0.5">{selectedCategory?.type}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <p className="text-xs uppercase text-gray-400 mb-1">Total</p>
-                    <p className="font-bold" style={{ color: "#4CA1AF", fontSize: 18 }}>
-                      ₹ {(selectedCategory?.total ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-xs uppercase text-gray-400 mb-1">Balance</p>
-                    <p
-                      className="font-bold"
-                      style={{
-                        color: (selectedCategory?.balance ?? 0) > 0 ? "#dc2626" : "#16a34a",
-                        fontSize: 18,
-                      }}
-                    >
-                      ₹ {(selectedCategory?.balance ?? 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div> */}
+             
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
 
                 {/* Category Name */}
@@ -807,12 +799,21 @@ export default function ExpensesByCategories() {
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div className="table-responsive table-desi"
+              <div ref={rightPanelRef} className="table-responsive table-desi"
                 // style={{
                 //   flex: 1,
                 //   minHeight: 0,
                 //   overflowY: "auto",
                 // }}
+                style={{
+
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  visibility: isRestoringRight ? "hidden" : "visible",
+                  // if using the placeholder above, also collapse height so it doesn't take double space
+                  // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+                }}
               >
                 <table className="w-full min-w-[600px]">
                   <thead>

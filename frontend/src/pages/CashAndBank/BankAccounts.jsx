@@ -372,17 +372,33 @@ const handleTransactionEdit = (row) => {
           };
       }, [ ledger.length]);
   const hasRestoredRightRef = useRef(false);
+  const [isRestoringRight, setIsRestoringRight] = useState(true);
   
+  // useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) return;
+  //     if (isLoading || isFetching) return;
+  
+  //     const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
+  //     if (ledger.length < savedCount) return;
+  
+  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //     hasRestoredRightRef.current = true;
+  // }, [isLoading, isFetching, ledger.length]);
   useLayoutEffect(() => {
-      if (hasRestoredRightRef.current) return;
-      if (isLoading || isFetching) return;
-  
-      const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
-      if (ledger.length < savedCount) return;
-  
-      highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-      hasRestoredRightRef.current = true;
-  }, [isLoading, isFetching, ledger.length]);
+    if (hasRestoredRightRef.current) {
+        setIsRestoringRight(false);
+        return;
+    }
+    if (isLoading || isFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
+     // keep waiting only if we might still get more data
+    if (ledger.length < savedCount && hasMore) return;
+
+    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredRightRef.current = true;
+    setIsRestoringRight(false); // reveal now, correctly positioned
+}, [isLoading, isFetching, ledger.length, hasMore]);
 
   if (!bankId) {
     return (
@@ -404,8 +420,9 @@ const handleTransactionEdit = (row) => {
   }
 
   return (
-    <div ref={rightPanelRef}
-    className="flex flex-col overflow-y-auto"
+    <div 
+    className="flex flex-col"
+      // className="flex flex-col overflow-y-auto"
       // style={{
       //   maxHeight: "calc(100vh - 180px)",
       //   minWidth: 0
@@ -413,10 +430,12 @@ const handleTransactionEdit = (row) => {
       style={{
       height: "100%",
        
-      minHeight: 0
+      minHeight: 0,
+      overflow: "hidden",
    
      
     }}
+  
       >
 
       {/* bank summary card */}
@@ -445,7 +464,18 @@ const handleTransactionEdit = (row) => {
       </div>
 
       {/* ledger table */}
-      <div className="table-responsive table-desi">
+      <div className="table-responsive table-desi" 
+      ref={rightPanelRef}
+          style={{
+        
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        visibility: isRestoringRight ? "hidden" : "visible",
+        // if using the placeholder above, also collapse height so it doesn't take double space
+       // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+    }}
+      >
         <table className="w-full min-w-[500px]">
           <thead>
             <tr>

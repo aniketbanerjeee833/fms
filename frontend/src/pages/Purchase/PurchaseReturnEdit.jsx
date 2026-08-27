@@ -1027,6 +1027,18 @@ export default function PurchaseReturndEdit() {
           search: location.search,
         });
       }
+      else if (from === "party-receivables") {
+        navigate({
+          pathname: "/party/receivables",
+          search: location.search,
+        });
+      }
+      else if (from === "party-payables") {
+        navigate({
+          pathname: "/party/payables",
+          search: location.search,
+        });
+      }
       else if (from === "all-purchase-return-list") {
         navigate({
           pathname: "/purchase/return",
@@ -1150,12 +1162,13 @@ export default function PurchaseReturndEdit() {
                       search: location.search,
                     });
                   }
-                  // if (from === "items-by-item") {
-                  //   navigate({
-                  //     pathname: "/items/all-items",
-                  //     search: `?itemId=${Item_Id}`,
-                  //   });
-                  // }
+
+                  else if (from === "party-payables") {
+                    navigate({
+                      pathname: "/party/payables",
+                      search: location.search,
+                    });
+                  }
                   else if (from === "party-receivables") {
                     navigate({
                       pathname: `/party/receivables`,

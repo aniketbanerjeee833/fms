@@ -40,6 +40,7 @@ export default function ItemsByCategory() {
   const categorySearch = searchParams.get("q") || "";
   const itemSearch = searchParams.get("itemSearch") || "";
   const [menuOpen, setMenuOpen] = useState(null);
+  const [selectedItemId, setSelectedItemId] = useState(null);
   //const [itemRowMenu, setItemRowMenu] = useState(null);
   //const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [categoryModal, setCategoryModal] = useState({ open: false, mode: "add", data: null });
@@ -213,15 +214,15 @@ export default function ItemsByCategory() {
 
       {/* <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}> */}
       <div className="flex flex-col bg-white" style={{ height: "100vh", overflow: "hidden" }}>
-      {/* ── PAGE HEADER ── */}
-      <div className="inn-title">
-        <div className="flex flex-row justify-between items-center">
-          <div>
-            <h4 className="text-2xl font-bold mb-1">Items By Categories</h4>
-            <p className="text-gray-500 text-sm">Manage your item categories and stock</p>
-          </div>
+        {/* ── PAGE HEADER ── */}
+        <div className="inn-title">
+          <div className="flex flex-row justify-between items-center">
+            <div>
+              <h4 className="text-2xl font-bold mb-1">Items By Categories</h4>
+              <p className="text-gray-500 text-sm">Manage your item categories and stock</p>
+            </div>
 
-          {/* <button
+            {/* <button
               type="button"
               onClick={() => setShowAddCategoryModal(true)}
               className="text-white px-4 py-2 rounded-md text-sm font-medium"
@@ -229,143 +230,144 @@ export default function ItemsByCategory() {
             >
               + Add Category
             </button> */}
-          <button
-            type="button"
-            onClick={() => setCategoryModal({ open: true, mode: "add", data: null })}
-            className="text-white px-4 py-2 rounded-md text-sm font-medium"
-            style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
-          >
-            + Add Category
-          </button>
+            <button
+              type="button"
+              onClick={() => setCategoryModal({ open: true, mode: "add", data: null })}
+              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
+            >
+              + Add Category
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* ── SPLIT LAYOUT ── */}
-      {/* <div
+        {/* ── SPLIT LAYOUT ── */}
+        {/* <div
           className="flex flex-col lg:flex-row gap-0"
           style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
         > */}
-      <div
-        //  className="flex flex-col lg:flex-row gap-0" 
-        //  style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
-        className="flex flex-col lg:flex-row gap-0 min-h-0 overflow-hidden"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          height: "calc(100vh - 180px)",
-          borderTop: "1px solid #e2e8f0",
-        }}
-      >
-
-        {/* ══ LEFT — 30% — category list ══ */}
         <div
-          className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
-          style={{
-            borderRight: "1px solid #e2e8f0",
-            height: "100%",
-            minHeight: 0,
-            //minHeight: "500px",
-            //maxHeight: "calc(100vh - 180px)",
-            //boxSizing: "border-box",
-          }}
+          //  className="flex flex-col lg:flex-row gap-0" 
+          //  style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+          className="flex flex-col lg:flex-row gap-0 min-h-0 overflow-hidden"
+          // style={{
+          //   flex: 1,
+          //   minHeight: 0,
+          //   height: "calc(100vh - 180px)",
+          //   borderTop: "1px solid #e2e8f0",
+          // }}
+          style={{ height: "100vh", overflow: "hidden" }}
         >
-          {/* search */}
-          <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
-            <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
-              <Search
-                size={14}
-                style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
-              />
-              <input
-                type="text"
-                value={categorySearch}
-                onChange={(e) => {
-                  const value = e.target.value;
 
-                  const next = new URLSearchParams(searchParams);
-
-                  if (value) {
-                    next.set("q", value);
-                  } else {
-                    next.delete("q");
-                  }
-
-                  setSearchParams(next, { replace: true });
-                }}
-                placeholder="Search Category"
-                className="border rounded-md text-sm outline-none"
-                style={{
-                  width: "100%",
-                  height: 34,
-                  paddingLeft: 30,
-                  paddingRight: 8,
-                  borderColor: "#dbe3ea",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          </div>
-
-          {/* list header */}
+          {/* ══ LEFT — 30% — category list ══ */}
           <div
-            className="px-4 py-3 flex items-center gap-2"
-            style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
+            className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+            style={{
+              borderRight: "1px solid #e2e8f0",
+              height: "100%",
+              minHeight: 0,
+              //minHeight: "500px",
+              //maxHeight: "calc(100vh - 180px)",
+              //boxSizing: "border-box",
+            }}
           >
-            <Tags size={15} style={{ color: "#4CA1AF" }} />
-            <span className="text-xs font-semibold text-black uppercase tracking-wider">
-              Categories ({totalCategories})
-            </span>
-          </div>
+            {/* search */}
+            <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
+              <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
+                <Search
+                  size={14}
+                  style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+                />
+                <input
+                  type="text"
+                  value={categorySearch}
+                  onChange={(e) => {
+                    const value = e.target.value;
 
-          {isCategoriesLoading ? (
-            <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
-          ) : filteredCategories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
-              <Tags size={36} strokeWidth={1.2} />
-              <p className="text-sm">No categories found</p>
-            </div>
-          ) : (
-            filteredCategories.map((category) => {
-              const isSelected = selectedCategoryId === category.Category_Id;
-              //const isAllBucket = category.Category_Id === "all";
-              const isUncategorized = category.Category_Id === "uncategorized";
+                    const next = new URLSearchParams(searchParams);
 
-              return (
-                <div
-                  key={category.Category_Id}
-                  onClick={() => handleSelectCategory(category)}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    if (category.Category_Id === "uncategorized") return; // can't edit the virtual bucket
-                    setCategoryModal({
-                      open: true,
-                      mode: "edit",
-                      data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
-                    });
+                    if (value) {
+                      next.set("q", value);
+                    } else {
+                      next.delete("q");
+                    }
+
+                    setSearchParams(next, { replace: true });
                   }}
-                  className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+                  placeholder="Search Category"
+                  className="border rounded-md text-sm outline-none"
                   style={{
-                    backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                    borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                    borderBottom: "1px solid #f1f5f9",
+                    width: "100%",
+                    height: 34,
+                    paddingLeft: 30,
+                    paddingRight: 8,
+                    borderColor: "#dbe3ea",
+                    boxSizing: "border-box",
                   }}
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div
-                      className="flex items-center justify-center rounded-lg flex-shrink-0"
-                      style={{ width: 36, height: 36, backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9" }}
-                    >
-                      <Tags size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-                        {category.Item_Category}
-                      </p>
-                    </div>
-                  </div>
+                />
+              </div>
+            </div>
 
-                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                    {/* {!isAllBucket && (
+            {/* list header */}
+            <div
+              className="px-4 py-3 flex items-center gap-2"
+              style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
+            >
+              <Tags size={15} style={{ color: "#4CA1AF" }} />
+              <span className="text-xs font-semibold text-black uppercase tracking-wider">
+                Categories ({totalCategories})
+              </span>
+            </div>
+
+            {isCategoriesLoading ? (
+              <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
+            ) : filteredCategories.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
+                <Tags size={36} strokeWidth={1.2} />
+                <p className="text-sm">No categories found</p>
+              </div>
+            ) : (
+              filteredCategories.map((category) => {
+                const isSelected = selectedCategoryId === category.Category_Id;
+                //const isAllBucket = category.Category_Id === "all";
+                const isUncategorized = category.Category_Id === "uncategorized";
+
+                return (
+                  <div
+                    key={category.Category_Id}
+                    onClick={() => handleSelectCategory(category)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      if (category.Category_Id === "uncategorized") return; // can't edit the virtual bucket
+                      setCategoryModal({
+                        open: true,
+                        mode: "edit",
+                        data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+                      });
+                    }}
+                    className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+                      borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+                      borderBottom: "1px solid #f1f5f9",
+                    }}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div
+                        className="flex items-center justify-center rounded-lg flex-shrink-0"
+                        style={{ width: 36, height: 36, backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9" }}
+                      >
+                        <Tags size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+                          {category.Item_Category}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                      {/* {!isAllBucket && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -391,347 +393,365 @@ export default function ItemsByCategory() {
                           <MoreVertical size={14} style={{ color: "#374151" }} />
                         </button>
                       )} */}
-                    {!isUncategorized && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                      {!isUncategorized && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
 
-                          const next = new URLSearchParams(searchParams);
+                            const next = new URLSearchParams(searchParams);
 
-                          next.set("categoryId", category.Category_Id);
-                          next.delete("itemSearch");
+                            next.set("categoryId", category.Category_Id);
+                            next.delete("itemSearch");
 
-                          setSearchParams(next);
+                            setSearchParams(next);
 
-                          setMenuOpen(
-                            menuOpen === category.Category_Id
-                              ? null
-                              : category.Category_Id
-                          );
-                        }}
-                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                        style={{ backgroundColor: "transparent" }}
-                        title="More"
-                      >
-                        <MoreVertical size={14} style={{ color: "#374151" }} />
-                      </button>
-                    )}
+                            setMenuOpen(
+                              menuOpen === category.Category_Id
+                                ? null
+                                : category.Category_Id
+                            );
+                          }}
+                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          style={{ backgroundColor: "transparent" }}
+                          title="More"
+                        >
+                          <MoreVertical size={14} style={{ color: "#374151" }} />
+                        </button>
+                      )}
 
-                    <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
-                  </div>
-
-                  {menuOpen === category.Category_Id && (
-                    <div
-                      className="absolute bg-white shadow-lg rounded-md"
-                      style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0" }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCategoryModal({
-                            open: true,
-                            mode: "edit",
-                            data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
-                          });
-                          setMenuOpen(null);
-                        }}
-                        //disabled
-                        title="Edit category"
-                        style={{ color: "#374151", cursor: "pointer" }}
-                      >
-                        View/Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
-                        disabled
-                        title="Delete category — coming soon"
-                        style={{ opacity: 0.5, cursor: "not-allowed" }}
-                      >
-                        Delete
-                      </button>
+                      <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
                     </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-          <div ref={leftSentinelRef} style={{ height: 1 }} />
-          {isCategoriesFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
-        </div>
 
-        {/* ══ RIGHT — 70% — detail panel ══ */}
-        <div
-          className="w-full lg:w-[70%] p-1 overflow-y-auto"
-          style={{ height: "100%", minHeight: 0 }}
-        //style={{ maxHeight: "calc(100vh - 180px)" }}
-        >
+                    {menuOpen === category.Category_Id && (
+                      <div
+                        className="absolute bg-white shadow-lg rounded-md"
+                        style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCategoryModal({
+                              open: true,
+                              mode: "edit",
+                              data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+                            });
+                            setMenuOpen(null);
+                          }}
+                          //disabled
+                          title="Edit category"
+                          style={{ color: "#374151", cursor: "pointer" }}
+                        >
+                          View/Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
+                          disabled
+                          title="Delete category — coming soon"
+                          style={{ opacity: 0.5, cursor: "not-allowed" }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+            <div ref={leftSentinelRef} style={{ height: 1 }} />
+            {isCategoriesFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+          </div>
+
+          {/* ══ RIGHT — 70% — detail panel ══ */}
           <div
-            className="flex flex-col"
+            className="w-full lg:w-[70%] p-1 overflow-y-auto"
+            //style={{ height: "100%", minHeight: 0 }}
             style={{
-              height: "100%",
-              minHeight: 0,
-              overflow: "hidden",
+              maxHeight: "calc(100vh - 180px)",
+              minHeight: 0,      // 👈 add this
+              minWidth: 0
             }}
+          //style={{ maxHeight: "calc(100vh - 180px)" }}
           >
-            {/* <div className="flex flex-col h-full"> */}
-
-            {/* ── CATEGORY SUMMARY CARD ── */}
-            {/* <div className="rounded-xl p-2 mb-2 flex items-center justify-between gap-4"> */}
-            <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              {/* LEFT — All Items + item count */}
-              <div className="flex items-center gap-4">
-
-                <div
-                  className="flex items-center justify-center rounded-xl"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    backgroundColor: "#4CA1AF22",
-                  }}
-                >
-                  <Package size={22} style={{ color: "#4CA1AF" }} />
-                </div>
-
-                <div>
-                  <h6
-                    className="font-bold text-gray-900"
-                    style={{ fontSize: 18, margin: 0 }}
-                  >
-                    {selectedCategory?.Item_Category}
-                  </h6>
-
-                  <p className="text-gray-500 text-sm mt-0.5">
-                    {totalItems} item{totalItems !== 1 ? "s" : ""}
-                  </p>
-                </div>
-
-              </div>
-
-              {/* RIGHT — Search */}
-              <div className="flex flex-col gap-2 w-full sm:w-auto">
-                <div
-                  className="relative flex-shrink-0 w-full sm:w-auto"
-                  style={{
-                    width: 220,
-                    height: 36,
-                  }}
-                >
-                  <Search
-                    size={16}
-                    style={{
-                      position: "absolute",
-                      left: 10,
-                      top: 10,
-                      color: "#94a3b8",
-                      pointerEvents: "none",
-                    }}
-                  />
-
-                  <input
-                    type="text"
-                    value={itemSearch}
-                    onChange={(e) => {
-                      const value = e.target.value;
-
-                      const next = new URLSearchParams(searchParams);
-
-                      if (value) {
-                        next.set("itemSearch", value);
-                      } else {
-                        next.delete("itemSearch");
-                      }
-
-                      setSearchParams(next, { replace: true });
-                    }}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{
-                      height: 36,
-                      paddingLeft: 34,
-                      paddingRight: 10,
-                      borderColor: "#dbe3ea",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-                {selectedCategory?.Category_Id !== "uncategorized" && (<button
-                  type="button"
-                  onClick={() => setShowMoveModal(true)}
-                  className="w-full sm:w-auto text-white px-4 py-2 rounded-md text-sm font-medium"
-                  style={{
-                    backgroundColor: "#4CA1AF",
-                    outline: "none",
-                    boxShadow: "none",
-                  }}
-                >
-                  Move to this category
-                </button>)}
-              </div>
-
-
-            </div>
-
-            {/* ── ITEMS TABLE ── */}
-            <div className="table-responsive table-desi"
+            <div
+              className="flex flex-col"
               style={{
-                flex: 1,
+                height: "100%",
                 minHeight: 0,
-                overflowY: "auto",
+                overflow: "hidden",
               }}
             >
-              <table
-                className="w-full min-w-[700px]"
-              //style={{ fontSize: 13, borderCollapse: "collapse" }}
-              >
-                <thead>
-                  <tr
-                  //style={{ borderBottom: "2px solid #e2e8f0" }}
+              {/* <div className="flex flex-col h-full"> */}
+
+              {/* ── CATEGORY SUMMARY CARD ── */}
+              {/* <div className="rounded-xl p-2 mb-2 flex items-center justify-between gap-4"> */}
+              <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* LEFT — All Items + item count */}
+                <div className="flex items-center gap-4">
+
+                  <div
+                    className="flex items-center justify-center rounded-xl"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      backgroundColor: "#4CA1AF22",
+                    }}
                   >
-                    <th>Sl.No</th>
-                    <th
-                      //className="text-left py-2 px-3 font-semibold text-black"
-                      style={{
-                        //fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Item Name
-                    </th>
+                    <Package size={22} style={{ color: "#4CA1AF" }} />
+                  </div>
 
-                    <th
-                      className="text-left py-2 px-3 font-semibold text-black"
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
+                  <div>
+                    <h6
+                      className="font-bold text-gray-900"
+                      style={{ fontSize: 18, margin: 0 }}
                     >
-                      Stock
-                    </th>
+                      {selectedCategory?.Item_Category}
+                    </h6>
 
-                    <th
-                      className="text-right py-2 px-3 font-semibold text-black"
+                    <p className="text-gray-500 text-sm mt-0.5">
+                      {totalItems} item{totalItems !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+
+                </div>
+
+                {/* RIGHT — Search */}
+                <div className="flex flex-col gap-2 w-full sm:w-auto">
+                  <div
+                    className="relative flex-shrink-0 w-full sm:w-auto"
+                    style={{
+                      width: 220,
+                      height: 36,
+                    }}
+                  >
+                    <Search
+                      size={16}
                       style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
                       }}
+                    />
+
+                    <input
+                      type="text"
+                      value={itemSearch}
+                      onChange={(e) => {
+                        const value = e.target.value;
+
+                        const next = new URLSearchParams(searchParams);
+
+                        if (value) {
+                          next.set("itemSearch", value);
+                        } else {
+                          next.delete("itemSearch");
+                        }
+
+                        setSearchParams(next, { replace: true });
+                      }}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                  {selectedCategory?.Category_Id !== "uncategorized" && (<button
+                    type="button"
+                    onClick={() => setShowMoveModal(true)}
+                    className="w-full sm:w-auto text-white px-4 py-2 rounded-md text-sm font-medium"
+                    style={{
+                      backgroundColor: "#4CA1AF",
+                      outline: "none",
+                      boxShadow: "none",
+                    }}
+                  >
+                    Move to this category
+                  </button>)}
+                </div>
+
+
+              </div>
+
+              {/* ── ITEMS TABLE ── */}
+              <div className="table-responsive table-desi"
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                }}
+              >
+                <table className="w-full min-w-[700px]"
+                //style={{ fontSize: 13, borderCollapse: "collapse" }}
+                >
+                  <thead>
+                    <tr
+                    //style={{ borderBottom: "2px solid #e2e8f0" }}
                     >
-                      Stock Value
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isItemsLoading ? (
-                    <tr>
-                      <td colSpan={3} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : items.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                        No items to show
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((item, idx) => (
-                      <tr
-                        key={item.Item_Id}
-                        style={{ borderBottom: "1px solid #f1f5f9" }}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
-                      // onDoubleClick={() => {
-                      //   setEditingItem(item);
-                      //   setShowEditItemModal(true);
-                      // }}
+                      <th>Sl.No</th>
+                      <th
+                        //className="text-left py-2 px-3 font-semibold text-black"
+                        style={{
+                          //fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
                       >
-                        <td>{idx + 1}.</td>
-                        <td className="py-2 px-3 text-black">
-                          {item.Item_Name}
-                        </td>
+                        Item Name
+                      </th>
 
-                        <td
-                          //className="py-2 px-3"
-                          style={{
-                            color: item.Stock_Quantity < 0 ? "#dc2626" : "#000000",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {item.Stock_Quantity} {item.Unit || ""}
-                        </td>
+                      <th
+                        className="text-left py-2 px-3 font-semibold text-black"
+                        style={{
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        Stock
+                      </th>
 
-                        <td
-                          className=" text-right"
-                          style={{
-                            color: "#000000",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          ₹ {fmt(item.Stock_Value)}
+                      <th
+                        className="text-right py-2 px-3 font-semibold text-black"
+                        style={{
+                          fontSize: 11,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        Stock Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isItemsLoading ? (
+                      <tr>
+                        <td colSpan={3} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+                          Loading...
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : items.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+                          No items to show
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((item, idx) => (
+                        // <tr
+                        //   key={item.Item_Id}
+                        //   style={{ borderBottom: "1px solid #f1f5f9" }}
+                        //   className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        // // onDoubleClick={() => {
+                        // //   setEditingItem(item);
+                        // //   setShowEditItemModal(true);
+                        // // }}
+                        // >
+                        <tr
+                          key={item.Item_Id}
+                          onClick={() => {
+                            setSelectedItemId(item.Item_Id);
+                          }}
+                          style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            backgroundColor:
+                              selectedItemId === item.Item_Id
+                                ? "#4CA1AF22"
+                                : "transparent",
+                          }}
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          <td>{idx + 1}.</td>
+                          <td className="py-2 px-3 text-black">
+                            {item.Item_Name}
+                          </td>
+
+                          <td
+                            //className="py-2 px-3"
+                            style={{
+                              color: item.Stock_Quantity < 0 ? "#dc2626" : "#000000",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.Stock_Quantity} {item.Unit || ""}
+                          </td>
+
+                          <td
+                            className=" text-right"
+                            style={{
+                              color: "#000000",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            ₹ {fmt(item.Stock_Value)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
             </div>
-
+            <div ref={rightSentinelRef} style={{ height: 1 }} />
+            {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+            {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>}
           </div>
-          <div ref={rightSentinelRef} style={{ height: 1 }} />
-          {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
-          {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>}
+
         </div>
+      </div >
 
-      </div>
-    </div >
-
-    {/* {showAddCategoryModal && (
+      {/* {showAddCategoryModal && (
         <AddItemCategoryModal
           onClose={() => setShowAddCategoryModal(false)}
           onSave={handleCategoryAdded}
         />
 
       )} */}
-  {
-    categoryModal.open && (
-      <AddItemCategoryModal
-        mode={categoryModal.mode}
-        categoryData={categoryModal.data}
-        onClose={() => setCategoryModal({ open: false, mode: "add", data: null })}
-        onSave={(savedCategory) => {
-          setCategoryModal({ open: false, mode: "add", data: null });
+      {
+        categoryModal.open && (
+          <AddItemCategoryModal
+            mode={categoryModal.mode}
+            categoryData={categoryModal.data}
+            onClose={() => setCategoryModal({ open: false, mode: "add", data: null })}
+            onSave={(savedCategory) => {
+              setCategoryModal({ open: false, mode: "add", data: null });
 
-          if (savedCategory?.Category_Id) {
-            const next = new URLSearchParams(searchParams);
-            next.set("categoryId", savedCategory.Category_Id);
-            next.delete("itemSearch");
-            setSearchParams(next);
-          }
-        }}
-      />
-    )
-  }
+              if (savedCategory?.Category_Id) {
+                const next = new URLSearchParams(searchParams);
+                next.set("categoryId", savedCategory.Category_Id);
+                next.delete("itemSearch");
+                setSearchParams(next);
+              }
+            }}
+          />
+        )
+      }
 
-  {
-    showMoveModal && (
-      <MoveToCategoryModal
-        targetCategory={selectedCategory}
-        onClose={() => setShowMoveModal(false)}
-        onMoved={() => {
-          setShowMoveModal(false);
-          setRightCursor(null); // reset pagination
-          // refetch category items if needed
-          refetchItems?.();
-        }}
-      />
-    )
-  } 
+      {
+        showMoveModal && (
+          <MoveToCategoryModal
+            targetCategory={selectedCategory}
+            onClose={() => setShowMoveModal(false)}
+            onMoved={() => {
+              setShowMoveModal(false);
+              setRightCursor(null); // reset pagination
+              // refetch category items if needed
+              refetchItems?.();
+            }}
+          />
+        )
+      }
 
     </>
   );
