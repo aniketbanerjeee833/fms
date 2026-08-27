@@ -391,7 +391,8 @@ export default function AllPurchaseList() {
           </div>
         </div>
         <div className="tab-inn">
-          <div className="table-responsive table-desi">
+          <div 
+          className="table-responsive table-desi">
             {isLoading ? (
               <p className="text-center mt-4">Fetching purchases...</p>
             ) : purchases?.length === 0 ? (

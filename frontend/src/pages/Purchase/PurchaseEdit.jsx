@@ -991,11 +991,17 @@ export default function PurchaseEdit() {
       // 9. NAVIGATION
       // =======================================================
 
-      if (from === "party-payables") {
+      if (from === "party-receivables") {
         navigate({
-          pathname: "/party/payables",
+          pathname: "/party/receivables",
           search: location.search,
         });
+      }
+      else if (from === "party-payables") {
+        navigate({
+          pathname: `/party/payables`,
+          search: location.search,
+        })
       }
 
       else if (
@@ -1157,8 +1163,13 @@ export default function PurchaseEdit() {
                 //   search: location.search,
                 // })}
                 onClick={() => {
-
-                  if (from === "party-payables") {
+                  if (from === "party-receivables") {
+                    navigate({
+                      pathname: "/party/receivables",
+                      search: location.search,
+                    });
+                  }
+                  else if (from === "party-payables") {
                     navigate({
                       pathname: `/party/payables`,
                       search: location.search,

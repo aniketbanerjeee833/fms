@@ -447,8 +447,8 @@ const highlightedRowRef = useRef(null);
        
         const saveRight = () => {
             console.log("saveRight fired", rightEl.scrollTop, ledger.length);
-            sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
-            sessionStorage.setItem("itemsByItem:rightCount", ledger.length);
+            sessionStorage.setItem("partiesByParty:rightScroll", rightEl.scrollTop);
+            sessionStorage.setItem("partiesByParty:rightCount", ledger.length);
             // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
             // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
         };
@@ -1410,7 +1410,7 @@ export default function Parties() {
                   return (
                     <div
                       key={party.Party_Id}
-                      ref={isSelected ? selectedItemRowRef : null}   // 👈 add this
+                      ref={isSelected ? selectedItemRowRef : null}   //  add this
                       onClick={() => handleSelectParty(party.Party_Id)}
                       onDoubleClick={() => {
                         if (party.Party_Name === "Cash Sale") return;

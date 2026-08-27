@@ -16,7 +16,7 @@ import { saleApi, useEditSaleMutation, useGetSingleSaleQuery } from "../../redux
 
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
-import { LayoutDashboard } from "lucide-react";
+
 import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { dashboardApi } from "../../redux/api/dashboardApi";
@@ -1115,7 +1115,12 @@ export default function SaleEdit() {
           search: location.search,
         });
       }
-
+      else if (from === "party-payables") {
+        navigate({
+          pathname: "/party/payables",
+          search: location.search,
+        });
+      }
       else if (
         from === "party-sales-purchases-details"
       ) {
@@ -1278,8 +1283,13 @@ export default function SaleEdit() {
               <button
                 type="button"
                 onClick={() => {
-
-                  if (from === "party-receivables") {
+                   if (from === "party-payables") {
+                    navigate({
+                      pathname: `/party/payables`,
+                      search: location.search,
+                    })
+                  }
+                  else if (from === "party-receivables") {
                     navigate({
                       pathname: `/party/receivables`,
                       search: location.search,

@@ -15,17 +15,8 @@ export const partyApi = createApi({
   endpoints: (builder) => ({
 
 
-    // // ✅ Get all leads (paginated)
-    // getAllLeads: builder.query({
-    //   query: ({ userId, page }) => `lead/${userId}?page=${page}`,
-    //   providesTags: (result) =>
-    //     result && Array.isArray(result.data)
-    //       ? [
-    //           { type: "Lead", id: "LIST" },
-    //           ...result.data.map((lead) => ({ type: "Lead", id: lead.id })),
-    //         ]
-    //       : [{ type: "Lead", id: "LIST" }],
-    // }),
+  
+   
 
  
     // getAllParties: builder.query({
@@ -334,10 +325,9 @@ getAllPayableParties: builder.query({
     currentArg,
     previousArg,
   }) =>
-    currentArg?.cursor !==
-      previousArg?.cursor ||
-    currentArg?.search !==
-      previousArg?.search,
+    currentArg?.cursor !==previousArg?.cursor ||
+    currentArg?.search !==previousArg?.search ||
+    currentArg?.limit !== previousArg?.limit,
   providesTags: ["Party"],
   // providesTags: [
   //   {
@@ -403,10 +393,9 @@ getAllReceivableParties: builder.query({
     currentArg,
     previousArg,
   }) =>
-    currentArg?.cursor !==
-      previousArg?.cursor ||
-    currentArg?.search !==
-      previousArg?.search,
+    currentArg?.cursor !==previousArg?.cursor ||
+    currentArg?.search !==previousArg?.search ||
+    currentArg?.limit !== previousArg?.limit,
 
   providesTags: ["Party"],
 }),

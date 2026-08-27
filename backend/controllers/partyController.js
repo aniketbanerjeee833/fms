@@ -640,119 +640,6 @@ const deleteParty = async (req, res, next) => {
     }
   }
 };
-// const deletePartyAddress = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     const { Party_Id: partyId, Address_Id: addressId } = req.params;
-
-//     if (!partyId || !addressId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Party ID and Address ID are required.",
-//       });
-//     }
-
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
-
-//     // =========================================================
-//     // 1. CHECK ADDRESS EXISTS AND BELONGS TO THIS PARTY
-//     // =========================================================
-
-//     const [[address]] = await connection.query(
-//       `
-//       SELECT
-//         id,
-//         Party_Id,
-//         Address_Type,
-//         Address_Text,
-//         Is_Default
-//       FROM add_party_addresses
-//       WHERE id = ?
-//         AND Party_Id = ?
-//       LIMIT 1
-//       `,
-//       [addressId, partyId]
-//     );
-
-//     if (!address) {
-//       await connection.rollback();
-
-//       return res.status(404).json({
-//         success: false,
-//         message: "Address not found for this party.",
-//       });
-//     }
-
-//     // =========================================================
-//     // 2. DELETE ADDRESS
-//     // =========================================================
-
-//     await connection.query(
-//       `
-//       DELETE FROM add_party_addresses
-//       WHERE id = ?
-//         AND Party_Id = ?
-//       `,
-//       [addressId, partyId]
-//     );
-
-//     // =========================================================
-//     // 3. IF DELETED ADDRESS WAS DEFAULT,
-//     //    MAKE ANOTHER ADDRESS OF SAME TYPE DEFAULT
-//     // =========================================================
-
-//     if (address.Is_Default === 1) {
-//       const [[nextAddress]] = await connection.query(
-//         `
-//         SELECT id
-//         FROM add_party_addresses
-//         WHERE Party_Id = ?
-//           AND Address_Type = ?
-//         ORDER BY id DESC
-//         LIMIT 1
-//         `,
-//         [partyId, address.Address_Type]
-//       );
-
-//       if (nextAddress) {
-//         await connection.query(
-//           `
-//           UPDATE add_party_addresses
-//           SET Is_Default = 1
-//           WHERE id = ?
-//             AND Party_Id = ?
-//           `,
-//           [nextAddress.id, partyId]
-//         );
-//       }
-//     }
-
-//     await connection.commit();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: `${address.Address_Type} address deleted successfully.`,
-//       Address_Id: addressId,
-//       Party_Id: partyId,
-//     });
-
-//   } catch (err) {
-//     if (connection) {
-//       await connection.rollback();
-//     }
-
-//     console.error("❌ Error deleting party address:", err);
-
-//     next(err);
-
-//   } finally {
-//     if (connection) {
-//       connection.release();
-//     }
-//   }
-// };
 
 // OR p.State LIKE ?
 //         OR p.Email_Id LIKE ?
@@ -1981,9 +1868,7 @@ const getAllPayableParties = async (req, res, next) => {
       ? parseInt(req.query.cursor, 10)
       : null;
 
-    const limit = req.query.limit
-      ? Math.min(parseInt(req.query.limit, 10), 10)
-      : 10;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     const search = req.query.search
       ? req.query.search.trim()
@@ -2197,9 +2082,7 @@ const getAllReceivableParties = async (req, res, next) => {
       ? parseInt(req.query.cursor, 10)
       : null;
 
-    const limit = req.query.limit
-      ? Math.min(parseInt(req.query.limit, 10), 10)
-      : 10;
+     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     const search = req.query.search
       ? req.query.search.trim()
