@@ -133,12 +133,22 @@ Item_Unit: z
       .transform((val) => val || null),
 
   Conversion_Rate:decimalNumber("Conversion Rate", 6),
+   Item_Code: z
+      .string()
+      .trim()
+      .nullable()
+      .optional()
+      .transform((val) => val || null),
+
+    MRP: priceField("MRP"),
+
+    Discount_On_MRP_For_Sale: priceField("Discount on MRP For Sale"),
   Sale_Price: priceField("Sale Price"),
 
-    // Sale_Price_Type: z
-    //   .enum(["With_Tax", "Without_Tax"])
-    //   .optional()
-    //   .default("Without_Tax"),
+    Sale_Price_Type: z
+      .enum(["With_Tax", "Without_Tax"])
+      .optional()
+      .default("Without_Tax"),
 
     Discount_On_Sale_Price: priceField("Discount on Sale Price"),
 
@@ -147,12 +157,12 @@ Item_Unit: z
       .optional()
       .default("Percentage"),
 
-    Purchase_Price: priceField("Purchase Price"),
+   Purchase_Price: priceField("Purchase Price"),
 
-    // Purchase_Price_Type: z
-    //   .enum(["With_Tax", "Without_Tax"])
-    //   .optional()
-    //   .default("Without_Tax"),
+    Purchase_Price_Type: z
+      .enum(["With_Tax", "Without_Tax"])
+      .optional()
+      .default("Without_Tax"),
 
     // =====================================================
     // PRICING
@@ -230,6 +240,14 @@ Item_Unit: z
         path: ["Secondary_Unit"],
         message:
           "Select a primary unit before selecting a secondary unit.",
+      });
+    }
+
+      if (data.Discount_On_Sale_Price && !data.Sale_Price) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["Discount_On_Sale_Price"],
+        message: "Discount cannot be added as Sale Price is 0.",
       });
     }
 
