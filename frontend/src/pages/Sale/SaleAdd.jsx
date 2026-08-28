@@ -170,20 +170,7 @@ export default function SaleAdd() {
       return updated;
     });
   };
-  // const handleSelect = (rowIndex, categoryName) => {
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[rowIndex] = {
-  //       ...updated[rowIndex],
-  //       Item_Category: categoryName,
-  //       CategoryOpen: false,
-  //       isExistingItem: false,   // user-typed, so still editable
-  //     };
-  //     return updated;
-  //   });
-
-  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  // };
+  
   const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {

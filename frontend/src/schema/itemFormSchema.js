@@ -88,19 +88,30 @@ export const itemFormSchema = z
       .enum(["Product", "Service"])
       .optional()
       .default("Product"),
-   Item_Category: z
-        .union([
-          z.string(),
-          z.null(),
-          z.undefined(),
-        ])
-        .transform((val) => {
+      Item_Category: z
+  .union([
+    z.string(),
+    z.null(),
+    z.undefined(),
+  ])
+  .transform((val) => {
+    const value = String(val ?? "").trim();
+
+    return value === "" ? "" : value;
+  }),
+  //  Item_Category: z
+  //       .union([
+  //         z.string(),
+  //         z.null(),
+  //         z.undefined(),
+  //       ])
+  //       .transform((val) => {
          
       
-          const value = val.trim();
+  //         const value = val.trim();
       
-          return value === "" ? "" : value;
-        }),
+  //         return value === "" ? "" : value;
+  //       }),
 
     Item_HSN: z
           .union([z.string(), z.number(), z.undefined(), z.null()])
