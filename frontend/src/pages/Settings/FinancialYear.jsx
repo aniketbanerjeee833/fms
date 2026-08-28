@@ -119,7 +119,9 @@ const handleSubmit = async (e) => {
           <div className="col-md-12">
             <div className="box-inn-sp"> */}
       
-            <div className="flex flex-col bg-white ">
+            <div className="flex flex-col bg-white"
+            style={{height: "90%" }}
+            >
               <div className="inn-title">
                 <h4 className="text-2xl font-bold mb-2">Financial Year</h4>
                 <p className="text-gray-500 mb-6">

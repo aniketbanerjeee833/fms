@@ -238,7 +238,7 @@ a:hover {
     padding: 12px 20px;
     color: #666;
 } */
-.sb2-13 ul li a:after {
+/* .sb2-13 ul li a:after {
     font-family: FontAwesome;
     content: "\f105";
     font-size: 16px;
@@ -248,7 +248,7 @@ a:hover {
     right: 20px;
     font-size: 12px;
     line-height: 1;
-    /* -webkit-font-smoothing: antialiased;
+     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-transform: rotate(0deg);
     -ms-transform: rotate(0deg);
@@ -256,20 +256,20 @@ a:hover {
     transform: rotate(0deg);
     -webkit-transition: -webkit-transform .2s ease-in-out;
     -o-transition: -webkit-transform .2s ease-in-out;
-    transition: -webkit-transform .2s ease-in-out; */
-}
-.sb2-13 ul li a:hover:after {
-    /* -webkit-transform: rotate(90deg);
+    transition: -webkit-transform .2s ease-in-out; 
+} */
+/* .sb2-13 ul li a:hover:after {
+     -webkit-transform: rotate(90deg);
     -ms-transform: rotate(90deg);
     -o-transform: rotate(90deg);
-    transform: rotate(90deg); */
-}
-.sb2-13 ul li a:focus:after {
-    /* -webkit-transform: rotate(90deg);
+    transform: rotate(90deg); 
+} */
+/*.sb2-13 ul li a:focus:after {
+     -webkit-transform: rotate(90deg);
     -ms-transform: rotate(90deg);
     -o-transform: rotate(90deg);
-    transform: rotate(90deg); */
-}
+    transform: rotate(90deg); 
+}*/
 .sb2-13 ul li a:hover {
     background: #4CA1AF ;
     color: #fff;
@@ -287,6 +287,7 @@ a:hover {
 }
 .sb2-2 {
     min-height: 100vh;
+    
     /* height: 100vh; */
     float: left; 
      /* width: 80% ; */

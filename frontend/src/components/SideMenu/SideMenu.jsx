@@ -333,6 +333,20 @@ if (
                  Reports
                  </span>
             </NavLink> */}
+{/* 
+              <NavLink
+              to="/barcode-scanner"
+              className={({ isActive }) => (isActive ? "menu-active" : "")}
+              style={{ display: 'block', padding: '10px 16px',
+                color: "#666", textDecoration: 'none' }}
+                  onClick={() => setOpenMenu(null)} // ✅ Close all submenus
+            >
+              
+               
+                 <span className="flex items-center gap-2">  <ClipboardMinus  size={20}/> 
+                 Barcode Scanner
+                 </span>
+            </NavLink> */}
                   {/* {
   renderMenu(
     "Reports",

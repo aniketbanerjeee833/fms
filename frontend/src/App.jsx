@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Layout from './components/Layout/Layout';
 import { useGetUserQuery } from './redux/api/userApi';
 import Spinner from './components/Layout/Spinner';
+// import BarcodeScannerInput from './pages/BarcodeScannerInput';
 
 
 
@@ -517,6 +518,15 @@ function RouterWrapper() {
               </Layout> 
               } 
               />
+
+              {/* <Route
+              path="/barcode-scanner"
+              element={
+                <Layout>
+                  <BarcodeScannerInput/>
+                </Layout>
+              }
+            /> */}
           </Route>
 
           {/* Fallback */}
