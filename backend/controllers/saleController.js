@@ -921,12 +921,13 @@ const addSale = async (req, res, next) => {
         );
       }
 
-      const [purchaseTax] = await connection.query(
-        `SELECT Tax_Type FROM add_purchase_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
-        [Item_Id]
-      );
+      // const [saleTax] = await connection.query(
+      //   `SELECT Tax_Type FROM add_sale_items WHERE Item_Id = ? ORDER BY id DESC LIMIT 1`,
+      //   [Item_Id]
+      // );
 
-      const safeTaxType = purchaseTax[0]?.Tax_Type || Tax_Type || "None";
+      //const safeTaxType = saleTax[0]?.Tax_Type || Tax_Type || "None";
+      const safeTaxType = Tax_Type || "None";
 
       const [saleItemResult] = await connection.execute(
         `INSERT INTO add_sale_items
@@ -1734,6 +1735,7 @@ const getSingleSale = async (req, res, next) => {
     i.Item_Name,
     i.Item_HSN,
     i.Item_Category,
+    i.Discount_On_MRP_For_Sale AS Current_MRP_Discount,
 
     -- CURRENT ITEM MASTER UNITS FROM IDs
     iu.Unit_Shorthand AS Item_Unit,
@@ -1816,6 +1818,8 @@ const getSingleSale = async (req, res, next) => {
 
       const currentSecondary =
         it.Current_Secondary_Unit || null;
+
+  const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
 
       const price = Number(it.Sale_Price || 0);
 
@@ -1960,6 +1964,10 @@ const getSingleSale = async (req, res, next) => {
         // ================================================
         MRP:it.MRP,
         Discount_On_MRP_For_Sale_Percentage:it.Discount_On_MRP_For_Sale_Percentage,
+          // CURRENT MASTER VALUE
+  Current_MRP_Discount:
+    it.Current_MRP_Discount,
+         hasHistoricalMRP,
 
         Sale_Price:
           it.Sale_Price,
@@ -4166,11 +4174,11 @@ const editSale = async (req, res, next) => {
 
     for (const line of resolvedLines) {
 
-      const [purchaseTax] =
+      const [saleTax] =
         await connection.query(
           `
         SELECT Tax_Type
-        FROM add_purchase_items
+        FROM add_sale_items
         WHERE Item_Id = ?
         ORDER BY id DESC
         LIMIT 1
@@ -4181,7 +4189,7 @@ const editSale = async (req, res, next) => {
 
       const safeTaxType =
         line.Tax_Type ||
-        purchaseTax[0]?.Tax_Type ||
+        saleTax[0]?.Tax_Type ||
         "None";
 
 
