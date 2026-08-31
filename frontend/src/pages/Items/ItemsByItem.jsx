@@ -690,7 +690,7 @@ export default function ItemsByItem() {
         highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
         hasRestoredRightRef.current = true;
         setIsRestoringRight(false); // reveal now, correctly positioned
-    }, [isLoading, isBillsFetching, transactions.length, hasMore]);
+    }, [isBillsLoading, isBillsFetching, transactions.length, hasMore]);
 
     return (
         <>

@@ -72,7 +72,7 @@ const ExpensePreview = lazy(() => import('./pages/Expense/ExpensePreview'));
 const CashInHand= lazy(() => import('./pages/CashAndBank/CashInHand'));
 const BankAccounts= lazy(() => import('./pages/CashAndBank/BankAccounts'));
 
-const FinancialYear = lazy(() => import('./pages/Settings/FinancialYear'));
+const Settings = lazy(() => import('./pages/Settings/Settings'));
 // const Reports = lazy(() => import('./pages/Reports'));
 
 
@@ -497,11 +497,20 @@ function RouterWrapper() {
             element={<DateRangeReport/>} 
             />
 
-              <Route
+              {/* <Route
               path="/financial-year/add"
               element={
                 <Layout>
                   <FinancialYear/>
+                </Layout>
+              }
+            /> */}
+
+             <Route
+              path="/settings"
+              element={
+                <Layout>
+                  <Settings/>
                 </Layout>
               }
             />

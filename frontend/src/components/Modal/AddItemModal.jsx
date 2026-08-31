@@ -16,6 +16,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import SelectUnitModal from "./SelectUnitModal";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
+import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
 
 export default function AddItemModal({ onClose, onSave, defaultItemType = "Product" }) {
     const dispatch = useDispatch();
@@ -36,6 +37,24 @@ export default function AddItemModal({ onClose, onSave, defaultItemType = "Produ
 
     const { data: itemUnitsFetched } = useGetAllItemUnitsQuery();
     const itemUnits = itemUnitsFetched;
+     const { data: settingsData } = useGetAllSettingsQuery();
+     const settings = settingsData?.settings || [];
+
+  const showMRP =
+  Number(
+    settings.find(
+      (s) => s.setting_key === "show_mrp"
+    )?.setting_value
+  ) === 1;
+
+const calculateSalePriceFromMRP =
+  Number(
+    settings.find(
+      (s) =>
+        s.setting_key ===
+        "calculate_sale_price_from_mrp_disc"
+    )?.setting_value
+  ) === 1;
 
     const { data: categories } = useGetAllCategoriesQuery();
 
@@ -138,18 +157,46 @@ export default function AddItemModal({ onClose, onSave, defaultItemType = "Produ
     const formValues = watch()
     console.log(formValues)
 
-   const mrp = watch("MRP");
+
+
+// useEffect(() => {
+//   const mrpNum = Number(mrp);
+//   const discountNum = Number(discountOnMrp);
+
+//   if (mrpNum > 0 && discountNum >= 0) {
+//     const calculated = mrpNum - (mrpNum * discountNum) / 100;
+//     setValue("Sale_Price", calculated.toFixed(2), { shouldValidate: true, shouldDirty: true });
+//   }
+// }, [mrp, discountOnMrp, setValue]);
+const mrp = watch("MRP");
 const discountOnMrp = watch("Discount_On_MRP_For_Sale");
 
 useEffect(() => {
+  // MRP calculation setting is OFF
+  if (!calculateSalePriceFromMRP) return;
+
   const mrpNum = Number(mrp);
   const discountNum = Number(discountOnMrp);
 
   if (mrpNum > 0 && discountNum >= 0) {
-    const calculated = mrpNum - (mrpNum * discountNum) / 100;
-    setValue("Sale_Price", calculated.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    const calculated =
+      mrpNum - (mrpNum * discountNum) / 100;
+
+    setValue(
+      "Sale_Price",
+      calculated.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
   }
-}, [mrp, discountOnMrp, setValue]);
+}, [
+  mrp,
+  discountOnMrp,
+  calculateSalePriceFromMRP,
+  setValue,
+]);
     return (
         <>
             <div
@@ -488,7 +535,7 @@ useEffect(() => {
                                 {/* <div className="p-4 border rounded-md mb-4"> */}
                                 {/* <p className="font-semibold mb-3">MRP</p> */}
                                 <div className="flex gap-4">
-                                    <div className="input-field col s6">
+                                    {showMRP &&(<div className="input-field col s6">
                                         <span className="active">MRP</span>
                                         <input
                                             type="text"
@@ -499,8 +546,8 @@ useEffect(() => {
                                             style={{ marginBottom: "0px" }}
                                         />
                                         {errors?.MRP && <p className="text-red-500 text-xs mt-1">{errors?.MRP?.message}</p>}
-                                    </div>
-                                    <div className="input-field col s6">
+                                    </div>)}
+                                    {showMRP && calculateSalePriceFromMRP && (<div className="input-field col s6">
                                         <span className="active">Disc. On MRP For Sale (%)</span>
                                         <input
                                             type="text"
@@ -513,7 +560,7 @@ useEffect(() => {
                                         {errors?.Discount_On_MRP_For_Sale && (
                                             <p className="text-red-500 text-xs mt-1">{errors?.Discount_On_MRP_For_Sale?.message}</p>
                                         )}
-                                    </div>
+                                    </div>)}
                                 </div>
                                 {/* </div> */}
                                 {/* <div className="p-4 border rounded-md mb-4"> */}

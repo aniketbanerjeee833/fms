@@ -8,7 +8,10 @@ import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,del
     moveItemsToCategory, printEachItemSalesPurchasesReport,addItemUnit,editItemUnit,
     getAllItemUnitsCursor,
     getUnitConversions,
-    getAllItemUnits} from "../controllers/itemController.js"
+    getAllItemUnits,
+    getItemByCode,
+    getItemsForDropdown,
+    getItemByName} from "../controllers/itemController.js"
 import userAuth from "../middleware/userAuth.js";
 
 
@@ -60,6 +63,10 @@ itemRouter.post("/print-each-item-sales-purchases-report", userAuth, printEachIt
 
 itemRouter.post("/item-conversions", userAuth, addItemConversion);
 itemRouter.get("/ledger", userAuth, getAllItemsForLedger);
+itemRouter.get("/dropdown",userAuth,getItemsForDropdown);
+itemRouter.get("/by-name",userAuth,getItemByName);
+
+itemRouter.get("/by-code/:code", userAuth, getItemByCode);
 itemRouter.get("/:Item_Id/bills", userAuth, getItemBills);
 // itemRouter.get("/item-conversions/:Item_Id", userAuth, getItemConversions);
 itemRouter.get("/item-conversions", userAuth, getItemConversions);

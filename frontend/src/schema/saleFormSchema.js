@@ -43,43 +43,43 @@ const paymentSplitSchema = z
   });
 
 export const saleFormSchema = z.object({
-    Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
+  Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
   // Party_Name: z.string().min(1, "Party_Name is required"),
-      Party_Name: z
-      .string()
-      .trim()
-      .optional()
-      .or(z.literal("")),
-   Billing_Name: z
+  Party_Name: z
     .string()
     .trim()
     .optional()
     .or(z.literal("")),
- Phone_Number: z
-  .string()
-  .trim()
-  .refine(
-    (value) => value === "" || /^\d{10}$/.test(value),
-    {
-      message: "Phone number must be exactly 10 digits",
-    }
-  )
-  .optional(),
+  Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  Phone_Number: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || /^\d{10}$/.test(value),
+      {
+        message: "Phone number must be exactly 10 digits",
+      }
+    )
+    .optional(),
   Billing_Address: z
-  .string()
-  .trim()
-  .optional()
-  .or(z.literal("")),
-    GSTIN: z.preprocess(
-  (val) => (val === null || val === undefined ? "" : String(val)),
-  z.string().refine((val) => val === "" || val.length === 15, {
-    message: "GSTIN must be exactly 15 characters or left empty",
-  })
-),
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  GSTIN: z.preprocess(
+    (val) => (val === null || val === undefined ? "" : String(val)),
+    z.string().refine((val) => val === "" || val.length === 15, {
+      message: "GSTIN must be exactly 15 characters or left empty",
+    })
+  ),
 
-     
 
-   Invoice_Number: z.string().optional().default(""),
+
+  Invoice_Number: z.string().optional().default(""),
 
   Invoice_Date: z
     .string()
@@ -90,20 +90,20 @@ export const saleFormSchema = z.object({
   // State_Of_Supply: z.string().min(1, "State_Of_Supply is required"),
   State_Of_Supply: z.string().nullable().optional(),
   // 🔹 Auto-calculated but cannot be empty
-   Total_Amount: digitsOnly("Total_Amount", false).default(0),
-    Round_Off: z
-  .union([z.string(), z.number()])
-  .optional()
-  .transform((val) => {
-    if (val === "" || val === undefined || val === null) return 0;
-    const n = Number(val);
-    return isNaN(n) ? 0 : n;
-  }),
-    Balance_Due: digitsOnly("Balance_Due", false).default(0),
+  Total_Amount: digitsOnly("Total_Amount", false).default(0),
+  Round_Off: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === undefined || val === null) return 0;
+      const n = Number(val);
+      return isNaN(n) ? 0 : n;
+    }),
+  Balance_Due: digitsOnly("Balance_Due", false).default(0),
 
   // 🔹 Optional but digits if provided
   Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
-  
+
 
   // Stock_Quantity: digitsOnly("Stock_Quantity"),
   splits: z
@@ -137,7 +137,7 @@ export const saleFormSchema = z.object({
       });
     }),
 
- items: z
+  items: z
     .array(
       z.object({
         Item_Category: z.string().optional().default(""),
@@ -148,6 +148,39 @@ export const saleFormSchema = z.object({
           .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
             message: "HSN Code must be 4-8 digits if provided",
           }),
+      MRP: z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .optional()
+  .transform((val) => String(val ?? "").trim())
+  .refine(
+    (s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s),
+    {
+      message: "MRP must be a valid number with up to 2 decimals",
+    }
+  )
+  .transform((s) => (s === "" ? "" : Number(s)))
+  .refine(
+    (val) => val === "" || val >= 0,
+    {
+      message: "MRP cannot be negative",
+    }
+  ),
+        Discount_On_MRP_For_Sale_Percentage: z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .optional()
+  .transform((val) => {
+    if (
+      val === "" ||
+      val === undefined ||
+      val === null
+    ) {
+      return "";
+    }
+
+    const n = Number(val);
+
+    return n === 0 ? "" : n;
+  }),
         Quantity: z.preprocess(
           (val) => {
             if (val === "" || val === undefined || val === null) return 0;
@@ -174,47 +207,47 @@ export const saleFormSchema = z.object({
     )
     .optional()
     .default([]),
-    
-    Terms_Conditions_Id: z
-  .union([z.string(), z.number(), z.null(), z.undefined()])
-  .optional()
-  .transform((val) => {
-    if (val === "" || val === null || val === undefined) {
-      return null;
-    }
 
-    const id = Number(val);
-    return Number.isInteger(id) ? id : null;
-  }),
+  Terms_Conditions_Id: z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === null || val === undefined) {
+        return null;
+      }
+
+      const id = Number(val);
+      return Number.isInteger(id) ? id : null;
+    }),
   Terms_Conditions_Description: z
-  .string()
-  .trim()
-  .nullable()
-  .optional(),
+    .string()
+    .trim()
+    .nullable()
+    .optional(),
 
 })
-.superRefine((data, ctx) => {
-  // =====================================================
-  // CREDIT SALE → PARTY IS MANDATORY
-  // =====================================================
+  .superRefine((data, ctx) => {
+    // =====================================================
+    // CREDIT SALE → PARTY IS MANDATORY
+    // =====================================================
 
-  if (
-    data.Sale_Mode === "Credit" &&
-    !data.Party_Name?.trim()
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["Party_Name"],
-      message: "Party name is required for credit sale",
-    });
-  }
+    if (
+      data.Sale_Mode === "Credit" &&
+      !data.Party_Name?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["Party_Name"],
+        message: "Party name is required for credit sale",
+      });
+    }
 
-  // =====================================================
-  // CASH SALE → PARTY CAN BE BLANK
-  // =====================================================
-  //
-  // No validation needed.
-  //
-  // Cash + blank party
-  // → backend will use "Cash Sale" party
-});
+    // =====================================================
+    // CASH SALE → PARTY CAN BE BLANK
+    // =====================================================
+    //
+    // No validation needed.
+    //
+    // Cash + blank party
+    // → backend will use "Cash Sale" party
+  });

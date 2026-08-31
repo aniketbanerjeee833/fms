@@ -516,6 +516,110 @@ export const itemApi = createApi({
       /* ✅ FIX 1 — scoped to LIST id, matches your invalidation bundle */
       providesTags: [{ type: "Item", id: "LIST" }],
     }),
+    getItemsForDropdown: builder.query({
+  query: ({
+    cursor = null,
+    search = "",
+    limit = 20,
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (cursor) {
+      params.append("cursor", cursor);
+    }
+
+    if (search?.trim()) {
+      params.append(
+        "search",
+        search.trim()
+      );
+    }
+
+    params.append(
+      "limit",
+      limit
+    );
+
+    return `item/dropdown?${params.toString()}`;
+  },
+
+  // =====================================================
+  // IMPORTANT
+  // Search must have its own cache
+  // =====================================================
+
+  serializeQueryArgs: ({
+    queryArgs,
+  }) => ({
+    search:
+      queryArgs?.search?.trim() || "",
+  }),
+
+  // =====================================================
+  // MERGE CURSOR RESULTS
+  // =====================================================
+
+  merge: (
+    currentCache,
+    newData,
+    { arg }
+  ) => {
+
+    // New search / initial request
+    if (!arg?.cursor) {
+      return newData;
+    }
+
+    // Next cursor request
+    currentCache.items.push(
+      ...newData.items
+    );
+
+    currentCache.hasMore =
+      newData.hasMore;
+
+    currentCache.nextCursor =
+      newData.nextCursor;
+  },
+
+  // =====================================================
+  // FETCH AGAIN WHEN CURSOR OR SEARCH CHANGES
+  // =====================================================
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !==
+      previousArg?.cursor ||
+    currentArg?.search !==
+      previousArg?.search ||
+    currentArg?.limit !==
+      previousArg?.limit,
+
+  providesTags: [
+    {
+      type: "Item",
+      id: "DROPDOWN",
+    },
+  ],
+}),
+getItemByName: builder.query({
+  query: (name) =>
+    `item/by-name?name=${encodeURIComponent(
+      name.trim()
+    )}`,
+
+  providesTags: (result) =>
+    result?.item?.Item_Id
+      ? [
+          {
+            type: "Item",
+            id: result.item.Item_Id,
+          },
+        ]
+      : [],
+}),
 
     addItem: builder.mutation({
       query: ({ body }) => ({
@@ -740,6 +844,10 @@ moveItemsToCategory: builder.mutation({
     currentArg?.limit !== previousArg?.limit,   // 👈 added
 
   providesTags: [{ type: "ItemLedger", id: "LIST" }],
+}),
+getItemsByCode: builder.query({
+  query: (code) =>
+    `item/by-code/${encodeURIComponent(code)}`,
 }),
 
     getItemBills: builder.query({
@@ -1056,6 +1164,8 @@ getUnitConversions: builder.query({
 
 export const {
   useGetAllItemsQuery,
+  useGetItemsForDropdownQuery,
+  useLazyGetItemByNameQuery,
   useAddItemMutation,
   useEditItemMutation,
   useDeleteItemMutation,
@@ -1073,6 +1183,7 @@ export const {
   useGetItemsByCategoryQuery,
   useGetItemBillsQuery,
   useGetAllItemsForLedgerQuery,
+  useLazyGetItemsByCodeQuery,
   useAddStockAdjustmentMutation,
   useEditStockAdjustmentMutation,
   useDeleteStockAdjustmentMutation,

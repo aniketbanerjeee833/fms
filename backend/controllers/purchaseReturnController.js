@@ -356,7 +356,7 @@ const getPurchaseReturnById = async (req, res, next) => {
     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
     pu3.Unit_Shorthand AS Selected_Unit,
-
+    pri.MRP,
     pri.Purchase_Price,
     pri.Discount_On_Purchase_Price,
     pri.Discount_Type_On_Purchase_Price,
@@ -542,6 +542,7 @@ const getPurchaseReturnById = async (req, res, next) => {
           : 0,
         // Dropdown
         Available_Units: availableUnits,
+        MRP:it.MRP,
 
         Purchase_Price: it.Purchase_Price,
 
@@ -1001,6 +1002,7 @@ const createPurchaseReturn = async (req, res, next) => {
       const {
         Item_Category,
         Item_HSN,
+        MRP,
         Item_Unit,
         Quantity,
         Purchase_Price,
@@ -1196,6 +1198,7 @@ VALUES
     Selected_Unit,
 
     Quantity,
+     MRP,
     Purchase_Price,
     Discount_On_Purchase_Price,
     Discount_Type_On_Purchase_Price,
@@ -1205,7 +1208,7 @@ VALUES
 )
 VALUES
 (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?
 )
          
          `,
@@ -1219,6 +1222,7 @@ VALUES
           resolvedSelectedUnit,
 
           Number(Quantity) || 0,
+          normalizeNumber(MRP) || null,
           Number(Purchase_Price) || 0,
           Number(Discount_On_Purchase_Price) || 0,
           Discount_Type_On_Purchase_Price || "Percentage",
@@ -1566,6 +1570,7 @@ const editPurchaseReturn = async (req, res, next) => {
         Item_HSN,
         Item_Unit,          // 🔹 Selected_Unit from frontend
         Quantity,
+        MRP,
         Purchase_Price,
         Discount_On_Purchase_Price,
         Discount_Type_On_Purchase_Price,
@@ -1725,6 +1730,7 @@ const editPurchaseReturn = async (req, res, next) => {
         // normalized values
         stockDelta,
         Quantity: Number(Quantity) || 0,
+         MRP:normalizeNumber(MRP) || null,
         Purchase_Price: Number(Purchase_Price) || 0,
         Discount_On_Purchase_Price: Number(Discount_On_Purchase_Price) || 0,
         Discount_Type_On_Purchase_Price: Discount_Type_On_Purchase_Price || "Percentage",
@@ -1886,15 +1892,16 @@ const editPurchaseReturn = async (req, res, next) => {
     for (const line of resolvedLines) {
       const [insertResult] = await connection.query(
         `INSERT INTO purchase_return_items
-         (Purchase_Return_Id, Item_Id, Quantity, Purchase_Price,
+         (Purchase_Return_Id, Item_Id, Quantity, MRP,Purchase_Price,
           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
           Tax_Type, Tax_Amount, Amount,
           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Purchase_Return_Id,
           line.Item_Id,
           line.Quantity,
+          normalizeNumber(line.MRP) || null,
           line.Purchase_Price,
           line.Discount_On_Purchase_Price,
           line.Discount_Type_On_Purchase_Price,

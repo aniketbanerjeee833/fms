@@ -14,6 +14,7 @@ import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
 import SelectUnitModal from "./SelectUnitModal";
 import { X } from "lucide-react";
+import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
 
 
 
@@ -1040,6 +1041,7 @@ import { X } from "lucide-react";
 export default function ItemModal({ itemDetails, editingItem, onClose, onRefreshBills,
   onRefreshTab }) {
   const dropdownRef = useRef(null);
+  //const isInitialEditLoad = useRef(true);
   const dispatch = useDispatch()
   console.log("editingItem", editingItem);
 
@@ -1053,15 +1055,8 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
   } = useForm({
     resolver: zodResolver(itemFormSchema)
   })
-  //   const {
-  //   register,
-  //   handleSubmit,
-  //   setValue,
-  //   reset,
-  //   watch,
-  //   formState: { errors },
-  // } = useForm();
-  console.log("3 - reached return");
+
+
   const toLocalDateString = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -1088,6 +1083,24 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
   const [shouldFetchBills, setShouldFetchBills] = useState(false);
   const [showSelectUnitModal, setShowSelectUnitModal] = useState(false)
   const { data: itemUnitsFetched } = useGetAllItemUnitsQuery();
+  const { data: settingsData } = useGetAllSettingsQuery();
+  const settings = settingsData?.settings || [];
+
+  const showMRP =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
+
+  const calculateSalePriceFromMRP =
+    Number(
+      settings.find(
+        (s) =>
+          s.setting_key ===
+          "calculate_sale_price_from_mrp_disc"
+      )?.setting_value
+    ) === 1;
 
   const itemUnits = itemUnitsFetched
   const { data: apiResponse } =
@@ -1223,18 +1236,36 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
   console.log(errors)
 
   // 🔹 auto-calc Sale_Price from MRP + discount, same behavior as AddItemModal
-  const mrp = watch("MRP");
-  const discountOnMrp = watch("Discount_On_MRP_For_Sale");
+  //const mrp = watch("MRP");
+  //const discountOnMrp = watch("Discount_On_MRP_For_Sale");
+  // useEffect(() => {
+  //   // Don't recalculate Sale Price when existing item is first loaded
+  //   if (editingItem && isInitialEditLoad.current) {
+  //     isInitialEditLoad.current = false;
+  //     return;
+  //   }
 
-  useEffect(() => {
-    const mrpNum = Number(mrp);
-    const discountNum = Number(discountOnMrp);
+  //   const mrpNum = Number(mrp);
+  //   const discountNum = Number(discountOnMrp);
 
-    if (mrpNum > 0 && discountNum >= 0) {
-      const calculated = mrpNum - (mrpNum * discountNum) / 100;
-      setValue("Sale_Price", calculated.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
-  }, [mrp, discountOnMrp, setValue]);
+  //   if (mrpNum > 0 && discountNum >= 0) {
+  //     const calculated = mrpNum - (mrpNum * discountNum) / 100;
+
+  //     setValue("Sale_Price", calculated.toFixed(2), {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     });
+  //   }
+  // }, [mrp, discountOnMrp, editingItem, setValue]);
+  // useEffect(() => {
+  //   const mrpNum = Number(mrp);
+  //   const discountNum = Number(discountOnMrp);
+
+  //   if (mrpNum > 0 && discountNum >= 0) {
+  //     const calculated = mrpNum - (mrpNum * discountNum) / 100;
+  //     setValue("Sale_Price", calculated.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+  // }, [mrp, discountOnMrp, setValue]);
 
   const onSubmit = async () => {
     console.log("editingItem", editingItem);
@@ -1409,12 +1440,12 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
                         </div>
                       ))}
                     {/* {categories?.filter((cat) => cat.Item_Category.toLowerCase().includes(search.toLowerCase())).length === 0 */}
-                      {(categories || []).filter((cat) =>String(cat?.Item_Category ?? "").toLowerCase()
-                    .includes(String(search ?? "").toLowerCase())
+                    {(categories || []).filter((cat) => String(cat?.Item_Category ?? "").toLowerCase()
+                      .includes(String(search ?? "").toLowerCase())
                     ).length === 0
-                    && (
-                    <p className="px-3 py-2 text-gray-500">No categories found</p>
-                    )}
+                      && (
+                        <p className="px-3 py-2 text-gray-500">No categories found</p>
+                      )}
                   </div>
                 )}
                 <input type="hidden" {...register("Item_Category")} value={selected || ""} />
@@ -1575,32 +1606,79 @@ export default function ItemModal({ itemDetails, editingItem, onClose, onRefresh
             {activeTab === "Pricing" && (
               <div className="mt-2">
                 <div className="flex gap-4">
-                  <div className="input-field col s6">
+                  {showMRP && (<div className="input-field col s6" style={{ width: "50%" }}>
                     <span className="active">MRP</span>
                     <input
                       type="text"
                       placeholder="MRP"
                       className="w-full outline-none border-b-2 text-gray-900"
                       {...register("MRP")}
-                      onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, "");
+
+                        setValue("MRP", value, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                        if (!calculateSalePriceFromMRP) return;
+                        const mrpNum = Number(value);
+                        const discountNum = Number(
+                          watch("Discount_On_MRP_For_Sale")
+                        );
+
+                        if (mrpNum > 0 && discountNum >= 0) {
+                          const calculated =
+                            mrpNum - (mrpNum * discountNum) / 100;
+
+                          setValue("Sale_Price", calculated.toFixed(2), {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }
+                      }}
+                      //onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }}
                       style={{ marginBottom: "0px" }}
                     />
                     {errors?.MRP && <p className="text-red-500 text-xs mt-1">{errors?.MRP?.message}</p>}
-                  </div>
-                  <div className="input-field col s6">
+                  </div>)}
+                  {showMRP && calculateSalePriceFromMRP && (<div className="input-field col s6" style={{ width: "50%" }}>
                     <span className="active">Disc. On MRP For Sale (%)</span>
                     <input
                       type="text"
                       placeholder="Discount %"
                       className="w-full outline-none border-b-2 text-gray-900"
                       {...register("Discount_On_MRP_For_Sale")}
-                      onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, "");
+
+                        setValue("Discount_On_MRP_For_Sale", value, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+
+                        // If setting is OFF, do NOT calculate Sale Price
+                        if (!calculateSalePriceFromMRP) return;
+
+                        const mrpNum = Number(watch("MRP"));
+                        const discountNum = Number(value);
+
+                        if (mrpNum > 0 && discountNum >= 0) {
+                          const calculated =
+                            mrpNum - (mrpNum * discountNum) / 100;
+
+                          setValue("Sale_Price", calculated.toFixed(2), {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }
+                      }}
+                      // onInput={(e) => { e.target.value = e.target.value.replace(/[^0-9.]/g, ""); }}
                       style={{ marginBottom: "0px" }}
                     />
                     {errors?.Discount_On_MRP_For_Sale && (
                       <p className="text-red-500 text-xs mt-1">{errors?.Discount_On_MRP_For_Sale?.message}</p>
                     )}
-                  </div>
+                  </div>)}
                 </div>
 
                 <div className="flex gap-4 mt-4">

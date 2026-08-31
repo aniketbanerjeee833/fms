@@ -1,11 +1,11 @@
 import { useDispatch } from "react-redux";
 import { useState, useRef, useEffect } from "react";
-import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsForDropdownQuery, useLazyGetItemByNameQuery } from "../../redux/api/itemApi";
 
 
 
@@ -30,7 +30,163 @@ import { Trash2 } from "lucide-react";
 import AddItemModal from "../../components/Modal/AddItemModal";
 import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback } from "react";
+import ScanCodeModal from "../../components/Modal/ScanCodeModal";
+function ItemDropdownVirtualized({
 
+  items,
+  isDropdownFetching,
+  loadMoreItems,
+  scrollRef,
+  onAddItemClick,
+  onSelectItem,
+
+}) {
+  const ROW_HEIGHT = 44; // px — adjust to match your actual row's rendered height
+
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 12, // renders a few extra rows above/below viewport so fast scrolling never shows blank gaps
+  });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
+  // 🔹 fetch-more trigger — fires when the virtualizer's last rendered
+  //    item gets within ~15 rows of the end of currently-loaded data.
+  //    Runs through the virtualizer's own render cycle, not raw scroll
+  //    events, so it's naturally throttled (no manual RAF guard needed).
+  useEffect(() => {
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (!lastItem) return;
+
+    if (lastItem.index >= items.length - 15 && !isDropdownFetching) {
+      loadMoreItems();
+    }
+  }, [virtualItems, items.length, isDropdownFetching, loadMoreItems]);
+
+  return (
+    <div
+      style={{ width: "45rem" }}
+      className="absolute z-20 w-full bg-white border border-gray-300 rounded-md shadow-lg"
+    >
+      {/* Add Item — stays a normal sticky element, outside the virtual scroll area */}
+      <div
+        onMouseDown={(e) => {
+          e.preventDefault();
+          onAddItemClick();
+        }}
+        className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+        style={{
+          borderBottom: "1px solid #e5e7eb",
+          color: "#4CA1AF",
+          fontWeight: 600,
+          fontSize: 13,
+          backgroundColor: "#fff",
+        }}
+      >
+        <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+        Add Item
+      </div>
+
+      {/* Column header row — static, matches the old <thead> */}
+      <div
+        className="grid text-xs font-semibold bg-gray-100 border-b"
+        style={{ gridTemplateColumns: "10% 40% 20% 20% 10%", }}
+      >
+        <div className="px-3 py-2">SL.NO</div>
+        <div className="px-3 py-2">ITEM NAME</div>
+        <div className="px-3 py-2">SALE PRICE</div>
+        <div className="px-3 py-2">PURCHASE PRICE</div>
+        <div className="px-3 py-2">STOCK</div>
+      </div>
+
+
+      {/* 🔹 Scroll viewport — fixed height, this is what the virtualizer measures against */}
+      <div
+        ref={(el) => (scrollRef.current = el)}
+        className="item-dropdown-scroll"
+        style={{
+          height: Math.min(
+            items.length * ROW_HEIGHT,
+            240
+          ),
+          //height: 240, // ≈ your old max-h-60 (60 * 4px = 240px)
+          overflowY: "auto",
+          position: "relative",
+        }}
+      >
+        {items.length === 0 && !isDropdownFetching ? (
+          <div className="px-3 py-2 text-gray-400 text-center">No Item found</div>
+        ) : (
+          // 🔹 THE key virtualization trick: a spacer div sized to the FULL
+          //    (unrendered) list height, so the scrollbar behaves correctly —
+          //    then only the visible rows are absolutely positioned inside it.
+          <div style={{ height: rowVirtualizer.getTotalSize(), width: "100%", position: "relative" }}>
+            {virtualItems.map((virtualRow) => {
+              const it = items[virtualRow.index];
+              if (!it) return null;
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  onClick={() => {
+
+
+                    onSelectItem(it, virtualRow.index);
+                  }}
+                  //onClick={() => onSelectItem(it, virtualRow.index)}
+                  className="grid hover:bg-gray-100 cursor-pointer  text-sm"
+                  style={{
+                    gridTemplateColumns: "10% 40% 20% 20% 10%",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    alignItems: "center",
+                  }}
+                >
+                  <div className="px-3">{virtualRow.index + 1}</div>
+
+                  <div className="px-3 truncate">
+                    {it.Item_Name}{" "}
+                    {it.Item_Code && (
+                      <span style={{ color: "#9ca3af", fontWeight: 400 }}>({it.Item_Code})</span>
+                    )}
+                  </div>
+
+                  <div className="px-3 text-gray-600">{it.Sale_Price || 0}</div>
+
+                  <div className="px-3 text-gray-600">
+                    {it.Item_Type === "Service" ? "" : it.Purchase_Price ?? 0}
+                  </div>
+
+                  <div
+                    className="px-3"
+                    style={{
+                      color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {it.Item_Type === "Service" ? "" : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {isDropdownFetching && (
+          <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>
+        )}
+      </div>
+    </div >
+  );
+}
 export default function SaleReturndEdit() {
 
   const location = useLocation();
@@ -104,7 +260,14 @@ export default function SaleReturndEdit() {
   const unitRefs = useRef([]);
   const baseSalePriceRef = useRef({});
   const baseSaleUnitRef = useRef({});
-
+  const masterMrpDiscountRef = useRef({});
+  const [rows, setRows] = useState([
+    {
+      itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
+      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: "",
+      unitOpen: false, unitSearch: ""
+    },
+  ]);
 
   const navigate = useNavigate();
   const { data: sale }
@@ -112,12 +275,76 @@ export default function SaleReturndEdit() {
       skip: Sale_Return_Id === undefined,
     });
   const { data: parties } = useGetAllPartiesQuery();
+  const [activeItemRow, setActiveItemRow] = useState(null);
+
+  const [itemCursor, setItemCursor] = useState(null);
+
+  const activeSearch =
+    activeItemRow !== null
+      ? rows[activeItemRow]?.itemSearch || ""
+      : "";
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(activeSearch), 300);
+    return () => clearTimeout(timer);
+  }, [activeSearch]);
+  const {
+    data: items,
+    isFetching: isDropdownFetching,
+    refetch: refetchItems
+
+  } =
+    useGetItemsForDropdownQuery(
+      {
+        cursor: itemCursor,
+        search: debouncedSearch,
+        limit: 20,
+      },
+      {
+        skip: activeItemRow === null,
+      }
+    );
+
+  const dropdownScrollRefs = useRef({});
+
+  // helper to get/create the ref for row i
+  const getDropdownScrollRef = (i) => {
+    if (!dropdownScrollRefs.current[i]) {
+      dropdownScrollRefs.current[i] = { current: null };
+    }
+    return dropdownScrollRefs.current[i];
+  };
+
+
+
+  useEffect(() => {
+    setItemCursor(null);
+  }, [activeItemRow, activeSearch]);
+
+  const loadMoreItems = useCallback(() => {
+    if (
+      !isDropdownFetching &&
+      items?.hasMore &&
+      items?.nextCursor
+    ) {
+      setItemCursor(items.nextCursor);
+    }
+  }, [
+    isDropdownFetching,
+    items?.hasMore,
+    items?.nextCursor,
+  ]);
+
+
+
+  const [getItemByName] = useLazyGetItemByNameQuery();
   const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
   // const [newlyAddedItem, setNewlyAddedItem] = useState(null);
-  const [activeItemRow, setActiveItemRow] = useState(null);
+
   // find this line in your code and add refetch:
-  const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
+  //const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
   const [addCategory] = useAddCategoryMutation();
   const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
@@ -139,6 +366,7 @@ export default function SaleReturndEdit() {
   // const [newUnitKey, setNewUnitKey] = useState("");
   // const [newUnitName, setNewUnitName] = useState("");
   const [isRoundOff, setIsRoundOff] = useState(false)
+  const [showScanCodeModal, setShowScanCodeModal] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
   console.log(itemUnits, "itemUnits");
   // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
@@ -178,6 +406,8 @@ export default function SaleReturndEdit() {
         Item_Name: "",
         Quantity: "",
         Item_Unit: "",
+        MRP: "",
+        Discount_On_MRP_For_Sale_Percentage: "",
         Sale_Price: "",
 
         Discount_On_Sale_Price: "",
@@ -241,13 +471,7 @@ export default function SaleReturndEdit() {
       }
     }
   };
-  const [rows, setRows] = useState([
-    {
-      itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", itemQuantity: 0, itemTaxType: "",
-      unitOpen: false, unitSearch: ""
-    },
-  ]);
+
 
   const [updateSaleReturn, { isLoading: isCreating }] = useUpdateSaleReturnMutation();
   // helper to update a field in a specific row
@@ -404,6 +628,8 @@ export default function SaleReturndEdit() {
       Item_HSN: "",
       Quantity: "",
       Item_Unit: "",
+      MRP: "",
+      Discount_On_MRP_For_Sale_Percentage: "",
       Sale_Price: "",
       Discount_On_Sale_Price: "",
       Discount_Type_On_Sale_Price: "Percentage",
@@ -413,32 +639,7 @@ export default function SaleReturndEdit() {
     });
   };
 
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
 
-  // const handleDeleteRow = (i) => {
-  //   // 1. get current items BEFORE removal
-  //   const currentItems = watch("items");
-
-  //   // 2. calculate new total excluding the deleted row
-  //   const newTotal = currentItems.reduce((sum, row, idx) => {
-  //     if (idx === i) return sum;                    // skip deleted row
-  //     return sum + parseFloat(row.Amount || 0);
-  //   }, 0);
-
-  //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  //   const newBalanceDue = newTotal - currentTotalPaid;
-
-  //   // 3. remove from UI state and form
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
-  //   remove(i);
-
-  //   // 4. update totals
-  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-  //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  // };
 
   const handleDeleteRow = (i) => {
     // 1. get current items BEFORE removal
@@ -519,6 +720,8 @@ export default function SaleReturndEdit() {
     Item_Name: "",
     itemSearch: "",
     Item_HSN: "",
+    MRP: "",
+    Discount_On_MRP_For_Sale_Percentage: "",
     Quantity: "",
     Sale_Price: "",
     Discount_On_Sale_Price: "",
@@ -557,7 +760,10 @@ export default function SaleReturndEdit() {
 
           // Original purchase price saved in this purchase line
           const salePrice = Number(item.Sale_Price) || 0;
-
+          masterMrpDiscountRef.current[index] =
+            Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
+              ? Number(item.Discount_On_MRP_For_Sale_Percentage)
+              : "";
           // If this purchase was saved in secondary unit,
           // convert its price back to PRIMARY price.
           // const primaryUnit = item.Primary_Unit || "";
@@ -637,6 +843,8 @@ export default function SaleReturndEdit() {
         Item_Name: item.Item_Name || "",
         Item_Category: item.Item_Category || "",
         Item_HSN: item.Item_HSN || "",
+        MRP: item.MRP || "",
+        Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
         Quantity: item.Quantity || "",
         Item_Unit: item.Item_Unit || "",
         Sale_Price: item.Sale_Price || "",
@@ -700,7 +908,7 @@ export default function SaleReturndEdit() {
   }, [sale]);
   //const Invoice_Number=sale.saleReturn?.Invoice_Number 
   //const Invoice_Date=sale?.saleReturn?.Invoice_Date
-  console.log(sale)
+  //console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
   const paymentType = watch("splits.0.Payment_Type");
@@ -994,7 +1202,7 @@ export default function SaleReturndEdit() {
       //     search: `?itemId=${Item_Id}`,
       //   });
       // }
-       if (from === "party-receivables") {
+      if (from === "party-receivables") {
         navigate({
           pathname: "/party/receivables",
           search: location.search,
@@ -1006,16 +1214,16 @@ export default function SaleReturndEdit() {
           search: location.search,
         });
       }
-          else if (from === "items-by-item") {
-  //const params = new URLSearchParams(location.search);
+      else if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
 
-  //params.set("itemId", Item_Id);
+        //params.set("itemId", Item_Id);
 
-  navigate({
-    pathname: "/items/all-items",
-    search: location.search,
-  });
-}
+        navigate({
+          pathname: "/items/all-items",
+          search: location.search,
+        });
+      }
       else if (from === "all-sale-return-list") {
         navigate({
           pathname: "/sale/return",
@@ -1069,22 +1277,662 @@ export default function SaleReturndEdit() {
       );
     }
   };
+  const handleOpenScanModal = () => {
+    setShowScanCodeModal(true);
+  };
+  // const handleScanSave = (scannedItems) => {
+  //   if (!scannedItems?.length) return;
+
+  //   const currentItems = watch("items") || [];
+
+  //   // =====================================================
+  //   // CREATE PURCHASE FORM ROWS FROM SCANNED ITEMS
+  //   // =====================================================
+
+  //   const scannedRows = scannedItems.map((item) => ({
+  //     Item_Category: item.Item_Category || "",
+  //     Item_Name: item.Item_Name || "",
+  //     Item_HSN: item.Item_HSN || "",
+
+  //     Quantity: Number(item.Quantity) || 1,
+
+  //     Item_Unit: item.Primary_Unit || "",
+
+  //     Sale_Price:
+  //       Number(item.Sale_Price) || 0,
+
+  //     // ✅ Sale discount
+  //     Discount_On_Sale_Price:
+  //       item.Discount_On_Sale_Price ?? "",
+
+  //     Discount_Type_On_Sale_Price:
+  //       item.Discount_Type_On_Sale_Price ||
+  //       "Percentage",
+
+  //     Tax_Type: item.Tax_Type || "None",
+
+  //     Tax_Amount: "",
+  //     Amount: "",
+  //   }));
+
+  //   // =====================================================
+  //   // FILL EXISTING BLANK ROWS FIRST
+  //   // =====================================================
+
+  //   let combinedItems = [...currentItems];
+
+  //   let scanIndex = 0;
+
+  //   for (
+  //     let i = 0;
+  //     i < combinedItems.length &&
+  //     scanIndex < scannedRows.length;
+  //     i++
+  //   ) {
+  //     const row = combinedItems[i];
+
+  //     const isBlankRow =
+  //       !row?.Item_Name ||
+  //       !row.Item_Name.trim();
+
+  //     if (isBlankRow) {
+  //       combinedItems[i] =
+  //         scannedRows[scanIndex];
+
+  //       scanIndex++;
+  //     }
+  //   }
+
+  //   // =====================================================
+  //   // REMOVE ALL UNUSED BLANK ROWS
+  //   // =====================================================
+
+  //   combinedItems = combinedItems.filter(
+  //     (row) =>
+  //       row?.Item_Name &&
+  //       row.Item_Name.trim()
+  //   );
+
+  //   // =====================================================
+  //   // APPEND REMAINING SCANNED ITEMS
+  //   // =====================================================
+
+  //   if (scanIndex < scannedRows.length) {
+  //     combinedItems.push(
+  //       ...scannedRows.slice(scanIndex)
+  //     );
+  //   }
+
+  //   // =====================================================
+  //   // CALCULATE ROW AMOUNTS
+  //   // =====================================================
+
+  //   const calculatedItems = combinedItems.map(
+  //     (row, index) =>
+  //       calculateRowAmount(
+  //         row,
+  //         index,
+  //         combinedItems
+  //       )
+  //   );
+
+  //   // =====================================================
+  //   // UPDATE REACT HOOK FORM
+  //   // =====================================================
+
+  //   setValue(
+  //     "items",
+  //     calculatedItems,
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   // =====================================================
+  //   // CREATE UI ROWS
+  //   // =====================================================
+
+  //   const scannedUiRows = scannedItems.map(
+  //     (item) => ({
+  //       itemSearch:
+  //         item.Item_Name || "",
+
+  //       itemOpen: false,
+
+  //       isExistingItem: true,
+  //       isHSNLocked: false,
+  //       isUnitLocked: false,
+
+  //       CategoryOpen: false,
+  //       categorySearch:
+  //         item.Item_Category || "",
+
+  //       unitOpen: false,
+  //       unitSearch: "",
+
+  //       Item_Id:
+  //         item.Item_Id || "",
+
+  //       Item_Name:
+  //         item.Item_Name || "",
+
+  //       Item_Category:
+  //         item.Item_Category || "",
+
+  //       Item_HSN:
+  //         item.Item_HSN || "",
+
+  //       Primary_Unit:
+  //         item.Primary_Unit || null,
+
+  //       Secondary_Unit:
+  //         item.Secondary_Unit || null,
+
+  //       Conversion_Rate:
+  //         item.Conversion_Rate || null,
+
+  //       Available_Units:
+  //         Array.isArray(item.Available_Units)
+  //           ? item.Available_Units
+  //           : [],
+
+  //       // ✅ PURCHASE PRICE
+  //       Sale_Price:
+  //         Number(item.Sale_Price) || 0,
+
+  //       // ✅ Sale DISCOUNT
+  //       Discount_On_Sale_Price:
+  //         item.Discount_On_Sale_Price ?? "",
+
+  //       Discount_Type_On_Sale_Price:
+  //         item.Discount_Type_On_Sale_Price ||
+  //         "Percentage",
+
+  //       Tax_Type:
+  //         item.Tax_Type || "None",
+  //     })
+  //   );
+
+  //   // =====================================================
+  //   // UPDATE UI ROWS
+  //   // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
+  //   // =====================================================
+
+  //   setRows((prev) => {
+  //     const updatedRows = [...prev];
+
+  //     let uiScanIndex = 0;
+
+  //     // ---------------------------------------------------
+  //     // Fill existing blank rows
+  //     // ---------------------------------------------------
+
+  //     for (
+  //       let i = 0;
+  //       i < updatedRows.length &&
+  //       uiScanIndex < scannedUiRows.length;
+  //       i++
+  //     ) {
+  //       const row = updatedRows[i];
+
+  //       const isBlankRow =
+  //         !row?.Item_Name ||
+  //         !row.Item_Name.trim();
+
+  //       if (isBlankRow) {
+  //         updatedRows[i] =
+  //           scannedUiRows[uiScanIndex];
+
+  //         uiScanIndex++;
+  //       }
+  //     }
+
+  //     // ---------------------------------------------------
+  //     // Remove remaining blank rows
+  //     // ---------------------------------------------------
+
+  //     const filledRows =
+  //       updatedRows.filter(
+  //         (row) =>
+  //           row?.Item_Name &&
+  //           row.Item_Name.trim()
+  //       );
+
+  //     // ---------------------------------------------------
+  //     // Append remaining scanned rows
+  //     // ---------------------------------------------------
+
+  //     if (
+  //       uiScanIndex <
+  //       scannedUiRows.length
+  //     ) {
+  //       filledRows.push(
+  //         ...scannedUiRows.slice(
+  //           uiScanIndex
+  //         )
+  //       );
+  //     }
+
+  //     return filledRows;
+  //   });
+
+  //   // =====================================================
+  //   // CALCULATE GRAND TOTAL
+  //   // =====================================================
+
+  //   const rawTotal =
+  //     calculatedItems.reduce(
+  //       (sum, item) =>
+  //         sum +
+  //         (Number(item.Amount) || 0),
+  //       0
+  //     );
+
+  //   const roundOff = isRoundOff
+  //     ? Number(watch("Round_Off")) || 0
+  //     : 0;
+
+  //   const finalTotal =
+  //     rawTotal + roundOff;
+
+  //   const totalPaid =
+  //     Number(watch("Total_Paid")) || 0;
+
+  //   const balanceDue =
+  //     finalTotal - totalPaid;
+
+  //   // =====================================================
+  //   // UPDATE TOTAL
+  //   // =====================================================
+
+  //   setValue(
+  //     "Total_Amount",
+  //     finalTotal.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   // =====================================================
+  //   // UPDATE BALANCE
+  //   // =====================================================
+
+  //   setValue(
+  //     "Balance_Due",
+  //     balanceDue.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   // =====================================================
+  //   // CLOSE MODAL
+  //   // =====================================================
+
+  //   setShowScanCodeModal(false);
+  // };
+  const handleScanSave = (scannedItems) => {
+    if (!scannedItems?.length) return;
+
+    const currentItems = watch("items") || [];
+
+    // =====================================================
+    // CREATE SALE FORM ROWS FROM SCANNED ITEMS
+    // =====================================================
+
+    const scannedRows = scannedItems.map((item) => {
+      const mrp = Number(item.MRP) || 0;
+
+      const mrpDiscount =
+        Number(item.Discount_On_MRP_For_Sale) || 0;
+
+      // ===================================================
+      // SALE PRICE
+      // If MRP exists (> 0), calculate from MRP discount.
+      // Otherwise use master's Sale_Price.
+      // ===================================================
+
+      const calculatedSalePrice =
+        mrp > 0
+          ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
+          : Number(item.Sale_Price) > 0
+            ? Number(item.Sale_Price).toFixed(2)
+            : "";
+
+      return {
+        Item_Category: item.Item_Category || "",
+        Item_Name: item.Item_Name || "",
+        Item_HSN: item.Item_HSN || "",
+
+        // ✅ MRP only when greater than 0
+        MRP: mrp > 0 ? mrp : "",
+
+        // ✅ MRP discount from master
+        Discount_On_MRP_For_Sale_Percentage:
+          mrp > 0 && mrpDiscount > 0
+            ? mrpDiscount
+            : "",
+
+        Quantity: Number(item.Quantity) || 1,
+
+        Item_Unit: item.Primary_Unit || "",
+
+        // ✅ Calculated Sale Price
+        Sale_Price: calculatedSalePrice,
+
+        // ✅ Separate Sale Price discount
+        Discount_On_Sale_Price:
+          item.Discount_On_Sale_Price ?? "",
+
+        Discount_Type_On_Sale_Price:
+          item.Discount_Type_On_Sale_Price ||
+          "Percentage",
+
+        Tax_Type: item.Tax_Type || "None",
+
+        Tax_Amount: "",
+        Amount: "",
+      };
+    });
+
+    // =====================================================
+    // FILL EXISTING BLANK ROWS FIRST
+    // =====================================================
+
+    let combinedItems = [...currentItems];
+
+    let scanIndex = 0;
+
+    for (
+      let i = 0;
+      i < combinedItems.length &&
+      scanIndex < scannedRows.length;
+      i++
+    ) {
+      const row = combinedItems[i];
+
+      const isBlankRow =
+        !row?.Item_Name ||
+        !row.Item_Name.trim();
+
+      if (isBlankRow) {
+        combinedItems[i] = scannedRows[scanIndex];
+        scanIndex++;
+      }
+    }
+
+    // =====================================================
+    // REMOVE ALL REMAINING BLANK ROWS
+    // =====================================================
+
+    combinedItems = combinedItems.filter(
+      (row) =>
+        row?.Item_Name &&
+        row.Item_Name.trim()
+    );
+
+
+    // =====================================================
+    // APPEND REMAINING SCANNED ITEMS
+    // =====================================================
+
+    if (scanIndex < scannedRows.length) {
+      combinedItems.push(
+        ...scannedRows.slice(scanIndex)
+      );
+    }
+        combinedItems.forEach((row, index) => {
+  const discount =
+    Number(row.Discount_On_MRP_For_Sale_Percentage) || 0;
+
+  masterMrpDiscountRef.current[index] =
+    discount > 0 ? discount : "";
+});
+
+    // =====================================================
+    // CALCULATE EACH ROW
+    // MRP IS NOT PASSED SEPARATELY
+    // =====================================================
+
+    const calculatedItems = combinedItems.map(
+      (row, index) =>
+        calculateRowAmount(
+          row,
+          index,
+          combinedItems
+        )
+    );
+
+    // =====================================================
+    // UPDATE REACT HOOK FORM
+    // =====================================================
+
+    setValue(
+      "items",
+      calculatedItems,
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    // =====================================================
+    // CREATE UI ROWS
+    // =====================================================
+
+    const scannedUiRows = scannedItems.map((item) => {
+      const mrp = Number(item.MRP) || 0;
+
+      const mrpDiscount =
+        Number(item.Discount_On_MRP_For_Sale) || 0;
+
+      const calculatedSalePrice =
+        mrp > 0
+          ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
+          : Number(item.Sale_Price) > 0
+            ? Number(item.Sale_Price).toFixed(2)
+            : "";
+
+      return {
+        itemSearch:
+          item.Item_Name || "",
+
+        itemOpen: false,
+
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
+
+        CategoryOpen: false,
+
+        categorySearch:
+          item.Item_Category || "",
+
+        unitOpen: false,
+        unitSearch: "",
+
+        Item_Id:
+          item.Item_Id || "",
+
+        Item_Name:
+          item.Item_Name || "",
+
+        Item_Category:
+          item.Item_Category || "",
+
+        Item_HSN:
+          item.Item_HSN || "",
+
+        // ✅ MRP from master
+        MRP:
+          mrp > 0
+            ? mrp
+            : "",
+
+        // ✅ MRP discount from master
+        Discount_On_MRP_For_Sale_Percentage:
+          mrp > 0 && mrpDiscount > 0
+            ? mrpDiscount
+            : "",
+
+        Primary_Unit:
+          item.Primary_Unit || null,
+
+        Secondary_Unit:
+          item.Secondary_Unit || null,
+
+        Conversion_Rate:
+          item.Conversion_Rate || null,
+
+        Available_Units:
+          Array.isArray(item.Available_Units)
+            ? item.Available_Units
+            : [],
+
+        //  Calculated Sale Price
+        Sale_Price:
+          calculatedSalePrice,
+
+        //  Separate Sale Price discount
+        Discount_On_Sale_Price:
+          item.Discount_On_Sale_Price ?? "",
+
+        Discount_Type_On_Sale_Price:
+          item.Discount_Type_On_Sale_Price ||
+          "Percentage",
+
+        Tax_Type:
+          item.Tax_Type || "None",
+      };
+    });
+
+    // =====================================================
+    // UPDATE UI ROWS
+    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
+    // =====================================================
+
+    setRows((prev) => {
+      const updatedRows = [...prev];
+
+      let uiScanIndex = 0;
+
+      // ---------------------------------------------------
+      // Fill existing blank rows
+      // ---------------------------------------------------
+
+      for (
+        let i = 0;
+        i < updatedRows.length &&
+        uiScanIndex < scannedUiRows.length;
+        i++
+      ) {
+        const row = updatedRows[i];
+
+        const isBlankRow =
+          !row?.Item_Name ||
+          !row.Item_Name.trim();
+
+        if (isBlankRow) {
+          updatedRows[i] =
+            scannedUiRows[uiScanIndex];
+
+          uiScanIndex++;
+        }
+      }
+
+      // ---------------------------------------------------
+      // Remove remaining blank rows
+      // ---------------------------------------------------
+
+      const filledRows =
+        updatedRows.filter(
+          (row) =>
+            row?.Item_Name &&
+            row.Item_Name.trim()
+        );
+
+      // ---------------------------------------------------
+      // Append remaining scanned rows
+      // ---------------------------------------------------
+
+      if (
+        uiScanIndex <
+        scannedUiRows.length
+      ) {
+        filledRows.push(
+          ...scannedUiRows.slice(
+            uiScanIndex
+          )
+        );
+      }
+
+      return filledRows;
+    });
+
+    // =====================================================
+    // CALCULATE GRAND TOTAL
+    // =====================================================
+
+    const rawTotal =
+      calculatedItems.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.Amount) || 0),
+        0
+      );
+
+    const roundOff = isRoundOff
+      ? Number(watch("Round_Off")) || 0
+      : 0;
+
+    const finalTotal =
+      rawTotal + roundOff;
+
+    const totalPaid =
+      Number(watch("Total_Paid")) || 0;
+
+    const balanceDue =
+      finalTotal - totalPaid;
+
+    // =====================================================
+    // UPDATE TOTAL AMOUNT
+    // =====================================================
+
+    setValue(
+      "Total_Amount",
+      finalTotal.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    // =====================================================
+    // UPDATE BALANCE DUE
+    // =====================================================
+
+    setValue(
+      "Balance_Due",
+      balanceDue.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    // =====================================================
+    // CLOSE SCAN MODAL
+    // =====================================================
+
+    setShowScanCodeModal(false);
+  };
+
   return (
     <>
-      {/* <div className="sb2-2-2">
-        <ul>
 
-          <NavLink style={{ display: "flex", flexDirection: "row" }}
-            to="/home"
-
-          >
-            <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-            
-            Dashboard
-          </NavLink>
-
-        </ul>
-      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -1123,23 +1971,23 @@ export default function SaleReturndEdit() {
               <button
                 type="button"
                 onClick={() => {
-                       if (from === "items-by-item") {
-  //const params = new URLSearchParams(location.search);
+                  if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
 
-  //params.set("itemId", Item_Id);
+                    //params.set("itemId", Item_Id);
 
-  navigate({
-    pathname: "/items/all-items",
-    search: location.search,
-  });
-}
-           
-      else if (from === "party-payables") {
-        navigate({
-          pathname: "/party/payables",
-          search: location.search,
-        });
-      }
+                    navigate({
+                      pathname: "/items/all-items",
+                      search: location.search,
+                    });
+                  }
+
+                  else if (from === "party-payables") {
+                    navigate({
+                      pathname: "/party/payables",
+                      search: location.search,
+                    });
+                  }
                   else if (from === "party-receivables") {
                     navigate({
                       pathname: `/party/receivables`,
@@ -1589,10 +2437,17 @@ export default function SaleReturndEdit() {
                 <thead>
                   <tr>
 
-                    <th>Sl.No</th>
+                    <th
+                      className=" cursor-pointer"
+                      onClick={handleOpenScanModal}
+                    >
+                      Sl.No
+                    </th>
                     <th>Category</th>
                     <th>Item</th>
                     <th>Item_HSN</th>
+                    <th>MRP</th>
+                    <th>Discount On MRP (%)</th>
                     <th>Qty</th>
                     <th>Unit</th>
                     <th>Price/Unit</th>
@@ -1712,108 +2567,1116 @@ export default function SaleReturndEdit() {
                           <input
                             type="text"
                             value={rows[i]?.itemSearch || ""}
+                            // onChange={(e) => {
+                            //   const typedValue = e.target.value;
+                            //   handleRowChange(i, "itemSearch", typedValue);
+                            //   handleRowChange(i, "CategoryOpen", false);
+                            //   handleRowChange(i, "unitOpen", false);
+                            //   // setValue(`items.${i}.Item_Name`, typedValue);
+                            //   handleRowChange(i, "isHSNLocked", false);
+                            //   handleRowChange(i, "isExistingItem", false);
+                            //   handleRowChange(i, "isUnitLocked", false);
+
+                            //   const exists = items?.items?.find(
+                            //     (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                            //   );
+                            //   if (exists) {
+                            //     // ✅ Only store if it's a valid item
+                            //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
+                            //     handleRowChange(i, "isExistingItem", true);
+                            //   } else {
+                            //     // ❌ Clear Item_Name in RHF to trigger error
+                            //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
+                            //     handleRowChange(i, "isExistingItem", false);
+
+                            //     handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                            //     handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                            //     handleRowChange(i, "Available_Units", [])
+                            //   }
+                            //   //handleRowChange(i, "isExistingItem", exists); // false if new item
+                            // }}
+                            // onBlur={() => {
+                            //   setTimeout(() => {
+                            //     const typedValue = rows[i]?.itemSearch?.trim() || "";
+                            //     if (!typedValue) return;
+
+                            //     const matchedItem = items?.items?.find(
+                            //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                            //     );
+
+                            //     if (matchedItem) {
+                            //       // ✅ auto-fill exactly like clicking from dropdown
+                            //       setRows((prev) => {
+                            //         const updated = [...prev];
+                            //         updated[i] = {
+                            //           ...updated[i],
+                            //           itemSearch: matchedItem.Item_Name,   // normalize display
+                            //           Item_Category: matchedItem.Item_Category || "",
+                            //           Item_HSN: matchedItem.Item_HSN || "",
+                            //           categorySearch: matchedItem.Item_Category || "",
+                            //           isExistingItem: true,
+                            //           isHSNLocked: false,
+                            //           isUnitLocked: false,
+                            //           itemOpen: false,
+                            //           Primary_Unit: matchedItem.Primary_Unit || null,
+                            //           Secondary_Unit: matchedItem.Secondary_Unit || null,
+                            //           Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                            //           //  ONLY CURRENT MASTER AVAILABLE UNITS
+                            //           Available_Units: Array.isArray(matchedItem.Available_Units)
+                            //             ? matchedItem.Available_Units
+                            //             : [],
+                            //         };
+                            //         return updated;
+                            //       });
+
+                            //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                            //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                            //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                            //       setValue(`items.${i}.Sale_Price`, matchedItem.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
+                            //       //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
+                            //       setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, {
+                            //         shouldValidate: true,
+                            //         shouldDirty: true,
+                            //       });
+                            //       baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
+                            //       baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
+                            //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                            //         {
+                            //           ...itemsValues[i],
+                            //           Item_Name: matchedItem.Item_Name,
+                            //           Sale_Price: matchedItem.Sale_Price || 0,
+                            //           Quantity: itemsValues[i]?.Quantity || 0,
+                            //         },
+                            //         i,
+                            //         itemsValues
+                            //       );
+
+                            //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                            //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                            //       syncTotalsAfterItemChange();
+                            //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                            //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            //     } else {
+                            //       // no match — close dropdown
+                            //       handleRowChange(i, "itemOpen", false);
+                            //     }
+                            //   }, 150); // small delay so click-from-dropdown fires first
+                            // }}
+                            // onClick={() => {
+                            //   handleRowChange(i, "itemOpen", true);
+                            //   handleRowChange(i, "unitOpen", false);
+                            //   handleRowChange(i, "CategoryOpen", false);
+                            // }}
+                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+
                             onChange={(e) => {
                               const typedValue = e.target.value;
+                              setActiveItemRow(i);
+                              setItemCursor(null);
                               handleRowChange(i, "itemSearch", typedValue);
+
                               handleRowChange(i, "CategoryOpen", false);
                               handleRowChange(i, "unitOpen", false);
-                              // setValue(`items.${i}.Item_Name`, typedValue);
+
+                              setValue(
+                                `items.${i}.Item_Name`,
+                                typedValue,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
                               handleRowChange(i, "isHSNLocked", false);
                               handleRowChange(i, "isExistingItem", false);
                               handleRowChange(i, "isUnitLocked", false);
 
-                              const exists = items?.items?.find(
-                                (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              );
-                              if (exists) {
-                                // ✅ Only store if it's a valid item
-                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                                handleRowChange(i, "isExistingItem", true);
-                              } else {
-                                // ❌ Clear Item_Name in RHF to trigger error
-                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                                handleRowChange(i, "isExistingItem", false);
-
-                                handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                                handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                                handleRowChange(i, "Available_Units", [])
-                              }
-                              //handleRowChange(i, "isExistingItem", exists); // false if new item
+                              // Clear previously selected item details
+                              handleRowChange(i, "Primary_Unit", null);
+                              handleRowChange(i, "Secondary_Unit", null);
+                              handleRowChange(i, "Available_Units", []);
                             }}
+                            // onBlur={() => {
+                            //   setTimeout(async () => {
+                            //     const typedValue =
+                            //       rows[i]?.itemSearch?.trim() || "";
+
+                            //     if (!typedValue) {
+                            //       handleRowChange(i, "itemOpen", false);
+                            //       return;
+                            //     }
+
+                            //     // =====================================================
+                            //     // IMPORTANT:
+                            //     // Existing add_sale_items values are the SOURCE OF TRUTH
+                            //     // =====================================================
+
+                            //     const currentRow =
+                            //       itemsValues[i] || {};
+
+                            //     try {
+                            //       // ===================================================
+                            //       // EXACT ITEM LOOKUP FROM BACKEND
+                            //       // Replaces old frontend items.find(...)
+                            //       // ===================================================
+
+                            //       const response =
+                            //         await getItemByName(typedValue).unwrap();
+
+                            //       const matchedItem =
+                            //         response?.item;
+
+                            //       // ===================================================
+                            //       // NO EXACT ITEM FOUND
+                            //       // ===================================================
+
+                            //       if (!matchedItem?.Item_Id) {
+                            //         handleRowChange(
+                            //           i,
+                            //           "itemOpen",
+                            //           false
+                            //         );
+                            //         return;
+                            //       }
+
+                            //       // ===================================================
+                            //       // UPDATE ROW
+                            //       // Master/current item information
+                            //       // ===================================================
+
+                            //       setRows((prev) => {
+                            //         const updated = [...prev];
+
+                            //         updated[i] = {
+                            //           ...updated[i],
+
+                            //           itemSearch:
+                            //             matchedItem.Item_Name || "",
+
+                            //           Item_Id:
+                            //             matchedItem.Item_Id || "",
+
+                            //           Item_Category:
+                            //             matchedItem.Item_Category || "",
+
+                            //           Item_HSN:
+                            //             matchedItem.Item_HSN || "",
+
+                            //           categorySearch:
+                            //             matchedItem.Item_Category || "",
+
+                            //           isExistingItem: true,
+
+                            //           isHSNLocked: false,
+                            //           isUnitLocked: false,
+
+                            //           itemOpen: false,
+
+                            //           // ==========================================
+                            //           // CURRENT MASTER UNIT INFORMATION
+                            //           // ==========================================
+
+                            //           Primary_Unit:
+                            //             matchedItem.Primary_Unit || null,
+
+                            //           Primary_Unit_Id:
+                            //             matchedItem.Primary_Unit_Id || null,
+
+                            //           Secondary_Unit:
+                            //             matchedItem.Secondary_Unit || null,
+
+                            //           Secondary_Unit_Id:
+                            //             matchedItem.Secondary_Unit_Id || null,
+
+                            //           Conversion_Rate:
+                            //             matchedItem.Conversion_Rate ?? null,
+
+                            //           Available_Units:
+                            //             Array.isArray(
+                            //               matchedItem.Available_Units
+                            //             )
+                            //               ? matchedItem.Available_Units
+                            //               : [],
+                            //         };
+
+                            //         return updated;
+                            //       });
+
+                            //       // ===================================================
+                            //       // ITEM MASTER INFORMATION
+                            //       // ===================================================
+
+                            //       setValue(
+                            //         `items.${i}.Item_Name`,
+                            //         matchedItem.Item_Name || "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       setValue(
+                            //         `items.${i}.Item_Id`,
+                            //         matchedItem.Item_Id || "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       setValue(
+                            //         `items.${i}.Item_Category`,
+                            //         matchedItem.Item_Category || "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       setValue(
+                            //         `items.${i}.Item_HSN`,
+                            //         matchedItem.Item_HSN || "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // ❗ SALE PRICE
+                            //       //
+                            //       // add_sale_items = SOURCE OF TRUTH
+                            //       //
+                            //       // DO NOT use matchedItem.Sale_Price here.
+                            //       // ===================================================
+
+                            //       // setValue(
+                            //       //   `items.${i}.Sale_Price`,
+                            //       //   matchedItem.Sale_Price ?? "",
+                            //       //   {
+                            //       //     shouldValidate: true,
+                            //       //     shouldDirty: true,
+                            //       //   }
+                            //       // );
+
+                            //       setValue(
+                            //         `items.${i}.Sale_Price`,
+                            //         currentRow.Sale_Price ?? "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // ❗ SALE PRICE TYPE
+                            //       //
+                            //       // add_sale_items = SOURCE OF TRUTH
+                            //       // ===================================================
+
+                            //       // setValue(
+                            //       //   `items.${i}.Sale_Price_Type`,
+                            //       //   currentRow.Sale_Price_Type ||
+                            //       //   "Without_Tax",
+                            //       //   {
+                            //       //     shouldValidate: true,
+                            //       //     shouldDirty: true,
+                            //       //   }
+                            //       // );
+
+                            //       // ===================================================
+                            //       // ❗ DISCOUNT
+                            //       //
+                            //       // add_sale_items = SOURCE OF TRUTH
+                            //       //
+                            //       // NEVER take these from matchedItem on blur.
+                            //       // ===================================================
+
+                            //       setValue(
+                            //         `items.${i}.Discount_On_Sale_Price`,
+                            //         currentRow.Discount_On_Sale_Price ?? "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       setValue(
+                            //         `items.${i}.Discount_Type_On_Sale_Price`,
+                            //         currentRow.Discount_Type_On_Sale_Price ||
+                            //         "Percentage",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // TAX
+                            //       //
+                            //       // add_sale_items = SOURCE OF TRUTH
+                            //       // ===================================================
+
+                            //       setValue(
+                            //         `items.${i}.Tax_Type`,
+                            //         currentRow.Tax_Type || "None",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // QUANTITY
+                            //       //
+                            //       // Existing transaction value stays.
+                            //       // ===================================================
+
+                            //       setValue(
+                            //         `items.${i}.Quantity`,
+                            //         currentRow.Quantity || 1,
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // UNIT
+                            //       //
+                            //       // Keep the unit saved in add_sale_items.
+                            //       // Only if missing, use current master primary unit.
+                            //       // ===================================================
+
+                            //       // const selectedUnit =
+                            //       //   currentRow.Item_Unit ||
+                            //       //   matchedItem.Primary_Unit ||
+                            //       //   "";
+                            //       const selectedUnit =
+
+                            //         matchedItem.Primary_Unit ||
+                            //         "";
+
+                            //       setValue(
+                            //         `items.${i}.Item_Unit`,
+                            //         selectedUnit,
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // BASE SALE PRICE / UNIT
+                            //       // ===================================================
+
+                            //       // baseSalePriceRef.current[i] =
+                            //       //   Number(
+                            //       //     matchedItem.Sale_Price
+                            //       //   ) || 0;
+                            //       baseSalePriceRef.current[i] =
+                            //         Number(currentRow.Sale_Price) || 0;
+
+                            //       baseSaleUnitRef.current[i] =
+                            //         selectedUnit;
+
+                            //       // ===================================================
+                            //       // CALCULATE ROW
+                            //       //
+                            //       // All transaction values come from currentRow.
+                            //       // ===================================================
+
+                            //       const calculatedRow = {
+                            //         ...currentRow,
+
+                            //         Item_Id:
+                            //           matchedItem.Item_Id || "",
+
+                            //         Item_Name:
+                            //           matchedItem.Item_Name || "",
+
+                            //         Item_Category:
+                            //           matchedItem.Item_Category || "",
+
+                            //         Item_HSN:
+                            //           matchedItem.Item_HSN || "",
+
+                            //         // ==============================================
+                            //         // ✅ add_sale_items = SOURCE OF TRUTH
+                            //         // ==============================================
+
+                            //         //Sale_Price:matchedItem.Sale_Price ?? "",
+                            //         Sale_Price: currentRow.Sale_Price ?? "",
+                            //         // Sale_Price_Type:
+                            //         //   currentRow.Sale_Price_Type ||
+                            //         //   "Without_Tax",
+
+                            //         Quantity:
+                            //           currentRow.Quantity || 1,
+
+                            //         // ==============================================
+                            //         // Keep existing transaction unit if available
+                            //         // ==============================================
+
+                            //         Item_Unit:
+                            //           selectedUnit,
+
+                            //         // ==============================================
+                            //         // ✅ add_sale_items = SOURCE OF TRUTH
+                            //         // ==============================================
+
+                            //         Discount_On_Sale_Price:
+                            //           currentRow.Discount_On_Sale_Price ?? "",
+
+                            //         Discount_Type_On_Sale_Price:
+                            //           currentRow.Discount_Type_On_Sale_Price ||
+                            //           "Percentage",
+
+                            //         Tax_Type:
+                            //           currentRow.Tax_Type ||
+                            //           "None",
+                            //       };
+
+                            //       // ===================================================
+                            //       // CALCULATE TAX + AMOUNT
+                            //       // ===================================================
+
+                            //       const {
+                            //         Tax_Amount,
+                            //         Amount,
+                            //       } = calculateRowAmount(
+                            //         calculatedRow,
+                            //         i,
+                            //         itemsValues
+                            //       );
+
+                            //       setValue(
+                            //         `items.${i}.Tax_Amount`,
+                            //         Tax_Amount,
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       setValue(
+                            //         `items.${i}.Amount`,
+                            //         Amount,
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // ===================================================
+                            //       // UPDATE TOTALS
+                            //       // ===================================================
+
+                            //       syncTotalsAfterItemChange();
+
+                            //       // ===================================================
+                            //       // CLOSE DROPDOWN
+                            //       // ===================================================
+
+                            //       handleRowChange(
+                            //         i,
+                            //         "itemOpen",
+                            //         false
+                            //       );
+
+                            //     } catch (err) {
+                            //       console.error(
+                            //         "❌ Item name lookup failed:",
+                            //         err
+                            //       );
+
+                            //       handleRowChange(
+                            //         i,
+                            //         "itemOpen",
+                            //         false
+                            //       );
+                            //     }
+                            //   }, 150);
+                            // }}
                             onBlur={() => {
-                              setTimeout(() => {
-                                const typedValue = rows[i]?.itemSearch?.trim() || "";
-                                if (!typedValue) return;
+                              setTimeout(async () => {
+                                const typedValue =
+                                  rows[i]?.itemSearch?.trim() || "";
 
-                                const matchedItem = items?.items?.find(
-                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                                );
+                                if (!typedValue) {
+                                  handleRowChange(i, "itemOpen", false);
+                                  return;
+                                }
 
-                                if (matchedItem) {
-                                  // ✅ auto-fill exactly like clicking from dropdown
+                                // =====================================================
+                                // IMPORTANT:
+                                // Capture the CURRENT row before changing anything.
+                                // This preserves existing transaction values.
+                                // =====================================================
+
+                                const currentRow =itemsValues[i] || {};
+
+                                // Original item currently belonging to this transaction row.
+                                // If the user deletes the name and types the same item again,
+                                // Item_Id lets us recognize that it is the same item.
+                                const existingItemId =currentRow.Item_Id || "";
+
+                                try {
+                                  // ===================================================
+                                  // EXACT ITEM LOOKUP FROM BACKEND
+                                  // ===================================================
+
+                                  const response =
+                                    await getItemByName(typedValue).unwrap();
+
+                                  const matchedItem = response?.item;
+                                 
+
+                                  // ===================================================
+                                  // NO EXACT ITEM FOUND
+                                  // ===================================================
+
+                                  if (!matchedItem?.Item_Id) {
+                                    handleRowChange(
+                                      i,
+                                      "itemOpen",
+                                      false
+                                    );
+                                    return;
+                                  }
+                                   masterMrpDiscountRef.current[i] =
+                                    Number(matchedItem?.Discount_On_MRP_For_Sale) > 0
+                                      ? Number(matchedItem.Discount_On_MRP_For_Sale)
+                                      : "";
+
+                                  // ===================================================
+                                  // CHECK WHETHER THIS IS THE SAME ITEM
+                                  // THAT WAS ALREADY IN THIS TRANSACTION ROW
+                                  // ===================================================
+
+                                  const isSameExistingItem =
+                                    existingItemId &&
+                                    matchedItem.Item_Id === existingItemId;
+
+                                  // ===================================================
+                                  // MASTER MRP / MRP DISCOUNT
+                                  //
+                                  // Only use these for:
+                                  //
+                                  // 1. A new/blank row
+                                  // 2. A different item selected in an existing row
+                                  //
+                                  // If it is the SAME existing item, preserve
+                                  // the transaction's old MRP values.
+                                  // ===================================================
+
+                                  const masterMRP =
+                                    Number(matchedItem.MRP) > 0
+                                      ? matchedItem.MRP
+                                      : "";
+
+                                  const masterMRPDiscount =
+                                    Number(
+                                      matchedItem.Discount_On_MRP_For_Sale
+                                    ) > 0
+                                      ? matchedItem.Discount_On_MRP_For_Sale
+                                      : "";
+
+                                  // ===================================================
+                                  // CALCULATE SALE PRICE FROM MASTER
+                                  //
+                                  // MRP - MRP Discount
+                                  // ===================================================
+
+                                  const calculatedMasterSalePrice =
+                                    Number(masterMRP) > 0
+                                      ? (
+                                        Number(masterMRP) -
+                                        (
+                                          Number(masterMRP) *
+                                          Number(masterMRPDiscount || 0)
+                                        ) / 100
+                                      ).toFixed(2)
+                                      : (
+                                        matchedItem.Sale_Price ?? ""
+                                      );
+
+                                  // ===================================================
+                                  // VALUES TO USE
+                                  //
+                                  // SAME ITEM:
+                                  //     preserve existing transaction values
+                                  //
+                                  // NEW/DIFFERENT ITEM:
+                                  //     use master MRP values
+                                  // ===================================================
+
+                                  const resolvedMRP =
+                                    isSameExistingItem
+                                      ? (currentRow.MRP ?? "")
+                                      : masterMRP;
+
+                                  const resolvedMRPDiscount =
+                                    isSameExistingItem
+                                      ? (
+                                        currentRow
+                                          .Discount_On_MRP_For_Sale_Percentage
+                                        ?? ""
+                                      )
+                                      : masterMRPDiscount;
+
+                                  const resolvedSalePrice =
+                                    isSameExistingItem
+                                      ? (currentRow.Sale_Price ?? "")
+                                      : calculatedMasterSalePrice;
+
+                                  // ===================================================
+                                  // SALE PRICE DISCOUNT
+                                  //
+                                  // SAME ITEM:
+                                  //     preserve existing transaction discount.
+                                  //
+                                  // DIFFERENT/NEW ITEM:
+                                  //     use master Sale Price discount IF > 0.
+                                  //     Otherwise blank.
+                                  // ===================================================
+
+                                  const masterSaleDiscount =
+                                    Number(
+                                      matchedItem.Discount_On_Sale_Price
+                                    ) > 0
+                                      ? matchedItem.Discount_On_Sale_Price
+                                      : "";
+
+                                  const masterSaleDiscountType =
+                                    Number(
+                                      matchedItem.Discount_On_Sale_Price
+                                    ) > 0
+                                      ? (
+                                        matchedItem
+                                          .Discount_Type_On_Sale_Price ||
+                                        "Percentage"
+                                      )
+                                      : "Percentage";
+
+                                  const resolvedSaleDiscount =
+                                    isSameExistingItem
+                                      ? (
+                                        currentRow
+                                          .Discount_On_Sale_Price ?? ""
+                                      )
+                                      : masterSaleDiscount;
+
+                                  const resolvedSaleDiscountType =
+                                    isSameExistingItem
+                                      ? (
+                                        currentRow
+                                          .Discount_Type_On_Sale_Price ||
+                                        "Percentage"
+                                      )
+                                      : masterSaleDiscountType;
+
+                                  // ===================================================
+                                  // UPDATE ROW
+                                  // ===================================================
+
                                   setRows((prev) => {
                                     const updated = [...prev];
+
                                     updated[i] = {
                                       ...updated[i],
-                                      itemSearch: matchedItem.Item_Name,   // normalize display
-                                      Item_Category: matchedItem.Item_Category || "",
-                                      Item_HSN: matchedItem.Item_HSN || "",
-                                      categorySearch: matchedItem.Item_Category || "",
+
+                                      itemSearch:
+                                        matchedItem.Item_Name || "",
+
+                                      Item_Id:
+                                        matchedItem.Item_Id || "",
+
+                                      Item_Category:
+                                        matchedItem.Item_Category || "",
+
+                                      Item_HSN:
+                                        matchedItem.Item_HSN || "",
+
+                                      categorySearch:
+                                        matchedItem.Item_Category || "",
+
                                       isExistingItem: true,
+
                                       isHSNLocked: false,
                                       isUnitLocked: false,
-                                      itemOpen: false,
-                                      Primary_Unit: matchedItem.Primary_Unit || null,
-                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
-                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
 
-                                      //  ONLY CURRENT MASTER AVAILABLE UNITS
-                                      Available_Units: Array.isArray(matchedItem.Available_Units)
-                                        ? matchedItem.Available_Units
-                                        : [],
+                                      itemOpen: false,
+
+                                      // ==========================================
+                                      // CURRENT MASTER UNIT INFORMATION
+                                      // ==========================================
+
+                                      Primary_Unit:
+                                        matchedItem.Primary_Unit || null,
+
+                                      Primary_Unit_Id:
+                                        matchedItem.Primary_Unit_Id || null,
+
+                                      Secondary_Unit:
+                                        matchedItem.Secondary_Unit || null,
+
+                                      Secondary_Unit_Id:
+                                        matchedItem.Secondary_Unit_Id || null,
+
+                                      Conversion_Rate:
+                                        matchedItem.Conversion_Rate ?? null,
+
+                                      Available_Units:
+                                        Array.isArray(
+                                          matchedItem.Available_Units
+                                        )
+                                          ? matchedItem.Available_Units
+                                          : [],
+
+                                      // ==========================================
+                                      // PRESERVE / RESOLVE SALE DISCOUNT
+                                      // ==========================================
+
+                                      Discount_On_Sale_Price:
+                                        resolvedSaleDiscount,
+
+                                      Discount_Type_On_Sale_Price:
+                                        resolvedSaleDiscountType,
                                     };
+
                                     return updated;
                                   });
 
-                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Sale_Price`, matchedItem.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                  //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
-                                  baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                                  baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
-                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                  // ===================================================
+                                  // ITEM MASTER INFORMATION
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.Item_Name`,
+                                    matchedItem.Item_Name || "",
                                     {
-                                      ...itemsValues[i],
-                                      Item_Name: matchedItem.Item_Name,
-                                      Sale_Price: matchedItem.Sale_Price || 0,
-                                      Quantity: itemsValues[i]?.Quantity || 0,
-                                    },
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Item_Id`,
+                                    matchedItem.Item_Id || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Item_Category`,
+                                    matchedItem.Item_Category || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Item_HSN`,
+                                    matchedItem.Item_HSN || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // MRP
+                                  //
+                                  // SAME ITEM  → old transaction MRP
+                                  // NEW ITEM   → master MRP
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    resolvedMRP,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // MRP DISCOUNT
+                                  //
+                                  // SAME ITEM  → old transaction discount
+                                  // NEW ITEM   → master discount
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
+                                    resolvedMRPDiscount,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // SALE PRICE
+                                  //
+                                  // SAME ITEM  → old transaction Sale Price
+                                  // NEW ITEM   → calculated from master MRP
+                                  //
+                                  // IMPORTANT:
+                                  // Do NOT use matchedItem.Sale_Price for a new item
+                                  // when MRP exists.
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.Sale_Price`,
+                                    resolvedSalePrice,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // SALE PRICE DISCOUNT
+                                  //
+                                  // SAME ITEM  → preserve existing transaction discount
+                                  // NEW ITEM   → master discount if > 0
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.Discount_On_Sale_Price`,
+                                    resolvedSaleDiscount,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Discount_Type_On_Sale_Price`,
+                                    resolvedSaleDiscountType,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // TAX
+                                  //
+                                  // SAME ITEM → preserve existing transaction tax
+                                  // NEW ITEM  → current/master tax if available
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.Tax_Type`,
+                                    currentRow.Tax_Type ||
+                                    matchedItem.Tax_Type ||
+                                    "None",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // QUANTITY
+                                  //
+                                  // ALWAYS PRESERVE CURRENT ROW QUANTITY
+                                  // ===================================================
+
+                                  const resolvedQuantity =
+                                    currentRow.Quantity || 1;
+
+                                  setValue(
+                                    `items.${i}.Quantity`,
+                                    resolvedQuantity,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // UNIT
+                                  //
+                                  // Keep existing transaction unit if available.
+                                  // Otherwise use master primary unit.
+                                  // ===================================================
+
+                                  const selectedUnit =
+                                    currentRow.Item_Unit ||
+                                    matchedItem.Primary_Unit ||
+                                    "";
+
+                                  setValue(
+                                    `items.${i}.Item_Unit`,
+                                    selectedUnit,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // BASE SALE PRICE / UNIT
+                                  // ===================================================
+
+                                  baseSalePriceRef.current[i] =
+                                    Number(resolvedSalePrice) || 0;
+
+                                  baseSaleUnitRef.current[i] =
+                                    selectedUnit;
+
+                                  // ===================================================
+                                  // CALCULATE ROW
+                                  //
+                                  // MRP IS NOT PASSED.
+                                  // ===================================================
+
+                                  const calculatedRow = {
+                                    ...currentRow,
+
+                                    Item_Id:
+                                      matchedItem.Item_Id || "",
+
+                                    Item_Name:
+                                      matchedItem.Item_Name || "",
+
+                                    Item_Category:
+                                      matchedItem.Item_Category || "",
+
+                                    Item_HSN:
+                                      matchedItem.Item_HSN || "",
+
+                                    // ==============================================
+                                    // RESOLVED SALE PRICE
+                                    // ==============================================
+
+                                    Sale_Price:
+                                      resolvedSalePrice,
+
+                                    // ==============================================
+                                    // EXISTING QUANTITY
+                                    // ==============================================
+
+                                    Quantity:
+                                      resolvedQuantity,
+
+                                    // ==============================================
+                                    // RESOLVED UNIT
+                                    // ==============================================
+
+                                    Item_Unit:
+                                      selectedUnit,
+
+                                    // ==============================================
+                                    // RESOLVED SALE DISCOUNT
+                                    // ==============================================
+
+                                    Discount_On_Sale_Price:
+                                      resolvedSaleDiscount,
+
+                                    Discount_Type_On_Sale_Price:
+                                      resolvedSaleDiscountType,
+
+                                    // ==============================================
+                                    // EXISTING TAX
+                                    // ==============================================
+
+                                    Tax_Type:
+                                      currentRow.Tax_Type ||
+                                      matchedItem.Tax_Type ||
+                                      "None",
+                                  };
+
+                                  // ===================================================
+                                  // CALCULATE TAX + AMOUNT
+                                  //
+                                  // NO MRP HERE.
+                                  // ===================================================
+
+                                  const {
+                                    Tax_Amount,
+                                    Amount,
+                                  } = calculateRowAmount(
+                                    calculatedRow,
                                     i,
                                     itemsValues
                                   );
 
-                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                  // ===================================================
+                                  // SET CALCULATED VALUES
+                                  // ===================================================
+
+                                  setValue(
+                                    `items.${i}.Tax_Amount`,
+                                    Tax_Amount,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Amount`,
+                                    Amount,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // ===================================================
+                                  // UPDATE TOTALS
+                                  // ===================================================
+
                                   syncTotalsAfterItemChange();
-                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                } else {
-                                  // no match — close dropdown
-                                  handleRowChange(i, "itemOpen", false);
+
+                                  // ===================================================
+                                  // CLOSE DROPDOWN
+                                  // ===================================================
+
+                                  handleRowChange(
+                                    i,
+                                    "itemOpen",
+                                    false
+                                  );
+
+                                } catch (err) {
+                                  console.error(
+                                    "❌ Item name lookup failed:",
+                                    err
+                                  );
+
+                                  handleRowChange(
+                                    i,
+                                    "itemOpen",
+                                    false
+                                  );
                                 }
-                              }, 150); // small delay so click-from-dropdown fires first
+                              }, 150);
                             }}
                             onClick={() => {
+                              const currentSearch =
+                                rows[i]?.itemSearch?.trim() || "";
+
+                              setActiveItemRow(i);
+                              setItemCursor(null);
+
+                              // IMPORTANT:
+                              // Existing Edit item should be searched immediately.
+                              setDebouncedSearch(currentSearch);
+
                               handleRowChange(i, "itemOpen", true);
                               handleRowChange(i, "unitOpen", false);
                               handleRowChange(i, "CategoryOpen", false);
                             }}
-                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
                             placeholder="Item Name"
                             className="w-full outline-none border-b-2 text-gray-900"
                           />
@@ -1827,7 +3690,228 @@ export default function SaleReturndEdit() {
 
 
                           {/* Dropdown List */}
+
+
+                          {/* {rows[i]?.itemOpen && (
+                            <ItemDropdownVirtualized
+                              rowIndex={i}
+                              items={items?.items || []}
+                              isDropdownFetching={isDropdownFetching}
+                              loadMoreItems={loadMoreItems}
+                              scrollRef={getDropdownScrollRef(i)}
+
+                              onAddItemClick={() => {
+                                handleRowChange(i, "itemOpen", true);
+                                setActiveItemRow(i);
+                                setShowItemAddModal(true);
+                              }}
+                              onSelectItem={(it) => {
+                                setRows((prev) => {
+                                  const updated = [...prev];
+                                  updated[i] = {
+                                    ...updated[i],
+                                    Item_Category: it.Item_Category || "",
+                                    Item_HSN: it.Item_HSN || "",
+                                    categorySearch: it.Item_Category || "",
+                                    isExistingItem: true,
+                                    isHSNLocked: false,
+                                    isUnitLocked: false,
+                                    Primary_Unit: it.Primary_Unit || null,
+                                    Secondary_Unit: it.Secondary_Unit || null,
+                                    Conversion_Rate: it.Conversion_Rate || null,
+                                    Available_Units: Array.isArray(it.Available_Units) ? it.Available_Units : [],
+                                     Discount_On_Sale_Price: it.Discount_On_Sale_Price ?? "",
+
+                                    Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price || "Percentage",
+                                  };
+                                  return updated;
+                                });
+
+                                handleRowChange(i, "itemSearch", it.Item_Name);
+                                handleRowChange(i, "isExistingItem", true);
+                                handleRowChange(i, "CategoryOpen", false);
+                                handleRowChange(i, "unitOpen", false);
+
+                                setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Discount_On_Sale_Price`, it.Discount_On_Sale_Price ?? "", { shouldValidate: true, shouldDirty: true, });
+                                
+                                setValue(`items.${i}.Discount_Type_On_Sale_Price`, it.Discount_Type_On_Sale_Price || "Percentage",
+                                  { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
+
+                                baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+                                baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+                                handleRowChange(i, "itemOpen", false);
+
+                                const { Tax_Amount, Amount } = calculateRowAmount(
+                                  {
+                                    ...itemsValues[i],
+                                    Item_Name: it.Item_Name,
+                                    Sale_Price: it.Sale_Price || 0,
+                                    Quantity: itemsValues[i]?.Quantity || 0,
+                                     Discount_On_Sale_Price: it.Discount_On_Sale_Price ?? 0,
+
+                                    Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price || "Percentage",
+                                    //Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
+                                    //Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
+                                    Tax_Type: itemsValues[i]?.Tax_Type,
+                                  },
+                                  i,
+                                  itemsValues
+                                );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                              }}
+                            />
+                          )} */}
                           {rows[i]?.itemOpen && (
+                            <ItemDropdownVirtualized
+                              rowIndex={i}
+                              items={items?.items || []}
+                              isDropdownFetching={isDropdownFetching}
+                              loadMoreItems={loadMoreItems}
+                              scrollRef={getDropdownScrollRef(i)}
+
+                              onAddItemClick={() => {
+                                handleRowChange(i, "itemOpen", true);
+                                setActiveItemRow(i);
+                                setShowItemAddModal(true);
+                              }}
+                              onSelectItem={(it) => {
+                                //console.log("DROPDOWN ITEM CLICKED:", it);
+                                masterMrpDiscountRef.current[i] =
+                                  Number(it.Discount_On_MRP_For_Sale) > 0
+                                    ? Number(it.Discount_On_MRP_For_Sale)
+                                    : "";
+                                const resolvedSaleDiscount =
+                                  Number(it.Discount_On_Sale_Price) > 0
+                                    ? it.Discount_On_Sale_Price
+                                    : itemsValues[i]?.Discount_On_Sale_Price ?? "";
+
+                                const resolvedSaleDiscountType =
+                                  Number(it.Discount_On_Sale_Price) > 0
+                                    ? it.Discount_Type_On_Sale_Price || "Percentage"
+                                    : itemsValues[i]?.Discount_Type_On_Sale_Price || "Percentage";
+
+                                const mrp = Number(it.MRP) || 0;
+                                const mrpDiscount = Number(it.Discount_On_MRP_For_Sale) || 0;
+
+                                const calculatedSalePrice =
+                                  mrp > 0
+                                    ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
+                                    : (it.Sale_Price || 0);
+                                setRows((prev) => {
+                                  const updated = [...prev];
+                                  updated[i] = {
+                                    ...updated[i],
+                                    Item_Category: it.Item_Category || "",
+                                    Item_HSN: it.Item_HSN || "",
+                                    categorySearch: it.Item_Category || "",
+                                    isExistingItem: true,
+                                    isHSNLocked: false,
+                                    isUnitLocked: false,
+                                    Primary_Unit: it.Primary_Unit || null,
+                                    Secondary_Unit: it.Secondary_Unit || null,
+                                    Conversion_Rate: it.Conversion_Rate || null,
+                                    Available_Units: Array.isArray(it.Available_Units) ? it.Available_Units : [],
+                                    // MASTER DISCOUNT — dropdown click only
+
+                                    Discount_On_Sale_Price: resolvedSaleDiscount,
+                                    Discount_Type_On_Sale_Price: resolvedSaleDiscountType,
+                                    //Discount_On_Sale_Price: it.Discount_On_Sale_Price ?? "",
+
+                                    //Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price || "Percentage",
+                                  };
+                                  return updated;
+                                });
+
+                                handleRowChange(i, "itemSearch", it.Item_Name);
+                                handleRowChange(i, "isExistingItem", true);
+                                handleRowChange(i, "CategoryOpen", false);
+                                handleRowChange(i, "unitOpen", false);
+
+                                setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Discount_On_MRP_For_Sale_Percentage`, it.Discount_On_MRP_For_Sale || "", { shouldValidate: true, shouldDirty: true });
+                                // const mrp = Number(it.MRP) || 0;
+                                // const mrpDiscount = Number(it.Discount_On_MRP_For_Sale) || 0;
+
+                                // const calculatedSalePrice =
+                                //   mrp > 0
+                                //     ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
+                                //     : (it.Sale_Price || 0);
+
+                                setValue(
+                                  `items.${i}.Sale_Price`,
+                                  calculatedSalePrice,
+                                  { shouldValidate: true, shouldDirty: true }
+                                );
+                                //setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                //setValue(`items.${i}.Discount_On_Sale_Price`, it.Discount_On_Sale_Price ?? "", { shouldValidate: true, shouldDirty: true, });
+
+                                // setValue(`items.${i}.Discount_Type_On_Sale_Price`, it.Discount_Type_On_Sale_Price || "Percentage",
+                                //   { shouldValidate: true, shouldDirty: true });
+                                //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                setValue(
+                                  `items.${i}.Discount_On_Sale_Price`,
+                                  resolvedSaleDiscount,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  `items.${i}.Discount_Type_On_Sale_Price`,
+                                  resolvedSaleDiscountType,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
+
+                                //baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
+                                baseSalePriceRef.current[i] = Number(calculatedSalePrice) || 0;
+
+                                baseSaleUnitRef.current[i] = it.Primary_Unit || "";
+                                handleRowChange(i, "itemOpen", false);
+
+                                const { Tax_Amount, Amount } = calculateRowAmount(
+                                  {
+                                    ...itemsValues[i],
+                                    Item_Name: it.Item_Name,
+                                    Sale_Price: calculatedSalePrice,
+                                    //Sale_Price: it.Sale_Price || 0,
+                                    Quantity: itemsValues[i]?.Quantity || 0,
+                                    Discount_On_Sale_Price: resolvedSaleDiscount,
+                                    Discount_Type_On_Sale_Price: resolvedSaleDiscountType,
+                                    // Discount_On_Sale_Price:itemsValues[i]?.Discount_On_Sale_Price ?? 0,
+                                    //Discount_Type_On_Sale_Price:itemsValues[i]?.Discount_Type_On_Sale_Price || "Percentage",
+                                    // Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
+                                    // Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
+                                    Tax_Type: itemsValues[i]?.Tax_Type,
+                                  },
+                                  i,
+                                  itemsValues
+                                );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                              }}
+                            />
+                          )}
+
+                          {/* {rows[i]?.itemOpen && (
                             <div
                               style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
@@ -1949,17 +4033,7 @@ export default function SaleReturndEdit() {
                                         <td>{idx + 1}</td>
                                         <td className="px-3 py-2">{it.Item_Name}</td>
                                         <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-
-                                        <td className="px-3 py-2 whitespace-nowrap"
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                        </td> */}
+                                      
                                         <td className="px-3 py-2 text-gray-600">
                                           {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
                                         </td>
@@ -1990,7 +4064,7 @@ export default function SaleReturndEdit() {
                                 </tbody>
                               </table>
                             </div>
-                          )}
+                          )} */}
 
                           {/* RHF error */}
 
@@ -2021,6 +4095,160 @@ export default function SaleReturndEdit() {
                             {errors.items[i].Item_HSN.message}
                           </p>
                         )}
+                      </td>
+                      {/*MRP */}
+                      <td style={{ padding: "0px", width: "6%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ width: "100%", marginBottom: "0px" }}
+                            {...register(`items.${i}.MRP`)}
+                            onChange={(e) => {
+                              let val = e.target.value;
+
+                              // allow digits and one dot
+                              val = val.replace(/[^0-9.]/g, "");
+
+                              // keep only first dot
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join("");
+                              }
+
+                              // max 2 decimals
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
+                              if (val === "") {
+                                setValue(`items.${i}.MRP`, "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue(
+                                  `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
+                                  "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                return;
+                              }
+
+                              setValue(`items.${i}.MRP`, val, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              // ==========================================
+                              // RECALCULATE SALE PRICE FROM MRP + MASTER DISCOUNT
+                              // ==========================================
+
+                              const mrpNum = Number(val) || 0;
+
+                              // const discountNum =
+                              //   Number(
+                              //     itemsValues[i]?.Discount_On_MRP_For_Sale_Percentage
+                              //   ) || 0;
+                              const discountNum =
+                                Number(masterMrpDiscountRef.current[i]) > 0
+                                  ? Number(masterMrpDiscountRef.current[i])
+                                  : 0;
+                              if (mrpNum > 0 && discountNum > 0) {
+                                setValue(
+                                  `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
+                                  discountNum,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }
+                              if (mrpNum > 0) {
+                                const calculatedSalePrice =
+                                  mrpNum - (mrpNum * discountNum) / 100;
+
+                                setValue(
+                                  `items.${i}.Sale_Price`,
+                                  calculatedSalePrice.toFixed(2),
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                const { Tax_Amount, Amount } = calculateRowAmount(
+                                  {
+                                    ...itemsValues[i],
+
+                                    Sale_Price: calculatedSalePrice.toFixed(2),
+                                  },
+                                  i,
+                                  itemsValues
+                                );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue(`items.${i}.Amount`, Amount, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                syncTotalsAfterItemChange();
+                              }
+                            }}
+                            onBlur={(e) => {
+                              if (Number(e.target.value) === 0) {
+                                e.target.value = "";
+
+                                setValue(`items.${i}.MRP`, "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setValue(
+                                  `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
+                                  "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                              }
+                            }}
+
+                            placeholder="MRP"
+                          />
+
+
+
+                        </div>
+                        {errors?.items?.[i]?.MRP && (
+                          <p className="text-red-500 text-xs mt-1">
+                            {errors.items[i].MRP.message}
+                          </p>
+                        )}
+                      </td>
+
+                      <td style={{ padding: "0px", width: "6%" }}>
+                        <div className="d-flex align-items-center">
+                          <input
+                            type="text"
+                            className="form-control"
+                            readOnly
+                            style={{ width: "100%", marginBottom: "0px" }}
+                            {...register(`items.${i}.Discount_On_MRP_For_Sale_Percentage`)}
+
+                          />
+
+
+
+                        </div>
+
                       </td>
 
                       {/* Quantity */}
@@ -2577,7 +4805,7 @@ export default function SaleReturndEdit() {
                                                 } = calculateRowAmount(
                                                   {
                                                     ...itemsValues[i],
-                                                    Purchase_Price:
+                                                    Sale_Price:
                                                       roundedPrice,
                                                   },
                                                   i,
@@ -2666,10 +4894,42 @@ export default function SaleReturndEdit() {
                             style={{ width: "100%", marginBottom: "0px" }}
                             {...register(`items.${i}.Sale_Price`)}
 
+                            // onChange={(e) => {
+                            //   let val = e.target.value.replace(/[^0-9.]/g, "");
+                            //   const parts = val.split(".");
+                            //   if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+                            //   if (val.includes(".")) {
+                            //     const [intPart, decPart] = val.split(".");
+                            //     val = intPart + "." + decPart.slice(0, 2);
+                            //   }
+
+                            //   e.target.value = val;
+
+                            //   // 🟩 Update RHF internal state FOR VALIDATION
+                            //   setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
+                            //   baseSalePriceRef.current[i] = Number(val) || 0;
+                            //   baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+                            //   const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                            //     { ...itemsValues[i], Sale_Price: val },
+                            //     i,
+                            //     itemsValues
+                            //   );
+
+                            //   setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                            //   setValue(`items.${i}.Amount`, Amount);
+                            //   syncTotalsAfterItemChange();
+                            //   // setValue("Total_Amount", Total_Amount);
+                            //   // setValue("Balance_Due", Balance_Due);
+                            // }}
+
                             onChange={(e) => {
                               let val = e.target.value.replace(/[^0-9.]/g, "");
+
                               const parts = val.split(".");
-                              if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+                              if (parts.length > 2) {
+                                val = parts[0] + "." + parts.slice(1).join("");
+                              }
+
                               if (val.includes(".")) {
                                 const [intPart, decPart] = val.split(".");
                                 val = intPart + "." + decPart.slice(0, 2);
@@ -2677,21 +4937,64 @@ export default function SaleReturndEdit() {
 
                               e.target.value = val;
 
-                              // 🟩 Update RHF internal state FOR VALIDATION
-                              setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
+                              // Update Sale Price
+                              setValue(`items.${i}.Sale_Price`, val, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
                               baseSalePriceRef.current[i] = Number(val) || 0;
                               baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
-                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                { ...itemsValues[i], Sale_Price: val },
+
+                              // =====================================================
+                              // CALCULATE DISCOUNT ON SALE PRICE BACKWARDS
+                              // =====================================================
+
+                              const mrp = Number(itemsValues[i]?.MRP) || 0;
+                              const enteredSalePrice = Number(val) || 0;
+
+                              let mrpDiscount = 0;
+
+                              if (mrp > 0 && enteredSalePrice <= mrp) {
+                                mrpDiscount =
+                                  ((mrp - enteredSalePrice) / mrp) * 100;
+                              }
+
+                              const discountDisplay =
+                                mrpDiscount === 0
+                                  ? ""
+                                  : mrpDiscount.toFixed(3);
+
+                              setValue(
+                                `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
+                                discountDisplay,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              // Sale discount is always Percentage
+
+
+                              // =====================================================
+                              // RECALCULATE ROW AMOUNT
+                              // =====================================================
+
+                              const { Tax_Amount, Amount } = calculateRowAmount(
+                                {
+                                  ...itemsValues[i],
+                                  Sale_Price: val,
+
+                                },
                                 i,
                                 itemsValues
                               );
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount);
                               setValue(`items.${i}.Amount`, Amount);
+
                               syncTotalsAfterItemChange();
-                              // setValue("Total_Amount", Total_Amount);
-                              // setValue("Balance_Due", Balance_Due);
                             }}
 
 
@@ -2892,6 +5195,8 @@ export default function SaleReturndEdit() {
                   <tr>
                     <td colSpan={2}></td>
                     <td>Total</td>
+                    <td></td>
+                    <td></td>
                     <td></td>
 
                     <td className="text-right">
@@ -3417,7 +5722,14 @@ export default function SaleReturndEdit() {
 
 
       </div>
+      {showScanCodeModal && (
+        <ScanCodeModal
+          onClose={() => setShowScanCodeModal(false)}
+          onSave={handleScanSave}
+        //items={items?.items || []}
 
+        />
+      )}
       {showAddUnitModal && (
         <AddUnitModal
           onClose={() => {
@@ -3618,6 +5930,20 @@ export default function SaleReturndEdit() {
       padding-left: 30px !important;
     }
   }
+       .item-dropdown-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.item-dropdown-scroll::-webkit-scrollbar { width: 14px; }
+.item-dropdown-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+.item-dropdown-scroll::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 8px;
+  border: 3px solid #f1f5f9;
+}
+.item-dropdown-scroll::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
 `}
       </style>
     </>

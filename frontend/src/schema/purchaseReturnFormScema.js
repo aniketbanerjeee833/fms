@@ -355,6 +355,17 @@ export const purchaseReturnFormSchema = z.object({
           .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
             message: "HSN Code must be 4-8 digits if provided",
           }),
+           MRP: z
+          .union([z.string(), z.number()])
+          .optional()
+          .transform((val) => String(val ?? "").trim())
+          .refine((s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s), {
+            message: "MRP must be a valid number with up to 2 decimals",
+          })
+          .transform((s) => (s === "" ? 0 : Number(s)))
+          .refine((num) => num >= 0, {
+            message: "MRP cannot be negative",
+          }),
 
         Quantity: z.preprocess(
           (val) => {

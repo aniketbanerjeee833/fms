@@ -402,7 +402,7 @@ export default function ExpensesByCategories() {
       }
       if (isExpensesLoading || isExpensesFetching) return;
   
-      const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+      const savedCount = Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 0;
       // keep waiting only if we might still get more data
       if (filteredTransactions.length < savedCount && expensesHasMore) return;
   

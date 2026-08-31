@@ -8,7 +8,7 @@ export const settingsApi = createApi({
     credentials: "include", // send cookies for userAuth middleware
   }),
 
-  tagTypes: ["FinancialYear"],  // helps for cache invalidation
+  tagTypes: ["FinancialYear", "AppSettings"],  // helps for cache invalidation
 
   endpoints: (builder) => ({
 
@@ -17,7 +17,8 @@ export const settingsApi = createApi({
     // -------------------------------
     addFinancialYear: builder.mutation({
       query: (data) => ({
-        url: "financial-year/add-financial-year",
+        //url: "financial-year/add-financial-year",
+        url: "settings/add-financial-year",
         method: "POST",
         body: data,
       }),
@@ -28,7 +29,7 @@ export const settingsApi = createApi({
     // 2️⃣ Get All Financial Years (GET)
     // -------------------------------
     getAllFinancialYears: builder.query({
-      query: () => "financial-year/get-all-financial-years",
+      query: () => "settings/get-all-financial-years",
       providesTags: ["FinancialYear"],
     }),
 
@@ -37,11 +38,27 @@ export const settingsApi = createApi({
     // -------------------------------
     updateCurrentFinancialYear: builder.mutation({
       query: ({ financialYearId }) => ({
-        url: "financial-year/update-current-financial-year",
+        url: "settings/update-current-financial-year",
         method: "PATCH",
         body: { financialYearId }, 
       }),
       invalidatesTags: ["FinancialYear"], // auto-refresh list
+    }),
+    getAllSettings: builder.query({
+      query: () => "settings/get-all-settings",
+      providesTags: ["AppSettings"],
+    }),
+
+    // UPDATE ONE SETTING
+    updateSetting: builder.mutation({
+      query: ({ setting_key, setting_value }) => ({
+        url: `settings/update-setting/${setting_key}`,
+        method: "PATCH",
+        body: {
+          setting_value,
+        },
+      }),
+      invalidatesTags: ["AppSettings"],
     }),
 
   }),
@@ -51,4 +68,8 @@ export const {
   useAddFinancialYearMutation,
   useGetAllFinancialYearsQuery,
   useUpdateCurrentFinancialYearMutation,
+
+
+  useGetAllSettingsQuery,
+  useUpdateSettingMutation,
 } = settingsApi;

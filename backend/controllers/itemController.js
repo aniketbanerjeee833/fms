@@ -12,6 +12,19 @@ const cleanValue = (value) => {
   }
   return value;  // ✅ returns the original value for valid data
 };
+const normalizeNumber = (val) => {
+  if (
+    val === undefined ||
+    val === null ||
+    String(val).trim() === ""
+  ) {
+    return null;
+  }
+
+  const num = Number(val);
+
+  return Number.isFinite(num) ? num : null;
+};
 const formatDateOnly = (date) => {
   if (!date) return null;
   const d = new Date(date);
@@ -488,8 +501,9 @@ const addItem = async (req, res, next) => {
         itemUnit,
 
         Item_Code || null,
-        MRP ?? null,
-        Discount_On_MRP_For_Sale ?? null,
+        //MRP ?? null,
+        normalizeNumber(MRP) || null,
+       normalizeNumber(Discount_On_MRP_For_Sale) || null,
         Sale_Price ?? null,
         Sale_Price_Type || "Without_Tax",
         Discount_On_Sale_Price ?? null,
@@ -1291,7 +1305,11 @@ const editItem = async (req, res, next) => {
       Min_Stock,
       Location,
     } = validation.data;
-
+console.log("EDIT ITEM VALIDATED DATA:", {
+  Item_Id,
+  MRP,
+  Discount_On_MRP_For_Sale,
+});
     // =========================================================
     // 4. GET EXISTING ITEM
     // =========================================================
@@ -1579,8 +1597,10 @@ const editItem = async (req, res, next) => {
         // PRICING
         // =====================================================
 
-        MRP ?? null,
-        Discount_On_MRP_For_Sale ?? null,
+        //MRP ?? null,
+        normalizeNumber(MRP) || null,
+        //Discount_On_MRP_For_Sale ?? null,
+        normalizeNumber(Discount_On_MRP_For_Sale) || null,
 
         Sale_Price ?? null,
         Sale_Price_Type || "Without_Tax",
@@ -1614,6 +1634,14 @@ const editItem = async (req, res, next) => {
         Item_Id,
       ]
     );
+    console.log("MASTER UPDATE VALUES:", {
+  Item_Id,
+  MRP,
+  normalizedMRP: normalizeNumber(MRP),
+  finalMRP: normalizeNumber(MRP) || null,
+  Discount_On_MRP_For_Sale,
+  finalDiscount: normalizeNumber(Discount_On_MRP_For_Sale) || null,
+});
 
     if (result.affectedRows === 0) {
       await connection.rollback();
@@ -1788,11 +1816,9 @@ const editItem = async (req, res, next) => {
         // PRICING
         // =====================================================
 
-        MRP:
-          MRP ?? null,
+        MRP:MRP ?? null,
 
-        Discount_On_MRP_For_Sale:
-          Discount_On_MRP_For_Sale ?? null,
+        Discount_On_MRP_For_Sale:Discount_On_MRP_For_Sale ?? null,
 
         Sale_Price:
           Sale_Price ?? null,
@@ -2627,20 +2653,16 @@ const getAllItems = async (req, res, next) => {
       LOWER(ai.Item_Name) LIKE ?
       OR LOWER(ai.Item_Category) LIKE ?
       OR LOWER(ai.Item_HSN) LIKE ?
-      OR LOWER(ai.Item_Id) LIKE ?
-      OR LOWER(iu.Unit_Shorthand) LIKE ?
-      OR LOWER(pu.Unit_Shorthand) LIKE ?
-      OR LOWER(su.Unit_Shorthand) LIKE ?
+
     )
   `);
-
+      // OR LOWER(ai.Item_Id) LIKE ?
+      // OR LOWER(iu.Unit_Shorthand) LIKE ?
+      // OR LOWER(pu.Unit_Shorthand) LIKE ?
+      // OR LOWER(su.Unit_Shorthand) LIKE ?
   const like = `%${search}%`;
 
   params.push(
-    like,
-    like,
-    like,
-    like,
     like,
     like,
     like
@@ -2689,6 +2711,27 @@ const getAllItems = async (req, res, next) => {
     ai.Item_Unit_Id,
 
     ai.Item_Category,
+      -- =====================================================
+    -- ITEM CODE
+    -- =====================================================
+
+    ai.Item_Code,
+
+    -- =====================================================
+    -- PRICING
+    -- =====================================================
+
+    ai.MRP,
+    ai.Discount_On_MRP_For_Sale,
+
+    ai.Sale_Price,
+    ai.Sale_Price_Type,
+
+    ai.Discount_On_Sale_Price,
+    ai.Discount_Type_On_Sale_Price,
+
+    ai.Purchase_Price,
+    ai.Purchase_Price_Type,
 
     -- CURRENT PRIMARY UNIT FROM units
     pu.Unit_Shorthand AS Primary_Unit,
@@ -2867,36 +2910,6 @@ FROM (
     // 11. MERGE EVERYTHING
     // =========================================================
 
-    // const combined = items.map((item) => ({
-    //   ...item,
-
-    //   Purchase_Price:
-    //     latestPurchasePrice[item.Item_Id] ?? 0,
-
-    //   Tax_Type:
-    //     latestTaxType[item.Item_Id] ?? null,
-
-    //   Sale_Price:
-    //     latestSalePrice[item.Item_Id] ?? 0,
-
-    //   // All previously saved conversions
-    //   unitConversions:
-    //     conversionsByItem[item.Item_Id] || [],
-    // }));
-    // =========================================================
-    // 11. MERGE EVERYTHING
-    // =========================================================
-//     const [unitMaster] = await connection.query(`
-//   SELECT
-//     Unit_Name,
-//     Unit_Shorthand
-//   FROM units
-// `);
-//     const unitLookup = {};
-
-//     unitMaster.forEach((unit) => {
-//       unitLookup[unit.Unit_Shorthand] = unit.Unit_Name;
-//     });
 const combined = items.map((item) => {
   const availableUnits = [];
 
@@ -2959,6 +2972,29 @@ const combined = items.map((item) => {
       : (item.Stock_Quantity ?? 0),
 
     Sale_Price:item.Sale_Price ?? 0,
+     MRP:
+    item.MRP !== null
+      ? Number(item.MRP)
+      : null,
+
+  Discount_On_MRP_For_Sale:
+    item.Discount_On_MRP_For_Sale !== null
+      ? Number(item.Discount_On_MRP_For_Sale)
+      : null,
+
+  Sale_Price_Type:
+    item.Sale_Price_Type || "Without_Tax",
+
+  Discount_On_Sale_Price:
+    item.Discount_On_Sale_Price !== null
+      ? Number(item.Discount_On_Sale_Price)
+      : null,
+
+  Discount_Type_On_Sale_Price:
+    item.Discount_Type_On_Sale_Price || "Percentage",
+
+  Purchase_Price_Type:
+    item.Purchase_Price_Type || "Without_Tax",
 
     Available_Units:availableUnits,
 
@@ -2967,79 +3003,6 @@ const combined = items.map((item) => {
     Can_Edit_Units:canEditUnits,
   };
 });
-    // const combined = items.map((item) => {
-    //   // =======================================================
-    //   // AVAILABLE UNITS = CURRENT ITEM MASTER ONLY
-    //   //
-    //   // Example:
-    //   // Current master:
-    //   // Primary   = Kgs
-    //   // Secondary = BOX
-    //   //
-    //   // Available_Units:
-    //   // Kgs + BOX
-    //   //
-    //   // OLD Kgs/gm conversions are NOT included here.
-    //   // =======================================================
-
-    //   const availableUnits = [];
-
-    //   // PRIMARY
-    //   if (item.Primary_Unit) {
-    //     availableUnits.push({
-    //       Unit_Shorthand: item.Primary_Unit,
-
-    //       Unit_Name:
-    //         unitLookup[item.Primary_Unit] ||
-    //         item.Primary_Unit,
-    //     });
-    //   }
-
-    //   // SECONDARY
-    //   if (
-    //     item.Secondary_Unit &&
-    //     item.Secondary_Unit !== item.Primary_Unit
-    //   ) {
-    //     availableUnits.push({
-    //       Unit_Shorthand: item.Secondary_Unit,
-
-    //       Unit_Name:
-    //         unitLookup[item.Secondary_Unit] ||
-    //         item.Secondary_Unit,
-    //     });
-    //   }
-    //   const hasTransactions = usedItemSet.has(item.Item_Id);
-
-    //   const canEditUnits =
-    //     !item.Primary_Unit
-    //       ? true
-    //       : !item.Secondary_Unit
-    //         ? true
-    //         : !hasTransactions;
-
-    //   const isService = item.Item_Type === "Service";
-    //   return {
-    //     ...item,
-
-    //     // Prices now come directly from add_item
-    //     Purchase_Price: isService
-    //       ? null
-    //       : (item.Purchase_Price ?? 0),
-    //     //Purchase_Price: item.Purchase_Price ?? 0,
-
-    //     Stock_Quantity: isService
-    //       ? null
-    //       : (item.Stock_Quantity ?? 0),
-    //     Sale_Price: item.Sale_Price ?? 0,
-
-    //     Available_Units: availableUnits,
-
-    //     unitConversions: conversionsByItem[item.Item_Id] || [],
-
-    //     Can_Edit_Units: canEditUnits,
-    //   };
-
-    // });
 
     // =========================================================
     // 12. RESPONSE
@@ -3070,6 +3033,553 @@ const combined = items.map((item) => {
   }
 };
 
+const getItemsForDropdown = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const search = req.query.search?.trim() || "";
+    const cursor = req.query.cursor
+      ? Number(req.query.cursor)
+      : null;
+
+    const limit = Math.min(
+      Number(req.query.limit) || 20,
+      50
+    );
+
+    const params = [];
+    const whereClauses = [];
+
+    // =====================================================
+    // SEARCH ENTIRE ITEM TABLE
+    // =====================================================
+
+    if (search) {
+      const like = `%${search}%`;
+
+      whereClauses.push(`
+        (
+          LOWER(ai.Item_Name) LIKE LOWER(?)
+          OR LOWER(ai.Item_Code) LIKE LOWER(?)
+          OR LOWER(ai.Item_Id) LIKE LOWER(?)
+          OR LOWER(ai.Item_Category) LIKE LOWER(?)
+          OR LOWER(ai.Item_HSN) LIKE LOWER(?)
+        )
+      `);
+
+      params.push(
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    // =====================================================
+    // CURSOR
+    // =====================================================
+
+    if (cursor) {
+      whereClauses.push(`ai.id < ?`);
+      params.push(cursor);
+    }
+
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
+    // =====================================================
+    // FETCH ONE EXTRA
+    // =====================================================
+
+    const [rows] = await connection.query(
+  `
+ SELECT
+  ai.id,
+  ai.Item_Id,
+  ai.Item_Type,
+
+  ai.Item_Name,
+  ai.Item_HSN,
+  ai.Item_Category,
+  ai.Item_Code,
+
+  ai.MRP,
+  ai.Discount_On_MRP_For_Sale,
+
+  ai.Sale_Price,
+  ai.Sale_Price_Type,
+  ai.Discount_On_Sale_Price,
+  ai.Discount_Type_On_Sale_Price,
+
+  ai.Purchase_Price,
+  ai.Purchase_Price_Type,
+
+  ai.Item_Unit_Id,
+  iu.Unit_Shorthand AS Item_Unit,
+  iu.Unit_Name AS Item_Unit_Name,
+
+  ai.Primary_Unit_Id,
+  pu.Unit_Shorthand AS Primary_Unit,
+  pu.Unit_Name AS Primary_Unit_Name,
+
+  ai.Secondary_Unit_Id,
+  su.Unit_Shorthand AS Secondary_Unit,
+  su.Unit_Name AS Secondary_Unit_Name,
+
+  ai.Conversion_Rate,
+  ai.Stock_Quantity
+
+FROM add_item ai
+
+LEFT JOIN units iu
+  ON ai.Item_Unit_Id = iu.id
+
+LEFT JOIN units pu
+  ON ai.Primary_Unit_Id = pu.id
+
+LEFT JOIN units su
+  ON ai.Secondary_Unit_Id = su.id
+
+${whereSQL}
+
+ORDER BY ai.id DESC
+
+LIMIT ?
+  `,
+  [...params, limit + 1]
+);
+// =====================================================
+// HAS MORE
+// =====================================================
+
+const hasMore = rows.length > limit;
+
+// =====================================================
+// GET ONLY THE ACTUAL PAGE ITEMS
+// AND FORMAT THEM
+// =====================================================
+
+const items = rows
+  .slice(0, limit)
+  .map((item) => {
+
+    const availableUnits = [];
+
+    // -------------------------------------------------
+    // PRIMARY UNIT
+    // -------------------------------------------------
+
+    if (item.Primary_Unit_Id) {
+      availableUnits.push({
+        Unit_Id: item.Primary_Unit_Id,
+        Unit_Shorthand: item.Primary_Unit,
+        Unit_Name: item.Primary_Unit_Name,
+      });
+    }
+
+    // -------------------------------------------------
+    // SECONDARY UNIT
+    // -------------------------------------------------
+
+    if (
+      item.Secondary_Unit_Id &&
+      item.Secondary_Unit_Id !== item.Primary_Unit_Id
+    ) {
+      availableUnits.push({
+        Unit_Id: item.Secondary_Unit_Id,
+        Unit_Shorthand: item.Secondary_Unit,
+        Unit_Name: item.Secondary_Unit_Name,
+      });
+    }
+
+    // -------------------------------------------------
+    // RETURN FORMATTED ITEM
+    // -------------------------------------------------
+
+    return {
+      ...item,
+
+      Sale_Price:
+        item.Sale_Price !== null
+          ? Number(item.Sale_Price)
+          : 0,
+
+      Purchase_Price:
+        item.Purchase_Price !== null
+          ? Number(item.Purchase_Price)
+          : 0,
+
+      MRP:
+        item.MRP !== null
+          ? Number(item.MRP)
+          : null,
+
+      Discount_On_MRP_For_Sale:
+        item.Discount_On_MRP_For_Sale !== null
+          ? Number(item.Discount_On_MRP_For_Sale)
+          : null,
+
+      Discount_On_Sale_Price:
+        item.Discount_On_Sale_Price !== null
+          ? Number(item.Discount_On_Sale_Price)
+          : null,
+
+      Conversion_Rate:
+        item.Conversion_Rate !== null
+          ? Number(item.Conversion_Rate)
+          : null,
+
+      Stock_Quantity:
+        Number(item.Stock_Quantity || 0),
+
+      Available_Units: availableUnits,
+    };
+  });
+
+// =====================================================
+// NEXT CURSOR
+// =====================================================
+
+const nextCursor =
+  hasMore && items.length > 0
+    ? items[items.length - 1].id
+    : null;
+
+// =====================================================
+// RESPONSE
+// =====================================================
+
+return res.status(200).json({
+  success: true,
+  items,
+  hasMore,
+  nextCursor,
+});
+
+  } catch (err) {
+    console.error(
+      "❌ Error fetching items for dropdown:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+// const getItemByName = async (req, res, next) => {
+//   try {
+//     const name = req.query.name?.trim();
+
+//     if (!name) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Item name is required.",
+//       });
+//     }
+
+//     const [rows] = await db.query(
+//       `
+//       SELECT
+//         ai.id,
+//         ai.Item_Id,
+//         ai.Item_Type,
+
+//         ai.Item_Name,
+//         ai.Item_HSN,
+//         ai.Item_Category,
+//         ai.Item_Code,
+
+//         ai.MRP,
+//         ai.Discount_On_MRP_For_Sale,
+
+//         ai.Sale_Price,
+//         ai.Sale_Price_Type,
+//         ai.Discount_On_Sale_Price,
+//         ai.Discount_Type_On_Sale_Price,
+
+//         ai.Purchase_Price,
+//         ai.Purchase_Price_Type,
+
+//         ai.Item_Unit_Id,
+//         iu.Unit_Shorthand AS Item_Unit,
+
+//         ai.Primary_Unit_Id,
+//         pu.Unit_Shorthand AS Primary_Unit,
+
+//         ai.Secondary_Unit_Id,
+//         su.Unit_Shorthand AS Secondary_Unit,
+
+//         ai.Conversion_Rate,
+
+//         ai.Stock_Quantity
+
+//       FROM add_item ai
+
+//       LEFT JOIN units iu
+//         ON ai.Item_Unit_Id = iu.id
+
+//       LEFT JOIN units pu
+//         ON ai.Primary_Unit_Id = pu.id
+
+//       LEFT JOIN units su
+//         ON ai.Secondary_Unit_Id = su.id
+
+//       WHERE ai.Item_Name = ?
+
+//       LIMIT 1
+//       `,
+//       [name]
+//     );
+
+//     if (rows.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `No item found with name "${name}".`,
+//       });
+//     }
+
+//     const item = rows[0];
+
+//     const availableUnits = [];
+
+//     if (item.Primary_Unit_Id) {
+//       availableUnits.push({
+//         Unit_Id: item.Primary_Unit_Id,
+//         Unit_Shorthand: item.Primary_Unit,
+//         Unit_Name: null,
+//       });
+//     }
+
+//     if (
+//       item.Secondary_Unit_Id &&
+//       item.Secondary_Unit_Id !== item.Primary_Unit_Id
+//     ) {
+//       availableUnits.push({
+//         Unit_Id: item.Secondary_Unit_Id,
+//         Unit_Shorthand: item.Secondary_Unit,
+//         Unit_Name: null,
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+
+//       item: {
+//         ...item,
+
+//         Sale_Price:
+//           item.Sale_Price !== null
+//             ? Number(item.Sale_Price)
+//             : 0,
+
+//         Purchase_Price:
+//           item.Purchase_Price !== null
+//             ? Number(item.Purchase_Price)
+//             : 0,
+
+//         MRP:
+//           item.MRP !== null
+//             ? Number(item.MRP)
+//             : null,
+
+//         Discount_On_MRP_For_Sale:
+//           item.Discount_On_MRP_For_Sale !== null
+//             ? Number(item.Discount_On_MRP_For_Sale)
+//             : null,
+
+//         Discount_On_Sale_Price:
+//           item.Discount_On_Sale_Price !== null
+//             ? Number(item.Discount_On_Sale_Price)
+//             : null,
+
+//         Conversion_Rate:
+//           item.Conversion_Rate !== null
+//             ? Number(item.Conversion_Rate)
+//             : null,
+
+//         Stock_Quantity:
+//           Number(item.Stock_Quantity || 0),
+
+//         Available_Units:
+//           availableUnits,
+//       },
+//     });
+
+//   } catch (err) {
+//     console.error(
+//       "❌ Error fetching item by name:",
+//       err
+//     );
+
+//     next(err);
+//   }
+// };
+const getItemByName = async (req, res, next) => {
+  try {
+    const name = req.query.name?.trim();
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Item name is required.",
+      });
+    }
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        ai.id,
+        ai.Item_Id,
+        ai.Item_Type,
+
+        ai.Item_Name,
+        ai.Item_HSN,
+        ai.Item_Category,
+        ai.Item_Code,
+
+        ai.MRP,
+        ai.Discount_On_MRP_For_Sale,
+
+        ai.Sale_Price,
+        ai.Sale_Price_Type,
+        ai.Discount_On_Sale_Price,
+        ai.Discount_Type_On_Sale_Price,
+
+        ai.Purchase_Price,
+        ai.Purchase_Price_Type,
+
+        ai.Item_Unit_Id,
+        iu.Unit_Shorthand AS Item_Unit,
+        iu.Unit_Name AS Item_Unit_Name,
+
+        ai.Primary_Unit_Id,
+        pu.Unit_Shorthand AS Primary_Unit,
+        pu.Unit_Name AS Primary_Unit_Name,
+
+        ai.Secondary_Unit_Id,
+        su.Unit_Shorthand AS Secondary_Unit,
+        su.Unit_Name AS Secondary_Unit_Name,
+
+        ai.Conversion_Rate,
+
+        ai.Stock_Quantity
+
+      FROM add_item ai
+
+      LEFT JOIN units iu
+        ON ai.Item_Unit_Id = iu.id
+
+      LEFT JOIN units pu
+        ON ai.Primary_Unit_Id = pu.id
+
+      LEFT JOIN units su
+        ON ai.Secondary_Unit_Id = su.id
+
+      WHERE ai.Item_Name = ?
+
+      LIMIT 1
+      `,
+      [name]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No item found with name "${name}".`,
+      });
+    }
+
+    const item = rows[0];
+
+    // =====================================================
+    // AVAILABLE UNITS
+    // =====================================================
+
+    const availableUnits = [];
+
+    if (item.Primary_Unit_Id) {
+      availableUnits.push({
+        Unit_Id: item.Primary_Unit_Id,
+        Unit_Shorthand: item.Primary_Unit,
+        Unit_Name: item.Primary_Unit_Name,
+      });
+    }
+
+    if (
+      item.Secondary_Unit_Id &&
+      item.Secondary_Unit_Id !== item.Primary_Unit_Id
+    ) {
+      availableUnits.push({
+        Unit_Id: item.Secondary_Unit_Id,
+        Unit_Shorthand: item.Secondary_Unit,
+        Unit_Name: item.Secondary_Unit_Name,
+      });
+    }
+
+    // =====================================================
+    // RESPONSE
+    // =====================================================
+
+    return res.status(200).json({
+      success: true,
+
+      item: {
+        ...item,
+
+        Sale_Price:
+          item.Sale_Price !== null
+            ? Number(item.Sale_Price)
+            : 0,
+
+        Purchase_Price:
+          item.Purchase_Price !== null
+            ? Number(item.Purchase_Price)
+            : 0,
+
+        MRP:
+          item.MRP !== null
+            ? Number(item.MRP)
+            : null,
+
+        Discount_On_MRP_For_Sale:
+          item.Discount_On_MRP_For_Sale !== null
+            ? Number(item.Discount_On_MRP_For_Sale)
+            : null,
+
+        Discount_On_Sale_Price:
+          item.Discount_On_Sale_Price !== null
+            ? Number(item.Discount_On_Sale_Price)
+            : null,
+
+        Conversion_Rate:
+          item.Conversion_Rate !== null
+            ? Number(item.Conversion_Rate)
+            : null,
+
+        Stock_Quantity:
+          Number(item.Stock_Quantity || 0),
+
+        Available_Units: availableUnits,
+      },
+    });
+
+  } catch (err) {
+    console.error(
+      "❌ Error fetching item by name:",
+      err
+    );
+
+    next(err);
+  }
+};
 //PREVIOUS
 // const getAllItemsForLedger = async (req, res, next) => {
 //   let connection;
@@ -3817,17 +4327,17 @@ const getAllItemsForLedger = async (req, res, next) => {
     //
     // =========================================================
 
-    const [purchaseItems] = await connection.query(
-      `
-      SELECT
-        Item_Id,
-        Purchase_Price,
-        Tax_Type,
-        created_at
-      FROM add_purchase_items
-      ORDER BY created_at DESC
-      `
-    );
+    // const [purchaseItems] = await connection.query(
+    //   `
+    //   SELECT
+    //     Item_Id,
+    //     Purchase_Price,
+    //     Tax_Type,
+    //     created_at
+    //   FROM add_purchase_items
+    //   ORDER BY created_at DESC
+    //   `
+    // );
 
     // =========================================================
     // 3. SALES HISTORY
@@ -3837,16 +4347,16 @@ const getAllItemsForLedger = async (req, res, next) => {
     //
     // =========================================================
 
-    const [salesItems] = await connection.query(
-      `
-      SELECT
-        Item_Id,
-        Sale_Price,
-        created_at
-      FROM add_sale_items
-      ORDER BY created_at DESC
-      `
-    );
+    // const [salesItems] = await connection.query(
+    //   `
+    //   SELECT
+    //     Item_Id,
+    //     Sale_Price,
+    //     created_at
+    //   FROM add_sale_items
+    //   ORDER BY created_at DESC
+    //   `
+    // );
 
     // =========================================================
     // 4. UNIT CONVERSION HISTORY
@@ -3931,35 +4441,35 @@ const getAllItemsForLedger = async (req, res, next) => {
     // 6. LATEST PURCHASE PRICE + TAX
     // =========================================================
 
-    const latestPurchasePrice = {};
-    const latestTaxType = {};
+    // const latestPurchasePrice = {};
+    // const latestTaxType = {};
 
-    purchaseItems.forEach((row) => {
-      if (
-        latestPurchasePrice[row.Item_Id] === undefined
-      ) {
-        latestPurchasePrice[row.Item_Id] =
-          row.Purchase_Price;
+    // purchaseItems.forEach((row) => {
+    //   if (
+    //     latestPurchasePrice[row.Item_Id] === undefined
+    //   ) {
+    //     latestPurchasePrice[row.Item_Id] =
+    //       row.Purchase_Price;
 
-        latestTaxType[row.Item_Id] =
-          row.Tax_Type;
-      }
-    });
+    //     latestTaxType[row.Item_Id] =
+    //       row.Tax_Type;
+    //   }
+    // });
 
-    // =========================================================
-    // 7. LATEST SALE PRICE
-    // =========================================================
+    // // =========================================================
+    // // 7. LATEST SALE PRICE
+    // // =========================================================
 
-    const latestSalePrice = {};
+    // const latestSalePrice = {};
 
-    salesItems.forEach((row) => {
-      if (
-        latestSalePrice[row.Item_Id] === undefined
-      ) {
-        latestSalePrice[row.Item_Id] =
-          row.Sale_Price;
-      }
-    });
+    // salesItems.forEach((row) => {
+    //   if (
+    //     latestSalePrice[row.Item_Id] === undefined
+    //   ) {
+    //     latestSalePrice[row.Item_Id] =
+    //       row.Sale_Price;
+    //   }
+    // });
 
     // =========================================================
     // 8. GROUP CONVERSION HISTORY BY ITEM
@@ -4309,20 +4819,29 @@ const [rows] = await connection.query(
 
         // Sale_Price:
         //   latestSalePrice[item.Item_Id] ?? 0,
-        Purchase_Price:
-    item.Purchase_Price !== null &&
-    item.Purchase_Price !== undefined
-      ? Number(item.Purchase_Price)
-      : (latestPurchasePrice[item.Item_Id] ?? 0),
+    //     Purchase_Price:
+    // item.Purchase_Price !== null &&
+    // item.Purchase_Price !== undefined
+    //   ? Number(item.Purchase_Price)
+    //   : (latestPurchasePrice[item.Item_Id] ?? 0),
+    Purchase_Price:
+  item.Purchase_Price !== null
+    ? Number(item.Purchase_Price)
+    : 0,
 
-  Tax_Type:
-    latestTaxType[item.Item_Id] ?? null,
+Sale_Price:
+  item.Sale_Price !== null
+    ? Number(item.Sale_Price)
+    : 0,
 
-  Sale_Price:
-    item.Sale_Price !== null &&
-    item.Sale_Price !== undefined
-      ? Number(item.Sale_Price)
-      : (latestSalePrice[item.Item_Id] ?? 0),
+  // Tax_Type:
+  //   latestTaxType[item.Item_Id] ?? null,
+
+  // Sale_Price:
+  //   item.Sale_Price !== null &&
+  //   item.Sale_Price !== undefined
+  //     ? Number(item.Sale_Price)
+  //     : (latestSalePrice[item.Item_Id] ?? 0),
            // -----------------------------------------------------
   // NEW PRICING FIELDS
   // -----------------------------------------------------
@@ -4433,6 +4952,146 @@ const [rows] = await connection.query(
     if (connection) {
       connection.release();
     }
+  }
+};
+
+const getItemByCode = async (req, res, next) => {
+  try {
+    const { code } = req.params;
+
+    if (!code || !code.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Item code is required.",
+      });
+    }
+    const trimmedCode= code.trim();
+    const [rows] = await db.query(
+      `
+      SELECT
+        ai.id,
+        ai.Item_Id,
+        ai.Item_Type,
+        ai.Item_Name,
+        ai.Item_HSN,
+        ai.Item_Category,
+
+        ai.Item_Code,
+
+        ai.MRP,
+        ai.Discount_On_MRP_For_Sale,
+
+        ai.Sale_Price,
+        ai.Sale_Price_Type,
+        ai.Discount_On_Sale_Price,
+        ai.Discount_Type_On_Sale_Price,
+
+        ai.Purchase_Price,
+        ai.Purchase_Price_Type,
+
+        ai.Primary_Unit_Id,
+        pu.Unit_Shorthand AS Primary_Unit,
+        pu.Unit_Name AS Primary_Unit_Name,
+
+        ai.Secondary_Unit_Id,
+        su.Unit_Shorthand AS Secondary_Unit,
+        su.Unit_Name AS Secondary_Unit_Name,
+
+        ai.Conversion_Rate,
+
+        ai.Stock_Quantity
+
+      FROM add_item ai
+
+      LEFT JOIN units pu
+        ON ai.Primary_Unit_Id = pu.id
+
+      LEFT JOIN units su
+        ON ai.Secondary_Unit_Id = su.id
+
+    WHERE ai.Item_Code = ?
+
+      LIMIT 1
+      `,
+      [trimmedCode]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No item found for code "${trimmedCode}".`,
+      });
+    }
+
+    const item = rows[0];
+
+    const availableUnits = [];
+
+    if (item.Primary_Unit_Id) {
+      availableUnits.push({
+        Unit_Id: item.Primary_Unit_Id,
+        Unit_Shorthand: item.Primary_Unit,
+        Unit_Name: item.Primary_Unit_Name,
+      });
+    }
+
+    if (
+      item.Secondary_Unit_Id &&
+      item.Secondary_Unit_Id !== item.Primary_Unit_Id
+    ) {
+      availableUnits.push({
+        Unit_Id: item.Secondary_Unit_Id,
+        Unit_Shorthand: item.Secondary_Unit,
+        Unit_Name: item.Secondary_Unit_Name,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      item: {
+        ...item,
+
+        Sale_Price:
+          item.Sale_Price !== null
+            ? Number(item.Sale_Price)
+            : 0,
+
+        Purchase_Price:
+          item.Purchase_Price !== null
+            ? Number(item.Purchase_Price)
+            : 0,
+
+        MRP:
+          item.MRP !== null
+            ? Number(item.MRP)
+            : null,
+
+        Discount_On_MRP_For_Sale:
+          item.Discount_On_MRP_For_Sale !== null
+            ? Number(item.Discount_On_MRP_For_Sale)
+            : null,
+
+        Discount_On_Sale_Price:
+          item.Discount_On_Sale_Price !== null
+            ? Number(item.Discount_On_Sale_Price)
+            : null,
+
+        Conversion_Rate:
+          item.Conversion_Rate !== null
+            ? Number(item.Conversion_Rate)
+            : null,
+
+        Stock_Quantity:
+          Number(item.Stock_Quantity || 0),
+
+        Available_Units: availableUnits,
+      },
+    });
+
+  } catch (err) {
+    console.error("❌ Error fetching item by code:", err);
+    next(err);
   }
 };
 const getItemBills = async (req, res, next) => {
@@ -7644,11 +8303,11 @@ console.log(
 };
 
 export {
-  addItem, editItem, deleteItem, addCategory, editCategory, getAllItems, getAllCategories, getAllCategoriesCursor,
+  addItem, editItem, deleteItem, addCategory, editCategory, getAllItems,getItemsForDropdown, getItemByName, getAllCategories, getAllCategoriesCursor,
   getItemsNotInCategory, moveItemsToCategory,
   eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers, addItemConversion, getItemConversions,
-  getAllItemsForLedger, getItemBills, getItemsByCategory, addStockAdjustment, editStockAdjustment,
+  getAllItemsForLedger,getItemByCode, getItemBills, getItemsByCategory, addStockAdjustment, editStockAdjustment,
   deleteStockAdjustment, addItemUnit, editItemUnit, getAllItemUnits, getAllItemUnitsCursor, getUnitConversions
 };
 // ALTER TABLE add_item

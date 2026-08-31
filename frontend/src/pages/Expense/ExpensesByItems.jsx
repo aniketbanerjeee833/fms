@@ -476,7 +476,7 @@ export default function ExpensesByItems() {
 
     selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
     hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-  }, [isItemsLoading, isItemsFetching, selectedItemId]);
+  }, [isItemsLoading, isItemsFetching, selectedItemId, items.length]);
   const hasRestoredRightRef = useRef(false);
   const [isRestoringRight, setIsRestoringRight] = useState(true);
 

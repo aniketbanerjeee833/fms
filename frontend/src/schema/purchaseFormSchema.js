@@ -61,18 +61,18 @@ const paymentSplitSchema = z
     message: "Please select a bank account.",
     path: ["Bank_Account_Id"],
   });
- 
+
 
 export const purchaseFormSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"), // 🔹 only real requirement
-  
 
- GSTIN: z.preprocess(
-  (val) => (val === null || val === undefined ? "" : String(val)),
-  z.string().refine((val) => val === "" || val.length === 15, {
-    message: "GSTIN must be exactly 15 characters or left empty",
-  })
-),
+
+  GSTIN: z.preprocess(
+    (val) => (val === null || val === undefined ? "" : String(val)),
+    z.string().refine((val) => val === "" || val.length === 15, {
+      message: "GSTIN must be exactly 15 characters or left empty",
+    })
+  ),
 
   // 🔹 Bill Number optional now — Vyapar shows it blank and still saves
   Bill_Number: z.string().optional().default(""),
@@ -86,13 +86,13 @@ export const purchaseFormSchema = z.object({
   // 🔹 Totals can legitimately be 0 for an empty bill
   Total_Amount: digitsOnly("Total_Amount", false).default(0),
   Round_Off: z
-  .union([z.string(), z.number()])
-  .optional()
-  .transform((val) => {
-    if (val === "" || val === undefined || val === null) return 0;
-    const n = Number(val);
-    return isNaN(n) ? 0 : n;
-  }),
+    .union([z.string(), z.number()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === undefined || val === null) return 0;
+      const n = Number(val);
+      return isNaN(n) ? 0 : n;
+    }),
   Balance_Due: digitsOnly("Balance_Due", false).default(0),
   Total_Paid: z.string().optional().or(digitsOnly("Total_Paid", false)),
 
@@ -133,7 +133,7 @@ export const purchaseFormSchema = z.object({
   //       .superRefine((splits, ctx) => {
   //         let cashSeen = false;
   //         const seenBankAccounts = new Set();
-  
+
   //         splits.forEach((split, index) => {
   //           if (split.Payment_Type === "Cash") {
   //             if (cashSeen) {
@@ -145,7 +145,7 @@ export const purchaseFormSchema = z.object({
   //             }
   //             cashSeen = true;
   //           }
-  
+
   //           if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
   //             if (seenBankAccounts.has(split.Bank_Account_Id)) {
   //               ctx.addIssue({
@@ -172,6 +172,19 @@ export const purchaseFormSchema = z.object({
           .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
             message: "HSN Code must be 4-8 digits if provided",
           }),
+        MRP: z
+          .union([z.string(), z.number()])
+          .optional()
+          .transform((val) => String(val ?? "").trim())
+          .refine((s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s), {
+            message: "MRP must be a valid number with up to 2 decimals",
+          })
+          .transform((s) => (s === "" ? 0 : Number(s)))
+          .refine((num) => num >= 0, {
+            message: "MRP cannot be negative",
+          }),
+
+        
         Quantity: z.preprocess(
           (val) => {
             if (val === "" || val === undefined || val === null) return 0;
@@ -199,21 +212,21 @@ export const purchaseFormSchema = z.object({
     .optional()
     .default([]),   // 🔹 array itself optional — no .nonempty() anymore
 
-       Terms_Conditions_Id: z
-  .union([z.string(), z.number(), z.null(), z.undefined()])
-  .optional()
-  .transform((val) => {
-    if (val === "" || val === null || val === undefined) {
-      return null;
-    }
+  Terms_Conditions_Id: z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === null || val === undefined) {
+        return null;
+      }
 
-    const id = Number(val);
-    return Number.isInteger(id) ? id : null;
-  }),
- Terms_Conditions_Description: z
-  .string()
-  .trim()
-  .nullable()
-  .optional(),
+      const id = Number(val);
+      return Number.isInteger(id) ? id : null;
+    }),
+  Terms_Conditions_Description: z
+    .string()
+    .trim()
+    .nullable()
+    .optional(),
 });
 

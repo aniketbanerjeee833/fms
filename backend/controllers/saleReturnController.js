@@ -285,7 +285,8 @@ const getSaleReturnById = async (req, res, next) => {
     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
     pu3.Unit_Shorthand AS Selected_Unit,
-
+        sri.MRP,
+      sri.Discount_On_MRP_For_Sale_Percentage,
     sri.Sale_Price,
     sri.Discount_On_Sale_Price,
     sri.Discount_Type_On_Sale_Price,
@@ -468,6 +469,8 @@ const getSaleReturnById = async (req, res, next) => {
           : 0,
         // Dropdown
         Available_Units: availableUnits,
+        MRP:it.MRP,
+        Discount_On_MRP_For_Sale_Percentage:it.Discount_On_MRP_For_Sale_Percentage,
 
         Sale_Price: it.Sale_Price,
 
@@ -802,6 +805,8 @@ const createSaleReturn = async (req, res, next) => {
         Item_Category,
         Item_HSN,
         Item_Unit,
+         MRP,
+        Discount_On_MRP_For_Sale_Percentage,
         Quantity,
         Sale_Price,
         Discount_On_Sale_Price,
@@ -959,6 +964,8 @@ const createSaleReturn = async (req, res, next) => {
            Secondary_Unit_Snapshot,
            Selected_Unit,
            Quantity,
+           MRP,
+           Discount_On_MRP_For_Sale_Percentage,
            Sale_Price,
            Discount_On_Sale_Price,
            Discount_Type_On_Sale_Price,
@@ -966,7 +973,7 @@ const createSaleReturn = async (req, res, next) => {
            Tax_Amount,
            Amount
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           Item_Id,
@@ -974,6 +981,8 @@ const createSaleReturn = async (req, res, next) => {
           snapshot.Secondary_Unit_Snapshot,  // step 6
           resolvedSelectedUnit,              // step 6
           Number(Quantity) || 0,
+           normalizeNumber(MRP) || null,
+           normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
           Number(Sale_Price) || 0,
           Number(Discount_On_Sale_Price) || 0,
           Discount_Type_On_Sale_Price || "Percentage",
@@ -1320,6 +1329,8 @@ const editSaleReturn = async (req, res, next) => {
         Item_Category,
         Item_HSN,
         Item_Unit,          // 🔹 Selected_Unit from frontend
+        MRP,
+        Discount_On_MRP_For_Sale_Percentage,
         Quantity,
         Sale_Price,
         Discount_On_Sale_Price,
@@ -1475,6 +1486,11 @@ const editSaleReturn = async (req, res, next) => {
 
         stockDelta,
         Quantity: Number(Quantity) || 0,
+         MRP: normalizeNumber(MRP) || null,
+
+
+        Discount_On_MRP_For_Sale_Percentage:normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
+
         Sale_Price: Number(Sale_Price) || 0,
         Discount_On_Sale_Price: Number(Discount_On_Sale_Price) || 0,
         Discount_Type_On_Sale_Price: Discount_Type_On_Sale_Price || "Percentage",
@@ -1691,6 +1707,8 @@ const editSaleReturn = async (req, res, next) => {
            Sale_Return_Id,
            Item_Id,
            Quantity,
+           MRP,
+           Discount_On_MRP_For_Sale_Percentage,
            Sale_Price,
            Discount_On_Sale_Price,
            Discount_Type_On_Sale_Price,
@@ -1701,11 +1719,13 @@ const editSaleReturn = async (req, res, next) => {
            Secondary_Unit_Snapshot,
            Selected_Unit
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Sale_Return_Id,
           line.Item_Id,
           line.Quantity,
+          normalizeNumber(line.MRP) || null,
+          normalizeNumber(line.Discount_On_MRP_For_Sale_Percentage) || null,
           line.Sale_Price,
           line.Discount_On_Sale_Price,
           line.Discount_Type_On_Sale_Price,

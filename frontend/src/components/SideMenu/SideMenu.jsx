@@ -259,7 +259,7 @@ if (
               to="/home"
               className={({ isActive }) => (isActive ? "menu-active" : "")}
               style={{ display: 'block', padding: '10px 16px',
-                color: "#666", textDecoration: 'none' }}
+                color: "#666", textDecoration: 'none',borderBottom:"1px solid #e8edf2" }}
                   onClick={() => setOpenMenu(null)} // ✅ Close all submenus
             >
               
@@ -314,11 +314,25 @@ if (
             { to: "/expense/categories", text: "Categories" },
              { to: "/expense/items", text: "Items" },
           ])}
-           {renderMenu("Settings", <Settings  size={20} />, [
+           {/* {renderMenu("Settings", <Settings  size={20} />, [
            
             { to: "/financial-year/add", text: "Financial Year" },
           
-          ])}
+          ])} */}
+
+            <NavLink
+              to="/settings"
+              className={({ isActive }) => (isActive ? "menu-active" : "")}
+              style={{ display: 'block', padding: '10px 16px',
+                color: "#666", textDecoration: 'none',borderBottom:"1px solid #e8edf2" }}
+                  onClick={() => setOpenMenu(null)} // ✅ Close all submenus
+            >
+              
+              {/* <i className="fa fa-bar-chart" aria-hidden="true"></i> Dashboard */}
+                 <span className="flex items-center gap-2"><Settings size={20}/> 
+                Settings
+                 </span>
+            </NavLink>
 
            {/* <NavLink
               to="/reports"

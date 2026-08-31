@@ -13,9 +13,9 @@ import { toast } from "react-toastify";
 
 import { useDispatch } from "react-redux";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
-import { LayoutDashboard } from "lucide-react";
+
 import AddUnitModal from "../../components/Modal/AddUnitModal";
-import { useGetAllItemUnitsQuery } from "../../redux/api/miscellaneousApi";
+import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
@@ -24,6 +24,9 @@ import { Trash2 } from "lucide-react";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 import AddItemModal from "../../components/Modal/AddItemModal";
+import BankAccountModal from "../../components/Modal/BankAccountModal";
+import PaymentTypeSelect from "../../components/PaymentTypeSelect";
+import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 export default function PurchaseEdit() {
   const location = useLocation();
   const from = location.state?.from
@@ -71,7 +74,7 @@ export default function PurchaseEdit() {
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
   console.log(termsTemplates, "termsTemplates");
-  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const { data: banks = [], refetch: refetchBanks } = useGetAllBankAccountsQuery();
   const { data: purchase }
     = useGetSinglePurchaseQuery(Purchase_Id)
   const [open, setOpen] = useState(false);
@@ -84,9 +87,9 @@ export default function PurchaseEdit() {
   // const[search,setSearch] = useState("");
   const [showPartyModal, setShowPartyModal] = useState(false);
   const [showSplitBox, setShowSplitBox] = useState(false);
-
+  const [showBankModal, setShowBankModal] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
-  const [originalTotal, setOriginalTotal] = useState(null);
+  //const [originalTotal, setOriginalTotal] = useState(null);
   const [addCategory] = useAddCategoryMutation();
 
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
@@ -130,11 +133,10 @@ export default function PurchaseEdit() {
     "Uttarakhand",
     "West Bengal"
   ];
+  const [isRoundOff, setIsRoundOff] = useState(false);
+  const [showScanCodeModal, setShowScanCodeModal] = useState(false);
   const { data: itemUnits = [] } = useGetAllItemUnitsQuery();
-  // console.log(itemUnits, "itemUnits");
-  // const {data: itemUnitsFetched} = useGetAllItemUnitsQuery();
-  // console.log(itemUnitsFetched, "itemUnitsFetched");
-  // const itemUnits=itemUnitsFetched
+
   const handleAddCategory = async () => {
 
     if (newCategory.trim() === "") {
@@ -176,7 +178,8 @@ export default function PurchaseEdit() {
   const [rows, setRows] = useState([
     {
       itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false, categorySearch: "", unitOpen: false, unitSearch: "",
+      isUnitLocked: false, CategoryOpen: false,
+      categorySearch: "", unitOpen: false, unitSearch: "",
     }
   ]);
 
@@ -208,8 +211,17 @@ export default function PurchaseEdit() {
             unitRef && unitRef.contains(event.target);
 
           // if clicked outside both → close
-          if (!clickedInsideCategory && !clickedInsideItem) {
-            return { ...row, CategoryOpen: false, itemOpen: false, unitOpen: false, };
+          if (
+            !clickedInsideCategory &&
+            !clickedInsideItem &&
+            !clickedInsideUnit
+          ) {
+            return {
+              ...row,
+              CategoryOpen: false,
+              itemOpen: false,
+              unitOpen: false,
+            };
           }
 
           return row;
@@ -245,6 +257,7 @@ export default function PurchaseEdit() {
       Bill_Date: "",
       State_Of_Supply: "",
       Total_Amount: "",
+      Round_Off: "",
       Balance_Due: "",
       Total_Paid: "",
       Terms_Conditions_Id: null,
@@ -287,69 +300,7 @@ export default function PurchaseEdit() {
     name: "splits",
   });
 
-  const handleAddRow = () => {
-    setRows((prev) => [
-      // only close CategoryOpen, preserve lock states
-      ...prev.map((row) => ({
-        ...row,
-        CategoryOpen: false,
-        itemOpen: false, // also close item dropdown if open
-        unitOpen: false
-      })),
-      {
-        itemSearch: "",
-        itemOpen: false,
-        CategoryOpen: false,
-        isHSNLocked: false,
-        isUnitLocked: false,
-        isExistingItem: false,
-        categorySearch: "",
-        unitOpen: false,
-        unitSearch: "",
-      },
-    ]);
 
-    append({
-      Item_Category: "",
-      Item_Name: "",
-      Item_HSN: "",
-      Quantity: "",
-      Item_Unit: "",
-      Purchase_Price: "",
-      Discount_On_Purchase_Price: "",
-      Discount_Type_On_Purchase_Price: "Percentage",
-      Tax_Type: "None",
-      Tax_Amount: "",
-      Amount: "",
-    });
-  };
-
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
-
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
-
-    // 2. calculate new total excluding the deleted row
-    const newTotal = currentItems.reduce((sum, row, idx) => {
-      if (idx === i) return sum;                    // skip deleted row
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
-
-    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-    const newBalanceDue = newTotal - currentTotalPaid;
-
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
-
-    // 4. update totals
-    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-    setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  };
 
   const itemsValues = watch("items");   // watch all item rows
   const totalPaid = watch("Total_Paid"); // watch Total_Paid
@@ -393,12 +344,131 @@ export default function PurchaseEdit() {
       Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
+  const getRawTotal = () => {
+    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  };
+
+  const applyRoundOff = (roundOffValue) => {
+    const rawTotal = getRawTotal();
+    const totalPaid = Number(watch("Total_Paid")) || 0;
+    const newTotal = rawTotal + roundOffValue;
+
+    setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  };
+  const syncTotalsAfterItemChange = () => {
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      applyRoundOff(currentRoundOff);
+    } else {
+      const rawTotal = getRawTotal();
+      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+  };
+  const handleAddRow = () => {
+    setRows((prev) => [
+      // only close CategoryOpen, preserve lock states
+      ...prev.map((row) => ({
+        ...row,
+        CategoryOpen: false,
+        itemOpen: false, // also close item dropdown if open
+        unitOpen: false
+      })),
+      {
+        itemSearch: "",
+        itemOpen: false,
+        CategoryOpen: false,
+        isHSNLocked: false,
+        isUnitLocked: false,
+        isExistingItem: false,
+        categorySearch: "",
+        unitOpen: false,
+        unitSearch: "",
+      },
+    ]);
+
+    append({
+      Item_Category: "",
+      Item_Name: "",
+      Item_HSN: "",
+      Quantity: "",
+      Item_Unit: "",
+      Purchase_Price: "",
+      Discount_On_Purchase_Price: "",
+      Discount_Type_On_Purchase_Price: "Percentage",
+      Tax_Type: "None",
+      Tax_Amount: "",
+      Amount: "",
+    });
+  };
+
+  // const handleDeleteRow = (i) => {
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
+  //   remove(i); // remove from form
+  // };
+
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   const currentItems = watch("items");
+
+  //   // 2. calculate new total excluding the deleted row
+  //   const newTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;                    // skip deleted row
+  //     return sum + parseFloat(row.Amount || 0);
+  //   }, 0);
+
+  //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+  //   const newBalanceDue = newTotal - currentTotalPaid;
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
+  //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  // };
+  const handleDeleteRow = (i) => {
+    // 1. get current items BEFORE removal
+    const currentItems = watch("items");
+
+    // 2. calculate new raw total excluding the deleted row
+    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+      if (idx === i) return sum;
+      return sum + parseFloat(row.Amount || 0);
+    }, 0);
+
+    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+
+    // 3. remove from UI state and form
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    remove(i);
+
+    // 4. update totals — respecting Round Off if active
+    if (isRoundOff) {
+      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+      const newTotal = newRawTotal + currentRoundOff;
+      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+      setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+    }
+
+    // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
+    // if (isTotalPaid) {
+    //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
+    //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
+    //   if ((watch("splits") || []).length === 1) {
+    //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+    //   }
+    // }
+  };
 
 
 
-
-
-  //const itemsValues = watch("items"); // watch all rows
   const formValues = watch();
 
   // const handleSelect = (rowIndex, categoryName) => {
@@ -429,37 +499,37 @@ export default function PurchaseEdit() {
 
   // repeatable: true  -> can be picked in more than one row (Cheque / Neft)
   // repeatable: false -> once picked in a row, disappears from every other row (Cash / a specific Bank)
-  const buildPaymentTypeOptions = (banks) => [
-    { value: "Cash", label: "Cash", repeatable: false },
-    { value: "Cheque", label: "Cheque", repeatable: true },
-    { value: "Neft", label: "Neft", repeatable: true },
-    ...(banks || []).map((bank) => ({
-      value: `bank_${bank.Bank_Account_Id}`,
-      label: bank.Account_Display_Name,
-      repeatable: false,
-    })),
-  ];
+  // const buildPaymentTypeOptions = (banks) => [
+  //   { value: "Cash", label: "Cash", repeatable: false },
+  //   { value: "Cheque", label: "Cheque", repeatable: true },
+  //   { value: "Neft", label: "Neft", repeatable: true },
+  //   ...(banks || []).map((bank) => ({
+  //     value: `bank_${bank.Bank_Account_Id}`,
+  //     label: bank.Account_Display_Name,
+  //     repeatable: false,
+  //   })),
+  // ];
 
   const getRowIdentifier = (type, bankId) =>
     type === "Bank" ? `bank_${bankId ?? ""}` : type;
 
   //Inside the component:
 
-  const getUsedIdentifiers = (excludeIndex) => {
-    const splitValues = watch("splits") || [];
-    return splitValues
-      .map((s, i) =>
-        i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
-      )
-      .filter(Boolean);
-  };
+  // const getUsedIdentifiers = (excludeIndex) => {
+  //   const splitValues = watch("splits") || [];
+  //   return splitValues
+  //     .map((s, i) =>
+  //       i === excludeIndex ? null : getRowIdentifier(s.Payment_Type, s.Bank_Account_Id)
+  //     )
+  //     .filter(Boolean);
+  // };
 
-  const getAvailableOptions = (excludeIndex) => {
-    const used = getUsedIdentifiers(excludeIndex);
-    return buildPaymentTypeOptions(banks).filter(
-      (opt) => opt.repeatable || !used.includes(opt.value)
-    );
-  };
+  // const getAvailableOptions = (excludeIndex) => {
+  //   const used = getUsedIdentifiers(excludeIndex);
+  //   return buildPaymentTypeOptions(banks).filter(
+  //     (opt) => opt.repeatable || !used.includes(opt.value)
+  //   );
+  // };
 
   const handleAddPaymentType = () => {
     appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
@@ -481,10 +551,16 @@ export default function PurchaseEdit() {
   useEffect(() => {
     const bal = (Number(totalAmountWatch) || 0) - computedTotalPaid;
     setValue("Balance_Due", bal.toFixed(2), { shouldValidate: false, shouldDirty: true });
-    setValue("Total_Paid", computedTotalPaid.toFixed(2), {
-      shouldValidate: false,
-      shouldDirty: true,
-    });
+    // setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+    //   shouldValidate: false,
+    //   shouldDirty: true,
+    // });
+    if (splitsWatch.length > 1) {
+      setValue("Total_Paid", computedTotalPaid.toFixed(2), {
+        shouldValidate: false,
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmountWatch, computedTotalPaid]);
 
@@ -507,6 +583,37 @@ export default function PurchaseEdit() {
     return `${year}-${month}-${day}`; // ✅ in yyyy-mm-dd for input[type="date"]
   };
   console.log("purchase", purchase);
+  const calculateTotals = (items = []) => {
+    return items.reduce(
+      (acc, item) => {
+        const qty = Number(item.Quantity) || 0;
+        const price = Number(item.Purchase_Price) || 0;
+
+        const subtotal = qty * price;
+
+        const discountRaw =
+          Number(item.Discount_On_Purchase_Price) || 0;
+
+        const discount =
+          item.Discount_Type_On_Purchase_Price === "Percentage"
+            ? (subtotal * discountRaw) / 100
+            : discountRaw * qty;
+
+        acc.totalQty += qty;
+        acc.totalDiscount += discount;
+        acc.totalTax += Number(item.Tax_Amount) || 0;
+        acc.totalAmount += Number(item.Amount) || 0;
+
+        return acc;
+      },
+      {
+        totalQty: 0,
+        totalDiscount: 0,
+        totalTax: 0,
+        totalAmount: 0,
+      }
+    );
+  };
   const emptyRow = () => ({
     Item_Category: "",
     Item_Name: "",
@@ -522,6 +629,8 @@ export default function PurchaseEdit() {
     Amount: "",
     itemOpen: false,
     CategoryOpen: false,
+    unitOpen: false,
+    unitSearch: "",
     isHSNLocked: false,
     isUnitLocked: false,
     isExistingItem: false,
@@ -529,16 +638,7 @@ export default function PurchaseEdit() {
   useEffect(() => {
     if (purchase) {
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
-      // const prefilledRows = purchase?.items?.map((item) => ({
-      //   ...item,
-      //   itemSearch: item.Item_Name,
-      //   itemOpen: false,
-      //   CategoryOpen: false,
-      //   isHSNLocked: false,
-      //   isUnitLocked: false,
-      //   isExistingItem: true,
 
-      // }))
       // const prefilledRows = purchase?.items?.length > 0
       //   ? purchase.items.map((item) => ({
       //     ...item,
@@ -626,6 +726,8 @@ export default function PurchaseEdit() {
             itemSearch: item.Item_Name,
             itemOpen: false,
             CategoryOpen: false,
+            unitOpen: false,
+            unitSearch: "",
 
             isHSNLocked: false,
             isUnitLocked: false,
@@ -645,20 +747,25 @@ export default function PurchaseEdit() {
         Item_Category: item.Item_Category || "",
         Item_HSN: item.Item_HSN || "",
         Quantity: item.Quantity || "",
+
         Item_Unit: item.Item_Unit || "",
+
         Purchase_Price: item.Purchase_Price || "",
 
-        Discount_On_Purchase_Price:
-          item.Discount_On_Purchase_Price || "",
+        Discount_On_Purchase_Price: item.Discount_On_Purchase_Price || "",
 
-        Discount_Type_On_Purchase_Price:
-          item.Discount_Type_On_Purchase_Price || "Percentage",
+        Discount_Type_On_Purchase_Price: item.Discount_Type_On_Purchase_Price || "Percentage",
 
         Tax_Type: item.Tax_Type || "None",
         Tax_Amount: item.Tax_Amount || "",
         Amount: item.Amount || "",
       }));
+
       setRows(prefilledRows)
+      const roundOffFromDb = Number(purchase.billPurchaseDetails?.Round_Off) || 0;
+
+      //  checkbox reflects whether a real round-off was applied
+      setIsRoundOff(roundOffFromDb !== 0);
       reset({
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
         GSTIN: purchase?.billPurchaseDetails?.GSTIN,
@@ -666,6 +773,7 @@ export default function PurchaseEdit() {
         Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
         State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
         Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
+        Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
         Total_Paid: purchase?.billPurchaseDetails?.Total_Paid,
         Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
         Terms_Conditions_Id: purchase?.billPurchaseDetails?.Terms_Conditions_Id ?? null,
@@ -702,7 +810,7 @@ export default function PurchaseEdit() {
       setShowGSTIN(purchase.GSTIN || "");   // ✅ only UI update
     }
   }, [purchase]);
-
+  const totals = calculateTotals(itemsValues);
 
 
   const onSubmit = async (data) => {
@@ -885,11 +993,17 @@ export default function PurchaseEdit() {
       // 9. NAVIGATION
       // =======================================================
 
-      if (from === "party-payables") {
+      if (from === "party-receivables") {
         navigate({
-          pathname: "/party/payables",
+          pathname: "/party/receivables",
           search: location.search,
         });
+      }
+      else if (from === "party-payables") {
+        navigate({
+          pathname: `/party/payables`,
+          search: location.search,
+        })
       }
 
       else if (
@@ -920,17 +1034,34 @@ export default function PurchaseEdit() {
         );
       }
       else if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
+
+        //params.set("itemId", Item_Id);
+
         navigate({
           pathname: "/items/all-items",
-          search: `?itemId=${Item_Id}`,
+          search: location.search,
         });
       }
+      // else if (from === "items-by-item") {
+      //   navigate({
+      //     pathname: "/items/all-items",
+      //     search: `?itemId=${Item_Id}`,
+      //   });
+      // }
       else if (from === "bank-accounts") {
+        // 🔹 new — return to Bank Accounts page with the same account selected
         navigate({
-          pathname: "/cash-bank/bank-accounts",
-          search: `?bankId=${bankId}`,
+          pathname: `/cash-bank/bank-accounts`,
+          search: location.search,
         });
       }
+      // else if (from === "bank-accounts") {
+      //   navigate({
+      //     pathname: "/cash-bank/bank-accounts",
+      //     search: `?bankId=${bankId}`,
+      //   });
+      // }
 
       else if (from === "party-details") {
         navigate({
@@ -942,6 +1073,7 @@ export default function PurchaseEdit() {
       else if (from === "cash-in-hand") {
         navigate({
           pathname: "/cash-bank/cash-in-hand",
+          search: location.search,
         });
       }
 
@@ -970,6 +1102,304 @@ export default function PurchaseEdit() {
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
   const paymentType = watch("splits.0.Payment_Type");
+  const handleOpenScanModal = () => {
+    setShowScanCodeModal(true);
+  };
+  const handleScanSave = (scannedItems) => {
+    if (!scannedItems?.length) return;
+
+    const currentItems = watch("items") || [];
+
+    // =====================================================
+    // CREATE PURCHASE FORM ROWS FROM SCANNED ITEMS
+    // =====================================================
+
+    const scannedRows = scannedItems.map((item) => ({
+      Item_Category: item.Item_Category || "",
+      Item_Name: item.Item_Name || "",
+      Item_HSN: item.Item_HSN || "",
+
+      Quantity: Number(item.Quantity) || 1,
+
+      Item_Unit: item.Primary_Unit || "",
+
+      Purchase_Price:
+        Number(item.Purchase_Price) || 0,
+
+      // ✅ Purchase discount
+      Discount_On_Purchase_Price:
+        item.Discount_On_Purchase_Price ?? "",
+
+      Discount_Type_On_Purchase_Price:
+        item.Discount_Type_On_Purchase_Price ||
+        "Percentage",
+
+      Tax_Type: item.Tax_Type || "None",
+
+      Tax_Amount: "",
+      Amount: "",
+    }));
+
+    // =====================================================
+    // FILL EXISTING BLANK ROWS FIRST
+    // =====================================================
+
+    let combinedItems = [...currentItems];
+
+    let scanIndex = 0;
+
+    for (
+      let i = 0;
+      i < combinedItems.length &&
+      scanIndex < scannedRows.length;
+      i++
+    ) {
+      const row = combinedItems[i];
+
+      const isBlankRow =
+        !row?.Item_Name ||
+        !row.Item_Name.trim();
+
+      if (isBlankRow) {
+        combinedItems[i] =
+          scannedRows[scanIndex];
+
+        scanIndex++;
+      }
+    }
+
+    // =====================================================
+    // REMOVE ALL UNUSED BLANK ROWS
+    // =====================================================
+
+    combinedItems = combinedItems.filter(
+      (row) =>
+        row?.Item_Name &&
+        row.Item_Name.trim()
+    );
+
+    // =====================================================
+    // APPEND REMAINING SCANNED ITEMS
+    // =====================================================
+
+    if (scanIndex < scannedRows.length) {
+      combinedItems.push(
+        ...scannedRows.slice(scanIndex)
+      );
+    }
+
+    // =====================================================
+    // CALCULATE ROW AMOUNTS
+    // =====================================================
+
+    const calculatedItems = combinedItems.map(
+      (row, index) =>
+        calculateRowAmount(
+          row,
+          index,
+          combinedItems
+        )
+    );
+
+    // =====================================================
+    // UPDATE REACT HOOK FORM
+    // =====================================================
+
+    setValue(
+      "items",
+      calculatedItems,
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    // =====================================================
+    // CREATE UI ROWS
+    // =====================================================
+
+    const scannedUiRows = scannedItems.map(
+      (item) => ({
+        itemSearch:
+          item.Item_Name || "",
+
+        itemOpen: false,
+
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
+
+        CategoryOpen: false,
+        categorySearch:
+          item.Item_Category || "",
+
+        unitOpen: false,
+        unitSearch: "",
+
+        Item_Id:
+          item.Item_Id || "",
+
+        Item_Name:
+          item.Item_Name || "",
+
+        Item_Category:
+          item.Item_Category || "",
+
+        Item_HSN:
+          item.Item_HSN || "",
+
+        Primary_Unit:
+          item.Primary_Unit || null,
+
+        Secondary_Unit:
+          item.Secondary_Unit || null,
+
+        Conversion_Rate:
+          item.Conversion_Rate || null,
+
+        Available_Units:
+          Array.isArray(item.Available_Units)
+            ? item.Available_Units
+            : [],
+
+        // ✅ PURCHASE PRICE
+        Purchase_Price:
+          Number(item.Purchase_Price) || 0,
+
+        // ✅ PURCHASE DISCOUNT
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price ?? "",
+
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price ||
+          "Percentage",
+
+        Tax_Type:
+          item.Tax_Type || "None",
+      })
+    );
+
+    // =====================================================
+    // UPDATE UI ROWS
+    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
+    // =====================================================
+
+    setRows((prev) => {
+      const updatedRows = [...prev];
+
+      let uiScanIndex = 0;
+
+      // ---------------------------------------------------
+      // Fill existing blank rows
+      // ---------------------------------------------------
+
+      for (
+        let i = 0;
+        i < updatedRows.length &&
+        uiScanIndex < scannedUiRows.length;
+        i++
+      ) {
+        const row = updatedRows[i];
+
+        const isBlankRow =
+          !row?.Item_Name ||
+          !row.Item_Name.trim();
+
+        if (isBlankRow) {
+          updatedRows[i] =
+            scannedUiRows[uiScanIndex];
+
+          uiScanIndex++;
+        }
+      }
+
+      // ---------------------------------------------------
+      // Remove remaining blank rows
+      // ---------------------------------------------------
+
+      const filledRows =
+        updatedRows.filter(
+          (row) =>
+            row?.Item_Name &&
+            row.Item_Name.trim()
+        );
+
+      // ---------------------------------------------------
+      // Append remaining scanned rows
+      // ---------------------------------------------------
+
+      if (
+        uiScanIndex <
+        scannedUiRows.length
+      ) {
+        filledRows.push(
+          ...scannedUiRows.slice(
+            uiScanIndex
+          )
+        );
+      }
+
+      return filledRows;
+    });
+
+    // =====================================================
+    // CALCULATE GRAND TOTAL
+    // =====================================================
+
+    const rawTotal =
+      calculatedItems.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.Amount) || 0),
+        0
+      );
+
+    const roundOff = isRoundOff
+      ? Number(watch("Round_Off")) || 0
+      : 0;
+
+    const finalTotal =
+      rawTotal + roundOff;
+
+    const totalPaid =
+      Number(watch("Total_Paid")) || 0;
+
+    const balanceDue =
+      finalTotal - totalPaid;
+
+    // =====================================================
+    // UPDATE TOTAL
+    // =====================================================
+
+    setValue(
+      "Total_Amount",
+      finalTotal.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    // =====================================================
+    // UPDATE BALANCE
+    // =====================================================
+
+    setValue(
+      "Balance_Due",
+      balanceDue.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    // =====================================================
+    // CLOSE MODAL
+    // =====================================================
+
+    setShowScanCodeModal(false);
+  };
+
   return (
     <>
       {/* <div className="sb2-2-2">
@@ -1033,8 +1463,13 @@ export default function PurchaseEdit() {
                 //   search: location.search,
                 // })}
                 onClick={() => {
-
-                  if (from === "party-payables") {
+                  if (from === "party-receivables") {
+                    navigate({
+                      pathname: "/party/receivables",
+                      search: location.search,
+                    });
+                  }
+                  else if (from === "party-payables") {
                     navigate({
                       pathname: `/party/payables`,
                       search: location.search,
@@ -1053,21 +1488,38 @@ export default function PurchaseEdit() {
                       search: location.search,
                     })
                   }
-                  else if (from === "items-by-item") {
+                  // else if (from === "items-by-item") {
 
+
+                  //   navigate({
+                  //     pathname: "/items/all-items",
+                  //     search: `?itemId=${Item_Id}`,
+                  //   });
+                  // }
+                  else if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
+
+                    //params.set("itemId", Item_Id);
 
                     navigate({
                       pathname: "/items/all-items",
-                      search: `?itemId=${Item_Id}`,
+                      search: location.search,
                     });
                   }
                   else if (from === "bank-accounts") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
                       pathname: `/cash-bank/bank-accounts`,
-                      search: `?bankId=${bankId}`,
-                    })
+                      search: location.search,
+                    });
                   }
+                  // else if (from === "bank-accounts") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/bank-accounts`,
+                  //     search: `?bankId=${bankId}`,
+                  //   })
+                  // }
                   else if (from === "party-details") {
                     // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
@@ -1077,12 +1529,18 @@ export default function PurchaseEdit() {
                     });
                   }
                   else if (from === "cash-in-hand") {
-                    // 🔹 new — return to Bank Accounts page with the same account selected
                     navigate({
-                      pathname: `/cash-bank/cash-in-hand`,
-
+                      pathname: "/cash-bank/cash-in-hand",
+                      search: location.search,
                     });
                   }
+                  // else if (from === "cash-in-hand") {
+                  //   // 🔹 new — return to Bank Accounts page with the same account selected
+                  //   navigate({
+                  //     pathname: `/cash-bank/cash-in-hand`,
+
+                  //   });
+                  // }
                   else {
                     navigate({
                       pathname: "/purchase/all-purchases",
@@ -1437,11 +1895,17 @@ export default function PurchaseEdit() {
 
 
             <div className="table-responsive table-desi mt-4">
+
               <table className="table table-hover">
                 <thead>
                   <tr>
 
-                    <th>Sl.No</th>
+                    <th
+                      className=" cursor-pointer"
+                      onClick={handleOpenScanModal}
+                    >
+                      Sl.No
+                    </th>
                     <th>Category</th>
                     <th>Item</th>
                     <th>Item_HSN</th>
@@ -1651,8 +2115,9 @@ export default function PurchaseEdit() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 } else {
                                   // // no match — close dropdown
                                   //      handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
@@ -1709,8 +2174,8 @@ export default function PurchaseEdit() {
                               </div>
 
                               {/* ══════════════════════════════════════════════
-        EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
-    ══════════════════════════════════════════════ */}
+                                    EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
+    ══                              ════════════════════════════════════════════ */}
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -1786,16 +2251,30 @@ export default function PurchaseEdit() {
 
                                           setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                           setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                          syncTotalsAfterItemChange();
+                                          // setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                          // setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
                                         }}
 
                                         className="hover:bg-gray-100 cursor-pointer border-b"
                                       >
                                         <td>{idx + 1}</td>
-                                        <td className="px-3 py-2">{it.Item_Name}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
+                                        <td className="px-3 py-2">
+                                          {it.Item_Name}{" "}
+                                          {it.Item_Code && (
+                                            <span
+                                              style={{
+                                                color: "#9ca3af",
+
+                                                fontWeight: "400",
+                                              }}
+                                            >
+                                              ({it.Item_Code})
+                                            </span>
+                                          )}
+                                          </td>
+                                          <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
+                                          {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
                                         <td className="px-3 py-2 whitespace-nowrap"
                                           style={{
                                             padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
@@ -1804,7 +2283,20 @@ export default function PurchaseEdit() {
                                           }}
                                         >
                                           {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                        </td>
+                                        </td> */}
+                                          <td className="px-3 py-2 text-gray-600">
+                                            {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
+                                          </td>
+
+                                          <td className="px-3 py-2" style={{
+                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
+                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                                            fontWeight: "500",
+                                          }}>
+                                            {it.Item_Type === "Service"
+                                              ? ""
+                                              : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
+                                          </td>
                                       </tr>
                                     ))}
 
@@ -1894,8 +2386,9 @@ export default function PurchaseEdit() {
 
                             setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                             setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                            syncTotalsAfterItemChange();
+                            // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                            // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                           }}
                           placeholder="Qty"
                         />
@@ -2165,7 +2658,7 @@ export default function PurchaseEdit() {
                             }
 
 
-                            
+
                             const selectedLabel = unitsWithNone.find(
                               u => u.Unit_Shorthand === field.value
                             );
@@ -2233,6 +2726,28 @@ export default function PurchaseEdit() {
 
                                       }}
                                     />
+                                    {!hasPrimary && !hasSecondary && (
+                                      <div
+                                        onClick={() => {
+                                          setActiveUnitRow(i);
+                                          setShowAddUnitModal(true);
+
+                                          handleRowChange(i, "unitOpen", false);
+                                          handleRowChange(i, "unitSearch", "");
+                                        }}
+                                        style={{
+                                          padding: "8px 10px",
+                                          borderBottom: "1px solid #e5e7eb",
+                                          cursor: "pointer",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: "#4CA1AF",
+                                          background: "#f8fafc",
+                                        }}
+                                      >
+                                        + Add Unit
+                                      </div>
+                                    )}
                                     {filtered.length === 0 ? (
                                       <div
                                         onClick={() => {
@@ -2322,8 +2837,7 @@ export default function PurchaseEdit() {
                                                 secondaryUnit &&
                                                 conversionRate > 0
                                               ) {
-                                                const basePrice =
-                                                  Number(basePurchasePriceRef.current[i]) || 0;
+                                                const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
 
                                                 const baseUnit = basePurchaseUnitRef.current[i];
 
@@ -2400,23 +2914,13 @@ export default function PurchaseEdit() {
                                                   }
                                                 );
 
-                                                setValue(
-                                                  "Total_Amount",
-                                                  Total_Amount,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
+                                                // setValue("Total_Amount",Total_Amount,{shouldValidate: true,shouldDirty: true,}
+                                                // );
 
-                                                setValue(
-                                                  "Balance_Due",
-                                                  Balance_Due,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
+                                                // setValue("Balance_Due",Balance_Due,{shouldValidate: true,shouldDirty: true,
+                                                //   }
+                                                // );
+                                                syncTotalsAfterItemChange();
                                               }
                                             }}
                                             style={{
@@ -2499,8 +3003,9 @@ export default function PurchaseEdit() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                               setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                             }}
 
                             placeholder="Price"
@@ -2548,8 +3053,9 @@ export default function PurchaseEdit() {
 
                               setValue(`items.${i}.Tax_Amount`, Tax_Amount);
                               setValue(`items.${i}.Amount`, Amount);
-                              setValue("Total_Amount", Total_Amount);
-                              setValue("Balance_Due", Balance_Due);
+                              syncTotalsAfterItemChange();
+                              // setValue("Total_Amount", Total_Amount);
+                              // setValue("Balance_Due", Balance_Due);
                             }}
 
                             placeholder="Discount"
@@ -2574,8 +3080,9 @@ export default function PurchaseEdit() {
 
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  syncTotalsAfterItemChange();
+                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                                 }}
                               >
                                 <option value="Percentage">%</option>
@@ -2607,8 +3114,9 @@ export default function PurchaseEdit() {
                                 );
                                 setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                               }}
                             >
                               <option value="None">None</option>
@@ -2657,9 +3165,39 @@ export default function PurchaseEdit() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td>Total</td>
+                    <td></td>
+
+                    <td className="text-right">
+                      {totals.totalQty}
+                    </td>
+
+                    <td></td>
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalDiscount.toFixed(2)}
+                    </td>
+
+                    <td></td>
+
+                    <td className="text-right">
+                      ₹{totals.totalTax.toFixed(2)}
+                    </td>
+
+                    <td className="text-right">
+                      ₹{totals.totalAmount.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
 
 
               </table>
+
+
               <div className="flex sm:w-1/4 p-2">
                 <button
                   type="button"
@@ -2670,6 +3208,7 @@ export default function PurchaseEdit() {
                   + Add Row
                 </button>
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
 
                 {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
@@ -2707,15 +3246,16 @@ export default function PurchaseEdit() {
                             {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                           />
 
-                          <select
-                            id="Payment_Type"
+
+                          <PaymentTypeSelect
                             value={
                               paymentType === "Bank"
                                 ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
                                 : paymentType || ""
                             }
-                            onChange={(e) => {
-                              const val = e.target.value;
+                            banks={banks}
+                            onAddBank={() => setShowBankModal(true)}
+                            onChange={(val) => {
                               if (val.startsWith("bank_")) {
                                 const bankId = val.replace("bank_", "");
                                 setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
@@ -2725,17 +3265,7 @@ export default function PurchaseEdit() {
                                 setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
                               }
                             }}
-                          >
-                            {/* <option value="">Select Payment Type</option> */}
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Neft">Neft</option>
-                            {banks?.map((bank) => (
-                              <option key={bank.Bank_Account_Id} value={`bank_${bank.Bank_Account_Id}`}>
-                                {bank.Account_Display_Name}
-                              </option>
-                            ))}
-                          </select>
+                          />
 
                           {errors?.splits?.[0]?.Payment_Type && (
                             <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
@@ -2769,19 +3299,26 @@ export default function PurchaseEdit() {
                         {splitFields.map((field, index) => {
                           const rowType = watch(`splits.${index}.Payment_Type`);
                           const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          const rowOptions = getAvailableOptions(index);
+                          //const rowOptions = getAvailableOptions(index);
                           const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
                           const amountField = register(`splits.${index}.Amount`, {
                             required: "Required",
                             validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
                           });
+                          const usedValues = splitsWatch
+                            .map((s, idx) => {
+                              if (idx === index) return null; // exclude current row
+                              return s.Payment_Type === "Bank"
+                                ? `bank_${s.Bank_Account_Id}`
+                                : s.Payment_Type || null;
+                            }).filter(Boolean);
 
                           return (
                             <div key={field.id} className="flex flex-col gap-2">
                               <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
                                 <div className="flex flex-col flex-1">
                                   <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  <select
+                                  {/* <select
                                     value={currentIdentifier || ""}
                                     onChange={(e) => {
                                       const val = e.target.value;
@@ -2801,7 +3338,22 @@ export default function PurchaseEdit() {
                                         {opt.label}
                                       </option>
                                     ))}
-                                  </select>
+                                  </select> */}
+                                  <PaymentTypeSelect
+                                    value={currentIdentifier || ""}
+                                    banks={banks}
+                                    onAddBank={() => setShowBankModal(true)}
+                                    usedValues={usedValues}
+                                    onChange={(val) => {
+                                      if (val.startsWith("bank_")) {
+                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                      } else {
+                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                      }
+                                    }}
+                                  />
                                 </div>
 
                                 <div className="flex flex-col flex-1">
@@ -2873,7 +3425,7 @@ export default function PurchaseEdit() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -2933,6 +3485,46 @@ export default function PurchaseEdit() {
                           setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
                         }}
                       //disabled={!watch("roundOffCheck") && originalTotal === null}
+                      />
+                    </div> */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={isRoundOff}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setIsRoundOff(isChecked);
+
+                          const rawTotal = getRawTotal();
+
+                          if (isChecked) {
+                            const rounded = Math.round(rawTotal);
+                            const diff = Number((rounded - rawTotal).toFixed(2));
+                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(diff);
+                          } else {
+                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(0);
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                      <input
+                        type="text"
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="border border-gray-300 text-right text-sm"
+                        {...register("Round_Off")}
+                        disabled={!isRoundOff}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                          const numVal = parseFloat(val) || 0;
+                          applyRoundOff(numVal);
+                        }}
                       />
                     </div>
 
@@ -3126,7 +3718,14 @@ export default function PurchaseEdit() {
 
 
       </div >
+      {showScanCodeModal && (
+        <ScanCodeModal
+          onClose={() => setShowScanCodeModal(false)}
+          onSave={handleScanSave}
+          items={items?.items || []}
 
+        />
+      )}
       {showAddUnitModal && (
         <AddUnitModal
           onClose={() => {
@@ -3154,41 +3753,54 @@ export default function PurchaseEdit() {
         />
       )
       }
-      {
-        showItemAddModal && (
-          <AddItemModal
-            onClose={() => {
+      {showBankModal && (
+        <BankAccountModal
+          mode="add"
+          onClose={() => {
+            setShowBankModal(false);
+            dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+          }}
+          onSave={() => {
+            refetchBanks();   // 🔹 refetch so new bank appears in dropdown
+            setShowBankModal(false);
+
+          }}
+        />
+      )}
+      {showItemAddModal && (
+        <AddItemModal
+          onClose={() => {
+            setShowItemAddModal(false);
+
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
+          }}
+          onSave={async (savedItem) => {
+            if (!savedItem || typeof savedItem !== "object") {
               setShowItemAddModal(false);
+              return;
+            }
 
-              if (activeItemRow !== null) {
-                handleRowChange(activeItemRow, "itemOpen", true);
-              }
-            }}
-            onSave={async (savedItem) => {
-              if (!savedItem || typeof savedItem !== "object") {
-                setShowItemAddModal(false);
-                return;
-              }
+            await refetchItems();
 
-              await refetchItems();
+            // setNewlyAddedItem(savedItem);
 
-              // setNewlyAddedItem(savedItem);
+            // setTimeout(() => {
+            //   setNewlyAddedItem(null);
+            // }, 8000);
 
-              // setTimeout(() => {
-              //   setNewlyAddedItem(null);
-              // }, 8000);
+            setShowItemAddModal(false);
 
-              setShowItemAddModal(false);
+            // Reopen the SAME row's dropdown
+            if (activeItemRow !== null) {
+              handleRowChange(activeItemRow, "itemOpen", true);
+            }
 
-              // Reopen the SAME row's dropdown
-              if (activeItemRow !== null) {
-                handleRowChange(activeItemRow, "itemOpen", true);
-              }
-
-              setActiveItemRow(null);
-            }}
-          />
-        )
+            setActiveItemRow(null);
+          }}
+        />
+      )
       }
       <style>
         {`

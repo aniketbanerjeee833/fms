@@ -30,10 +30,6 @@ const cleanDiscount = (value) => {
   }
   return Number(value);
 }
-// const normalizeNumber = (val) =>
-//   val !== undefined && val !== null && String(val).trim() !== ""
-//     ? Number(val)
-//     : null;
 
 
 const normalizeNumber = (val) => {
@@ -667,6 +663,7 @@ const addPurchase = async (req, res, next) => {
         Item_Category,
         Item_Name,
         Item_HSN,
+        MRP,
         Quantity,
         Item_Unit,
 
@@ -693,51 +690,7 @@ const addPurchase = async (req, res, next) => {
       let snapshot = { Primary_Unit_Snapshot: null, Secondary_Unit_Snapshot: null };
       let resolvedSelectedUnit = null;
 
-      // if (itemRows.length === 0) {
-      //   // ── NEW ITEM — legacy/no-unit, never invent a primary/secondary here ──
-      //   const [itemResult] = await connection.execute(
-      //     `INSERT INTO add_item
-      //      (Item_Name, Item_HSN, Item_Unit, Item_Category, Stock_Quantity, created_at, updated_at)
-      //      VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-      //     [
-      //       Item_Name,
-      //       cleanValue(Item_HSN),
-      //       Item_Unit || "",
-      //       Item_Category || "",
-      //       normalizeNumber(Quantity) ?? 0,
-      //     ]
-      //   );
-      //   const itemIdNum = itemResult.insertId;
-      //   Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
-      //   await connection.execute(`UPDATE add_item SET Item_Id = ? WHERE id = ?`, [Item_Id, itemIdNum]);
-
-      //   stockDelta = normalizeNumber(Quantity) ?? 0;
-      //   // snapshot stays null — legacy item, no unit config
-      // } else {
-      //   // ── EXISTING ITEM — resolve unit + stock delta ──
-      //   Item_Id = itemRows[0].Item_Id;
-      //   const dbItemRow = itemRows[0];
-
-      //   try {
-      //     const result = resolveUnitAndStockDelta({ dbItemRow, Selected_Unit, Quantity });
-      //     stockDelta = result.stockDelta;
-      //     snapshot = result.snapshot;
-      //     resolvedSelectedUnit = result.resolvedSelectedUnit;
-      //   } catch (unitErr) {
-      //     await connection.rollback();
-      //     return res.status(400).json({ success: false, message: unitErr.message });
-      //   }
-
-      //   await connection.execute(
-      //     `UPDATE add_item
-      //      SET Stock_Quantity = Stock_Quantity + ?,
-      //          Item_HSN = ?,
-      //          Item_Category = ?,
-      //          updated_at = NOW()
-      //      WHERE Item_Id = ?`,
-      //     [stockDelta, cleanValue(Item_HSN) || dbItemRow.Item_HSN, Item_Category || "", Item_Id]
-      //   );
-      // }
+     
       if (itemRows.length === 0) {
         // =========================================================
         // NEW ITEM CREATED DIRECTLY FROM PURCHASE
@@ -778,7 +731,7 @@ const addPurchase = async (req, res, next) => {
   Primary_Unit,
   Secondary_Unit,
   Conversion_Rate,
-
+MRP,
   Purchase_Price,
 
   Stock_Quantity,
@@ -791,7 +744,7 @@ VALUES
   ?, ?, ?, ?,
   ?, ?, ?,
   ?,
-  ?,
+  ?,?,
   NOW(), NOW()
 )
     `,
@@ -808,7 +761,7 @@ VALUES
   primaryUnit,
   null,
   null,
-
+normalizeNumber(MRP)|| null,
   // ✅ Latest purchase price
   normalizeNumber(Purchase_Price) ?? null,
 
@@ -948,6 +901,7 @@ try {
     Stock_Quantity = Stock_Quantity + ?,
     Item_HSN = ?,
     Item_Category = ?,
+     MRP = ?,
     Purchase_Price = ?,
     updated_at = NOW()
   WHERE Item_Id = ?
@@ -958,7 +912,7 @@ try {
     cleanValue(Item_HSN) || dbItemRow.Item_HSN,
 
     Item_Category || "",
-
+    normalizeNumber(MRP) || null,
     // ✅ Always keep latest purchase price
     normalizeNumber(Purchase_Price) ?? null,
 
@@ -970,16 +924,17 @@ try {
 
       const [pitResult] = await connection.execute(
         `INSERT INTO add_purchase_items
-         (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+         (Purchase_Id, Item_Id, Quantity, MRP, Purchase_Price,
           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
           Tax_Type, Tax_Amount, Amount,
           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
           created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           newPurchaseId,
           Item_Id,
           normalizeNumber(Quantity) ?? 0,
+          normalizeNumber(MRP) || null,
           normalizeNumber(Purchase_Price) ?? 0,
           cleanDiscount(Discount_On_Purchase_Price),
           cleanValue(Discount_Type_On_Purchase_Price),
@@ -1588,6 +1543,7 @@ for (const item of items) {
     Item_Name,
     Item_Category,
     Item_HSN,
+    MRP,
 
     // Unit selected on THIS purchase row
     Item_Unit,
@@ -1759,6 +1715,7 @@ for (const item of items) {
     Item_Name,
     Item_Category,
     Item_HSN,
+    MRP,
 
     Item_Unit,
 
@@ -1779,7 +1736,7 @@ for (const item of items) {
     ?,
     ?, ?, ?,
 
-    ?,
+    ?,?,
 
     ?,
 
@@ -1792,7 +1749,7 @@ for (const item of items) {
     Item_Name,
     Item_Category || "",
     cleanValue(Item_HSN),
-
+    normalizeNumber(MRP) || null,
     Item_Unit || "",
 
     primaryUnit,
@@ -2160,6 +2117,8 @@ for (const item of items) {
 
 updates.push("Purchase_Price = ?");
 params.push(normalizeNumber(Purchase_Price) ?? null);
+updates.push("MRP = ?");
+params.push(normalizeNumber(MRP) || null);
     if (updates.length > 0) {
       params.push(Item_Id);
 
@@ -2430,16 +2389,17 @@ for (const itemId of allItemIds) {
     for (const line of resolvedLines) {
       const [insertRes] = await connection.execute(
         `INSERT INTO add_purchase_items
-         (Purchase_Id, Item_Id, Quantity, Purchase_Price,
+         (Purchase_Id, Item_Id, Quantity,MRP, Purchase_Price,
           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
           Tax_Type, Tax_Amount, Amount,
           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
           created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           purchaseId,
           line.Item_Id,
           normalizeNumber(line.Quantity) ?? 0,
+          normalizeNumber(line.MRP) || null,
           normalizeNumber(line.Purchase_Price) ?? 0,
           cleanDiscount(line.Discount_On_Purchase_Price),
           cleanValue(line.Discount_Type_On_Purchase_Price),
@@ -2968,7 +2928,7 @@ const [items] = await connection.query(
     -- CURRENT MASTER UNITS
     cpu.Unit_Shorthand AS Current_Primary_Unit,
     csu.Unit_Shorthand AS Current_Secondary_Unit,
-
+    pi.MRP,
     pi.Purchase_Price,
     pi.Discount_On_Purchase_Price,
     pi.Discount_Type_On_Purchase_Price,
@@ -3277,8 +3237,7 @@ availableUnits = unitCodes.map((unitCode) => {
 
         Item_Category:it.Item_Category,
 
-        Quantity:
-          it.Quantity,
+        Quantity:it.Quantity,
 
         // =====================================================
         // UNIT DATA
@@ -3286,8 +3245,7 @@ availableUnits = unitCodes.map((unitCode) => {
 
         Primary_Unit:it.Primary_Unit_Snapshot,
 
-        Secondary_Unit:
-          it.Secondary_Unit_Snapshot,
+        Secondary_Unit:it.Secondary_Unit_Snapshot,
 
         // ONE unit selected by user for this bill row
         Selected_Unit:it.Selected_Unit,
@@ -3295,15 +3253,13 @@ availableUnits = unitCodes.map((unitCode) => {
     ? Number(it.Conversion_Rate)
     : 0,
         // Units frontend should show in edit dropdown
-        Available_Units:
-          availableUnits,
+        Available_Units:availableUnits,
 
         // =====================================================
         // PRICE / TAX
         // =====================================================
-
-        Purchase_Price:
-          it.Purchase_Price,
+        MRP:it.MRP,
+        Purchase_Price:it.Purchase_Price,
 
         Discount_On_Purchase_Price:
           it.Discount_On_Purchase_Price,

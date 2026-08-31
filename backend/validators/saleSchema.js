@@ -14,33 +14,33 @@ const digitsOnly = (fieldName, required = true) =>
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
 // ✅ Schema
- const paymentSplitSchema = z
-      .object({
-        Payment_Type: z
-          .enum(["Cash", "Cheque", "Neft", "Bank"])
-          .or(z.literal("")) // allow blank select
-          .refine((val) => val !== "", {
-            message: "Please select a payment type.",
-          }),
-    
-        // Required only when Payment_Type === "Bank"
-        Bank_Account_Id: z
-          .union([z.number(), z.string(), z.null(), z.undefined()])
-          .optional(),
-    
-        Reference_Number: z
-          .string()
-          .trim()
-          .nullable()
-          .optional()
-          .transform((val) => val ?? ""),
-    
-        Amount: digitsOnly("Amount", true),
-      })
-      .refine((data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id, {
-        message: "Please select a bank account.",
-        path: ["Bank_Account_Id"],
-      });
+const paymentSplitSchema = z
+  .object({
+    Payment_Type: z
+      .enum(["Cash", "Cheque", "Neft", "Bank"])
+      .or(z.literal("")) // allow blank select
+      .refine((val) => val !== "", {
+        message: "Please select a payment type.",
+      }),
+
+    // Required only when Payment_Type === "Bank"
+    Bank_Account_Id: z
+      .union([z.number(), z.string(), z.null(), z.undefined()])
+      .optional(),
+
+    Reference_Number: z
+      .string()
+      .trim()
+      .nullable()
+      .optional()
+      .transform((val) => val ?? ""),
+
+    Amount: digitsOnly("Amount", true),
+  })
+  .refine((data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id, {
+    message: "Please select a bank account.",
+    path: ["Bank_Account_Id"],
+  });
 // const priceStringDigits = z
 //   .union([z.string(), z.number()])
 //   .transform((val) => String(val ?? "").trim())   // normalize everything to string
@@ -49,47 +49,47 @@ const digitsOnly = (fieldName, required = true) =>
 //   })
 //   .transform((s) => Number(s))
 //   .refine((num) => !isNaN(num) && num > 0, { message: "must be > 0" });
- const saleSchema = z.object({
-   Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
-    Party_Name: z
+const saleSchema = z.object({
+  Sale_Mode: z.enum(["Credit", "Cash"]).default("Credit"),
+  Party_Name: z
     .string()
     .trim()
     .optional()
     .or(z.literal("")),
   // Party_Name: z.string().min(1, "Party_Name is required"),
- Phone_Number: z
-  .string()
-  .trim()
-  .refine(
-    (value) => value === "" || /^\d{10}$/.test(value),
-    {
-      message: "Phone number must be exactly 10 digits",
-    }
-  )
-  .optional(),
+  Phone_Number: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || /^\d{10}$/.test(value),
+      {
+        message: "Phone number must be exactly 10 digits",
+      }
+    )
+    .optional(),
 
-   Billing_Name: z
+  Billing_Name: z
     .string()
     .trim()
     .optional()
     .or(z.literal("")),
   Billing_Address: z
-  .string()
-  .trim()
-  .optional()
-  .or(z.literal("")),
-    GSTIN: z.preprocess(
-     (val) => (val === null || val === undefined ? "" : String(val)),
-     z.string().refine((val) => val === "" || val.length === 15, {
-       message: "GSTIN must be exactly 15 characters or left empty",
-     })
-   ),
-    // GSTIN: z
-    //   .string({
-    //     required_error: "GSTIN is required",
-    //     invalid_type_error: "GSTIN must be a string",
-    //   })
-    //   .length(15, "GSTIN must be exactly 15 characters").optional(),
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  GSTIN: z.preprocess(
+    (val) => (val === null || val === undefined ? "" : String(val)),
+    z.string().refine((val) => val === "" || val.length === 15, {
+      message: "GSTIN must be exactly 15 characters or left empty",
+    })
+  ),
+  // GSTIN: z
+  //   .string({
+  //     required_error: "GSTIN is required",
+  //     invalid_type_error: "GSTIN must be a string",
+  //   })
+  //   .length(15, "GSTIN must be exactly 15 characters").optional(),
   Invoice_Number: z.string().optional().default(""),
 
   Invoice_Date: z
@@ -115,39 +115,39 @@ const digitsOnly = (fieldName, required = true) =>
   // 🔹 Optional but digits if provided
   Total_Received: z.string().optional().or(digitsOnly("Total_Received", false)),
 
- 
-splits: z
-  .array(paymentSplitSchema)
-  .optional()
-  .default([])
-  .superRefine((splits, ctx) => {
-    let cashSeen = false;
-    const seenBankAccounts = new Set();
 
-    splits.forEach((split, index) => {
-      if (split.Payment_Type === "Cash") {
-        if (cashSeen) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Only one Cash split is allowed.",
-            path: [index, "Payment_Type"],
-          });
-        }
-        cashSeen = true;
-      }
+  splits: z
+    .array(paymentSplitSchema)
+    .optional()
+    .default([])
+    .superRefine((splits, ctx) => {
+      let cashSeen = false;
+      const seenBankAccounts = new Set();
 
-      if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
-        if (seenBankAccounts.has(split.Bank_Account_Id)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Each bank account can only be used once.",
-            path: [index, "Bank_Account_Id"],
-          });
+      splits.forEach((split, index) => {
+        if (split.Payment_Type === "Cash") {
+          if (cashSeen) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Only one Cash split is allowed.",
+              path: [index, "Payment_Type"],
+            });
+          }
+          cashSeen = true;
         }
-        seenBankAccounts.add(split.Bank_Account_Id);
-      }
-    });
-  }),
+
+        if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
+          if (seenBankAccounts.has(split.Bank_Account_Id)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Each bank account can only be used once.",
+              path: [index, "Bank_Account_Id"],
+            });
+          }
+          seenBankAccounts.add(split.Bank_Account_Id);
+        }
+      });
+    }),
 
   // 🔹 items — allowed to be empty array entirely (blank rows never submitted as "items")
   items: z
@@ -162,6 +162,39 @@ splits: z
           .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
             message: "HSN Code must be 4-8 digits if provided",
           }),
+        MRP: z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .optional()
+  .transform((val) => String(val ?? "").trim())
+  .refine(
+    (s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s),
+    {
+      message: "MRP must be a valid number with up to 2 decimals",
+    }
+  )
+  .transform((s) => (s === "" ? "" : Number(s)))
+  .refine(
+    (val) => val === "" || val >= 0,
+    {
+      message: "MRP cannot be negative",
+    }
+  ),
+        Discount_On_MRP_For_Sale_Percentage: z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .optional()
+  .transform((val) => {
+    if (
+      val === "" ||
+      val === undefined ||
+      val === null
+    ) {
+      return "";
+    }
+
+    const n = Number(val);
+
+    return n === 0 ? "" : n;
+  }),
 
         Quantity: z.preprocess(
           (val) => {
@@ -193,48 +226,48 @@ splits: z
     .optional()
     .default([]), // 🔹 array itself optional — no .nonempty() anymore
 
-     Terms_Conditions_Id: z
-      .union([z.string(), z.number(), z.null(), z.undefined()])
-      .optional()
-      .transform((val) => {
-        if (val === "" || val === null || val === undefined) {
-          return null;
-        }
-    
-        const id = Number(val);
-        return Number.isInteger(id) ? id : null;
-      }),
-      Terms_Conditions_Description: z
-  .string()
-  .trim()
-  .nullable()
-  .optional(),
+  Terms_Conditions_Id: z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .optional()
+    .transform((val) => {
+      if (val === "" || val === null || val === undefined) {
+        return null;
+      }
+
+      const id = Number(val);
+      return Number.isInteger(id) ? id : null;
+    }),
+  Terms_Conditions_Description: z
+    .string()
+    .trim()
+    .nullable()
+    .optional(),
 })
-.superRefine((data, ctx) => {
-  // =====================================================
-  // CREDIT SALE → PARTY IS MANDATORY
-  // =====================================================
+  .superRefine((data, ctx) => {
+    // =====================================================
+    // CREDIT SALE → PARTY IS MANDATORY
+    // =====================================================
 
-  if (
-    data.Sale_Mode === "Credit" &&
-    !data.Party_Name?.trim()
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["Party_Name"],
-      message: "Party name is required for credit sale",
-    });
-  }
+    if (
+      data.Sale_Mode === "Credit" &&
+      !data.Party_Name?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["Party_Name"],
+        message: "Party name is required for credit sale",
+      });
+    }
 
-  // =====================================================
-  // CASH SALE → PARTY CAN BE BLANK
-  // =====================================================
-  //
-  // No validation needed.
-  //
-  // Cash + blank party
-  // → backend will use "Cash Sale" party
-});
+    // =====================================================
+    // CASH SALE → PARTY CAN BE BLANK
+    // =====================================================
+    //
+    // No validation needed.
+    //
+    // Cash + blank party
+    // → backend will use "Cash Sale" party
+  });
 // .refine(
 //     (data) => data.Payment_Type !== "Bank" || !!data.Bank_Account_Id,
 //     {

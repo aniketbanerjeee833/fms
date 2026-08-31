@@ -1,0 +1,278 @@
+
+import db from "../config/db.js";
+const addFinancialYear = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { financialYear, startDate, endDate } = req.body;
+
+   
+    if (!financialYear || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Financial year, start date and end date are required",
+      });
+    }
+
+  
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Start Date and End Date must be valid dates",
+      });
+    }
+
+ 
+    if (start > end) {
+      return res.status(400).json({
+        success: false,
+        message: "Start date cannot be greater than end date",
+      });
+    }
+
+    const[existingFinancialYear]=await connection.query("SELECT * FROM financial_year WHERE financial_year=?",[financialYear]);
+    if (existingFinancialYear.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Financial year already exists, please add a different one",
+      });
+    }
+    // --------------------------------
+    // 🟢 4. Insert into database
+    // --------------------------------
+    const [rows] = await connection.query(
+      `
+        INSERT INTO financial_year 
+        (financial_year, Start_Date, End_Date, Current_Financial_Year, created_at, updated_at)
+        VALUES (?, ?, ?, 0, NOW(), NOW())
+      `,
+      [financialYear, startDate, endDate]
+    );
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Financial year added successfully",
+      insertedId: rows.insertId,
+    });
+
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("❌ Error adding financial year:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+
+const getAllFinancialYears = async (req, res, next) => {
+  let connection;
+  try {
+    connection = await db.getConnection();
+    // const [rows] = await connection.query("SELECT * FROM financial_year");
+    const [rows] = await connection.query(`
+  SELECT 
+    id,
+    Financial_Year,
+    DATE_FORMAT(Start_Date, '%Y-%m-%d') AS Start_Date,
+    DATE_FORMAT(End_Date, '%Y-%m-%d') AS End_Date,
+    Current_Financial_Year,
+    created_at,
+    updated_at
+  FROM financial_year
+`);
+    return res.status(200).json(rows);
+  } catch (err) {
+    if (connection) connection.release();
+    console.error("❌ Error getting all financial years:", err);
+    next(err);
+  }finally {
+    if (connection) connection.release();
+  }
+}
+const updateCurrentFinancialYear = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const { financialYearId } = req.body;
+
+    if (!financialYearId) {
+      return res.status(400).json({
+        success: false,
+        message: "Financial Year ID is required",
+      });
+    }
+
+    // Step 1: Set all to 0
+    await connection.query(`
+      UPDATE financial_year SET Current_Financial_Year = 0
+    `);
+
+    // Step 2: Set selected one to 1
+    const [result] = await connection.query(
+      `
+      UPDATE financial_year 
+      SET Current_Financial_Year = 1
+      WHERE id = ?
+      `,
+      [financialYearId]
+    );
+
+    await connection.commit();
+    return res.status(200).json({
+      success: true,
+      message: "Current Financial Year updated successfully",
+    });
+
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error(err);
+    return next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+// settingsController.js
+
+
+// =========================================================
+// GET ALL SETTINGS (active only, ordered)
+// =========================================================
+const getAllSettings = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        id,
+        setting_key,
+        setting_value,
+        setting_label,
+        description,
+        sort_order
+      FROM app_settings
+      WHERE is_active = 1
+      ORDER BY sort_order ASC
+      `
+    );
+
+    return res.status(200).json({
+      success: true,
+      settings: rows,
+    });
+  } catch (err) {
+    console.error("❌ Error fetching settings:", err);
+    next(err);
+  }
+};
+
+// =========================================================
+// UPDATE A SINGLE SETTING (toggle on/off)
+// =========================================================
+const updateSetting = async (req, res, next) => {
+  let connection;
+
+  try {
+    const { setting_key } = req.params;
+    const { setting_value } = req.body; // expects 0 or 1
+
+    if (![0, 1].includes(Number(setting_value))) {
+      return res.status(400).json({
+        success: false,
+        message: "setting_value must be 0 or 1",
+      });
+    }
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // fetch current setting + related MRP setting for the linked-rule check
+    const [[targetSetting]] = await connection.query(
+      `SELECT setting_key, setting_value FROM app_settings WHERE setting_key = ? LIMIT 1`,
+      [setting_key]
+    );
+
+    if (!targetSetting) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Setting not found",
+      });
+    }
+
+    // =====================================================
+    // LINKED RULE:
+    // show_mrp OFF  → calculate_sale_price_from_mrp_disc OFF too
+    // calculate_sale_price_from_mrp_disc ON requires show_mrp already ON
+    // =====================================================
+
+    if (setting_key === "show_mrp" && Number(setting_value) === 0) {
+      // turning MRP off — cascade off the dependent setting too
+      await connection.execute(
+        `UPDATE app_settings SET setting_value = 0 WHERE setting_key = 'calculate_sale_price_from_mrp_disc'`
+      );
+    }
+
+    if (
+      setting_key === "calculate_sale_price_from_mrp_disc" &&
+      Number(setting_value) === 1
+    ) {
+      const [[mrpSetting]] = await connection.query(
+        `SELECT setting_value FROM app_settings WHERE setting_key = 'show_mrp' LIMIT 1`
+      );
+
+      if (!mrpSetting || Number(mrpSetting.setting_value) === 0) {
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Enable MRP before turning on this setting.",
+        });
+      }
+    }
+
+    // update the target setting itself
+    await connection.execute(
+      `UPDATE app_settings SET setting_value = ? WHERE setting_key = ?`,
+      [Number(setting_value), setting_key]
+    );
+
+    await connection.commit();
+
+    // return the fresh full list so the frontend can sync all toggles at once
+    const [rows] = await db.query(
+      `
+      SELECT id, setting_key, setting_value, setting_label, description, sort_order
+      FROM app_settings
+      WHERE is_active = 1
+      ORDER BY sort_order ASC
+      `
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Setting updated successfully",
+      settings: rows,
+    });
+  } catch (err) {
+    if (connection) await connection.rollback();
+    console.error("❌ Error updating setting:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+
+
+export {addFinancialYear,getAllFinancialYears,updateCurrentFinancialYear,updateSetting,getAllSettings};

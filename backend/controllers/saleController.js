@@ -732,6 +732,9 @@ const addSale = async (req, res, next) => {
         Item_Category,
         Quantity,
         Item_Unit,
+        MRP,
+        Discount_On_MRP_For_Sale_Percentage,
+        
         Sale_Price,
         Discount_On_Sale_Price,
         Discount_Type_On_Sale_Price,
@@ -927,16 +930,18 @@ const addSale = async (req, res, next) => {
 
       const [saleItemResult] = await connection.execute(
         `INSERT INTO add_sale_items
-     (Sale_Id, Item_Id, Quantity, Sale_Price,
+     (Sale_Id, Item_Id, Quantity, MRP,Discount_On_MRP_For_Sale_Percentage ,Sale_Price,
       Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
       Tax_Type, Tax_Amount, Amount,
       Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
       created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+     VALUES (?, ?, ?, ?, ?, ?, ?,?,?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           newSaleId,
           Item_Id,
           normalizeNumber(Quantity) ?? 0,
+          normalizeNumber(MRP) || null,
+           normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
           normalizeNumber(Sale_Price) ?? 0,
           cleanDiscount(Discount_On_Sale_Price),
           cleanValue(Discount_Type_On_Sale_Price),
@@ -1581,7 +1586,7 @@ const getSingleSale = async (req, res, next) => {
   try {
     connection = await db.getConnection();
     const { Sale_Id: saleId } = req.params;
-    console.log("🔍 Params =>", { saleId });
+    //console.log("🔍 Params =>", { saleId });
 
     if (!saleId) {
       return res.status(400).json({ success: false, message: "Sale ID is required." });
@@ -1743,7 +1748,8 @@ const getSingleSale = async (req, res, next) => {
     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
     pu3.Unit_Shorthand AS Selected_Unit,
-
+      si.MRP,
+      si.Discount_On_MRP_For_Sale_Percentage,
     si.Sale_Price,
     si.Discount_On_Sale_Price,
     si.Discount_Type_On_Sale_Price,
@@ -1952,6 +1958,8 @@ const getSingleSale = async (req, res, next) => {
         // ================================================
         // PRICE / TAX
         // ================================================
+        MRP:it.MRP,
+        Discount_On_MRP_For_Sale_Percentage:it.Discount_On_MRP_For_Sale_Percentage,
 
         Sale_Price:
           it.Sale_Price,
@@ -1987,10 +1995,10 @@ const getSingleSale = async (req, res, next) => {
        ORDER BY ps.id ASC`,
       [saleHeader.id]   // numeric id — add to SELECT if not already there
     );
-    console.log("🔍 SALE SPLIT DEBUG");
-    console.log("saleId param:", saleId);
-    console.log("saleHeader.id:", saleHeader.id);
-    console.log("splits:", splits);
+    // console.log("🔍 SALE SPLIT DEBUG");
+    // console.log("saleId param:", saleId);
+    // console.log("saleHeader.id:", saleHeader.id);
+    // console.log("splits:", splits);
     // build a display summary for the header (e.g. "Cash + HDFC")
     const splitLabels = splits.map((s) =>
       s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
@@ -4190,6 +4198,8 @@ const editSale = async (req, res, next) => {
           Primary_Unit_Snapshot,
           Secondary_Unit_Snapshot,
           Selected_Unit,
+          MRP,
+          Discount_On_MRP_For_Sale_Percentage,
 
           Sale_Price,
 
@@ -4209,7 +4219,7 @@ const editSale = async (req, res, next) => {
           ?, ?, ?,
           ?,
           ?, ?,
-          ?, ?, ?,
+          ?, ?, ?,?,?,
           NOW(), NOW()
         )
       `,
@@ -4226,6 +4236,11 @@ const editSale = async (req, res, next) => {
             // line.Primary_Unit_Snapshot,
             // line.Secondary_Unit_Snapshot,
             // line.Selected_Unit,
+            normalizeNumber(
+              line.MRP
+            ),
+            normalizeNumber(
+              line.Discount_On_MRP_For_Sale_Percentage),
 
             normalizeNumber(
               line.Sale_Price
