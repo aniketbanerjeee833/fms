@@ -483,7 +483,7 @@ export default function PurchaseAdd() {
     }
 
   })
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -1286,202 +1286,197 @@ export default function PurchaseAdd() {
     // UPDATE REACT HOOK FORM
     // =====================================================
 
-    setValue(
-      "items",
-      calculatedItems,
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "items",
+    //   calculatedItems,
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
+    replace(calculatedItems);
 
     // =====================================================
     // CREATE UI ROWS
     // =====================================================
 
-    const scannedUiRows = scannedItems.map(
-      (item) => ({
-        itemSearch:
-          item.Item_Name || "",
+    // const scannedUiRows = scannedItems.map(
+    //   (item) => ({
+    //     itemSearch:
+    //       item.Item_Name || "",
 
-        itemOpen: false,
+    //     itemOpen: false,
 
-        isExistingItem: true,
-        isHSNLocked: false,
-        isUnitLocked: false,
+    //     isExistingItem: true,
+    //     isHSNLocked: false,
+    //     isUnitLocked: false,
 
-        CategoryOpen: false,
-        categorySearch:
-          item.Item_Category || "",
+    //     CategoryOpen: false,
+    //     categorySearch:
+    //       item.Item_Category || "",
 
-        unitOpen: false,
-        unitSearch: "",
+    //     unitOpen: false,
+    //     unitSearch: "",
 
-        Item_Id:
-          item.Item_Id || "",
+    //     Item_Id:
+    //       item.Item_Id || "",
 
-        Item_Name:
-          item.Item_Name || "",
+    //     Item_Name:
+    //       item.Item_Name || "",
 
-        Item_Category:
-          item.Item_Category || "",
+    //     Item_Category:
+    //       item.Item_Category || "",
 
-        Item_HSN: item.Item_HSN || "",
+    //     Item_HSN: item.Item_HSN || "",
 
-        MRP: Number(item.MRP) > 0
-          ? Number(item.MRP)
-          : "",
+    //     MRP: Number(item.MRP) > 0
+    //       ? Number(item.MRP)
+    //       : "",
 
-        Primary_Unit:
-          item.Primary_Unit || null,
+    //     Primary_Unit:
+    //       item.Primary_Unit || null,
 
-        Secondary_Unit:
-          item.Secondary_Unit || null,
+    //     Secondary_Unit:
+    //       item.Secondary_Unit || null,
 
-        Conversion_Rate:
-          item.Conversion_Rate || null,
+    //     Conversion_Rate:
+    //       item.Conversion_Rate || null,
 
-        Available_Units:
-          Array.isArray(item.Available_Units)
-            ? item.Available_Units
-            : [],
+    //     Available_Units:
+    //       Array.isArray(item.Available_Units)
+    //         ? item.Available_Units
+    //         : [],
 
-        // ✅ PURCHASE PRICE
-        Purchase_Price:
-          Number(item.Purchase_Price) || 0,
+    //     // ✅ PURCHASE PRICE
+    //     Purchase_Price:
+    //       Number(item.Purchase_Price) || 0,
 
-        // ✅ PURCHASE DISCOUNT
-        Discount_On_Purchase_Price:
-          item.Discount_On_Purchase_Price ?? "",
+    //     // ✅ PURCHASE DISCOUNT
+    //     Discount_On_Purchase_Price:
+    //       item.Discount_On_Purchase_Price ?? "",
 
-        Discount_Type_On_Purchase_Price:
-          item.Discount_Type_On_Purchase_Price ||
-          "Percentage",
+    //     Discount_Type_On_Purchase_Price:
+    //       item.Discount_Type_On_Purchase_Price ||
+    //       "Percentage",
 
-        Tax_Type:
-          item.Tax_Type || "None",
-      })
-    );
+    //     Tax_Type:
+    //       item.Tax_Type || "None",
+    //   })
+    // );
 
     // =====================================================
     // UPDATE UI ROWS
     // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
     // =====================================================
 
-    setRows((prev) => {
-      const updatedRows = [...prev];
+    // setRows((prev) => {
+    //   const updatedRows = [...prev];
 
-      let uiScanIndex = 0;
+    //   let uiScanIndex = 0;
 
-      // ---------------------------------------------------
-      // Fill existing blank rows
-      // ---------------------------------------------------
+    //   // ---------------------------------------------------
+    //   // Fill existing blank rows
+    //   // ---------------------------------------------------
 
-      for (
-        let i = 0;
-        i < updatedRows.length &&
-        uiScanIndex < scannedUiRows.length;
-        i++
-      ) {
-        const row = updatedRows[i];
+    //   for (
+    //     let i = 0;
+    //     i < updatedRows.length &&
+    //     uiScanIndex < scannedUiRows.length;
+    //     i++
+    //   ) {
+    //     const row = updatedRows[i];
 
-        const isBlankRow =
-          !row?.Item_Name ||
-          !row.Item_Name.trim();
+    //     const isBlankRow =
+    //       !row?.Item_Name ||
+    //       !row.Item_Name.trim();
 
-        if (isBlankRow) {
-          updatedRows[i] =
-            scannedUiRows[uiScanIndex];
+    //     if (isBlankRow) {
+    //       updatedRows[i] =
+    //         scannedUiRows[uiScanIndex];
 
-          uiScanIndex++;
-        }
-      }
+    //       uiScanIndex++;
+    //     }
+    //   }
 
-      // ---------------------------------------------------
-      // Remove remaining blank rows
-      // ---------------------------------------------------
+    //   // ---------------------------------------------------
+    //   // Remove remaining blank rows
+    //   // ---------------------------------------------------
 
-      const filledRows =
-        updatedRows.filter(
-          (row) =>
-            row?.Item_Name &&
-            row.Item_Name.trim()
-        );
+    //   const filledRows =
+    //     updatedRows.filter(
+    //       (row) =>
+    //         row?.Item_Name &&
+    //         row.Item_Name.trim()
+    //     );
 
-      // ---------------------------------------------------
-      // Append remaining scanned rows
-      // ---------------------------------------------------
+    //   // ---------------------------------------------------
+    //   // Append remaining scanned rows
+    //   // ---------------------------------------------------
 
-      if (
-        uiScanIndex <
-        scannedUiRows.length
-      ) {
-        filledRows.push(
-          ...scannedUiRows.slice(
-            uiScanIndex
-          )
-        );
-      }
+    //   if (
+    //     uiScanIndex <
+    //     scannedUiRows.length
+    //   ) {
+    //     filledRows.push(
+    //       ...scannedUiRows.slice(
+    //         uiScanIndex
+    //       )
+    //     );
+    //   }
 
-      return filledRows;
-    });
-//     setRows((prev) => {
-//   const existingRows = prev.filter(
-//     (row) =>
-//       row?.Item_Name &&
-//       row.Item_Name.trim()
-//   );
-
-//   return [
-//     ...existingRows,
-//     ...scannedUiRows,
-//   ];
-// });
-// setRows((prev) => {
-//   const updatedRows = [...prev];
-
-//   let scanIndex = 0;
-
-//   // Fill blank rows first
-//   for (
-//     let i = 0;
-//     i < updatedRows.length &&
-//     scanIndex < scannedUiRows.length;
-//     i++
-//   ) {
-//     const row = updatedRows[i];
-
-//     const isBlankRow =
-//       !row?.Item_Name ||
-//       !row.Item_Name.trim();
-
-//     if (isBlankRow) {
-//       updatedRows[i] = scannedUiRows[scanIndex];
-//       scanIndex++;
-//     }
-//   }
-
-//   // Remove unused blank rows
-//   const filledRows = updatedRows.filter(
-//     (row) =>
-//       row?.Item_Name &&
-//       row.Item_Name.trim()
-//   );
-
-//   // Append remaining scanned items
-//   if (scanIndex < scannedUiRows.length) {
-//     filledRows.push(
-//       ...scannedUiRows.slice(scanIndex)
-//     );
-//   }
-
-//   return filledRows;
-// });
+    //   return filledRows;
+    // });
 
     // =====================================================
     // CALCULATE GRAND TOTAL
     // =====================================================
+setRows(() => {
+  return combinedItems.map((item) => ({
+    itemSearch: item.Item_Name || "",
 
+    itemOpen: false,
+
+    isExistingItem: true,
+    isHSNLocked: false,
+    isUnitLocked: false,
+
+    CategoryOpen: false,
+    categorySearch: item.Item_Category || "",
+
+    unitOpen: false,
+    unitSearch: "",
+
+    Item_Id: item.Item_Id || "",
+
+    Item_Name: item.Item_Name || "",
+
+    Item_Category: item.Item_Category || "",
+
+    Item_HSN: item.Item_HSN || "",
+
+    MRP: showMRP && Number(item.MRP) > 0
+      ? Number(item.MRP)
+      : "",
+
+    Primary_Unit: item.Primary_Unit || null,
+    Secondary_Unit: item.Secondary_Unit || null,
+    Conversion_Rate: item.Conversion_Rate || null,
+
+    Available_Units: Array.isArray(item.Available_Units)
+      ? item.Available_Units
+      : [],
+
+    Purchase_Price: Number(item.Purchase_Price) || 0,
+
+    Discount_On_Purchase_Price:
+      item.Discount_On_Purchase_Price ?? "",
+
+    Discount_Type_On_Purchase_Price:
+      item.Discount_Type_On_Purchase_Price || "Percentage",
+
+    Tax_Type: item.Tax_Type || "None",
+  }));
+});
     const rawTotal =
       calculatedItems.reduce(
         (sum, item) =>

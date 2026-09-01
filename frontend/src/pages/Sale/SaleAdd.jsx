@@ -555,7 +555,7 @@ export default function SaleAdd() {
     }
 
   })
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove,replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -1010,111 +1010,8 @@ export default function SaleAdd() {
   }, [watch("Party_Name"), parties]);
 
 
-  //   const handleItemSelect = (it, i) => {
-  //     console.log("Selected Item:", it, "at row", i);
-  //     setRows((prev) => {
-  //       const updated = [...prev];
-  //       updated[i] = {
-  //         ...updated[i],
-  //         Item_Category: it.Item_Category || "",
-  //         Item_HSN: it.Item_HSN || "",
-  //         categorySearch: it.Item_Category || "",
-  //         isExistingItem: true,
-  //         isHSNLocked: false,
-  //         isUnitLocked: false,
-  //         // CURRENT MASTER CONFIG
-  //         Primary_Unit: it.Primary_Unit || null,
-  //         Secondary_Unit: it.Secondary_Unit || null,
-  //         Conversion_Rate: it.Conversion_Rate || null,
-
-  //         // CURRENT PRIMARY + SECONDARY ONLY
-  //         Available_Units: Array.isArray(it.Available_Units)
-  //           ? it.Available_Units
-  //           : [],
-  //         Discount_On_Sale_Price: it.Discount_On_Sale_Price ?? "",
-  //         Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price || "Percentage",
-  //       };
-  //       return updated;
-  //     });
-
-  //     handleRowChange(i, "itemSearch", it.Item_Name);
-  //     handleRowChange(i, "isExistingItem", true);
-  //     handleRowChange(i, "CategoryOpen", false);
-  //     handleRowChange(i, "unitOpen", false);
-
-  //     setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-  //     setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-  //     setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-  //         setValue(`items.${i}.MRP`, it.MRP || "", {
-  //   shouldValidate: true,
-  //   shouldDirty: true,
-  // });
-
-  // setValue(
-  //   `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
-  //   it.Discount_On_MRP_For_Sale || "",
-  //   {
-  //     shouldValidate: true,
-  //     shouldDirty: true,
-  //   }
-  // );
-  //     setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0.0, { shouldValidate: true, shouldDirty: true });
-  //     setValue(
-  //       `items.${i}.Discount_On_Sale_Price`,
-  //       it.Discount_On_Sale_Price ?? "",
-  //       {
-  //         shouldValidate: true,
-  //         shouldDirty: true,
-  //       }
-  //     );
-
-  //     setValue(
-  //       `items.${i}.Discount_Type_On_Sale_Price`,
-  //       it.Discount_Type_On_Sale_Price || "Percentage",
-  //       {
-  //         shouldValidate: true,
-  //         shouldDirty: true,
-  //       }
-  //     );
-  //     //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-  //     setValue(
-  //       `items.${i}.Item_Unit`,
-  //       it.Primary_Unit || "",
-  //       {
-  //         shouldValidate: true,
-  //         shouldDirty: true,
-  //       }
-  //     );
-  //     setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
-  //     baseSalePriceRef.current[i] = Number(it.Sale_Price) || 0;
-  //     baseSaleUnitRef.current[i] = it.Primary_Unit || "";
-  //     setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true, shouldDirty: true });
-  //     handleRowChange(i, "itemOpen", false);
-
-  //     const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-  //       {
-  //         ...itemsValues[i],
-  //         Item_Name: it.Item_Name,
-  //         Sale_Price: it.Sale_Price,
-  //         Quantity: itemsValues[i]?.Quantity || 0,
-  //         Discount_On_Sale_Price: it.Discount_On_Sale_Price ?? 0,
-
-  //         Discount_Type_On_Sale_Price: it.Discount_Type_On_Sale_Price || "Percentage",
-  //         //Discount_On_Sale_Price: itemsValues[i]?.Discount_On_Sale_Price || 0,
-  //         //Discount_Type_On_Sale_Price: itemsValues[i]?.Discount_Type_On_Sale_Price,
-  //         Tax_Type: itemsValues[i]?.Tax_Type,
-  //       },
-  //       i,
-  //       itemsValues
-  //     );
-
-  //     setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-  //     setValue(`items.${i}.Amount`, Amount);
-  //     syncTotalsAfterItemChange()
-  //     // setValue(`Total_Amount`, Total_Amount);
-  //     // setValue(`Balance_Due`, Balance_Due);
-  //   };
-  const handleItemSelect = (it, i) => {
+ 
+const handleItemSelect = (it, i) => {
     console.log("Selected Item:", it, "at row", i);
     masterMrpDiscountRef.current[i] =
       Number(it.Discount_On_MRP_For_Sale) > 0
@@ -1389,7 +1286,8 @@ export default function SaleAdd() {
         Item_HSN: item.Item_HSN || "",
 
         // ✅ MRP only when greater than 0
-        MRP: mrp > 0 ? mrp : "",
+        //MRP: mrp > 0 ? mrp : "",
+        MRP:showMRP && mrp > 0? mrp: "",
 
         // ✅ MRP discount from master
         Discount_On_MRP_For_Sale_Percentage:
@@ -1489,167 +1387,229 @@ export default function SaleAdd() {
     // UPDATE REACT HOOK FORM
     // =====================================================
 
-    setValue(
-      "items",
-      calculatedItems,
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "items",
+    //   calculatedItems,
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
+      replace(calculatedItems);
 
     // =====================================================
     // CREATE UI ROWS
     // =====================================================
 
-    const scannedUiRows = scannedItems.map((item) => {
-      const mrp = Number(item.MRP) || 0;
+    // const scannedUiRows = scannedItems.map((item) => {
+    //   const mrp = Number(item.MRP) || 0;
 
-      const mrpDiscount =
-        Number(item.Discount_On_MRP_For_Sale) || 0;
+    //   const mrpDiscount =
+    //     Number(item.Discount_On_MRP_For_Sale) || 0;
 
-      const calculatedSalePrice =
-        calculateSalePriceFromMRP && mrp > 0
-          ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
-          : Number(item.Sale_Price) > 0
-            ? Number(item.Sale_Price).toFixed(2)
-            : "";
+    //   const calculatedSalePrice =
+    //     calculateSalePriceFromMRP && mrp > 0
+    //       ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
+    //       : Number(item.Sale_Price) > 0
+    //         ? Number(item.Sale_Price).toFixed(2)
+    //         : "";
 
-      return {
-        itemSearch:
-          item.Item_Name || "",
+    //   return {
+    //     itemSearch:
+    //       item.Item_Name || "",
 
-        itemOpen: false,
+    //     itemOpen: false,
 
-        isExistingItem: true,
-        isHSNLocked: false,
-        isUnitLocked: false,
+    //     isExistingItem: true,
+    //     isHSNLocked: false,
+    //     isUnitLocked: false,
 
-        CategoryOpen: false,
+    //     CategoryOpen: false,
 
-        categorySearch:
-          item.Item_Category || "",
+    //     categorySearch:
+    //       item.Item_Category || "",
 
-        unitOpen: false,
-        unitSearch: "",
+    //     unitOpen: false,
+    //     unitSearch: "",
 
-        Item_Id:
-          item.Item_Id || "",
+    //     Item_Id:
+    //       item.Item_Id || "",
 
-        Item_Name:
-          item.Item_Name || "",
+    //     Item_Name:
+    //       item.Item_Name || "",
 
-        Item_Category:
-          item.Item_Category || "",
+    //     Item_Category:
+    //       item.Item_Category || "",
 
-        Item_HSN:
-          item.Item_HSN || "",
+    //     Item_HSN:
+    //       item.Item_HSN || "",
 
-        // ✅ MRP from master
-        MRP:
-          mrp > 0
-            ? mrp
-            : "",
+    //     // ✅ MRP from master
+    //     MRP:
+    //       mrp > 0
+    //         ? mrp
+    //         : "",
 
-        // ✅ MRP discount from master
-        Discount_On_MRP_For_Sale_Percentage:
-          calculateSalePriceFromMRP && mrp > 0 && mrpDiscount > 0
-            ? mrpDiscount
-            : "",
+    //     // ✅ MRP discount from master
+    //     Discount_On_MRP_For_Sale_Percentage:
+    //       calculateSalePriceFromMRP && mrp > 0 && mrpDiscount > 0
+    //         ? mrpDiscount
+    //         : "",
 
-        Primary_Unit:
-          item.Primary_Unit || null,
+    //     Primary_Unit:
+    //       item.Primary_Unit || null,
 
-        Secondary_Unit:
-          item.Secondary_Unit || null,
+    //     Secondary_Unit:
+    //       item.Secondary_Unit || null,
 
-        Conversion_Rate:
-          item.Conversion_Rate || null,
+    //     Conversion_Rate:
+    //       item.Conversion_Rate || null,
 
-        Available_Units:
-          Array.isArray(item.Available_Units)
-            ? item.Available_Units
-            : [],
+    //     Available_Units:
+    //       Array.isArray(item.Available_Units)
+    //         ? item.Available_Units
+    //         : [],
 
-        // ✅ Calculated Sale Price
-        Sale_Price:
-          calculatedSalePrice,
+    //     // ✅ Calculated Sale Price
+    //     Sale_Price:
+    //       calculatedSalePrice,
 
-        // ✅ Separate Sale Price discount
-        Discount_On_Sale_Price:
-          item.Discount_On_Sale_Price ?? "",
+    //     // ✅ Separate Sale Price discount
+    //     Discount_On_Sale_Price:
+    //       item.Discount_On_Sale_Price ?? "",
 
-        Discount_Type_On_Sale_Price:
-          item.Discount_Type_On_Sale_Price ||
-          "Percentage",
+    //     Discount_Type_On_Sale_Price:
+    //       item.Discount_Type_On_Sale_Price ||
+    //       "Percentage",
 
-        Tax_Type:
-          item.Tax_Type || "None",
-      };
-    });
+    //     Tax_Type:
+    //       item.Tax_Type || "None",
+    //   };
+    // });
 
     // =====================================================
     // UPDATE UI ROWS
     // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
     // =====================================================
 
-    setRows((prev) => {
-      const updatedRows = [...prev];
+    // setRows((prev) => {
+    //   const updatedRows = [...prev];
 
-      let uiScanIndex = 0;
+    //   let uiScanIndex = 0;
 
-      // ---------------------------------------------------
-      // Fill existing blank rows
-      // ---------------------------------------------------
+    //   // ---------------------------------------------------
+    //   // Fill existing blank rows
+    //   // ---------------------------------------------------
 
-      for (
-        let i = 0;
-        i < updatedRows.length &&
-        uiScanIndex < scannedUiRows.length;
-        i++
-      ) {
-        const row = updatedRows[i];
+    //   for (
+    //     let i = 0;
+    //     i < updatedRows.length &&
+    //     uiScanIndex < scannedUiRows.length;
+    //     i++
+    //   ) {
+    //     const row = updatedRows[i];
 
-        const isBlankRow =
-          !row?.Item_Name ||
-          !row.Item_Name.trim();
+    //     const isBlankRow =
+    //       !row?.Item_Name ||
+    //       !row.Item_Name.trim();
 
-        if (isBlankRow) {
-          updatedRows[i] =
-            scannedUiRows[uiScanIndex];
+    //     if (isBlankRow) {
+    //       updatedRows[i] =
+    //         scannedUiRows[uiScanIndex];
 
-          uiScanIndex++;
-        }
-      }
+    //       uiScanIndex++;
+    //     }
+    //   }
 
-      // ---------------------------------------------------
-      // Remove remaining blank rows
-      // ---------------------------------------------------
+    //   // ---------------------------------------------------
+    //   // Remove remaining blank rows
+    //   // ---------------------------------------------------
 
-      const filledRows =
-        updatedRows.filter(
-          (row) =>
-            row?.Item_Name &&
-            row.Item_Name.trim()
-        );
+    //   const filledRows =
+    //     updatedRows.filter(
+    //       (row) =>
+    //         row?.Item_Name &&
+    //         row.Item_Name.trim()
+    //     );
 
-      // ---------------------------------------------------
-      // Append remaining scanned rows
-      // ---------------------------------------------------
+    //   // ---------------------------------------------------
+    //   // Append remaining scanned rows
+    //   // ---------------------------------------------------
 
-      if (
-        uiScanIndex <
-        scannedUiRows.length
-      ) {
-        filledRows.push(
-          ...scannedUiRows.slice(
-            uiScanIndex
-          )
-        );
-      }
+    //   if (
+    //     uiScanIndex <
+    //     scannedUiRows.length
+    //   ) {
+    //     filledRows.push(
+    //       ...scannedUiRows.slice(
+    //         uiScanIndex
+    //       )
+    //     );
+    //   }
 
-      return filledRows;
-    });
+    //   return filledRows;
+    // });
+    // =====================================================
+// UPDATE UI ROWS
+// USE THE SAME combinedItems ORDER AS RHF
+// =====================================================
+
+setRows(
+  combinedItems.map((item) => ({
+    itemSearch: item.Item_Name || "",
+
+    itemOpen: false,
+
+    isExistingItem: true,
+    isHSNLocked: false,
+    isUnitLocked: false,
+
+    CategoryOpen: false,
+    categorySearch: item.Item_Category || "",
+
+    unitOpen: false,
+    unitSearch: "",
+
+    Item_Id: item.Item_Id || "",
+
+    Item_Name: item.Item_Name || "",
+    Item_Category: item.Item_Category || "",
+    Item_HSN: item.Item_HSN || "",
+
+    // Current MRP setting controls newly scanned items
+    MRP:
+      showMRP && Number(item.MRP) > 0
+        ? Number(item.MRP)
+        : "",
+
+    // MRP discount
+    Discount_On_MRP_For_Sale_Percentage:
+      showMRP &&
+      calculateSalePriceFromMRP &&
+      Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
+        ? item.Discount_On_MRP_For_Sale_Percentage
+        : "",
+
+    Primary_Unit: item.Primary_Unit || null,
+    Secondary_Unit: item.Secondary_Unit || null,
+    Conversion_Rate: item.Conversion_Rate || null,
+
+    Available_Units: Array.isArray(item.Available_Units)
+      ? item.Available_Units
+      : [],
+
+    Sale_Price: item.Sale_Price || "",
+
+    Discount_On_Sale_Price:
+      item.Discount_On_Sale_Price ?? "",
+
+    Discount_Type_On_Sale_Price:
+      item.Discount_Type_On_Sale_Price ||
+      "Percentage",
+
+    Tax_Type: item.Tax_Type || "None",
+  }))
+);
 
     // =====================================================
     // CALCULATE GRAND TOTAL

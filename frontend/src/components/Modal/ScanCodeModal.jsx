@@ -12,18 +12,35 @@ export default function ScanCodeModal({ onClose, onSave }) {
 
   // const [lookupItemByCode] = useLazyLookupItemByCodeQuery(); 
   const [getItemByCode] = useLazyGetItemsByCodeQuery();
-  // const handleAddCode = async () => {
-  //   const trimmed = code.trim();
 
-  //   if (!trimmed) return;
 
-  //   // Prevent scanning the exact same code twice
-  //   if (
-  //     scannedItems.some(
-  //       (it) => it.Code?.trim()?.toLowerCase() === trimmed.toLowerCase()
-  //     )
-  //   ) {
-  //     toast.info("This code has already been scanned.");
+  // const handleAddCode = async (scannedCode = code) => {
+  //   const trimmed = scannedCode.trim();
+  //   //const trimmed = code.trim();
+
+  //   // =====================================================
+  //   // IF CODE ALREADY EXISTS → INCREASE QUANTITY
+  //   // =====================================================
+
+  //   const existingItem = scannedItems.find(
+  //     (it) =>
+  //       it.Code?.trim()?.toLowerCase() ===
+  //       trimmed.toLowerCase()
+  //   );
+
+  //   if (existingItem) {
+  //     setScannedItems((prev) =>
+  //       prev.map((it) =>
+  //         it.Code?.trim()?.toLowerCase() ===
+  //           trimmed.toLowerCase()
+  //           ? {
+  //             ...it,
+  //             Quantity: Number(it.Quantity || 0) + 1,
+  //           }
+  //           : it
+  //       )
+  //     );
+
   //     setCode("");
   //     inputRef.current?.focus();
   //     return;
@@ -31,23 +48,26 @@ export default function ScanCodeModal({ onClose, onSave }) {
 
   //   setIsLooking(true);
 
+
   //   try {
   //     // =====================================================
-  //     // FIND ITEM FROM ALREADY LOADED ITEMS
+  //     // LOOK UP ITEM FROM BACKEND
   //     // =====================================================
 
-  //     const res = items.find(
-  //       (item) =>
-  //         item?.Item_Code?.trim()?.toLowerCase() ===
-  //         trimmed.toLowerCase()
-  //     );
+  //     const response =
+  //       await getItemByCode(trimmed).unwrap();
+
+  //     const res = response?.item;
 
   //     // =====================================================
   //     // ITEM NOT FOUND
   //     // =====================================================
 
   //     if (!res?.Item_Id) {
-  //       toast.error(`No item found for code "${trimmed}"`);
+  //       toast.error(
+  //         `No item found for code "${trimmed}"`
+  //       );
+
   //       setCode("");
   //       inputRef.current?.focus();
   //       return;
@@ -55,74 +75,97 @@ export default function ScanCodeModal({ onClose, onSave }) {
 
   //     // =====================================================
   //     // ITEM FOUND
-  //     // Return ALL useful item details to parent
+  //     // RETURN ALL USEFUL DETAILS TO PARENT
   //     // =====================================================
 
   //     const scannedItem = {
-  //       // Barcode
+  //       // -------------------------------------------------
+  //       // BARCODE / CODE
+  //       // -------------------------------------------------
+
   //       Code: trimmed,
 
-  //       // Basic item details
+  //       // -------------------------------------------------
+  //       // BASIC ITEM DETAILS
+  //       // -------------------------------------------------
+
   //       Item_Id: res.Item_Id,
   //       Item_Name: res.Item_Name || "",
   //       Item_HSN: res.Item_HSN || "",
   //       Item_Category: res.Item_Category || "",
+  //       Item_Type: res.Item_Type || "",
 
-  //       // Units
+  //       // -------------------------------------------------
+  //       // UNITS
+  //       // -------------------------------------------------
+
   //       Primary_Unit: res.Primary_Unit || "",
+
   //       Primary_Unit_Id: res.Primary_Unit_Id || null,
 
   //       Secondary_Unit: res.Secondary_Unit || "",
+
   //       Secondary_Unit_Id: res.Secondary_Unit_Id || null,
 
-  //       Conversion_Rate:
-  //         res.Conversion_Rate || null,
+  //       Conversion_Rate: res.Conversion_Rate ?? null,
 
   //       Available_Units:
-  //         res.Available_Units || [],
+  //         Array.isArray(res.Available_Units)
+  //           ? res.Available_Units
+  //           : [],
 
-  //       // =====================================================
+  //       // -------------------------------------------------
   //       // SALE DETAILS
-  //       // =====================================================
+  //       // Parent can use these for Sale/Sale Return
+  //       // -------------------------------------------------
 
   //       Sale_Price:
   //         Number(res.Sale_Price) || 0,
 
-  //       Sale_Price_Type:
-  //         res.Sale_Price_Type || "With_Tax",
+  //       Sale_Price_Type: res.Sale_Price_Type || "With_Tax",
 
-  //       Discount_On_Sale_Price:
-  //         res.Discount_On_Sale_Price ?? "",
+  //       Discount_On_Sale_Price: res.Discount_On_Sale_Price ?? "",
 
-  //       Discount_Type_On_Sale_Price:
-  //         res.Discount_Type_On_Sale_Price || "Percentage",
+  //       Discount_Type_On_Sale_Price: res.Discount_Type_On_Sale_Price ||
+  //         "Percentage",
 
-  //       // =====================================================
+  //       // -------------------------------------------------
   //       // PURCHASE DETAILS
-  //       // =====================================================
+  //       // Parent can use these for Purchase/Purchase Return
+  //       // -------------------------------------------------
 
-  //       Purchase_Price:
-  //         Number(res.Purchase_Price) || 0,
+  //       Purchase_Price: Number(res.Purchase_Price) || 0,
 
   //       Purchase_Price_Type:
-  //         res.Purchase_Price_Type || "Without_Tax",
+  //         res.Purchase_Price_Type ||
+  //         "Without_Tax",
 
-  //       // =====================================================
-  //       // OTHER DETAILS
-  //       // =====================================================
+  //       // -------------------------------------------------
+  //       // MRP
+  //       // -------------------------------------------------
 
   //       MRP:
-  //         res.MRP ?? null,
+  //         res.MRP !== null &&
+  //           res.MRP !== undefined
+  //           ? Number(res.MRP)
+  //           : null,
 
   //       Discount_On_MRP_For_Sale:
-  //         res.Discount_On_MRP_For_Sale ?? "",
+  //         res.Discount_On_MRP_For_Sale ??
+  //         "",
 
-  //       Tax_Type:
-  //         res.Tax_Type || "None",
+  //       // -------------------------------------------------
+  //       // STOCK
+  //       // -------------------------------------------------
 
-  //       // =====================================================
+  //       Stock_Quantity:
+  //         Number(res.Stock_Quantity || 0),
+
+  //       // -------------------------------------------------
   //       // SCANNED QUANTITY
-  //       // =====================================================
+  //       // Default = 1
+  //       // User can change it in modal
+  //       // -------------------------------------------------
 
   //       Quantity: 1,
   //     };
@@ -136,47 +179,80 @@ export default function ScanCodeModal({ onClose, onSave }) {
   //       scannedItem,
   //     ]);
 
-  //     // Clear input and focus again
+  //     // =====================================================
+  //     // CLEAR INPUT FOR NEXT SCAN
+  //     // =====================================================
+
   //     setCode("");
   //     inputRef.current?.focus();
 
   //   } catch (err) {
-  //     console.error("❌ Code lookup failed:", err);
+  //     console.error(
+  //       "❌ Code lookup failed:",
+  //       err
+  //     );
 
   //     toast.error(
   //       err?.data?.message ||
   //       `No item found for code "${trimmed}"`
   //     );
+
+  //     setCode("");
+  //     inputRef.current?.focus();
+
   //   } finally {
   //     setIsLooking(false);
   //   }
   // };
-
+  
   const handleAddCode = async (scannedCode = code) => {
-    const trimmed = scannedCode.trim();
-    //const trimmed = code.trim();
+  const trimmed = String(scannedCode || "").trim();
 
-    // =====================================================
-    // IF CODE ALREADY EXISTS → INCREASE QUANTITY
-    // =====================================================
+  if (!trimmed) return;
 
-    const existingItem = scannedItems.find(
-      (it) =>
+  // =====================================================
+  // IF CODE ALREADY EXISTS → INCREASE QUANTITY
+  // =====================================================
+
+  const existingItem = scannedItems.find(
+    (it) =>
+      it.Code?.trim()?.toLowerCase() ===
+      trimmed.toLowerCase()
+  );
+
+  if (existingItem) {
+    setScannedItems((prev) =>
+      prev.map((it) =>
         it.Code?.trim()?.toLowerCase() ===
-        trimmed.toLowerCase()
-    );
-
-    if (existingItem) {
-      setScannedItems((prev) =>
-        prev.map((it) =>
-          it.Code?.trim()?.toLowerCase() ===
-            trimmed.toLowerCase()
-            ? {
+          trimmed.toLowerCase()
+          ? {
               ...it,
               Quantity: Number(it.Quantity || 0) + 1,
             }
-            : it
-        )
+          : it
+      )
+    );
+
+    setCode("");
+    inputRef.current?.focus();
+    return;
+  }
+
+  setIsLooking(true);
+
+  try {
+    const response =
+      await getItemByCode(trimmed).unwrap();
+
+    const res = response?.item;
+
+    // =====================================================
+    // ITEM NOT FOUND
+    // =====================================================
+
+    if (!res?.Item_Id) {
+      toast.error(
+        `No item found for code "${trimmed}"`
       );
 
       setCode("");
@@ -184,164 +260,93 @@ export default function ScanCodeModal({ onClose, onSave }) {
       return;
     }
 
-    setIsLooking(true);
+    // =====================================================
+    // ITEM FOUND
+    // =====================================================
 
+    const scannedItem = {
+      Code: trimmed,
 
-    try {
-      // =====================================================
-      // LOOK UP ITEM FROM BACKEND
-      // =====================================================
+      Item_Id: res.Item_Id,
+      Item_Name: res.Item_Name || "",
+      Item_HSN: res.Item_HSN || "",
+      Item_Category: res.Item_Category || "",
+      Item_Type: res.Item_Type || "",
 
-      const response =
-        await getItemByCode(trimmed).unwrap();
+      Primary_Unit: res.Primary_Unit || "",
+      Primary_Unit_Id: res.Primary_Unit_Id || null,
 
-      const res = response?.item;
+      Secondary_Unit: res.Secondary_Unit || "",
+      Secondary_Unit_Id: res.Secondary_Unit_Id || null,
 
-      // =====================================================
-      // ITEM NOT FOUND
-      // =====================================================
+      Conversion_Rate: res.Conversion_Rate ?? null,
 
-      if (!res?.Item_Id) {
-        toast.error(
-          `No item found for code "${trimmed}"`
-        );
+      Available_Units:
+        Array.isArray(res.Available_Units)
+          ? res.Available_Units
+          : [],
 
-        setCode("");
-        inputRef.current?.focus();
-        return;
-      }
+      Sale_Price:
+        Number(res.Sale_Price) || 0,
 
-      // =====================================================
-      // ITEM FOUND
-      // RETURN ALL USEFUL DETAILS TO PARENT
-      // =====================================================
+      Sale_Price_Type:
+        res.Sale_Price_Type || "With_Tax",
 
-      const scannedItem = {
-        // -------------------------------------------------
-        // BARCODE / CODE
-        // -------------------------------------------------
+      Discount_On_Sale_Price:
+        res.Discount_On_Sale_Price ?? "",
 
-        Code: trimmed,
+      Discount_Type_On_Sale_Price:
+        res.Discount_Type_On_Sale_Price ||
+        "Percentage",
 
-        // -------------------------------------------------
-        // BASIC ITEM DETAILS
-        // -------------------------------------------------
+      Purchase_Price:
+        Number(res.Purchase_Price) || 0,
 
-        Item_Id: res.Item_Id,
-        Item_Name: res.Item_Name || "",
-        Item_HSN: res.Item_HSN || "",
-        Item_Category: res.Item_Category || "",
-        Item_Type: res.Item_Type || "",
+      Purchase_Price_Type:
+        res.Purchase_Price_Type ||
+        "Without_Tax",
 
-        // -------------------------------------------------
-        // UNITS
-        // -------------------------------------------------
+      MRP:
+        res.MRP !== null &&
+        res.MRP !== undefined
+          ? Number(res.MRP)
+          : null,
 
-        Primary_Unit: res.Primary_Unit || "",
+      Discount_On_MRP_For_Sale:
+        res.Discount_On_MRP_For_Sale ?? "",
 
-        Primary_Unit_Id: res.Primary_Unit_Id || null,
+      Stock_Quantity:
+        Number(res.Stock_Quantity || 0),
 
-        Secondary_Unit: res.Secondary_Unit || "",
+      Quantity: 1,
+    };
 
-        Secondary_Unit_Id: res.Secondary_Unit_Id || null,
+    setScannedItems((prev) => [
+      ...prev,
+      scannedItem,
+    ]);
 
-        Conversion_Rate: res.Conversion_Rate ?? null,
+    setCode("");
+    inputRef.current?.focus();
 
-        Available_Units:
-          Array.isArray(res.Available_Units)
-            ? res.Available_Units
-            : [],
+  } catch (err) {
+    console.error(
+      "❌ Code lookup failed:",
+      err
+    );
 
-        // -------------------------------------------------
-        // SALE DETAILS
-        // Parent can use these for Sale/Sale Return
-        // -------------------------------------------------
+    toast.error(
+      err?.data?.message ||
+      `No item found for code "${trimmed}"`
+    );
 
-        Sale_Price:
-          Number(res.Sale_Price) || 0,
+    setCode("");
+    inputRef.current?.focus();
 
-        Sale_Price_Type: res.Sale_Price_Type || "With_Tax",
-
-        Discount_On_Sale_Price: res.Discount_On_Sale_Price ?? "",
-
-        Discount_Type_On_Sale_Price: res.Discount_Type_On_Sale_Price ||
-          "Percentage",
-
-        // -------------------------------------------------
-        // PURCHASE DETAILS
-        // Parent can use these for Purchase/Purchase Return
-        // -------------------------------------------------
-
-        Purchase_Price: Number(res.Purchase_Price) || 0,
-
-        Purchase_Price_Type:
-          res.Purchase_Price_Type ||
-          "Without_Tax",
-
-        // -------------------------------------------------
-        // MRP
-        // -------------------------------------------------
-
-        MRP:
-          res.MRP !== null &&
-            res.MRP !== undefined
-            ? Number(res.MRP)
-            : null,
-
-        Discount_On_MRP_For_Sale:
-          res.Discount_On_MRP_For_Sale ??
-          "",
-
-        // -------------------------------------------------
-        // STOCK
-        // -------------------------------------------------
-
-        Stock_Quantity:
-          Number(res.Stock_Quantity || 0),
-
-        // -------------------------------------------------
-        // SCANNED QUANTITY
-        // Default = 1
-        // User can change it in modal
-        // -------------------------------------------------
-
-        Quantity: 1,
-      };
-
-      // =====================================================
-      // ADD TO SCANNED LIST
-      // =====================================================
-
-      setScannedItems((prev) => [
-        ...prev,
-        scannedItem,
-      ]);
-
-      // =====================================================
-      // CLEAR INPUT FOR NEXT SCAN
-      // =====================================================
-
-      setCode("");
-      inputRef.current?.focus();
-
-    } catch (err) {
-      console.error(
-        "❌ Code lookup failed:",
-        err
-      );
-
-      toast.error(
-        err?.data?.message ||
-        `No item found for code "${trimmed}"`
-      );
-
-      setCode("");
-      inputRef.current?.focus();
-
-    } finally {
-      setIsLooking(false);
-    }
-  };
+  } finally {
+    setIsLooking(false);
+  }
+};
   const handleQuantityChange = (code, value) => {
     const sanitized = value.replace(/[^0-9.]/g, "");
     setScannedItems((prev) =>
@@ -475,11 +480,15 @@ export default function ScanCodeModal({ onClose, onSave }) {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                   handleAddCode(code);   // explicit
-                  //handleAddCode();
-                }
+                   if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddCode(e.currentTarget.value);
+    }
+                // if (e.key === "Enter") {
+                //   e.preventDefault();
+                //    handleAddCode(code);   // explicit
+                //   //handleAddCode();
+                // }
               }}
               placeholder="Enter / Scan barcode"
               className="w-full outline-none border-b-2 text-gray-900"
@@ -490,7 +499,8 @@ export default function ScanCodeModal({ onClose, onSave }) {
 
           <button
             type="button"
-            onClick={handleAddCode}
+            onClick={() => handleAddCode(code)}
+            //onClick={handleAddCode}
             disabled={isLooking || !code.trim()}
             className="text-white font-bold px-4 rounded"
             style={{
