@@ -1816,8 +1816,7 @@ const getSingleSale = async (req, res, next) => {
       const currentPrimary =
         it.Current_Primary_Unit || null;
 
-      const currentSecondary =
-        it.Current_Secondary_Unit || null;
+      const currentSecondary =it.Current_Secondary_Unit || null;
 
   const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
 
@@ -1965,15 +1964,12 @@ const getSingleSale = async (req, res, next) => {
         MRP:it.MRP,
         Discount_On_MRP_For_Sale_Percentage:it.Discount_On_MRP_For_Sale_Percentage,
           // CURRENT MASTER VALUE
-  Current_MRP_Discount:
-    it.Current_MRP_Discount,
-         hasHistoricalMRP,
+        Current_MRP_Discount:it.Current_MRP_Discount,
+        hasHistoricalMRP,
 
-        Sale_Price:
-          it.Sale_Price,
+        Sale_Price:it.Sale_Price,
 
-        Discount_On_Sale_Price:
-          it.Discount_On_Sale_Price,
+        Discount_On_Sale_Price:it.Discount_On_Sale_Price,
 
         Discount_Type_On_Sale_Price:
           it.Discount_Type_On_Sale_Price,

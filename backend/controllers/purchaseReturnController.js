@@ -434,6 +434,7 @@ const getPurchaseReturnById = async (req, res, next) => {
       const currentPrimary = it.Current_Primary_Unit || null;
 
       const currentSecondary = it.Current_Secondary_Unit || null;
+       const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
       const price = Number(it.Purchase_Price || 0);
       let discountAmount = 0;
 
@@ -543,6 +544,7 @@ const getPurchaseReturnById = async (req, res, next) => {
         // Dropdown
         Available_Units: availableUnits,
         MRP:it.MRP,
+        hasHistoricalMRP,
 
         Purchase_Price: it.Purchase_Price,
 

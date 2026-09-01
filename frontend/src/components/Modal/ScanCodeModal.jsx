@@ -2,206 +2,181 @@ import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "react-toastify";
 import { useLazyGetItemsByCodeQuery } from "../../redux/api/itemApi";
-const ACCENT="#4CA1AF"
-export default function ScanCodeModal({ onClose, onSave}) { 
-  const [code, setCode] = useState(""); 
-  const [scannedItems, setScannedItems] = useState([]); 
-  const [isLooking, setIsLooking] = useState(false); 
-  const inputRef = useRef(null); 
- 
+import BarcodeScanner from "../BarcodeScanner";
+const ACCENT = "#4CA1AF"
+export default function ScanCodeModal({ onClose, onSave }) {
+  const [code, setCode] = useState("");
+  const [scannedItems, setScannedItems] = useState([]);
+  const [isLooking, setIsLooking] = useState(false);
+  const inputRef = useRef(null);
+
   // const [lookupItemByCode] = useLazyLookupItemByCodeQuery(); 
- const [getItemByCode] =useLazyGetItemsByCodeQuery();
-// const handleAddCode = async () => {
-//   const trimmed = code.trim();
+  const [getItemByCode] = useLazyGetItemsByCodeQuery();
+  // const handleAddCode = async () => {
+  //   const trimmed = code.trim();
 
-//   if (!trimmed) return;
+  //   if (!trimmed) return;
 
-//   // Prevent scanning the exact same code twice
-//   if (
-//     scannedItems.some(
-//       (it) => it.Code?.trim()?.toLowerCase() === trimmed.toLowerCase()
-//     )
-//   ) {
-//     toast.info("This code has already been scanned.");
-//     setCode("");
-//     inputRef.current?.focus();
-//     return;
-//   }
+  //   // Prevent scanning the exact same code twice
+  //   if (
+  //     scannedItems.some(
+  //       (it) => it.Code?.trim()?.toLowerCase() === trimmed.toLowerCase()
+  //     )
+  //   ) {
+  //     toast.info("This code has already been scanned.");
+  //     setCode("");
+  //     inputRef.current?.focus();
+  //     return;
+  //   }
 
-//   setIsLooking(true);
+  //   setIsLooking(true);
 
-//   try {
-//     // =====================================================
-//     // FIND ITEM FROM ALREADY LOADED ITEMS
-//     // =====================================================
+  //   try {
+  //     // =====================================================
+  //     // FIND ITEM FROM ALREADY LOADED ITEMS
+  //     // =====================================================
 
-//     const res = items.find(
-//       (item) =>
-//         item?.Item_Code?.trim()?.toLowerCase() ===
-//         trimmed.toLowerCase()
-//     );
+  //     const res = items.find(
+  //       (item) =>
+  //         item?.Item_Code?.trim()?.toLowerCase() ===
+  //         trimmed.toLowerCase()
+  //     );
 
-//     // =====================================================
-//     // ITEM NOT FOUND
-//     // =====================================================
+  //     // =====================================================
+  //     // ITEM NOT FOUND
+  //     // =====================================================
 
-//     if (!res?.Item_Id) {
-//       toast.error(`No item found for code "${trimmed}"`);
-//       setCode("");
-//       inputRef.current?.focus();
-//       return;
-//     }
+  //     if (!res?.Item_Id) {
+  //       toast.error(`No item found for code "${trimmed}"`);
+  //       setCode("");
+  //       inputRef.current?.focus();
+  //       return;
+  //     }
 
-//     // =====================================================
-//     // ITEM FOUND
-//     // Return ALL useful item details to parent
-//     // =====================================================
+  //     // =====================================================
+  //     // ITEM FOUND
+  //     // Return ALL useful item details to parent
+  //     // =====================================================
 
-//     const scannedItem = {
-//       // Barcode
-//       Code: trimmed,
+  //     const scannedItem = {
+  //       // Barcode
+  //       Code: trimmed,
 
-//       // Basic item details
-//       Item_Id: res.Item_Id,
-//       Item_Name: res.Item_Name || "",
-//       Item_HSN: res.Item_HSN || "",
-//       Item_Category: res.Item_Category || "",
+  //       // Basic item details
+  //       Item_Id: res.Item_Id,
+  //       Item_Name: res.Item_Name || "",
+  //       Item_HSN: res.Item_HSN || "",
+  //       Item_Category: res.Item_Category || "",
 
-//       // Units
-//       Primary_Unit: res.Primary_Unit || "",
-//       Primary_Unit_Id: res.Primary_Unit_Id || null,
+  //       // Units
+  //       Primary_Unit: res.Primary_Unit || "",
+  //       Primary_Unit_Id: res.Primary_Unit_Id || null,
 
-//       Secondary_Unit: res.Secondary_Unit || "",
-//       Secondary_Unit_Id: res.Secondary_Unit_Id || null,
+  //       Secondary_Unit: res.Secondary_Unit || "",
+  //       Secondary_Unit_Id: res.Secondary_Unit_Id || null,
 
-//       Conversion_Rate:
-//         res.Conversion_Rate || null,
+  //       Conversion_Rate:
+  //         res.Conversion_Rate || null,
 
-//       Available_Units:
-//         res.Available_Units || [],
+  //       Available_Units:
+  //         res.Available_Units || [],
 
-//       // =====================================================
-//       // SALE DETAILS
-//       // =====================================================
+  //       // =====================================================
+  //       // SALE DETAILS
+  //       // =====================================================
 
-//       Sale_Price:
-//         Number(res.Sale_Price) || 0,
+  //       Sale_Price:
+  //         Number(res.Sale_Price) || 0,
 
-//       Sale_Price_Type:
-//         res.Sale_Price_Type || "With_Tax",
+  //       Sale_Price_Type:
+  //         res.Sale_Price_Type || "With_Tax",
 
-//       Discount_On_Sale_Price:
-//         res.Discount_On_Sale_Price ?? "",
+  //       Discount_On_Sale_Price:
+  //         res.Discount_On_Sale_Price ?? "",
 
-//       Discount_Type_On_Sale_Price:
-//         res.Discount_Type_On_Sale_Price || "Percentage",
+  //       Discount_Type_On_Sale_Price:
+  //         res.Discount_Type_On_Sale_Price || "Percentage",
 
-//       // =====================================================
-//       // PURCHASE DETAILS
-//       // =====================================================
+  //       // =====================================================
+  //       // PURCHASE DETAILS
+  //       // =====================================================
 
-//       Purchase_Price:
-//         Number(res.Purchase_Price) || 0,
+  //       Purchase_Price:
+  //         Number(res.Purchase_Price) || 0,
 
-//       Purchase_Price_Type:
-//         res.Purchase_Price_Type || "Without_Tax",
+  //       Purchase_Price_Type:
+  //         res.Purchase_Price_Type || "Without_Tax",
 
-//       // =====================================================
-//       // OTHER DETAILS
-//       // =====================================================
+  //       // =====================================================
+  //       // OTHER DETAILS
+  //       // =====================================================
 
-//       MRP:
-//         res.MRP ?? null,
+  //       MRP:
+  //         res.MRP ?? null,
 
-//       Discount_On_MRP_For_Sale:
-//         res.Discount_On_MRP_For_Sale ?? "",
+  //       Discount_On_MRP_For_Sale:
+  //         res.Discount_On_MRP_For_Sale ?? "",
 
-//       Tax_Type:
-//         res.Tax_Type || "None",
+  //       Tax_Type:
+  //         res.Tax_Type || "None",
 
-//       // =====================================================
-//       // SCANNED QUANTITY
-//       // =====================================================
+  //       // =====================================================
+  //       // SCANNED QUANTITY
+  //       // =====================================================
 
-//       Quantity: 1,
-//     };
+  //       Quantity: 1,
+  //     };
 
-//     // =====================================================
-//     // ADD TO SCANNED LIST
-//     // =====================================================
+  //     // =====================================================
+  //     // ADD TO SCANNED LIST
+  //     // =====================================================
 
-//     setScannedItems((prev) => [
-//       ...prev,
-//       scannedItem,
-//     ]);
+  //     setScannedItems((prev) => [
+  //       ...prev,
+  //       scannedItem,
+  //     ]);
 
-//     // Clear input and focus again
-//     setCode("");
-//     inputRef.current?.focus();
+  //     // Clear input and focus again
+  //     setCode("");
+  //     inputRef.current?.focus();
 
-//   } catch (err) {
-//     console.error("❌ Code lookup failed:", err);
+  //   } catch (err) {
+  //     console.error("❌ Code lookup failed:", err);
 
-//     toast.error(
-//       err?.data?.message ||
-//       `No item found for code "${trimmed}"`
-//     );
-//   } finally {
-//     setIsLooking(false);
-//   }
-// };
-  
-const handleAddCode = async () => {
-  const trimmed = code.trim();
+  //     toast.error(
+  //       err?.data?.message ||
+  //       `No item found for code "${trimmed}"`
+  //     );
+  //   } finally {
+  //     setIsLooking(false);
+  //   }
+  // };
 
-  // =====================================================
-  // IF CODE ALREADY EXISTS → INCREASE QUANTITY
-  // =====================================================
+  const handleAddCode = async (scannedCode = code) => {
+    const trimmed = scannedCode.trim();
+    //const trimmed = code.trim();
 
-  const existingItem = scannedItems.find(
-    (it) =>
-      it.Code?.trim()?.toLowerCase() ===
-      trimmed.toLowerCase()
-  );
+    // =====================================================
+    // IF CODE ALREADY EXISTS → INCREASE QUANTITY
+    // =====================================================
 
-  if (existingItem) {
-    setScannedItems((prev) =>
-      prev.map((it) =>
+    const existingItem = scannedItems.find(
+      (it) =>
         it.Code?.trim()?.toLowerCase() ===
         trimmed.toLowerCase()
-          ? {
+    );
+
+    if (existingItem) {
+      setScannedItems((prev) =>
+        prev.map((it) =>
+          it.Code?.trim()?.toLowerCase() ===
+            trimmed.toLowerCase()
+            ? {
               ...it,
               Quantity: Number(it.Quantity || 0) + 1,
             }
-          : it
-      )
-    );
-
-    setCode("");
-    inputRef.current?.focus();
-    return;
-  }
-
-  setIsLooking(true);
-
-
-  try {
-    // =====================================================
-    // LOOK UP ITEM FROM BACKEND
-    // =====================================================
-
-    const response =
-      await getItemByCode(trimmed).unwrap();
-
-    const res = response?.item;
-
-    // =====================================================
-    // ITEM NOT FOUND
-    // =====================================================
-
-    if (!res?.Item_Id) {
-      toast.error(
-        `No item found for code "${trimmed}"`
+            : it
+        )
       );
 
       setCode("");
@@ -209,206 +184,233 @@ const handleAddCode = async () => {
       return;
     }
 
-    // =====================================================
-    // ITEM FOUND
-    // RETURN ALL USEFUL DETAILS TO PARENT
-    // =====================================================
+    setIsLooking(true);
 
-    const scannedItem = {
-      // -------------------------------------------------
-      // BARCODE / CODE
-      // -------------------------------------------------
 
-      Code: trimmed,
+    try {
+      // =====================================================
+      // LOOK UP ITEM FROM BACKEND
+      // =====================================================
 
-      // -------------------------------------------------
-      // BASIC ITEM DETAILS
-      // -------------------------------------------------
+      const response =
+        await getItemByCode(trimmed).unwrap();
 
-      Item_Id: res.Item_Id,
-      Item_Name: res.Item_Name || "",
-      Item_HSN: res.Item_HSN || "",
-      Item_Category: res.Item_Category || "",
-      Item_Type: res.Item_Type || "",
+      const res = response?.item;
 
-      // -------------------------------------------------
-      // UNITS
-      // -------------------------------------------------
+      // =====================================================
+      // ITEM NOT FOUND
+      // =====================================================
 
-      Primary_Unit:res.Primary_Unit || "",
+      if (!res?.Item_Id) {
+        toast.error(
+          `No item found for code "${trimmed}"`
+        );
 
-      Primary_Unit_Id:res.Primary_Unit_Id || null,
+        setCode("");
+        inputRef.current?.focus();
+        return;
+      }
 
-      Secondary_Unit:res.Secondary_Unit || "",
+      // =====================================================
+      // ITEM FOUND
+      // RETURN ALL USEFUL DETAILS TO PARENT
+      // =====================================================
 
-      Secondary_Unit_Id:res.Secondary_Unit_Id || null,
+      const scannedItem = {
+        // -------------------------------------------------
+        // BARCODE / CODE
+        // -------------------------------------------------
 
-      Conversion_Rate:res.Conversion_Rate ?? null,
+        Code: trimmed,
 
-      Available_Units:
-        Array.isArray(res.Available_Units)
-          ? res.Available_Units
-          : [],
+        // -------------------------------------------------
+        // BASIC ITEM DETAILS
+        // -------------------------------------------------
 
-      // -------------------------------------------------
-      // SALE DETAILS
-      // Parent can use these for Sale/Sale Return
-      // -------------------------------------------------
+        Item_Id: res.Item_Id,
+        Item_Name: res.Item_Name || "",
+        Item_HSN: res.Item_HSN || "",
+        Item_Category: res.Item_Category || "",
+        Item_Type: res.Item_Type || "",
 
-      Sale_Price:
-        Number(res.Sale_Price) || 0,
+        // -------------------------------------------------
+        // UNITS
+        // -------------------------------------------------
 
-      Sale_Price_Type:res.Sale_Price_Type ||"With_Tax",
+        Primary_Unit: res.Primary_Unit || "",
 
-      Discount_On_Sale_Price:res.Discount_On_Sale_Price ?? "",
+        Primary_Unit_Id: res.Primary_Unit_Id || null,
 
-      Discount_Type_On_Sale_Price:res.Discount_Type_On_Sale_Price ||
-        "Percentage",
+        Secondary_Unit: res.Secondary_Unit || "",
 
-      // -------------------------------------------------
-      // PURCHASE DETAILS
-      // Parent can use these for Purchase/Purchase Return
-      // -------------------------------------------------
+        Secondary_Unit_Id: res.Secondary_Unit_Id || null,
 
-      Purchase_Price:Number(res.Purchase_Price) || 0,
+        Conversion_Rate: res.Conversion_Rate ?? null,
 
-      Purchase_Price_Type:
-        res.Purchase_Price_Type ||
-        "Without_Tax",
+        Available_Units:
+          Array.isArray(res.Available_Units)
+            ? res.Available_Units
+            : [],
 
-      // -------------------------------------------------
-      // MRP
-      // -------------------------------------------------
+        // -------------------------------------------------
+        // SALE DETAILS
+        // Parent can use these for Sale/Sale Return
+        // -------------------------------------------------
 
-      MRP:
-        res.MRP !== null &&
-        res.MRP !== undefined
-          ? Number(res.MRP)
-          : null,
+        Sale_Price:
+          Number(res.Sale_Price) || 0,
 
-      Discount_On_MRP_For_Sale:
-        res.Discount_On_MRP_For_Sale ??
-        "",
+        Sale_Price_Type: res.Sale_Price_Type || "With_Tax",
 
-      // -------------------------------------------------
-      // STOCK
-      // -------------------------------------------------
+        Discount_On_Sale_Price: res.Discount_On_Sale_Price ?? "",
 
-      Stock_Quantity:
-        Number(res.Stock_Quantity || 0),
+        Discount_Type_On_Sale_Price: res.Discount_Type_On_Sale_Price ||
+          "Percentage",
 
-      // -------------------------------------------------
-      // SCANNED QUANTITY
-      // Default = 1
-      // User can change it in modal
-      // -------------------------------------------------
+        // -------------------------------------------------
+        // PURCHASE DETAILS
+        // Parent can use these for Purchase/Purchase Return
+        // -------------------------------------------------
 
-      Quantity: 1,
-    };
+        Purchase_Price: Number(res.Purchase_Price) || 0,
 
-    // =====================================================
-    // ADD TO SCANNED LIST
-    // =====================================================
+        Purchase_Price_Type:
+          res.Purchase_Price_Type ||
+          "Without_Tax",
 
-    setScannedItems((prev) => [
-      ...prev,
-      scannedItem,
-    ]);
+        // -------------------------------------------------
+        // MRP
+        // -------------------------------------------------
 
-    // =====================================================
-    // CLEAR INPUT FOR NEXT SCAN
-    // =====================================================
+        MRP:
+          res.MRP !== null &&
+            res.MRP !== undefined
+            ? Number(res.MRP)
+            : null,
 
-    setCode("");
-    inputRef.current?.focus();
+        Discount_On_MRP_For_Sale:
+          res.Discount_On_MRP_For_Sale ??
+          "",
 
-  } catch (err) {
-    console.error(
-      "❌ Code lookup failed:",
-      err
+        // -------------------------------------------------
+        // STOCK
+        // -------------------------------------------------
+
+        Stock_Quantity:
+          Number(res.Stock_Quantity || 0),
+
+        // -------------------------------------------------
+        // SCANNED QUANTITY
+        // Default = 1
+        // User can change it in modal
+        // -------------------------------------------------
+
+        Quantity: 1,
+      };
+
+      // =====================================================
+      // ADD TO SCANNED LIST
+      // =====================================================
+
+      setScannedItems((prev) => [
+        ...prev,
+        scannedItem,
+      ]);
+
+      // =====================================================
+      // CLEAR INPUT FOR NEXT SCAN
+      // =====================================================
+
+      setCode("");
+      inputRef.current?.focus();
+
+    } catch (err) {
+      console.error(
+        "❌ Code lookup failed:",
+        err
+      );
+
+      toast.error(
+        err?.data?.message ||
+        `No item found for code "${trimmed}"`
+      );
+
+      setCode("");
+      inputRef.current?.focus();
+
+    } finally {
+      setIsLooking(false);
+    }
+  };
+  const handleQuantityChange = (code, value) => {
+    const sanitized = value.replace(/[^0-9.]/g, "");
+    setScannedItems((prev) =>
+      prev.map((it) => (it.Code === code ? { ...it, Quantity: sanitized } : it))
     );
+  };
 
-    toast.error(
-      err?.data?.message ||
-      `No item found for code "${trimmed}"`
-    );
+  const handleRemove = (code) => {
+    setScannedItems((prev) => prev.filter((it) => it.Code !== code));
+  };
 
-    setCode("");
-    inputRef.current?.focus();
+  const handleSave = () => {
+    if (scannedItems.length === 0) {
+      toast.info("Scan at least one item before saving.");
+      return;
+    }
 
-  } finally {
-    setIsLooking(false);
-  }
-};
-const handleQuantityChange = (code, value) => { 
-    const sanitized = value.replace(/[^0-9.]/g, ""); 
-    setScannedItems((prev) => 
-      prev.map((it) => (it.Code === code ? { ...it, Quantity: sanitized } : it)) 
-    ); 
-  }; 
- 
-  const handleRemove = (code) => { 
-    setScannedItems((prev) => prev.filter((it) => it.Code !== code)); 
-  }; 
- 
-  const handleSave = () => { 
-    if (scannedItems.length === 0) { 
-      toast.info("Scan at least one item before saving."); 
-      return; 
-    } 
- 
     // normalize quantity to a number, default to 1 if blank 
-    const normalized = scannedItems.map((it) => ({ 
-      ...it, 
-      Quantity: Number(it.Quantity) > 0 ? Number(it.Quantity) : 1, 
-    })); 
- 
-    onSave(normalized); 
-  }; 
- 
-  return ( 
-    <div 
-      style={{ 
-        position: "fixed", 
-        inset: 0, 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center", 
-        backgroundColor: "rgba(0,0,0,0.3)", 
-        backdropFilter: "blur(4px)", 
-        zIndex: 100, 
-        padding: "1rem", 
-         marginTop: "50px", 
-      }} 
-      onClick={onClose} 
-    > 
-      <div 
-        className="bg-white w-full max-w-md rounded-lg shadow-lg p-6 flex flex-col" 
-        style={{ maxHeight: "85vh" }} 
-        onClick={(e) => e.stopPropagation()} 
-      > 
-        {/* Header */} 
-        <div className="flex justify-between items-center" style={{ paddingBottom: 10 }}> 
-          <h4 className="text-lg font-semibold text-gray-900">Scan code/serial</h4> 
-          <button 
-            type="button" 
-            onClick={onClose} 
-            style={{ background: "transparent", border: "none", cursor: "pointer" }} 
-            className="text-gray-500 hover:text-gray-700" 
-          > 
-            <X size={20} /> 
-          </button> 
-        </div> 
- 
-        <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: 14 }} /> 
- 
-        {/* Scan input row */} 
-        <div className="flex items-center justify-between mb-2"> 
-          <span className="text-sm font-medium text-gray-700">Enter code/serial:</span> 
-          <span className="text-sm text-gray-500">{scannedItems.length} Entered</span> 
-        </div> 
- 
-        <div className="flex gap-2 mb-4"> 
+    const normalized = scannedItems.map((it) => ({
+      ...it,
+      Quantity: Number(it.Quantity) > 0 ? Number(it.Quantity) : 1,
+    }));
+
+    onSave(normalized);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0,0,0,0.3)",
+        backdropFilter: "blur(4px)",
+        zIndex: 100,
+        padding: "1rem",
+        marginTop: "50px",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-md rounded-lg shadow-lg p-6 flex flex-col"
+        style={{ maxHeight: "85vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center" style={{ paddingBottom: 10 }}>
+          <h4 className="text-lg font-semibold text-gray-900">Scan code/serial</h4>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ borderBottom: "1px solid #e5e7eb", marginBottom: 14 }} />
+
+        {/* Scan input row */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Enter code/serial:</span>
+          <span className="text-sm text-gray-500">{scannedItems.length} Entered</span>
+        </div>
+
+        {/* <div className="flex gap-2 mb-4"> 
              <div className="input-field col s6 " 
               style={{ 
       flex: 1, 
@@ -434,6 +436,14 @@ const handleQuantityChange = (code, value) => {
             //style={{ height: 40, backgroundColor: "#f3f4f6", border: "1px solid #e5e7eb" }} 
           /> 
           </div> 
+            <BarcodeScanner
+    label=""
+    placeholder="Scan barcode"
+    autoFocus={false}
+    onScan={(scannedValue) => {
+      handleAddCode(scannedValue);
+    }}
+  />
             
           <button 
             type="button" 
@@ -449,70 +459,119 @@ const handleQuantityChange = (code, value) => {
           > 
             {isLooking ? "..." : "Add"} 
           </button> 
-          </div> 
-         
- 
-        {/* Scanned items list — scrollable */} 
-        <div style={{ overflowY: "auto", flex: 1 }}> 
-          {scannedItems.length === 0 ? ( 
-            <p className="text-sm text-gray-400 text-center py-6">No items scanned yet.</p> 
-          ) : ( 
-            scannedItems.map((it) => ( 
-              <div 
-                key={it.Code} 
-                className="flex items-center justify-between py-3" 
-                style={{ borderBottom: "1px solid #f1f5f9" }} 
-              > 
-                <div className="flex flex-col min-w-0"> 
-                  <span className="text-sm text-gray-800 font-medium truncate">{it.Item_Name}</span> 
-                  <span className="text-xs text-gray-400 truncate">{it.Code}</span> 
-                </div> 
- 
-                <div className="flex items-center gap-3 flex-shrink-0"> 
-                  <div className="flex flex-col"> 
-                    <span className="text-xs text-gray-400 mb-0.5">Quantity</span> 
-                    <input 
-                      type="text" 
-                      value={it.Quantity} 
-                      onChange={(e) => handleQuantityChange(it.Code, e.target.value)} 
-                      className="rounded-md text-sm outline-none px-2 text-center" 
-                      style={{ width: 64, height: 32, border: "1px solid #d1d5db" }} 
-                    /> 
-                  </div> 
- 
-                  <button 
-                    type="button" 
-                    onClick={() => handleRemove(it.Code)} 
-                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "#9ca3af" }} 
-                    title="Remove" 
-                  > 
-                    <X size={18} /> 
-                  </button> 
-                </div> 
-              </div> 
-            )) 
-          )} 
-        </div> 
- 
-        {/* Footer */} 
-        <div className="flex justify-center gap-4 mt-4"> 
-          <button 
-            type="button" 
-            onClick={handleSave} 
-            className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#3b8c98]" 
-          > 
-            Save 
-          </button> 
-          <button 
-            type="button" 
-            onClick={onClose} 
-            className="px-4 py-2 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-700" 
-          > 
-            Close 
-          </button> 
-        </div> 
-      </div> 
-    </div> 
-  ); 
-} 
+          </div>  */}
+        <div className="flex gap-2 mb-4">
+          <div
+            className="input-field col s6"
+            style={{
+              flex: 1,
+              margin: 0,
+            }}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                   handleAddCode(code);   // explicit
+                  //handleAddCode();
+                }
+              }}
+              placeholder="Enter / Scan barcode"
+              className="w-full outline-none border-b-2 text-gray-900"
+              style={{ marginBottom: "0" }}
+              autoComplete="off"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAddCode}
+            disabled={isLooking || !code.trim()}
+            className="text-white font-bold px-4 rounded"
+            style={{
+              backgroundColor: ACCENT,
+              border: "none",
+              cursor:
+                isLooking || !code.trim()
+                  ? "not-allowed"
+                  : "pointer",
+              opacity:
+                isLooking || !code.trim()
+                  ? 0.6
+                  : 1,
+            }}
+          >
+            {isLooking ? "..." : "Add"}
+          </button>
+        </div>
+
+
+        {/* Scanned items list — scrollable */}
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {scannedItems.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No items scanned yet.</p>
+          ) : (
+            scannedItems.map((it) => (
+              <div
+                key={it.Code}
+                className="flex items-center justify-between py-3"
+                style={{ borderBottom: "1px solid #f1f5f9" }}
+              >
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm text-gray-800 font-medium truncate">{it.Item_Name}</span>
+                  <span className="text-xs text-gray-400 truncate">{it.Code}</span>
+                </div>
+
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-400 mb-0.5">Quantity</span>
+                    <input
+                      type="text"
+                      value={it.Quantity}
+                      onChange={(e) => handleQuantityChange(it.Code, e.target.value)}
+                      className="rounded-md text-sm outline-none px-2 text-center"
+                      style={{ width: 64, height: 32, border: "1px solid #d1d5db" }}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(it.Code)}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "#9ca3af" }}
+                    title="Remove"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-center gap-4 mt-4">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-4 py-2 rounded-md bg-[#4CA1AF] text-white hover:bg-[#3b8c98]"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-700"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 

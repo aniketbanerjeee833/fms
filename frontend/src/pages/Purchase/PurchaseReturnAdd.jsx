@@ -29,6 +29,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
+import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -411,8 +412,22 @@ export default function PurchaseReturnAdd() {
 
 
   const [createPurchaseReturn, { isLoading: isCreating }] = useCreatePurchaseReturnMutation();
+  const { data: settingsData } = useGetAllSettingsQuery();
+  const settings = settingsData?.settings || [];
 
-  // const [editPurchase, { isLoading: isEditingPurchase }] = useEditPurchaseMutation();
+  const showMRP =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
+  const hasHistoricalMRP =
+    purchase?.items?.some(
+      (item) => item.hasHistoricalMRP === true
+    );
+
+  const shouldShowMRP = showMRP || hasHistoricalMRP;
+
   // helper to update a field in a specific row
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -499,7 +514,7 @@ export default function PurchaseReturnAdd() {
           Item_Unit: "",
           MRP: "",
           Purchase_Price: "",
-          
+
           Discount_On_Purchase_Price: "",
           Discount_Type_On_Purchase_Price: "Percentage",
           Tax_Type: "None",
@@ -1273,8 +1288,10 @@ export default function PurchaseReturnAdd() {
       Item_Category: item.Item_Category || "",
       Item_Name: item.Item_Name || "",
       Item_HSN: item.Item_HSN || "",
-      MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
-
+      //MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
+      MRP: showMRP && Number(item.MRP) > 0
+        ? Number(item.MRP)
+        : "",
       Quantity: Number(item.Quantity) || 1,
 
       Item_Unit: item.Primary_Unit || "",
@@ -1401,16 +1418,18 @@ export default function PurchaseReturnAdd() {
         Item_Category:
           item.Item_Category || "",
 
-        Item_HSN:item.Item_HSN || "",
-          MRP:Number(item.MRP) > 0
-        ? Number(item.MRP)
-        : "",
+        Item_HSN: item.Item_HSN || "",
 
-        Primary_Unit:
-          item.Primary_Unit || null,
+        // MRP: Number(item.MRP) > 0
+        //   ? Number(item.MRP)
+        //   : "",
+         MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
-        Secondary_Unit:
-          item.Secondary_Unit || null,
+        Primary_Unit:item.Primary_Unit || null,
+
+        Secondary_Unit:item.Secondary_Unit || null,
 
         Conversion_Rate:
           item.Conversion_Rate || null,
@@ -1559,22 +1578,7 @@ export default function PurchaseReturnAdd() {
   };
   return (
     <>
-      {/* <div className="sb2-2-2">
-        <ul>
-          <li>
-
-            <NavLink style={{ display: "flex", flexDirection: "row" }}
-              to="/home"
-
-            >
-              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              
-              Dashboard
-            </NavLink>
-          </li>
-
-        </ul>
-      </div> */}
+      
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -2040,7 +2044,7 @@ export default function PurchaseReturnAdd() {
                     <th>Category</th>
                     <th>Item</th>
                     <th>Item_HSN</th>
-                    <th>MRP</th>
+                    {shouldShowMRP && <th>MRP</th>}
                     <th>Qty</th>
                     <th>Unit</th>
                     <th>Price/Unit</th>
@@ -2449,9 +2453,9 @@ export default function PurchaseReturnAdd() {
                                   // Replaces old frontend items.find(...)
                                   // ===================================================
 
-                                  const response =await getItemByName(typedValue).unwrap();
+                                  const response = await getItemByName(typedValue).unwrap();
 
-                                  const matchedItem =response?.item;
+                                  const matchedItem = response?.item;
                                   const existingItemId =
                                     currentRow.Item_Id || "";
 
@@ -2706,7 +2710,7 @@ export default function PurchaseReturnAdd() {
                                   //   Number(
                                   //     matchedItem.Purchase_Price
                                   //   ) || 0;
-                                   basePurchasePriceRef.current[i] =
+                                  basePurchasePriceRef.current[i] =
                                     Number(resolvedPurchasePrice) || 0;
                                   //basePurchasePriceRef.current[i] =Number(currentRow.Purchase_Price) || 0;
 
@@ -2731,7 +2735,7 @@ export default function PurchaseReturnAdd() {
 
                                     Item_HSN:
                                       matchedItem.Item_HSN || "",
-                                       Purchase_Price:
+                                    Purchase_Price:
                                       resolvedPurchasePrice,
 
                                     // ✅ add_purchase_items
@@ -2848,7 +2852,7 @@ export default function PurchaseReturnAdd() {
                             </p>
                           )}
                           {/* Dropdown List */}
-                          
+
                           {rows[i]?.itemOpen && (
                             <ItemDropdownVirtualized
                               rowIndex={i}
@@ -2888,9 +2892,36 @@ export default function PurchaseReturnAdd() {
                                 setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                //setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                 if (showMRP) {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    Number(it.MRP) > 0 ? it.MRP : "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                } else {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                }
                                 setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                 setValue(
+                                  `items.${i}.Quantity`,
+                                  Number(itemsValues[i]?.Quantity) || 1,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
 
                                 basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
@@ -3113,7 +3144,7 @@ export default function PurchaseReturnAdd() {
                         )}
                       </td>
                       {/*MRP */}
-                      <td style={{ padding: "0px", width: "6%" }}>
+                      {shouldShowMRP && (<td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
                             type="text"
@@ -3136,6 +3167,16 @@ export default function PurchaseReturnAdd() {
                               if (val.includes(".")) {
                                 const [int, dec] = val.split(".");
                                 val = int + "." + dec.slice(0, 2);
+                              }
+                              if (val === "") {
+                                setValue(`items.${i}.MRP`, "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+
+
+                                return;
                               }
 
                               //const displayValue = Number(val) === 0 ? "" : val;
@@ -3182,7 +3223,7 @@ export default function PurchaseReturnAdd() {
                             {errors.items[i].MRP.message}
                           </p>
                         )}
-                      </td>
+                      </td>)}
 
                       {/* Qty */}
                       <td style={{ padding: "0px", width: "4%" }}>
@@ -3999,7 +4040,7 @@ export default function PurchaseReturnAdd() {
                     <td colSpan={2}></td>
                     <td>Total</td>
                     <td></td>
-                     <td></td>
+                    {shouldShowMRP && <td></td>}
 
                     <td className="text-right">
                       {totals.totalQty}

@@ -789,15 +789,26 @@ export default function SaleEdit() {
         : (it.Sale_Price || "");
 
     // MRP from master
-    setValue(`items.${i}.MRP`,
-      //it.MRP || "", 
-      shouldShowMRP && Number(it.MRP) > 0
-        ? it.MRP
-        : "",
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+    // setValue(`items.${i}.MRP`,
+    //   //it.MRP || "", 
+    //   shouldShowMRP && Number(it.MRP) > 0
+    //     ? it.MRP
+    //     : "",
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   });
+    setValue(
+  `items.${i}.MRP`,
+  showMRP && Number(it.MRP) > 0
+    ? it.MRP
+    : "",
+  {
+    shouldValidate: true,
+    shouldDirty: true,
+  }
+);
+   
 
     // MRP discount from master
     // setValue(
@@ -865,7 +876,15 @@ export default function SaleEdit() {
         shouldDirty: true,
       }
     );
-    setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+    setValue(
+  `items.${i}.Quantity`,
+  Number(itemsValues[i]?.Quantity) || 1,
+  {
+    shouldValidate: true,
+    shouldDirty: true,
+  }
+);
+
     //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
     setValue(
       `items.${i}.Item_Unit`,
@@ -1267,7 +1286,7 @@ export default function SaleEdit() {
 
 
   const onSubmit = async (data) => {
-    console.log("🧾 Form Data (from RHF):", data);
+    console.log(" Form Data (from RHF):", data);
 
     // =========================================================
     // 1. ITEMS
@@ -1652,10 +1671,10 @@ export default function SaleEdit() {
 
         Item_Unit: item.Primary_Unit || "",
 
-        // ✅ Calculated Sale Price
+        //  Calculated Sale Price
         Sale_Price: calculatedSalePrice,
 
-        // ✅ Separate Sale Price discount
+        //  Separate Sale Price discount
         Discount_On_Sale_Price:
           item.Discount_On_Sale_Price ?? "",
 
@@ -1824,11 +1843,11 @@ export default function SaleEdit() {
             ? item.Available_Units
             : [],
 
-        // ✅ Calculated Sale Price
+        //  Calculated Sale Price
         Sale_Price:
           calculatedSalePrice,
 
-        // ✅ Separate Sale Price discount
+        //  Separate Sale Price discount
         Discount_On_Sale_Price:
           item.Discount_On_Sale_Price ?? "",
 
@@ -3135,8 +3154,7 @@ export default function SaleEdit() {
                                   const response =
                                     await getItemByName(typedValue).unwrap();
 
-                                  const matchedItem =
-                                    response?.item;
+                                  const matchedItem =response?.item;
 
                                   // ===================================================
                                   // NO EXACT ITEM FOUND
@@ -4218,21 +4236,34 @@ export default function SaleEdit() {
                                 setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                 //setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
                                 //setValue(`items.${i}.Discount_On_MRP_For_Sale_Percentage`, it.Discount_On_MRP_For_Sale || "", { shouldValidate: true, shouldDirty: true });
-                                // const mrp = Number(it.MRP) || 0;
-                                // const mrpDiscount = Number(it.Discount_On_MRP_For_Sale) || 0;
 
-                                // const calculatedSalePrice =
-                                //   mrp > 0
-                                //     ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
-                                //     : (it.Sale_Price || 0);
-                                setValue(
-                                  `items.${i}.MRP`,
-                                  Number(it.MRP) > 0 ? it.MRP : "",
-                                  {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  }
-                                );
+                                // setValue(
+                                //   `items.${i}.MRP`,
+                                //   Number(it.MRP) > 0 ? it.MRP : "",
+                                //   {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   }
+                                // );
+                                if (showMRP) {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    Number(it.MRP) > 0 ? it.MRP : "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                } else {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                }
 
                                 // =====================================================
                                 // MRP DISCOUNT FROM MASTER
@@ -4254,6 +4285,14 @@ export default function SaleEdit() {
                                   `items.${i}.Sale_Price`,
                                   calculatedSalePrice,
                                   { shouldValidate: true, shouldDirty: true }
+                                );
+                                 setValue(
+                                  `items.${i}.Quantity`,
+                                  Number(itemsValues[i]?.Quantity) || 1,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
                                 );
                                 //setValue(`items.${i}.Sale_Price`, it.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
                                 //setValue(`items.${i}.Discount_On_Sale_Price`, it.Discount_On_Sale_Price ?? "", { shouldValidate: true, shouldDirty: true, });
@@ -4292,7 +4331,7 @@ export default function SaleEdit() {
                                     Item_Name: it.Item_Name,
                                     Sale_Price: calculatedSalePrice,
                                     //Sale_Price: it.Sale_Price || 0,
-                                    Quantity: itemsValues[i]?.Quantity || 0,
+                                    Quantity: itemsValues[i]?.Quantity,
                                     Discount_On_Sale_Price: resolvedSaleDiscount,
                                     Discount_Type_On_Sale_Price: resolvedSaleDiscountType,
                                     // Discount_On_Sale_Price:itemsValues[i]?.Discount_On_Sale_Price ?? 0,
@@ -5516,54 +5555,7 @@ export default function SaleEdit() {
                           <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
                         )}
                       </td>
-                      {/* <td style={{ padding: "0px", width: "6%" }}>
-                        <div className="d-flex align-items-center">
-                          <input
-                            type="text"
-                            className="form-control"
-                            style={{ width: "100%", marginBottom: "0px" }}
-                            {...register(`items.${i}.Sale_Price`)}
-
-                            onChange={(e) => {
-                              let val = e.target.value.replace(/[^0-9.]/g, "");
-                              const parts = val.split(".");
-                              if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-                              if (val.includes(".")) {
-                                const [intPart, decPart] = val.split(".");
-                                val = intPart + "." + decPart.slice(0, 2);
-                              }
-
-                              e.target.value = val;
-
-                              // 🟩 Update RHF internal state FOR VALIDATION
-                              setValue(`items.${i}.Sale_Price`, val, { shouldValidate: true });
-                              baseSalePriceRef.current[i] = Number(val) || 0;
-                              baseSaleUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
-
-                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                { ...itemsValues[i], Sale_Price: val },
-                                i,
-                                itemsValues
-                              );
-
-                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                              setValue(`items.${i}.Amount`, Amount);
-                              // setValue("Total_Amount", Total_Amount);
-                              // setValue("Balance_Due", Balance_Due);
-                              syncTotalsAfterItemChange();
-                            }}
-
-
-                            placeholder="Price"
-                          />
-
-                        </div>
-                        {errors?.items?.[i]?.Sale_Price && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Sale_Price.message}
-                          </p>
-                        )}
-                      </td> */}
+                    
                       <td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
@@ -5640,7 +5632,7 @@ export default function SaleEdit() {
                               // ONLY WHEN MRP CALCULATION SETTING IS ON
                               // =====================================================
 
-                              if (calculateSalePriceFromMRP) {
+                              if (showMRP && calculateSalePriceFromMRP) {
                                 const mrp =
                                   Number(itemsValues[i]?.MRP) || 0;
 

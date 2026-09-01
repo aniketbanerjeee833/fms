@@ -480,6 +480,9 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const hasDiscountColumn = items.some(
     (item) => Number(item.Discount_Amount || 0) > 0
   );
+    const hasMRPColumn =items?.some(
+      (item) => item.hasHistoricalMRP === true
+    );
   const getLineDiscount = (item, type) => {
     console.log("type inside getLineDiscount", type);
     const price = Number(
@@ -688,6 +691,15 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               HSN/ SAC
             </th>
 
+             {hasMRPColumn && (
+              <th
+                className="invoice-table-header"
+                style={{ width: "9%" }}
+              >
+                MRP
+              </th>
+            )}
+
             <th
               className="invoice-table-header"
               style={{ width: "9%" }}
@@ -857,6 +869,11 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 <td className="invoice-item-cell">
                   {safe(item.Item_HSN)}
                 </td>
+                    {hasMRPColumn && (
+                    <td className="invoice-item-right">
+                      {safe(item.MRP)}
+                    </td>
+                  )}
 
                 {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
                 {/* <td className="invoice-item-right">
@@ -986,6 +1003,10 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             {/* HSN column */}
             <td className="invoice-total-cell"></td>
+             {/* MRP column if there */}
+              {hasMRPColumn && (
+              <td className="invoice-total-cell"></td>
+            )}
             <td className="invoice-total-cell">
               {money(totalQuantity)}
             </td>

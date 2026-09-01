@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,6 +33,7 @@ import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -367,7 +368,15 @@ export default function PurchaseAdd() {
 
 
   const [addPurchase, { isLoading: isAddingPurchase }] = useAddPurchaseMutation();
-  // helper to update a field in a specific row
+  const { data: settingsData } = useGetAllSettingsQuery();
+  const settings = settingsData?.settings || [];
+
+  const showMRP =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
       const updated = [...prev];
@@ -1166,8 +1175,7 @@ export default function PurchaseAdd() {
 
       Item_Unit: item.Primary_Unit || "",
 
-      Purchase_Price:
-        Number(item.Purchase_Price) || 0,
+      Purchase_Price: Number(item.Purchase_Price) || 0,
 
       // ✅ Purchase discount
       Discount_On_Purchase_Price:
@@ -1211,25 +1219,55 @@ export default function PurchaseAdd() {
       }
     }
 
-    // =====================================================
-    // REMOVE ALL UNUSED BLANK ROWS
-    // =====================================================
-
+  
     combinedItems = combinedItems.filter(
       (row) =>
         row?.Item_Name &&
         row.Item_Name.trim()
     );
 
-    // =====================================================
-    // APPEND REMAINING SCANNED ITEMS
-    // =====================================================
-
+    
     if (scanIndex < scannedRows.length) {
       combinedItems.push(
         ...scannedRows.slice(scanIndex)
       );
     }
+// let combinedItems = [...currentItems];
+
+// let scanIndex = 0;
+
+// // 1. Fill existing blank rows first
+// for (
+//   let i = 0;
+//   i < combinedItems.length && scanIndex < scannedRows.length;
+//   i++
+// ) {
+//   const row = combinedItems[i];
+
+//   const isBlankRow =
+//     !row?.Item_Name ||
+//     !row.Item_Name.trim();
+
+//   if (isBlankRow) {
+//     combinedItems[i] = scannedRows[scanIndex];
+//     scanIndex++;
+//   }
+// }
+
+// // 2. Remove only the blank rows that are still unused
+// combinedItems = combinedItems.filter(
+//   (row) =>
+//     row?.Item_Name &&
+//     row.Item_Name.trim()
+// );
+
+// // 3. Append every scanned item that wasn't used above
+// if (scanIndex < scannedRows.length) {
+//   combinedItems = [
+//     ...combinedItems,
+//     ...scannedRows.slice(scanIndex),
+//   ];
+// }
 
     // =====================================================
     // CALCULATE ROW AMOUNTS
@@ -1288,11 +1326,11 @@ export default function PurchaseAdd() {
         Item_Category:
           item.Item_Category || "",
 
-        Item_HSN:item.Item_HSN || "",
+        Item_HSN: item.Item_HSN || "",
 
-         MRP:Number(item.MRP) > 0
-        ? Number(item.MRP)
-        : "",
+        MRP: Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
         Primary_Unit:
           item.Primary_Unit || null,
@@ -1387,6 +1425,58 @@ export default function PurchaseAdd() {
 
       return filledRows;
     });
+//     setRows((prev) => {
+//   const existingRows = prev.filter(
+//     (row) =>
+//       row?.Item_Name &&
+//       row.Item_Name.trim()
+//   );
+
+//   return [
+//     ...existingRows,
+//     ...scannedUiRows,
+//   ];
+// });
+// setRows((prev) => {
+//   const updatedRows = [...prev];
+
+//   let scanIndex = 0;
+
+//   // Fill blank rows first
+//   for (
+//     let i = 0;
+//     i < updatedRows.length &&
+//     scanIndex < scannedUiRows.length;
+//     i++
+//   ) {
+//     const row = updatedRows[i];
+
+//     const isBlankRow =
+//       !row?.Item_Name ||
+//       !row.Item_Name.trim();
+
+//     if (isBlankRow) {
+//       updatedRows[i] = scannedUiRows[scanIndex];
+//       scanIndex++;
+//     }
+//   }
+
+//   // Remove unused blank rows
+//   const filledRows = updatedRows.filter(
+//     (row) =>
+//       row?.Item_Name &&
+//       row.Item_Name.trim()
+//   );
+
+//   // Append remaining scanned items
+//   if (scanIndex < scannedUiRows.length) {
+//     filledRows.push(
+//       ...scannedUiRows.slice(scanIndex)
+//     );
+//   }
+
+//   return filledRows;
+// });
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1452,25 +1542,7 @@ export default function PurchaseAdd() {
     <>
 
 
-      {/* <div className="sb2-2-2">
-        <ul>
-          <li>
-            {/* <NavLink to="/">
-                                <i className="fa fa-home mr-2" aria-hidden="true"></i>
-                                Dashboard
-                            </NavLink>
-            <NavLink style={{ display: "flex", flexDirection: "row" }}
-              to="/home"
 
-            >
-              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-              {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> *
-              Dashboard
-            </NavLink>
-          </li>
-
-        </ul>
-      </div> */}
 
       {/* Main Content */}
       {/* <div   className="sb2-2-3" >
@@ -2070,7 +2142,7 @@ export default function PurchaseAdd() {
                     <th>Category</th>
                     <th>Item</th>
                     <th>Item_HSN</th>
-                    <th>MRP</th>
+                    {showMRP && <th>MRP</th>}
                     <th>Qty</th>
                     <th>Unit</th>
                     <th>Price/Unit</th>
@@ -2589,19 +2661,20 @@ export default function PurchaseAdd() {
                                         shouldDirty: true,
                                       }
                                     );
-                                     setValue(
-                                    `items.${i}.MRP`,
-                                    matchedItem.MRP ?? "",
-                                    {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    }
-                                  );
+                                    setValue(
+                                      `items.${i}.MRP`,
+                                      //matchedItem.MRP ?? "",
+                                      showMRP ? matchedItem.MRP ?? "" : "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
 
                                     // ===================================================
                                     // ❗ PURCHASE PRICE
                                     //
-                                   
+
                                     // ===================================================
 
                                     setValue(
@@ -2849,7 +2922,7 @@ export default function PurchaseAdd() {
                             )}
                             {/* Dropdown List */}
 
-                            
+
                             {rows[i]?.itemOpen && (
                               <ItemDropdownVirtualized
                                 rowIndex={i}
@@ -2889,7 +2962,17 @@ export default function PurchaseAdd() {
                                   setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.MRP`, it.MRP ||"", { shouldValidate: true, shouldDirty: true });
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    showMRP && Number(it.MRP) > 0
+                                      ? it.MRP
+                                      : "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                  //setValue(`items.${i}.MRP`, it.MRP ||"", { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
@@ -3155,7 +3238,7 @@ export default function PurchaseAdd() {
                           )}
                         </td>
                         {/*MRP */}
-                        <td style={{ padding: "0px", width: "6%" }}>
+                        {showMRP && (<td style={{ padding: "0px", width: "6%" }}>
                           <div className="d-flex align-items-center">
                             <input
                               type="text"
@@ -3224,7 +3307,7 @@ export default function PurchaseAdd() {
                               {errors.items[i].MRP.message}
                             </p>
                           )}
-                        </td>
+                        </td>)}
 
                         {/* Qty */}
                         <td style={{ padding: "0px", width: "4%" }}>
@@ -3852,7 +3935,7 @@ export default function PurchaseAdd() {
                     <td colSpan={2}></td>
                     <td>Total</td>
                     <td></td>
-                    <td></td>
+                    {showMRP && <td></td>}
                     <td className="text-right">
                       {totals.totalQty}
                     </td>

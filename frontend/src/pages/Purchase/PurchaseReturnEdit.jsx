@@ -35,6 +35,7 @@ import BankAccountModal from "../../components/Modal/BankAccountModal";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
+import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -412,7 +413,7 @@ export default function PurchaseReturndEdit() {
           Item_Name: "",
           Quantity: "",
           Item_Unit: "",
-           MRP: "",
+          MRP: "",
           Purchase_Price: "",
           Discount_On_Purchase_Price: "",
           Discount_Type_On_Purchase_Price: "Percentage",
@@ -478,7 +479,25 @@ export default function PurchaseReturndEdit() {
 
 
   const [updatePurchaseReturn, { isLoading: isCreating }] = useUpdatePurchaseReturnMutation();
+
+  const { data: settingsData } = useGetAllSettingsQuery();
+  const settings = settingsData?.settings || [];
+
+  const showMRP =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
+  const hasHistoricalMRP =
+    purchase?.purchaseReturn?.items?.some(
+      (item) => item.hasHistoricalMRP === true
+    );
+
+  const shouldShowMRP = showMRP || hasHistoricalMRP;
   // helper to update a field in a specific row
+
+
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
       const updated = [...prev];
@@ -631,7 +650,7 @@ export default function PurchaseReturndEdit() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
-       MRP: "",
+      MRP: "",
       Quantity: "",
       Item_Unit: "",
       Purchase_Price: "",
@@ -703,7 +722,7 @@ export default function PurchaseReturndEdit() {
     Item_Name: "",
     itemSearch: "",
     Item_HSN: "",
-     MRP: "",
+    MRP: "",
     Quantity: "",
     Item_Unit: "",
     Purchase_Price: "",
@@ -1327,7 +1346,10 @@ export default function PurchaseReturndEdit() {
       Item_Category: item.Item_Category || "",
       Item_Name: item.Item_Name || "",
       Item_HSN: item.Item_HSN || "",
-      MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
+      MRP: showMRP && Number(item.MRP) > 0
+        ? Number(item.MRP)
+        : "",
+      //MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
 
       Quantity: Number(item.Quantity) || 1,
 
@@ -1458,9 +1480,12 @@ export default function PurchaseReturndEdit() {
         Item_HSN:
           item.Item_HSN || "",
 
-          MRP:Number(item.MRP) > 0
-        ? Number(item.MRP)
-        : "",
+        // MRP: Number(item.MRP) > 0
+        //   ? Number(item.MRP)
+        //   : "",
+        MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
         Primary_Unit:
           item.Primary_Unit || null,
@@ -2151,7 +2176,7 @@ export default function PurchaseReturndEdit() {
                     <th>Category</th>
                     <th>Item</th>
                     <th>Item_HSN</th>
-                     <th>MRP</th>
+                    {shouldShowMRP && <th>MRP</th>}
                     <th>Qty</th>
                     <th>Unit</th>
                     <th>Price/Unit</th>
@@ -2428,8 +2453,8 @@ export default function PurchaseReturndEdit() {
                                   const response =
                                     await getItemByName(typedValue).unwrap();
 
-                                  const matchedItem =response?.item;
-                                         const existingItemId =currentRow.Item_Id || "";
+                                  const matchedItem = response?.item;
+                                  const existingItemId = currentRow.Item_Id || "";
 
                                   const isSameExistingItem =
                                     existingItemId &&
@@ -2553,7 +2578,7 @@ export default function PurchaseReturndEdit() {
                                       shouldDirty: true,
                                     }
                                   );
-                                   setValue(
+                                  setValue(
                                     `items.${i}.MRP`,
                                     resolvedMRP,
                                     //currentRow.MRP ?? "",
@@ -2686,10 +2711,10 @@ export default function PurchaseReturndEdit() {
                                   // BASE PRICE / UNIT
                                   // ===================================================
 
-                                  
+
                                   // basePurchasePriceRef.current[i] =
                                   //   Number(currentRow.Purchase_Price) || 0;
-                                   basePurchasePriceRef.current[i] =
+                                  basePurchasePriceRef.current[i] =
                                     Number(resolvedPurchasePrice) || 0;
                                   basePurchaseUnitRef.current[i] =
                                     selectedUnit;
@@ -2825,7 +2850,7 @@ export default function PurchaseReturndEdit() {
 
 
                           {/* Dropdown List */}
-                          
+
                           {rows[i]?.itemOpen && (
                             <ItemDropdownVirtualized
                               rowIndex={i}
@@ -2865,9 +2890,36 @@ export default function PurchaseReturndEdit() {
                                 setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                if (showMRP) {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    Number(it.MRP) > 0 ? it.MRP : "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                } else {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                }
+                                //setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                setValue(
+                                  `items.${i}.Quantity`,
+                                  Number(itemsValues[i]?.Quantity) || 1,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
                                 setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
 
                                 basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
@@ -2895,170 +2947,6 @@ export default function PurchaseReturndEdit() {
                             />
                           )}
 
-                          {/* {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "45rem" }}
-                              className="absolute z-20  w-full bg-white border
-      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                            >
-                              <div
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleRowChange(i, "itemOpen", true);
-                                  setActiveItemRow(i);
-                                  setShowItemAddModal(true);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
-                                style={{
-                                  borderBottom: "1px solid #e5e7eb",
-                                  color: "#4CA1AF",
-                                  fontWeight: 600,
-                                  fontSize: 13,
-                                  position: "sticky",
-                                  top: 0,
-                                  backgroundColor: "#fff",
-                                  zIndex: 1,
-                                }}
-                              >
-                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
-                                Add Item
-                              </div>
-                              <table className="w-full text-sm border-collapse">
-                                <thead className="bg-gray-100 border-b">
-                                  <tr>
-                                    <th>Sl.No</th>
-                                    <th className="text-left px-3 py-2">Item Name</th>
-                                    <th className="text-left px-3 py-2">Sale Price</th>
-                                    <th className="text-left px-3 py-2">Purchase Price</th>
-                                    <th className="text-left px-3 py-2">Stock</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items?.items
-                                    ?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    )
-                                    .map((it, idx) => (
-                                      <tr
-                                        key={idx}
-                                        onClick={() => {
-
-                                          setRows((prev) => {
-                                            const updated = [...prev];
-                                            updated[i] = {
-                                              ...updated[i],
-                                              Item_Category: it.Item_Category || "",
-                                              Item_HSN: it.Item_HSN || "",
-                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                              isExistingItem: true,   // lock category
-                                              isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: false,     // lock unit
-                                              itemQuantity: it.Stock_Quantity || 0,
-                                              Primary_Unit: it.Primary_Unit || null,
-                                              Secondary_Unit: it.Secondary_Unit || null,
-                                              Conversion_Rate: it.Conversion_Rate || null,
-                                              // 
-                                              Available_Units: Array.isArray(it.Available_Units)
-                                                ? it.Available_Units
-                                                : [],
-                                            };
-                                            return updated;
-                                          });
-                                          handleRowChange(i, "itemSearch", it.Item_Name);
-                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                          handleRowChange(i, "CategoryOpen", false);
-                                          handleRowChange(i, "unitOpen", false);
-                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true });
-                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true });
-                                          setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0.00, { shouldValidate: true });
-                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true });
-                                          setValue(
-                                            `items.${i}.Item_Unit`,
-                                            it.Primary_Unit || "",
-                                            {
-                                              shouldValidate: true,
-                                              shouldDirty: true,
-                                            }
-                                          );
-                                          basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
-                                          basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
-                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
-                                          //setValue(`items.${i}.Quantity`, it.Stock_Quantity || 0, { shouldValidate: true });
-                                          setValue(`items.${i}.Tax_Type`, it.Tax_Type, { shouldValidate: true });
-                                          handleRowChange(i, "itemOpen", false);
-
-
-                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                            {
-                                              ...itemsValues[i],
-                                              Item_Name: it.Item_Name,
-                                              Purchase_Price: it.Purchase_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 0,
-                                              Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
-                                              Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
-                                              Tax_Type: itemsValues[i]?.Tax_Type
-                                            },
-                                            i,
-                                            itemsValues
-                                          );
-
-                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                                          setValue(`items.${i}.Amount`, Amount);
-                                          syncTotalsAfterItemChange();
-                                          // setValue(`Total_Amount`, Total_Amount);
-                                          // setValue(`Balance_Due`, Balance_Due);
-                                        }}
-
-                                        className="hover:bg-gray-100 cursor-pointer border-b"
-                                      >
-                                        <td>{idx + 1}</td>
-                                        <td className="px-3 py-2">{it.Item_Name}</td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        
-                                        <td className="px-3 py-2 whitespace-nowrap"
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                        </td> 
-                                        <td className="px-3 py-2 text-gray-600">
-                                          {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
-                                        </td>
-
-                                        <td className="px-3 py-2" style={{
-                                          padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                          color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                          fontWeight: "500",
-                                        }}>
-                                          {it.Item_Type === "Service"
-                                            ? ""
-                                            : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
-                                        </td>
-                                      </tr>
-                                    ))}
-
-                                  {items?.items?.filter((it) =>
-                                    it.Item_Name.toLowerCase().includes(
-                                      (rows[i]?.itemSearch || "").toLowerCase()
-                                    )
-                                  ).length === 0 && (
-                                      <tr>
-                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                          No Item found
-                                        </td>
-                                      </tr>
-                                    )}
-                                </tbody>
-                              </table>
-                            </div>
-                          )} */}
 
                           {/* RHF error */}
 
@@ -3096,8 +2984,8 @@ export default function PurchaseReturndEdit() {
                           </p>
                         )}
                       </td>
-                         {/*MRP */}
-                      <td style={{ padding: "0px", width: "6%" }}>
+                      {/*MRP */}
+                      {shouldShowMRP && (<td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
                             type="text"
@@ -3120,6 +3008,16 @@ export default function PurchaseReturndEdit() {
                               if (val.includes(".")) {
                                 const [int, dec] = val.split(".");
                                 val = int + "." + dec.slice(0, 2);
+                              }
+                              if (val === "") {
+                                setValue(`items.${i}.MRP`, "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+
+
+                                return;
                               }
 
                               //const displayValue = Number(val) === 0 ? "" : val;
@@ -3166,7 +3064,7 @@ export default function PurchaseReturndEdit() {
                             {errors.items[i].MRP.message}
                           </p>
                         )}
-                      </td>
+                      </td>)}
 
                       {/* Quantity */}
                       <td style={{ padding: "0px", width: "4%" }}>
@@ -4037,7 +3935,7 @@ export default function PurchaseReturndEdit() {
                     <td colSpan={2}></td>
                     <td>Total</td>
                     <td></td>
-                    <td></td>
+                    {shouldShowMRP && <td></td>}
 
                     <td className="text-right">
                       {totals.totalQty}

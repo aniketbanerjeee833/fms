@@ -21,6 +21,7 @@ const TYPE_CONFIG = {
         paidKey: "Total_Received",
         paidLabel: "Received",
         priceKey: "Sale_Price",
+        mrpKey: "MRP",
         discountKey: "Discount_On_Sale_Price",
         discountTypeKey: "Discount_Type_On_Sale_Price",
     },
@@ -31,6 +32,7 @@ const TYPE_CONFIG = {
         paidKey: "Total_Paid",
         paidLabel: "Paid",
         priceKey: "Purchase_Price",
+        mrpKey: "MRP",
         discountKey: "Discount_On_Purchase_Price",
         discountTypeKey: "Discount_Type_On_Purchase_Price",
     },
@@ -41,6 +43,7 @@ const TYPE_CONFIG = {
         paidKey: "Total_Paid",      // ← fixed
         paidLabel: "Paid",           // ← fixed label to match
         priceKey: "Price",
+
         discountKey: "Discount_On_Price",
         discountTypeKey: "Discount_Type_On_Price",
     },
@@ -51,6 +54,7 @@ const TYPE_CONFIG = {
         paidKey: "Total_Paid",
         paidLabel: "Received",
         priceKey: "Sale_Price",
+        mrpKey: "MRP",
         discountKey: "Discount_On_Sale_Price",
         discountTypeKey: "Discount_Type_On_Sale_Price",
     },
@@ -61,6 +65,7 @@ const TYPE_CONFIG = {
         paidKey: "Total_Received",
         paidLabel: "Paid",
         priceKey: "Purchase_Price",
+        mrpKey: "MRP",
         discountKey: "Discount_On_Purchase_Price",
         discountTypeKey: "Discount_Type_On_Purchase_Price",
     },
@@ -202,6 +207,9 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                 const hasDiscountColumn = items.some(
                                     (it) => Number(it[cfg.discountKey] || 0) > 0
                                 );
+                                const hasMRPColumn = items.some(
+                                    (it) => Number(it[cfg.mrpKey] || 0) > 0
+                                );
                                 const showTaxColumns = items.some(
                                     (it) => Number(it.Tax_Amount || 0) > 0
                                 );
@@ -272,6 +280,11 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                     <th className="bulk-center" style={{ width: "4%" }}>#</th>
                                                     <th style={{ width: "22%" }}>Item name</th>
                                                     <th style={{ width: "9%" }}>HSN</th>
+                                                    {hasMRPColumn && (
+                                                        <th className="bulk-right" style={{ width: "8%" }}>
+                                                            MRP
+                                                        </th>
+                                                    )}
                                                     <th className="bulk-right" style={{ width: "8%" }}>Qty</th>
                                                     <th className="bulk-center" style={{ width: "6%" }}>Unit</th>
                                                     <th className="bulk-right" style={{ width: "10%" }}>Price</th>
@@ -301,6 +314,13 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                             <td className="bulk-center">{i + 1}</td>
                                                             <td>{item.Item_Name || "-"}</td>
                                                             <td>{item.Item_HSN || "-"}</td>
+                                                            {hasMRPColumn && (
+                                                                <td className="bulk-right">
+                                                                    {Number(item[cfg.mrpKey] || 0) > 0
+                                                                        ? money(item[cfg.mrpKey])
+                                                                        : "-"}
+                                                                </td>
+                                                            )}
                                                             <td className="bulk-right">{money(item.Quantity)}</td>
                                                             <td className="bulk-center">
                                                                 {item.Selected_Unit || item.Item_Unit || "-"}
@@ -342,6 +362,7 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                     <td />
                                                     <td className="bulk-bold">Total</td>
                                                     <td />
+                                                    {hasMRPColumn && <td />}
                                                     <td className="bulk-right bulk-bold">
                                                         {money(items.reduce((s, i) => s + Number(i.Quantity || 0), 0))}
                                                     </td>
@@ -442,10 +463,10 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                             /* ══════════════════════════════════════════
                                SINGLE-LINE ROW — Payment In / Out / Opening Balance
                             ══════════════════════════════════════════ */
-                            const doc = getDoc(txn.data);
+                            //const doc = getDoc(txn.data);
                             const splits = txn.data?.splits || [];
                             const splitSummary = buildSplitSummary(splits);
-                            const direction = txn.data?.Direction;
+                            //const direction = txn.data?.Direction;
 
 
                             if (txn.type === "Payment In") {
@@ -661,33 +682,4 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
 });
 
 export default PartyBulkReportPrintTemplate;
-
-// <div
-//     key={`${txn.type}-${gIdx}-${rIdx}`}
-//     className="bulk-single-line"
-// >
-//     <span className="bulk-single-type">{txn.type}</span>
-
-//     {txn.number && txn.number !== "-" && (
-//         <span className="bulk-single-number">{txn.number}</span>
-//     )}
-
-//     {splitSummary && (
-//         <span className="bulk-single-splits">{splitSummary}</span>
-//     )}
-
-//     <span
-//         className="bulk-single-amount"
-//         style={{
-//             color:
-//                 direction === "Credit"
-//                     ? "#166534"
-//                     : direction === "Debit"
-//                         ? "#991b1b"
-//                         : "#111827",
-//         }}
-//     >
-//         ₹ {money(txn.amount)}
-//     </span>
-// </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import {
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart,
+ 
   Users, Package, AlertCircle, FileText, LayoutDashboard, CalendarDays,
   Icon,
   IndianRupee
@@ -22,7 +22,7 @@ import {
 
 import { useGetTotalSalesEachDayQuery } from "../redux/api/saleApi";
 import { useGetTotalPurchasesEachDayQuery } from "../redux/api/purchaseApi";
-import { Filter, X } from 'lucide-react';
+
 import { NavLink, } from 'react-router-dom';
 import { useMemo } from 'react';
 
@@ -48,6 +48,13 @@ const firstOfMonthStr = () => {
 const formatAxisDate = (dateStr) => {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+};
+const lastOfMonthStr = () => {
+  const d = new Date();
+
+  return formatLocalDate(
+    new Date(d.getFullYear(), d.getMonth() + 1, 0)
+  );
 };
 export default function Dashboard() {
   // const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
@@ -115,7 +122,7 @@ export default function Dashboard() {
   console.log("totalPayablesLeft", totalPayablesLeft);
   console.log("totalReceivablesLeft", totalReceivablesLeft);
    const [fromDate, setFromDate] = useState(firstOfMonthStr());
-  const [toDate, setToDate]     = useState(todayStr());
+  const [toDate, setToDate]     = useState(lastOfMonthStr());
  
   const { data, isLoading } = useGetSalesChartDataQuery({ fromDate, toDate });
  
@@ -489,7 +496,7 @@ export default function Dashboard() {
               type="date"
               value={toDate}
               min={fromDate}
-              max={todayStr()}
+              //max={todayStr()}
               onChange={(e) => setToDate(e.target.value)}
               className="w-full outline-none border-b-2 text-gray-900"
               //style={{ borderColor: "#d1d5db" }}

@@ -468,7 +468,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   // =========================================================
   // RENDER
   // =========================================================
-  const hasTaxDetails = taxGroupList.length > 0;
+  //const hasTaxDetails = taxGroupList.length > 0;
   const showUnitColumn = items.some(
     (item) => item.Selected_Unit?.trim()
   );
@@ -478,6 +478,9 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const hasDiscountColumn = items.some(
     (item) => Number(item.Discount_Amount || 0) > 0
   );
+  const hasMRPColumn =items?.some(
+      (item) => item.hasHistoricalMRP === true
+    );
   const hasItems = items.length > 0;
   //const MIN_ROWS = 10;
   //const emptyRows = Math.max(0, MIN_ROWS - items.length);
@@ -693,6 +696,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               HSN/ SAC
             </th>
 
+             {hasMRPColumn && (
+              <th
+                className="invoice-table-header"
+                style={{ width: "9%" }}
+              >
+                MRP
+              </th>
+            )}
+
             <th
               className="invoice-table-header"
               style={{ width: "9%" }}
@@ -801,6 +813,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
           {items.map((item, idx) => {
+            console.log("item", item);
             const taxAmount = getTaxAmount(item);
             // const gstRate = getGstRate(item.Tax_Type);
             // const halfRate = gstRate / 2;
@@ -842,9 +855,9 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 : 0;
 
 
-            const isTaxable =
-              gstRate > 0 &&
-              taxAmount > 0;
+            // const isTaxable =
+            //   gstRate > 0 &&
+            //   taxAmount > 0;
 
 
             return (
@@ -858,6 +871,12 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 <td className="invoice-item-cell">
                   {safe(item.Item_HSN)}
                 </td>
+
+                  {hasMRPColumn && (
+                    <td className="invoice-item-right">
+                      {safe(item.MRP)}
+                    </td>
+                  )}
 
                 {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
                 {/* <td className="invoice-item-right">
@@ -1031,6 +1050,9 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             {/* HSN column */}
             <td className="invoice-total-cell"></td>
+            {hasMRPColumn && (
+              <td className="invoice-total-cell"></td>
+            )}
             <td className="invoice-total-cell">
               {hasItems ? money(totalQuantity) : ""}
             </td>

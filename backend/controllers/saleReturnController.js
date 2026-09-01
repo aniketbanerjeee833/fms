@@ -271,6 +271,7 @@ const getSaleReturnById = async (req, res, next) => {
     i.Item_Name,
     i.Item_HSN,
     i.Item_Category,
+    i.Discount_On_MRP_For_Sale AS Current_MRP_Discount,
 
     -- CURRENT MASTER UNITS FROM IDs
     iu.Unit_Shorthand AS Item_Unit,
@@ -361,6 +362,7 @@ const getSaleReturnById = async (req, res, next) => {
       const currentPrimary = it.Current_Primary_Unit || null;
 
       const currentSecondary = it.Current_Secondary_Unit || null;
+      const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
       const price = Number(it.Sale_Price || 0);
       let discountAmount = 0;
 
@@ -471,6 +473,8 @@ const getSaleReturnById = async (req, res, next) => {
         Available_Units: availableUnits,
         MRP:it.MRP,
         Discount_On_MRP_For_Sale_Percentage:it.Discount_On_MRP_For_Sale_Percentage,
+        Current_MRP_Discount:it.Current_MRP_Discount,
+         hasHistoricalMRP,
 
         Sale_Price: it.Sale_Price,
 

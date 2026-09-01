@@ -29,6 +29,7 @@ import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
+import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
 
 function ItemDropdownVirtualized({
 
@@ -397,6 +398,21 @@ export default function PurchaseEdit() {
 
   const [editPurchase, { isLoading: isEditingPurchase }] = useEditPurchaseMutation();
   // helper to update a field in a specific row
+  const { data: settingsData } = useGetAllSettingsQuery();
+  const settings = settingsData?.settings || [];
+
+  const showMRP =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
+  const hasHistoricalMRP =
+    purchase?.items?.some(
+      (item) => item.hasHistoricalMRP === true
+    );
+
+  const shouldShowMRP = showMRP || hasHistoricalMRP;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
       const updated = [...prev];
@@ -619,32 +635,7 @@ export default function PurchaseEdit() {
     });
   };
 
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
 
-  // const handleDeleteRow = (i) => {
-  //   // 1. get current items BEFORE removal
-  //   const currentItems = watch("items");
-
-  //   // 2. calculate new total excluding the deleted row
-  //   const newTotal = currentItems.reduce((sum, row, idx) => {
-  //     if (idx === i) return sum;                    // skip deleted row
-  //     return sum + parseFloat(row.Amount || 0);
-  //   }, 0);
-
-  //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  //   const newBalanceDue = newTotal - currentTotalPaid;
-
-  //   // 3. remove from UI state and form
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
-  //   remove(i);
-
-  //   // 4. update totals
-  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-  //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  // };
   const handleDeleteRow = (i) => {
     // 1. get current items BEFORE removal
     const currentItems = watch("items");
@@ -933,7 +924,9 @@ export default function PurchaseEdit() {
         Item_Name: item.Item_Name || "",
         Item_Category: item.Item_Category || "",
         Item_HSN: item.Item_HSN || "",
-        MRP: item.MRP || "",
+        MRP: Number(item.MRP) > 0
+          ? item.MRP
+          : "",
         Quantity: item.Quantity || "",
 
         Item_Unit: item.Item_Unit || "",
@@ -1314,7 +1307,10 @@ export default function PurchaseEdit() {
       Item_Category: item.Item_Category || "",
       Item_Name: item.Item_Name || "",
       Item_HSN: item.Item_HSN || "",
-      MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
+      MRP: showMRP && Number(item.MRP) > 0
+  ? Number(item.MRP)
+  : "",
+      //MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
 
       Quantity: Number(item.Quantity) || 1,
 
@@ -1444,9 +1440,12 @@ export default function PurchaseEdit() {
 
         Item_HSN: item.Item_HSN || "",
 
-         MRP:Number(item.MRP) > 0
-        ? Number(item.MRP)
-        : "",
+        // MRP: Number(item.MRP) > 0
+        //   ? Number(item.MRP)
+        //   : "",
+        MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
         Primary_Unit:
           item.Primary_Unit || null,
@@ -1602,7 +1601,7 @@ export default function PurchaseEdit() {
 
   return (
     <>
-     
+
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -2094,7 +2093,7 @@ export default function PurchaseEdit() {
                     <th>Category</th>
                     <th>Item</th>
                     <th>Item_HSN</th>
-                    <th>MRP</th>
+                    {shouldShowMRP && <th>MRP</th>}
                     <th>Qty</th>
                     <th>Unit</th>
                     <th>Price/Unit</th>
@@ -2832,9 +2831,36 @@ export default function PurchaseEdit() {
                                 setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                //setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                if (showMRP) {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    Number(it.MRP) > 0 ? it.MRP : "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                } else {
+                                  setValue(
+                                    `items.${i}.MRP`,
+                                    "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                }
                                 setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                 setValue(
+                                  `items.${i}.Quantity`,
+                                  Number(itemsValues[i]?.Quantity) || 1,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
 
                                 basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
@@ -3055,7 +3081,7 @@ export default function PurchaseEdit() {
                         )}
                       </td>
                       {/*MRP */}
-                      <td style={{ padding: "0px", width: "6%" }}>
+                      {shouldShowMRP && (<td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
                           <input
                             type="text"
@@ -3078,6 +3104,16 @@ export default function PurchaseEdit() {
                               if (val.includes(".")) {
                                 const [int, dec] = val.split(".");
                                 val = int + "." + dec.slice(0, 2);
+                              }
+                              if (val === "") {
+                                setValue(`items.${i}.MRP`, "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+
+
+                                return;
                               }
 
                               //const displayValue = Number(val) === 0 ? "" : val;
@@ -3124,7 +3160,7 @@ export default function PurchaseEdit() {
                             {errors.items[i].MRP.message}
                           </p>
                         )}
-                      </td>
+                      </td>)}
 
                       {/* Qty */}
                       <td style={{ padding: "0px", width: "4%" }}>
@@ -3949,7 +3985,7 @@ export default function PurchaseEdit() {
                     <td colSpan={2}></td>
                     <td>Total</td>
                     <td></td>
-                    <td></td>
+                    {shouldShowMRP && <td></td>}
 
                     <td className="text-right">
                       {totals.totalQty}
