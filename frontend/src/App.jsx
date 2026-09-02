@@ -72,6 +72,9 @@ const ExpensePreview = lazy(() => import('./pages/Expense/ExpensePreview'));
 const CashInHand= lazy(() => import('./pages/CashAndBank/CashInHand'));
 const BankAccounts= lazy(() => import('./pages/CashAndBank/BankAccounts'));
 
+
+
+const BarcodeGenerator = lazy(() => import('./pages/Utilities/BarcodeGenerator'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
 // const Reports = lazy(() => import('./pages/Reports'));
 
@@ -251,6 +254,19 @@ function RouterWrapper() {
                
               }
             />
+
+             <Route path="/party/payables" element={
+              <Layout>
+              <PartyPayablesLeft/>
+              </Layout>
+              } 
+              />
+            <Route path="/party/receivables" element={
+              <Layout>
+              <PartyReceivablesLeft/>
+              </Layout> 
+              } 
+              />
             <Route
               path="/sale/invoice"
               element={
@@ -507,6 +523,15 @@ function RouterWrapper() {
             /> */}
 
              <Route
+              path="/utilities/barcode-generator"
+              element={
+                <Layout>
+                  <BarcodeGenerator/>
+                </Layout>
+              }
+            />
+
+             <Route
               path="/settings"
               element={
                 <Layout>
@@ -515,18 +540,7 @@ function RouterWrapper() {
               }
             />
 
-            <Route path="/party/payables" element={
-              <Layout>
-              <PartyPayablesLeft/>
-              </Layout>
-              } 
-              />
-            <Route path="/party/receivables" element={
-              <Layout>
-              <PartyReceivablesLeft/>
-              </Layout> 
-              } 
-              />
+           
 
               {/* <Route
               path="/barcode-scanner"

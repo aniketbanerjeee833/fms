@@ -1,7 +1,7 @@
 import  { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet, IndianRupee } from 'lucide-react'
+import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet, IndianRupee, Wrench } from 'lucide-react'
 
 const REACT_APP_API_URL = "http://localhost:4000";
 
@@ -75,11 +75,17 @@ const currentPath = location.pathname;
       
     }
 
-    if(currentPath.startsWith("/financial-year/add") )
+    if(currentPath.startsWith("/utilities/barcode-generator") )
      {
-      setOpenMenu("Settings");
+      setOpenMenu("Utilities");
       
     }
+
+    // if(currentPath.startsWith("/financial-year/add") )
+    //  {
+    //   setOpenMenu("Settings");
+      
+    // }
      if(currentPath.startsWith("/reports/sales-purchases-report") ||
     currentPath.startsWith("/reports/balance-sheet") )
      {
@@ -165,8 +171,13 @@ if (
     )
       return true;
 
-    if(cleanLink==="/financial-year/add" && current.startsWith("/financial-year/add"))
-      return true;
+      if(
+        (cleanLink==="/utilities/barcode-generator" && current.startsWith("/utilities/barcode-generator"))
+      )
+        return true;
+
+    // if(cleanLink==="/financial-year/add" && current.startsWith("/financial-year/add"))
+    //   return true;
 
     if((cleanLink==="/reports/sales-purchases-report" && 
       current.startsWith("/reports/sales-purchases-report"))||
@@ -319,7 +330,12 @@ if (
             { to: "/financial-year/add", text: "Financial Year" },
           
           ])} */}
-
+          {renderMenu("Utilities", <Wrench  size={20} />, [
+           
+            
+            { to: "/utilities/barcode-generator", text: "Barcode Generator" },
+            
+          ])}
             <NavLink
               to="/settings"
               className={({ isActive }) => (isActive ? "menu-active" : "")}

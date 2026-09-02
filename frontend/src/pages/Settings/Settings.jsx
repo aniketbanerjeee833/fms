@@ -378,17 +378,17 @@ export default function Settings() {
 
         <button
           type="button"
-          onClick={() => setActiveSection("settings")}
+          onClick={() => setActiveSection("Items")}
           className="text-left px-4 py-3 text-sm font-medium"
           style={{
-            backgroundColor: activeSection === "settings" ? "#f0f9ff" : "transparent",
-            borderLeft: activeSection === "settings" ? "3px solid #4CA1AF" : "3px solid transparent",
-            color: activeSection === "settings" ? "#4CA1AF" : "#374151",
+            backgroundColor: activeSection === "Items" ? "#f0f9ff" : "transparent",
+            borderLeft: activeSection === "Items" ? "3px solid #4CA1AF" : "3px solid transparent",
+            color: activeSection === "Items" ? "#4CA1AF" : "#374151",
             border: "none",
             cursor: "pointer",
           }}
         >
-          Settings
+          Items
         </button>
       </div>
 
@@ -484,7 +484,7 @@ export default function Settings() {
           </>
         )}
 
-        {activeSection === "settings" && (
+        {activeSection === "Items" && (
           <>
             <div className="inn-title">
               <h4 className="text-2xl font-bold mb-2">Settings</h4>

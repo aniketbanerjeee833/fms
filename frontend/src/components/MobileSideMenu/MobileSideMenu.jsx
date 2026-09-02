@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Users, Package, ShoppingCart, X, CalendarDays, ClipboardMinus, Wallet, LayoutDashboard, Settings, IndianRupee } from 'lucide-react'
+import { Users, Package, ShoppingCart, X, CalendarDays, ClipboardMinus, Wallet, LayoutDashboard, Settings, IndianRupee, Wrench } from 'lucide-react'
 
 import "./MobileSideMenu.css";
 const MobileSideMenu = ({ onClose }) => {
@@ -46,12 +46,18 @@ const MobileSideMenu = ({ onClose }) => {
       setOpenMenu("Purchase");
 
     }
-    if (currentPath.startsWith("/daily-expense/add") ||
-      currentPath.startsWith("/daily-expense/all-expense")) {
-      setOpenMenu("Daily Expense ");
-
+    if(currentPath.startsWith("/expense/categories") || 
+    currentPath.startsWith("/expense/items") )
+     {
+      setOpenMenu("Expense");
+      
     }
 
+    if(currentPath.startsWith("/utilities/barcode-generator") )
+     {
+      setOpenMenu("Utilities");
+      
+    }
     if (currentPath.startsWith("/financial-year/add")) {
       setOpenMenu("Settings");
 
@@ -132,10 +138,19 @@ const MobileSideMenu = ({ onClose }) => {
       (cleanLink === "/purchase/all-purchases" && current.startsWith("/purchase/all-purchases"))
     )
       return true;
-    if ((cleanLink === "/daily-expense/add" && current.startsWith("/daily-expense/add")) ||
-      (cleanLink === "/daily-expense/all-expense" && current.startsWith("/daily-expense/all-expense"))
+   
+
+       if(
+      (cleanLink==="/expense/categories" && current.startsWith("/expense/categories")) ||
+      (cleanLink==="/expense/items" && current.startsWith("/expense/items"))
     )
       return true;
+
+      if(
+        (cleanLink==="/utilities/barcode-generator" && current.startsWith("/utilities/barcode-generator"))
+      )
+        return true;
+
 
     if (cleanLink === "/financial-year/add" && current.startsWith("/financial-year/add"))
       return true;
@@ -395,11 +410,30 @@ const MobileSideMenu = ({ onClose }) => {
               { to: "/expense/categories", text: "Categories" },
               { to: "/expense/items", text: "Items" },
             ])}
-            {renderMenu("Settings", <Settings size={20} />, [
+            {/* {renderMenu("Settings", <Settings size={20} />, [
 
               { to: "/financial-year/add", text: "Financial Year" },
 
-            ])}
+            ])} */}
+             {renderMenu("Utilities", <Wrench  size={20} />, [
+                       
+                        
+                        { to: "/utilities/barcode-generator", text: "Barcode Generator" },
+                        
+                      ])}
+                        <NavLink
+                          to="/settings"
+                          className={({ isActive }) => (isActive ? "menu-active" : "")}
+                          style={{ display: 'block', padding: '10px 16px',
+                            color: "#666", textDecoration: 'none',borderBottom:"1px solid #e8edf2" }}
+                              onClick={() => setOpenMenu(null)} // ✅ Close all submenus
+                        >
+                          
+                          {/* <i className="fa fa-bar-chart" aria-hidden="true"></i> Dashboard */}
+                             <span className="flex items-center gap-2"><Settings size={20}/> 
+                            Settings
+                             </span>
+                        </NavLink>
 
             {/* <NavLink
               to="/reports"

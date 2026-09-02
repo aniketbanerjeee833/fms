@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "react-toastify";
 import { useLazyGetItemsByCodeQuery } from "../../redux/api/itemApi";
-import BarcodeScanner from "../BarcodeScanner";
+import BarcodeScanner from "../Barcode/BarcodeScanner";
 const ACCENT = "#4CA1AF"
 export default function ScanCodeModal({ onClose, onSave }) {
   const [code, setCode] = useState("");
