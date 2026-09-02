@@ -7,7 +7,8 @@ import { Trash2 } from "lucide-react";
 
 import { useEditItemMutation, useGetItemsForDropdownQuery, useLazyGetItemByNameQuery } from "../../redux/api/itemApi";
 import AddItemModal from "../../components/Modal/AddItemModal";
-import BarcodeLabelSheet from "../../components/Barcode/BarcodeLabelSheet";
+// import BarcodeLabelSheet from "../../components/Barcode/BarcodeLabelSheet";
+import BarcodeLabelSheet from "../../components/Barcode/BarcodeLabelSheet"
 // =========================================================
 // FIELD OPTIONS for Header/Line1-4 dropdowns
 // =========================================================
