@@ -140,8 +140,8 @@ function BankDetailPanel({ bankId }) {
 
   // 🔹 only cursor state needed — no page, no manual ledger array
   const [cursor, setCursor] = useState(null);
-  const sentinelRef = useRef(null);
-  const observerRef = useRef(null);
+  //const sentinelRef = useRef(null);
+  //const observerRef = useRef(null);
     const itemRef = useRef(bankId);
   
       const effectiveCursor = itemRef.current === bankId ? cursor : null;
@@ -196,31 +196,32 @@ function BankDetailPanel({ bankId }) {
       }, [bankId]);
 
   // 🔹 intersection observer
-  const handleObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        hasMore &&
-        nextCursor &&
-        !isFetching &&
-        !isLoading
-      ) {
-        setCursor(nextCursor);
-      }
-    },
-    [hasMore, nextCursor, isFetching, isLoading]
-  );
+  // const handleObserver = useCallback(
+  //   (entries) => {
+  //     if (
+  //       entries[0].isIntersecting &&
+  //       hasMore &&
+  //       nextCursor &&
+  //       !isFetching &&
+  //       !isLoading
+  //     ) {
+  //       setCursor(nextCursor);
+  //     }
+  //   },
+  //   [hasMore, nextCursor, isFetching, isLoading]
+  // );
 
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(handleObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-    return () => observerRef.current?.disconnect();
-  }, [handleObserver]);
+  // useEffect(() => {
+  //   if (observerRef.current) observerRef.current.disconnect();
+  //   observerRef.current = new IntersectionObserver(handleObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
+  //   if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+  //   return () => observerRef.current?.disconnect();
+  // }, [handleObserver]);
+
 const handleTransactionEdit = (row) => {
   if (!row?.Formatted_Reference_Id) return;
 
@@ -758,7 +759,7 @@ const handleTransactionEdit = (row) => {
         </table>
 
         {/* sentinel */}
-        <div ref={sentinelRef} style={{ height: "1px" }} />
+        {/* <div ref={sentinelRef} style={{ height: "1px" }} /> */}
 
         {isFetching && (
           <div className="flex justify-center py-4">

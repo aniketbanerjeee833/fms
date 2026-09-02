@@ -1,14 +1,29 @@
 
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  
+  Building2,
+  SquarePen,
+  ChevronRight,
+ 
+  Eye,
+ 
+  CreditCard,
+  Landmark,
+  Wallet,
+  Trash2,
+  MoreVertical,
+  Printer
+} from "lucide-react";
 
-import { NavLink, useSearchParams } from "react-router-dom";
-import { LayoutDashboard, Building2, SquarePen, ChevronRight, ArrowUpRight, Eye, ArrowDownLeft, CreditCard, Landmark, Wallet, Trash2 } from "lucide-react";
 import {
   bankAccountApi,
   useGetAllBankAccountsQuery,
   useGetBankAccountByIdQuery,
 } from "../../redux/api/bankAccountApi";
+
 import BankAccountModal from "../../components/Modal/BankAccountModal";
 import { useDeletePaymentInMutation, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
 import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
@@ -117,419 +132,49 @@ const DELETE_CONFIG = {
     label: "payment out entry",
   },
 };
-// function BankDetailPanel({ bankId }) {
-//   const dispatch = useDispatch();
 
-//   /* ── infinite scroll state ── */
-//   const [page, setPage] = useState(1);
-//   const [ledger, setLedger] = useState([]);
-//   const [hasMore, setHasMore] = useState(true);
-//   const sentinelRef = useRef(null);   // div at bottom of list
-//   const observerRef = useRef(null);   // IntersectionObserver instance
-
-//   /* ── modals ── */
-//   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
-//   const openModal = (type, id) => setModalState({ open: true, type, id });
-//   const closeModal = () => setModalState({ open: false, type: null, id: null });
-
-//   /* ── mutations ── */
-//   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
-//   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
-//   const { data: partiesList } = useGetAllPartiesQuery();
-//   /* ── bank list for modals ── */
-//   const { data: banks = [] } = useGetAllBankAccountsQuery();
-
-//   /* ── RTK Query — one page at a time ── */
-//   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
-//     { Bank_Account_Id: bankId, page, limit: 10 },
-//     { skip: !bankId }
-//   );
-//   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
-//   //const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
-//   /* ── Reset when bankId changes ── */
-//   useEffect(() => {
-//     setPage(1);
-//     setLedger([]);
-//     setHasMore(true);
-//   }, [bankId]);
-
-//   /* ── Append new page of transactions ── */
-//   useEffect(() => {
-//     if (!data?.transactions) return;
-
-//     setLedger((prev) => {
-//       /* deduplicate by bt.id in case RTK refetches */
-//       const existingIds = new Set(prev.map((r) => r.id));
-//       const fresh = data.transactions.filter((r) => !existingIds.has(r.id));
-//       return [...prev, ...fresh];
-//     });
-
-//     /* no more pages? */
-//     if (page >= (data.totalPages ?? 1)) {
-//       setHasMore(false);
-//     }
-//   }, [data]);
-
-//   /* ── IntersectionObserver: load next page when sentinel visible ── */
-//   const handleObserver = useCallback(
-//     (entries) => {
-//       const target = entries[0];
-//       if (target.isIntersecting && hasMore && !isFetching && !isLoading) {
-//         setPage((prev) => prev + 1);
-//       }
-//     },
-//     [hasMore, isFetching, isLoading]
-//   );
-
-//   useEffect(() => {
-//     /* disconnect old observer */
-//     if (observerRef.current) observerRef.current.disconnect();
-
-//     observerRef.current = new IntersectionObserver(handleObserver, {
-//       root: null,       // viewport
-//       rootMargin: "0px",
-//       threshold: 0.1,
-//     });
-
-//     if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-
-//     return () => {
-//       if (observerRef.current) observerRef.current.disconnect();
-//     };
-//   }, [handleObserver]);
-
-//   /* ── handlers ── */
-//   const handleSavePaymentIn = async (formData) => {
-//     try {
-//       await updatePaymentIn({ id: modalState.id, ...formData }).unwrap();
-//       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-//       dispatch(bankAccountApi.util.invalidateTags([
-//         { type: "BankAccount", id: formData.Bank_Account_Id },
-//         "BankAccount",
-//       ]));
-//       /* reset scroll so updated data reloads */
-//       setPage(1);
-//       setLedger([]);
-//       setHasMore(true);
-//       closeModal();
-//       toast.success("Payment In updated");
-//     } catch (err) {
-//       toast.error(err?.data?.message || "Failed to save payment in.");
-//     }
-//   };
-
-//   const handleSavePaymentOut = async (formData) => {
-//     try {
-//       await updatePaymentOut({ id: modalState.id, ...formData }).unwrap();
-//       dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-//       dispatch(bankAccountApi.util.invalidateTags([
-//         { type: "BankAccount", id: formData.Bank_Account_Id },
-//         "BankAccount",
-//       ]));
-//       setPage(1);
-//       setLedger([]);
-//       setHasMore(true);
-//       closeModal();
-//       toast.success("Payment Out updated");
-//     } catch (err) {
-//       toast.error(err?.data?.message || "Failed to save payment out.");
-//     }
-//   };
-
-//   const bank = data?.bankAccount;
-//   const [deleteSale, { isLoading: isDeletingSale }] = useDeleteSaleMutation();
-//   const [deletePurchase, { isLoading: isDeletingPurchase }] = useDeletePurchaseMutation();
-//     const [deleteSaleReturn, { isLoading: isDeletingSaleReturn }] = useDeleteSaleReturnMutation();
-//      const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
-//     const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
-//      const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
-
-//      const isDeleting =
-//      isDeletingSale ||
-//        isDeletingPurchase ||
-//       isDeletingSaleReturn ||
-//        isDeletingPurchaseReturn ||
-//       isDeletingPaymentIn ||
-//       isDeletingPaymentOut;
-//   const handleConfirmDelete = async () => {
-//     if (!deleteTarget) return;
-
-//     try {
-//       let res;
-
-//       switch (deleteTarget.Txn_Type) {
-//         case "Sale":
-//           res = await deleteSale(deleteTarget.Id).unwrap();
-//           break;
-
-//         case "Purchase":
-//           res = await deletePurchase(
-//             deleteTarget.Id
-//           ).unwrap();
-//           break;
-
-//         case "Sale_Return":
-//           res = await deleteSaleReturn(deleteTarget.Id).unwrap();
-//           break;
-
-//         case "Purchase_Return":
-//            res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
-//           break;
-
-//         case "Payment_In":
-//           res = await deletePaymentIn(deleteTarget.Id).unwrap();
-//           break;
-
-//         case "Payment_Out":
-//            res = await deletePaymentOut(deleteTarget.Id).unwrap();
-//           break;
-
-//         default:
-//           toast.error(
-//             "Unknown transaction type — cannot delete"
-//           );
-//           return;
-//       }
-
-//       toast.success(res?.message || "Deleted successfully");
-
-//       setDeleteTarget(null);
-//       dispatch(partyApi.util.invalidateTags(["Party"]));
-//        dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-//      dispatch(
-//   bankAccountApi.util.invalidateTags([
-//     { type: "BankAccount", id: bankId },
-//     "BankAccount",
-//   ])
-
-// );
-// dispatch(saleApi.util.invalidateTags(["Sale"]));
-//     dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-//     dispatch(
-//   itemApi.util.invalidateTags([
-//     "Item",
-//     "ItemLedger",
-//   ])
-// );
-//     } catch (err) {
-
-//       console.error(
-//         "❌ Delete error:",
-//         err
-//       );
-
-//       toast.error(
-//         err?.data?.message ||
-//         "Failed to delete"
-//       );
-//       setDeleteTarget(null);
-
-//       // IMPORTANT:
-//       // Don't close modal here.
-//       // User should see the error and can close it manually.
-//     }
-//   }
-//   /* ── empty state ── */
-//   if (!bankId) {
-//     return (
-//       <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3"
-//         style={{ minHeight: "400px" }}>
-//         <Landmark size={48} strokeWidth={1.2} />
-//         <p className="text-base">Select a bank account to view details</p>
-//       </div>
-//     );
-//   }
-
-//   /* ── first load skeleton ── */
-//   if (isLoading && page === 1) {
-//     return (
-//       <div className="flex items-center justify-center h-full text-gray-400"
-//         style={{ minHeight: "400px" }}>
-//         <p>Loading...</p>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="flex flex-col h-full">
-
-//       {/* ── BANK SUMMARY CARD ── */}
-//       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-//         <div className="flex items-center gap-4">
-//           <div className="flex items-center justify-center rounded-xl"
-//             style={{ width: 20, height: 20, backgroundColor: "#4CA1AF22" }}>
-//             <Building2 size={26} style={{ color: "#4CA1AF" }} />
-//           </div>
-//           <div>
-//             <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
-//               {bank?.Bank_Name}
-//             </h6>
-//             <p className="text-gray-500 text-sm mt-0.5">
-//               A/C: <span className="font-medium">{bank?.Account_Number || "—"}</span>
-//               {" • "}
-//               IFSC: <span className="font-medium">{bank?.IFSC_Code || "—"}</span>
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* ── LEDGER TABLE ── */}
-//       <div className="flex-1 overflow-x-auto">
-//         <table className="w-full min-w-[500px]">
-//           <thead>
-//             <tr>
-//               <th className="text-left">Sl.No</th>
-//               <th className="text-left">Type</th>
-//               <th className="text-left">Party</th>
-//               <th className="text-left">Date</th>
-//               <th className="text-left">Amount</th>
-//               <th>View/Edit</th>
-//               <th>Delete</th>
-//             </tr>
-//           </thead>
-
-//           <tbody>
-//             {ledger.length === 0 && !isLoading ? (
-//               <tr>
-//                 <td className="text-center" colSpan={6} style={{ padding: "40px 0", color: "#9ca3af" }}>
-//                   No transactions found
-//                 </td>
-//               </tr>
-//             ) : (
-//               ledger.map((row, idx) => {
-//                 const meta =
-//                   TYPE_META[row.Txn_Type?.toLowerCase()] ?? {
-//                     label: row.Txn_Type,
-//                     color: "#6b7280",
-//                     dir: row.Direction === "Credit" ? "in" : "out",
-//                   };
-
-//                 return (
-//                   <tr key={row.id}>
-//                     <td>{idx + 1}.</td>
-//                     <td>{meta.label}</td>
-//                     <td>{row.Party_Name || "N/A"}</td>
-//                     <td>
-//                       {row.Txn_Date
-//                         ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {
-//                           day: "numeric", month: "numeric", year: "numeric",
-//                         })
-//                         : "N/A"}
-//                     </td>
-//                     <td style={{ color: meta.color, fontWeight: 600 }}>
-//                       ₹ {fmt(row.Amount)}
-//                     </td>
-//                     <td>
-//                       {row.Formatted_Reference_Id && (
-//                         MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
-//                           <Eye
-//                             style={{ cursor: "pointer", color: "#4CA1AF" }}
-//                             onClick={() => openModal(row.Txn_Type, row.Formatted_Reference_Id)}
-//                           />
-//                         ) : (
-//                           <NavLink
-//                             to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
-//                             state={{ from: "bank-accounts", bankId }}
-//                           >
-//                             <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
-//                           </NavLink>
-//                         )
-//                       )}
-//                     </td>
-//                     <td>
-//                       <Trash2
-//                         size={18}
-//                         style={{ cursor: "pointer", color: "#ef4444" }}
-//                         onClick={() =>
-//                           setDeleteTarget({
-//                             Id: row.Formatted_Reference_Id,
-//                             Txn_Type: row.Txn_Type,   // ✅ must be here
-//                             //Doc_Number: row.Doc_Number,
-//                           })
-//                         }
-//                       />
-//                     </td>
-//                   </tr>
-//                 );
-//               })
-//             )}
-//           </tbody>
-//         </table>
-
-//         {/* ── SENTINEL + LOADING INDICATOR ── */}
-//         <div ref={sentinelRef} style={{ height: "1px" }} />
-
-//         {isFetching && (
-//           <div className="flex justify-center py-4">
-//             <span className="text-sm text-gray-400">Loading more...</span>
-//           </div>
-//         )}
-
-//         {!hasMore && ledger.length > 0 && (
-//           <div className="flex justify-center py-4">
-//             <span className="text-xs text-gray-300">— End of transactions —</span>
-//           </div>
-//         )}
-//       </div>
-
-//       {/* ── MODALS ── */}
-//       {modalState.open && modalState.type === "Payment_In" && (
-//         <PaymentInModalLoader
-//           id={modalState.id}
-//           banks={banks}
-//           onClose={closeModal}
-//           onSave={handleSavePaymentIn}
-//           isSaving={isUpdatingPaymentIn}
-//           parties={partiesList}
-//         />
-//       )}
-//       {modalState.open && modalState.type === "Payment_Out" && (
-//         <PaymentOutModalLoader
-//           id={modalState.id}
-//           banks={banks}
-//           onClose={closeModal}
-//           onSave={handleSavePaymentOut}
-//           isSaving={isUpdatingPaymentOut}
-//           parties={partiesList}
-//         />
-//       )}
-//       {deleteTarget && (
-//         <DeleteConfirmModal
-//           title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
-//           message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
-//             }? This action cannot be undone.`}
-//           onClose={() => setDeleteTarget(null)}
-//           onConfirm={handleConfirmDelete}
-//           isDeleting={isDeleting}
-//         //isDeleting={false}
-//         />
-//       )}
-//     </div>
-//   );
-// }
 function BankDetailPanel({ bankId }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // 🔹 only cursor state needed — no page, no manual ledger array
   const [cursor, setCursor] = useState(null);
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
+    const itemRef = useRef(bankId);
+  
+      const effectiveCursor = itemRef.current === bankId ? cursor : null;
 
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
   const closeModal = () => setModalState({ open: false, type: null, id: null });
+  const [rowMenuOpen, setRowMenuOpen] = useState(null);
+
+  useEffect(() => {
+    const closeRowMenu = () => {
+      setRowMenuOpen(null);
+    };
+
+    document.addEventListener("click", closeRowMenu);
+
+    return () => {
+      document.removeEventListener("click", closeRowMenu);
+    };
+  }, []);
 
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
   const { data: partiesList } = useGetAllPartiesQuery();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-
-  // const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
-  //   { Bank_Account_Id: bankId, cursor, limit: 10 },
-  //   { skip: !bankId }
-  // );
+    const initialRightLimit = useRef(
+    Number(sessionStorage.getItem("banksByBank:rightCount")) || 10
+      );
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
-    { Bank_Account_Id: bankId, cursor },
+    //{ Bank_Account_Id: bankId, cursor },
+    { Bank_Account_Id: bankId, 
+      cursor: effectiveCursor,
+      limit:effectiveCursor ? 10 : initialRightLimit.current},
     { skip: !bankId }
   );
 
@@ -541,14 +186,14 @@ function BankDetailPanel({ bankId }) {
   const nextCursor = data?.nextCursor ?? null;
 
   // 🔹 reset cursor when bank changes
+
   // useEffect(() => {
   //   setCursor(null);
-  //   // also reset the RTK cache for this bank so merge starts fresh
-  //   dispatch(bankAccountApi.util.resetApiState());
   // }, [bankId]);
-  useEffect(() => {
-    setCursor(null);
-  }, [bankId]);
+      useEffect(() => {
+          itemRef.current = bankId;
+          setCursor(null);
+      }, [bankId]);
 
   // 🔹 intersection observer
   const handleObserver = useCallback(
@@ -576,6 +221,44 @@ function BankDetailPanel({ bankId }) {
     if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
   }, [handleObserver]);
+const handleTransactionEdit = (row) => {
+  if (!row?.Formatted_Reference_Id) return;
+
+  // Payment In / Payment Out open their edit modals
+  if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+    openModal(
+      row.Txn_Type,
+      row.Formatted_Reference_Id
+    );
+    return;
+  }
+
+  // Other transactions open their edit page
+  const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
+  if (!route) return;
+
+  const params = new URLSearchParams(searchParams);
+
+  // Keep the bank selected when coming back
+  params.set("bankId", bankId);
+
+  // Keep this transaction highlighted
+  params.set("highlightTxn", row.id);
+
+  navigate(
+    {
+      pathname: `/${route}/edit/${row.Formatted_Reference_Id}`,
+      search: `?${params.toString()}`,
+    },
+    {
+      state: {
+        from: "bank-accounts",
+      },
+    }
+  );
+};
+ 
 
   // 🔹 after save/delete — reset cursor to reload from top
   const resetLedger = () => {
@@ -649,12 +332,12 @@ function BankDetailPanel({ bankId }) {
       dispatch(saleApi.util.invalidateTags(["Sale"]));
       dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
       dispatch(
-  itemApi.util.invalidateTags([
-    { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" },
-    { type: "ItemLedger", id: "LIST" },
-  ])
-);;
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
+      );;
       resetLedger();   // 🔹 reload bank ledger from top
     } catch (err) {
       console.error("❌ Delete error:", err);
@@ -664,10 +347,62 @@ function BankDetailPanel({ bankId }) {
   };
 
   const bank = data?.bankAccount;
+    const rightPanelRef = useRef(null);
+     
+  const highlightedRowRef = useRef(null);
+      useEffect(() => {
+          
+          const rightEl = rightPanelRef.current;
+  
+         
+          const saveRight = () => {
+              console.log("saveRight fired", rightEl.scrollTop, ledger.length);
+              sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
+              sessionStorage.setItem("banksByBank:rightCount", ledger.length);
+              // sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
+              // sessionStorage.setItem("banksByBank:rightCount", transactions.length);
+          };
+  
+         
+          rightEl?.addEventListener("scroll", saveRight);
+  
+          return () => {
+              
+              rightEl?.removeEventListener("scroll", saveRight);
+          };
+      }, [ ledger.length]);
+  const hasRestoredRightRef = useRef(false);
+  const [isRestoringRight, setIsRestoringRight] = useState(true);
+  
+  // useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) return;
+  //     if (isLoading || isFetching) return;
+  
+  //     const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
+  //     if (ledger.length < savedCount) return;
+  
+  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //     hasRestoredRightRef.current = true;
+  // }, [isLoading, isFetching, ledger.length]);
+  useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) {
+        setIsRestoringRight(false);
+        return;
+    }
+    if (isLoading || isFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
+     // keep waiting only if we might still get more data
+    if (ledger.length < savedCount && hasMore) return;
+
+    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredRightRef.current = true;
+    setIsRestoringRight(false); // reveal now, correctly positioned
+}, [isLoading, isFetching, ledger.length, hasMore]);
 
   if (!bankId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3"
+      <div className="flex flex-col items-center justify-center text-gray-400 gap-3"
         style={{ minHeight: "400px" }}>
         <Landmark size={48} strokeWidth={1.2} />
         <p className="text-base">Select a bank account to view details</p>
@@ -677,7 +412,7 @@ function BankDetailPanel({ bankId }) {
 
   if (isLoading && !data) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-400"
+      <div className="flex items-center justify-center  text-gray-400"
         style={{ minHeight: "400px" }}>
         <p>Loading...</p>
       </div>
@@ -685,7 +420,23 @@ function BankDetailPanel({ bankId }) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div 
+    className="flex flex-col"
+      // className="flex flex-col overflow-y-auto"
+      // style={{
+      //   maxHeight: "calc(100vh - 180px)",
+      //   minWidth: 0
+      // }}
+      style={{
+      height: "100%",
+       
+      minHeight: 0,
+      overflow: "hidden",
+   
+     
+    }}
+  
+      >
 
       {/* bank summary card */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -713,23 +464,33 @@ function BankDetailPanel({ bankId }) {
       </div>
 
       {/* ledger table */}
-      <div className="flex-1 overflow-x-auto">
+      <div className="table-responsive table-desi" 
+      ref={rightPanelRef}
+          style={{
+        
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        visibility: isRestoringRight ? "hidden" : "visible",
+        // if using the placeholder above, also collapse height so it doesn't take double space
+       // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+    }}
+      >
         <table className="w-full min-w-[500px]">
           <thead>
             <tr>
-              <th className="text-left">Sl.No</th>
-              <th className="text-left">Type</th>
-              <th className="text-left">Party</th>
-              <th className="text-left">Date</th>
-              <th className="text-left">Amount</th>
-              <th>View/Edit</th>
-              <th>Delete</th>
+              <th className="text-left">SL.NO</th>
+              <th className="text-left">TYPE</th>
+              <th className="text-left">PARTY</th>
+              <th className="text-left">DATE</th>
+              <th className="text-left">AMOUNT</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {ledger.length === 0 && !isLoading ? (
               <tr>
-                <td className="text-center" colSpan={7}
+                <td className="text-center" colSpan={6}
                   style={{ padding: "40px 0", color: "#9ca3af" }}>
                   No transactions found
                 </td>
@@ -742,8 +503,40 @@ function BankDetailPanel({ bankId }) {
                     color: "#6b7280",
                     dir: row.Direction === "Credit" ? "in" : "out",
                   };
+                const isHighlighted =
+                  String(searchParams.get("highlightTxn")) ===
+                  String(row.id)
                 return (
-                  <tr key={row.id}>
+                  
+                  <tr
+                    key={row.id}
+                    ref={isHighlighted ? highlightedRowRef : null}
+
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+
+                      params.set("highlightTxn", row.id);
+
+                      setSearchParams(params, { replace: true });
+                    }}
+
+                    onDoubleClick={() => {
+                      const params = new URLSearchParams(searchParams);
+
+                      params.set("highlightTxn", row.id);
+
+                      setSearchParams(params, { replace: true });
+
+                      handleTransactionEdit(row);
+                    }}
+
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor: isHighlighted
+                        ? "#4CA1AF22"
+                        : "transparent",
+                    }}
+                  >
                     <td>{idx + 1}.</td>
                     <td>{meta.label}</td>
                     <td>{row.Party_Name || "N/A"}</td>
@@ -757,35 +550,206 @@ function BankDetailPanel({ bankId }) {
                     <td style={{ color: meta.color, fontWeight: 600 }}>
                       ₹ {fmt(row.Amount)}
                     </td>
-                    <td>
-                      {row.Formatted_Reference_Id && (
-                        MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
-                          <Eye
-                            style={{ cursor: "pointer", color: "#4CA1AF" }}
-                            onClick={() => openModal(row.Txn_Type, row.Formatted_Reference_Id)}
-                          />
-                        ) : (
-                          <NavLink
-                            to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
-                            state={{ from: "bank-accounts", bankId }}
+
+                    {/* THREE DOT MENU */}
+                    <td
+                      className="py-2 px-2"
+                      style={{
+                        position: "relative",
+                        width: 50,
+                        textAlign: "center",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+
+                          const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
+
+                          setRowMenuOpen(
+                            rowMenuOpen === menuId ? null : menuId
+                          );
+                        }}
+                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                        style={{
+                          backgroundColor: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                        title="More"
+                      >
+                        <MoreVertical
+                          size={16}
+                          style={{ color: "#374151" }}
+                        />
+                      </button>
+
+                      {/* ROW MENU */}
+                      {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute bg-white shadow-lg rounded-md"
+                          style={{
+                            right: 0,
+                            top: 32,
+                            width: 150,
+                            zIndex: 100,
+                            border: "1px solid #e2e8f0",
+                            overflow: "hidden",
+                          }}
+                        >
+
+                          {/* VIEW / EDIT */}
+                          {/* {row.Formatted_Reference_Id && (
+                            MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{ color: "#374151" }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  openModal(
+                                    row.Txn_Type,
+                                    row.Formatted_Reference_Id
+                                  );
+                                }}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </button>
+                            ) : (
+                              <NavLink
+                                to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
+                                state={{
+                                  from: "bank-accounts",
+                                  bankId
+                                }}
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                  textDecoration: "none",
+                                }}
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </NavLink>
+                            )
+                          )} */}
+                          {row.Formatted_Reference_Id && (
+                            MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{ color: "#374151" }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  const params = new URLSearchParams(searchParams);
+
+                                  params.set("highlightTxn", row.id);
+
+                                  setSearchParams(params, { replace: true });
+
+                                  openModal(
+                                    row.Txn_Type,
+                                    row.Formatted_Reference_Id
+                                  );
+                                }}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </button>
+                            ) : (
+                              <NavLink
+                                to={{
+                                  pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                                  search: (() => {
+                                    const params = new URLSearchParams(searchParams);
+
+                                    params.set("bankId", bankId);
+                                    params.set("highlightTxn", row.id);
+
+                                    return `?${params.toString()}`;
+                                  })(),
+                                }}
+                                state={{
+                                  from: "bank-accounts",
+                                  bankId,
+                                }}
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                  textDecoration: "none",
+                                }}
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </NavLink>
+                            )
+                          )}
+
+                          {/* PRINT */}
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                            style={{ color: "#374151" }}
+                            onClick={() => {
+                              setRowMenuOpen(null);
+                              console.log("Print transaction:", row);
+                            }}
                           >
-                            <Eye style={{ cursor: "pointer", color: "#4CA1AF" }} />
-                          </NavLink>
-                        )
+                            <Printer
+                              size={13}
+                              style={{ color: "#4CA1AF" }}
+                            />
+                            Print
+                          </button>
+
+                          {/* DELETE */}
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                            title="Delete transaction"
+                            style={{
+                              cursor: "pointer",
+                              color: "#dc2626",
+                            }}
+                            onClick={() => {
+                              setRowMenuOpen(null);
+
+                              setDeleteTarget({
+                                Id: row.Formatted_Reference_Id,
+                                Txn_Type: row.Txn_Type,
+                              });
+                            }}
+                          >
+                            <Trash2
+                              size={13}
+                              style={{ color: "#dc2626" }}
+                            />
+                            Delete
+                          </button>
+
+                        </div>
                       )}
                     </td>
-                    <td>
-                      <Trash2
-                        size={18}
-                        style={{ cursor: "pointer", color: "#ef4444" }}
-                        onClick={() =>
-                          setDeleteTarget({
-                            Id: row.Formatted_Reference_Id,
-                            Txn_Type: row.Txn_Type,
-                          })
-                        }
-                      />
-                    </td>
+
                   </tr>
                 );
               })
@@ -896,18 +860,12 @@ export default function BankAccounts() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-      {/* <div className="sb2-2-2">
-        <ul>
-          <li>
-            <NavLink style={{ display: "flex", flexDirection: "row" }} to="/home">
-              <LayoutDashboard size={20} style={{ marginRight: "8px" }} />
-              Dashboard
-            </NavLink>
-          </li>
-        </ul>
-      </div> */}
+      
 
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col bg-white"
+      style={{ height: "100vh", overflow: "hidden" }}
+      //  style={{ minHeight: "100vh" }}
+       >
 
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
@@ -919,7 +877,7 @@ export default function BankAccounts() {
             {/* Add Bank button — wire to your modal */}
             <button
               type="button"
-              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              className="text-white px-4 py-2 rounded-md text-white"
               style={{ backgroundColor: "#4CA1AF", outline: "none", boxShadow: "none" }}
               onClick={() => setBankModal({ open: true, mode: "add", data: null })}
             >
@@ -931,7 +889,11 @@ export default function BankAccounts() {
         {/* ── SPLIT LAYOUT ── */}
         <div
           className="flex flex-col lg:flex-row gap-0"
-          style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+          style={{
+             flex: 1,
+        minHeight: 0,
+        height: "calc(100vh - 180px)",
+             borderTop: "1px solid #e2e8f0" }}
         >
 
           {/* ══ LEFT — 30% — bank list ══ */}
@@ -947,7 +909,7 @@ export default function BankAccounts() {
             <div className="px-4 py-3 flex items-center gap-2"
               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}>
               <CreditCard size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <span className="text-xs font-semibold  uppercase tracking-wider">
                 Accounts ({banks.length})
               </span>
             </div>
@@ -968,6 +930,7 @@ export default function BankAccounts() {
                   <div
                     key={bank.Bank_Account_Id}
                     onClick={() => handleSelectBank(bank.Bank_Account_Id)}
+                    onDoubleClick={() => handleEdit(bank)}
                     className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                     style={{
                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
@@ -1039,12 +1002,14 @@ export default function BankAccounts() {
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           <div
-            className="w-full lg:w-[70%] p-1 overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 180px)" }}
+            className="w-full lg:w-[70%] p-1"
+            //style={{ maxHeight: "calc(100vh - 180px)" }}
+              style={{ height: "100%", minHeight: 0 }}
           >
             <BankDetailPanel
               bankId={selectedId}
               onEdit={handleEdit}
+              key={selectedId}
             />
           </div>
 
