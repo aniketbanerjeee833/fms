@@ -140,13 +140,59 @@ export const paymentOutApi = createApi({
       ],
     }),
  
+    // deletePaymentOut: builder.mutation({
+    //   query: (id) => ({
+    //     url: `/payment-out/${id}`,
+    //     method: "DELETE",
+    //   }),
+    //   invalidatesTags: [{ type: "PaymentOut", id: "LIST" }],
+    // }),
     deletePaymentOut: builder.mutation({
-      query: (id) => ({
-        url: `/payment-out/${id}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: [{ type: "PaymentOut", id: "LIST" }],
-    }),
+  query: (id) => ({
+    url: `/payment-out/${id}`,
+    method: "DELETE",
+  }),
+
+  async onQueryStarted(id, { dispatch, queryFulfilled }) {
+    const patchResult = dispatch(
+      paymentOutApi.util.updateQueryData(
+        "getAllPaymentOuts",
+        {
+          cursor: null,
+          search: "",
+          fromDate: "",
+          toDate: "",
+          limit: 10,
+        },
+        (draft) => {
+          if (!draft?.paymentOuts) return;
+
+          draft.paymentOuts = draft.paymentOuts.filter(
+            (paymentOut) =>
+              String(paymentOut.id) !== String(id)
+          );
+
+          if (draft.totalPayments != null) {
+            draft.totalPayments = Math.max(
+              0,
+              draft.totalPayments - 1
+            );
+          }
+        }
+      )
+    );
+
+    try {
+      await queryFulfilled;
+    } catch {
+      patchResult.undo();
+    }
+  },
+
+  invalidatesTags: [
+    { type: "PaymentOut", id: "LIST" },
+  ],
+}),
     getPaymentOutPrintReport: builder.query({
   query: ({
     search = "",

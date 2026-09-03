@@ -681,118 +681,345 @@ const updatePaymentIn = async (req, res, next) => {
 };
 
 /* ── GET ALL ─────────────────────────────────────────────── */
+// const getAllPaymentIns = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = 10;
+//     const offset = (page - 1) * limit;
+//     const search = req.query.search?.trim().toLowerCase() || "";
+//     const fromDate = req.query.fromDate || null;
+//     const toDate = req.query.toDate || null;
+
+//      const dateError = validateDateRange(fromDate, toDate);
+//     if (dateError) return res.status(400).json({ success: false, message: dateError });
+
+
+//     const whereClauses = [];
+//     const params = [];
+
+//     // if (search) {
+//     //   whereClauses.push(`(
+//     //     LOWER(a.Party_Name)       LIKE ? OR
+//     //     LOWER(pi.Receipt_No)      LIKE ? OR
+//     //     CAST(pi.Received AS CHAR) LIKE ?
+//     //   )`);
+//     //   const like = `%${search}%`;
+//     //   params.push(like, like, like);
+//     // }
+
+//      if (search) {
+//       whereClauses.push(`(
+//         a.Party_Name       LIKE ? OR
+//         pi.Receipt_No      LIKE ? OR
+//         CAST(pi.Received AS CHAR) LIKE ?
+//       )`);
+//       const like = `%${search}%`;
+//       params.push(like, like, like);
+//     }
+
+//     if (fromDate && toDate) {
+//       whereClauses.push(`DATE(pi.Payment_Date) BETWEEN ? AND ?`);
+//       params.push(fromDate, toDate);
+//     } else if (fromDate) {
+//       whereClauses.push(`DATE(pi.Payment_Date) >= ?`);
+//       params.push(fromDate);
+//     } else if (toDate) {
+//       whereClauses.push(`DATE(pi.Payment_Date) <= ?`);
+//       params.push(toDate);
+//     }
+
+//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+//     // main list — no Payment_Type column anymore, splits carry that detail
+//     const [rows] = await connection.query(
+//       `SELECT pi.*, a.Party_Name
+//        FROM payment_in pi
+//        LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+//        ${whereSQL}
+//        ORDER BY pi.created_at DESC
+//        LIMIT ? OFFSET ?`,
+//       [...params, limit, offset]
+//     );
+
+//     // attach split payment-type labels per row
+//     const paymentIds = rows.map((r) => r.id);
+
+//     if (paymentIds.length > 0) {
+//       const placeholders = paymentIds.map(() => "?").join(",");
+//       //       const [splits] = await connection.query(
+//       //         `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
+//       //          FROM payment_splits ps
+//       //          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+//       //          WHERE ps.Source_Type = 'Payment_In'
+//       //            AND ps.Source_Id IN (${placeholders})`,
+//       //         paymentIds
+//       //       );
+
+//       //       const splitMap = {};
+//       //       for (const s of splits) {
+//       //         if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
+//       //         splitMap[s.Source_Id].push(
+//       //           s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+//       //         );
+//       //       }
+
+//       //      for (const row of rows) {
+//       //   const labels = splitMap[row.id] || [];
+
+//       //   const counts = {};
+//       //   labels.forEach((l) => {
+//       //     counts[l] = (counts[l] || 0) + 1;
+//       //   });
+
+//       //   row.Payment_Type_Display = Object.entries(counts)
+//       //     .map(([label, count]) =>
+//       //       count > 1 ? `${label} (x${count})` : label
+//       //     )
+//       //     .join(", ") || "—";
+//       // }
+//       const [splits] = await connection.query(
+//         `SELECT
+//       ps.Source_Id,
+//       ps.Payment_Type,
+//       ps.Bank_Account_Id,
+//       ps.Reference_Number,
+//       ps.Amount,
+//       ba.Account_Display_Name
+//    FROM payment_splits ps
+//    LEFT JOIN bank_accounts ba
+//       ON ba.id = ps.Bank_Account_Id
+//    WHERE ps.Source_Type = 'Payment_In'
+//      AND ps.Source_Id IN (${placeholders})`,
+//         paymentIds
+//       );
+
+//       const splitMap = {};
+
+//       for (const split of splits) {
+//         if (!splitMap[split.Source_Id]) {
+//           splitMap[split.Source_Id] = [];
+//         }
+
+//         splitMap[split.Source_Id].push({
+//           Payment_Type: split.Payment_Type,
+//           Bank_Account_Id: split.Bank_Account_Id,
+//           Reference_Number: split.Reference_Number,
+//           Amount: Number(split.Amount),
+
+//           // for displaying only
+//           Bank_Display_Name: split.Account_Display_Name,
+//         });
+//       }
+
+//       for (const row of rows) {
+//         row.splits = splitMap[row.id] || [];
+
+//         row.Payment_Type_Display = row.splits
+//           .map((s) =>
+//             s.Payment_Type === "Bank"
+//               ? s.Bank_Display_Name
+//               : s.Payment_Type
+//           )
+//           .join(", ") || "—";
+//       }
+//     }
+
+//     const [[{ total }]] = await connection.query(
+//       `SELECT COUNT(*) AS total
+//        FROM payment_in pi
+//        LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+//        ${whereSQL}`,
+//       params
+//     );
+
+//     const [[totals]] = await connection.query(
+//       `SELECT COALESCE(SUM(pi.Received), 0) AS totalReceived
+//        FROM payment_in pi
+//        LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+//        ${whereSQL}`,
+//       params
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       currentPage: page,
+//       totalPages: Math.ceil(total / limit),
+//       totalPayments: total,
+//       paymentIns: rows,
+//       totals,
+//     });
+//   } catch (err) {
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getAllPaymentIns = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || 10,
+      200
+    );
+
+    const cursor = req.query.cursor || null;
     const search = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
     const toDate = req.query.toDate || null;
 
-     const dateError = validateDateRange(fromDate, toDate);
-    if (dateError) return res.status(400).json({ success: false, message: dateError });
+    const dateError = validateDateRange(fromDate, toDate);
 
+    if (dateError) {
+      return res.status(400).json({
+        success: false,
+        message: dateError,
+      });
+    }
 
     const whereClauses = [];
     const params = [];
 
-    // if (search) {
-    //   whereClauses.push(`(
-    //     LOWER(a.Party_Name)       LIKE ? OR
-    //     LOWER(pi.Receipt_No)      LIKE ? OR
-    //     CAST(pi.Received AS CHAR) LIKE ?
-    //   )`);
-    //   const like = `%${search}%`;
-    //   params.push(like, like, like);
-    // }
+    // SEARCH
+    if (search) {
+      whereClauses.push(`
+        (
+          a.Party_Name LIKE ? OR
+          pi.Receipt_No LIKE ? OR
+          CAST(pi.Received AS CHAR) LIKE ?
+        )
+      `);
 
-     if (search) {
-      whereClauses.push(`(
-        a.Party_Name       LIKE ? OR
-        pi.Receipt_No      LIKE ? OR
-        CAST(pi.Received AS CHAR) LIKE ?
-      )`);
       const like = `%${search}%`;
-      params.push(like, like, like);
+
+      params.push(
+        like,
+        like,
+        like
+      );
     }
 
+    // DATE FILTER
     if (fromDate && toDate) {
-      whereClauses.push(`DATE(pi.Payment_Date) BETWEEN ? AND ?`);
-      params.push(fromDate, toDate);
+      whereClauses.push(
+        `DATE(pi.Payment_Date) BETWEEN ? AND ?`
+      );
+
+      params.push(
+        fromDate,
+        toDate
+      );
     } else if (fromDate) {
-      whereClauses.push(`DATE(pi.Payment_Date) >= ?`);
+      whereClauses.push(
+        `DATE(pi.Payment_Date) >= ?`
+      );
+
       params.push(fromDate);
     } else if (toDate) {
-      whereClauses.push(`DATE(pi.Payment_Date) <= ?`);
+      whereClauses.push(
+        `DATE(pi.Payment_Date) <= ?`
+      );
+
       params.push(toDate);
     }
 
-    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    // CURSOR
+    if (cursor) {
+      let decodedCursor;
 
-    // main list — no Payment_Type column anymore, splits carry that detail
+      try {
+        decodedCursor = JSON.parse(
+          Buffer.from(cursor, "base64").toString("utf8")
+        );
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor",
+        });
+      }
+
+      const { date, id } = decodedCursor;
+
+      whereClauses.push(`
+        (
+          pi.Payment_Date < ?
+          OR (
+            pi.Payment_Date = ?
+            AND pi.id < ?
+          )
+        )
+      `);
+
+      params.push(
+        date,
+        date,
+        id
+      );
+    }
+
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
+    // --------------------------------------------------
+    // MAIN LIST
+    // --------------------------------------------------
+
     const [rows] = await connection.query(
-      `SELECT pi.*, a.Party_Name
+      `SELECT
+         pi.*,
+         a.Party_Name
        FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
+       LEFT JOIN add_party a
+         ON a.Party_Id = pi.Party_Id
        ${whereSQL}
-       ORDER BY pi.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY pi.Payment_Date DESC, pi.id DESC
+       LIMIT ?`,
+      [
+        ...params,
+        limit + 1,
+      ]
     );
 
-    // attach split payment-type labels per row
-    const paymentIds = rows.map((r) => r.id);
+    // Check if more rows exist
+    const hasMore = rows.length > limit;
+
+    // Return only requested amount
+    const pageRows = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    // --------------------------------------------------
+    // PAYMENT SPLITS
+    // --------------------------------------------------
+
+    const paymentIds = pageRows.map(
+      (r) => r.id
+    );
 
     if (paymentIds.length > 0) {
-      const placeholders = paymentIds.map(() => "?").join(",");
-      //       const [splits] = await connection.query(
-      //         `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
-      //          FROM payment_splits ps
-      //          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-      //          WHERE ps.Source_Type = 'Payment_In'
-      //            AND ps.Source_Id IN (${placeholders})`,
-      //         paymentIds
-      //       );
+      const placeholders = paymentIds
+        .map(() => "?")
+        .join(",");
 
-      //       const splitMap = {};
-      //       for (const s of splits) {
-      //         if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
-      //         splitMap[s.Source_Id].push(
-      //           s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-      //         );
-      //       }
-
-      //      for (const row of rows) {
-      //   const labels = splitMap[row.id] || [];
-
-      //   const counts = {};
-      //   labels.forEach((l) => {
-      //     counts[l] = (counts[l] || 0) + 1;
-      //   });
-
-      //   row.Payment_Type_Display = Object.entries(counts)
-      //     .map(([label, count]) =>
-      //       count > 1 ? `${label} (x${count})` : label
-      //     )
-      //     .join(", ") || "—";
-      // }
       const [splits] = await connection.query(
         `SELECT
-      ps.Source_Id,
-      ps.Payment_Type,
-      ps.Bank_Account_Id,
-      ps.Reference_Number,
-      ps.Amount,
-      ba.Account_Display_Name
-   FROM payment_splits ps
-   LEFT JOIN bank_accounts ba
-      ON ba.id = ps.Bank_Account_Id
-   WHERE ps.Source_Type = 'Payment_In'
-     AND ps.Source_Id IN (${placeholders})`,
+           ps.Source_Id,
+           ps.Payment_Type,
+           ps.Bank_Account_Id,
+           ps.Reference_Number,
+           ps.Amount,
+           ba.Account_Display_Name
+         FROM payment_splits ps
+         LEFT JOIN bank_accounts ba
+           ON ba.id = ps.Bank_Account_Id
+         WHERE ps.Source_Type = 'Payment_In'
+           AND ps.Source_Id IN (${placeholders})`,
         paymentIds
       );
 
@@ -808,56 +1035,157 @@ const getAllPaymentIns = async (req, res, next) => {
           Bank_Account_Id: split.Bank_Account_Id,
           Reference_Number: split.Reference_Number,
           Amount: Number(split.Amount),
-
-          // for displaying only
-          Bank_Display_Name: split.Account_Display_Name,
+          Bank_Display_Name:
+            split.Account_Display_Name,
         });
       }
 
-      for (const row of rows) {
-        row.splits = splitMap[row.id] || [];
+      for (const row of pageRows) {
+        row.splits =
+          splitMap[row.id] || [];
 
-        row.Payment_Type_Display = row.splits
-          .map((s) =>
-            s.Payment_Type === "Bank"
-              ? s.Bank_Display_Name
-              : s.Payment_Type
-          )
-          .join(", ") || "—";
+        row.Payment_Type_Display =
+          row.splits
+            .map((s) =>
+              s.Payment_Type === "Bank"
+                ? s.Bank_Display_Name
+                : s.Payment_Type
+            )
+            .join(", ") || "—";
       }
     }
 
-    const [[{ total }]] = await connection.query(
-      `SELECT COUNT(*) AS total
-       FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
-       ${whereSQL}`,
-      params
-    );
+    // --------------------------------------------------
+    // TOTAL COUNT
+    // --------------------------------------------------
+    // IMPORTANT:
+    // Cursor is NOT included here.
+    // Total represents the current filters.
 
-    const [[totals]] = await connection.query(
-      `SELECT COALESCE(SUM(pi.Received), 0) AS totalReceived
-       FROM payment_in pi
-       LEFT JOIN add_party a ON a.Party_Id = pi.Party_Id
-       ${whereSQL}`,
-      params
-    );
+    const countWhereClauses = [];
+    const countParams = [];
+
+    if (search) {
+      countWhereClauses.push(`
+        (
+          a.Party_Name LIKE ? OR
+          pi.Receipt_No LIKE ? OR
+          CAST(pi.Received AS CHAR) LIKE ?
+        )
+      `);
+
+      const like = `%${search}%`;
+
+      countParams.push(
+        like,
+        like,
+        like
+      );
+    }
+
+    if (fromDate && toDate) {
+      countWhereClauses.push(
+        `DATE(pi.Payment_Date) BETWEEN ? AND ?`
+      );
+
+      countParams.push(
+        fromDate,
+        toDate
+      );
+    } else if (fromDate) {
+      countWhereClauses.push(
+        `DATE(pi.Payment_Date) >= ?`
+      );
+
+      countParams.push(fromDate);
+    } else if (toDate) {
+      countWhereClauses.push(
+        `DATE(pi.Payment_Date) <= ?`
+      );
+
+      countParams.push(toDate);
+    }
+
+    const countWhereSQL = countWhereClauses.length
+      ? `WHERE ${countWhereClauses.join(" AND ")}`
+      : "";
+
+    const [[{ total }]] =
+      await connection.query(
+        `SELECT COUNT(*) AS total
+         FROM payment_in pi
+         LEFT JOIN add_party a
+           ON a.Party_Id = pi.Party_Id
+         ${countWhereSQL}`,
+        countParams
+      );
+
+    // --------------------------------------------------
+    // TOTAL RECEIVED
+    // --------------------------------------------------
+
+    const [[totals]] =
+      await connection.query(
+        `SELECT
+           COALESCE(
+             SUM(pi.Received),
+             0
+           ) AS totalReceived
+         FROM payment_in pi
+         LEFT JOIN add_party a
+           ON a.Party_Id = pi.Party_Id
+         ${countWhereSQL}`,
+        countParams
+      );
+
+    // --------------------------------------------------
+    // NEXT CURSOR
+    // --------------------------------------------------
+
+    let nextCursor = null;
+
+    if (
+      hasMore &&
+      pageRows.length > 0
+    ) {
+      const last =
+        pageRows[pageRows.length - 1];
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          date: last.Payment_Date,
+          id: last.id,
+        })
+      ).toString("base64");
+    }
+
+    // --------------------------------------------------
+    // RESPONSE
+    // --------------------------------------------------
 
     return res.status(200).json({
       success: true,
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
+
+      paymentIns: pageRows,
+
+      hasMore,
+
+      nextCursor,
+
       totalPayments: total,
-      paymentIns: rows,
+
       totals,
     });
+
   } catch (err) {
     next(err);
+
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
-
 /* ── GET SINGLE ──────────────────────────────────────────── */
 const getPaymentInById = async (req, res, next) => {
   let connection;

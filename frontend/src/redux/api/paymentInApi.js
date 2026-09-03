@@ -8,23 +8,113 @@ export const paymentInApi = createApi({
   }),
   tagTypes: ["PaymentIn"],
   endpoints: (builder) => ({
+    // getAllPaymentIns: builder.query({
+    //   query: ({ page = 1, search = "", fromDate = "", toDate = "" } = {}) => {
+    //     const params = new URLSearchParams();
+    //     params.set("page", page);
+    //     if (search) params.set("search", search);
+    //     if (fromDate) params.set("fromDate", fromDate);
+    //     if (toDate) params.set("toDate", toDate);
+    //     return `/payment-in?${params.toString()}`;
+    //   },
+    //   providesTags: (result) =>
+    //     result?.paymentIns
+    //       ? [
+    //           ...result.paymentIns.map((p) => ({ type: "PaymentIn", id: p.Id })),
+    //           { type: "PaymentIn", id: "LIST" },
+    //         ]
+    //       : [{ type: "PaymentIn", id: "LIST" }],
+    // }),
+
     getAllPaymentIns: builder.query({
-      query: ({ page = 1, search = "", fromDate = "", toDate = "" } = {}) => {
-        const params = new URLSearchParams();
-        params.set("page", page);
-        if (search) params.set("search", search);
-        if (fromDate) params.set("fromDate", fromDate);
-        if (toDate) params.set("toDate", toDate);
-        return `/payment-in?${params.toString()}`;
-      },
-      providesTags: (result) =>
-        result?.paymentIns
-          ? [
-              ...result.paymentIns.map((p) => ({ type: "PaymentIn", id: p.Id })),
-              { type: "PaymentIn", id: "LIST" },
-            ]
-          : [{ type: "PaymentIn", id: "LIST" }],
-    }),
+  query: ({
+    cursor = null,
+    search = "",
+    fromDate = "",
+    toDate = "",
+    limit = 10,
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (cursor) {
+      params.append("cursor", cursor);
+    }
+
+    if (search?.trim()) {
+      params.append("search", search.trim());
+    }
+
+    if (fromDate) {
+      params.append("fromDate", fromDate);
+    }
+
+    if (toDate) {
+      params.append("toDate", toDate);
+    }
+
+    params.append("limit", limit);
+
+    return `/payment-in?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: queryArgs.search,
+    fromDate: queryArgs.fromDate,
+    toDate: queryArgs.toDate,
+  }),
+
+  merge: (currentCache, newData, { arg }) => {
+    // First request
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    // Cursor request
+    currentCache.paymentIns.push(
+      ...newData.paymentIns
+    );
+
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+
+    currentCache.totalPayments =
+      newData.totalPayments;
+
+    if (newData.totals) {
+      currentCache.totals = newData.totals;
+    }
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.search !== previousArg?.search ||
+    currentArg?.fromDate !== previousArg?.fromDate ||
+    currentArg?.toDate !== previousArg?.toDate ||
+    currentArg?.limit !== previousArg?.limit,
+
+  providesTags: (result) =>
+    result?.paymentIns
+      ? [
+          ...result.paymentIns.map((p) => ({
+            type: "PaymentIn",
+            id: p.id,
+          })),
+
+          {
+            type: "PaymentIn",
+            id: "LIST",
+          },
+        ]
+      : [
+          {
+            type: "PaymentIn",
+            id: "LIST",
+          },
+        ],
+}),
 
     getPaymentInById: builder.query({
       query: (id) => `/payment-in/${id}`,
