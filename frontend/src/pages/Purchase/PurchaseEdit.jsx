@@ -29,7 +29,7 @@ import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
-import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
+import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 
 function ItemDropdownVirtualized({
 
@@ -514,7 +514,7 @@ export default function PurchaseEdit() {
     }
 
   })
-  const { fields, append, remove ,replace} = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -1308,8 +1308,8 @@ export default function PurchaseEdit() {
       Item_Name: item.Item_Name || "",
       Item_HSN: item.Item_HSN || "",
       MRP: showMRP && Number(item.MRP) > 0
-  ? Number(item.MRP)
-  : "",
+        ? Number(item.MRP)
+        : "",
       //MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
 
       Quantity: Number(item.Quantity) || 1,
@@ -1542,62 +1542,62 @@ export default function PurchaseEdit() {
     //   return filledRows;
     // });
     // =====================================================
-// UPDATE UI ROWS
-// USE THE SAME combinedItems ORDER AS RHF
-// =====================================================
+    // UPDATE UI ROWS
+    // USE THE SAME combinedItems ORDER AS RHF
+    // =====================================================
 
-setRows(
-  combinedItems.map((item) => ({
-    itemSearch: item.Item_Name || "",
+    setRows(
+      combinedItems.map((item) => ({
+        itemSearch: item.Item_Name || "",
 
-    itemOpen: false,
+        itemOpen: false,
 
-    isExistingItem: true,
-    isHSNLocked: false,
-    isUnitLocked: false,
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
 
-    CategoryOpen: false,
-    categorySearch: item.Item_Category || "",
+        CategoryOpen: false,
+        categorySearch: item.Item_Category || "",
 
-    unitOpen: false,
-    unitSearch: "",
+        unitOpen: false,
+        unitSearch: "",
 
-    Item_Id: item.Item_Id || "",
+        Item_Id: item.Item_Id || "",
 
-    Item_Name: item.Item_Name || "",
-    Item_Category: item.Item_Category || "",
-    Item_HSN: item.Item_HSN || "",
+        Item_Name: item.Item_Name || "",
+        Item_Category: item.Item_Category || "",
+        Item_HSN: item.Item_HSN || "",
 
-    // Historical MRP is allowed to remain visible
-    // in the existing bill, but scanned/selected items
-    // must respect the CURRENT MRP setting.
-    MRP:
-      showMRP && Number(item.MRP) > 0
-        ? Number(item.MRP)
-        : "",
+        // Historical MRP is allowed to remain visible
+        // in the existing bill, but scanned/selected items
+        // must respect the CURRENT MRP setting.
+        MRP:
+          showMRP && Number(item.MRP) > 0
+            ? Number(item.MRP)
+            : "",
 
-    Primary_Unit: item.Primary_Unit || null,
-    Secondary_Unit: item.Secondary_Unit || null,
-    Conversion_Rate: item.Conversion_Rate || null,
+        Primary_Unit: item.Primary_Unit || null,
+        Secondary_Unit: item.Secondary_Unit || null,
+        Conversion_Rate: item.Conversion_Rate || null,
 
-    Available_Units: Array.isArray(item.Available_Units)
-      ? item.Available_Units
-      : [],
+        Available_Units: Array.isArray(item.Available_Units)
+          ? item.Available_Units
+          : [],
 
-    Purchase_Price:
-      Number(item.Purchase_Price) || 0,
+        Purchase_Price:
+          Number(item.Purchase_Price) || 0,
 
-    Discount_On_Purchase_Price:
-      item.Discount_On_Purchase_Price ?? "",
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price ?? "",
 
-    Discount_Type_On_Purchase_Price:
-      item.Discount_Type_On_Purchase_Price ||
-      "Percentage",
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price ||
+          "Percentage",
 
-    Tax_Type:
-      item.Tax_Type || "None",
-  }))
-);
+        Tax_Type:
+          item.Tax_Type || "None",
+      }))
+    );
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1804,9 +1804,22 @@ setRows(
                 Back
               </button>
 
-              <button
+              {/* <button
                 type="button"
                 onClick={() => navigate("/purchase/all-purchases")}
+                className="text-white py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                All Purchases
+              </button> */}
+              <button
+                type="button"
+                onClick={() =>
+                  navigate({
+                    pathname: "/purchase/all-purchases",
+                    search: location.search,
+                  })
+                }
                 className="text-white py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
@@ -2910,7 +2923,7 @@ setRows(
                                   );
                                 }
                                 setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                 setValue(
+                                setValue(
                                   `items.${i}.Quantity`,
                                   Number(itemsValues[i]?.Quantity) || 1,
                                   {

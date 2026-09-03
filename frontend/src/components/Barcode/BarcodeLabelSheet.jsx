@@ -270,15 +270,15 @@
 import { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 
-const LABEL_SIZE_PRESETS = {
-    "2_labels_50x25": { labelWidthMm: 50, labelHeightMm: 25, columns: 2 },
-    "1_label_100x50": { labelWidthMm: 100, labelHeightMm: 50, columns: 1 },
-    "1_label_50x25": { labelWidthMm: 50, labelHeightMm: 25, columns: 1 },
-    "2_labels_38x25": { labelWidthMm: 38, labelHeightMm: 25, columns: 2 },
-};
+// const LABEL_SIZE_PRESETS = {
+//     "2_labels_50x25": { labelWidthMm: 50, labelHeightMm: 25, columns: 2 },
+//     "1_label_100x50": { labelWidthMm: 100, labelHeightMm: 50, columns: 1 },
+//     "1_label_50x25": { labelWidthMm: 50, labelHeightMm: 25, columns: 1 },
+//     "2_labels_38x25": { labelWidthMm: 38, labelHeightMm: 25, columns: 2 },
+// };
 
-const ACTIVE_LABEL_SIZE_KEY = "2_labels_50x25";
-const LABELS_PER_ITEM = 2;
+// const ACTIVE_LABEL_SIZE_KEY = "2_labels_50x25";
+// const LABELS_PER_ITEM = 2;
 
 function LabelBarcodeSVG({ value }) {
     const svgRef = useRef(null);
@@ -305,20 +305,126 @@ function LabelBarcodeSVG({ value }) {
 
 // Builds a self-contained HTML document (with inline barcode SVGs already rendered)
 // for the hidden print iframe.
+// function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
+//     const cellsHtml = labels
+//         .map((label) => {
+//             // render barcode as an SVG string via a throwaway container
+//             const svgContainer = document.createElement("div");
+//             const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+//             svgContainer.appendChild(svgEl);
+
+//             try {
+//                 JsBarcode(svgEl, label.itemCode, {
+//                     format: "CODE128",
+//                     displayValue: false,
+//                     height: 26,
+//                     width: 1.1,
+//                     margin: 0,
+//                     background: "transparent",
+//                 });
+//             } catch (err) {
+//                 console.error("Barcode render error:", err);
+//             }
+
+//             const barcodeSvgString = svgContainer.innerHTML;
+
+//             return `
+//                 <div class="label-cell">
+//                     ${label.header?.value ? `<div class="label-header">${label.header.value}</div>` : ""}
+//                     ${barcodeSvgString}
+//                     <div class="label-code">${label.itemCode}</div>
+//                     ${label.line1?.value ? `<div class="label-line">${label.line1.value}</div>` : ""}
+//                     ${label.line2?.value ? `<div class="label-line">${label.line2.value}</div>` : ""}
+//                     ${label.line3?.value ? `<div class="label-line">${label.line3.value}</div>` : ""}
+//                     ${label.line4?.value ? `<div class="label-line">${label.line4.value}</div>` : ""}
+//                 </div>
+//             `;
+//         })
+//         .join("");
+
+//     return `
+// <!DOCTYPE html>
+// <html>
+// <head>
+// <meta charset="utf-8" />
+// <style>
+//     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+//     @page {
+//         size: ${pageWidthMm}mm ${pageHeightMm}mm;
+//         margin: 0;
+//     }
+
+//     body {
+//         margin: 0;
+//     }
+
+//     .label-grid {
+//         display: grid;
+//         grid-template-columns: repeat(${size.columns}, ${size.labelWidthMm}mm);
+//         grid-auto-rows: ${size.labelHeightMm}mm;
+//         width: ${pageWidthMm}mm;
+//     }
+
+//     .label-cell {
+//         width: ${size.labelWidthMm}mm;
+//         height: ${size.labelHeightMm}mm;
+//         box-sizing: border-box;
+//         padding: 1mm 2mm;
+//         display: flex;
+//         flex-direction: column;
+//         align-items: center;
+//         justify-content: center;
+//         text-align: center;
+//         overflow: hidden;
+//         page-break-inside: avoid;
+//         font-family: Arial, sans-serif;
+//     }
+
+//     .label-header { font-size: 7px; font-style: italic; line-height: 1.1; }
+//     .label-code { font-size: 7px; font-weight: 600; margin-top: 0.5mm; }
+//     .label-line { font-size: 6.5px; line-height: 1.1; }
+
+//     svg { display: block; }
+// </style>
+// </head>
+// <body>
+//     <div class="label-grid">
+//         ${cellsHtml}
+//     </div>
+// </body>
+// </html>
+//     `;
+// }
 function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
+    // Scale everything based on label height.
+    // 50mm height = 100% scale
+    // 25mm height = 50% scale
+    const scale = size.labelHeightMm / 50;
+
+    const barcodeHeight = 26 * scale;
+    const barcodeWidth = 1.1 * scale;
+
+    const headerFontSize = 7 * scale;
+    const codeFontSize = 7 * scale;
+    const lineFontSize = 6.5 * scale;
+
     const cellsHtml = labels
         .map((label) => {
-            // render barcode as an SVG string via a throwaway container
             const svgContainer = document.createElement("div");
-            const svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            const svgEl = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "svg"
+            );
+
             svgContainer.appendChild(svgEl);
 
             try {
                 JsBarcode(svgEl, label.itemCode, {
                     format: "CODE128",
                     displayValue: false,
-                    height: 26,
-                    width: 1.1,
+                    height: barcodeHeight,
+                    width: barcodeWidth,
                     margin: 0,
                     background: "transparent",
                 });
@@ -330,13 +436,39 @@ function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
 
             return `
                 <div class="label-cell">
-                    ${label.header?.value ? `<div class="label-header">${label.header.value}</div>` : ""}
+                    ${
+                        label.header?.value
+                            ? `<div class="label-header">${label.header.value}</div>`
+                            : ""
+                    }
+
                     ${barcodeSvgString}
+
                     <div class="label-code">${label.itemCode}</div>
-                    ${label.line1?.value ? `<div class="label-line">${label.line1.value}</div>` : ""}
-                    ${label.line2?.value ? `<div class="label-line">${label.line2.value}</div>` : ""}
-                    ${label.line3?.value ? `<div class="label-line">${label.line3.value}</div>` : ""}
-                    ${label.line4?.value ? `<div class="label-line">${label.line4.value}</div>` : ""}
+
+                    ${
+                        label.line1?.value
+                            ? `<div class="label-line">${label.line1.value}</div>`
+                            : ""
+                    }
+
+                    ${
+                        label.line2?.value
+                            ? `<div class="label-line">${label.line2.value}</div>`
+                            : ""
+                    }
+
+                    ${
+                        label.line3?.value
+                            ? `<div class="label-line">${label.line3.value}</div>`
+                            : ""
+                    }
+
+                    ${
+                        label.line4?.value
+                            ? `<div class="label-line">${label.line4.value}</div>`
+                            : ""
+                    }
                 </div>
             `;
         })
@@ -347,8 +479,13 @@ function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
 <html>
 <head>
 <meta charset="utf-8" />
+
 <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
 
     @page {
         size: ${pageWidthMm}mm ${pageHeightMm}mm;
@@ -361,7 +498,10 @@ function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
 
     .label-grid {
         display: grid;
-        grid-template-columns: repeat(${size.columns}, ${size.labelWidthMm}mm);
+        grid-template-columns: repeat(
+            ${size.columns},
+            ${size.labelWidthMm}mm
+        );
         grid-auto-rows: ${size.labelHeightMm}mm;
         width: ${pageWidthMm}mm;
     }
@@ -369,25 +509,48 @@ function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
     .label-cell {
         width: ${size.labelWidthMm}mm;
         height: ${size.labelHeightMm}mm;
+
         box-sizing: border-box;
-        padding: 1mm 2mm;
+
+        padding: ${1 * scale}mm ${2 * scale}mm;
+
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+
         text-align: center;
         overflow: hidden;
+
         page-break-inside: avoid;
+
         font-family: Arial, sans-serif;
     }
 
-    .label-header { font-size: 7px; font-style: italic; line-height: 1.1; }
-    .label-code { font-size: 7px; font-weight: 600; margin-top: 0.5mm; }
-    .label-line { font-size: 6.5px; line-height: 1.1; }
+    .label-header {
+        font-size: ${headerFontSize}px;
+        font-style: italic;
+        line-height: 1.1;
+    }
 
-    svg { display: block; }
+    .label-code {
+        font-size: ${codeFontSize}px;
+        font-weight: 600;
+        margin-top: ${0.5 * scale}mm;
+    }
+
+    .label-line {
+        font-size: ${lineFontSize}px;
+        line-height: 1.1;
+    }
+
+    svg {
+        display: block;
+    }
 </style>
+
 </head>
+
 <body>
     <div class="label-grid">
         ${cellsHtml}
@@ -396,20 +559,51 @@ function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm) {
 </html>
     `;
 }
-
-export default function BarcodeLabelSheet({ barcodeItems, triggerPrint }) {
-    const size = LABEL_SIZE_PRESETS[ACTIVE_LABEL_SIZE_KEY];
-    const pageWidthMm = size.labelWidthMm * size.columns;
-    const pageHeightMm = size.labelHeightMm;
+export default function BarcodeLabelSheet({ barcodeItems, triggerPrint, labelSettings }) {
+    console.log("BarcodeLabelSheet render", { barcodeItems, labelSettings });
     const iframeRef = useRef(null);
+    //const size = LABEL_SIZE_PRESETS[ACTIVE_LABEL_SIZE_KEY];
 
-    const labels = barcodeItems.flatMap((row) =>
-        Array.from({ length: LABELS_PER_ITEM }, (_, i) => ({
+    const size = labelSettings
+        ? {
+            labelWidthMm: Number(labelSettings.Label_Width_Mm),
+            labelHeightMm: Number(labelSettings.Label_Height_Mm),
+            columns: Number(labelSettings.Columns_Count),
+        }
+        : null;
+
+    const pageWidthMm = size
+        ? size.labelWidthMm * size.columns
+        : 0;
+
+    const pageHeightMm = size
+        ? size.labelHeightMm
+        : 0;
+
+
+    // const labels = barcodeItems.flatMap((row) =>
+    //     Array.from({ length: LABELS_PER_ITEM }, (_, i) => ({
+    //         ...row,
+    //         _key: `${row.itemCode}-${i}`,
+    //     }))
+    // );
+const labelsPerItem = Number(labelSettings?.Columns_Count) || 1;
+
+const labels = barcodeItems.flatMap((row) =>
+    Array.from(
+        { length: labelsPerItem },
+        (_, i) => ({
             ...row,
             _key: `${row.itemCode}-${i}`,
-        }))
-    );
+        })
+    )
+);
 
+console.log("labelSettings:", labelSettings);
+console.log("size:", size);
+console.log("barcodeItems:", barcodeItems);
+console.log("labels.length:", labels.length);
+console.log("labels:", labels);
     const handlePrint = () => {
         if (labels.length === 0) return;
 
@@ -448,5 +642,7 @@ export default function BarcodeLabelSheet({ barcodeItems, triggerPrint }) {
         }
     }, [labels]);
 
-    return null; // nothing rendered on the visible page — print happens via the iframe only
+    if (!labelSettings) return null;
+
+    return null;
 }

@@ -2,13 +2,16 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Trash2 } from "lucide-react";
+import { Settings, Trash2 } from "lucide-react";
 
 
 import { useEditItemMutation, useGetItemsForDropdownQuery, useLazyGetItemByNameQuery } from "../../redux/api/itemApi";
 import AddItemModal from "../../components/Modal/AddItemModal";
 // import BarcodeLabelSheet from "../../components/Barcode/BarcodeLabelSheet";
 import BarcodeLabelSheet from "../../components/Barcode/BarcodeLabelSheet"
+import BarcodeSettingsDrawer from "../../components/Barcode/BarcodeSettingsDrawer";
+import { useGetBarcodeSettingsQuery, useSelectBarcodeSettingMutation } from "../../redux/api/Settings/barcodeSettingsApi";
+import { toast } from "react-toastify";
 // =========================================================
 // FIELD OPTIONS for Header/Line1-4 dropdowns
 // =========================================================
@@ -340,8 +343,28 @@ export default function BarcodeGenerator() {
     const [showItemAddModal, setShowItemAddModal] = useState(false);
     const inputRef = useRef(null);
     const [barcodeValue, setBarcodeValue] = useState("");
+    const [showBarcodeSettings, setShowBarcodeSettings] = useState(false);
+
+    const [selectedBarcodeSizeId, setSelectedBarcodeSizeId] = useState(null);
+
     const [getItemByName] = useLazyGetItemByNameQuery();
-      const [editItem] = useEditItemMutation()
+    const [editItem] = useEditItemMutation()
+    const {
+        data: barcodeSettings = [],
+        isLoading: isBarcodeSettingsLoading,
+        isFetching: isBarcodeSettingsFetching,
+    } = useGetBarcodeSettingsQuery();
+
+    const [selectBarcodeSetting] = useSelectBarcodeSettingMutation();
+    useEffect(() => {
+        const activeSetting = barcodeSettings.find(
+            (setting) => Number(setting.Is_Active) === 1
+        );
+
+        if (activeSetting) {
+            setSelectedBarcodeSizeId(activeSetting.id);
+        }
+    }, [barcodeSettings]);
     // debounce search
     useEffect(() => {
         const t = setTimeout(() => setDebouncedSearch(itemSearch), 300);
@@ -488,80 +511,80 @@ export default function BarcodeGenerator() {
     // =========================================================
     // ADD / REPLACE ROW
     // =========================================================
-   const handleAddForBarcode = async () => {
-    if (!isAddValid) return;
+    const handleAddForBarcode = async () => {
+        if (!isAddValid) return;
 
-    const itemKey =
-        selectedItem.Item_Id ??
-        selectedItem.id ??
-        selectedItem.Item_Code ??
-        barcodeValue;
+        const itemKey =
+            selectedItem.Item_Id ??
+            selectedItem.id ??
+            selectedItem.Item_Code ??
+            barcodeValue;
 
-    // Save barcode to DB if item doesn't already have one
-    if (!selectedItem.Item_Code && barcodeValue) {
-        try {
-            const payload = {
+        // Save barcode to DB if item doesn't already have one
+        if (!selectedItem.Item_Code && barcodeValue) {
+            try {
+                const payload = {
+                    ...selectedItem,
+                    Item_Code: barcodeValue,
+                };
+
+                await editItem({
+                    body: payload,
+                    Item_Id: selectedItem.Item_Id,
+                }).unwrap();
+
+            } catch (error) {
+                console.error("Failed to save Item Code:", error);
+                return;
+            }
+        }
+
+        const newRow = {
+            itemId: selectedItem.Item_Id ?? selectedItem.id ?? null,
+            itemCode: barcodeValue,
+            itemName: selectedItem.Item_Name,
+            noOfLabels: Number(noOfLabels),
+            header: labelConfig.header,
+            line1: labelConfig.line1,
+            line2: labelConfig.line2,
+            line3: labelConfig.line3,
+            line4: labelConfig.line4,
+            selectedItem: {
                 ...selectedItem,
                 Item_Code: barcodeValue,
-            };
+            },
+        };
 
-            await editItem({
-                body: payload,
-                Item_Id: selectedItem.Item_Id,
-            }).unwrap();
+        setBarcodeItems((prev) => {
+            const existingIndex = prev.findIndex((row) => {
+                const rowKey = row.itemId ?? row.itemCode;
+                return String(rowKey) === String(itemKey);
+            });
+            console.log("itemKey:", itemKey, "existingIndex:", existingIndex, "prev:", prev);
 
-        } catch (error) {
-            console.error("Failed to save Item Code:", error);
-            return;
-        }
-    }
+            if (existingIndex !== -1) {
+                const updated = [...prev];
+                updated[existingIndex] = newRow;
+                return updated;
+            }
 
-    const newRow = {
-        itemId: selectedItem.Item_Id ?? selectedItem.id ?? null,
-        itemCode: barcodeValue,
-        itemName: selectedItem.Item_Name,
-        noOfLabels: Number(noOfLabels),
-        header: labelConfig.header,
-        line1: labelConfig.line1,
-        line2: labelConfig.line2,
-        line3: labelConfig.line3,
-        line4: labelConfig.line4,
-        selectedItem: {
-            ...selectedItem,
-            Item_Code: barcodeValue,
-        },
-    };
-
-    setBarcodeItems((prev) => {
-        const existingIndex = prev.findIndex((row) => {
-            const rowKey = row.itemId ?? row.itemCode;
-            return String(rowKey) === String(itemKey);
+            return [...prev, newRow];
         });
-        console.log("itemKey:", itemKey, "existingIndex:", existingIndex, "prev:", prev);
 
-        if (existingIndex !== -1) {
-            const updated = [...prev];
-            updated[existingIndex] = newRow;
-            return updated;
-        }
+        // Reset fields
+        setSelectedItem(null);
+        setItemSearch("");
+        setBarcodeValue("");
+        setNoOfLabels("");
 
-        return [...prev, newRow];
-    });
-
-    // Reset fields
-    setSelectedItem(null);
-    setItemSearch("");
-    setBarcodeValue("");
-    setNoOfLabels("");
-
-    setLabelConfig({
-        header: { field: "", value: "" },
-        line1: { field: "", value: "" },
-        line2: { field: "", value: "" },
-        line3: { field: "", value: "" },
-        line4: { field: "", value: "" },
-    });
-};
+        setLabelConfig({
+            header: { field: "", value: "" },
+            line1: { field: "", value: "" },
+            line2: { field: "", value: "" },
+            line3: { field: "", value: "" },
+            line4: { field: "", value: "" },
+        });
+    };
 
     const handleRemoveRow = (itemKey) => {
         setBarcodeItems((prev) =>
@@ -573,7 +596,7 @@ export default function BarcodeGenerator() {
         () => barcodeItems.reduce((sum, row) => sum + (row.noOfLabels || 0), 0),
         [barcodeItems]
     );
-    
+
     const handleLabelFieldSelect = (fieldKey, selectedField) => {
         let initialValue = "";
 
@@ -692,30 +715,89 @@ export default function BarcodeGenerator() {
             },
         });
     }, [selectedItem]);
-const printTriggerRef = useRef(null);
-const handleGenerate = () => {
-    if (printTriggerRef.current) {
-        printTriggerRef.current();
-    }
-};
-//     const handleGenerate = () => {
-//     if (barcodeItems.length === 0) return;
+    const printTriggerRef = useRef(null);
+    const handleGenerate = () => {
+        if (printTriggerRef.current) {
+            printTriggerRef.current();
+        }
+    };
+    //     const handleGenerate = () => {
+    //     if (barcodeItems.length === 0) return;
 
-//     setTimeout(() => {
-//         window.print();
-//     }, 100);
-// };
+    //     setTimeout(() => {
+    //         window.print();
+    //     }, 100);
+    // };
     return (
         <>
-            <div  className="flex flex-col bg-white" style={{ minHeight: "90vh" }}>
+            <div className="flex flex-col bg-white" style={{ minHeight: "100%" }}>
 
-                <div className="inn-title">
-                    <h4 className="text-2xl font-bold mb-1">Barcode Generator</h4>
-                    <p className="text-gray-500 text-sm mb-4">Enter item details to add for barcode</p>
+                <div
+                    className="inn-title flex items-start justify-between"
+                    style={{
+                        width: "100%",
+                    }}
+                >
+                    <div>
+                        <h4 className="text-2xl font-bold mb-1">
+                            Barcode Generator
+                        </h4>
+
+                        <p className="text-gray-500 text-sm mb-4">
+                            Enter item details to add for barcode
+                        </p>
+                    </div>
+
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                        }}
+                    >
+                        <span
+                            style={{
+                                fontSize: "13px",
+                                color: "#64748b",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Size:{" "}
+                            <span
+                                style={{
+                                    color: "#334155",
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {barcodeSettings.find(
+                                    (setting) => Number(setting.Is_Active) === 1
+                                )?.Size_Label || "Not selected"}
+                            </span>
+                        </span>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowBarcodeSettings(true)}
+                            title="Barcode Settings"
+                            style={{
+                                border: "none",
+                                background: "transparent",
+                                padding: "4px",
+                                cursor: "pointer",
+                                color: "#4CA1AF",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <Settings size={21} strokeWidth={1.8} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* ══ TOP: FORM (left) + PREVIEW (right) ══ */}
-                <div className="flex flex-col lg:flex-row gap-6" style={{ borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
+                <div className="flex flex-col lg:flex-row gap-6"
+                    style={{ borderTop: "1px solid #e2e8f0", width: "100%" }}>
 
                     {/* ══ LEFT FORM ══ */}
                     {/* //style={{ flex: 1 }} */}
@@ -947,72 +1029,7 @@ const handleGenerate = () => {
 
                     {/* ══ RIGHT PREVIEW ══ */}
 
-                    {/* <div
-                        style={{
-                            width: 280,
-                            flexShrink: 0,
-                            borderLeft: "1px solid #e2e8f0",
-                            paddingLeft: "1.5rem",
-                        }}
-                    >
-                        <p className="text-sm font-semibold text-gray-700 mb-3">
-                            Preview
-                        </p> */}
 
-                    {/* <div
-                            className="rounded-md border flex flex-col items-center justify-center text-center p-4"
-                            style={{
-                                borderStyle: "dashed",
-                                borderColor: "#cbd5e1",
-                                minHeight: 180,
-                            }}
-                        >
-
-                           
-                            {previewHeader && (
-                                <p className="text-sm italic mb-1">
-                                    {previewHeader || "Header"}
-                                </p>
-                            )}
-
-                            
-                            <div
-                                className="w-full flex items-center justify-center my-2"
-                                style={{
-                                    height: 50,
-                                    backgroundColor: "#f1f5f9",
-                                }}
-                            >
-                                <span className="text-xs text-gray-400">
-                                    [ barcode: {previewBarcodeValue} ]
-                                </span>
-                            </div>
-
-                            
-                            <p className="text-xs font-semibold">
-                                {previewBarcodeValue || "Item Code"}
-                            </p>
-
-                            
-                            <p className="text-xs">
-                                 {previewLine1 || "Line 1"}
-                            </p>
-
-                            
-                            <p className="text-xs">
-                                {previewLine2 || "Line 2"}
-                            </p>
-
-                           
-                            <p className="text-xs">
-                                {previewLine3 || "Line 3"}
-                            </p>
-
-                            
-                            <p className="text-xs italic">
-                                {previewLine4 || "Line 4"}
-                            </p>
-                        </div> */}
                     <div
                         style={{
                             width: 280,
@@ -1059,7 +1076,7 @@ const handleGenerate = () => {
                                         </p>
 
                                         {/* STATIC BARCODE */}
-                                        <div
+                                        {/* <div
                                             className="w-full flex items-center justify-center my-2"
                                             style={{
                                                 height: 50,
@@ -1080,6 +1097,27 @@ const handleGenerate = () => {
                                             >
                                                 [ barcode: {previewBarcodeValue || "Item Code"} ]
                                             </span>
+                                        </div> */}
+                                        <div
+                                            className="w-full flex items-center justify-center my-2"
+                                            style={{
+                                                height: 50,
+                                                //backgroundColor: "#f1f5f9",
+                                                maxWidth: "100%",
+                                                overflow: "hidden",
+                                                boxSizing: "border-box",
+                                            }}
+                                        >
+                                            <img
+                                                src="/assets/images/barcode.png"
+                                                alt="Barcode preview"
+                                                style={{
+                                                    maxWidth: "90%",
+                                                    maxHeight: "90%",
+                                                    objectFit: "contain",
+                                                    display: "block",
+                                                }}
+                                            />
                                         </div>
 
                                         {/* ITEM CODE */}
@@ -1200,22 +1238,22 @@ const handleGenerate = () => {
                         </div>
                     )}
                     {barcodeItems.length > 0 && (
-    <div className="flex justify-end mt-4">
-        <button
-            type="button"
-            onClick={handleGenerate}
-            //onClick={() => setShowBarcodePreview(true)}
-            className="px-5 py-2 rounded-md text-white font-medium"
-            style={{
-                backgroundColor: "#4CA1AF",
-                border: "none",
-                cursor: "pointer",
-            }}
-        >
-            Generate
-        </button>
-    </div>
-)}
+                        <div className="flex justify-end mt-4">
+                            <button
+                                type="button"
+                                onClick={handleGenerate}
+                                //onClick={() => setShowBarcodePreview(true)}
+                                className="px-5 py-2 rounded-md text-white font-medium"
+                                style={{
+                                    backgroundColor: "#4CA1AF",
+                                    border: "none",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Generate
+                            </button>
+                        </div>
+                    )}
                 </div>
 
             </div>
@@ -1240,8 +1278,41 @@ const handleGenerate = () => {
                     }}
                 />
             )}
-           
-<BarcodeLabelSheet barcodeItems={barcodeItems} triggerPrint={printTriggerRef} />
+            <BarcodeSettingsDrawer
+                open={showBarcodeSettings}
+                sizes={barcodeSettings}
+                selectedSizeId={selectedBarcodeSizeId}
+                onChange={(sizeId) => {
+                    setSelectedBarcodeSizeId(sizeId);
+                }}
+                onClose={() => {
+                    setShowBarcodeSettings(false);
+                }}
+                onSave={async () => {
+                    if (!selectedBarcodeSizeId) return;
+
+                    try {
+                        await selectBarcodeSetting({
+                            id: selectedBarcodeSizeId,
+                        }).unwrap();
+
+                        setShowBarcodeSettings(false);
+                        toast.success("Setting saved successfully");
+                    } catch (error) {
+                        // console.error(
+                        //     "Failed to select barcode setting:",
+                        //     error
+                        // );
+                        toast.error(error?.data?.message || "Failed to select barcode size");
+                    }
+                }}
+                isLoading={isBarcodeSettingsLoading || isBarcodeSettingsFetching}
+            />
+            <BarcodeLabelSheet barcodeItems={barcodeItems} triggerPrint={printTriggerRef}
+                labelSettings={barcodeSettings.find(
+                    (setting) => Number(setting.Is_Active) === 1
+                )}
+            />
             <style>
                 {`
  

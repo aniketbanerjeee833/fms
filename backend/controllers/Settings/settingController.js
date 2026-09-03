@@ -1,5 +1,5 @@
 
-import db from "../config/db.js";
+import db from "../../config/db.js";
 const addFinancialYear = async (req, res, next) => {
   let connection;
 

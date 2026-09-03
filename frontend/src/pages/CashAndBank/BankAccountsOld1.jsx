@@ -3,13 +3,13 @@ import { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react
 
 import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
-
+  
   Building2,
   SquarePen,
   ChevronRight,
-
+ 
   Eye,
-
+ 
   CreditCard,
   Landmark,
   Wallet,
@@ -40,7 +40,6 @@ import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnA
 import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
 import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
 import { itemApi } from "../../redux/api/itemApi";
-import VirtualScrollList from "../../components/VirtualScrollList";
 
 /* ── source_type → icon + label ── */
 const TYPE_META = {
@@ -143,9 +142,9 @@ function BankDetailPanel({ bankId }) {
   const [cursor, setCursor] = useState(null);
   //const sentinelRef = useRef(null);
   //const observerRef = useRef(null);
-  const itemRef = useRef(bankId);
-
-  const effectiveCursor = itemRef.current === bankId ? cursor : null;
+    const itemRef = useRef(bankId);
+  
+      const effectiveCursor = itemRef.current === bankId ? cursor : null;
 
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
@@ -168,16 +167,14 @@ function BankDetailPanel({ bankId }) {
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
   const { data: partiesList } = useGetAllPartiesQuery();
   const { data: banks = [] } = useGetAllBankAccountsQuery();
-  const initialRightLimit = useRef(
+    const initialRightLimit = useRef(
     Number(sessionStorage.getItem("banksByBank:rightCount")) || 10
-  );
+      );
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
     //{ Bank_Account_Id: bankId, cursor },
-    {
-      Bank_Account_Id: bankId,
+    { Bank_Account_Id: bankId, 
       cursor: effectiveCursor,
-      limit: effectiveCursor ? 10 : initialRightLimit.current
-    },
+      limit:effectiveCursor ? 10 : initialRightLimit.current},
     { skip: !bankId }
   );
 
@@ -187,22 +184,19 @@ function BankDetailPanel({ bankId }) {
   const ledger = data?.transactions ?? [];
   const hasMore = data?.hasMore ?? false;
   const nextCursor = data?.nextCursor ?? null;
-  //For virtualization
-  const handleLoadMore = useCallback(() => {
-    if (!hasMore || !nextCursor || isFetching) return;
-    setCursor(nextCursor);
-  }, [hasMore, nextCursor, isFetching]);
 
   // 🔹 reset cursor when bank changes
 
   // useEffect(() => {
   //   setCursor(null);
   // }, [bankId]);
-  useEffect(() => {
-    itemRef.current = bankId;
-    setCursor(null);
-  }, [bankId]);
+      useEffect(() => {
+          itemRef.current = bankId;
+          setCursor(null);
+      }, [bankId]);
 
+
+      
   // 🔹 intersection observer
   // const handleObserver = useCallback(
   //   (entries) => {
@@ -229,47 +223,45 @@ function BankDetailPanel({ bankId }) {
   //   if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
   //   return () => observerRef.current?.disconnect();
   // }, [handleObserver]);
-  const handleTransactionEdit = (row) => {
-    if (!row?.Formatted_Reference_Id) return;
-    const currentParams = new URLSearchParams(searchParams);
-    currentParams.set("highlightTxn", row.id);
-    setSearchParams(currentParams, { replace: true });
 
-    // Payment In / Payment Out open their edit modals
-    if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-      openModal(
-        row.Txn_Type,
-        row.Formatted_Reference_Id
-      );
-      return;
-    }
+const handleTransactionEdit = (row) => {
+  if (!row?.Formatted_Reference_Id) return;
 
-    // Other transactions open their edit page
-    const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-
-    if (!route) return;
-
-    const params = new URLSearchParams(searchParams);
-
-    // Keep the bank selected when coming back
-    params.set("bankId", bankId);
-
-    // Keep this transaction highlighted
-    params.set("highlightTxn", row.id);
-
-    navigate(
-      {
-        pathname: `/${route}/edit/${row.Formatted_Reference_Id}`,
-        search: `?${params.toString()}`,
-      },
-      {
-        state: {
-          from: "bank-accounts",
-        },
-      }
+  // Payment In / Payment Out open their edit modals
+  if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+    openModal(
+      row.Txn_Type,
+      row.Formatted_Reference_Id
     );
-  };
+    return;
+  }
 
+  // Other transactions open their edit page
+  const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
+  if (!route) return;
+
+  const params = new URLSearchParams(searchParams);
+
+  // Keep the bank selected when coming back
+  params.set("bankId", bankId);
+
+  // Keep this transaction highlighted
+  params.set("highlightTxn", row.id);
+
+  navigate(
+    {
+      pathname: `/${route}/edit/${row.Formatted_Reference_Id}`,
+      search: `?${params.toString()}`,
+    },
+    {
+      state: {
+        from: "bank-accounts",
+      },
+    }
+  );
+};
+ 
 
   // 🔹 after save/delete — reset cursor to reload from top
   const resetLedger = () => {
@@ -358,81 +350,59 @@ function BankDetailPanel({ bankId }) {
   };
 
   const bank = data?.bankAccount;
-  //   const rightPanelRef = useRef(null);
-
-  // const highlightedRowRef = useRef(null);
-  //     useEffect(() => {
-
-  //         const rightEl = rightPanelRef.current;
-
-
-  //         const saveRight = () => {
-  //             console.log("saveRight fired", rightEl.scrollTop, ledger.length);
-  //             sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
-  //             sessionStorage.setItem("banksByBank:rightCount", ledger.length);
-  //             // sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
-  //             // sessionStorage.setItem("banksByBank:rightCount", transactions.length);
-  //         };
-
-
-  //         rightEl?.addEventListener("scroll", saveRight);
-
-  //         return () => {
-
-  //             rightEl?.removeEventListener("scroll", saveRight);
-  //         };
-  //     }, [ ledger.length]);
-  // const hasRestoredRightRef = useRef(false);
-  // const [isRestoringRight, setIsRestoringRight] = useState(true);
-
-
-  //   useLayoutEffect(() => {
-  //     if (hasRestoredRightRef.current) {
-  //         setIsRestoringRight(false);
-  //         return;
-  //     }
+    const rightPanelRef = useRef(null);
+     
+  const highlightedRowRef = useRef(null);
+      useEffect(() => {
+          
+          const rightEl = rightPanelRef.current;
+  
+         
+          const saveRight = () => {
+              console.log("saveRight fired", rightEl.scrollTop, ledger.length);
+              sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
+              sessionStorage.setItem("banksByBank:rightCount", ledger.length);
+              // sessionStorage.setItem("banksByBank:rightScroll", rightEl.scrollTop);
+              // sessionStorage.setItem("banksByBank:rightCount", transactions.length);
+          };
+  
+         
+          rightEl?.addEventListener("scroll", saveRight);
+  
+          return () => {
+              
+              rightEl?.removeEventListener("scroll", saveRight);
+          };
+      }, [ ledger.length]);
+  const hasRestoredRightRef = useRef(false);
+  const [isRestoringRight, setIsRestoringRight] = useState(true);
+  
+  // useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) return;
   //     if (isLoading || isFetching) return;
-
+  
   //     const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
-  //      // keep waiting only if we might still get more data
-  //     if (ledger.length < savedCount && hasMore) return;
-
+  //     if (ledger.length < savedCount) return;
+  
   //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
   //     hasRestoredRightRef.current = true;
-  //     setIsRestoringRight(false); // reveal now, correctly positioned
-  // }, [isLoading, isFetching, ledger.length, hasMore]);
-  const virtualListRef = useRef(null);
-  const hasScrolledToHighlightRef = useRef(false);
-
-  // find the target row's index once ledger is loaded
-  useEffect(() => {
-    if (hasScrolledToHighlightRef.current) return;
-
-    const highlightTxnId = searchParams.get("highlightTxn");
-    if (!highlightTxnId) return;
+  // }, [isLoading, isFetching, ledger.length]);
+  useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) {
+        setIsRestoringRight(false);
+        return;
+    }
     if (isLoading || isFetching) return;
 
-    const targetIndex = ledger.findIndex(
-      (row) => String(row.id) === String(highlightTxnId)
-    );
+    const savedCount = Number(sessionStorage.getItem("banksByBank:rightCount")) || 0;
+     // keep waiting only if we might still get more data
+    if (ledger.length < savedCount && hasMore) return;
 
-    if (targetIndex === -1) {
-      // not loaded yet — keep paginating until found or hasMore is false
-      if (hasMore && !isFetching) {
-        handleLoadMore();
-      }
-      return;
-    }
+    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredRightRef.current = true;
+    setIsRestoringRight(false); // reveal now, correctly positioned
+}, [isLoading, isFetching, ledger.length, hasMore]);
 
-    //virtualListRef.current?.scrollToIndex(targetIndex, { align: "center" });
-    virtualListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
-    hasScrolledToHighlightRef.current = true;
-  }, [ledger, isLoading, isFetching, hasMore, searchParams, handleLoadMore]);
-
-  useEffect(() => {
-    hasScrolledToHighlightRef.current = false;
-  }, [bankId]);
-  
   if (!bankId) {
     return (
       <div className="flex flex-col items-center justify-center text-gray-400 gap-3"
@@ -453,30 +423,23 @@ function BankDetailPanel({ bankId }) {
   }
 
   return (
-    <div
-      className="flex flex-col"
+    <div 
+    className="flex flex-col"
       // className="flex flex-col overflow-y-auto"
       // style={{
       //   maxHeight: "calc(100vh - 180px)",
       //   minWidth: 0
       // }}
-      //   style={{
-      //   height: "100%",
-
-      //   minHeight: 0,
-      //   overflow: "hidden",
-
-
-      // }}
       style={{
-        flex: 1,
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-
-    >
+      height: "100%",
+       
+      minHeight: 0,
+      overflow: "hidden",
+   
+     
+    }}
+  
+      >
 
       {/* bank summary card */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -504,7 +467,7 @@ function BankDetailPanel({ bankId }) {
       </div>
 
       {/* ledger table */}
-      {/* <div className="table-responsive table-desi" 
+      <div className="table-responsive table-desi" 
       ref={rightPanelRef}
           style={{
         
@@ -515,9 +478,8 @@ function BankDetailPanel({ bankId }) {
         // if using the placeholder above, also collapse height so it doesn't take double space
        // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
     }}
-      > */}
-
-      {/* <table className="w-full min-w-[500px]">
+      >
+        <table className="w-full min-w-[500px]">
           <thead>
             <tr>
               <th className="text-left">SL.NO</th>
@@ -592,7 +554,7 @@ function BankDetailPanel({ bankId }) {
                       ₹ {fmt(row.Amount)}
                     </td>
 
-                    
+                    {/* THREE DOT MENU */}
                     <td
                       className="py-2 px-2"
                       style={{
@@ -626,7 +588,7 @@ function BankDetailPanel({ bankId }) {
                         />
                       </button>
 
-                      
+                      {/* ROW MENU */}
                       {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
                         <div
                           onClick={(e) => e.stopPropagation()}
@@ -641,8 +603,50 @@ function BankDetailPanel({ bankId }) {
                           }}
                         >
 
-                          
-                       
+                          {/* VIEW / EDIT */}
+                          {/* {row.Formatted_Reference_Id && (
+                            MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{ color: "#374151" }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  openModal(
+                                    row.Txn_Type,
+                                    row.Formatted_Reference_Id
+                                  );
+                                }}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </button>
+                            ) : (
+                              <NavLink
+                                to={`/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`}
+                                state={{
+                                  from: "bank-accounts",
+                                  bankId
+                                }}
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                  textDecoration: "none",
+                                }}
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                View / Edit
+                              </NavLink>
+                            )
+                          )} */}
                           {row.Formatted_Reference_Id && (
                             MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
                               <button
@@ -703,7 +707,7 @@ function BankDetailPanel({ bankId }) {
                             )
                           )}
 
-                         
+                          {/* PRINT */}
                           <button
                             type="button"
                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -720,7 +724,7 @@ function BankDetailPanel({ bankId }) {
                             Print
                           </button>
 
-                         
+                          {/* DELETE */}
                           <button
                             type="button"
                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -754,199 +758,10 @@ function BankDetailPanel({ bankId }) {
               })
             )}
           </tbody>
-        </table> */}
-
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* TABLE HEADER */}
-        {/* <div className="table-responsive table-desi"> */}
-        <table className="w-full min-w-[500px] table-responsive table-desi"
-          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
-          {/* //<table className="w-full min-w-[500px]"> */}
-          <thead style={{ fontWeight: "700", fontSize: "12px", color: "#333" }}>
-            <tr>
-              <th className="text-left" style={{ width: 70 }}>SL.NO</th>
-              <th className="text-left" style={{ width: 120 }}>TYPE</th>
-              <th className="text-left">PARTY</th>
-              <th className="text-left" style={{ width: 110 }}>DATE</th>
-              <th className="text-left" style={{ width: 120 }}>AMOUNT</th>
-              <th style={{ width: 50 }}></th>
-            </tr>
-          </thead>
         </table>
-        {/* </div> */}
 
-        {/* VIRTUALIZED TABLE BODY */}
-        <VirtualScrollList
-          ref={virtualListRef}
-          items={ledger}
-          rowHeight={52}
-          height="100%"
-          onLoadMore={handleLoadMore}
-          dynamicHeight={true}    // 👈 opt in
-          isFetching={isFetching}
-          hasMore={hasMore}
-          getItemKey={(row) => row.id}
-          emptyMessage="No transactions found"
-          endMessage="— End of transactions —"
-          isRowActive={(row, idx) =>
-            rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`
-          }
-          renderRow={(row, idx) => {
-            const meta =
-              TYPE_META[row.Txn_Type?.toLowerCase()] ?? {
-                label: row.Txn_Type,
-                color: "#6b7280",
-                dir: row.Direction === "Credit" ? "in" : "out",
-              };
-
-            const isHighlighted =
-              String(searchParams.get("highlightTxn")) === String(row.id);
-
-            return (
-              <div
-                key={row.id}
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set("highlightTxn", row.id);
-                  setSearchParams(params, { replace: true });
-                }}
-                onDoubleClick={() => handleTransactionEdit(row)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "70px 120px minmax(150px, 1fr) 110px 120px 50px",
-                  alignItems: "center",
-                  minHeight: "52px",
-                  // columnGap removed — padding on cells handles spacing instead, matching header
-                  width: "100%",
-                  cursor: "pointer",
-                  backgroundColor: isHighlighted ? "#4CA1AF22" : "transparent",
-                  borderBottom: "1px solid #f1f5f9",
-                  boxSizing: "border-box",
-                }}
-
-              >
-                {/* SL.NO */}
-                <div className="table-desi-cell" style={{ padding: "0 5px" }}>{idx + 1}.</div>
-                <div className="table-desi-cell" style={{ padding: "0 5px" }}>{meta.label}</div>
-                <div className="table-desi-cell" style={{ padding: "0 5px", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                  {row.Party_Name || "N/A"}
-                </div>
-
-                {/* DATE */}
-                <div className="table-desi-cell" style={{ padding: "0 5px" }}>
-                  {row.Txn_Date
-                    ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "numeric",
-                      year: "numeric",
-                    })
-                    : "N/A"}
-                </div>
-
-                {/* AMOUNT */}
-                <div style={{ color: meta.color, fontWeight: 600,padding: "0 5px" }}>
-                  ₹ {fmt(row.Amount)}
-                </div>
-
-                {/* THREE DOT MENU */}
-                <div
-                  className="py-2 px-2 table-desi-cell"
-                  style={{ position: "relative", width: 50, textAlign: "center" }}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
-                      setRowMenuOpen(rowMenuOpen === menuId ? null : menuId);
-                    }}
-                    className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                    style={{ backgroundColor: "transparent", border: "none", cursor: "pointer" }}
-                    title="More"
-                  >
-                    <MoreVertical size={16} style={{ color: "#374151" }} />
-                  </button>
-
-                  {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute bg-white shadow-lg rounded-md"
-                      style={{
-                        right: 0,
-                        top: 32,
-                        width: 150,
-                        zIndex: 100,
-                        border: "1px solid #e2e8f0",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {/* VIEW / EDIT — single button now, works for BOTH modal and route types
-                                since handleTransactionEdit itself branches internally */}
-                      {row.Formatted_Reference_Id && (
-                        <button
-                          type="button"
-                          className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                          style={{ color: "#374151" }}
-                          onClick={() => {
-                            setRowMenuOpen(null);
-                            handleTransactionEdit(row);
-                          }}
-                        >
-                          <Eye size={13} style={{ color: "#4CA1AF" }} />
-                          View / Edit
-                        </button>
-                      )}
-
-                      {/* PRINT */}
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                        style={{ color: "#374151" }}
-                        onClick={() => {
-                          setRowMenuOpen(null);
-                          console.log("Print transaction:", row);
-                        }}
-                      >
-                        <Printer size={13} style={{ color: "#4CA1AF" }} />
-                        Print
-                      </button>
-
-                      {/* DELETE */}
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                        title="Delete transaction"
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                        onClick={() => {
-                          setRowMenuOpen(null);
-                          setDeleteTarget({
-                            Id: row.Formatted_Reference_Id,
-                            Txn_Type: row.Txn_Type,
-                          });
-                        }}
-                      >
-                        <Trash2 size={13} style={{ color: "#dc2626" }} />
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          }}
-        />
-      </div>
-
-      {/* sentinel */}
-      {/* <div ref={sentinelRef} style={{ height: "1px" }} />
+        {/* sentinel */}
+        {/* <div ref={sentinelRef} style={{ height: "1px" }} /> */}
 
         {isFetching && (
           <div className="flex justify-center py-4">
@@ -958,8 +773,8 @@ function BankDetailPanel({ bankId }) {
           <div className="flex justify-center py-4">
             <span className="text-xs text-gray-300">— End of transactions —</span>
           </div>
-        )} */}
-
+        )}
+      </div>
 
       {/* modals */}
       {modalState.open && modalState.type === "Payment_In" && (
@@ -993,7 +808,6 @@ function BankDetailPanel({ bankId }) {
         />
       )}
     </div>
-
   );
 }
 /* ════════════════════════════════════════════════════════════
@@ -1049,12 +863,12 @@ export default function BankAccounts() {
   return (
     <>
       {/* ── BREADCRUMB ── */}
-
+      
 
       <div className="flex flex-col bg-white"
-        style={{ height: "100vh", overflow: "hidden" }}
+      style={{ height: "100vh", overflow: "hidden" }}
       //  style={{ minHeight: "100vh" }}
-      >
+       >
 
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
@@ -1079,11 +893,10 @@ export default function BankAccounts() {
         <div
           className="flex flex-col lg:flex-row gap-0"
           style={{
-            flex: 1,
-            minHeight: 0,
-            height: "calc(100vh - 180px)",
-            borderTop: "1px solid #e2e8f0"
-          }}
+             flex: 1,
+        minHeight: 0,
+        height: "calc(100vh - 180px)",
+             borderTop: "1px solid #e2e8f0" }}
         >
 
           {/* ══ LEFT — 30% — bank list ══ */}
@@ -1194,13 +1007,7 @@ export default function BankAccounts() {
           <div
             className="w-full lg:w-[70%] p-1"
             //style={{ maxHeight: "calc(100vh - 180px)" }}
-            // style={{ height: "100%", minHeight: 0 }}
-            style={{
-              height: "100%",
-              minHeight: 0,
-              display: "flex",        // 👈 add this
-              flexDirection: "column", // 👈 add this
-            }}
+              style={{ height: "100%", minHeight: 0 }}
           >
             <BankDetailPanel
               bankId={selectedId}

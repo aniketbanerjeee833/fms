@@ -7,13 +7,13 @@ import {
   Eye,
   Printer,
   FileSpreadsheet,
- 
+
   Trash2,
   Undo2,
   PrinterIcon
 } from "lucide-react";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
@@ -24,6 +24,7 @@ import { itemApi } from "../../redux/api/itemApi";
 import { useReactToPrint } from "react-to-print";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 
 export default function AllPurchaseList() {
@@ -31,7 +32,8 @@ export default function AllPurchaseList() {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const page = Number(searchParams.get("page")) || 1;
+  //const page = Number(searchParams.get("page")) || 1;
+  const [cursor, setCursor] = useState(null);
   const searchTerm = searchParams.get("search") || "";
   const fromDate = searchParams.get("fromDate") || "";
   const toDate = searchParams.get("toDate") || "";
@@ -51,39 +53,59 @@ export default function AllPurchaseList() {
     skip: !printPurchaseId,
   });
   const navigate = useNavigate();
-  const handlePageChange = (newPage) => {
-    setSearchParams({
-      page: newPage,
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handlePageChange = (newPage) => {
+  //   setSearchParams({
+  //     page: newPage,
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
-  const handleNextPage = () => {
-    setSearchParams({
-      page: page + 1,
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handleNextPage = () => {
+  //   setSearchParams({
+  //     page: page + 1,
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
-  const handlePreviousPage = () => {
-    setSearchParams({
-      page: Math.max(1, page - 1),
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
-
-  const { data: purchases, isLoading } = useGetAllPurchasesQuery({
-    page,
+  // const handlePreviousPage = () => {
+  //   setSearchParams({
+  //     page: Math.max(1, page - 1),
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
+  const {
+    data: purchases,
+    isLoading,
+    isFetching,
+  } = useGetAllPurchasesQuery({
+    cursor,
     search: searchTerm,
     fromDate,
     toDate,
+    limit: 10,
   });
+  const purchaseList = purchases?.purchases ?? [];
+  const hasMore = purchases?.hasMore ?? false;
+  const nextCursor = purchases?.nextCursor ?? null;
+
+  // For virtualization
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || !nextCursor || isFetching) return;
+
+    setCursor(nextCursor);
+  }, [hasMore, nextCursor, isFetching]);
+  // const { data: purchases, isLoading } = useGetAllPurchasesQuery({
+  //   page,
+  //   search: searchTerm,
+  //   fromDate,
+  //   toDate,
+  // });
   console.log(purchases, fromDate, toDate);
   const [
     triggerPurchaseBulkReport,
@@ -189,9 +211,65 @@ export default function AllPurchaseList() {
       handleBulkPrint();
     }
   }, [bulkPurchaseReportData, showPurchaseBulkPrintReview]);
+
+ const virtualListRef = useRef(null);
+const hasScrolledToHighlightRef = useRef(false);
+
+const highlightTxnId = searchParams.get("highlightTxn");
+
+useEffect(() => {
+  if (hasScrolledToHighlightRef.current) return;
+  if (!highlightTxnId) return;
+  if (isLoading || isFetching) return;
+
+  const targetIndex = purchaseList.findIndex(
+    (purchase) =>
+      String(purchase?.Purchase_Id) === String(highlightTxnId)
+  );
+console.log("Target index for highlight:", targetIndex);
+  if (targetIndex === -1) {
+    if (hasMore && nextCursor && !isFetching) {
+      handleLoadMore();
+    }
+    return;
+  }
+
+  // Wait until VirtualScrollList has rendered the new data
+  const timer = setTimeout(() => {
+    virtualListRef.current?.scrollToIndex(targetIndex, {
+      align: "center",
+      behavior: "auto",
+    });
+
+    hasScrolledToHighlightRef.current = true;
+  }, 100);
+
+  return () => clearTimeout(timer);
+}, [
+  purchaseList,
+  highlightTxnId,
+  isLoading,
+  isFetching,
+  hasMore,
+  nextCursor,
+  handleLoadMore,
+]);
+useEffect(() => {
+  hasScrolledToHighlightRef.current = false;
+}, [highlightTxnId, searchTerm, fromDate, toDate]);
   return (
     <>
-      <div className="flex flex-col bg-white">
+      <div className="flex flex-col bg-white"
+        style={{
+          flex: 1,
+          minHeight: 0,
+         
+             height: "calc(100vh - 20px)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
 
 
         <div className="inn-title">
@@ -236,12 +314,19 @@ export default function AllPurchaseList() {
                   type="date"
                   value={fromDate}
                   onChange={(e) => {
+                    setCursor(null);
+
                     setSearchParams({
-                      page: 1,
                       search: searchTerm,
                       fromDate: e.target.value,
                       toDate,
                     });
+                    // setSearchParams({
+                    //   page: 1,
+                    //   search: searchTerm,
+                    //   fromDate: e.target.value,
+                    //   toDate,
+                    // });
                   }}
                   // onChange={(e) => setFromDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
@@ -256,12 +341,19 @@ export default function AllPurchaseList() {
                   type="date"
                   value={toDate}
                   onChange={(e) => {
+                    setCursor(null);
+
                     setSearchParams({
-                      page: 1,
                       search: searchTerm,
                       fromDate,
                       toDate: e.target.value,
                     });
+                    // setSearchParams({
+                    //   page: 1,
+                    //   search: searchTerm,
+                    //   fromDate,
+                    //   toDate: e.target.value,
+                    // });
                   }}
                   // onChange={(e) => setToDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
@@ -276,12 +368,19 @@ export default function AllPurchaseList() {
                   placeholder="Search ..."
                   value={searchTerm}
                   onChange={(e) => {
+                    setCursor(null);
+
                     setSearchParams({
-                      page: 1,               // reset page on new search
                       search: e.target.value,
                       fromDate,
                       toDate,
                     });
+                    // setSearchParams({
+                    //   page: 1,               // reset page on new search
+                    //   search: e.target.value,
+                    //   fromDate,
+                    //   toDate,
+                    // });
                   }}
                   // onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-56"
@@ -352,7 +451,7 @@ export default function AllPurchaseList() {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4 gap-2">
+          <div className="flex justify-end sm: mt-2 gap-2">
             {/* <button
               type="button"
               onClick={handleExportPurchaseReportExcel}
@@ -390,300 +489,354 @@ export default function AllPurchaseList() {
 
           </div>
         </div>
-        <div className="tab-inn">
-          <div 
-          className="table-responsive table-desi">
+        <div className="tab-inn"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+
+        >
+          {/* <div className="table-responsive table-desi"> */}
+          <div
+            //className="table-responsive table-desi"
+            //             style={{
+            //               flex: 1,
+            //               minHeight: 0,
+            //              overflowX: "auto",
+            // overflowY: "hidden",
+            //               display: "flex",
+            //               flexDirection: "column",
+            //             }}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
             {isLoading ? (
               <p className="text-center mt-4">Fetching purchases...</p>
-            ) : purchases?.length === 0 ? (
+            ) : purchaseList.length === 0 ? (
               <p className="text-center mt-4">No purchases found.</p>
             ) : (
 
 
+              <>
+                {/* <div style={{ flexShrink: 0 }}> */}
+                <table className="w-full min-w-[800px]  table-responsive table-desi">
+                  <thead>
+                    <tr>
+                      <th className="text-left">Sl.No</th>
+                      <th className="text-left">Date</th>
+                      <th className="text-left">Bill No.</th>
+                      <th className="text-left">Party Name</th>
+                      <th className="text-left">Payment Type</th>
+                      <th className="text-left">Amount</th>
+                      <th className="text-left">Balance</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                </table>
+                {/* </div> */}
+                <div style={{
+                  flex: 1,
+                  minHeight: 0,
+                  height:0,
+                  overflow: "hidden",
+                  position: "relative",
+                }}>
+                <VirtualScrollList
+                  ref={virtualListRef}
+                  items={purchaseList}
+                  rowHeight={52}
+                  height="100%"
+                  dynamicHeight={true}
+                  onLoadMore={handleLoadMore}
+                  isFetching={isFetching}
+                  hasMore={hasMore}
+                  getItemKey={(purchase) => purchase?.Purchase_Id}
+                  emptyMessage="No purchase found"
+                  endMessage="— End of purchases —"
+                  isRowActive={(purchase) =>
+                    rowMenuOpen === purchase?.Purchase_Id
+                  }
+                  renderRow={(purchase, idx) => {
+                    const isHighlighted =
+                      String(searchParams.get("highlightTxn")) ===
+                      String(purchase?.Purchase_Id);
 
+                    return (
+                      <div
+                        key={purchase?.Purchase_Id}
+                        onClick={() => {
+                          const params = new URLSearchParams(searchParams);
 
+                          params.set(
+                            "highlightTxn",
+                            purchase?.Purchase_Id
+                          );
 
-              <table className="w-full min-w-[500px]">
-                <thead>
-                  <tr>
-                    <th className="text-left">Sl.No</th>
-                    <th className="text-left ">Date</th>
-                    <th className="text-left ">Bill No.</th>
-                    <th className="text-left ">Party Name</th>
-                    <th className="text-left">Payment Type</th>
-                    <th className="text-left">Amount </th>
-                    <th className="text-left">Balance</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {purchases && purchases?.purchases?.length > 0 ? (
-                    purchases?.purchases?.map((purchase, idx) => {
-                      const isHighlighted = String(searchParams.get("highlightTxn")) === String(purchase?.Purchase_Id);
-                      return (
+                          setSearchParams(params, { replace: true });
+                        }}
+                        onDoubleClick={() => {
+                          const params = new URLSearchParams(searchParams);
 
-                        <tr
-                          key={purchase?.Purchase_Id}
+                          params.set(
+                            "highlightTxn",
+                            purchase?.Purchase_Id
+                          );
 
-                          onClick={() => {
-                            const params = new URLSearchParams(searchParams);
+                          navigate(
+                            `/purchase/edit/${purchase?.Purchase_Id}?${params.toString()}`,
+                            {
+                              state: {
+                                from: "all-purchase-list",
+                              },
+                            }
+                          );
+                        }}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "70px 110px 120px minmax(150px, 1fr) 130px 110px 110px 50px",
+                          alignItems: "center",
+                          minHeight: "52px",
+                          columnGap: "10px",
+                          width: "100%",
+                          cursor: "pointer",
+                          backgroundColor: isHighlighted
+                            ? "#4CA1AF22"
+                            : "transparent",
+                          borderBottom: "1px solid #f1f5f9",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        {/* SL.NO */}
+                        <div className="table-desi-cell">
+                          {idx + 1}.
+                        </div>
 
-                            params.set(
-                              "highlightTxn",
-                              purchase?.Purchase_Id
-                            );
+                        {/* DATE */}
+                        <div className="table-desi-cell">
+                          {purchase?.Bill_Date
+                            ? new Date(
+                              purchase.Bill_Date
+                            ).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "numeric",
+                              year: "numeric",
+                            })
+                            : "N/A"}
+                        </div>
 
-                            setSearchParams(params, { replace: true });
-                          }}
+                        {/* BILL NO */}
+                        <div className="table-desi-cell">
+                          {purchase?.Bill_Number
+                            ? purchase.Bill_Number.split("T")[0]
+                            : "N/A"}
+                        </div>
 
-                          onDoubleClick={() => {
-                            const params = new URLSearchParams(searchParams);
-
-                            params.set(
-                              "highlightTxn",
-                              purchase?.Purchase_Id
-                            );
-
-                            navigate(
-                              `/purchase/edit/${purchase?.Purchase_Id}?${params.toString()}`,
-                              {
-                                state: {
-                                  from: "all-purchase-list",
-                                },
-                              }
-                            );
-                          }}
-
+                        {/* PARTY */}
+                        <div
+                          className="table-desi-cell"
                           style={{
-                            cursor: "pointer",
-                            borderBottom: "1px solid #f1f5f9",
-                            backgroundColor: isHighlighted
-                              ? "#4CA1AF22"
-                              : "transparent",
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
                           }}
                         >
-                          <td>
-                            {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
-                          </td>
+                          {purchase?.Party_Name || "N/A"}
+                        </div>
 
-                          <td>
-                            {purchase?.Bill_Date
-                              ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "numeric",
-                                year: "numeric",
-                              })
-                              : "N/A"}
-                          </td>
-                          <td>
-                            {purchase?.Bill_Number
-                              ? purchase.Bill_Number.split("T")[0]
-                              : "N/A"}
-                          </td>
-                          <td>{purchase?.Party_Name || "N/A"}</td>
-                          <td>{purchase?.Payment_Type_Display || "N/A"}</td>
+                        {/* PAYMENT TYPE */}
+                        <div className="table-desi-cell">
+                          {purchase?.Payment_Type_Display || "N/A"}
+                        </div>
 
-                          <td>₹ {purchase?.Total_Amount || "N/A"}</td>
-                          <td>₹ {purchase?.Balance_Due || "N/A"}</td>
+                        {/* AMOUNT */}
+                        <div className="table-desi-cell">
+                          ₹ {purchase?.Total_Amount || "N/A"}
+                        </div>
 
+                        {/* BALANCE */}
+                        <div className="table-desi-cell">
+                          ₹ {purchase?.Balance_Due || "N/A"}
+                        </div>
 
-                          <td
-                            className="py-2 px-2"
-                            style={{
-                              position: "relative",
-                              width: 50,
-                              textAlign: "center"
+                        {/* THREE DOT MENU */}
+                        <div
+                          className="py-2 px-2 table-desi-cell"
+                          style={{
+                            position: "relative",
+                            width: 50,
+                            textAlign: "center",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              setRowMenuOpen(
+                                rowMenuOpen === purchase?.Purchase_Id
+                                  ? null
+                                  : purchase?.Purchase_Id
+                              );
                             }}
+                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                            style={{
+                              backgroundColor: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                            }}
+                            title="More"
                           >
-                            {/* THREE DOT BUTTON */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                            <MoreVertical
+                              size={16}
+                              style={{ color: "#374151" }}
+                            />
+                          </button>
 
-                                setRowMenuOpen(
-                                  rowMenuOpen === purchase?.Purchase_Id
-                                    ? null
-                                    : purchase?.Purchase_Id
-                                );
-                              }}
-                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          {/* THREE DOT MENU */}
+                          {rowMenuOpen === purchase?.Purchase_Id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute bg-white shadow-lg rounded-md"
                               style={{
-                                backgroundColor: "transparent",
-                                border: "none",
-                                cursor: "pointer"
+                                right: 0,
+                                top: "100%",
+                                width: 150,
+                                zIndex: 100,
+                                border: "1px solid #e2e8f0",
+                                overflow: "hidden",
                               }}
-                              title="More"
                             >
-                              <MoreVertical
-                                size={16}
-                                style={{ color: "#374151" }}
-                              />
-                            </button>
+                              {/* VIEW / EDIT */}
+                              <NavLink
+                                to={{
+                                  pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
+                                  search: (() => {
+                                    const params = new URLSearchParams(searchParams);
 
-                            {/* THREE DOT MENU */}
-                            {rowMenuOpen === purchase?.Purchase_Id && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute bg-white shadow-lg rounded-md"
+                                    params.set(
+                                      "highlightTxn",
+                                      purchase?.Purchase_Id
+                                    );
+
+                                    return params.toString();
+                                  })(),
+                                }}
+                                state={{
+                                  from: "all-purchase-list",
+                                }}
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                                 style={{
-                                  right: 0,
-                                  top: 32,
-                                  width: 150,
-                                  zIndex: 100,
-                                  border: "1px solid #e2e8f0",
-                                  overflow: "hidden"
+                                  color: "#374151",
+                                  textDecoration: "none",
+                                }}
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Eye
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+
+                                View / Edit
+                              </NavLink>
+
+                              {/* PRINT */}
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                  backgroundColor: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+                                  setPrintPurchaseId(
+                                    purchase.Purchase_Id
+                                  );
                                 }}
                               >
+                                <Printer
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
 
-                                {/* VIEW / EDIT */}
-                                <NavLink
-                                  to={{
-                                    pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
-                                    search: (() => {
-                                      const params = new URLSearchParams(searchParams);
+                                Print
+                              </button>
 
-                                      params.set(
-                                        "highlightTxn",
-                                        purchase?.Purchase_Id
-                                      );
+                              {/* RETURN */}
+                              <NavLink
+                                to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
+                                state={{
+                                  from: "purchase-return-list",
+                                }}
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                  textDecoration: "none",
+                                }}
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Undo2
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
 
-                                      return params.toString();
-                                    })(),
-                                  }}
-                                  state={{
-                                    from: "all-purchase-list"
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration: "none"
-                                  }}
-                                  onClick={() => setRowMenuOpen(null)}
-                                >
-                                  <Eye
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
+                                Return
+                              </NavLink>
 
-                                  View / Edit
-                                </NavLink>
-                                {/* <NavLink
-                                  to={`/purchase/edit/${purchase?.Purchase_Id}${location.search}`}
-                                  state={{
-                                    from: "all-purchase-list"
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration: "none"
-                                  }}
-                                  onClick={() => setRowMenuOpen(null)}
-                                >
-                                  <Eye
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
+                              {/* DELETE */}
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                style={{
+                                  cursor: "pointer",
+                                  color: "#dc2626",
+                                  backgroundColor: "transparent",
+                                  border: "none",
+                                }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
 
-                                  View / Edit
-                                </NavLink> */}
+                                  setDeleteTarget({
+                                    Purchase_Id:
+                                      purchase?.Purchase_Id,
+                                  });
+                                }}
+                              >
+                                <Trash2
+                                  size={13}
+                                  style={{ color: "#dc2626" }}
+                                />
 
-                                {/* PRINT */}
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    backgroundColor: "transparent",
-                                    border: "none",
-                                    cursor: "pointer"
-                                  }}
-                                  onClick={() => {
-                                    setRowMenuOpen(null);
-                                    setPrintPurchaseId(purchase.Purchase_Id)
-                                    //handlePrint(purchase);
-                                  }}
-                                >
-                                  <Printer
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                </div>
+              </>
 
-                                  Print
-                                </button>
-
-                                {/* RETURN */}
-                                <NavLink
-                                  to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
-                                  state={{
-                                    from: "purchase-return-list"
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration: "none"
-                                  }}
-                                  onClick={() => setRowMenuOpen(null)}
-                                >
-                                  <Undo2
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
-
-                                  Return
-                                </NavLink>
-
-                                {/* DELETE */}
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                  style={{
-                                    cursor: "pointer",
-                                    color: "#dc2626",
-                                    backgroundColor: "transparent",
-                                    border: "none"
-                                  }}
-                                  onClick={() => {
-                                    setRowMenuOpen(null);
-
-                                    setDeleteTarget({
-                                      Purchase_Id: purchase?.Purchase_Id
-                                    });
-                                  }}
-                                >
-                                  <Trash2
-                                    size={13}
-                                    style={{ color: "#dc2626" }}
-                                  />
-
-                                  Delete
-                                </button>
-
-                              </div>
-                            )}
-                          </td>
-
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td className="mx-auto text-center" colSpan={8}>
-                        No purchase found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-
-              </table>
 
             )}
           </div>
         </div>
-        <div className="flex justify-center align-center p-4">
+        {/* <div className="flex justify-center align-center p-4">
           <div className="flex items-center space-x-2 flex-wrap justify-center">
 
-            {/* PREVIOUS */}
+            
             <button
               type="button"
               onClick={() => handlePreviousPage()}
@@ -695,7 +848,7 @@ export default function AllPurchaseList() {
               ← Previous
             </button>
 
-            {/* PAGE NUMBERS — DESKTOP / TABLET */}
+           
             <div style={{ marginRight: "0px" }}
               className="hidden sm:flex space-x-2">
               {(() => {
@@ -774,12 +927,12 @@ export default function AllPurchaseList() {
               })()}
             </div>
 
-            {/* CURRENT PAGE — MOBILE ONLY */}
+           
             <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
               Page {page} / {purchases?.totalPages || 1}
             </div>
 
-            {/* NEXT */}
+          
             <button
               type="button"
               onClick={() => handleNextPage()}
@@ -797,7 +950,7 @@ export default function AllPurchaseList() {
             </button>
 
           </div>
-        </div>
+        </div> */}
 
       </div>
 
@@ -843,3 +996,276 @@ export default function AllPurchaseList() {
   )
 }
 
+// <table className="w-full min-w-[500px]">
+//               <thead>
+//                 <tr>
+//                   <th className="text-left">Sl.No</th>
+//                   <th className="text-left ">Date</th>
+//                   <th className="text-left ">Bill No.</th>
+//                   <th className="text-left ">Party Name</th>
+//                   <th className="text-left">Payment Type</th>
+//                   <th className="text-left">Amount </th>
+//                   <th className="text-left">Balance</th>
+//                   <th></th>
+//                 </tr>
+//               </thead>
+//               <tbody>
+//                 {purchases && purchases?.purchases?.length > 0 ? (
+//                   purchases?.purchases?.map((purchase, idx) => {
+//                     const isHighlighted = String(searchParams.get("highlightTxn")) === String(purchase?.Purchase_Id);
+//                     return (
+
+//                       <tr
+//                         key={purchase?.Purchase_Id}
+
+//                         onClick={() => {
+//                           const params = new URLSearchParams(searchParams);
+
+//                           params.set(
+//                             "highlightTxn",
+//                             purchase?.Purchase_Id
+//                           );
+
+//                           setSearchParams(params, { replace: true });
+//                         }}
+
+//                         onDoubleClick={() => {
+//                           const params = new URLSearchParams(searchParams);
+
+//                           params.set(
+//                             "highlightTxn",
+//                             purchase?.Purchase_Id
+//                           );
+
+//                           navigate(
+//                             `/purchase/edit/${purchase?.Purchase_Id}?${params.toString()}`,
+//                             {
+//                               state: {
+//                                 from: "all-purchase-list",
+//                               },
+//                             }
+//                           );
+//                         }}
+
+//                         style={{
+//                           cursor: "pointer",
+//                           borderBottom: "1px solid #f1f5f9",
+//                           backgroundColor: isHighlighted
+//                             ? "#4CA1AF22"
+//                             : "transparent",
+//                         }}
+//                       >
+//                         <td>
+//                           {(purchases?.currentPage - 1) * 10 + (idx + 1)}.
+//                         </td>
+
+//                         <td>
+//                           {purchase?.Bill_Date
+//                             ? new Date(purchase?.Bill_Date).toLocaleDateString("en-IN", {
+//                               day: "numeric",
+//                               month: "numeric",
+//                               year: "numeric",
+//                             })
+//                             : "N/A"}
+//                         </td>
+//                         <td>
+//                           {purchase?.Bill_Number
+//                             ? purchase.Bill_Number.split("T")[0]
+//                             : "N/A"}
+//                         </td>
+//                         <td>{purchase?.Party_Name || "N/A"}</td>
+//                         <td>{purchase?.Payment_Type_Display || "N/A"}</td>
+
+//                         <td>₹ {purchase?.Total_Amount || "N/A"}</td>
+//                         <td>₹ {purchase?.Balance_Due || "N/A"}</td>
+
+
+//                         <td
+//                           className="py-2 px-2"
+//                           style={{
+//                             position: "relative",
+//                             width: 50,
+//                             textAlign: "center"
+//                           }}
+//                         >
+//                           {/* THREE DOT BUTTON */}
+//                           <button
+//                             type="button"
+//                             onClick={(e) => {
+//                               e.stopPropagation();
+
+//                               setRowMenuOpen(
+//                                 rowMenuOpen === purchase?.Purchase_Id
+//                                   ? null
+//                                   : purchase?.Purchase_Id
+//                               );
+//                             }}
+//                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                             style={{
+//                               backgroundColor: "transparent",
+//                               border: "none",
+//                               cursor: "pointer"
+//                             }}
+//                             title="More"
+//                           >
+//                             <MoreVertical
+//                               size={16}
+//                               style={{ color: "#374151" }}
+//                             />
+//                           </button>
+
+//                           {/* THREE DOT MENU */}
+//                           {rowMenuOpen === purchase?.Purchase_Id && (
+//                             <div
+//                               onClick={(e) => e.stopPropagation()}
+//                               className="absolute bg-white shadow-lg rounded-md"
+//                               style={{
+//                                 right: 0,
+//                                 top: 32,
+//                                 width: 150,
+//                                 zIndex: 100,
+//                                 border: "1px solid #e2e8f0",
+//                                 overflow: "hidden"
+//                               }}
+//                             >
+
+//                               {/* VIEW / EDIT */}
+//                               <NavLink
+//                                 to={{
+//                                   pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
+//                                   search: (() => {
+//                                     const params = new URLSearchParams(searchParams);
+
+//                                     params.set(
+//                                       "highlightTxn",
+//                                       purchase?.Purchase_Id
+//                                     );
+
+//                                     return params.toString();
+//                                   })(),
+//                                 }}
+//                                 state={{
+//                                   from: "all-purchase-list"
+//                                 }}
+//                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                 style={{
+//                                   color: "#374151",
+//                                   textDecoration: "none"
+//                                 }}
+//                                 onClick={() => setRowMenuOpen(null)}
+//                               >
+//                                 <Eye
+//                                   size={13}
+//                                   style={{ color: "#4CA1AF" }}
+//                                 />
+
+//                                 View / Edit
+//                               </NavLink>
+//                               {/* <NavLink
+//                                 to={`/purchase/edit/${purchase?.Purchase_Id}${location.search}`}
+//                                 state={{
+//                                   from: "all-purchase-list"
+//                                 }}
+//                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                 style={{
+//                                   color: "#374151",
+//                                   textDecoration: "none"
+//                                 }}
+//                                 onClick={() => setRowMenuOpen(null)}
+//                               >
+//                                 <Eye
+//                                   size={13}
+//                                   style={{ color: "#4CA1AF" }}
+//                                 />
+
+//                                 View / Edit
+//                               </NavLink> */}
+
+//                               {/* PRINT */}
+//                               <button
+//                                 type="button"
+//                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                 style={{
+//                                   color: "#374151",
+//                                   backgroundColor: "transparent",
+//                                   border: "none",
+//                                   cursor: "pointer"
+//                                 }}
+//                                 onClick={() => {
+//                                   setRowMenuOpen(null);
+//                                   setPrintPurchaseId(purchase.Purchase_Id)
+//                                   //handlePrint(purchase);
+//                                 }}
+//                               >
+//                                 <Printer
+//                                   size={13}
+//                                   style={{ color: "#4CA1AF" }}
+//                                 />
+
+//                                 Print
+//                               </button>
+
+//                               {/* RETURN */}
+//                               <NavLink
+//                                 to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
+//                                 state={{
+//                                   from: "purchase-return-list"
+//                                 }}
+//                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                 style={{
+//                                   color: "#374151",
+//                                   textDecoration: "none"
+//                                 }}
+//                                 onClick={() => setRowMenuOpen(null)}
+//                               >
+//                                 <Undo2
+//                                   size={13}
+//                                   style={{ color: "#4CA1AF" }}
+//                                 />
+
+//                                 Return
+//                               </NavLink>
+
+//                               {/* DELETE */}
+//                               <button
+//                                 type="button"
+//                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+//                                 style={{
+//                                   cursor: "pointer",
+//                                   color: "#dc2626",
+//                                   backgroundColor: "transparent",
+//                                   border: "none"
+//                                 }}
+//                                 onClick={() => {
+//                                   setRowMenuOpen(null);
+
+//                                   setDeleteTarget({
+//                                     Purchase_Id: purchase?.Purchase_Id
+//                                   });
+//                                 }}
+//                               >
+//                                 <Trash2
+//                                   size={13}
+//                                   style={{ color: "#dc2626" }}
+//                                 />
+
+//                                 Delete
+//                               </button>
+
+//                             </div>
+//                           )}
+//                         </td>
+
+//                       </tr>
+//                     )
+//                   })
+//                 ) : (
+//                   <tr>
+//                     <td className="mx-auto text-center" colSpan={8}>
+//                       No purchase found
+//                     </td>
+//                   </tr>
+//                 )}
+//               </tbody>
+
+//             </table>

@@ -1,48 +1,7 @@
-import { useRef, useEffect } from "react";
+import  { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-/**
- * VirtualScrollList
- *
- * A single reusable virtualized list/table you can drop in anywhere you
- * currently render a long `.map()` of rows — item dropdowns, bank ledgers,
- * party lists, transaction tables, etc. Only the rows actually visible in
- * the viewport (+ overscan) ever exist in the DOM, no matter how many
- * thousands of items are in `items`.
- *
- * Props:
- *   items            — the full (already-loaded) array to render
- *   renderRow        — (item, index) => ReactNode. You control what each
- *                       row looks like — a CSS-grid row, a plain div, etc.
- *                       Do NOT set position/top/transform yourself; the
- *                       wrapper below handles that.
- *   rowHeight        — fixed px height per row (default 44). Use this when
- *                       every row is the same height — by far the common
- *                       case (dropdown rows, ledger rows).
- *   estimateSize     — optional (index) => number, for variable-height
- *                       rows. If provided, overrides rowHeight.
- *   height           — px height of the scroll viewport. If omitted, it
- *                       auto-sizes to `items.length * rowHeight`, capped
- *                       at `maxHeight`.
- *   maxHeight        — cap for the auto-sized height (default 240, i.e.
- *                       your old `max-h-60`).
- *   header           — optional ReactNode rendered once, above the
- *                       scrollable area, outside the virtualizer (sticky
- *                       column headers, an "+ Add" row, etc).
- *   onLoadMore       — () => void, called once when the user scrolls near
- *                       the end of the currently-loaded `items`.
- *   isFetching       — bool, shows a "Loading more…" footer and suppresses
- *                       duplicate onLoadMore calls while true.
- *   hasMore          — bool, stops calling onLoadMore once there's nothing
- *                       left to fetch.
- *   loadMoreThreshold— how many rows from the end triggers onLoadMore
- *                       (default 15).
- *   emptyMessage     — text shown when items.length === 0 and !isFetching.
- *   overscan         — extra rows rendered above/below the viewport so
- *                       fast scrolling never flashes blank gaps (default 12).
- *   className/style  — passed to the outer wrapper div.
- */
-export default function VirtualScrollList({
+const VirtualScrollList = forwardRef(function VirtualScrollList({
     items = [],
     renderRow,
     rowHeight = 44,
@@ -55,90 +14,142 @@ export default function VirtualScrollList({
     hasMore = false,
     loadMoreThreshold = 15,
     emptyMessage = "No results found",
+    endMessage = "— End of results —",
     overscan = 12,
     getItemKey = (item, index) => index,
+    dynamicHeight = false, // 👈 new prop — opt-in per usage
     className = "",
     style = {},
-}) {
-  const scrollRef = useRef(null);
+    isRowActive, // 👈 new — (item, index) => boolean
+    
+}, ref) {
+    const scrollRef = useRef(null);
+    
+    const rowVirtualizer = useVirtualizer({
+        count: items.length,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: estimateSize || (() => rowHeight),
+        overscan,
+    });
 
-  const rowVirtualizer = useVirtualizer({
-    count: items.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: estimateSize || (() => rowHeight),
-    overscan,
-  });
+    useImperativeHandle(ref, () => ({
+        scrollToIndex: (index, options) => {
+            rowVirtualizer.scrollToIndex(index, options);
+        },
+    }));
 
-  const virtualItems = rowVirtualizer.getVirtualItems();
+    const virtualItems = rowVirtualizer.getVirtualItems();
 
-  /* ── infinite-scroll trigger — fires through the virtualizer's own
-     render cycle, so it's naturally throttled without a manual RAF/
-     scroll-event guard. ── */
-  useEffect(() => {
-    if (!onLoadMore || !hasMore) return;
+    useEffect(() => {
+        if (!onLoadMore || !hasMore) return;
+        const lastItem = virtualItems[virtualItems.length - 1];
+        if (!lastItem) return;
+        if (lastItem.index >= items.length - loadMoreThreshold && !isFetching) {
+            onLoadMore();
+        }
+    }, [virtualItems, items.length, isFetching, hasMore, onLoadMore, loadMoreThreshold]);
 
-    const lastItem = virtualItems[virtualItems.length - 1];
-    if (!lastItem) return;
+    const calculatedHeight = height ?? Math.min(items.length * rowHeight, maxHeight);
 
-    if (lastItem.index >= items.length - loadMoreThreshold && !isFetching) {
-      onLoadMore();
-    }
-  }, [virtualItems, items.length, isFetching, hasMore, onLoadMore, loadMoreThreshold]);
-
-  const viewportHeight =
-    height ?? Math.min(items.length * rowHeight, maxHeight);
-
-  return (
-    <div className={className} style={style}>
-      {header}
-
-      <div
-        ref={scrollRef}
-        style={{
-          height: viewportHeight,
-          overflowY: "auto",
-          position: "relative",
-        }}
-      >
-        {items.length === 0 && !isFetching ? (
-          <div className="px-3 py-2 text-gray-400 text-center">{emptyMessage}</div>
-        ) : (
-          <div
+    return (
+        <div
+            className={className}
             style={{
-              height: rowVirtualizer.getTotalSize(),
-              width: "100%",
-              position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: 0,
+                height: "100%",
+                width: "100%",
+                padding: 4,
+                ...style,
             }}
-          >
-            {virtualItems.map((virtualRow) => {
-              const item = items[virtualRow.index];
-              if (!item) return null;
+        >
+            {header}
 
-              return (
-                <div
-                key={getItemKey(item, virtualRow.index)}
-                  //key={virtualRow.key}
-                  data-index={virtualRow.index}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
+            <div
+                ref={scrollRef}
+                //className="virtual-scroll-list"
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+                    height: height !== undefined ? height : calculatedHeight,
+                    overflowY: "auto",
+                    //overflowX: "visible",
+                    overflowX: "hidden",
+                    position: "relative",
                     width: "100%",
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                >
-                  {renderRow(item, virtualRow.index)}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                }}
+              
+            >
+                {items.length === 0 && !isFetching ? (
+                    <div className="px-3 py-2  text-center" 
+                    style={{ paddingTop: 40, paddingBottom: 40 }}>
+                        {emptyMessage}
+                    </div>
+                ) : (
+                    <div style={{ height: rowVirtualizer.getTotalSize(), width: "100%", position: "relative" }}>
+                        {virtualItems.map((virtualRow) => {
+                            const item = items[virtualRow.index];
+                            if (!item) return null;
+                             const active = isRowActive ? isRowActive(item, virtualRow.index) : false;
+                            return (
+                                <div
+                                    key={getItemKey(item, virtualRow.index)}
+                                    data-index={virtualRow.index}
+                                    ref={dynamicHeight ? rowVirtualizer.measureElement : undefined} // 👈 key change
+                                    style={{
+                                        position: "absolute",
+                                        top: 0,
+                                        left: 0,
+                                        width: "100%",
+                                        transform: `translateY(${virtualRow.start}px)`,
+                                        zIndex: active ? 50 : 1,
+                                        color:"black"
+                                    }}
+                                >
+                                    {renderRow(item, virtualRow.index)}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
-        {isFetching && (
-          <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>
-        )}
-      </div>
-    </div>
-  );
+                {isFetching && (
+                    <div className="text-center text-xs text-gray-400 py-2" style={{ position: "sticky", bottom: 0, background: "white" }}>
+                        Loading more...
+                    </div>
+                )}
+
+                {!hasMore && !isFetching && items.length > 0 && (
+                    <div className="flex justify-center py-3">
+                        <span className="text-xs text-gray-300">{endMessage}</span>
+                    </div>
+                )}
+            </div>
+              {/* <style>
+        {`
+
+.virtual-scroll-list::-webkit-scrollbar {
+  width: 12px;
 }
+
+.virtual-scroll-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.virtual-scroll-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+}
+
+.virtual-scroll-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+`}
+      </style> */}
+        </div>
+    );
+   
+});
+
+export default VirtualScrollList;

@@ -12,7 +12,7 @@ import { dashboardApi } from "./api/dashboardApi";
 import { userApi } from "./api/userApi";
 import { reportApi } from "./api/reportApi";
 import { dailyExpenseApi } from "./api/dailyExpenseApi";
-import { settingsApi } from "./api/settingsApi";
+
 
 import { paymentOutApi } from "./api/paymentOutApi";
 import { paymentInApi } from "./api/paymentInApi";
@@ -22,6 +22,8 @@ import { cashInHandApi } from "./api/cashInHandApi";
 import { bankAccountApi } from "./api/bankAccountApi";
 import { expenseApi } from "./api/expenseApi";
 import { termsConditionsApi } from "./api/termsConditionsApi";
+import { settingsApi } from "./api/Settings/settingsApi";
+import { barcodeSettingsApi } from "./api/Settings/barcodeSettingsApi";
 
 
 // ✅ Combine reducers
@@ -45,6 +47,7 @@ const rootReducer = combineReducers({
   [expenseApi.reducerPath]: expenseApi.reducer,
   [reportApi.reducerPath]: reportApi.reducer,
   [settingsApi.reducerPath]: settingsApi.reducer,
+  [barcodeSettingsApi.reducerPath]: barcodeSettingsApi.reducer,
   [termsConditionsApi.reducerPath]: termsConditionsApi.reducer
 
  
@@ -82,6 +85,7 @@ const store = configureStore({
       expenseApi.middleware,
       reportApi.middleware,
       settingsApi.middleware,
+      barcodeSettingsApi.middleware,
       termsConditionsApi.middleware
      
     ),

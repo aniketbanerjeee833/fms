@@ -270,7 +270,7 @@ import { toast } from "react-toastify";
 import { useAddFinancialYearMutation, useGetAllFinancialYearsQuery,
    useGetAllSettingsQuery,
    useUpdateCurrentFinancialYearMutation, 
-   useUpdateSettingMutation} from "../../redux/api/settingsApi";
+   useUpdateSettingMutation} from "../../redux/api/Settings/settingsApi";
 
 export default function Settings() {
   const [activeSection, setActiveSection] = useState("financialYear"); // "financialYear" | "settings"

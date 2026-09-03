@@ -29,7 +29,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
-import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
+import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 function ItemDropdownVirtualized({
 
   items,

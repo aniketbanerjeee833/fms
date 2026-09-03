@@ -16,7 +16,7 @@ import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import SelectUnitModal from "./SelectUnitModal";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
-import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
+import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 
 export default function AddItemModal({ onClose, onSave, defaultItemType = "Product" }) {
     const dispatch = useDispatch();

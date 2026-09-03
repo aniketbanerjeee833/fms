@@ -1125,15 +1125,150 @@ const getSingleInvoice = async (req, res, next) => {
   }
 };
 
+// const getAllSales = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = 10;
+//     const offset = (page - 1) * limit;
+
+//     const search = req.query.search?.trim().toLowerCase() || "";
+//     const fromDate = req.query.fromDate || null;
+//     const toDate = req.query.toDate || null;
+
+//     const whereClauses = [];
+//     const params = [];
+
+//     // if (search) {
+//     //   whereClauses.push(`(
+//     //     LOWER(a.Party_Name)      LIKE ? OR
+//     //     CAST(s.Total_Amount AS CHAR) LIKE ? OR
+//     //     CAST(s.Balance_Due  AS CHAR) LIKE ?
+//     //   )`);
+//     //   const like = `%${search}%`;
+//     //   params.push(like, like, like);
+//     // }
+//     if (search) {
+//       whereClauses.push(`(
+//         a.Party_Name      LIKE ? OR
+//         CAST(s.Total_Amount AS CHAR) LIKE ? OR
+//         CAST(s.Balance_Due  AS CHAR) LIKE ? OR
+//         s.Invoice_Number LIKE ?
+//       )`);
+//       const like = `%${search}%`;
+//       params.push(like, like, like, like);
+//     }
+//     if (fromDate && toDate) {
+//       whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
+//       params.push(`${fromDate} 00:00:00`, `${toDate} 23:59:59`);
+//     } else if (fromDate) {
+//       whereClauses.push(`s.Invoice_Date >= ?`);
+//       params.push(`${fromDate} 00:00:00`);
+//     } else if (toDate) {
+//       whereClauses.push(`s.Invoice_Date <= ?`);
+//       params.push(`${toDate} 23:59:59`);
+//     }
+
+//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+//     //ORDER BY s.created_at DESC
+//     const [rows] = await connection.query(
+//       `SELECT s.*, a.Party_Name
+//        FROM add_sale s
+//        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+//        ${whereSQL}
+//        ORDER BY s.Invoice_Date DESC
+//        LIMIT ? OFFSET ?`,
+//       [...params, limit, offset]
+//     );
+
+//     // 🔹 attach Payment_Type_Display per row from splits
+//     for (const row of rows) {
+//       const [splits] = await connection.query(
+//         `SELECT ps.Payment_Type, ba.Account_Display_Name
+//          FROM payment_splits ps
+//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
+//          WHERE ps.Source_Type = 'Sale' AND ps.Source_Id = ?`,
+//         [row.id]
+//       );
+
+//       const labels = splits.map((s) =>
+//         s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
+//       );
+//       const counts = {};
+//       labels.forEach((l) => (counts[l] = (counts[l] || 0) + 1));
+//       row.Payment_Type_Display = Object.entries(counts)
+//         .map(([label, count]) => (count > 1 ? `${label} (x${count})` : label))
+//         .join(" , ") || "—";
+//     }
+
+//     const [[{ total }]] = await connection.query(
+//       `SELECT COUNT(*) AS total
+//        FROM add_sale s
+//        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+//        ${whereSQL}`,
+//       params
+//     );
+
+//     const [[totals]] = await connection.query(
+//       `SELECT
+//          COALESCE(SUM(s.Total_Amount),   0) AS totalAmount,
+//          COALESCE(SUM(s.Balance_Due),    0) AS totalBalance,
+//          COALESCE(SUM(s.Total_Received), 0) AS totalReceived
+//        FROM add_sale s
+//        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
+//        ${whereSQL}`,
+//       params
+//     );
+
+//     return res.status(200).json({
+//       currentPage: page,
+//       totalPages: Math.ceil(total / limit),
+//       totalSales: total,
+//       sales: rows,
+//       totals,
+//     });
+//   } catch (err) {
+//     console.error("❌ Error fetching sales:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getAllSales = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
+    /* ---------- CURSOR PAGINATION ---------- */
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || 10,
+      200
+    );
 
+    let cursorDate = null;
+    let cursorId = null;
+    const cursorRaw = req.query.cursor || null;
+
+    if (cursorRaw) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(cursorRaw, "base64").toString("utf8")
+        );
+
+        cursorDate = decoded.date || null;
+        cursorId = decoded.id ? Number(decoded.id) : null;
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor.",
+        });
+      }
+    }
+
+    /* ---------- FILTERS ---------- */
     const search = req.query.search?.trim().toLowerCase() || "";
     const fromDate = req.query.fromDate || null;
     const toDate = req.query.toDate || null;
@@ -1141,28 +1276,26 @@ const getAllSales = async (req, res, next) => {
     const whereClauses = [];
     const params = [];
 
-    // if (search) {
-    //   whereClauses.push(`(
-    //     LOWER(a.Party_Name)      LIKE ? OR
-    //     CAST(s.Total_Amount AS CHAR) LIKE ? OR
-    //     CAST(s.Balance_Due  AS CHAR) LIKE ?
-    //   )`);
-    //   const like = `%${search}%`;
-    //   params.push(like, like, like);
-    // }
+    /* ---------- SEARCH ---------- */
     if (search) {
       whereClauses.push(`(
-        a.Party_Name      LIKE ? OR
-        CAST(s.Total_Amount AS CHAR) LIKE ? OR
-        CAST(s.Balance_Due  AS CHAR) LIKE ? OR
-        s.Invoice_Number LIKE ?
+        a.Party_Name                  LIKE ? OR
+        CAST(s.Total_Amount AS CHAR)  LIKE ? OR
+        CAST(s.Balance_Due AS CHAR)   LIKE ? OR
+        s.Invoice_Number              LIKE ?
       )`);
+
       const like = `%${search}%`;
       params.push(like, like, like, like);
     }
+
+    /* ---------- DATE FILTER ---------- */
     if (fromDate && toDate) {
       whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
-      params.push(`${fromDate} 00:00:00`, `${toDate} 23:59:59`);
+      params.push(
+        `${fromDate} 00:00:00`,
+        `${toDate} 23:59:59`
+      );
     } else if (fromDate) {
       whereClauses.push(`s.Invoice_Date >= ?`);
       params.push(`${fromDate} 00:00:00`);
@@ -1171,72 +1304,168 @@ const getAllSales = async (req, res, next) => {
       params.push(`${toDate} 23:59:59`);
     }
 
-    const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-    //ORDER BY s.created_at DESC
+    /* ---------- CURSOR CONDITION ---------- */
+    if (cursorDate && cursorId) {
+      whereClauses.push(`(
+        s.Invoice_Date < ?
+        OR (
+          s.Invoice_Date = ?
+          AND s.id < ?
+        )
+      )`);
+
+      params.push(cursorDate, cursorDate, cursorId);
+    }
+
+    const whereSQL = whereClauses.length
+      ? `WHERE ${whereClauses.join(" AND ")}`
+      : "";
+
+    /* ---------- MAIN QUERY ---------- */
     const [rows] = await connection.query(
       `SELECT s.*, a.Party_Name
        FROM add_sale s
        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
        ${whereSQL}
-       ORDER BY s.Invoice_Date DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY s.Invoice_Date DESC, s.id DESC
+       LIMIT ?`,
+      [...params, limit + 1]
     );
 
-    // 🔹 attach Payment_Type_Display per row from splits
-    for (const row of rows) {
+    /* ---------- DETECT hasMore ---------- */
+    const hasMore = rows.length > limit;
+
+    const pageRows = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    /* ---------- BUILD NEXT CURSOR ---------- */
+    let nextCursor = null;
+
+    if (hasMore && pageRows.length > 0) {
+      const last = pageRows[pageRows.length - 1];
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          date: last.Invoice_Date,
+          id: last.id,
+        })
+      ).toString("base64");
+    }
+
+    /* ---------- ATTACH PAYMENT TYPE LABELS ---------- */
+
+    const saleIds = pageRows.map((row) => row.id);
+
+    if (saleIds.length > 0) {
+      const placeholders = saleIds.map(() => "?").join(",");
+
       const [splits] = await connection.query(
-        `SELECT ps.Payment_Type, ba.Account_Display_Name
+        `SELECT
+           ps.Source_Id,
+           ps.Payment_Type,
+           ba.Account_Display_Name
          FROM payment_splits ps
-         LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-         WHERE ps.Source_Type = 'Sale' AND ps.Source_Id = ?`,
-        [row.id]
+         LEFT JOIN bank_accounts ba
+           ON ba.id = ps.Bank_Account_Id
+         WHERE ps.Source_Type = 'Sale'
+           AND ps.Source_Id IN (${placeholders})`,
+        saleIds
       );
 
-      const labels = splits.map((s) =>
-        s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-      );
-      const counts = {};
-      labels.forEach((l) => (counts[l] = (counts[l] || 0) + 1));
-      row.Payment_Type_Display = Object.entries(counts)
-        .map(([label, count]) => (count > 1 ? `${label} (x${count})` : label))
-        .join(" , ") || "—";
+      const splitMap = {};
+
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
+        }
+
+        splitMap[split.Source_Id].push(
+          split.Payment_Type === "Bank"
+            ? split.Account_Display_Name
+            : split.Payment_Type
+        );
+      }
+
+      for (const row of pageRows) {
+        const labels = splitMap[row.id] || [];
+        const counts = {};
+
+        labels.forEach((label) => {
+          counts[label] = (counts[label] || 0) + 1;
+        });
+
+        row.Payment_Type_Display = Object.entries(counts)
+          .map(([label, count]) =>
+            count > 1 ? `${label} (x${count})` : label
+          )
+          .join(" , ") || "—";
+      }
     }
+
+    /* ---------- COUNT ----------
+       Ignore cursor condition
+    ---------- */
+
+    const countWhereClauses = whereClauses.filter(
+      (clause) => !clause.startsWith("(\n        s.Invoice_Date <")
+    );
+
+    const countParams = [...params];
+
+    if (cursorDate && cursorId) {
+      countParams.splice(countParams.length - 3, 3);
+    }
+
+    const countWhereSQL = countWhereClauses.length
+      ? `WHERE ${countWhereClauses.join(" AND ")}`
+      : "";
 
     const [[{ total }]] = await connection.query(
       `SELECT COUNT(*) AS total
        FROM add_sale s
-       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-       ${whereSQL}`,
-      params
+       LEFT JOIN add_party a
+         ON s.Party_Id = a.Party_Id
+       ${countWhereSQL}`,
+      countParams
     );
+
+    /* ---------- TOTALS ----------
+       Ignore cursor condition
+    ---------- */
 
     const [[totals]] = await connection.query(
       `SELECT
-         COALESCE(SUM(s.Total_Amount),   0) AS totalAmount,
-         COALESCE(SUM(s.Balance_Due),    0) AS totalBalance,
+         COALESCE(SUM(s.Total_Amount), 0) AS totalAmount,
+         COALESCE(SUM(s.Balance_Due), 0) AS totalBalance,
          COALESCE(SUM(s.Total_Received), 0) AS totalReceived
        FROM add_sale s
-       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-       ${whereSQL}`,
-      params
+       LEFT JOIN add_party a
+         ON s.Party_Id = a.Party_Id
+       ${countWhereSQL}`,
+      countParams
     );
 
+    /* ---------- RESPONSE ---------- */
+
     return res.status(200).json({
-      currentPage: page,
-      totalPages: Math.ceil(total / limit),
+      success: true,
+      sales: pageRows,
+      hasMore,
+      nextCursor,
       totalSales: total,
-      sales: rows,
       totals,
     });
+
   } catch (err) {
     console.error("❌ Error fetching sales:", err);
     next(err);
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
-
 const exportAllSalesReportToExcel = async (req, res, next) => {
   let connection;
   try {

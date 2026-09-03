@@ -15,24 +15,105 @@ export const paymentOutApi = createApi({
   }),
   tagTypes: ["PaymentOut" ],
   endpoints: (builder) => ({
-   getAllPaymentOuts: builder.query({
-      query: ({ page = 1, search = "", fromDate = "", toDate = "" } = {}) => {
-        const params = new URLSearchParams();
-        params.set("page", page);
-        if (search) params.set("search", search);
-        if (fromDate) params.set("fromDate", fromDate);
-        if (toDate) params.set("toDate", toDate);
-        return `/payment-out?${params.toString()}`;
-      },
-      providesTags: (result) =>
-        result?.paymentOuts
-          ? [
-              ...result.paymentOuts.map((p) => ({ type: "PaymentOut", id: p.Payment_Out_Id })),
-              { type: "PaymentOut", id: "LIST" },
-            ]
-          : [{ type: "PaymentOut", id: "LIST" }],
-    }),
- 
+  //  getAllPaymentOuts: builder.query({
+  //     query: ({ page = 1, search = "", fromDate = "", toDate = "" } = {}) => {
+  //       const params = new URLSearchParams();
+  //       params.set("page", page);
+  //       if (search) params.set("search", search);
+  //       if (fromDate) params.set("fromDate", fromDate);
+  //       if (toDate) params.set("toDate", toDate);
+  //       return `/payment-out?${params.toString()}`;
+  //     },
+  //     providesTags: (result) =>
+  //       result?.paymentOuts
+  //         ? [
+  //             ...result.paymentOuts.map((p) => ({ type: "PaymentOut", id: p.Payment_Out_Id })),
+  //             { type: "PaymentOut", id: "LIST" },
+  //           ]
+  //         : [{ type: "PaymentOut", id: "LIST" }],
+  //   }),
+ getAllPaymentOuts: builder.query({
+  query: ({
+    cursor = null,
+    search = "",
+    fromDate = "",
+    toDate = "",
+    limit = 10,
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (cursor) {
+      params.append("cursor", cursor);
+    }
+
+    if (search?.trim()) {
+      params.append("search", search.trim());
+    }
+
+    if (fromDate) {
+      params.append("fromDate", fromDate);
+    }
+
+    if (toDate) {
+      params.append("toDate", toDate);
+    }
+
+    params.append("limit", limit);
+
+    return `/payment-out?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: queryArgs.search,
+    fromDate: queryArgs.fromDate,
+    toDate: queryArgs.toDate,
+  }),
+
+  merge: (currentCache, newData, { arg }) => {
+    // First request
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    // Cursor request
+    currentCache.paymentOuts.push(
+      ...newData.paymentOuts
+    );
+
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+
+    if (newData.totals) {
+      currentCache.totals = newData.totals;
+    }
+
+    currentCache.totalPayments =
+      newData.totalPayments;
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.search !== previousArg?.search ||
+    currentArg?.fromDate !== previousArg?.fromDate ||
+    currentArg?.toDate !== previousArg?.toDate ||
+    currentArg?.limit !== previousArg?.limit,
+
+  providesTags: (result) =>
+    result?.paymentOuts
+      ? [
+          ...result.paymentOuts.map((p) => ({
+            type: "PaymentOut",
+            id: p.Payment_Out_Id,
+          })),
+          { type: "PaymentOut", id: "LIST" },
+        ]
+      : [
+          { type: "PaymentOut", id: "LIST" },
+        ],
+}),
     getPaymentOutById: builder.query({
       query: (id) => `/payment-out/${id}`,
       providesTags: (result, error, id) => [{ type: "PaymentOut", id }],

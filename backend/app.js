@@ -15,7 +15,9 @@ import saleRoutes from "./routes/saleRoutes.js";
 import cashInHandRoutes from "./routes/cashInHandRoutes.js";
 import bankAccountRoutes from "./routes/bankAccountRoutes.js";
 import dailyExpenseRoutes from "./routes/dailyExpense.js";
-import settingRoutes from "./routes/settingRoutes.js";
+import settingRoutes from "./routes/Settings/settingRoutes.js";
+import barcodeSettingsRoutes from "./routes/Settings/barcodeSettingRoutes.js";
+// import settingRoutes from "./routes/Settings/settingRoutes.js";
 import miscellaneousRoutes from "./routes/miscellaneousRoutes.js";
 import { expenseCategoryRouter, expenseRouter,expenseItemRouter } from "./routes/expenseRoutes.js";
 import termsConditionRoutes from "./routes/termsConditionsRoutes.js";
@@ -146,6 +148,7 @@ app.use("/api/bank", bankAccountRoutes);
 app.use("/api/daily-expense",dailyExpenseRoutes);
 ///app.use("/api/settings",financialYearRoutes)
 app.use("/api/settings",settingRoutes)
+app.use("/api/barcode-settings", barcodeSettingsRoutes);
 app.use("/api/misc",miscellaneousRoutes)
 
 //ITEM

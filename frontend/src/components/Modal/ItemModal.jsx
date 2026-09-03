@@ -14,7 +14,7 @@ import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
 import SelectUnitModal from "./SelectUnitModal";
 import { X } from "lucide-react";
-import { useGetAllSettingsQuery } from "../../redux/api/settingsApi";
+import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 
 
 

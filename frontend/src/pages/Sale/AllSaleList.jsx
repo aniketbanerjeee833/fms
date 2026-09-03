@@ -3,10 +3,10 @@ import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router
 import { useDeleteSaleMutation, useGetAllSalesQuery, useGetSingleSaleQuery, useLazyGetSalesPrintReportQuery } from "../../redux/api/saleApi";
 
 import {
-  Download,
+
   Eye,
   FileSpreadsheet,
-  LayoutDashboard,
+
   MoreVertical,
   Printer,
   PrinterIcon,
@@ -14,7 +14,7 @@ import {
   Undo2
 } from "lucide-react";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
@@ -22,12 +22,14 @@ import { useDispatch } from "react-redux";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import { useReactToPrint } from "react-to-print";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 export default function AllSaleList() {
   const dispatch = useDispatch()
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const page = Number(searchParams.get("page")) || 1;
+  const [cursor, setCursor] = useState(null);
+  //const page = Number(searchParams.get("page")) || 1;
   const searchTerm = searchParams.get("search") || "";
   const fromDate = searchParams.get("fromDate") || "";
   const toDate = searchParams.get("toDate") || "";
@@ -42,14 +44,34 @@ export default function AllSaleList() {
   const { data: printData } = useGetSingleSaleQuery(printSaleId, {
     skip: !printSaleId,
   });
-  const { data: sales, isLoading } = useGetAllSalesQuery({
-    page,
+  // const { data: sales, isLoading } = useGetAllSalesQuery({
+  //   page,
+  //   search: searchTerm,
+  //   fromDate,
+  //   toDate,
+  // });
+  const {
+    data: sales,
+    isLoading,
+    isFetching,
+  } = useGetAllSalesQuery({
+    cursor,
     search: searchTerm,
     fromDate,
     toDate,
+    limit: 10,
   });
   console.log(sales);
+  const salesList = sales?.sales ?? [];
+  const hasMore = sales?.hasMore ?? false;
+  const nextCursor = sales?.nextCursor ?? null;
 
+  // For virtualization
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || !nextCursor || isFetching) return;
+
+    setCursor(nextCursor);
+  }, [hasMore, nextCursor, isFetching]);
   const [triggerSaleBulkReport, { data: bulkSaleReportData, isFetching: isBulkFetching }] =
     useLazyGetSalesPrintReportQuery();
 
@@ -65,32 +87,32 @@ export default function AllSaleList() {
     };
   }, []);
 
-  const handlePageChange = (newPage) => {
-    setSearchParams({
-      page: newPage,
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handlePageChange = (newPage) => {
+  //   setSearchParams({
+  //     page: newPage,
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
-  const handleNextPage = () => {
-    setSearchParams({
-      page: page + 1,
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handleNextPage = () => {
+  //   setSearchParams({
+  //     page: page + 1,
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
-  const handlePreviousPage = () => {
-    setSearchParams({
-      page: Math.max(1, page - 1),
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handlePreviousPage = () => {
+  //   setSearchParams({
+  //     page: Math.max(1, page - 1),
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
   const handleExportSaleReportExcel = () => {
     const params = new URLSearchParams();
@@ -163,11 +185,65 @@ export default function AllSaleList() {
       handleBulkPrint();
     }
   }, [bulkSaleReportData, showSaleBulkPrintPreview]);
+   const virtualListRef = useRef(null);
+  const hasScrolledToHighlightRef = useRef(false);
+  
+  const highlightTxnId = searchParams.get("highlightTxn");
+  
+  useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+    if (!highlightTxnId) return;
+    if (isLoading || isFetching) return;
+  
+    const targetIndex = salesList.findIndex(
+      (sale) =>
+        String(sale?.Sale_Id) === String(highlightTxnId)
+    );
+  console.log("Target index for highlight:", targetIndex);
+    if (targetIndex === -1) {
+      if (hasMore && nextCursor && !isFetching) {
+        handleLoadMore();
+      }
+      return;
+    }
+  
+    // Wait until VirtualScrollList has rendered the new data
+    const timer = setTimeout(() => {
+      virtualListRef.current?.scrollToIndex(targetIndex, {
+        align: "center",
+        behavior: "auto",
+      });
+  
+      hasScrolledToHighlightRef.current = true;
+    }, 100);
+  
+    return () => clearTimeout(timer);
+  }, [
+    salesList,
+    highlightTxnId,
+    isLoading,
+    isFetching,
+    hasMore,
+    nextCursor,
+    handleLoadMore,
+  ]);
+  useEffect(() => {
+    hasScrolledToHighlightRef.current = false;
+  }, [highlightTxnId, searchTerm, fromDate, toDate])
+  
   return (
     <>
 
-      <div className="flex flex-col bg-white "
+      <div className="flex flex-col bg-white"
       //style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
+       style={{
+          flex: 1,
+          minHeight: 0,
+         height: "calc(100vh - 20px)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
       >
 
         <div className="inn-title">
@@ -213,7 +289,6 @@ export default function AllSaleList() {
                   value={fromDate}
                   onChange={(e) => {
                     setSearchParams({
-                      page: 1,
                       search: searchTerm,
                       fromDate: e.target.value,
                       toDate,
@@ -232,7 +307,6 @@ export default function AllSaleList() {
                   value={toDate}
                   onChange={(e) => {
                     setSearchParams({
-                      page: 1,
                       search: searchTerm,
                       fromDate,
                       toDate: e.target.value,
@@ -251,11 +325,16 @@ export default function AllSaleList() {
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchParams({
-                      page: 1,               // reset page on new search
                       search: e.target.value,
                       fromDate,
                       toDate,
                     });
+                    // setSearchParams({
+                    //   page: 1,               // reset page on new search
+                    //   search: e.target.value,
+                    //   fromDate,
+                    //   toDate,
+                    // });
                   }}
                   className="w-full sm:w-56"
                 />
@@ -324,7 +403,7 @@ export default function AllSaleList() {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4 gap-2">
+          <div className="flex justify-end sm: mt-2 gap-2">
 
             {/* <button
               type="button"
@@ -364,300 +443,392 @@ export default function AllSaleList() {
 
           </div>
         </div>
-        
-        <div className="tab-inn"
-        //style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
-        >
-          <div className="table-responsive table-desi"
-           //style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}
-          >
-            {isLoading ? (
-              <p className="text-center mt-4">Fetching sales...</p>
-            ) : sales?.length === 0 ? (
+            <div
+  className="tab-inn"
+  style={{
+    flex: 1,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  }}
+>
+  <div
+    style={{
+      flex: 1,
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }}
+  >
+    {isLoading ? (
+      <p className="text-center mt-4">
+        Fetching sales...
+      </p>
+    )  : salesList.length === 0 ? (
               <p className="text-center mt-4">No sales found.</p>
             ) : (
+      <>
+        {/* HEADER */}
+        <table
+          className="w-full min-w-[500px] table-responsive table-desi"
+          style={{
+            flexShrink: 0,
+          }}
+        >
+          <thead>
+            <tr>
+              <th className="text-left">Sl.No</th>
+              <th className="text-left">Date</th>
+              <th className="text-left">Invoice No.</th>
+              <th className="text-left">Party Name</th>
+              <th className="text-left">Payment Type</th>
+              <th className="text-left">Amount</th>
+              <th className="text-left">Balance</th>
+              <th></th>
+            </tr>
+          </thead>
+        </table>
 
-              <table className="w-full min-w-[500px]">
-                <thead>
-                  <tr>
-                    <th className="text-left">Sl.No</th>
-                    <th className="text-left ">Date</th>
-                    <th className="text-left ">Invoice No.</th>
-                    <th className="text-left ">Party Name</th>
-                    <th className="text-left">Payment Type</th>
-                    <th className="text-left">Amount </th>
-                    <th className="text-left">Balance </th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sales && sales?.sales?.length > 0 ? (
-                    sales?.sales?.map((sale, idx) => {
-                      const isHighlighted = String(searchParams.get("highlightTxn")) === String(sale?.Sale_Id);
-                      return (
-                       
-                        <tr
-                          key={sale?.Sale_Id}
+        {/* VIRTUALIZED BODY */}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            height: 0,
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
+          <VirtualScrollList
+            ref={virtualListRef}
+            items={salesList}
+            rowHeight={52}
+            height="100%"
+            dynamicHeight={true}
+            onLoadMore={() => {
+              if (
+                sales?.hasMore &&
+                sales?.nextCursor &&
+                !isFetching
+              ) {
+                setCursor(sales.nextCursor);
+              }
+            }}
+            isFetching={isFetching}
+            hasMore={sales?.hasMore || false}
+            getItemKey={(sale) => sale?.Sale_Id}
+            emptyMessage="No sale found"
+            endMessage="— End of sales —"
+            isRowActive={(sale) =>
+              rowMenuOpen === sale?.Sale_Id
+            }
+            renderRow={(sale, idx) => {
+              const isHighlighted =
+                String(searchParams.get("highlightTxn")) ===
+                String(sale?.Sale_Id);
 
-                          onClick={() => {
-                            const params = new URLSearchParams(searchParams);
+              return (
+                <div
+                  key={sale?.Sale_Id}
+                  onClick={() => {
+                    const params = new URLSearchParams(
+                      searchParams
+                    );
 
-                            params.set(
-                              "highlightTxn",
-                              sale?.Sale_Id
-                            );
+                    params.set(
+                      "highlightTxn",
+                      sale?.Sale_Id
+                    );
 
-                            setSearchParams(params, { replace: true });
+                    setSearchParams(params, {
+                      replace: true,
+                    });
+                  }}
+                  onDoubleClick={() => {
+                    const params = new URLSearchParams(
+                      searchParams
+                    );
+
+                    params.set(
+                      "highlightTxn",
+                      sale?.Sale_Id
+                    );
+
+                    navigate(
+                      `/sale/edit/${sale?.Sale_Id}?${params.toString()}`,
+                      {
+                        state: {
+                          from: "all-sale-list",
+                        },
+                      }
+                    );
+                  }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "70px 110px 120px minmax(150px, 1fr) 130px 110px 110px 50px",
+                    alignItems: "center",
+                    minHeight: "52px",
+                    columnGap: "10px",
+                    width: "100%",
+                    cursor: "pointer",
+                    backgroundColor: isHighlighted
+                      ? "#4CA1AF22"
+                      : "transparent",
+                    borderBottom:
+                      "1px solid #f1f5f9",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {/* SL.NO */}
+                  <div className="table-desi-cell">
+                    {idx + 1}.
+                  </div>
+
+                  {/* DATE */}
+                  <div className="table-desi-cell">
+                    {sale?.Invoice_Date
+                      ? new Date(
+                          sale.Invoice_Date
+                        ).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "numeric",
+                            month: "numeric",
+                            year: "numeric",
+                          }
+                        )
+                      : "N/A"}
+                  </div>
+
+                  {/* INVOICE NO */}
+                  <div className="table-desi-cell">
+                    {sale?.Invoice_Number || "N/A"}
+                  </div>
+
+                  {/* PARTY */}
+                  <div
+                    className="table-desi-cell"
+                    style={{
+                      overflowWrap: "break-word",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {sale?.Party_Name || "N/A"}
+                  </div>
+
+                  {/* PAYMENT TYPE */}
+                  <div className="table-desi-cell">
+                    {!sale?.Payment_Type_Display ||
+                    sale.Payment_Type_Display === "—"
+                      ? "Cash"
+                      : sale.Payment_Type_Display}
+                  </div>
+
+                  {/* AMOUNT */}
+                  <div className="table-desi-cell">
+                    ₹{sale?.Total_Amount || "N/A"}
+                  </div>
+
+                  {/* BALANCE */}
+                  <div className="table-desi-cell">
+                    ₹{sale?.Balance_Due || "N/A"}
+                  </div>
+
+                  {/* THREE DOT MENU */}
+                  <div
+                    className="py-2 px-2 table-desi-cell"
+                    style={{
+                      position: "relative",
+                      width: 50,
+                      textAlign: "center",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+
+                        setRowMenuOpen(
+                          rowMenuOpen === sale?.Sale_Id
+                            ? null
+                            : sale?.Sale_Id
+                        );
+                      }}
+                      className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                      style={{
+                        backgroundColor:
+                          "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      title="More"
+                    >
+                      <MoreVertical
+                        size={16}
+                        style={{
+                          color: "#374151",
+                        }}
+                      />
+                    </button>
+
+                    {rowMenuOpen === sale?.Sale_Id && (
+                      <div
+                        onClick={(e) =>
+                          e.stopPropagation()
+                        }
+                        className="absolute bg-white shadow-lg rounded-md"
+                        style={{
+                          right: 0,
+                          top: "100%",
+                          width: 150,
+                          zIndex: 100,
+                          border:
+                            "1px solid #e2e8f0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {/* VIEW / EDIT */}
+                        <NavLink
+                          to={{
+                            pathname: `/sale/edit/${sale?.Sale_Id}`,
+                            search: (() => {
+                              const params =
+                                new URLSearchParams(
+                                  searchParams
+                                );
+
+                              params.set(
+                                "highlightTxn",
+                                sale?.Sale_Id
+                              );
+
+                              return params.toString();
+                            })(),
                           }}
-
-                          onDoubleClick={() => {
-                            const params = new URLSearchParams(searchParams);
-
-                            params.set(
-                              "highlightTxn",
-                              sale?.Sale_Id
-                            );
-
-                            navigate(
-                              `/sale/edit/${sale?.Sale_Id}?${params.toString()}`,
-                              {
-                                state: {
-                                  from: "all-sale-list",
-                                },
-                              }
-                            );
+                          state={{
+                            from: "all-sale-list",
                           }}
-
+                          className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                           style={{
+                            color: "#374151",
+                            textDecoration: "none",
+                          }}
+                          onClick={() =>
+                            setRowMenuOpen(null)
+                          }
+                        >
+                          <Eye
+                            size={13}
+                            style={{
+                              color: "#4CA1AF",
+                            }}
+                          />
+
+                          View / Edit
+                        </NavLink>
+
+                        {/* RETURN */}
+                        <NavLink
+                          to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
+                          state={{
+                            from: "sale-return-list",
+                          }}
+                          className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                          style={{
+                            color: "#374151",
+                            textDecoration: "none",
+                          }}
+                          onClick={() =>
+                            setRowMenuOpen(null)
+                          }
+                        >
+                          <Undo2
+                            size={13}
+                            style={{
+                              color: "#4CA1AF",
+                            }}
+                          />
+
+                          Return
+                        </NavLink>
+
+                        {/* PRINT */}
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                          style={{
+                            color: "#374151",
+                            backgroundColor:
+                              "transparent",
+                            border: "none",
                             cursor: "pointer",
-                            borderBottom: "1px solid #f1f5f9",
-                            backgroundColor: isHighlighted
-                              ? "#4CA1AF22"
-                              : "transparent",
+                          }}
+                          onClick={() => {
+                            setRowMenuOpen(null);
+                            setPrintSaleId(
+                              sale.Sale_Id
+                            );
                           }}
                         >
-                          <td>
-                            {(sales?.currentPage - 1) * 10 + (idx + 1)}.
-                          </td>
-                          <td >
-                            {sale?.Invoice_Date
-                              ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "numeric",
-                                year: "numeric",
-                              })
-                              : "N/A"}
-                          </td>
-                          <td>
-                            {sale?.Invoice_Number
-                              ? sale?.Invoice_Number
-                              : "N/A"}
-                          </td>
-                          <td >{sale?.Party_Name || "N/A"}</td>
-                          <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
-
-                          <td>₹{sale?.Total_Amount || "N/A"}</td>
-                          <td>₹{sale?.Balance_Due || "N/A"}</td>
-
-                          <td
-                            className="py-2 px-2"
+                          <Printer
+                            size={13}
                             style={{
-                              position: "relative",
-                              width: 50,
-                              textAlign: "center"
+                              color: "#4CA1AF",
                             }}
-                          >
-                            {/* THREE DOT BUTTON */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                          />
 
-                                setRowMenuOpen(
-                                  rowMenuOpen === sale?.Sale_Id
-                                    ? null
-                                    : sale?.Sale_Id
-                                );
-                              }}
-                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                              style={{
-                                backgroundColor: "transparent",
-                                border: "none",
-                                cursor: "pointer"
-                              }}
-                              title="More"
-                            >
-                              <MoreVertical
-                                size={16}
-                                style={{ color: "#374151" }}
-                              />
-                            </button>
+                          Print
+                        </button>
 
-                            {/* THREE DOT MENU */}
-                            {rowMenuOpen === sale?.Sale_Id && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute bg-white shadow-lg rounded-md"
-                                style={{
-                                  right: 0,
-                                  top: 32,
-                                  width: 150,
-                                  zIndex: 100,
-                                  border: "1px solid #e2e8f0",
-                                  overflow: "hidden"
-                                }}
-                              >
+                        {/* DELETE */}
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                          style={{
+                            cursor: "pointer",
+                            color: "#dc2626",
+                            backgroundColor:
+                              "transparent",
+                            border: "none",
+                          }}
+                          onClick={() => {
+                            setRowMenuOpen(null);
 
-                                {/* VIEW / EDIT */}
-                                {/* <NavLink
-                                  to={`/sale/edit/${sale?.Sale_Id}${location.search}`}
-                                  state={{
-                                    from: "all-sale-list"
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration: "none"
-                                  }}
-                                  onClick={() => setRowMenuOpen(null)}
-                                >
-                                  <Eye
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
+                            setDeleteTarget({
+                              Sale_Id:
+                                sale?.Sale_Id,
+                            });
+                          }}
+                        >
+                          <Trash2
+                            size={13}
+                            style={{
+                              color: "#dc2626",
+                            }}
+                          />
 
-                                  View / Edit
-                                </NavLink> */}
-                                <NavLink
-                                  to={{
-                                    pathname: `/sale/edit/${sale?.Sale_Id}`,
-                                    search: (() => {
-                                      const params = new URLSearchParams(searchParams);
-
-                                      params.set(
-                                        "highlightTxn",
-                                        sale?.Sale_Id
-                                      );
-
-                                      return params.toString();
-                                    })(),
-                                  }}
-                                  state={{
-                                    from: "all-sale-list",
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration: "none",
-                                  }}
-                                  onClick={() => setRowMenuOpen(null)}
-                                >
-                                  <Eye
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
-
-                                  View / Edit
-                                </NavLink>
-
-
-                                {/* RETURN */}
-                                <NavLink
-                                  to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
-                                  state={{
-                                    from: "sale-return-list"
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration: "none"
-                                  }}
-                                  onClick={() => setRowMenuOpen(null)}
-                                >
-                                  <Undo2
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
-
-                                  Return
-                                </NavLink>
-
-
-                                {/* PRINT */}
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    backgroundColor: "transparent",
-                                    border: "none",
-                                    cursor: "pointer"
-                                  }}
-                                  onClick={() => {
-                                    setRowMenuOpen(null);
-                                    setPrintSaleId(sale.Sale_Id)
-                                  }}
-                                >
-                                  <Printer
-                                    size={13}
-                                    style={{ color: "#4CA1AF" }}
-                                  />
-
-                                  Print
-                                </button>
-
-
-                                {/* DELETE */}
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                  style={{
-                                    cursor: "pointer",
-                                    color: "#dc2626",
-                                    backgroundColor: "transparent",
-                                    border: "none"
-                                  }}
-                                  onClick={() => {
-                                    setRowMenuOpen(null);
-
-                                    setDeleteTarget({
-                                      Sale_Id: sale?.Sale_Id
-                                    });
-                                  }}
-                                >
-                                  <Trash2
-                                    size={13}
-                                    style={{ color: "#dc2626" }}
-                                  />
-
-                                  Delete
-                                </button>
-
-                              </div>
-                            )}
-                          </td>
-
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td className="mx-auto text-center" colSpan={8}>
-                        No sale found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-
-              </table>
-
-            )}
-          </div>
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }}
+          />
         </div>
-        <div className="flex justify-center align-center p-4">
+      </>
+    )}
+  </div>
+</div>
+       
+        {/* <div className="flex justify-center align-center p-4">
           <div className="flex items-center space-x-2 flex-wrap justify-center">
 
-            {/* PREVIOUS */}
+           
             <button
               type="button"
               onClick={() => handlePreviousPage()}
@@ -669,7 +840,7 @@ export default function AllSaleList() {
               ← Previous
             </button>
 
-            {/* PAGE NUMBERS — DESKTOP / TABLET */}
+         
             <div style={{ marginRight: "0px" }}
               className="hidden sm:flex space-x-2">
 
@@ -749,12 +920,12 @@ export default function AllSaleList() {
               })()}
             </div>
 
-            {/* CURRENT PAGE — MOBILE ONLY */}
+         
             <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
               Page {page} / {sales?.totalPages || 1}
             </div>
 
-            {/* NEXT */}
+           
             <button
               type="button"
               onClick={() => handleNextPage()}
@@ -772,7 +943,7 @@ export default function AllSaleList() {
             </button>
 
           </div>
-        </div>
+        </div> */}
 
       </div>
 
@@ -816,3 +987,293 @@ export default function AllSaleList() {
 
   )
 }
+
+//  <div className="tab-inn"
+//         //style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
+//         >
+//           <div className="table-responsive table-desi"
+//           //style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "auto" }}
+//           >
+//             {isLoading ? (
+//               <p className="text-center mt-4">Fetching sales...</p>
+//             ) : sales?.length === 0 ? (
+//               <p className="text-center mt-4">No sales found.</p>
+//             ) : (
+
+//               <table className="w-full min-w-[500px]">
+//                 <thead>
+//                   <tr>
+//                     <th className="text-left">Sl.No</th>
+//                     <th className="text-left ">Date</th>
+//                     <th className="text-left ">Invoice No.</th>
+//                     <th className="text-left ">Party Name</th>
+//                     <th className="text-left">Payment Type</th>
+//                     <th className="text-left">Amount </th>
+//                     <th className="text-left">Balance </th>
+//                     <th></th>
+//                   </tr>
+//                 </thead>
+//                 <tbody>
+//                   {sales && sales?.sales?.length > 0 ? (
+//                     sales?.sales?.map((sale, idx) => {
+//                       const isHighlighted = String(searchParams.get("highlightTxn")) === String(sale?.Sale_Id);
+//                       return (
+
+//                         <tr
+//                           key={sale?.Sale_Id}
+
+//                           onClick={() => {
+//                             const params = new URLSearchParams(searchParams);
+
+//                             params.set(
+//                               "highlightTxn",
+//                               sale?.Sale_Id
+//                             );
+
+//                             setSearchParams(params, { replace: true });
+//                           }}
+
+//                           onDoubleClick={() => {
+//                             const params = new URLSearchParams(searchParams);
+
+//                             params.set(
+//                               "highlightTxn",
+//                               sale?.Sale_Id
+//                             );
+
+//                             navigate(
+//                               `/sale/edit/${sale?.Sale_Id}?${params.toString()}`,
+//                               {
+//                                 state: {
+//                                   from: "all-sale-list",
+//                                 },
+//                               }
+//                             );
+//                           }}
+
+//                           style={{
+//                             cursor: "pointer",
+//                             borderBottom: "1px solid #f1f5f9",
+//                             backgroundColor: isHighlighted
+//                               ? "#4CA1AF22"
+//                               : "transparent",
+//                           }}
+//                         >
+//                           <td>
+//                             {(sales?.currentPage - 1) * 10 + (idx + 1)}.
+//                           </td>
+//                           <td >
+//                             {sale?.Invoice_Date
+//                               ? new Date(sale?.Invoice_Date).toLocaleDateString("en-IN", {
+//                                 day: "numeric",
+//                                 month: "numeric",
+//                                 year: "numeric",
+//                               })
+//                               : "N/A"}
+//                           </td>
+//                           <td>
+//                             {sale?.Invoice_Number
+//                               ? sale?.Invoice_Number
+//                               : "N/A"}
+//                           </td>
+//                           <td >{sale?.Party_Name || "N/A"}</td>
+//                           <td>{!sale?.Payment_Type_Display || sale.Payment_Type_Display === "—" ? "Cash" : sale.Payment_Type_Display}</td>
+
+//                           <td>₹{sale?.Total_Amount || "N/A"}</td>
+//                           <td>₹{sale?.Balance_Due || "N/A"}</td>
+
+//                           <td
+//                             className="py-2 px-2"
+//                             style={{
+//                               position: "relative",
+//                               width: 50,
+//                               textAlign: "center"
+//                             }}
+//                           >
+//                             {/* THREE DOT BUTTON */}
+//                             <button
+//                               type="button"
+//                               onClick={(e) => {
+//                                 e.stopPropagation();
+
+//                                 setRowMenuOpen(
+//                                   rowMenuOpen === sale?.Sale_Id
+//                                     ? null
+//                                     : sale?.Sale_Id
+//                                 );
+//                               }}
+//                               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                               style={{
+//                                 backgroundColor: "transparent",
+//                                 border: "none",
+//                                 cursor: "pointer"
+//                               }}
+//                               title="More"
+//                             >
+//                               <MoreVertical
+//                                 size={16}
+//                                 style={{ color: "#374151" }}
+//                               />
+//                             </button>
+
+//                             {/* THREE DOT MENU */}
+//                             {rowMenuOpen === sale?.Sale_Id && (
+//                               <div
+//                                 onClick={(e) => e.stopPropagation()}
+//                                 className="absolute bg-white shadow-lg rounded-md"
+//                                 style={{
+//                                   right: 0,
+//                                   top: 32,
+//                                   width: 150,
+//                                   zIndex: 100,
+//                                   border: "1px solid #e2e8f0",
+//                                   overflow: "hidden"
+//                                 }}
+//                               >
+
+//                                 {/* VIEW / EDIT */}
+//                                 {/* <NavLink
+//                                   to={`/sale/edit/${sale?.Sale_Id}${location.search}`}
+//                                   state={{
+//                                     from: "all-sale-list"
+//                                   }}
+//                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                   style={{
+//                                     color: "#374151",
+//                                     textDecoration: "none"
+//                                   }}
+//                                   onClick={() => setRowMenuOpen(null)}
+//                                 >
+//                                   <Eye
+//                                     size={13}
+//                                     style={{ color: "#4CA1AF" }}
+//                                   />
+
+//                                   View / Edit
+//                                 </NavLink> */}
+//                                 <NavLink
+//                                   to={{
+//                                     pathname: `/sale/edit/${sale?.Sale_Id}`,
+//                                     search: (() => {
+//                                       const params = new URLSearchParams(searchParams);
+
+//                                       params.set(
+//                                         "highlightTxn",
+//                                         sale?.Sale_Id
+//                                       );
+
+//                                       return params.toString();
+//                                     })(),
+//                                   }}
+//                                   state={{
+//                                     from: "all-sale-list",
+//                                   }}
+//                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                   style={{
+//                                     color: "#374151",
+//                                     textDecoration: "none",
+//                                   }}
+//                                   onClick={() => setRowMenuOpen(null)}
+//                                 >
+//                                   <Eye
+//                                     size={13}
+//                                     style={{ color: "#4CA1AF" }}
+//                                   />
+
+//                                   View / Edit
+//                                 </NavLink>
+
+
+//                                 {/* RETURN */}
+//                                 <NavLink
+//                                   to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
+//                                   state={{
+//                                     from: "sale-return-list"
+//                                   }}
+//                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                   style={{
+//                                     color: "#374151",
+//                                     textDecoration: "none"
+//                                   }}
+//                                   onClick={() => setRowMenuOpen(null)}
+//                                 >
+//                                   <Undo2
+//                                     size={13}
+//                                     style={{ color: "#4CA1AF" }}
+//                                   />
+
+//                                   Return
+//                                 </NavLink>
+
+
+//                                 {/* PRINT */}
+//                                 <button
+//                                   type="button"
+//                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                   style={{
+//                                     color: "#374151",
+//                                     backgroundColor: "transparent",
+//                                     border: "none",
+//                                     cursor: "pointer"
+//                                   }}
+//                                   onClick={() => {
+//                                     setRowMenuOpen(null);
+//                                     setPrintSaleId(sale.Sale_Id)
+//                                   }}
+//                                 >
+//                                   <Printer
+//                                     size={13}
+//                                     style={{ color: "#4CA1AF" }}
+//                                   />
+
+//                                   Print
+//                                 </button>
+
+
+//                                 {/* DELETE */}
+//                                 <button
+//                                   type="button"
+//                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+//                                   style={{
+//                                     cursor: "pointer",
+//                                     color: "#dc2626",
+//                                     backgroundColor: "transparent",
+//                                     border: "none"
+//                                   }}
+//                                   onClick={() => {
+//                                     setRowMenuOpen(null);
+
+//                                     setDeleteTarget({
+//                                       Sale_Id: sale?.Sale_Id
+//                                     });
+//                                   }}
+//                                 >
+//                                   <Trash2
+//                                     size={13}
+//                                     style={{ color: "#dc2626" }}
+//                                   />
+
+//                                   Delete
+//                                 </button>
+
+//                               </div>
+//                             )}
+//                           </td>
+
+//                         </tr>
+//                       )
+//                     })
+//                   ) : (
+//                     <tr>
+//                       <td className="mx-auto text-center" colSpan={8}>
+//                         No sale found
+//                       </td>
+//                     </tr>
+//                   )}
+//                 </tbody>
+
+//               </table>
+
+//             )}
+//           </div>
+//         </div>
