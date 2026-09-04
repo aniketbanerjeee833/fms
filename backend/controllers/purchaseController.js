@@ -1364,7 +1364,8 @@ const getAllPurchases = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
-    /* ---------- CURSOR PAGINATION ---------- */
+    /* ---------- PAGINATION ---------- */
+
     const limit = Math.min(
       parseInt(req.query.limit, 10) || 10,
       200
@@ -1373,16 +1374,28 @@ const getAllPurchases = async (req, res, next) => {
     let cursorDate = null;
     let cursorId = null;
 
-    const cursorRaw = req.query.cursor || null;
-
-    if (cursorRaw) {
+    if (req.query.cursor) {
       try {
         const decoded = JSON.parse(
-          Buffer.from(cursorRaw, "base64").toString("utf8")
+          Buffer.from(req.query.cursor, "base64").toString("utf8")
         );
 
         cursorDate = decoded.date || null;
-        cursorId = decoded.id ? Number(decoded.id) : null;
+        cursorId =
+          decoded.id !== undefined && decoded.id !== null
+            ? Number(decoded.id)
+            : null;
+
+        if (
+          !cursorDate ||
+          !Number.isInteger(cursorId) ||
+          cursorId <= 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor.",
+          });
+        }
       } catch {
         return res.status(400).json({
           success: false,
@@ -1392,25 +1405,29 @@ const getAllPurchases = async (req, res, next) => {
     }
 
     /* ---------- FILTERS ---------- */
-    const search = req.query.search?.trim().toLowerCase() || "";
+
+    const search =
+      req.query.search?.trim().toLowerCase() || "";
+
     const fromDate = req.query.fromDate || null;
     const toDate = req.query.toDate || null;
 
-    const whereClauses = [];
-    const params = [];
+    const filterClauses = [];
+    const filterParams = [];
 
     /* ---------- SEARCH ---------- */
-    if (search) {
-      whereClauses.push(`(
-        a.Party_Name                 LIKE ? OR
-        CAST(p.Total_Amount AS CHAR) LIKE ? OR
-        CAST(p.Balance_Due AS CHAR)  LIKE ? OR
-        p.Bill_Number                LIKE ?
-      )`);
 
+    if (search) {
       const like = `%${search}%`;
 
-      params.push(
+      filterClauses.push(`(
+        a.Party_Name LIKE ?
+        OR CAST(p.Total_Amount AS CHAR) LIKE ?
+        OR CAST(p.Balance_Due AS CHAR) LIKE ?
+        OR p.Bill_Number LIKE ?
+      )`);
+
+      filterParams.push(
         like,
         like,
         like,
@@ -1419,71 +1436,99 @@ const getAllPurchases = async (req, res, next) => {
     }
 
     /* ---------- DATE FILTER ---------- */
-    if (fromDate && toDate) {
-      whereClauses.push(
-        `DATE(p.Bill_Date) BETWEEN ? AND ?`
-      );
 
-      params.push(
+    if (fromDate && toDate) {
+      filterClauses.push(`
+        DATE(p.Bill_Date) BETWEEN ? AND ?
+      `);
+
+      filterParams.push(
         fromDate,
         toDate
       );
 
     } else if (fromDate) {
-      whereClauses.push(
-        `DATE(p.Bill_Date) >= ?`
-      );
+      filterClauses.push(`
+        DATE(p.Bill_Date) >= ?
+      `);
 
-      params.push(fromDate);
+      filterParams.push(fromDate);
 
     } else if (toDate) {
-      whereClauses.push(
-        `DATE(p.Bill_Date) <= ?`
-      );
+      filterClauses.push(`
+        DATE(p.Bill_Date) <= ?
+      `);
 
-      params.push(toDate);
+      filterParams.push(toDate);
     }
 
-    /* ---------- CURSOR CONDITION ---------- */
-    if (cursorDate && cursorId) {
-      whereClauses.push(`(
-        p.Bill_Date < ?
-        OR (
-          p.Bill_Date = ?
-          AND p.id < ?
-        )
-      )`);
+    /* ---------- CURSOR ---------- */
 
-      params.push(
+    const cursorClauses = [];
+    const cursorParams = [];
+
+    if (cursorDate !== null && cursorId !== null) {
+      cursorClauses.push(`
+        (
+          p.Bill_Date < ?
+          OR (
+            p.Bill_Date = ?
+            AND p.id < ?
+          )
+        )
+      `);
+
+      cursorParams.push(
         cursorDate,
         cursorDate,
         cursorId
       );
     }
 
-    const whereSQL = whereClauses.length
-      ? `WHERE ${whereClauses.join(" AND ")}`
+    /* ---------- MAIN WHERE ---------- */
+
+    const mainWhereClauses = [
+      ...filterClauses,
+      ...cursorClauses,
+    ];
+
+    const mainWhereSQL = mainWhereClauses.length
+      ? `WHERE ${mainWhereClauses.join(" AND ")}`
       : "";
 
-    /* ---------- MAIN QUERY ----------
-       Fetch limit + 1 to detect hasMore
-    ---------- */
+    const mainParams = [
+      ...filterParams,
+      ...cursorParams,
+    ];
+
+    /* ---------- MAIN QUERY ---------- */
 
     const [rows] = await connection.query(
-      `SELECT p.*, a.Party_Name
-       FROM add_purchase p
-       LEFT JOIN add_party a
-         ON a.Party_Id = p.Party_Id
-       ${whereSQL}
-       ORDER BY p.Bill_Date DESC, p.id DESC
-       LIMIT ?`,
+      `
+        SELECT
+          p.*,
+          a.Party_Name
+
+        FROM add_purchase p
+
+        LEFT JOIN add_party a
+          ON a.Party_Id = p.Party_Id
+
+        ${mainWhereSQL}
+
+        ORDER BY
+          p.Bill_Date DESC,
+          p.id DESC
+
+        LIMIT ?
+      `,
       [
-        ...params,
-        limit + 1
+        ...mainParams,
+        limit + 1,
       ]
     );
 
-    /* ---------- DETECT hasMore ---------- */
+    /* ---------- hasMore ---------- */
 
     const hasMore = rows.length > limit;
 
@@ -1491,56 +1536,62 @@ const getAllPurchases = async (req, res, next) => {
       ? rows.slice(0, limit)
       : rows;
 
-    /* ---------- BUILD NEXT CURSOR ---------- */
+    /* ---------- NEXT CURSOR ---------- */
 
     let nextCursor = null;
 
     if (hasMore && pageRows.length > 0) {
-      const last = pageRows[pageRows.length - 1];
+      const lastRow =
+        pageRows[pageRows.length - 1];
 
       nextCursor = Buffer.from(
         JSON.stringify({
-          date: last.Bill_Date,
-          id: last.id,
+          date: lastRow.Bill_Date,
+          id: lastRow.id,
         })
       ).toString("base64");
     }
 
-    /* ---------- ATTACH SPLIT PAYMENT-TYPE LABELS ---------- */
+    /* ---------- PAYMENT SPLITS ---------- */
 
-    const purchaseIds = pageRows.map(
-      (row) => row.id
-    );
+    if (pageRows.length > 0) {
+      const purchaseIds = pageRows.map(
+        (row) => row.id
+      );
 
-    if (purchaseIds.length > 0) {
       const placeholders = purchaseIds
         .map(() => "?")
         .join(",");
 
       const [splits] = await connection.query(
-        `SELECT
-           ps.Source_Id,
-           ps.Payment_Type,
-           ba.Account_Display_Name
-         FROM payment_splits ps
-         LEFT JOIN bank_accounts ba
-           ON ba.id = ps.Bank_Account_Id
-         WHERE ps.Source_Type = 'Purchase'
-           AND ps.Source_Id IN (${placeholders})`,
+        `
+          SELECT
+            ps.Source_Id,
+            ps.Payment_Type,
+            ba.Account_Display_Name
+
+          FROM payment_splits ps
+
+          LEFT JOIN bank_accounts ba
+            ON ba.id = ps.Bank_Account_Id
+
+          WHERE ps.Source_Type = 'Purchase'
+            AND ps.Source_Id IN (${placeholders})
+        `,
         purchaseIds
       );
 
       const splitMap = {};
 
-      for (const s of splits) {
-        if (!splitMap[s.Source_Id]) {
-          splitMap[s.Source_Id] = [];
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
         }
 
-        splitMap[s.Source_Id].push(
-          s.Payment_Type === "Bank"
-            ? s.Account_Display_Name
-            : s.Payment_Type
+        splitMap[split.Source_Id].push(
+          split.Payment_Type === "Bank"
+            ? split.Account_Display_Name
+            : split.Payment_Type
         );
       }
 
@@ -1550,10 +1601,10 @@ const getAllPurchases = async (req, res, next) => {
 
         const counts = {};
 
-        labels.forEach((label) => {
+        for (const label of labels) {
           counts[label] =
             (counts[label] || 0) + 1;
-        });
+        }
 
         row.Payment_Type_Display =
           Object.entries(counts)
@@ -1566,64 +1617,41 @@ const getAllPurchases = async (req, res, next) => {
       }
     }
 
-    /* ---------- COUNT ----------
-       Ignore cursor condition
-    ---------- */
+    /* ---------- COUNT + TOTALS ---------- */
 
-    const countWhereClauses =
-      whereClauses.filter(
-        (clause) =>
-          !clause.startsWith(`(
-        p.Bill_Date < ?`)
-      );
+    const countWhereSQL = filterClauses.length
+      ? `WHERE ${filterClauses.join(" AND ")}`
+      : "";
 
-    const countParams = [...params];
-
-    if (cursorDate && cursorId) {
-      countParams.splice(
-        countParams.length - 3,
-        3
-      );
-    }
-
-    const countWhereSQL =
-      countWhereClauses.length
-        ? `WHERE ${countWhereClauses.join(" AND ")}`
-        : "";
-
-    const [[{ total }]] =
+    const [[combined]] =
       await connection.query(
-        `SELECT COUNT(*) AS total
-         FROM add_purchase p
-         LEFT JOIN add_party a
-           ON a.Party_Id = p.Party_Id
-         ${countWhereSQL}`,
-        countParams
-      );
+        `
+          SELECT
+            COUNT(*) AS total,
 
-    /* ---------- TOTALS ----------
-       Ignore cursor condition
-    ---------- */
+            COALESCE(
+              SUM(p.Total_Amount),
+              0
+            ) AS totalAmount,
 
-    const [[totals]] =
-      await connection.query(
-        `SELECT
-           COALESCE(SUM(p.Total_Amount), 0)
-             AS totalAmount,
+            COALESCE(
+              SUM(p.Balance_Due),
+              0
+            ) AS totalUnpaid,
 
-           COALESCE(SUM(p.Balance_Due), 0)
-             AS totalUnpaid,
+            COALESCE(
+              SUM(p.Total_Paid),
+              0
+            ) AS totalPaid
 
-           COALESCE(SUM(p.Total_Paid), 0)
-             AS totalPaid
+          FROM add_purchase p
 
-         FROM add_purchase p
+          LEFT JOIN add_party a
+            ON a.Party_Id = p.Party_Id
 
-         LEFT JOIN add_party a
-           ON a.Party_Id = p.Party_Id
-
-         ${countWhereSQL}`,
-        countParams
+          ${countWhereSQL}
+        `,
+        filterParams
       );
 
     /* ---------- RESPONSE ---------- */
@@ -1637,9 +1665,13 @@ const getAllPurchases = async (req, res, next) => {
 
       nextCursor,
 
-      totalPurchases: total,
+      totalPurchases: combined.total,
 
-      totals,
+      totals: {
+        totalAmount: combined.totalAmount,
+        totalUnpaid: combined.totalUnpaid,
+        totalPaid: combined.totalPaid,
+      },
     });
 
   } catch (err) {

@@ -11,7 +11,7 @@ import {
     Trash2
 } from "lucide-react";
 import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { toast } from "react-toastify";
 import { useAddPaymentInMutation, useDeletePaymentInMutation, useGetAllPaymentInsQuery, useGetPaymentInByIdQuery, useLazyGetPaymentInPrintReportQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
@@ -25,6 +25,7 @@ import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { useReactToPrint } from "react-to-print";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 import PaymentInOutBulkReportPrintTemplate from "../../components/Print/PaymentInOutBulkReportPrintTemplate";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 
 
@@ -33,7 +34,8 @@ export default function PaymentIn() {
 
     const dispatch = useDispatch();
     const [searchParams, setSearchParams] = useSearchParams();
-    const page = Number(searchParams.get("page")) || 1;
+    const [cursor, setCursor] = useState(null);
+    //const page = Number(searchParams.get("page")) || 1;
     const searchTerm = searchParams.get("search") || "";
     const fromDate = searchParams.get("fromDate") || "";
     const toDate = searchParams.get("toDate") || "";
@@ -59,38 +61,60 @@ export default function PaymentIn() {
     const [triggerPaymentInReport, { data: bulkPaymentInReportData, isFetching: isBulkFetching }] =
         useLazyGetPaymentInPrintReportQuery();
     console.log(bulkPaymentInReportData);
-    const handlePageChange = (newPage) => {
-        setSearchParams({
-            page: newPage,
-            search: searchTerm,
-            fromDate,
-            toDate,
-        });
-    };
-    const handleNextPage = () => {
-        setSearchParams({
-            page: page + 1,
-            search: searchTerm,
-            fromDate,
-            toDate,
-        });
-    };
+    // const handlePageChange = (newPage) => {
+    //     setSearchParams({
+    //         page: newPage,
+    //         search: searchTerm,
+    //         fromDate,
+    //         toDate,
+    //     });
+    // };
+    // const handleNextPage = () => {
+    //     setSearchParams({
+    //         page: page + 1,
+    //         search: searchTerm,
+    //         fromDate,
+    //         toDate,
+    //     });
+    // };
 
-    const handlePreviousPage = () => {
-        setSearchParams({
-            page: Math.max(1, page - 1),
-            search: searchTerm,
-            fromDate,
-            toDate,
-        });
-    };
+    // const handlePreviousPage = () => {
+    //     setSearchParams({
+    //         page: Math.max(1, page - 1),
+    //         search: searchTerm,
+    //         fromDate,
+    //         toDate,
+    //     });
+    // };
 
-    const { data: paymentInData, isLoading } = useGetAllPaymentInsQuery({
-        page,
+    // const { data: paymentInData, isLoading } =
+    //  useGetAllPaymentInsQuery({
+    //     page,
+    //     search: searchTerm,
+    //     fromDate,
+    //     toDate,
+    // });
+    const {
+        data: paymentInData,
+        isLoading,
+        isFetching,
+    } = useGetAllPaymentInsQuery({
+        cursor,
         search: searchTerm,
         fromDate,
         toDate,
+        limit: 10,
     });
+    const paymentInList = paymentInData?.paymentIns ?? [];
+
+    const hasMore = paymentInData?.hasMore ?? false;
+
+    const nextCursor = paymentInData?.nextCursor ?? null;
+    const handleLoadMore = useCallback(() => {
+        if (!hasMore || !nextCursor || isFetching) return;
+
+        setCursor(nextCursor);
+    }, [hasMore, nextCursor, isFetching])
     console.log(paymentInData, fromDate, toDate);
 
     useEffect(() => {
@@ -212,7 +236,17 @@ export default function PaymentIn() {
 
     return (
         <>
-            <div className="flex flex-col bg-white">
+            <div className="flex flex-col bg-white"
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+
+                    height: "calc(100vh - 20px)",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                }}
+            >
 
 
                 <div className="inn-title">
@@ -404,55 +438,157 @@ export default function PaymentIn() {
 
 
                     </div>
-                </div>
-                <div className="tab-inn">
-                    <div className="table-responsive table-desi">
-                        {isLoading ? (
-                            <p className="text-center mt-4">Fetching payment In Data...</p>
-                        ) : paymentInData?.length === 0 ? (
-                            <p className="text-center mt-4">No paymentIn Data found.</p>
-                        ) : (
 
-                            <table className="w-full min-w-[500px]">
-                                <thead>
-                                    <tr>
-                                        <th className="text-left">Sl.No</th>
-                                        <th className="text-left ">Date</th>
-                                        <th className="text-left ">Party Name</th>
-                                        <th className="text-left">Payment Type</th>
-                                        <th className="text-left">Total Received</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paymentInData && paymentInData?.paymentIns?.length > 0 ? (
-                                        paymentInData?.paymentIns?.map((paymentIn, idx) => {
-                                            const isHighlighted = String(searchParams.get("highlightTxn")) === String(paymentIn?.id);
+                </div>
+                <div
+                    className="tab-inn"
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden",
+                    }}
+                >
+                    {isLoading ? (
+                        <p className="text-center mt-4">
+                            Fetching payment In Data...
+                        </p>
+                    ) : paymentInList.length === 0 ? (
+                        <p className="text-center mt-4">
+                            No payment In Data found.
+                        </p>
+                    ) : (
+                        <div
+                            style={{
+                                flex: 1,
+                                minHeight: 0,
+                                overflowX: "auto",
+                                overflowY: "hidden",   // fine to keep — this hides the OUTER wrapper's own vertical scrollbar
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                        >
+                            <div style={{
+                                minWidth: 962, display: "flex", flexDirection: "column",
+                                flex: 1, minHeight: 0
+                            }}>
+                                {/* ---------- HEADER ---------- */}
+
+                                {/* <table className="w-full min-w-[800px] table-responsive table-desi">
+                                    <thead >
+                                        <tr>
+                                            <th className="text-left" style={{ width: 70 }}>Sl.No</th>
+                                            <th className="text-left" style={{ width: 120 }}>Date</th>
+                                            <th className="text-left" style={{ width: 300 }}>Party Name</th>
+                                            <th className="text-left" style={{ width: 160 }}>Payment Type</th>
+                                            <th className="text-left" 
+                                            
+                                            >
+                                                Total Received</th>
+                                            <th style={{ width: 50 }}></th>
+                                        </tr>
+                                    </thead>
+                                </table> */}
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.5fr",
+                                        width: "100%",
+                                        //minWidth: "850px",
+                                        boxSizing: "border-box",
+                                        alignItems: "center",
+                                        minHeight: 40,
+                                        padding: "0 8px",
+                                        flexShrink: 0,
+                                        borderBottom: "2px solid #e2e8f0",
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        color: "#333",
+                                        textTransform: "uppercase",
+                                    }}
+                                >
+                                    <div>Sl.No</div>
+                                    <div>Date</div>
+                                    <div>Party Name</div>
+                                    <div>Payment Type</div>
+                                    <div>Total Received</div>
+                                    <div
+                                        style={{
+                                            position: "sticky",
+                                            right: 0,
+                                            //backgroundColor: "#fff",
+                                        }}
+                                    />
+                                </div>
+
+                                {/* ---------- VIRTUAL LIST ---------- */}
+
+                                <div
+                                    style={{
+                                        flex: 1,
+                                        minHeight: 0,
+                                        //height: 0,
+                                        overflow: "hidden",
+                                        position: "relative",
+                                    }}
+                                >
+                                    <VirtualScrollList
+                                        //ref={virtualListRef}
+                                        items={paymentInList}
+                                        rowHeight={52}
+                                        height="100%"
+                                        dynamicHeight={true}
+                                        isFetching={isFetching}
+                                        hasMore={hasMore}
+                                        getItemKey={(paymentIn) =>
+                                            paymentIn?.id
+                                        }
+                                        emptyMessage="No payment In Data found"
+                                        endMessage="— End of payment In data —"
+                                        onLoadMore={handleLoadMore}
+                                        isRowActive={(paymentIn) =>
+                                            rowMenuOpen === paymentIn?.id
+                                        }
+                                        renderRow={(paymentIn, idx) => {
+                                            const isHighlighted =
+                                                String(
+                                                    searchParams.get("highlightTxn")
+                                                ) === String(paymentIn?.id);
 
                                             return (
-                                                <tr
+                                                <div
                                                     key={paymentIn?.id}
-
                                                     onClick={() => {
-                                                        const params = new URLSearchParams(searchParams);
+                                                        const params =
+                                                            new URLSearchParams(
+                                                                searchParams
+                                                            );
 
                                                         params.set(
                                                             "highlightTxn",
                                                             paymentIn?.id
                                                         );
 
-                                                        setSearchParams(params, { replace: true });
+                                                        setSearchParams(params, {
+                                                            replace: true,
+                                                        });
                                                     }}
-
                                                     onDoubleClick={() => {
-                                                        const params = new URLSearchParams(searchParams);
+                                                        const params =
+                                                            new URLSearchParams(
+                                                                searchParams
+                                                            );
 
                                                         params.set(
                                                             "highlightTxn",
                                                             paymentIn?.id
                                                         );
 
-                                                        setSearchParams(params, { replace: true });
+                                                        setSearchParams(
+                                                            params,
+                                                            { replace: true }
+                                                        );
 
                                                         setModal({
                                                             open: true,
@@ -460,314 +596,262 @@ export default function PaymentIn() {
                                                             data: paymentIn,
                                                         });
                                                     }}
-
                                                     style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.5fr",
+                                                        //gridTemplateColumns:"70px 110px minmax(180px, 1fr) 130px 110px 110px 50px",
+                                                        //gridTemplateColumns: "70px 120px 300px 160px 262px 50px",
+                                                        alignItems: "center",
+                                                        minHeight: 52,
+                                                        padding: "0 8px",
                                                         cursor: "pointer",
-                                                        borderBottom: "1px solid #f1f5f9",
-                                                        backgroundColor: isHighlighted
-                                                            ? "#4CA1AF22"
-                                                            : "transparent",
+                                                        borderBottom:
+                                                            "1px solid #f1f5f9",
+                                                        backgroundColor:
+                                                            isHighlighted
+                                                                ? "#4CA1AF22"
+                                                                : "transparent",
                                                     }}
                                                 >
-                                                    <td>
-                                                        {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.
-                                                    </td>
+                                                    {/* SL.NO */}
 
-                                                    <td>
+                                                    <div className="table-desi-cell">
+                                                        {idx + 1}.
+                                                    </div>
+
+                                                    {/* DATE */}
+
+                                                    <div className="table-desi-cell">
                                                         {paymentIn?.Payment_Date
-                                                            ? new Date(paymentIn?.Payment_Date).toLocaleDateString("en-IN", {
-                                                                day: "numeric",
-                                                                month: "numeric",
-                                                                year: "numeric",
-                                                            })
+                                                            ? new Date(
+                                                                paymentIn.Payment_Date
+                                                            ).toLocaleDateString(
+                                                                "en-IN",
+                                                                {
+                                                                    day: "numeric",
+                                                                    month: "numeric",
+                                                                    year: "numeric",
+                                                                }
+                                                            )
                                                             : "N/A"}
-                                                    </td>
-                                                    <td>{paymentIn?.Party_Name || "N/A"}</td>
-                                                    <td>
-                                                        {paymentIn?.Payment_Type_Display || "N/A"}
-                                                    </td>
+                                                    </div>
 
-                                                    <td>{paymentIn?.Received || "N/A"}</td>
+                                                    {/* PARTY */}
 
-                                                    <td
-                                                        className="py-2 px-2"
+                                                    <div
+                                                        className="table-desi-cell"
                                                         style={{
-                                                            position: "relative",
+                                                            overflowWrap: "break-word",
+                                                            wordBreak: "break-word",
+                                                        }}
+                                                    >
+                                                        {paymentIn?.Party_Name ||
+                                                            "N/A"}
+                                                    </div>
+
+                                                    {/* PAYMENT TYPE */}
+
+                                                    <div className="table-desi-cell">
+                                                        {paymentIn
+                                                            ?.Payment_Type_Display ||
+                                                            "N/A"}
+                                                    </div>
+
+                                                    {/* RECEIVED */}
+
+                                                    <div className="table-desi-cell">
+                                                        ₹
+                                                        {paymentIn?.Received ??
+                                                            "N/A"}
+                                                    </div>
+
+                                                    {/* MENU */}
+
+                                                    <div
+                                                        className="py-2 px-2 table-desi-cell"
+                                                        style={{
+                                                            position: "sticky",   
+                                                            right: 0,              
                                                             width: 50,
-                                                            textAlign: "center"
+                                                            //position: "relative",
+                                                            //width: 50,
+                                                            textAlign: "center",
                                                         }}
                                                     >
                                                         {/* THREE DOT BUTTON */}
+
                                                         <button
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
 
                                                                 setRowMenuOpen(
-                                                                    rowMenuOpen === paymentIn?.id
+                                                                    rowMenuOpen ===
+                                                                        paymentIn?.id
                                                                         ? null
                                                                         : paymentIn?.id
                                                                 );
                                                             }}
                                                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                             style={{
-                                                                backgroundColor: "transparent",
+                                                                backgroundColor:
+                                                                    "transparent",
                                                                 border: "none",
-                                                                cursor: "pointer"
+                                                                cursor: "pointer",
                                                             }}
                                                             title="More"
                                                         >
                                                             <MoreVertical
                                                                 size={16}
-                                                                style={{ color: "#374151" }}
+                                                                style={{
+                                                                    color: "#374151",
+                                                                }}
                                                             />
                                                         </button>
 
-                                                        {/* THREE DOT MENU */}
-                                                        {rowMenuOpen === paymentIn?.id && (
-                                                            <div
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="absolute bg-white shadow-lg rounded-md"
-                                                                style={{
-                                                                    right: 0,
-                                                                    top: 32,
-                                                                    width: 150,
-                                                                    zIndex: 100,
-                                                                    border: "1px solid #e2e8f0",
-                                                                    overflow: "hidden"
-                                                                }}
-                                                            >
+                                                        {/* ROW MENU */}
 
-                                                                {/* VIEW / EDIT */}
-                                                                <button
-                                                                    type="button"
-                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                        {rowMenuOpen ===
+                                                            paymentIn?.id && (
+                                                                <div
+                                                                    onClick={(e) =>
+                                                                        e.stopPropagation()
+                                                                    }
+                                                                    className="absolute bg-white shadow-lg rounded-md"
                                                                     style={{
-                                                                        color: "#374151",
-                                                                        backgroundColor: "transparent",
-                                                                        border: "none",
-                                                                        cursor: "pointer"
-                                                                    }}
-                                                                    onClick={() => {
-                                                                        setRowMenuOpen(null);
-
-                                                                        const params = new URLSearchParams(searchParams);
-
-                                                                        params.set(
-                                                                            "highlightTxn",
-                                                                            paymentIn?.id
-                                                                        );
-
-                                                                        setSearchParams(params, { replace: true });
-
-                                                                        setModal({
-                                                                            open: true,
-                                                                            mode: "edit",
-                                                                            data: paymentIn,
-                                                                        });
+                                                                        right: 0,
+                                                                        top: "100%",
+                                                                        width: 150,
+                                                                        zIndex: 100,
+                                                                        border:
+                                                                            "1px solid #e2e8f0",
+                                                                        overflow: "hidden",
                                                                     }}
                                                                 >
-                                                                    <Eye
-                                                                        size={13}
-                                                                        style={{ color: "#4CA1AF" }}
-                                                                    />
+                                                                    {/* VIEW / EDIT */}
 
-                                                                    View / Edit
-                                                                </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        style={{
+                                                                            color: "#374151",
+                                                                            backgroundColor:
+                                                                                "transparent",
+                                                                            border: "none",
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(null);
 
-                                                                {/* PRINT */}
-                                                                <button
-                                                                    type="button"
-                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                    style={{
-                                                                        color: "#374151",
-                                                                        backgroundColor: "transparent",
-                                                                        border: "none",
-                                                                        cursor: "pointer"
-                                                                    }}
-                                                                    onClick={() => {
-                                                                        setRowMenuOpen(null);
-                                                                        setPrintPaymentInId(paymentIn?.id)
-                                                                        //handlePrint(purchase);
-                                                                    }}
-                                                                // onClick={() => {
-                                                                //     setRowMenuOpen(null);
-                                                                //     handlePrint(paymentIn);
-                                                                // }}
-                                                                >
-                                                                    <Printer
-                                                                        size={13}
-                                                                        style={{ color: "#4CA1AF" }}
-                                                                    />
+                                                                            const params =
+                                                                                new URLSearchParams(
+                                                                                    searchParams
+                                                                                );
 
-                                                                    Print
-                                                                </button>
+                                                                            params.set(
+                                                                                "highlightTxn",
+                                                                                paymentIn?.id
+                                                                            );
 
-                                                                {/* DELETE */}
-                                                                <button
-                                                                    type="button"
-                                                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                                                    style={{
-                                                                        cursor: "pointer",
-                                                                        color: "#dc2626",
-                                                                        backgroundColor: "transparent",
-                                                                        border: "none"
-                                                                    }}
-                                                                    onClick={() => {
-                                                                        setRowMenuOpen(null);
+                                                                            setSearchParams(
+                                                                                params,
+                                                                                {
+                                                                                    replace: true,
+                                                                                }
+                                                                            );
 
-                                                                        setDeleteTarget({
-                                                                            Payment_In_Id: paymentIn?.id,
-                                                                        });
-                                                                    }}
-                                                                >
-                                                                    <Trash2
-                                                                        size={13}
-                                                                        style={{ color: "#dc2626" }}
-                                                                    />
+                                                                            setModal({
+                                                                                open: true,
+                                                                                mode: "edit",
+                                                                                data: paymentIn,
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <Eye
+                                                                            size={13}
+                                                                            style={{
+                                                                                color: "#4CA1AF",
+                                                                            }}
+                                                                        />
 
-                                                                    Delete
-                                                                </button>
+                                                                        View / Edit
+                                                                    </button>
 
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                                                    {/* PRINT */}
 
-                                                </tr>
-                                            )
-                                        })
-                                    ) : (
-                                        <tr>
-                                            <td className="mx-auto text-center" colSpan={6}>
-                                                No payment out found
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        style={{
+                                                                            color: "#374151",
+                                                                            backgroundColor:
+                                                                                "transparent",
+                                                                            border: "none",
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(null);
 
-                            </table>
-                        )}
-                    </div>
-                </div>
-                <div className="flex justify-center align-center p-4">
-                    <div className="flex items-center space-x-2 flex-wrap justify-center">
+                                                                            setPrintPaymentInId(
+                                                                                paymentIn?.id
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Printer
+                                                                            size={13}
+                                                                            style={{
+                                                                                color: "#4CA1AF",
+                                                                            }}
+                                                                        />
 
-                        {/* PREVIOUS */}
-                        <button
-                            type="button"
-                            onClick={() => handlePreviousPage()}
-                            disabled={page === 1}
-                            className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === 1 ? 'opacity-50 ' : ''}
-      `}
-                        >
-                            ← Previous
-                        </button>
+                                                                        Print
+                                                                    </button>
 
-                        {/* PAGE NUMBERS — DESKTOP / TABLET */}
-                        <div style={{ marginRight: "0px" }}
-                            className="hidden sm:flex space-x-2">
+                                                                    {/* DELETE */}
 
-                            {(() => {
-                                const totalPages = paymentInData?.totalPages || 1;
-                                const maxVisible = 5; // how many pages around current
-                                const pages = [];
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                        title="Delete payment in"
+                                                                        style={{
+                                                                            cursor: "pointer",
+                                                                            color: "#dc2626",
+                                                                            backgroundColor:
+                                                                                "transparent",
+                                                                            border: "none",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(null);
 
-                                let start = Math.max(1, page - 2);
-                                let end = Math.min(totalPages, page + 2);
+                                                                            setDeleteTarget({
+                                                                                Payment_In_Id:
+                                                                                    paymentIn?.id,
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <Trash2
+                                                                            size={13}
+                                                                            style={{
+                                                                                color: "#dc2626",
+                                                                            }}
+                                                                        />
 
-                                // Adjust if near start
-                                if (page <= 3) {
-                                    end = Math.min(totalPages, maxVisible);
-                                }
-
-                                // Adjust if near end
-                                if (page > totalPages - 3) {
-                                    start = Math.max(1, totalPages - maxVisible + 1);
-                                }
-
-                                // First page + dots
-                                if (start > 1) {
-                                    pages.push(
-                                        <button
-                                            key={1}
-                                            onClick={() => handlePageChange(1)}
-                                            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                                        >
-                                            1
-                                        </button>
-                                    );
-
-                                    if (start > 2) {
-                                        pages.push(
-                                            <span key="start-dots" className="px-2">...</span>
-                                        );
-                                    }
-                                }
-
-                                // Middle pages
-                                for (let i = start; i <= end; i++) {
-                                    pages.push(
-                                        <button
-                                            key={i}
-                                            onClick={() => handlePageChange(i)}
-                                            className={`px-3 py-1 rounded ${page === i
-                                                ? 'bg-[#4CA1AF] text-white'
-                                                : 'bg-gray-200 hover:bg-gray-300'
-                                                }`}
-                                        >
-                                            {i}
-                                        </button>
-                                    );
-                                }
-
-                                // Last page + dots
-                                if (end < totalPages) {
-                                    if (end < totalPages - 1) {
-                                        pages.push(
-                                            <span key="end-dots" className="px-2">...</span>
-                                        );
-                                    }
-
-                                    pages.push(
-                                        <button
-                                            key={totalPages}
-                                            onClick={() => handlePageChange(totalPages)}
-                                            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                                        >
-                                            {totalPages}
-                                        </button>
-                                    );
-                                }
-
-                                return pages;
-                            })()}
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            </div>
                         </div>
-
-                        {/* CURRENT PAGE — MOBILE ONLY */}
-                        <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
-                            Page {page} / {paymentInData?.totalPages || 1}
-                        </div>
-
-                        {/* NEXT */}
-                        <button
-                            type="button"
-                            onClick={() => handleNextPage()}
-                            disabled={page === paymentInData?.totalPages ||
-                                paymentInData?.totalPages === 0}
-                            className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
-        ${page === paymentInData?.totalPages ||
-                                    paymentInData?.totalPages === 0
-                                    ? 'opacity-50 '
-                                    : ''
-                                }
-      `}
-                        >
-                            Next →
-                        </button>
-
-                    </div>
+                    )}
                 </div>
+
+
 
             </div>
             {modal.open && (
@@ -819,3 +903,367 @@ export default function PaymentIn() {
 
     )
 }
+//  <div className="flex justify-center align-center p-4">
+//                     <div className="flex items-center space-x-2 flex-wrap justify-center">
+
+//                         {/* PREVIOUS */}
+//                         <button
+//                             type="button"
+//                             onClick={() => handlePreviousPage()}
+//                             disabled={page === 1}
+//                             className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+//         ${page === 1 ? 'opacity-50 ' : ''}
+//       `}
+//                         >
+//                             ← Previous
+//                         </button>
+
+//                         {/* PAGE NUMBERS — DESKTOP / TABLET */}
+//                         <div style={{ marginRight: "0px" }}
+//                             className="hidden sm:flex space-x-2">
+
+//                             {(() => {
+//                                 const totalPages = paymentInData?.totalPages || 1;
+//                                 const maxVisible = 5; // how many pages around current
+//                                 const pages = [];
+
+//                                 let start = Math.max(1, page - 2);
+//                                 let end = Math.min(totalPages, page + 2);
+
+//                                 // Adjust if near start
+//                                 if (page <= 3) {
+//                                     end = Math.min(totalPages, maxVisible);
+//                                 }
+
+//                                 // Adjust if near end
+//                                 if (page > totalPages - 3) {
+//                                     start = Math.max(1, totalPages - maxVisible + 1);
+//                                 }
+
+//                                 // First page + dots
+//                                 if (start > 1) {
+//                                     pages.push(
+//                                         <button
+//                                             key={1}
+//                                             onClick={() => handlePageChange(1)}
+//                                             className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+//                                         >
+//                                             1
+//                                         </button>
+//                                     );
+
+//                                     if (start > 2) {
+//                                         pages.push(
+//                                             <span key="start-dots" className="px-2">...</span>
+//                                         );
+//                                     }
+//                                 }
+
+//                                 // Middle pages
+//                                 for (let i = start; i <= end; i++) {
+//                                     pages.push(
+//                                         <button
+//                                             key={i}
+//                                             onClick={() => handlePageChange(i)}
+//                                             className={`px-3 py-1 rounded ${page === i
+//                                                 ? 'bg-[#4CA1AF] text-white'
+//                                                 : 'bg-gray-200 hover:bg-gray-300'
+//                                                 }`}
+//                                         >
+//                                             {i}
+//                                         </button>
+//                                     );
+//                                 }
+
+//                                 // Last page + dots
+//                                 if (end < totalPages) {
+//                                     if (end < totalPages - 1) {
+//                                         pages.push(
+//                                             <span key="end-dots" className="px-2">...</span>
+//                                         );
+//                                     }
+
+//                                     pages.push(
+//                                         <button
+//                                             key={totalPages}
+//                                             onClick={() => handlePageChange(totalPages)}
+//                                             className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+//                                         >
+//                                             {totalPages}
+//                                         </button>
+//                                     );
+//                                 }
+
+//                                 return pages;
+//                             })()}
+//                         </div>
+
+//                         {/* CURRENT PAGE — MOBILE ONLY */}
+//                         <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
+//                             Page {page} / {paymentInData?.totalPages || 1}
+//                         </div>
+
+//                         {/* NEXT */}
+//                         <button
+//                             type="button"
+//                             onClick={() => handleNextPage()}
+//                             disabled={page === paymentInData?.totalPages ||
+//                                 paymentInData?.totalPages === 0}
+//                             className={`px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded
+//         ${page === paymentInData?.totalPages ||
+//                                     paymentInData?.totalPages === 0
+//                                     ? 'opacity-50 '
+//                                     : ''
+//                                 }
+//       `}
+//                         >
+//                             Next →
+//                         </button>
+
+//                     </div>
+//                 </div>
+
+//  <div className="tab-inn">
+//                     <div className="table-responsive table-desi">
+//                         {isLoading ? (
+//                             <p className="text-center mt-4">Fetching payment In Data...</p>
+//                         ) : paymentInData?.length === 0 ? (
+//                             <p className="text-center mt-4">No paymentIn Data found.</p>
+//                         ) : (
+
+//                             <table className="w-full min-w-[500px]">
+//                                 <thead>
+//                                     <tr>
+//                                         <th className="text-left">Sl.No</th>
+//                                         <th className="text-left ">Date</th>
+//                                         <th className="text-left ">Party Name</th>
+//                                         <th className="text-left">Payment Type</th>
+//                                         <th className="text-left">Total Received</th>
+//                                         <th></th>
+//                                     </tr>
+//                                 </thead>
+//                                 <tbody>
+//                                     {paymentInData && paymentInData?.paymentIns?.length > 0 ? (
+//                                         paymentInData?.paymentIns?.map((paymentIn, idx) => {
+//                                             const isHighlighted = String(searchParams.get("highlightTxn")) === String(paymentIn?.id);
+
+//                                             return (
+//                                                 <tr
+//                                                     key={paymentIn?.id}
+
+//                                                     onClick={() => {
+//                                                         const params = new URLSearchParams(searchParams);
+
+//                                                         params.set(
+//                                                             "highlightTxn",
+//                                                             paymentIn?.id
+//                                                         );
+
+//                                                         setSearchParams(params, { replace: true });
+//                                                     }}
+
+//                                                     onDoubleClick={() => {
+//                                                         const params = new URLSearchParams(searchParams);
+
+//                                                         params.set(
+//                                                             "highlightTxn",
+//                                                             paymentIn?.id
+//                                                         );
+
+//                                                         setSearchParams(params, { replace: true });
+
+//                                                         setModal({
+//                                                             open: true,
+//                                                             mode: "edit",
+//                                                             data: paymentIn,
+//                                                         });
+//                                                     }}
+
+//                                                     style={{
+//                                                         cursor: "pointer",
+//                                                         borderBottom: "1px solid #f1f5f9",
+//                                                         backgroundColor: isHighlighted
+//                                                             ? "#4CA1AF22"
+//                                                             : "transparent",
+//                                                     }}
+//                                                 >
+//                                                     <td>
+//                                                         {(paymentInData?.currentPage - 1) * 10 + (idx + 1)}.
+//                                                     </td>
+
+//                                                     <td>
+//                                                         {paymentIn?.Payment_Date
+//                                                             ? new Date(paymentIn?.Payment_Date).toLocaleDateString("en-IN", {
+//                                                                 day: "numeric",
+//                                                                 month: "numeric",
+//                                                                 year: "numeric",
+//                                                             })
+//                                                             : "N/A"}
+//                                                     </td>
+//                                                     <td>{paymentIn?.Party_Name || "N/A"}</td>
+//                                                     <td>
+//                                                         {paymentIn?.Payment_Type_Display || "N/A"}
+//                                                     </td>
+
+//                                                     <td>{paymentIn?.Received || "N/A"}</td>
+
+//                                                     <td
+//                                                         className="py-2 px-2"
+//                                                         style={{
+//                                                             position: "relative",
+//                                                             width: 50,
+//                                                             textAlign: "center"
+//                                                         }}
+//                                                     >
+//                                                         {/* THREE DOT BUTTON */}
+//                                                         <button
+//                                                             type="button"
+//                                                             onClick={(e) => {
+//                                                                 e.stopPropagation();
+
+//                                                                 setRowMenuOpen(
+//                                                                     rowMenuOpen === paymentIn?.id
+//                                                                         ? null
+//                                                                         : paymentIn?.id
+//                                                                 );
+//                                                             }}
+//                                                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                                                             style={{
+//                                                                 backgroundColor: "transparent",
+//                                                                 border: "none",
+//                                                                 cursor: "pointer"
+//                                                             }}
+//                                                             title="More"
+//                                                         >
+//                                                             <MoreVertical
+//                                                                 size={16}
+//                                                                 style={{ color: "#374151" }}
+//                                                             />
+//                                                         </button>
+
+//                                                         {/* THREE DOT MENU */}
+//                                                         {rowMenuOpen === paymentIn?.id && (
+//                                                             <div
+//                                                                 onClick={(e) => e.stopPropagation()}
+//                                                                 className="absolute bg-white shadow-lg rounded-md"
+//                                                                 style={{
+//                                                                     right: 0,
+//                                                                     top: 32,
+//                                                                     width: 150,
+//                                                                     zIndex: 100,
+//                                                                     border: "1px solid #e2e8f0",
+//                                                                     overflow: "hidden"
+//                                                                 }}
+//                                                             >
+
+//                                                                 {/* VIEW / EDIT */}
+//                                                                 <button
+//                                                                     type="button"
+//                                                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                                                     style={{
+//                                                                         color: "#374151",
+//                                                                         backgroundColor: "transparent",
+//                                                                         border: "none",
+//                                                                         cursor: "pointer"
+//                                                                     }}
+//                                                                     onClick={() => {
+//                                                                         setRowMenuOpen(null);
+
+//                                                                         const params = new URLSearchParams(searchParams);
+
+//                                                                         params.set(
+//                                                                             "highlightTxn",
+//                                                                             paymentIn?.id
+//                                                                         );
+
+//                                                                         setSearchParams(params, { replace: true });
+
+//                                                                         setModal({
+//                                                                             open: true,
+//                                                                             mode: "edit",
+//                                                                             data: paymentIn,
+//                                                                         });
+//                                                                     }}
+//                                                                 >
+//                                                                     <Eye
+//                                                                         size={13}
+//                                                                         style={{ color: "#4CA1AF" }}
+//                                                                     />
+
+//                                                                     View / Edit
+//                                                                 </button>
+
+//                                                                 {/* PRINT */}
+//                                                                 <button
+//                                                                     type="button"
+//                                                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                                                     style={{
+//                                                                         color: "#374151",
+//                                                                         backgroundColor: "transparent",
+//                                                                         border: "none",
+//                                                                         cursor: "pointer"
+//                                                                     }}
+//                                                                     onClick={() => {
+//                                                                         setRowMenuOpen(null);
+//                                                                         setPrintPaymentInId(paymentIn?.id)
+//                                                                         //handlePrint(purchase);
+//                                                                     }}
+//                                                                 // onClick={() => {
+//                                                                 //     setRowMenuOpen(null);
+//                                                                 //     handlePrint(paymentIn);
+//                                                                 // }}
+//                                                                 >
+//                                                                     <Printer
+//                                                                         size={13}
+//                                                                         style={{ color: "#4CA1AF" }}
+//                                                                     />
+
+//                                                                     Print
+//                                                                 </button>
+
+//                                                                 {/* DELETE */}
+//                                                                 <button
+//                                                                     type="button"
+//                                                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+//                                                                     style={{
+//                                                                         cursor: "pointer",
+//                                                                         color: "#dc2626",
+//                                                                         backgroundColor: "transparent",
+//                                                                         border: "none"
+//                                                                     }}
+//                                                                     onClick={() => {
+//                                                                         setRowMenuOpen(null);
+
+//                                                                         setDeleteTarget({
+//                                                                             Payment_In_Id: paymentIn?.id,
+//                                                                         });
+//                                                                     }}
+//                                                                 >
+//                                                                     <Trash2
+//                                                                         size={13}
+//                                                                         style={{ color: "#dc2626" }}
+//                                                                     />
+
+//                                                                     Delete
+//                                                                 </button>
+
+//                                                             </div>
+//                                                         )}
+//                                                     </td>
+
+//                                                 </tr>
+//                                             )
+//                                         })
+//                                     ) : (
+//                                         <tr>
+//                                             <td className="mx-auto text-center" colSpan={6}>
+//                                                 No payment out found
+//                                             </td>
+//                                         </tr>
+//                                     )}
+//                                 </tbody>
+
+//                             </table>
+//                         )}
+//                     </div>
+//                 </div>

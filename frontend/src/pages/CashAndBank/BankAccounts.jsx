@@ -762,14 +762,41 @@ function BankDetailPanel({ bankId }) {
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
+         
           overflow: "hidden",
         }}
       >
+          <div
+        style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflowX: "auto",
+            overflowY: "hidden",
+        }}
+    >
         {/* TABLE HEADER */}
-        {/* <div className="table-responsive table-desi"> */}
-        <table className="w-full min-w-[500px] table-responsive table-desi"
-          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
+       
+         <div
+            style={{
+                minWidth: 720, // 70+120+300(party min)+110+120+50 — adjust to taste
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+            }}
+        >
+        {/* <table className="w-full min-w-[500px] table-responsive table-desi"
+          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}> */}
           {/* //<table className="w-full min-w-[500px]"> */}
+           <table
+          className="w-full min-w-[500px] table-responsive table-desi"
+          style={{
+            flexShrink: 0,
+          }}
+        >
+          
           <thead style={{ fontWeight: "700", fontSize: "12px", color: "#333" }}>
             <tr>
               <th className="text-left" style={{ width: 70 }}>SL.NO</th>
@@ -782,7 +809,15 @@ function BankDetailPanel({ bankId }) {
           </thead>
         </table>
         {/* </div> */}
-
+         <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          height: 0,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
         {/* VIRTUALIZED TABLE BODY */}
         <VirtualScrollList
           ref={virtualListRef}
@@ -943,6 +978,9 @@ function BankDetailPanel({ bankId }) {
             );
           }}
         />
+        </div>
+      </div>
+      </div>
       </div>
 
       {/* sentinel */}

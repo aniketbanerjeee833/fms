@@ -8,13 +8,99 @@ export const saleReturnApi = createApi({
   endpoints: (builder) => ({
 
     /* GET ALL */
+    // getAllSaleReturns: builder.query({
+    //   query: ({ page = 1, search = "", fromDate = "", toDate = "" }) => {
+    //     const params = new URLSearchParams({ page, search, fromDate, toDate });
+    //     return `/sale-return?${params.toString()}`;
+    //   },
+    //   providesTags: ["SaleReturn"],
+    // }),
+
     getAllSaleReturns: builder.query({
-      query: ({ page = 1, search = "", fromDate = "", toDate = "" }) => {
-        const params = new URLSearchParams({ page, search, fromDate, toDate });
-        return `/sale-return?${params.toString()}`;
-      },
-      providesTags: ["SaleReturn"],
-    }),
+  query: ({
+    cursor = null,
+    search = "",
+    fromDate = "",
+    toDate = "",
+    limit = 10,
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (cursor) {
+      params.append("cursor", cursor);
+    }
+
+    if (search?.trim()) {
+      params.append("search", search.trim());
+    }
+
+    if (fromDate) {
+      params.append("fromDate", fromDate);
+    }
+
+    if (toDate) {
+      params.append("toDate", toDate);
+    }
+
+    params.append("limit", limit);
+
+    return `/sale-return?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: queryArgs.search,
+    fromDate: queryArgs.fromDate,
+    toDate: queryArgs.toDate,
+  }),
+
+  merge: (currentCache, newData, { arg }) => {
+    // First request / filters changed
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    // Cursor request → append next batch
+    currentCache.saleReturns.push(
+      ...newData.saleReturns
+    );
+
+    currentCache.hasMore =
+      newData.hasMore;
+
+    currentCache.nextCursor =
+      newData.nextCursor;
+
+    currentCache.totalReturns =
+      newData.totalReturns;
+
+    if (newData.totals) {
+      currentCache.totals =
+        newData.totals;
+    }
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !==
+      previousArg?.cursor ||
+    currentArg?.search !==
+      previousArg?.search ||
+    currentArg?.fromDate !==
+      previousArg?.fromDate ||
+    currentArg?.toDate !==
+      previousArg?.toDate ||
+    currentArg?.limit !==
+      previousArg?.limit,
+
+  providesTags: [
+    {
+      type: "SaleReturn",
+      id: "LIST",
+    },
+  ],
+}),
 
     /* GET SINGLE */
     getSaleReturnById: builder.query({

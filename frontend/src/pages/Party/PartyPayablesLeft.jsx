@@ -30,6 +30,7 @@ import {
   useGetExpenseByIdQuery,
   useDeleteExpenseMutation,
 } from "../../redux/api/expenseApi";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 const TXN_TYPE_ROUTE_MAP = {
   Sale: "sale",
@@ -132,8 +133,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const search = searchParams.get("txnSearch") || "";
   const [cursor, setCursor] = useState(null);
 
-  const sentinelRef = useRef(null);
-  const observerRef = useRef(null);
+  //const sentinelRef = useRef(null);
+  //const observerRef = useRef(null);
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
   const closeModal = () => setModalState({ open: false, type: null, id: null });
@@ -144,10 +145,10 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
   const initialRightLimit = useRef(
-  Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 10
-    );
+    Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 10
+  );
   const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
-    { Party_Id: partyId, cursor, search ,limit: initialRightLimit.current },
+    { Party_Id: partyId, cursor, search, limit: initialRightLimit.current },
     { skip: !partyId }
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
@@ -243,26 +244,29 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const hasMore = data?.hasMore ?? false;
   const nextCursor = data?.nextCursor ?? null;
 
-  const handleObserver = useCallback(
-    (entries) => {
-      if (entries[0].isIntersecting && hasMore && nextCursor && !isFetching && !isLoading) {
-        setCursor(nextCursor);
-      }
-    },
-    [hasMore, nextCursor, isFetching, isLoading]
-  );
+  // const handleObserver = useCallback(
+  //   (entries) => {
+  //     if (entries[0].isIntersecting && hasMore && nextCursor && !isFetching && !isLoading) {
+  //       setCursor(nextCursor);
+  //     }
+  //   },
+  //   [hasMore, nextCursor, isFetching, isLoading]
+  // );
 
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(handleObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-    return () => observerRef.current?.disconnect();
-  }, [handleObserver]);
-
+  // useEffect(() => {
+  //   if (observerRef.current) observerRef.current.disconnect();
+  //   observerRef.current = new IntersectionObserver(handleObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
+  //   if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+  //   return () => observerRef.current?.disconnect();
+  // }, [handleObserver]);
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || !nextCursor || isFetching) return;
+    setCursor(nextCursor);
+  }, [hasMore, nextCursor, isFetching]);
 
   useEffect(() => {
     const closeRowMenu = () => {
@@ -450,58 +454,116 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       handleBulkPrint();
     }
   }, [bulkPartyPrintReportData, showPartyBulkPrintReview]);
- const rightPanelRef = useRef(null);
-   
-const highlightedRowRef = useRef(null);
-    useEffect(() => {
-        
-        const rightEl = rightPanelRef.current;
+  //  const rightPanelRef = useRef(null);
 
-       
-        const saveRight = () => {
-            console.log("saveRight fired", rightEl.scrollTop, ledger.length);
-            sessionStorage.setItem("partiesByPartyPayable:rightScroll", rightEl.scrollTop);
-            sessionStorage.setItem("partiesByPartyPayablerightCount", ledger.length);
-            // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
-            // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
-        };
+  // const highlightedRowRef = useRef(null);
+  //     useEffect(() => {
 
-       
-        rightEl?.addEventListener("scroll", saveRight);
+  //         const rightEl = rightPanelRef.current;
 
-        return () => {
-            
-            rightEl?.removeEventListener("scroll", saveRight);
-        };
-    }, [ ledger.length]);
-const hasRestoredRightRef = useRef(false);
- const [isRestoringRight, setIsRestoringRight] = useState(true);
 
-// useLayoutEffect(() => {
-//     if (hasRestoredRightRef.current) return;
-//     if (isLoading || isFetching) return;
+  //         const saveRight = () => {
+  //             console.log("saveRight fired", rightEl.scrollTop, ledger.length);
+  //             sessionStorage.setItem("partiesByPartyPayable:rightScroll", rightEl.scrollTop);
+  //             sessionStorage.setItem("partiesByPartyPayablerightCount", ledger.length);
+  //             // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
+  //             // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
+  //         };
 
-//     const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 0;
-//     if (ledger.length < savedCount) return;
 
-//     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-//     hasRestoredRightRef.current = true;
-// }, [isLoading, isFetching, ledger.length]);
-  useLayoutEffect(() => {
-    if (hasRestoredRightRef.current) {
-        setIsRestoringRight(false);
-        return;
-    }
+  //         rightEl?.addEventListener("scroll", saveRight);
+
+  //         return () => {
+
+  //             rightEl?.removeEventListener("scroll", saveRight);
+  //         };
+  //     }, [ ledger.length]);
+  // const hasRestoredRightRef = useRef(false);
+  //  const [isRestoringRight, setIsRestoringRight] = useState(true);
+
+
+  //   useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) {
+  //         setIsRestoringRight(false);
+  //         return;
+  //     }
+  //     if (isLoading || isFetching) return;
+
+  //     const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 0;
+  //      // keep waiting only if we might still get more data
+  //     if (ledger.length < savedCount && hasMore) return;
+
+  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //     hasRestoredRightRef.current = true;
+  //     setIsRestoringRight(false); // reveal now, correctly positioned
+  // }, [isLoading, isFetching, ledger.length, hasMore]);
+
+  const virtualListRef = useRef(null);
+  const hasScrolledToHighlightRef = useRef(false);
+
+  useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+
+    const highlightTxnId =
+      searchParams.get("highlightTxn");
+
+    if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
+    if (!ledger?.length) return;
 
-    const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 0;
-     // keep waiting only if we might still get more data
-    if (ledger.length < savedCount && hasMore) return;
+    const targetIndex = ledger.findIndex((row) => {
+      const refId =
+        row.Sale_Id ||
+        row.Purchase_Id ||
+        row.Expense_Id ||
+        row.Sale_Return_Id ||
+        row.Purchase_Return_Id ||
+        row.Payment_In_Id ||
+        row.Payment_Out_Id;
 
-    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredRightRef.current = true;
-    setIsRestoringRight(false); // reveal now, correctly positioned
-}, [isLoading, isFetching, ledger.length, hasMore]);
+      const transactionId =
+        row.Expense_Id ||
+        row.Formatted_Reference_Id ||
+        refId;
+
+      return (
+        String(transactionId) ===
+        String(highlightTxnId)
+      );
+    });
+
+    if (targetIndex === -1) {
+      if (hasMore && !isFetching) {
+        handleLoadMore();
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      virtualListRef.current?.scrollToIndex(
+        targetIndex,
+        {
+          align: "center",
+          behavior: "auto",
+        }
+      );
+
+      hasScrolledToHighlightRef.current = true;
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [
+    ledger,
+    isLoading,
+    isFetching,
+    hasMore,
+    searchParams,
+    handleLoadMore,
+  ]);
+  useEffect(() => {
+    hasScrolledToHighlightRef.current = false;
+  }, [partyId]);
+
   if (!partyId) {
     return (
       <div
@@ -541,18 +603,22 @@ const hasRestoredRightRef = useRef(false);
   };
   return (
     // <div ref={rightPanelRef}
-    <div 
-     className="flex flex-col"
-      // style={{
-      //   maxHeight: "calc(100vh - 180px)",
-      //   minWidth: 0
+    <div
+      className="flex flex-col"
+
+      //    style={{
+      //   height: "100%",
+
+      //   minHeight: 0,
+      //   overflow: "hidden",
       // }}
-       style={{
-      height: "100%",
-       
-      minHeight: 0,
-      overflow: "hidden",
-    }}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
     >
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -654,7 +720,9 @@ const hasRestoredRightRef = useRef(false);
           </div>
 
         </div>
-        <div className="flex justify-end gap-2 mr-2">
+       
+      </div>
+       <div className="flex justify-end gap-2 mr-2">
           <button
             type="button"
             onClick={handleExportPartyReportExcel}
@@ -682,291 +750,471 @@ const hasRestoredRightRef = useRef(false);
 
 
         </div>
-      </div>
 
       {/* ── LEDGER TABLE ── */}
-      <div ref={rightPanelRef} className="table-responsive table-desi"
-      //    style={{
-      //   flex: 1,
-      //   minHeight: 0,
-      //   overflowY: "auto",
-      // }}
-           style={{
-        
-        flex: 1,
-        minHeight: 0,
-        overflowY: "auto",
-        visibility: isRestoringRight ? "hidden" : "visible",
-        // if using the placeholder above, also collapse height so it doesn't take double space
-       // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
-    }}
+      {/* const GRID_COLUMNS =
+  ; */}
+
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          overflowX: "auto",
+          overflowY: "hidden",
+        }}
       >
-        <table className="w-full min-w-[500px]">
-          <thead>
-            <tr>
-              <th className="text-left">Sl.No</th>
-              <th className="text-left">Type</th>
-              <th className="text-left">Number</th>
-              <th className="text-left">Date</th>
-              <th className="text-left">Total</th>
-              <th className="text-left">Balance Due</th>
-              <th></th>
-            </tr>
-          </thead>
+        {/* HEADER */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
+            width: "100%",
+            //minWidth: "710px",  
+            //minWidth: "650px",
+            boxSizing: "border-box",
+            alignItems: "center",
+            minHeight: 40,
+            padding: "0 8px",
+            flexShrink: 0,
+            borderBottom: "2px solid #e2e8f0",
+            fontWeight: 600,
+            fontSize: 13,
+            color: "#333",
+            textTransform: "uppercase",
+          }}
+        >
+          <div>Sl.No</div>
+          <div>Type</div>
+          <div>Number</div>
+          <div>Date</div>
+          <div>Total</div>
+          <div>Balance Due</div>
+          <div style={{
+            position: "sticky",
+            right: 0,
+            //backgroundColor: "#fff",
+          }} />
+        </div>
 
-          <tbody>
-            {ledger.length === 0 && !isLoading ? (
-              <tr>
-                <td className="text-center" colSpan={6} style={{ padding: "40px 0", color: "#9ca3af" }}>
-                  No transactions found
-                </td>
-              </tr>
-            ) : (
-              ledger.map((row, idx) => {
-                const meta = PARTY_TYPE_META[row.Txn_Type] ?? { label: row.Txn_Type, color: "#6b7280" };
-                const refId =
-                  row.Sale_Id || row.Purchase_Id || row.Sale_Return_Id ||
-                  row.Purchase_Return_Id || row.Payment_In_Id || row.Payment_Out_Id;
+        {/* VIRTUAL BODY */}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            //height: 0,
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
+          <VirtualScrollList
+            ref={virtualListRef}
+            items={ledger}
+            rowHeight={52}
+            height="100%"
+            dynamicHeight={true}
+            isFetching={isFetching}
+            hasMore={hasMore}
+            getItemKey={(row) =>
+              `${row.Txn_Type}-${row.id || row.Formatted_Reference_Id}`
+            }
+            emptyMessage="No transactions found"
+            endMessage="— End of transactions —"
+            onLoadMore={handleLoadMore}
+            isRowActive={(row, idx) =>
+              rowMenuOpen ===
+              `${row.Txn_Type}-${row.Formatted_Reference_Id || row.id}-${idx}`
+            }
+            renderRow={(row, idx) => {
+              const meta =
+                PARTY_TYPE_META[row.Txn_Type] ?? {
+                  label: row.Txn_Type,
+                  color: "#6b7280",
+                };
 
-                const transactionId = row.Formatted_Reference_Id || refId;
-                const menuId = `${row.Txn_Type}-${transactionId || idx}`;
-                const isHighlighted = String(searchParams.get("highlightTxn")) === String(transactionId);
-                return (
+              const refId =
+                row.Sale_Id ||
+                row.Purchase_Id ||
+                row.Sale_Return_Id ||
+                row.Purchase_Return_Id ||
+                row.Payment_In_Id ||
+                row.Payment_Out_Id;
 
-                  <tr
-                    key={`${row.Txn_Type}-${refId}-${idx}`}
-                  ref={isHighlighted ? highlightedRowRef : null}
-                    onClick={() => {
-                      const params = new URLSearchParams(searchParams);
-                      params.set("highlightTxn", transactionId);
+              const transactionId =
+                row.Formatted_Reference_Id || refId;
 
-                      setSearchParams(params, { replace: true });
-                    }}
+              const menuId =
+                `${row.Txn_Type}-${transactionId || idx}`;
 
-                    onDoubleClick={() => {
-                      if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-                        const params = new URLSearchParams(searchParams);
-                        params.set("highlightTxn", transactionId);
+              const isHighlighted =
+                String(searchParams.get("highlightTxn")) ===
+                String(transactionId);
 
-                        setSearchParams(params, { replace: true });
+              return (
+                <div
+                  key={`${row.Txn_Type}-${transactionId || idx}`}
+                  onClick={() => {
+                    const params =
+                      new URLSearchParams(searchParams);
 
-                        openModal(row.Txn_Type, transactionId);
-                        return;
-                      }
+                    params.set(
+                      "highlightTxn",
+                      transactionId
+                    );
 
-                      const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+                    setSearchParams(params, {
+                      replace: true,
+                    });
+                  }}
+                  onDoubleClick={() => {
+                    if (
+                      MODAL_TXN_TYPES.includes(row.Txn_Type)
+                    ) {
+                      const params =
+                        new URLSearchParams(searchParams);
 
-                      if (route) {
-                        const params = new URLSearchParams(searchParams);
-                        params.set("highlightTxn", transactionId);
+                      params.set(
+                        "highlightTxn",
+                        transactionId
+                      );
 
-                        navigate(
-                          {
-                            pathname: `/${route}/edit/${transactionId}`,
-                            search: params.toString(),
+                      setSearchParams(params, {
+                        replace: true,
+                      });
+
+                      openModal(
+                        row.Txn_Type,
+                        transactionId
+                      );
+
+                      return;
+                    }
+
+                    const route =
+                      TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
+                    if (route) {
+                      navigate(
+                        {
+                          pathname:
+                            `/${route}/edit/${transactionId}`,
+                          search: (() => {
+                            const params =
+                              new URLSearchParams(
+                                searchParams
+                              );
+
+                            params.set(
+                              "highlightTxn",
+                              transactionId
+                            );
+
+                            return params.toString();
+                          })(),
+                        },
+                        {
+                          state: {
+                            from: "party-payables",
+                            partyId,
                           },
-                          {
-                            state: {
-                              from: "party-payables",
-                              partyId,
-                            },
-                          }
-                        );
-                      }
-                    }}
-
-                    style={{
-                      cursor: "pointer",
-                      backgroundColor: isHighlighted
+                        }
+                      );
+                    }
+                  }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
+                    width: "100%",
+                    //minWidth: "710px",  
+                    //minWidth: "850px",
+                    minHeight: 52,
+                    alignItems: "center",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
+                    borderBottom:
+                      "1px solid #f1f5f9",
+                    backgroundColor:
+                      isHighlighted
                         ? "#4CA1AF22"
                         : "transparent",
+                  }}
+                >
+                  {/* SL.NO */}
+                  <div
+                    className="table-desi-cell"
+                    style={{ padding: "0 5px" }}
+                  >
+                    {idx + 1}.
+                  </div>
+
+                  {/* TYPE */}
+                  <div
+                    className="table-desi-cell"
+                    style={{ padding: "0 5px" }}
+                  >
+                    {row.Txn_Type ===
+                      "Opening_Balance"
+                      ? row.Direction === "Credit"
+                        ? "Receivable Opening Balance"
+                        : "Payable Opening Balance"
+                      : meta.label}
+                  </div>
+
+                  {/* NUMBER */}
+                  <div
+                    className="table-desi-cell"
+                    style={{
+                      padding: "0 5px",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    <td>{idx + 1}.</td>
-                    <td>
-                      {row.Txn_Type === "Opening_Balance"
-                        ? row.Direction === "Credit"
-                          ? "Receivable Opening Balance"
-                          : "Payable Opening Balance"
-                        : meta.label}
-                    </td>
-                    {/* <td>{meta.label}</td> */}
-                    <td>{row.Doc_Number}</td>
-                    <td>
-                      {row.Txn_Date
-                        ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {
+                    {row.Doc_Number || "—"}
+                  </div>
+
+                  {/* DATE */}
+                  <div
+                    className="table-desi-cell"
+                    style={{ padding: "0 5px" }}
+                  >
+                    {row.Txn_Date
+                      ? new Date(
+                        row.Txn_Date
+                      ).toLocaleDateString(
+                        "en-IN",
+                        {
                           day: "numeric",
                           month: "numeric",
                           year: "numeric",
-                        })
-                        : "N/A"}
-                    </td>
-                    <td>₹ {fmt(row.Amount)}</td>
-                    <td>₹ {fmt(row.Balance_Due)}</td>
-                    {/* THREE DOT MENU */}
-                    {row.Txn_Type !== "Opening_Balance" && (<td
-                      className="py-2 px-2"
-                      style={{
-                        position: "relative",
-                        width: 50,
-                        textAlign: "center",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        }
+                      )
+                      : "N/A"}
+                  </div>
 
-                          setRowMenuOpen(
-                            rowMenuOpen === menuId
-                              ? null
-                              : menuId
-                          );
-                        }}
-                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                        style={{
-                          backgroundColor: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                        }}
-                        title="More"
-                      >
-                        <MoreVertical
-                          size={16}
-                          style={{ color: "#374151" }}
-                        />
-                      </button>
+                  {/* TOTAL */}
+                  <div
+                    className="table-desi-cell"
+                    style={{ padding: "0 5px" }}
+                  >
+                    ₹ {fmt(row.Amount)}
+                  </div>
 
-                      {/* ROW MENU */}
-                      {rowMenuOpen === menuId && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute bg-white shadow-lg rounded-md"
-                          style={{
-                            right: 0,
-                            top: 32,
-                            width: 150,
-                            zIndex: 100,
-                            border: "1px solid #e2e8f0",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {/* VIEW / EDIT */}
-                          {MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
-                            <button
-                              type="button"
-                              className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                              style={{ color: "#374151" }}
-                               onClick={() => {
-                                setRowMenuOpen(null);
+                  {/* BALANCE DUE */}
+                  <div
+                    className="table-desi-cell"
+                    style={{ padding: "0 5px" }}
+                  >
+                    ₹ {fmt(row.Balance_Due)}
+                  </div>
 
-                                const params = new URLSearchParams(searchParams);
-                                params.set("highlightTxn", transactionId);
+                  {/* THREE DOT MENU */}
+                  <div
+                    className="table-desi-cell"
+                    style={{
+                      position: "sticky",
+                      right: 0,
+                      width: "100%",
+                      textAlign: "center",
+                    }}
+                  >
+                    {row.Txn_Type !==
+                      "Opening_Balance" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
 
-                                setSearchParams(params, { replace: true });
+                              setRowMenuOpen(
+                                rowMenuOpen === menuId
+                                  ? null
+                                  : menuId
+                              );
+                            }}
+                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                            style={{
+                              backgroundColor:
+                                "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                            }}
+                            title="More"
+                          >
+                            <MoreVertical
+                              size={16}
+                              style={{
+                                color: "#374151",
+                              }}
+                            />
+                          </button>
 
-                                openModal(row.Txn_Type, transactionId);
+                          {rowMenuOpen === menuId && (
+                            <div
+                              onClick={(e) =>
+                                e.stopPropagation()
+                              }
+                              className="absolute bg-white shadow-lg rounded-md"
+                              style={{
+                                right: 0,
+                                top: 32,
+                                width: 150,
+                                zIndex: 100,
+                                border:
+                                  "1px solid #e2e8f0",
+                                overflow: "hidden",
                               }}
                             >
-                              <Eye size={13} style={{ color: "#4CA1AF" }} />
-                              View / Edit
-                            </button>
-                          ) : (
-                            <NavLink
-                              to={{
-                                pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
-                                search: (() => {
-                                  const params = new URLSearchParams(searchParams);
-                                  params.set("highlightTxn", transactionId);
-                                  return params.toString();
-                                })(),
-                              }}
-                              state={{
-                                from: "party-details",
-                                partyId,
-                              }}
-                              className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                              style={{ color: "#374151" }}
-                              onClick={() => setRowMenuOpen(null)}
-                            >
-                              <Eye size={13} style={{ color: "#4CA1AF" }} />
-                              View / Edit
-                            </NavLink>
-                            // <NavLink
-                            //   to={{
-                            //     pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
-                            //     search: searchParams.toString(),
-                            //   }}
-                            //   state={{
-                            //     from: "party-details",
-                            //     partyId,
-                            //   }}
-                            //   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                            //   style={{ color: "#374151" }}
-                            //   onClick={() => setRowMenuOpen(null)}
-                            // >
-                            //   <Eye size={13} style={{ color: "#4CA1AF" }} />
-                            //   View / Edit
-                            // </NavLink>
+                              {/* VIEW / EDIT */}
+                              {MODAL_TXN_TYPES.includes(
+                                row.Txn_Type
+                              ) ? (
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    const params =
+                                      new URLSearchParams(
+                                        searchParams
+                                      );
+
+                                    params.set(
+                                      "highlightTxn",
+                                      transactionId
+                                    );
+
+                                    setSearchParams(
+                                      params,
+                                      {
+                                        replace: true,
+                                      }
+                                    );
+
+                                    openModal(
+                                      row.Txn_Type,
+                                      transactionId
+                                    );
+                                  }}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+                                  View / Edit
+                                </button>
+                              ) : (
+                                <NavLink
+                                  to={{
+                                    pathname:
+                                      `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
+                                    search: (() => {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        transactionId
+                                      );
+
+                                      return `?${params.toString()}`;
+                                    })(),
+                                  }}
+                                  state={{
+                                    from:
+                                      "party-payables",
+                                    partyId,
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration:
+                                      "none",
+                                  }}
+                                  onClick={() =>
+                                    setRowMenuOpen(null)
+                                  }
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+                                  View / Edit
+                                </NavLink>
+                              )}
+
+                              {/* PRINT */}
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{
+                                  color: "#374151",
+                                }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  handlePrintClick(
+                                    row,
+                                    transactionId
+                                  );
+                                }}
+                              >
+                                <Printer
+                                  size={13}
+                                  style={{
+                                    color: "#4CA1AF",
+                                  }}
+                                />
+                                Print
+                              </button>
+
+                              {/* DELETE */}
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                title="Delete transaction"
+                                style={{
+                                  cursor: "pointer",
+                                  color: "#dc2626",
+                                }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  setDeleteTarget({
+                                    Id: transactionId,
+                                    Txn_Type:
+                                      row.Txn_Type,
+                                  });
+                                }}
+                              >
+                                <Trash2
+                                  size={13}
+                                  style={{
+                                    color: "#dc2626",
+                                  }}
+                                />
+                                Delete
+                              </button>
+                            </div>
                           )}
-
-                          {/* PRINT */}
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                            style={{ color: "#374151" }}
-                            onClick={() => {
-
-                              setRowMenuOpen(null);
-                              handlePrintClick(row, transactionId);
-
-                            }}
-                          >
-                            <Printer size={13} style={{ color: "#4CA1AF" }} />
-                            Print
-                          </button>
-
-                          {/* DELETE */}
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                            title="Delete transaction"
-                            style={{ cursor: "pointer", color: "#dc2626" }}
-                            onClick={() => {
-                              setRowMenuOpen(null);
-
-                              setDeleteTarget({
-                                Id: transactionId,
-                                Txn_Type: row.Txn_Type,
-                              });
-                            }}
-                          >
-                            <Trash2 size={13} style={{ color: "#dc2626" }} />
-                            Delete
-                          </button>
-                        </div>
+                        </>
                       )}
-                    </td>)}
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-
-        <div ref={sentinelRef} style={{ height: "1px" }} />
-
-        {isFetching && (
-          <div className="flex justify-center py-4">
-            <span className="text-sm text-gray-400">Loading more...</span>
-          </div>
-        )}
-
-        {!hasMore && ledger.length > 0 && (
-          <div className="flex justify-center py-4">
-            <span className="text-xs text-gray-300">— End of transactions —</span>
-          </div>
-        )}
+                  </div>
+                </div>
+              );
+            }}
+          />
+        </div>
       </div>
 
       {/* ── MODALS ── */}
@@ -1113,7 +1361,7 @@ export default function PartyPayablesLeft() {
   const [leftCursor, setLeftCursor] = useState(null);
   const leftSentinelRef = useRef(null);
   const leftObserverRef = useRef(null);
-   const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 10);
+  const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 10);
   const { data: partiesData, isLoading: isLoading,
     isFetching: isPartiesFetching
   } =
@@ -1217,50 +1465,50 @@ export default function PartyPayablesLeft() {
     };
   }, []);
 
-const leftListRef = useRef(null);
-      
-      const selectedItemRowRef = useRef(null);
-  
-      useEffect(() => {
-          const leftEl = leftListRef.current;
-          
-  
-          const saveLeft = () => {
-              sessionStorage.setItem("partiesByPartyPayable:leftScroll", leftEl.scrollTop);
-              sessionStorage.setItem("partiesByPartyPayable:leftCount", parties.length);
-          };
-         
-  
-          leftEl?.addEventListener("scroll", saveLeft);
-          
-  
-          return () => {
-              leftEl?.removeEventListener("scroll", saveLeft);
-              
-          };
-      }, [parties.length]);
-  
-  
-  
+  const leftListRef = useRef(null);
+
+  const selectedItemRowRef = useRef(null);
+
+  useEffect(() => {
+    const leftEl = leftListRef.current;
+
+
+    const saveLeft = () => {
+      sessionStorage.setItem("partiesByPartyPayable:leftScroll", leftEl.scrollTop);
+      sessionStorage.setItem("partiesByPartyPayable:leftCount", parties.length);
+    };
+
+
+    leftEl?.addEventListener("scroll", saveLeft);
+
+
+    return () => {
+      leftEl?.removeEventListener("scroll", saveLeft);
+
+    };
+  }, [parties.length]);
+
+
+
   const hasRestoredLeftRef = useRef(false);
-  
+
   useLayoutEffect(() => {
-      if (hasRestoredLeftRef.current) return; // only do this once per mount
-      if (isLoading || isPartiesFetching) return;
-  
-      const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 0;
-      if (parties.length < savedCount) return;
-  
-      selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-      hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+    if (hasRestoredLeftRef.current) return; // only do this once per mount
+    if (isLoading || isPartiesFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 0;
+    if (parties.length < savedCount) return;
+
+    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
   }, [isLoading, isPartiesFetching, parties.length, selectedId]);
 
   return (
     <>
       <div className="flex flex-col bg-white"
-      //  style={{ minHeight: "100vh" }}
-       style={{ height: "100vh", overflow: "hidden" }}
-       >
+        //  style={{ minHeight: "100vh" }}
+        style={{ height: "100vh", overflow: "hidden" }}
+      >
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
           <div className="flex flex-row justify-between items-center">
@@ -1280,10 +1528,10 @@ const leftListRef = useRef(null);
         </div>
 
         {/* ── SPLIT LAYOUT ── */}
-        <div className="flex flex-col lg:flex-row gap-0" 
-         style={{
+        <div className="flex flex-col lg:flex-row gap-0"
+          style={{
             flex: 1,
-            minHeight:0,
+            minHeight: 0,
             height: "calc(100vh - 180px)",
             borderTop: "1px solid #e2e8f0",
           }}
@@ -1500,8 +1748,14 @@ const leftListRef = useRef(null);
           {/* <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
             <PartyDetailPanel partyId={selectedId}  key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div> */}
-          <div className="w-full lg:w-[70%] p-1 overflow-y-auto" 
-          style={{ height: "100%", minHeight: 0 }}
+          <div className="w-full lg:w-[70%] p-1 overflow-y-auto 
+          "
+            style={{
+              height: "100%",
+              minHeight: 0,
+              display: "flex",        // 👈 add this
+              flexDirection: "column", // 👈 add this
+            }}
           >
             <PartyDetailPanel partyId={selectedId} key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div>

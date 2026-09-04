@@ -60,6 +60,7 @@ const VirtualScrollList = forwardRef(function VirtualScrollList({
                 minHeight: 0,
                 height: "100%",
                 width: "100%",
+                minWidth: "fit-content",  // 👈 add this
                 padding: 4,
                 ...style,
             }}

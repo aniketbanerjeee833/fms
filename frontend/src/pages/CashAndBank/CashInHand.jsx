@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { cashInHandApi, useGetCashBalanceQuery, useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CashAdjustmentModal from "../../components/Modal/CashAdjustmentModal";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
@@ -30,6 +30,7 @@ import { useDeletePurchaseReturnMutation } from "../../redux/api/purchaseReturnA
 import { useDeleteSaleReturnMutation } from "../../redux/api/saleReturnApi";
 import { saleApi, useDeleteSaleMutation } from "../../redux/api/saleApi";
 import { itemApi } from "../../redux/api/itemApi";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 function PaymentInModalLoader({ id, banks, onClose, onSave, isSaving, parties }) {
     const { data: record, isLoading } = useGetPaymentInByIdQuery(id);
@@ -119,7 +120,8 @@ export default function CashInHand() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     //const location = useLocation();
-    const page = Number(searchParams.get("page")) || 1;
+    const [cursor, setCursor] = useState(null);
+    //const page = Number(searchParams.get("page")) || 1;
     const searchTerm = searchParams.get("search") || "";
     const dispatch = useDispatch();
     // const [page, setPage] = useState(1);
@@ -129,7 +131,28 @@ export default function CashInHand() {
     const [cashAdjustmentModal, setCashAdjustmentModal] = useState({ open: false, mode: "add", data: null })
 
     const { data: cashBalance } = useGetCashBalanceQuery();
-    const { data: cashInHand, isLoading } = useGetCashInHandQuery({ fromDate, toDate, page, search: searchTerm });
+    // const { data: cashInHand, isLoading } = 
+    // useGetCashInHandQuery({ fromDate, toDate, page, search: searchTerm });
+    const {
+        data: cashInHand,
+        isLoading,
+        isFetching,
+    } = useGetCashInHandQuery({
+        cursor,
+        fromDate,
+        toDate,
+        search: searchTerm,
+        limit: 10,
+    });
+    const cashInHandLedger = cashInHand?.ledger || [];
+    const hasMore = cashInHand?.hasMore ?? false;
+    const nextCursor = cashInHand?.nextCursor ?? null;
+    // For virtualization
+    const handleLoadMore = useCallback(() => {
+        if (!hasMore || !nextCursor || isFetching) return;
+
+        setCursor(nextCursor);
+    }, [hasMore, nextCursor, isFetching]);
     console.log(cashInHand, "cashInHand", cashBalance, "cashBalance");
     const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
     const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
@@ -149,14 +172,14 @@ export default function CashInHand() {
         };
     }, []);
 
-    const handlePageChange = (newPage) => {
-        setSearchParams({
-            page: newPage,
-            search: searchTerm,
-            fromDate,
-            toDate,
-        });
-    };
+    // const handlePageChange = (newPage) => {
+    //     setSearchParams({
+    //         page: newPage,
+    //         search: searchTerm,
+    //         fromDate,
+    //         toDate,
+    //     });
+    // };
     const handleTransactionEdit = (row) => {
         if (!row?.Formatted_Reference_Id) return;
 
@@ -201,50 +224,24 @@ export default function CashInHand() {
         );
     };
 
-    // const handleTransactionEdit = (row) => {
-    //     if (!row?.Formatted_Reference_Id) return;
 
-    //     // Payment In / Payment Out open their edit modals
-    //     if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-    //         openModal(
-    //             row.Txn_Type,
-    //             row.Formatted_Reference_Id
-    //         );
-    //         return;
-    //     }
-
-    //     // Other transactions open their edit page
-    //     const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
-
-    //     if (!route) return;
-
-    //     navigate(
-    //         `/${route}/edit/${row.Formatted_Reference_Id}`,
-    //         {
-    //             state: {
-    //                 from: "cash-in-hand"
-    //             }
-    //         }
-    //     );
+    // const handleNextPage = () => {
+    //     setSearchParams({
+    //         page: page + 1,
+    //         search: searchTerm,
+    //         fromDate,
+    //         toDate,
+    //     });
     // };
 
-    const handleNextPage = () => {
-        setSearchParams({
-            page: page + 1,
-            search: searchTerm,
-            fromDate,
-            toDate,
-        });
-    };
-
-    const handlePreviousPage = () => {
-        setSearchParams({
-            page: Math.max(1, page - 1),
-            search: searchTerm,
-            fromDate,
-            toDate,
-        });
-    };
+    // const handlePreviousPage = () => {
+    //     setSearchParams({
+    //         page: Math.max(1, page - 1),
+    //         search: searchTerm,
+    //         fromDate,
+    //         toDate,
+    //     });
+    // };
 
 
     const handleSavePaymentIn = async (formData) => {
@@ -371,12 +368,68 @@ export default function CashInHand() {
         }
     }
 
+    const virtualListRef = useRef(null);
+    const hasScrolledToHighlightRef = useRef(false);
 
+    const highlightTxnId = searchParams.get("highlightTxn");
+
+    useEffect(() => {
+        if (hasScrolledToHighlightRef.current) return;
+        if (!highlightTxnId) return;
+        if (isLoading || isFetching) return;
+
+        const targetIndex = cashInHandLedger.findIndex(
+            (txn) =>
+                String(txn?.id) === String(highlightTxnId)
+        );
+        console.log("Target index for highlight:", targetIndex);
+        if (targetIndex === -1) {
+            if (hasMore && nextCursor && !isFetching) {
+                handleLoadMore();
+            }
+            return;
+        }
+
+        // Wait until VirtualScrollList has rendered the new data
+        const timer = setTimeout(() => {
+            virtualListRef.current?.scrollToIndex(targetIndex, {
+                align: "center",
+                behavior: "auto",
+            });
+
+            hasScrolledToHighlightRef.current = true;
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, [
+        cashInHandLedger,
+        highlightTxnId,
+        isLoading,
+        isFetching,
+        hasMore,
+        nextCursor,
+        handleLoadMore,
+    ]);
+    useEffect(() => {
+        hasScrolledToHighlightRef.current = false;
+    }, [highlightTxnId, searchTerm, fromDate, toDate])
+    // define ONCE, reuse for both header and every row
+    //const GRID_COLUMNS = "70px 180px minmax(240px, 480px) 130px 120px 50px";
+    //const GRID_COLUMNS ="70px 180px minmax(300px, 1fr) 130px 120px 50px";
     return (
         <>
 
             <div className="flex flex-col bg-white"
-              style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+
+                    height: "calc(100vh - 20px)",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflow: "hidden",
+                }}
+            //style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
             >
 
                 <div className="inn-title" style={{ flexShrink: 0 }}>
@@ -423,8 +476,9 @@ export default function CashInHand() {
                                     type="date"
                                     value={fromDate}
                                     onChange={(e) => {
+                                        setCursor(null);
+
                                         setSearchParams({
-                                            page: 1,
                                             search: searchTerm,
                                             fromDate: e.target.value,
                                             toDate,
@@ -443,8 +497,9 @@ export default function CashInHand() {
                                     type="date"
                                     value={toDate}
                                     onChange={(e) => {
+                                        setCursor(null);
+
                                         setSearchParams({
-                                            page: 1,
                                             search: searchTerm,
                                             fromDate,
                                             toDate: e.target.value,
@@ -463,8 +518,8 @@ export default function CashInHand() {
                                     placeholder="Search ..."
                                     value={searchTerm}
                                     onChange={(e) => {
+                                        setCursor(null);
                                         setSearchParams({
-                                            page: 1,               // reset page on new search
                                             search: e.target.value,
                                             fromDate,
                                             toDate,
@@ -515,13 +570,602 @@ export default function CashInHand() {
 
                 </div>
 
+                <div
+                    className="tab-inn"
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden",
+                    }}
+                >
+                    {isLoading ? (
+                        <p className="text-center mt-4">
+                            Fetching ...
+                        </p>
+                    ) : (
+                        <div
+                            style={{
+                                flex: 1,
+                                minHeight: 0,
+                                overflowX: "auto",
+                                overflowY: "hidden",
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                        >
+                            <div style={{
+                                minWidth: 850, display: "flex", flexDirection: "column",
+                                flex: 1, minHeight: 0
+                            }}>
+                                {/* ---------- HEADER ---------- */}
+
+                                {/* <table className="w-full min-w-[800px] table-responsive table-desi"
+                                    style={{
+                                        
+                                        tableLayout: "fixed",
+                                        flexShrink: 0,
+                                    }}>
+                                    <thead>
+                                        <tr>
+                                            <th
+                                                className="text-left"
+                                                style={{ width: 70 }}
+                                            >
+                                                Sl.No
+                                            </th>
+
+                                            <th
+                                                className="text-left"
+                                                style={{ width: 180 }}
+                                            >
+                                                Type
+                                            </th>
+
+                                            <th
+                                                className="text-left"
+                                                style={{ width: 300 }}
+                                            >
+                                                Party Name
+                                            </th>
+
+                                            <th
+                                                className="text-left"
+                                                style={{ width: 130 }}
+                                            >
+                                                Date
+                                            </th>
+
+                                            <th
+                                                className="text-left"
+                                                style={{ width: 120 }}
+                                            >
+                                                Amount
+                                            </th>
+
+                                            <th style={{ width: 50 }}></th>
+                                        </tr>
+                                    </thead>
+                                </table> */}
+                                {/* ---------- HEADER ---------- */}
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "0.7fr 1.8fr 3fr 1.3fr 1.2fr 0.5fr",
+                                        alignItems: "center",
+                                        minWidth: "850px",
+                                        minHeight: 40,
+                                        padding: "0 8px",
+                                        flexShrink: 0,
+                                        borderBottom: "2px solid #e2e8f0",
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        color:  "#333",
+                                        textTransform: "uppercase",
+                                    }}
+                                >
+                                    <div>Sl.No</div>
+                                    <div>Type</div>
+                                    <div>Party Name</div>
+                                    <div>Date</div>
+                                    <div>Amount</div>
+                                    <div style={{
+                                            position: "sticky",
+                                            right: 0,
+                                            //backgroundColor: "#fff",
+                                        }}></div>
+                                </div>
+
+                                {/* ---------- VIRTUAL LIST ---------- */}
+
+                                <div
+                                    style={{
+                                        flex: 1,
+                                        minHeight: 0,
+                                        //height: 0,
+                                        overflow: "hidden",
+                                        position: "relative",
+                                        width: "100%",
+                                    }}
+                                >
+                                    <VirtualScrollList
+                                        ref={virtualListRef}
+                                        items={cashInHandLedger}
+                                        rowHeight={52}
+                                        height="100%"
+                                        dynamicHeight={true}
+                                        isFetching={isFetching}
+                                        hasMore={hasMore}
+                                        getItemKey={(row) => row?.id}
+                                        emptyMessage="No cash in hand found"
+                                        endMessage="— End of cash in hand —"
+                                        onLoadMore={handleLoadMore}
+                                        isRowActive={(row) =>
+                                            rowMenuOpen ===
+                                            `${row?.Txn_Type}-${row?.Formatted_Reference_Id}-${row?.id}`
+                                        }
+                                        renderRow={(row, idx) => {
+                                            const meta =
+                                                TYPE_META[
+                                                row.Txn_Type?.toLowerCase()
+                                                ] ?? {
+                                                    label: row.Txn_Type,
+                                                    color: "#6b7280",
+                                                    dir:
+                                                        row.Direction ===
+                                                            "Credit"
+                                                            ? "in"
+                                                            : "out",
+                                                };
+
+                                            const isHighlighted =
+                                                String(
+                                                    searchParams.get(
+                                                        "highlightTxn"
+                                                    )
+                                                ) ===
+                                                String(row?.id);
+
+                                            const menuId = `${row?.Txn_Type}-${row?.Formatted_Reference_Id}-${row?.id}`;
+
+                                            return (
+                                                <div
+                                                    key={row?.id}
+                                                    onClick={() => {
+                                                        const params =
+                                                            new URLSearchParams(
+                                                                searchParams
+                                                            );
+
+                                                        params.set(
+                                                            "highlightTxn",
+                                                            row?.id
+                                                        );
+
+                                                        setSearchParams(
+                                                            params,
+                                                            {
+                                                                replace: true,
+                                                            }
+                                                        );
+                                                    }}
+                                                    onDoubleClick={() => {
+                                                        const params =
+                                                            new URLSearchParams(
+                                                                searchParams
+                                                            );
+
+                                                        params.set(
+                                                            "highlightTxn",
+                                                            row?.id
+                                                        );
+
+                                                        setSearchParams(
+                                                            params,
+                                                            {
+                                                                replace: true,
+                                                            }
+                                                        );
+
+                                                        handleTransactionEdit(
+                                                            row
+                                                        );
+                                                    }}
+                                                    style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns: "0.7fr 1.8fr 3fr 1.3fr 1.2fr 0.5fr",
+                                                        //gridTemplateColumns: "70px 180px minmax(300px,600px) 130px 120px 50px",
+                                                        alignItems: "center",
+                                                        minHeight: 52,
+                                                        padding: "0 8px",
+                                                        cursor: "pointer",
+                                                        borderBottom:
+                                                            "1px solid #f1f5f9",
+                                                        backgroundColor:
+                                                            isHighlighted
+                                                                ? "#4CA1AF22"
+                                                                : "transparent",
+                                                        boxSizing: "border-box",
+                                                    }}
+                                                >
+                                                    {/* SL.NO */}
+
+                                                    <div className="table-desi-cell">
+                                                        {idx + 1}.
+                                                    </div>
+
+                                                    {/* TYPE */}
+
+                                                    <div className="table-desi-cell">
+                                                        {row?.Txn_Type ||
+                                                            "N/A"}
+                                                    </div>
+
+                                                    {/* NAME */}
+
+                                                    <div
+                                                        className="table-desi-cell"
+                                                        style={{
+                                                            overflowWrap:
+                                                                "break-word",
+                                                            wordBreak:
+                                                                "break-word",
+                                                        }}
+                                                    >
+                                                        {row?.Party_Name ||
+                                                            "N/A"}
+                                                    </div>
+
+                                                    {/* DATE */}
+
+                                                    <div className="table-desi-cell">
+                                                        {row?.Txn_Date
+                                                            ? new Date(
+                                                                row.Txn_Date
+                                                            ).toLocaleDateString(
+                                                                "en-IN",
+                                                                {
+                                                                    day: "numeric",
+                                                                    month: "numeric",
+                                                                    year: "numeric",
+                                                                }
+                                                            )
+                                                            : "N/A"}
+                                                    </div>
+
+                                                    {/* AMOUNT */}
+
+                                                    <div
+                                                        className="table-desi-cell"
+                                                        style={{
+                                                            color: meta.color,
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        ₹{" "}
+                                                        {row?.Amount ??
+                                                            "N/A"}
+                                                    </div>
+
+                                                    {/* MENU */}
+
+                                                    <div
+                                                        className="py-2 px-2 table-desi-cell"
+                                                          style={{
+                                                            position: "sticky",   
+                                                            right: 0,              
+                                                            width: 50,
+                                                            //position: "relative",
+                                                            //width: 50,
+                                                            textAlign: "center",
+                                                        }}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+
+                                                                setRowMenuOpen(
+                                                                    rowMenuOpen ===
+                                                                        menuId
+                                                                        ? null
+                                                                        : menuId
+                                                                );
+                                                            }}
+                                                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    "transparent",
+                                                                border: "none",
+                                                                cursor: "pointer",
+                                                            }}
+                                                            title="More"
+                                                        >
+                                                            <MoreVertical
+                                                                size={16}
+                                                                style={{
+                                                                    color: "#374151",
+                                                                }}
+                                                            />
+                                                        </button>
+
+                                                        {/* ROW MENU */}
+
+                                                        {rowMenuOpen ===
+                                                            menuId && (
+                                                                <div
+                                                                    onClick={(e) =>
+                                                                        e.stopPropagation()
+                                                                    }
+                                                                    className="absolute bg-white shadow-lg rounded-md"
+                                                                    style={{
+                                                                        right: 0,
+                                                                        top: "100%",
+                                                                        width: 150,
+                                                                        zIndex: 100,
+                                                                        border:
+                                                                            "1px solid #e2e8f0",
+                                                                        overflow:
+                                                                            "hidden",
+                                                                    }}
+                                                                >
+                                                                    {/* VIEW / EDIT */}
+
+                                                                    {row.Formatted_Reference_Id &&
+                                                                        (MODAL_TXN_TYPES.includes(
+                                                                            row.Txn_Type
+                                                                        ) ? (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                                style={{
+                                                                                    color: "#374151",
+                                                                                    backgroundColor:
+                                                                                        "transparent",
+                                                                                    border: "none",
+                                                                                    cursor: "pointer",
+                                                                                }}
+                                                                                onClick={() => {
+                                                                                    setRowMenuOpen(
+                                                                                        null
+                                                                                    );
+
+                                                                                    const params =
+                                                                                        new URLSearchParams(
+                                                                                            searchParams
+                                                                                        );
+
+                                                                                    params.set(
+                                                                                        "highlightTxn",
+                                                                                        row?.id
+                                                                                    );
+
+                                                                                    setSearchParams(
+                                                                                        params,
+                                                                                        {
+                                                                                            replace: true,
+                                                                                        }
+                                                                                    );
+
+                                                                                    openModal(
+                                                                                        row.Txn_Type,
+                                                                                        row.Formatted_Reference_Id
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <Eye
+                                                                                    size={
+                                                                                        13
+                                                                                    }
+                                                                                    style={{
+                                                                                        color: "#4CA1AF",
+                                                                                    }}
+                                                                                />
+
+                                                                                View /
+                                                                                Edit
+                                                                            </button>
+                                                                        ) : (
+                                                                            <NavLink
+                                                                                to={{
+                                                                                    pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                                                                                    search: (() => {
+                                                                                        const params =
+                                                                                            new URLSearchParams(
+                                                                                                searchParams
+                                                                                            );
+
+                                                                                        params.set(
+                                                                                            "highlightTxn",
+                                                                                            row?.id
+                                                                                        );
+
+                                                                                        return `?${params.toString()}`;
+                                                                                    })(),
+                                                                                }}
+                                                                                state={{
+                                                                                    from: "cash-in-hand",
+                                                                                    highlightTxn:
+                                                                                        row?.id,
+                                                                                }}
+                                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                                style={{
+                                                                                    color: "#374151",
+                                                                                    textDecoration:
+                                                                                        "none",
+                                                                                }}
+                                                                                onClick={() =>
+                                                                                    setRowMenuOpen(
+                                                                                        null
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Eye
+                                                                                    size={
+                                                                                        13
+                                                                                    }
+                                                                                    style={{
+                                                                                        color: "#4CA1AF",
+                                                                                    }}
+                                                                                />
+
+                                                                                View /
+                                                                                Edit
+                                                                            </NavLink>
+                                                                        ))}
+
+                                                                    {/* PRINT */}
+
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        style={{
+                                                                            color: "#374151",
+                                                                            backgroundColor:
+                                                                                "transparent",
+                                                                            border: "none",
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(
+                                                                                null
+                                                                            );
+
+                                                                            console.log(
+                                                                                "Print transaction:",
+                                                                                row
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Printer
+                                                                            size={
+                                                                                13
+                                                                            }
+                                                                            style={{
+                                                                                color: "#4CA1AF",
+                                                                            }}
+                                                                        />
+
+                                                                        Print
+                                                                    </button>
+
+                                                                    {/* DELETE */}
+
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                        title="Delete transaction"
+                                                                        style={{
+                                                                            cursor: "pointer",
+                                                                            color: "#dc2626",
+                                                                            backgroundColor:
+                                                                                "transparent",
+                                                                            border: "none",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(
+                                                                                null
+                                                                            );
+
+                                                                            setDeleteTarget(
+                                                                                {
+                                                                                    Id: row.Formatted_Reference_Id,
+                                                                                    Txn_Type:
+                                                                                        row.Txn_Type,
+                                                                                }
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Trash2
+                                                                            size={
+                                                                                13
+                                                                            }
+                                                                            style={{
+                                                                                color: "#dc2626",
+                                                                            }}
+                                                                        />
+
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
 
                 {/* <div className="tab-inn"
                 style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
                 > */}
-                <div className="tab-inn"
-                style={{ flex: 1, minHeight: 0, overflow: "hidden" }}
-                > 
+
+
+            </div>
+
+            {cashAdjustmentModal.open && (
+                <CashAdjustmentModal
+                    mode={cashAdjustmentModal.mode}
+                    data={cashAdjustmentModal.data}
+                    currentBalance={Number(cashInHand?.cashInHand ?? 0)}
+                    onClose={() => setCashAdjustmentModal({ open: false, mode: "add", data: null })}
+                />
+            )}
+            {modalState.open && modalState.type === "Payment_In" && (
+                <PaymentInModalLoader
+                    id={modalState.id}
+                    banks={banks}
+                    onClose={closeModal}
+                    onSave={handleSavePaymentIn}
+                    isSaving={isUpdatingPaymentIn}
+                    parties={partiesList}
+                />
+            )}
+            {modalState.open && modalState.type === "Payment_Out" && (
+                <PaymentOutModalLoader
+                    id={modalState.id}
+                    banks={banks}
+                    onClose={closeModal}
+                    onSave={handleSavePaymentOut}
+                    isSaving={isUpdatingPaymentOut}
+                    parties={partiesList}
+                />
+            )}
+            {deleteTarget && (
+                <DeleteConfirmModal
+                    title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
+                    message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
+                        }? This action cannot be undone.`}
+                    onClose={() => setDeleteTarget(null)}
+                    onConfirm={handleConfirmDelete}
+                    isDeleting={isDeleting}
+                //isDeleting={false}
+                />
+            )}
+        </>
+
+
+    )
+}
+
+
+
+
+
+
+
+
+
+
+{/* <div className="tab-inn"
+                    style={{ flex: 1, minHeight: 0, overflow: "hidden" }}
+                >
                     <div className="table-responsive table-desi">
                         {isLoading ? (
                             <p className="text-center mt-4">Fetching ...</p>
@@ -619,7 +1263,7 @@ export default function CashInHand() {
                                                     <td style={{ color: meta.color, fontWeight: 600 }}>
                                                         {row?.Amount || "N/A"}</td>
 
-                                                    {/* THREE DOT MENU */}
+                                                    
                                                     <td
                                                         className="py-2 px-2"
                                                         style={{
@@ -653,7 +1297,7 @@ export default function CashInHand() {
                                                             />
                                                         </button>
 
-                                                        {/* ROW MENU */}
+                                                   
                                                         {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
                                                             <div
                                                                 onClick={(e) => e.stopPropagation()}
@@ -668,7 +1312,7 @@ export default function CashInHand() {
                                                                 }}
                                                             >
 
-                                                                {/* VIEW / EDIT */}
+                                 
                                                                 {row.Formatted_Reference_Id && (
                                                                     MODAL_TXN_TYPES.includes(row.Txn_Type) ? (
                                                                         <button
@@ -763,7 +1407,6 @@ export default function CashInHand() {
                                                                     )
                                                                 )}
 
-                                                                {/* PRINT */}
                                                                 <button
                                                                     type="button"
                                                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -780,7 +1423,7 @@ export default function CashInHand() {
                                                                     Print
                                                                 </button>
 
-                                                                {/* DELETE */}
+                
                                                                 <button
                                                                     type="button"
                                                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -837,7 +1480,7 @@ export default function CashInHand() {
                 <div className="flex justify-center align-center p-4">
                     <div className="flex items-center space-x-2 flex-wrap justify-center">
 
-                        {/* PREVIOUS */}
+                        
                         <button
                             type="button"
                             onClick={() => handlePreviousPage()}
@@ -849,7 +1492,7 @@ export default function CashInHand() {
                             ← Previous
                         </button>
 
-                        {/* PAGE NUMBERS — DESKTOP / TABLET */}
+                        
                         <div style={{ marginRight: "0px" }}
                             className="hidden sm:flex space-x-2">
                             {/* {[...Array(foodItems?.totalPages).keys()].map((index) => (
@@ -866,7 +1509,7 @@ export default function CashInHand() {
         >
           {index + 1}
         </button>
-      ))} */}
+      ))} 
                             {(() => {
                                 const totalPages = cashInHand?.totalPages || 1;
                                 const maxVisible = 5; // how many pages around current
@@ -943,12 +1586,12 @@ export default function CashInHand() {
                             })()}
                         </div>
 
-                        {/* CURRENT PAGE — MOBILE ONLY */}
+                       
                         <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
                             Page {page} / {cashInHand?.totalPages || 1}
                         </div>
 
-                        {/* NEXT */}
+                      
                         <button
                             type="button"
                             onClick={() => handleNextPage()}
@@ -966,52 +1609,5 @@ export default function CashInHand() {
                         </button>
 
                     </div>
-                </div>
-
-            </div>
-
-            {cashAdjustmentModal.open && (
-                <CashAdjustmentModal
-                    mode={cashAdjustmentModal.mode}
-                    data={cashAdjustmentModal.data}
-                    currentBalance={Number(cashInHand?.cashInHand ?? 0)}
-                    onClose={() => setCashAdjustmentModal({ open: false, mode: "add", data: null })}
-                />
-            )}
-            {modalState.open && modalState.type === "Payment_In" && (
-                <PaymentInModalLoader
-                    id={modalState.id}
-                    banks={banks}
-                    onClose={closeModal}
-                    onSave={handleSavePaymentIn}
-                    isSaving={isUpdatingPaymentIn}
-                    parties={partiesList}
-                />
-            )}
-            {modalState.open && modalState.type === "Payment_Out" && (
-                <PaymentOutModalLoader
-                    id={modalState.id}
-                    banks={banks}
-                    onClose={closeModal}
-                    onSave={handleSavePaymentOut}
-                    isSaving={isUpdatingPaymentOut}
-                    parties={partiesList}
-                />
-            )}
-            {deleteTarget && (
-                <DeleteConfirmModal
-                    title={DELETE_CONFIG[deleteTarget.Txn_Type]?.title || "Delete"}
-                    message={`Are you sure you want to delete this ${DELETE_CONFIG[deleteTarget.Txn_Type]?.label || "record"
-                        }? This action cannot be undone.`}
-                    onClose={() => setDeleteTarget(null)}
-                    onConfirm={handleConfirmDelete}
-                    isDeleting={isDeleting}
-                //isDeleting={false}
-                />
-            )}
-        </>
-
-
-    )
-}
+                </div> */}
 

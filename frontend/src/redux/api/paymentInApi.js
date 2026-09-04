@@ -26,14 +26,14 @@ export const paymentInApi = createApi({
     //       : [{ type: "PaymentIn", id: "LIST" }],
     // }),
 
-    getAllPaymentIns: builder.query({
+getAllPaymentIns: builder.query({
   query: ({
     cursor = null,
     search = "",
     fromDate = "",
     toDate = "",
     limit = 10,
-  } = {}) => {
+  }) => {
     const params = new URLSearchParams();
 
     if (cursor) {
@@ -64,25 +64,30 @@ export const paymentInApi = createApi({
   }),
 
   merge: (currentCache, newData, { arg }) => {
-    // First request
+    // First request / filters changed
     if (!arg.cursor) {
       return newData;
     }
 
-    // Cursor request
+    // Load next cursor page
     currentCache.paymentIns.push(
       ...newData.paymentIns
     );
 
-    currentCache.hasMore = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
+    currentCache.hasMore =
+      newData.hasMore;
+
+    currentCache.nextCursor =
+      newData.nextCursor;
+
+    // Keep totals updated
+    if (newData.totals) {
+      currentCache.totals =
+        newData.totals;
+    }
 
     currentCache.totalPayments =
       newData.totalPayments;
-
-    if (newData.totals) {
-      currentCache.totals = newData.totals;
-    }
   },
 
   forceRefetch: ({
@@ -95,25 +100,12 @@ export const paymentInApi = createApi({
     currentArg?.toDate !== previousArg?.toDate ||
     currentArg?.limit !== previousArg?.limit,
 
-  providesTags: (result) =>
-    result?.paymentIns
-      ? [
-          ...result.paymentIns.map((p) => ({
-            type: "PaymentIn",
-            id: p.id,
-          })),
-
-          {
-            type: "PaymentIn",
-            id: "LIST",
-          },
-        ]
-      : [
-          {
-            type: "PaymentIn",
-            id: "LIST",
-          },
-        ],
+  providesTags: [
+    {
+      type: "PaymentIn",
+      id: "LIST",
+    },
+  ],
 }),
 
     getPaymentInById: builder.query({
@@ -142,13 +134,88 @@ export const paymentInApi = createApi({
       ],
     }),
 
+    // deletePaymentIn: builder.mutation({
+    //   query: (id) => ({
+    //     url: `/payment-in/${id}`,
+    //     method: "DELETE",
+    //   }),
+    //   invalidatesTags: [{ type: "PaymentIn", id: "LIST" }],
+    // }),
     deletePaymentIn: builder.mutation({
-      query: (id) => ({
-        url: `/payment-in/${id}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: [{ type: "PaymentIn", id: "LIST" }],
-    }),
+  query: (id) => ({
+    url: `/payment-in/${id}`,
+    method: "DELETE",
+  }),
+
+  async onQueryStarted(
+    id,
+    { dispatch, queryFulfilled }
+  ) {
+    const patchResult = dispatch(
+      paymentInApi.util.updateQueryData(
+        "getAllPaymentIns",
+        {
+          cursor: null,
+          search: "",
+          fromDate: "",
+          toDate: "",
+          limit: 10,
+        },
+        (draft) => {
+          if (!draft?.paymentIns) return;
+
+          const deletedPayment =
+            draft.paymentIns.find(
+              (item) =>
+                String(item.id) === String(id)
+            );
+
+          draft.paymentIns =
+            draft.paymentIns.filter(
+              (item) =>
+                String(item.id) !== String(id)
+            );
+
+          if (draft.totalPayments != null) {
+            draft.totalPayments = Math.max(
+              0,
+              draft.totalPayments - 1
+            );
+          }
+
+          if (
+            draft.totals?.totalReceived != null &&
+            deletedPayment
+          ) {
+            draft.totals.totalReceived =
+              Math.max(
+                0,
+                Number(
+                  draft.totals.totalReceived
+                ) -
+                  Number(
+                    deletedPayment.Received || 0
+                  )
+              );
+          }
+        }
+      )
+    );
+
+    try {
+      await queryFulfilled;
+    } catch {
+      patchResult.undo();
+    }
+  },
+
+  invalidatesTags: [
+    {
+      type: "PaymentIn",
+      id: "LIST",
+    },
+  ],
+}),
     getPaymentInPrintReport: builder.query({
   query: ({
     search = "",

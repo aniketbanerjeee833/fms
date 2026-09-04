@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { useDeletePurchaseReturnMutation, useGetAllPurchaseReturnsQuery, useGetPurchaseReturnByIdQuery, useLazyGetPurchaseReturnPrintReportQuery } from "../../redux/api/purchaseReturnApi";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import { toast } from "react-toastify";
 import { itemApi } from "../../redux/api/itemApi";
@@ -19,6 +19,7 @@ import { useDispatch } from "react-redux";
 import { useReactToPrint } from "react-to-print";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 
 
@@ -30,7 +31,9 @@ export default function PurchaseReturn() {
   const [searchParams, setSearchParams] = useSearchParams();
   //const location = useLocation();
   const navigate = useNavigate();
-  const page = Number(searchParams.get("page")) || 1;
+  //const page = Number(searchParams.get("page")) || 1;
+
+  const [cursor, setCursor] = useState(null);
   const searchTerm = searchParams.get("search") || "";
 
   const fromDate = searchParams.get("fromDate") || "";
@@ -49,43 +52,66 @@ export default function PurchaseReturn() {
   });
   const [triggerPurchaseBulkReport, { data: bulkPurchaseReturnReportData, isFetching: isBulkFetching }] =
     useLazyGetPurchaseReturnPrintReportQuery();
-  const handlePageChange = (newPage) => {
-    setSearchParams({
-      page: newPage,
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handlePageChange = (newPage) => {
+  //   setSearchParams({
+  //     page: newPage,
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
-  const handleNextPage = () => {
-    setSearchParams({
-      page: page + 1,
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handleNextPage = () => {
+  //   setSearchParams({
+  //     page: page + 1,
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
 
-  const handlePreviousPage = () => {
-    setSearchParams({
-      page: Math.max(1, page - 1),
-      search: searchTerm,
-      fromDate,
-      toDate,
-    });
-  };
+  // const handlePreviousPage = () => {
+  //   setSearchParams({
+  //     page: Math.max(1, page - 1),
+  //     search: searchTerm,
+  //     fromDate,
+  //     toDate,
+  //   });
+  // };
   // const [searchTerm, setSearchTerm] = useState("");
   // const [fromDate, setFromDate] = useState('');
   // const [toDate, setToDate] = useState('');
-  const { data: purchaseReturns, isLoading } = useGetAllPurchaseReturnsQuery({
-    page,
+  // const { data: purchaseReturns, isLoading } = useGetAllPurchaseReturnsQuery({
+  //   page,
+  //   search: searchTerm,
+  //   fromDate,
+  //   toDate,
+  // });
+  const {
+    data: purchaseReturns,
+    isLoading,
+    isFetching,
+  } = useGetAllPurchaseReturnsQuery({
+    cursor,
     search: searchTerm,
     fromDate,
     toDate,
+    limit: 10,
   });
-  console.log(purchaseReturns, fromDate, toDate);
 
+  const purchaseReturnList = purchaseReturns?.purchaseReturns ?? [];
+
+  const hasMore = purchaseReturns?.hasMore ?? false;
+
+  const nextCursor = purchaseReturns?.nextCursor ?? null;
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || !nextCursor || isFetching) return;
+
+    setCursor(nextCursor);
+  }, [hasMore, nextCursor, isFetching]);
+  //console.log(purchaseReturnList, fromDate, toDate);
+  console.log("purchaseReturns", purchaseReturnList);
   useEffect(() => {
     const closeRowMenu = () => {
       setRowMenuOpen(null);
@@ -169,10 +195,67 @@ export default function PurchaseReturn() {
       handleBulkPrint();
     }
   }, [bulkPurchaseReturnReportData, showSaleReturnBulkPrintPreview]);
+
+  const virtualListRef = useRef(null);
+  const hasScrolledToHighlightRef = useRef(false);
+
+  const highlightTxnId = searchParams.get("highlightTxn");
+
+  useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+    if (!highlightTxnId) return;
+    if (isLoading || isFetching) return;
+
+    const targetIndex = purchaseReturnList.findIndex(
+  (purchaseReturn) =>
+    String(purchaseReturn?.id) === String(highlightTxnId)
+);
+    console.log("Target index for highlight:", targetIndex);
+    if (targetIndex === -1) {
+      if (hasMore && nextCursor && !isFetching) {
+        handleLoadMore();
+      }
+      return;
+    }
+
+    // Wait until VirtualScrollList has rendered the new data
+    const timer = setTimeout(() => {
+      virtualListRef.current?.scrollToIndex(targetIndex, {
+        align: "center",
+        behavior: "auto",
+      });
+
+      hasScrolledToHighlightRef.current = true;
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [
+    purchaseReturnList,
+    highlightTxnId,
+    isLoading,
+    isFetching,
+    hasMore,
+    nextCursor,
+    handleLoadMore,
+  ]);
+  useEffect(() => {
+    hasScrolledToHighlightRef.current = false;
+  }, [highlightTxnId, searchTerm, fromDate, toDate])
+
   return (
     <>
 
-      <div className="flex flex-col bg-white">
+      <div className="flex flex-col bg-white"
+        style={{
+          flex: 1,
+          minHeight: 0,
+
+          height: "calc(100vh - 20px)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
 
         <div className="inn-title">
           <div className="flex flex-col sm:flex-col lg:flex-row justify-between lg:items-center">
@@ -204,12 +287,19 @@ export default function PurchaseReturn() {
                   type="date"
                   value={fromDate}
                   onChange={(e) => {
+                    setCursor(null);
+
                     setSearchParams({
-                      page: 1,
                       search: searchTerm,
                       fromDate: e.target.value,
                       toDate,
-                    });
+                    })
+                    // setSearchParams({
+                    //   page: 1,
+                    //   search: searchTerm,
+                    //   fromDate: e.target.value,
+                    //   toDate,
+                    // });
                   }}
                   // onChange={(e) => setFromDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
@@ -224,12 +314,19 @@ export default function PurchaseReturn() {
                   type="date"
                   value={toDate}
                   onChange={(e) => {
+                    setCursor(null);
+
                     setSearchParams({
-                      page: 1,
                       search: searchTerm,
                       fromDate,
                       toDate: e.target.value,
                     });
+                    // setSearchParams({
+                    //   page: 1,
+                    //   search: searchTerm,
+                    //   fromDate,
+                    //   toDate: e.target.value,
+                    // });
                   }}
                   // onChange={(e) => setToDate(e.target.value)}
                   className="border p-1 rounded-md shadow-sm text-gray-700 sm:w-auto"
@@ -244,12 +341,18 @@ export default function PurchaseReturn() {
                   placeholder="Search ..."
                   value={searchTerm}
                   onChange={(e) => {
+                    setCursor(null);
                     setSearchParams({
-                      page: 1,               // reset page on new search
                       search: e.target.value,
                       fromDate,
                       toDate,
                     });
+                    // setSearchParams({
+                    //   page: 1,               // reset page on new search
+                    //   search: e.target.value,
+                    //   fromDate,
+                    //   toDate,
+                    // });
                   }}
                   // onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-56"
@@ -309,7 +412,7 @@ export default function PurchaseReturn() {
             </div>
 
           </div>
-          <div className="flex justify-end sm: mt-4 gap-2">
+          <div className="flex justify-end sm: mt-2 gap-2">
 
             <button
               type="button"
@@ -339,7 +442,7 @@ export default function PurchaseReturn() {
 
           </div>
         </div>
-        <div className="tab-inn">
+        {/* <div className="tab-inn">
           <div className="table-responsive table-desi">
             {isLoading ? (
               <p className="text-center mt-4">Fetching purchaseReturns...</p>
@@ -475,7 +578,6 @@ export default function PurchaseReturn() {
                               />
                             </button>
 
-                            {/* ROW MENU */}
                             {rowMenuOpen === purchaseReturn.id && (
                               <div
                                 onClick={(e) => e.stopPropagation()}
@@ -490,7 +592,7 @@ export default function PurchaseReturn() {
                                 }}
                               >
 
-                                {/* VIEW / EDIT */}
+                                
                                
                                 <NavLink
                                   to={{
@@ -523,7 +625,7 @@ export default function PurchaseReturn() {
                                   View / Edit
                                 </NavLink>
 
-                                {/* PRINT */}
+                                
                                 <button
                                   type="button"
                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -546,7 +648,7 @@ export default function PurchaseReturn() {
                                   Print
                                 </button>
 
-                                {/* DELETE */}
+                                
                                 <button
                                   type="button"
                                   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -592,11 +694,402 @@ export default function PurchaseReturn() {
 
             )}
           </div>
+        </div> */}
+        <div
+          className="tab-inn"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {isLoading ? (
+            <p className="text-center mt-4">
+              Fetching purchase returns...
+            </p>
+          ) : purchaseReturnList.length === 0 ? (
+            <p className="text-center mt-4">
+              No purchase returns found.
+            </p>
+          ) : (
+             <div
+    style={{
+        flex: 1,
+        minHeight: 0,
+        overflowX: "auto",
+        overflowY: "hidden",   // fine to keep — this hides the OUTER wrapper's own vertical scrollbar
+        display: "flex",
+        flexDirection: "column",
+    }}
+>
+             <div style={{ minWidth: 962, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+              {/* ---------- HEADER ---------- */}
+              {/* <table className="w-full min-w-[800px] table-responsive table-desi">
+              
+                <thead>
+                    <tr>
+                      <th className="text-left" style={{ width: 70 }}>Sl.No</th>
+                      <th className="text-left" style={{ width: 120 }}>Bill Date</th>
+                      <th className="text-left" style={{ width: 300 }}>Party Name</th>
+                      <th className="text-left" style={{ width: 160 }}>Payment Type</th>
+                      <th className="text-left" style={{ width: 120 }}>Amount</th>
+                      <th className="text-left" style={{ width: 120 }}>Received</th>
+                      <th className="text-left" style={{ width: 120 }}>Balance Due</th>
+                      <th style={{ width: 50 }}></th>
+                    </tr>
+                  </thead>
+              </table> */}
+              <div
+    style={{
+        display: "grid",
+        gridTemplateColumns:
+            "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
+        width: "100%",
+        //minWidth: "1062px",
+        boxSizing: "border-box",
+        alignItems: "center",
+        minHeight: 40,
+        padding: "0 8px",
+        flexShrink: 0,
+        borderBottom: "2px solid #e2e8f0",
+        fontWeight: 600,
+        fontSize: 13,
+        color: "#333",
+        textTransform: "uppercase",
+    }}
+>
+    <div>Sl.No</div>
+    <div>Bill Date</div>
+    <div>Party Name</div>
+    <div>Payment Type</div>
+    <div>Amount</div>
+    <div>Received</div>
+    <div>Balance Due</div>
+    <div
+        style={{
+            position: "sticky",
+            right: 0,
+            //backgroundColor: "#fff",
+        }}
+    />
+</div>
+
+              {/* ---------- VIRTUAL LIST ---------- */}
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  height: 0,
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                <VirtualScrollList
+                  ref={virtualListRef}
+                  items={purchaseReturnList}
+                  rowHeight={52}
+                  height="100%"
+                  dynamicHeight={true}
+                  isFetching={isFetching}
+                  hasMore={hasMore}
+                  getItemKey={(purchaseReturn) => purchaseReturn?.id}
+                  emptyMessage="No purchase returns found"
+                  endMessage="— End of purchase returns —"
+                  onLoadMore={handleLoadMore}
+                  isRowActive={(purchaseReturn) =>
+                    rowMenuOpen === purchaseReturn?.id
+                  }
+                  // isRowActive={(purchaseReturn) =>
+                  //   String(
+                  //     searchParams.get("highlightTxn")
+                  //   ) === String(purchaseReturn?.id)
+                  // }
+                  renderRow={(purchaseReturn, idx) => {
+                    const isHighlighted =
+                      String(
+                        searchParams.get("highlightTxn")
+                      ) === String(purchaseReturn?.id);
+
+                    return (
+                      <div
+                      key={purchaseReturn?.id}
+                        onClick={() => {
+                          const params =
+                            new URLSearchParams(searchParams);
+
+                          params.set(
+                            "highlightTxn",
+                            purchaseReturn?.id
+                          );
+
+                          setSearchParams(params, {
+                            replace: true,
+                          });
+                        }}
+                        onDoubleClick={() => {
+                          const params =
+                            new URLSearchParams(searchParams);
+
+                          params.set(
+                            "highlightTxn",
+                            purchaseReturn?.id
+                          );
+
+                          navigate(
+                            `/purchase/return/edit/${purchaseReturn?.id}?${params.toString()}`,
+                            {
+                              state: {
+                                from: "all-purchase-return-list",
+                              },
+                            }
+                          );
+                        }}
+                        style={{
+                          display: "grid",
+                            gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
+                          //gridTemplateColumns:"70px 120px minmax(180px, 1fr) 160px 120px 120px 120px 50px",
+                          alignItems: "center",
+                          minHeight: 52,
+                          padding: "0 8px",
+                          cursor: "pointer",
+                          borderBottom:
+                            "1px solid #f1f5f9",
+                          backgroundColor:
+                            isHighlighted
+                              ? "#4CA1AF22"
+                              : "transparent",
+                        }}
+                      >
+                        {/* SL.NO */}
+                        <div>
+                          {idx + 1}.
+                        </div>
+
+                        {/* BILL DATE */}
+                        <div>
+                          {purchaseReturn?.Bill_Date
+                            ? new Date(
+                              purchaseReturn.Bill_Date
+                            ).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "numeric",
+                                year: "numeric",
+                              }
+                            )
+                            : "N/A"}
+                        </div>
+
+                        {/* PARTY */}
+                        <div className="table-desi-cell"
+                          style={{
+                            overflowWrap: "break-word",
+                            wordBreak: "break-word",
+                          }}>
+                          {purchaseReturn?.Party_Name ||
+                            "N/A"}
+                        </div>
+
+                        {/* PAYMENT TYPE */}
+                        <div className="table-desi-cell">
+                          {purchaseReturn
+                            ?.Payment_Type_Display ||
+                            "N/A"}
+                        </div>
+
+                        {/* AMOUNT */}
+                        <div className="table-desi-cell">
+                          ₹
+                          {purchaseReturn?.Total_Amount ??
+                            "N/A"}
+                        </div>
+
+                        {/* RECEIVED */}
+                        <div className="table-desi-cell">
+                          ₹
+                          {purchaseReturn?.Total_Received ??
+                            "N/A"}
+                        </div>
+
+                        {/* BALANCE */}
+                        <div className="table-desi-cell">
+                          ₹
+                          {purchaseReturn?.Balance_Due ??
+                            "N/A"}
+                        </div>
+
+                        {/* MENU */}
+                        <div className="py-2 px-2 table-desi-cell"
+                          style={{
+                             position: "sticky",   // 👈 was "relative", now sticky
+                                right: 0,              // 👈 pins to the right edge of the SCROLL viewport
+                                width: 50,
+                                //position: "relative",
+                                //width: 50,
+                                textAlign: "center",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              setRowMenuOpen(
+                                rowMenuOpen ===
+                                  purchaseReturn.id
+                                  ? null
+                                  : purchaseReturn.id
+                              );
+                            }}
+                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                            style={{
+                              backgroundColor: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                            }}
+                            title="More"
+                          >
+                            <MoreVertical
+                              size={16}
+                              style={{
+                                color: "#374151",
+                              }}
+                            />
+                          </button>
+
+                          {/* ROW MENU */}
+                          {rowMenuOpen ===
+                            purchaseReturn.id && (
+                              <div
+                                onClick={(e) =>
+                                  e.stopPropagation()
+                                }
+                                className="absolute bg-white shadow-lg rounded-md"
+                                style={{
+                                  right: 0,
+                                  top: "100%",
+                                  //top: 32,
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {/* VIEW / EDIT */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
+                                    search: (() => {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        purchaseReturn?.id
+                                      );
+
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-purchase-return-list",
+                                  }}
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    textDecoration:
+                                      "none",
+                                  }}
+                                  onClick={() =>
+                                    setRowMenuOpen(null)
+                                  }
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+                                  View / Edit
+                                </NavLink>
+
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                  style={{
+                                    color: "#374151",
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setPrintPurchaseReturnId(
+                                      purchaseReturn.id
+                                    );
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+                                  Print
+                                </button>
+
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                  title="Delete purchase return"
+                                  style={{
+                                    cursor: "pointer",
+                                    color: "#dc2626",
+                                    backgroundColor:
+                                      "transparent",
+                                    border: "none",
+                                  }}
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setDeleteTarget({
+                                      Purchase_Return_Id:
+                                        purchaseReturn.id,
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{
+                                      color: "#dc2626",
+                                    }}
+                                  />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+              </div>
+            </div>
+             </div>
+          )}
         </div>
         <div className="flex justify-center align-center p-4">
-          <div className="flex items-center space-x-2 flex-wrap justify-center">
+          {/* <div className="flex items-center space-x-2 flex-wrap justify-center">
 
-            {/* PREVIOUS */}
+           
             <button
               type="button"
               onClick={() => handlePreviousPage()}
@@ -608,7 +1101,7 @@ export default function PurchaseReturn() {
               ← Previous
             </button>
 
-            {/* PAGE NUMBERS — DESKTOP / TABLET */}
+           
             <div style={{ marginRight: "0px" }}
               className="hidden sm:flex space-x-2">
 
@@ -688,12 +1181,12 @@ export default function PurchaseReturn() {
               })()}
             </div>
 
-            {/* CURRENT PAGE — MOBILE ONLY */}
+          
             <div className="sm:hidden px-3 py-1 bg-gray-100 rounded text-sm">
               Page {page} / {purchaseReturns?.totalPages || 1}
             </div>
 
-            {/* NEXT */}
+           
             <button
               type="button"
               onClick={() => handleNextPage()}
@@ -710,7 +1203,7 @@ export default function PurchaseReturn() {
               Next →
             </button>
 
-          </div>
+          </div> */}
         </div>
       </div>
 

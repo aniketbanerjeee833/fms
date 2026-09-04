@@ -24,145 +24,461 @@ import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
  
 /* ── GET CASH IN HAND SUMMARY + LEDGER ────────────────────── */
 
-const getCashInHand = async (req, res, next) => {
+// const getCashInHand = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     const fromDate = req.query.fromDate || null;
+//     const toDate   = req.query.toDate   || null;
+//     const page     = parseInt(req.query.page,  10) || 1;
+//     const limit    = parseInt(req.query.limit, 10) || 10;
+//     const offset   = (page - 1) * limit;
+//     const search   = req.query.search?.trim() || "";
+
+//     /* ── build WHERE ── */
+//     const conditions = [
+//       `Txn_Type NOT IN ('Adjustment_Add', 'Adjustment_Reduce')`,  // 🔹 hide adjustments from ledger UI
+//     ];
+//     const params = [];
+
+//     if (fromDate && toDate) {
+//       conditions.push(`DATE(Txn_Date) BETWEEN ? AND ?`);
+//       params.push(fromDate, toDate);
+//     } else if (fromDate) {
+//       conditions.push(`DATE(Txn_Date) >= ?`);
+//       params.push(fromDate);
+//     } else if (toDate) {
+//       conditions.push(`DATE(Txn_Date) <= ?`);
+//       params.push(toDate);
+//     }
+
+//     if (search) {
+//       conditions.push(`(Txn_Type LIKE ? OR Party_Name LIKE ? OR CAST(Amount AS CHAR) LIKE ?)`);
+//       const like = `%${search}%`;
+//       params.push(like, like, like);
+//     }
+
+//     const whereSQL = `WHERE ${conditions.join(" AND ")}`;
+
+//     /* ── ledger (paginated) — adjustments excluded ── */
+//    const [ledgerRows] = await connection.query(
+//   `
+//   SELECT
+//   ct.*,
+//   ps.Source_Id,
+//   CASE ct.Txn_Type
+//     WHEN 'Sale'            THEN s.Sale_Id
+//     WHEN 'Purchase'        THEN p.Purchase_Id
+//     WHEN 'Payment_In'      THEN pi.id
+//     WHEN 'Payment_Out'     THEN po.id
+//     WHEN 'Sale_Return'     THEN sr.id
+//     WHEN 'Purchase_Return' THEN pr.id
+//     ELSE NULL
+//   END AS Formatted_Reference_Id
+
+// FROM cash_transactions ct
+
+// -- resolve split_id → parent source id
+// LEFT JOIN payment_splits ps
+//   ON ct.Reference_Id = ps.id
+//   AND ct.Txn_Type IN (
+//     'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
+//     'Payment_In', 'Payment_Out'
+//   )
+
+// -- now join parent tables via ps.Source_Id
+// LEFT JOIN add_sale s
+//   ON ct.Txn_Type = 'Sale'
+//   AND ps.Source_Id = s.id
+
+// LEFT JOIN add_purchase p
+//   ON ct.Txn_Type = 'Purchase'
+//   AND ps.Source_Id = p.id
+
+// LEFT JOIN payment_in pi
+//   ON ct.Txn_Type = 'Payment_In'
+//   AND ps.Source_Id = pi.Id
+
+// LEFT JOIN payment_out po
+//   ON ct.Txn_Type = 'Payment_Out'
+//   AND ps.Source_Id = po.id
+
+// LEFT JOIN sale_return sr
+//   ON ct.Txn_Type = 'Sale_Return'
+//   AND ps.Source_Id = sr.id
+
+// LEFT JOIN purchase_return pr
+//   ON ct.Txn_Type = 'Purchase_Return'
+//   AND ps.Source_Id = pr.id
+
+// ${whereSQL}
+
+// ORDER BY ct.id DESC
+// LIMIT ? OFFSET ?
+//    `,
+//   [...params, limit, offset]
+// );
+
+//     /* ── total count (for pagination) — same filter ── */
+//     const [[{ totalCount }]] = await connection.query(
+//       `SELECT COUNT(*) AS totalCount FROM cash_transactions ${whereSQL}`,
+//       params
+//     );
+
+//     /* ── current balance (ALL-TIME, includes adjustments — unfiltered on purpose) ── */
+//     const [[balanceRow]] = await connection.query(
+//       `SELECT Running_Balance FROM cash_transactions ORDER BY id DESC LIMIT 1`
+//     );
+
+//     const cashInHand = balanceRow ? Number(balanceRow.Running_Balance) : 0;
+
+//     /* ── cash in / cash out totals — also exclude adjustments to keep these
+//          two numbers meaning "from real transactions", matching the ledger view ── */
+//     const [[totals]] = await connection.query(
+//       `SELECT
+//          COALESCE(SUM(CASE WHEN Direction = 'Credit' THEN Amount ELSE 0 END), 0) AS totalCashIn,
+//          COALESCE(SUM(CASE WHEN Direction = 'Debit'  THEN Amount ELSE 0 END), 0) AS totalCashOut
+//        FROM cash_transactions
+//        ${whereSQL}`,
+//       params
+//     );
+
+//     return res.status(200).json({
+//       success:      true,
+//       cashInHand:   parseFloat(cashInHand.toFixed(2)),
+//       totalCashIn:  parseFloat(totals.totalCashIn),
+//       totalCashOut: parseFloat(totals.totalCashOut),
+//       currentPage:  page,
+//       totalPages:   Math.ceil(totalCount / limit),
+//       totalCount,
+//       ledger:       ledgerRows,
+//     });
+
+//   } catch (err) {
+//     console.error("❌ getCashInHand:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
+ const getCashInHand = async (req, res, next) => {
   let connection;
+
   try {
     connection = await db.getConnection();
 
-    const fromDate = req.query.fromDate || null;
-    const toDate   = req.query.toDate   || null;
-    const page     = parseInt(req.query.page,  10) || 1;
-    const limit    = parseInt(req.query.limit, 10) || 10;
-    const offset   = (page - 1) * limit;
-    const search   = req.query.search?.trim() || "";
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || 10,
+      200
+    );
 
-    /* ── build WHERE ── */
-    const conditions = [
-      `Txn_Type NOT IN ('Adjustment_Add', 'Adjustment_Reduce')`,  // 🔹 hide adjustments from ledger UI
+    /* ── decode cursor ── */
+
+    let cursorDate = null;
+    let cursorId = null;
+
+    if (req.query.cursor) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(req.query.cursor, "base64").toString("utf8")
+        );
+
+        cursorDate = decoded.date || null;
+        cursorId =
+          decoded.id !== undefined && decoded.id !== null
+            ? Number(decoded.id)
+            : null;
+
+        if (
+          !cursorDate ||
+          !Number.isInteger(cursorId) ||
+          cursorId <= 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor.",
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor.",
+        });
+      }
+    }
+
+    const fromDate = req.query.fromDate || null;
+    const toDate = req.query.toDate || null;
+    const search = req.query.search?.trim() || "";
+
+    /* ── FILTER CONDITIONS ── */
+
+    const filterClauses = [
+      `Txn_Type NOT IN ('Adjustment_Add', 'Adjustment_Reduce')`,
     ];
-    const params = [];
+
+    const filterParams = [];
 
     if (fromDate && toDate) {
-      conditions.push(`DATE(Txn_Date) BETWEEN ? AND ?`);
-      params.push(fromDate, toDate);
+      filterClauses.push(`DATE(Txn_Date) BETWEEN ? AND ?`);
+      filterParams.push(fromDate, toDate);
     } else if (fromDate) {
-      conditions.push(`DATE(Txn_Date) >= ?`);
-      params.push(fromDate);
+      filterClauses.push(`DATE(Txn_Date) >= ?`);
+      filterParams.push(fromDate);
     } else if (toDate) {
-      conditions.push(`DATE(Txn_Date) <= ?`);
-      params.push(toDate);
+      filterClauses.push(`DATE(Txn_Date) <= ?`);
+      filterParams.push(toDate);
     }
 
     if (search) {
-      conditions.push(`(Txn_Type LIKE ? OR Party_Name LIKE ? OR CAST(Amount AS CHAR) LIKE ?)`);
+      filterClauses.push(`
+        (
+          Txn_Type LIKE ?
+          OR Party_Name LIKE ?
+          OR CAST(Amount AS CHAR) LIKE ?
+        )
+      `);
+
       const like = `%${search}%`;
-      params.push(like, like, like);
+
+      filterParams.push(
+        like,
+        like,
+        like
+      );
     }
 
-    const whereSQL = `WHERE ${conditions.join(" AND ")}`;
+    /* ── CURSOR CONDITIONS ── */
 
-    /* ── ledger (paginated) — adjustments excluded ── */
-   const [ledgerRows] = await connection.query(
-  `
-  SELECT
-  ct.*,
-  ps.Source_Id,
-  CASE ct.Txn_Type
-    WHEN 'Sale'            THEN s.Sale_Id
-    WHEN 'Purchase'        THEN p.Purchase_Id
-    WHEN 'Payment_In'      THEN pi.id
-    WHEN 'Payment_Out'     THEN po.id
-    WHEN 'Sale_Return'     THEN sr.id
-    WHEN 'Purchase_Return' THEN pr.id
-    ELSE NULL
-  END AS Formatted_Reference_Id
+    const cursorClauses = [];
+    const cursorParams = [];
 
-FROM cash_transactions ct
+    if (cursorDate !== null && cursorId !== null) {
+      cursorClauses.push(`
+        (
+          ct.Txn_Date < ?
+          OR (
+            ct.Txn_Date = ?
+            AND ct.id < ?
+          )
+        )
+      `);
 
--- resolve split_id → parent source id
-LEFT JOIN payment_splits ps
-  ON ct.Reference_Id = ps.id
-  AND ct.Txn_Type IN (
-    'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
-    'Payment_In', 'Payment_Out'
-  )
+      cursorParams.push(
+        cursorDate,
+        cursorDate,
+        cursorId
+      );
+    }
 
--- now join parent tables via ps.Source_Id
-LEFT JOIN add_sale s
-  ON ct.Txn_Type = 'Sale'
-  AND ps.Source_Id = s.id
+    /* ── MAIN WHERE ── */
 
-LEFT JOIN add_purchase p
-  ON ct.Txn_Type = 'Purchase'
-  AND ps.Source_Id = p.id
+    const mainWhereClauses = [
+      ...filterClauses,
+      ...cursorClauses,
+    ];
 
-LEFT JOIN payment_in pi
-  ON ct.Txn_Type = 'Payment_In'
-  AND ps.Source_Id = pi.Id
+    const mainWhereSQL = mainWhereClauses.length
+      ? `WHERE ${mainWhereClauses.join(" AND ")}`
+      : "";
 
-LEFT JOIN payment_out po
-  ON ct.Txn_Type = 'Payment_Out'
-  AND ps.Source_Id = po.id
+    const mainParams = [
+      ...filterParams,
+      ...cursorParams,
+    ];
 
-LEFT JOIN sale_return sr
-  ON ct.Txn_Type = 'Sale_Return'
-  AND ps.Source_Id = sr.id
+    /* ── LEDGER ── */
 
-LEFT JOIN purchase_return pr
-  ON ct.Txn_Type = 'Purchase_Return'
-  AND ps.Source_Id = pr.id
+    const [rows] = await connection.query(
+      `
+        SELECT
+          ct.*,
 
-${whereSQL}
+          ps.Source_Id,
 
-ORDER BY ct.id DESC
-LIMIT ? OFFSET ?
-   `,
-  [...params, limit, offset]
-);
+          CASE ct.Txn_Type
+            WHEN 'Sale'            THEN s.Sale_Id
+            WHEN 'Purchase'        THEN p.Purchase_Id
+            WHEN 'Payment_In'      THEN pi.id
+            WHEN 'Payment_Out'     THEN po.id
+            WHEN 'Sale_Return'     THEN sr.id
+            WHEN 'Purchase_Return' THEN pr.id
+            ELSE NULL
+          END AS Formatted_Reference_Id
 
-    /* ── total count (for pagination) — same filter ── */
-    const [[{ totalCount }]] = await connection.query(
-      `SELECT COUNT(*) AS totalCount FROM cash_transactions ${whereSQL}`,
-      params
+        FROM cash_transactions ct
+
+        -- resolve split_id → parent source id
+        LEFT JOIN payment_splits ps
+          ON ct.Reference_Id = ps.id
+          AND ct.Txn_Type IN (
+            'Sale',
+            'Purchase',
+            'Sale_Return',
+            'Purchase_Return',
+            'Payment_In',
+            'Payment_Out'
+          )
+
+        -- parent tables
+        LEFT JOIN add_sale s
+          ON ct.Txn_Type = 'Sale'
+          AND ps.Source_Id = s.id
+
+        LEFT JOIN add_purchase p
+          ON ct.Txn_Type = 'Purchase'
+          AND ps.Source_Id = p.id
+
+        LEFT JOIN payment_in pi
+          ON ct.Txn_Type = 'Payment_In'
+          AND ps.Source_Id = pi.Id
+
+        LEFT JOIN payment_out po
+          ON ct.Txn_Type = 'Payment_Out'
+          AND ps.Source_Id = po.id
+
+        LEFT JOIN sale_return sr
+          ON ct.Txn_Type = 'Sale_Return'
+          AND ps.Source_Id = sr.id
+
+        LEFT JOIN purchase_return pr
+          ON ct.Txn_Type = 'Purchase_Return'
+          AND ps.Source_Id = pr.id
+
+        ${mainWhereSQL}
+
+        ORDER BY ct.Txn_Date DESC, ct.id DESC
+
+        LIMIT ?
+      `,
+      [...mainParams, limit + 1]
     );
 
-    /* ── current balance (ALL-TIME, includes adjustments — unfiltered on purpose) ── */
-    const [[balanceRow]] = await connection.query(
-      `SELECT Running_Balance FROM cash_transactions ORDER BY id DESC LIMIT 1`
-    );
+    /* ── HAS MORE ── */
 
-    const cashInHand = balanceRow ? Number(balanceRow.Running_Balance) : 0;
+    const hasMore = rows.length > limit;
 
-    /* ── cash in / cash out totals — also exclude adjustments to keep these
-         two numbers meaning "from real transactions", matching the ledger view ── */
+    const ledgerRows = hasMore
+      ? rows.slice(0, limit)
+      : rows;
+
+    /* ── NEXT CURSOR ── */
+
+    let nextCursor = null;
+
+    if (hasMore && ledgerRows.length > 0) {
+      const lastRow =
+        ledgerRows[ledgerRows.length - 1];
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          date: lastRow.Txn_Date,
+          id: lastRow.id,
+        })
+      ).toString("base64");
+    }
+
+    /* ── TOTAL COUNT + CASH TOTALS ── */
+    /*
+       IMPORTANT:
+       These use FILTERS ONLY.
+       Cursor is NOT included.
+    */
+
+    const countWhereSQL = filterClauses.length
+      ? `WHERE ${filterClauses.join(" AND ")}`
+      : "";
+
     const [[totals]] = await connection.query(
-      `SELECT
-         COALESCE(SUM(CASE WHEN Direction = 'Credit' THEN Amount ELSE 0 END), 0) AS totalCashIn,
-         COALESCE(SUM(CASE WHEN Direction = 'Debit'  THEN Amount ELSE 0 END), 0) AS totalCashOut
-       FROM cash_transactions
-       ${whereSQL}`,
-      params
+      `
+        SELECT
+          COUNT(*) AS totalCount,
+
+          COALESCE(
+            SUM(
+              CASE
+                WHEN Direction = 'Credit'
+                THEN Amount
+                ELSE 0
+              END
+            ),
+            0
+          ) AS totalCashIn,
+
+          COALESCE(
+            SUM(
+              CASE
+                WHEN Direction = 'Debit'
+                THEN Amount
+                ELSE 0
+              END
+            ),
+            0
+          ) AS totalCashOut
+
+        FROM cash_transactions
+
+        ${countWhereSQL}
+      `,
+      filterParams
     );
+
+    /* ── CURRENT CASH IN HAND ── */
+    /*
+       ALL-TIME latest running balance.
+       Adjustments are intentionally included here,
+       exactly like your original controller.
+    */
+
+    const [[balanceRow]] = await connection.query(
+      `
+        SELECT Running_Balance
+        FROM cash_transactions
+        ORDER BY id DESC
+        LIMIT 1
+      `
+    );
+
+    const cashInHand = balanceRow
+      ? Number(balanceRow.Running_Balance)
+      : 0;
+
+    /* ── RESPONSE ── */
 
     return res.status(200).json({
-      success:      true,
-      cashInHand:   parseFloat(cashInHand.toFixed(2)),
-      totalCashIn:  parseFloat(totals.totalCashIn),
-      totalCashOut: parseFloat(totals.totalCashOut),
-      currentPage:  page,
-      totalPages:   Math.ceil(totalCount / limit),
-      totalCount,
-      ledger:       ledgerRows,
+      success: true,
+
+      cashInHand: parseFloat(
+        cashInHand.toFixed(2)
+      ),
+
+      totalCashIn: parseFloat(
+        totals.totalCashIn
+      ),
+
+      totalCashOut: parseFloat(
+        totals.totalCashOut
+      ),
+
+      hasMore,
+      nextCursor,
+
+      totalCount: totals.totalCount,
+
+      ledger: ledgerRows,
     });
 
   } catch (err) {
     console.error("❌ getCashInHand:", err);
     next(err);
+
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      connection.release();
+    }
   }
 };
- 
 /* ── getCashBalance (dashboard widget) ── */
 const getCashBalance = async (req, res, next) => {
   let connection;

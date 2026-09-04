@@ -212,59 +212,60 @@ export default function AllPurchaseList() {
     }
   }, [bulkPurchaseReportData, showPurchaseBulkPrintReview]);
 
- const virtualListRef = useRef(null);
-const hasScrolledToHighlightRef = useRef(false);
+  const virtualListRef = useRef(null);
+  const hasScrolledToHighlightRef = useRef(false);
 
-const highlightTxnId = searchParams.get("highlightTxn");
+  const highlightTxnId = searchParams.get("highlightTxn");
 
-useEffect(() => {
-  if (hasScrolledToHighlightRef.current) return;
-  if (!highlightTxnId) return;
-  if (isLoading || isFetching) return;
+  useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+    if (!highlightTxnId) return;
+    if (isLoading || isFetching) return;
 
-  const targetIndex = purchaseList.findIndex(
-    (purchase) =>
-      String(purchase?.Purchase_Id) === String(highlightTxnId)
-  );
-console.log("Target index for highlight:", targetIndex);
-  if (targetIndex === -1) {
-    if (hasMore && nextCursor && !isFetching) {
-      handleLoadMore();
+    const targetIndex = purchaseList.findIndex(
+      (purchase) =>
+        String(purchase?.Purchase_Id) === String(highlightTxnId)
+    );
+    console.log("Target index for highlight:", targetIndex);
+    if (targetIndex === -1) {
+      if (hasMore && nextCursor && !isFetching) {
+        handleLoadMore();
+      }
+      return;
     }
-    return;
-  }
 
-  // Wait until VirtualScrollList has rendered the new data
-  const timer = setTimeout(() => {
-    virtualListRef.current?.scrollToIndex(targetIndex, {
-      align: "center",
-      behavior: "auto",
-    });
+    // Wait until VirtualScrollList has rendered the new data
+    const timer = setTimeout(() => {
+      virtualListRef.current?.scrollToIndex(targetIndex, {
+        align: "center",
+        behavior: "auto",
+      });
 
-    hasScrolledToHighlightRef.current = true;
-  }, 100);
+      hasScrolledToHighlightRef.current = true;
+    }, 100);
 
-  return () => clearTimeout(timer);
-}, [
-  purchaseList,
-  highlightTxnId,
-  isLoading,
-  isFetching,
-  hasMore,
-  nextCursor,
-  handleLoadMore,
-]);
-useEffect(() => {
-  hasScrolledToHighlightRef.current = false;
-}, [highlightTxnId, searchTerm, fromDate, toDate]);
+    return () => clearTimeout(timer);
+  }, [
+    purchaseList,
+    highlightTxnId,
+    isLoading,
+    isFetching,
+    hasMore,
+    nextCursor,
+    handleLoadMore,
+  ]);
+  useEffect(() => {
+    hasScrolledToHighlightRef.current = false;
+  }, [highlightTxnId, searchTerm, fromDate, toDate]);
+
   return (
     <>
       <div className="flex flex-col bg-white"
         style={{
           flex: 1,
           minHeight: 0,
-         
-             height: "calc(100vh - 20px)",
+
+          height: "calc(100vh - 20px)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -524,11 +525,24 @@ useEffect(() => {
               <p className="text-center mt-4">No purchases found.</p>
             ) : (
 
-
-              <>
-                {/* <div style={{ flexShrink: 0 }}> */}
-                <table className="w-full min-w-[800px]  table-responsive table-desi">
-                  <thead>
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowX: "auto",
+                  overflowY: "hidden",   // fine to keep — this hides the OUTER wrapper's own vertical scrollbar
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{
+                  minWidth: 962, display: "flex", flexDirection: "column",
+                  flex: 1, minHeight: 0
+                }}>
+                  {/* <div style={{ flexShrink: 0 }}> */}
+                  {/* <table className="w-full min-w-[800px] 
+                 table-responsive table-desi">
+                  {/* <thead>
                     <tr>
                       <th className="text-left">Sl.No</th>
                       <th className="text-left">Date</th>
@@ -539,295 +553,344 @@ useEffect(() => {
                       <th className="text-left">Balance</th>
                       <th></th>
                     </tr>
-                  </thead>
-                </table>
-                {/* </div> */}
-                <div style={{
-                  flex: 1,
-                  minHeight: 0,
-                  height:0,
-                  overflow: "hidden",
-                  position: "relative",
-                }}>
-                <VirtualScrollList
-                  ref={virtualListRef}
-                  items={purchaseList}
-                  rowHeight={52}
-                  height="100%"
-                  dynamicHeight={true}
-                  onLoadMore={handleLoadMore}
-                  isFetching={isFetching}
-                  hasMore={hasMore}
-                  getItemKey={(purchase) => purchase?.Purchase_Id}
-                  emptyMessage="No purchase found"
-                  endMessage="— End of purchases —"
-                  isRowActive={(purchase) =>
-                    rowMenuOpen === purchase?.Purchase_Id
-                  }
-                  renderRow={(purchase, idx) => {
-                    const isHighlighted =
-                      String(searchParams.get("highlightTxn")) ===
-                      String(purchase?.Purchase_Id);
+                  </thead> 
+                   <thead >
+                      <tr>
+                        <th className="text-left" style={{ width: 60 }}>Sl.No</th>
+                        <th className="text-left" style={{ width: 110 }}>Date</th>
+                        <th className="text-left" style={{ width: 130 }}>Bill No.</th>
+                        <th className="text-left" style={{ width: 300 }}>Party Name</th>
+                        <th className="text-left" style={{ width: 160 }}>Payment Type</th>
+                        <th className="text-left" style={{ width: 132 }}>Amount</th>
+                        <th className="text-left" style={{ width: 120 }}>Balance</th>
+                        <th style={{ width: 50 }}></th>
+                      </tr>
+                    </thead>
+                </table> */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                      width: "100%",
+                      //minWidth: "1062px",
+                      boxSizing: "border-box",
+                      alignItems: "center",
+                      minHeight: 40,
+                      padding: "0 8px",
+                      flexShrink: 0,
+                      borderBottom: "2px solid #e2e8f0",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: "#333",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    <div>Sl.No</div>
+                    <div>Date</div>
+                    <div>Bill No.</div>
+                    <div>Party Name</div>
+                    <div>Payment Type</div>
+                    <div>Amount</div>
+                    <div>Balance</div>
+                    <div
+                      style={{
+                        position: "sticky",
+                        right: 0,
+                        //backgroundColor: "#fff",
+                      }}
+                    />
+                  </div>
+                  {/* </div> */}
+                  <div style={{
+                    flex: 1,
+                    minHeight: 0,
+                    //height:0,
+                    overflow: "hidden",
+                    position: "relative",
+                  }}>
+                    <VirtualScrollList
+                      ref={virtualListRef}
+                      items={purchaseList}
+                      rowHeight={52}
+                      height="100%"
+                      dynamicHeight={true}
+                      onLoadMore={handleLoadMore}
+                      isFetching={isFetching}
+                      hasMore={hasMore}
+                      getItemKey={(purchase) => purchase?.Purchase_Id}
+                      emptyMessage="No purchase found"
+                      endMessage="— End of purchases —"
+                      isRowActive={(purchase) =>
+                        rowMenuOpen === purchase?.Purchase_Id
+                      }
+                      renderRow={(purchase, idx) => {
+                        const isHighlighted =
+                          String(searchParams.get("highlightTxn")) ===
+                          String(purchase?.Purchase_Id);
 
-                    return (
-                      <div
-                        key={purchase?.Purchase_Id}
-                        onClick={() => {
-                          const params = new URLSearchParams(searchParams);
+                        return (
+                          <div
+                            key={purchase?.Purchase_Id}
+                            onClick={() => {
+                              const params = new URLSearchParams(searchParams);
 
-                          params.set(
-                            "highlightTxn",
-                            purchase?.Purchase_Id
-                          );
+                              params.set(
+                                "highlightTxn",
+                                purchase?.Purchase_Id
+                              );
 
-                          setSearchParams(params, { replace: true });
-                        }}
-                        onDoubleClick={() => {
-                          const params = new URLSearchParams(searchParams);
+                              setSearchParams(params, { replace: true });
+                            }}
+                            onDoubleClick={() => {
+                              const params = new URLSearchParams(searchParams);
 
-                          params.set(
-                            "highlightTxn",
-                            purchase?.Purchase_Id
-                          );
+                              params.set(
+                                "highlightTxn",
+                                purchase?.Purchase_Id
+                              );
 
-                          navigate(
-                            `/purchase/edit/${purchase?.Purchase_Id}?${params.toString()}`,
-                            {
-                              state: {
-                                from: "all-purchase-list",
-                              },
-                            }
-                          );
-                        }}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "70px 110px 120px minmax(150px, 1fr) 130px 110px 110px 50px",
-                          alignItems: "center",
-                          minHeight: "52px",
-                          columnGap: "10px",
-                          width: "100%",
-                          cursor: "pointer",
-                          backgroundColor: isHighlighted
-                            ? "#4CA1AF22"
-                            : "transparent",
-                          borderBottom: "1px solid #f1f5f9",
-                          boxSizing: "border-box",
-                        }}
-                      >
-                        {/* SL.NO */}
-                        <div className="table-desi-cell">
-                          {idx + 1}.
-                        </div>
-
-                        {/* DATE */}
-                        <div className="table-desi-cell">
-                          {purchase?.Bill_Date
-                            ? new Date(
-                              purchase.Bill_Date
-                            ).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "numeric",
-                              year: "numeric",
-                            })
-                            : "N/A"}
-                        </div>
-
-                        {/* BILL NO */}
-                        <div className="table-desi-cell">
-                          {purchase?.Bill_Number
-                            ? purchase.Bill_Number.split("T")[0]
-                            : "N/A"}
-                        </div>
-
-                        {/* PARTY */}
-                        <div
-                          className="table-desi-cell"
-                          style={{
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {purchase?.Party_Name || "N/A"}
-                        </div>
-
-                        {/* PAYMENT TYPE */}
-                        <div className="table-desi-cell">
-                          {purchase?.Payment_Type_Display || "N/A"}
-                        </div>
-
-                        {/* AMOUNT */}
-                        <div className="table-desi-cell">
-                          ₹ {purchase?.Total_Amount || "N/A"}
-                        </div>
-
-                        {/* BALANCE */}
-                        <div className="table-desi-cell">
-                          ₹ {purchase?.Balance_Due || "N/A"}
-                        </div>
-
-                        {/* THREE DOT MENU */}
-                        <div
-                          className="py-2 px-2 table-desi-cell"
-                          style={{
-                            position: "relative",
-                            width: 50,
-                            textAlign: "center",
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-
-                              setRowMenuOpen(
-                                rowMenuOpen === purchase?.Purchase_Id
-                                  ? null
-                                  : purchase?.Purchase_Id
+                              navigate(
+                                `/purchase/edit/${purchase?.Purchase_Id}?${params.toString()}`,
+                                {
+                                  state: {
+                                    from: "all-purchase-list",
+                                  },
+                                }
                               );
                             }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                             style={{
-                              backgroundColor: "transparent",
-                              border: "none",
+                              display: "grid",
+                              gridTemplateColumns:"0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                              alignItems: "center",
+                              minHeight: "52px",
+                              columnGap: "10px",
+                              width: "100%",
                               cursor: "pointer",
+                              backgroundColor: isHighlighted
+                                ? "#4CA1AF22"
+                                : "transparent",
+                              borderBottom: "1px solid #f1f5f9",
+                              boxSizing: "border-box",
                             }}
-                            title="More"
                           >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
+                            {/* SL.NO */}
+                            <div className="table-desi-cell">
+                              {idx + 1}.
+                            </div>
 
-                          {/* THREE DOT MENU */}
-                          {rowMenuOpen === purchase?.Purchase_Id && (
+                            {/* DATE */}
+                            <div className="table-desi-cell">
+                              {purchase?.Bill_Date
+                                ? new Date(
+                                  purchase.Bill_Date
+                                ).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "numeric",
+                                  year: "numeric",
+                                })
+                                : "N/A"}
+                            </div>
+
+                            {/* BILL NO */}
+                            <div className="table-desi-cell">
+                              {purchase?.Bill_Number
+                                ? purchase.Bill_Number.split("T")[0]
+                                : "N/A"}
+                            </div>
+
+                            {/* PARTY */}
                             <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute bg-white shadow-lg rounded-md"
+                              className="table-desi-cell"
                               style={{
-                                right: 0,
-                                top: "100%",
-                                width: 150,
-                                zIndex: 100,
-                                border: "1px solid #e2e8f0",
-                                overflow: "hidden",
+                                overflowWrap: "break-word",
+                                wordBreak: "break-word",
                               }}
                             >
-                              {/* VIEW / EDIT */}
-                              <NavLink
-                                to={{
-                                  pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
-                                  search: (() => {
-                                    const params = new URLSearchParams(searchParams);
+                              {purchase?.Party_Name || "N/A"}
+                            </div>
 
-                                    params.set(
-                                      "highlightTxn",
-                                      purchase?.Purchase_Id
-                                    );
+                            {/* PAYMENT TYPE */}
+                            <div className="table-desi-cell">
+                              {purchase?.Payment_Type_Display || "N/A"}
+                            </div>
 
-                                    return params.toString();
-                                  })(),
-                                }}
-                                state={{
-                                  from: "all-purchase-list",
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  textDecoration: "none",
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Eye
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
+                            {/* AMOUNT */}
+                            <div className="table-desi-cell">
+                              ₹ {purchase?.Total_Amount || "N/A"}
+                            </div>
 
-                                View / Edit
-                              </NavLink>
+                            {/* BALANCE */}
+                            <div className="table-desi-cell">
+                              ₹ {purchase?.Balance_Due || "N/A"}
+                            </div>
 
-                              {/* PRINT */}
+                            {/* THREE DOT MENU */}
+                            <div
+                              className="py-2 px-2 table-desi-cell"
+                              style={{
+                                 position: "sticky",   // 👈 was "relative", now sticky
+                                right: 0,              // 👈 pins to the right edge of the SCROLL viewport
+                                width: 50,
+                                //position: "relative",
+                                //width: 50,
+                                textAlign: "center",
+                              }}
+                            >
                               <button
                                 type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                style={{
-                                  color: "#374151",
-                                  backgroundColor: "transparent",
-                                  border: "none",
-                                  cursor: "pointer",
-                                }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-                                  setPrintPurchaseId(
-                                    purchase.Purchase_Id
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  setRowMenuOpen(
+                                    rowMenuOpen === purchase?.Purchase_Id
+                                      ? null
+                                      : purchase?.Purchase_Id
                                   );
                                 }}
-                              >
-                                <Printer
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Print
-                              </button>
-
-                              {/* RETURN */}
-                              <NavLink
-                                to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
-                                state={{
-                                  from: "purchase-return-list",
-                                }}
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                 style={{
-                                  color: "#374151",
-                                  textDecoration: "none",
-                                }}
-                                onClick={() => setRowMenuOpen(null)}
-                              >
-                                <Undo2
-                                  size={13}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-
-                                Return
-                              </NavLink>
-
-                              {/* DELETE */}
-                              <button
-                                type="button"
-                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                style={{
-                                  cursor: "pointer",
-                                  color: "#dc2626",
                                   backgroundColor: "transparent",
                                   border: "none",
+                                  cursor: "pointer",
                                 }}
-                                onClick={() => {
-                                  setRowMenuOpen(null);
-
-                                  setDeleteTarget({
-                                    Purchase_Id:
-                                      purchase?.Purchase_Id,
-                                  });
-                                }}
+                                title="More"
                               >
-                                <Trash2
-                                  size={13}
-                                  style={{ color: "#dc2626" }}
+                                <MoreVertical
+                                  size={16}
+                                  style={{ color: "#374151" }}
                                 />
-
-                                Delete
                               </button>
+
+                              {/* THREE DOT MENU */}
+                              {rowMenuOpen === purchase?.Purchase_Id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute bg-white shadow-lg rounded-md"
+                                  style={{
+                                    right: 0,
+                                    top: "100%",
+                                    width: 150,
+                                    zIndex: 100,
+                                    border: "1px solid #e2e8f0",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {/* VIEW / EDIT */}
+                                  <NavLink
+                                    to={{
+                                      pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
+                                      search: (() => {
+                                        const params = new URLSearchParams(searchParams);
+
+                                        params.set(
+                                          "highlightTxn",
+                                          purchase?.Purchase_Id
+                                        );
+
+                                        return params.toString();
+                                      })(),
+                                    }}
+                                    state={{
+                                      from: "all-purchase-list",
+                                    }}
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    style={{
+                                      color: "#374151",
+                                      textDecoration: "none",
+                                    }}
+                                    onClick={() => setRowMenuOpen(null)}
+                                  >
+                                    <Eye
+                                      size={13}
+                                      style={{ color: "#4CA1AF" }}
+                                    />
+
+                                    View / Edit
+                                  </NavLink>
+
+                                  {/* PRINT */}
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    style={{
+                                      color: "#374151",
+                                      backgroundColor: "transparent",
+                                      border: "none",
+                                      cursor: "pointer",
+                                    }}
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+                                      setPrintPurchaseId(
+                                        purchase.Purchase_Id
+                                      );
+                                    }}
+                                  >
+                                    <Printer
+                                      size={13}
+                                      style={{ color: "#4CA1AF" }}
+                                    />
+
+                                    Print
+                                  </button>
+
+                                  {/* RETURN */}
+                                  <NavLink
+                                    to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
+                                    state={{
+                                      from: "purchase-return-list",
+                                    }}
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    style={{
+                                      color: "#374151",
+                                      textDecoration: "none",
+                                    }}
+                                    onClick={() => setRowMenuOpen(null)}
+                                  >
+                                    <Undo2
+                                      size={13}
+                                      style={{ color: "#4CA1AF" }}
+                                    />
+
+                                    Return
+                                  </NavLink>
+
+                                  {/* DELETE */}
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                    style={{
+                                      cursor: "pointer",
+                                      color: "#dc2626",
+                                      backgroundColor: "transparent",
+                                      border: "none",
+                                    }}
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setDeleteTarget({
+                                        Purchase_Id:
+                                          purchase?.Purchase_Id,
+                                      });
+                                    }}
+                                  >
+                                    <Trash2
+                                      size={13}
+                                      style={{ color: "#dc2626" }}
+                                    />
+
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }}
-                />
+                          </div>
+                        );
+                      }}
+                    />
+                  </div>
                 </div>
-              </>
+              </div>
 
 
             )}

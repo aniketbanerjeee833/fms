@@ -9,13 +9,78 @@ export const cashInHandApi = createApi({
   endpoints: (builder) => ({
  
     /* summary + ledger — pass fromDate, toDate, page for filtering */
+    // getCashInHand: builder.query({
+    //   query: ({ fromDate = "", toDate = "", page = 1, limit = 10,search="" } = {}) => {
+    //     const params = new URLSearchParams({ fromDate, toDate, page, limit,search });
+    //     return `/cash-in-hand?${params.toString()}`;
+    //   },
+    //   providesTags: ["CashInHand"],
+    // }),
     getCashInHand: builder.query({
-      query: ({ fromDate = "", toDate = "", page = 1, limit = 10,search="" } = {}) => {
-        const params = new URLSearchParams({ fromDate, toDate, page, limit,search });
-        return `/cash-in-hand?${params.toString()}`;
-      },
-      providesTags: ["CashInHand"],
-    }),
+  query: ({
+    cursor = null,
+    fromDate = "",
+    toDate = "",
+    limit = 10,
+    search = "",
+  } = {}) => {
+    const params = new URLSearchParams();
+
+    if (cursor) {
+      params.append("cursor", cursor);
+    }
+
+    if (fromDate) {
+      params.append("fromDate", fromDate);
+    }
+
+    if (toDate) {
+      params.append("toDate", toDate);
+    }
+
+    if (search?.trim()) {
+      params.append("search", search.trim());
+    }
+
+    params.append("limit", limit);
+
+    return `/cash-in-hand?${params.toString()}`;
+  },
+
+  serializeQueryArgs: ({ queryArgs }) => ({
+    fromDate: queryArgs.fromDate,
+    toDate: queryArgs.toDate,
+    search: queryArgs.search,
+  }),
+
+  merge: (currentCache, newData, { arg }) => {
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    currentCache.ledger.push(...newData.ledger);
+
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+
+    currentCache.totalCount = newData.totalCount;
+    currentCache.cashInHand = newData.cashInHand;
+    currentCache.totalCashIn = newData.totalCashIn;
+    currentCache.totalCashOut = newData.totalCashOut;
+  },
+
+  forceRefetch: ({
+    currentArg,
+    previousArg,
+  }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.fromDate !== previousArg?.fromDate ||
+    currentArg?.toDate !== previousArg?.toDate ||
+    currentArg?.search !== previousArg?.search ||
+    currentArg?.limit !== previousArg?.limit,
+
+  providesTags: [{ type: "CashInHand", id: "LIST" }],
+}),
     getCashBalance: builder.query({
       query: () => `/cash-in-hand/cash-balance`,
       providesTags: ["CashInHand"],

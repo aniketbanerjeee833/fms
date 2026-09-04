@@ -863,89 +863,109 @@ const getAllPaymentIns = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
+    /* ---------- PAGINATION ---------- */
+
     const limit = Math.min(
       parseInt(req.query.limit, 10) || 10,
       200
     );
 
-    const cursor = req.query.cursor || null;
-    const search = req.query.search?.trim().toLowerCase() || "";
+    let cursorDate = null;
+    let cursorId = null;
+
+    if (req.query.cursor) {
+      try {
+        const decoded = JSON.parse(
+          Buffer.from(req.query.cursor, "base64").toString("utf8")
+        );
+
+        cursorDate = decoded.date || null;
+        cursorId =
+          decoded.id !== undefined && decoded.id !== null
+            ? Number(decoded.id)
+            : null;
+
+        if (
+          !cursorDate ||
+          !Number.isInteger(cursorId) ||
+          cursorId <= 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid cursor.",
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cursor.",
+        });
+      }
+    }
+
+    /* ---------- FILTERS ---------- */
+
+    const search =
+      req.query.search?.trim().toLowerCase() || "";
+
     const fromDate = req.query.fromDate || null;
     const toDate = req.query.toDate || null;
 
-    const dateError = validateDateRange(fromDate, toDate);
+    const filterClauses = [];
+    const filterParams = [];
 
-    if (dateError) {
-      return res.status(400).json({
-        success: false,
-        message: dateError,
-      });
-    }
+    /* ---------- SEARCH ---------- */
 
-    const whereClauses = [];
-    const params = [];
-
-    // SEARCH
     if (search) {
-      whereClauses.push(`
-        (
-          a.Party_Name LIKE ? OR
-          pi.Receipt_No LIKE ? OR
-          CAST(pi.Received AS CHAR) LIKE ?
-        )
-      `);
-
       const like = `%${search}%`;
 
-      params.push(
+      filterClauses.push(`(
+        a.Party_Name LIKE ?
+        OR pi.Receipt_No LIKE ?
+        OR CAST(pi.Received AS CHAR) LIKE ?
+      )`);
+
+      filterParams.push(
         like,
         like,
         like
       );
     }
 
-    // DATE FILTER
-    if (fromDate && toDate) {
-      whereClauses.push(
-        `DATE(pi.Payment_Date) BETWEEN ? AND ?`
-      );
+    /* ---------- DATE FILTER ---------- */
 
-      params.push(
+    if (fromDate && toDate) {
+      filterClauses.push(`
+        DATE(pi.Payment_Date) BETWEEN ? AND ?
+      `);
+
+      filterParams.push(
         fromDate,
         toDate
       );
+
     } else if (fromDate) {
-      whereClauses.push(
-        `DATE(pi.Payment_Date) >= ?`
-      );
+      filterClauses.push(`
+        DATE(pi.Payment_Date) >= ?
+      `);
 
-      params.push(fromDate);
+      filterParams.push(fromDate);
+
     } else if (toDate) {
-      whereClauses.push(
-        `DATE(pi.Payment_Date) <= ?`
-      );
+      filterClauses.push(`
+        DATE(pi.Payment_Date) <= ?
+      `);
 
-      params.push(toDate);
+      filterParams.push(toDate);
     }
 
-    // CURSOR
-    if (cursor) {
-      let decodedCursor;
+    /* ---------- CURSOR ---------- */
 
-      try {
-        decodedCursor = JSON.parse(
-          Buffer.from(cursor, "base64").toString("utf8")
-        );
-      } catch {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid cursor",
-        });
-      }
+    const cursorClauses = [];
+    const cursorParams = [];
 
-      const { date, id } = decodedCursor;
-
-      whereClauses.push(`
+    if (cursorDate !== null && cursorId !== null) {
+      cursorClauses.push(`
         (
           pi.Payment_Date < ?
           OR (
@@ -955,71 +975,93 @@ const getAllPaymentIns = async (req, res, next) => {
         )
       `);
 
-      params.push(
-        date,
-        date,
-        id
+      cursorParams.push(
+        cursorDate,
+        cursorDate,
+        cursorId
       );
     }
 
-    const whereSQL = whereClauses.length
-      ? `WHERE ${whereClauses.join(" AND ")}`
+    /* ---------- MAIN WHERE ---------- */
+
+    const mainWhereClauses = [
+      ...filterClauses,
+      ...cursorClauses,
+    ];
+
+    const mainWhereSQL = mainWhereClauses.length
+      ? `WHERE ${mainWhereClauses.join(" AND ")}`
       : "";
 
-    // --------------------------------------------------
-    // MAIN LIST
-    // --------------------------------------------------
+    const mainParams = [
+      ...filterParams,
+      ...cursorParams,
+    ];
+
+    /* ---------- MAIN QUERY ---------- */
 
     const [rows] = await connection.query(
-      `SELECT
-         pi.*,
-         a.Party_Name
-       FROM payment_in pi
-       LEFT JOIN add_party a
-         ON a.Party_Id = pi.Party_Id
-       ${whereSQL}
-       ORDER BY pi.Payment_Date DESC, pi.id DESC
-       LIMIT ?`,
+      `
+        SELECT
+          pi.*,
+          a.Party_Name
+
+        FROM payment_in pi
+
+        LEFT JOIN add_party a
+          ON a.Party_Id = pi.Party_Id
+
+        ${mainWhereSQL}
+
+        ORDER BY
+          pi.Payment_Date DESC,
+          pi.id DESC
+
+        LIMIT ?
+      `,
       [
-        ...params,
+        ...mainParams,
         limit + 1,
       ]
     );
 
-    // Check if more rows exist
+    /* ---------- hasMore ---------- */
+
     const hasMore = rows.length > limit;
 
-    // Return only requested amount
     const pageRows = hasMore
       ? rows.slice(0, limit)
       : rows;
 
-    // --------------------------------------------------
-    // PAYMENT SPLITS
-    // --------------------------------------------------
+    /* ---------- PAYMENT SPLITS ---------- */
 
-    const paymentIds = pageRows.map(
-      (r) => r.id
-    );
+    if (pageRows.length > 0) {
+      const paymentIds = pageRows.map(
+        (row) => row.id
+      );
 
-    if (paymentIds.length > 0) {
       const placeholders = paymentIds
         .map(() => "?")
         .join(",");
 
       const [splits] = await connection.query(
-        `SELECT
-           ps.Source_Id,
-           ps.Payment_Type,
-           ps.Bank_Account_Id,
-           ps.Reference_Number,
-           ps.Amount,
-           ba.Account_Display_Name
-         FROM payment_splits ps
-         LEFT JOIN bank_accounts ba
-           ON ba.id = ps.Bank_Account_Id
-         WHERE ps.Source_Type = 'Payment_In'
-           AND ps.Source_Id IN (${placeholders})`,
+        `
+          SELECT
+            ps.Source_Id,
+            ps.Payment_Type,
+            ps.Bank_Account_Id,
+            ps.Reference_Number,
+            ps.Amount,
+            ba.Account_Display_Name
+
+          FROM payment_splits ps
+
+          LEFT JOIN bank_accounts ba
+            ON ba.id = ps.Bank_Account_Id
+
+          WHERE ps.Source_Type = 'Payment_In'
+            AND ps.Source_Id IN (${placeholders})
+        `,
         paymentIds
       );
 
@@ -1046,101 +1088,43 @@ const getAllPaymentIns = async (req, res, next) => {
 
         row.Payment_Type_Display =
           row.splits
-            .map((s) =>
-              s.Payment_Type === "Bank"
-                ? s.Bank_Display_Name
-                : s.Payment_Type
+            .map((split) =>
+              split.Payment_Type === "Bank"
+                ? split.Bank_Display_Name
+                : split.Payment_Type
             )
             .join(", ") || "—";
       }
     }
 
-    // --------------------------------------------------
-    // TOTAL COUNT
-    // --------------------------------------------------
-    // IMPORTANT:
-    // Cursor is NOT included here.
-    // Total represents the current filters.
+    /* ---------- COUNT + TOTALS ---------- */
 
-    const countWhereClauses = [];
-    const countParams = [];
-
-    if (search) {
-      countWhereClauses.push(`
-        (
-          a.Party_Name LIKE ? OR
-          pi.Receipt_No LIKE ? OR
-          CAST(pi.Received AS CHAR) LIKE ?
-        )
-      `);
-
-      const like = `%${search}%`;
-
-      countParams.push(
-        like,
-        like,
-        like
-      );
-    }
-
-    if (fromDate && toDate) {
-      countWhereClauses.push(
-        `DATE(pi.Payment_Date) BETWEEN ? AND ?`
-      );
-
-      countParams.push(
-        fromDate,
-        toDate
-      );
-    } else if (fromDate) {
-      countWhereClauses.push(
-        `DATE(pi.Payment_Date) >= ?`
-      );
-
-      countParams.push(fromDate);
-    } else if (toDate) {
-      countWhereClauses.push(
-        `DATE(pi.Payment_Date) <= ?`
-      );
-
-      countParams.push(toDate);
-    }
-
-    const countWhereSQL = countWhereClauses.length
-      ? `WHERE ${countWhereClauses.join(" AND ")}`
+    const countWhereSQL = filterClauses.length
+      ? `WHERE ${filterClauses.join(" AND ")}`
       : "";
 
-    const [[{ total }]] =
+    const [[combined]] =
       await connection.query(
-        `SELECT COUNT(*) AS total
-         FROM payment_in pi
-         LEFT JOIN add_party a
-           ON a.Party_Id = pi.Party_Id
-         ${countWhereSQL}`,
-        countParams
+        `
+          SELECT
+            COUNT(*) AS total,
+
+            COALESCE(
+              SUM(pi.Received),
+              0
+            ) AS totalReceived
+
+          FROM payment_in pi
+
+          LEFT JOIN add_party a
+            ON a.Party_Id = pi.Party_Id
+
+          ${countWhereSQL}
+        `,
+        filterParams
       );
 
-    // --------------------------------------------------
-    // TOTAL RECEIVED
-    // --------------------------------------------------
-
-    const [[totals]] =
-      await connection.query(
-        `SELECT
-           COALESCE(
-             SUM(pi.Received),
-             0
-           ) AS totalReceived
-         FROM payment_in pi
-         LEFT JOIN add_party a
-           ON a.Party_Id = pi.Party_Id
-         ${countWhereSQL}`,
-        countParams
-      );
-
-    // --------------------------------------------------
-    // NEXT CURSOR
-    // --------------------------------------------------
+    /* ---------- NEXT CURSOR ---------- */
 
     let nextCursor = null;
 
@@ -1148,20 +1132,18 @@ const getAllPaymentIns = async (req, res, next) => {
       hasMore &&
       pageRows.length > 0
     ) {
-      const last =
+      const lastRow =
         pageRows[pageRows.length - 1];
 
       nextCursor = Buffer.from(
         JSON.stringify({
-          date: last.Payment_Date,
-          id: last.id,
+          date: lastRow.Payment_Date,
+          id: lastRow.id,
         })
       ).toString("base64");
     }
 
-    // --------------------------------------------------
-    // RESPONSE
-    // --------------------------------------------------
+    /* ---------- RESPONSE ---------- */
 
     return res.status(200).json({
       success: true,
@@ -1172,12 +1154,19 @@ const getAllPaymentIns = async (req, res, next) => {
 
       nextCursor,
 
-      totalPayments: total,
+      totalPayments: combined.total,
 
-      totals,
+      totals: {
+        totalReceived: combined.totalReceived,
+      },
     });
 
   } catch (err) {
+    console.error(
+      "❌ Error fetching payment ins:",
+      err
+    );
+
     next(err);
 
   } finally {

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
-import { partyApi, useGetAllPartiesQuery, useGetAllPayablePartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery } from "../../redux/api/partyAPi";
-import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer } from "lucide-react";
+import { partyApi, useGetAllPartiesQuery, useGetAllPayablePartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
+import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useDispatch } from "react-redux";
@@ -24,10 +24,17 @@ import { useReactToPrint } from "react-to-print";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import PartyBulkReportPrintTemplate from "../../components/Print/PartyBulkReportPrintTemplate";
+import {
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+} from "../../redux/api/expenseApi";
 
 const TXN_TYPE_ROUTE_MAP = {
   Sale: "sale",
   Purchase: "purchase",
+  Expense: "expense",
   Sale_Return: "sale/return",
   Purchase_Return: "purchase/return",
 };
@@ -37,6 +44,7 @@ const MODAL_TXN_TYPES = ["Payment_In", "Payment_Out"];
 const PARTY_TYPE_META = {
   Sale: { label: "Sale", color: "#059669" },
   Purchase: { label: "Purchase", color: "#dc2626" },
+  Expense: { label: "Expense", color: "#dc2626" },
   Sale_Return: { label: "Sale Return", color: "#059669" },
   Purchase_Return: { label: "Purchase Return", color: "#dc2626" },
   Payment_In: { label: "Payment In", color: "#059669" },
@@ -87,6 +95,10 @@ const DELETE_CONFIG = {
     title: "Delete Purchase",
     label: "purchase bill",
   },
+  Expense: {
+    title: "Delete Expense",
+    label: "expense",
+  },
   Sale_Return: {
     title: "Delete Credit Note",
     label: "credit note",
@@ -120,8 +132,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const search = searchParams.get("txnSearch") || "";
   const [cursor, setCursor] = useState(null);
 
-  const sentinelRef = useRef(null);
-  const observerRef = useRef(null);
+  //const sentinelRef = useRef(null);
+  //const observerRef = useRef(null);
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
   const closeModal = () => setModalState({ open: false, type: null, id: null });
@@ -131,61 +143,76 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
-
+  const initialRightLimit = useRef(
+  Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 10
+    );
   const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
-    { Party_Id: partyId, cursor, search },
+    { Party_Id: partyId, cursor, search ,limit: initialRightLimit.current },
     { skip: !partyId }
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
   const printRef = useRef(null);
-  // const[selecedSales,setSelectedSales]= useState(null);
- const [printTarget, setPrintTarget] = useState({ type: null, id: null });
+  const [showPartyBulkPrintReview, setShowPartyBulkPrintPreview] = useState(false);
 
- 
-/* fire the correct query hook — only ONE will actually run at a time
-   because of the `skip` condition on each                              */
-const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
-  skip: printTarget.type !== "Sale" || !printTarget.id,
-});
- 
-const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
-  skip: printTarget.type !== "Purchase" || !printTarget.id,
-});
- 
-const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Sale_Return" || !printTarget.id,
-});
- 
-const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
-});
-const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Payment_In" || !printTarget.id,
-});
- 
-const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
-  skip: printTarget.type !== "Payment_Out" || !printTarget.id,
-})
-const printReady =
-  (printTarget.type === "Sale"             && printSaleData?.invoicePartyDetails) ||
-  (printTarget.type === "Purchase"         && printPurchaseData?.billPurchaseDetails) ||
-  (printTarget.type === "Sale_Return"      && printSaleReturnData?.saleReturn) ||
-  (printTarget.type === "Purchase_Return"  && printPurchaseReturnData?.purchaseReturn) ||
-  (printTarget.type === "Payment_In"       && printPaymentInData?.paymentIn) ||
-  (printTarget.type === "Payment_Out"      && printPaymentOutData?.paymentOut);
- 
-const handlePrint = useReactToPrint({
-  contentRef: printRef,
-  documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
-  onAfterPrint: () => setPrintTarget({ type: null, id: null }),
-});
- 
-/* fire print automatically once the right data has arrived */
-useEffect(() => {
-  if (printReady && printTarget.id) {
-    handlePrint();
-  }
-}, [printReady, printTarget.id]);
+  const bulkPartyPrintRef = useRef(null);
+  const [printTarget, setPrintTarget] = useState({ type: null, id: null });
+
+  const [
+    triggerPartyPrintBulkReport,
+    {
+      data: bulkPartyPrintReportData,
+      isFetching: isBulkPartyFetching,
+    },
+  ] = useLazyGetPartyPrintReportQuery();
+  /* fire the correct query hook — only ONE will actually run at a time
+     because of the `skip` condition on each                              */
+  const { data: printSaleData } = useGetSingleSaleQuery(printTarget.id, {
+    skip: printTarget.type !== "Sale" || !printTarget.id,
+  });
+
+  const { data: printPurchaseData } = useGetSinglePurchaseQuery(printTarget.id, {
+    skip: printTarget.type !== "Purchase" || !printTarget.id,
+  });
+
+  const { data: printSaleReturnData } = useGetSaleReturnByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Sale_Return" || !printTarget.id,
+  });
+
+  const { data: printPurchaseReturnData } = useGetPurchaseReturnByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Purchase_Return" || !printTarget.id,
+  });
+  const { data: printPaymentInData } = useGetPaymentInByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Payment_In" || !printTarget.id,
+  });
+
+  const { data: printPaymentOutData } = useGetPaymentOutByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Payment_Out" || !printTarget.id,
+  })
+  const { data: printExpenseData } = useGetExpenseByIdQuery(printTarget.id, {
+    skip: printTarget.type !== "Expense" || !printTarget.id,
+  });
+
+  const printReady =
+    (printTarget.type === "Sale" && printSaleData?.invoicePartyDetails) ||
+    (printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails) ||
+    (printTarget.type === "Expense" && printExpenseData?.expense) ||
+    (printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn) ||
+    (printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn) ||
+    (printTarget.type === "Payment_In" && printPaymentInData?.paymentIn) ||
+    (printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut);
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printTarget.id ? `${printTarget.type}-${printTarget.id}` : "Document",
+    onAfterPrint: () => setPrintTarget({ type: null, id: null }),
+  });
+
+  /* fire print automatically once the right data has arrived */
+  useEffect(() => {
+    if (printReady && printTarget.id) {
+      handlePrint();
+    }
+  }, [printReady, printTarget.id]);
   useEffect(() => {
     if (data?.partyDetails) {
       setSelectedPartyDetails(data.partyDetails);
@@ -216,26 +243,29 @@ useEffect(() => {
   const hasMore = data?.hasMore ?? false;
   const nextCursor = data?.nextCursor ?? null;
 
-  const handleObserver = useCallback(
-    (entries) => {
-      if (entries[0].isIntersecting && hasMore && nextCursor && !isFetching && !isLoading) {
-        setCursor(nextCursor);
-      }
-    },
-    [hasMore, nextCursor, isFetching, isLoading]
-  );
+  // const handleObserver = useCallback(
+  //   (entries) => {
+  //     if (entries[0].isIntersecting && hasMore && nextCursor && !isFetching && !isLoading) {
+  //       setCursor(nextCursor);
+  //     }
+  //   },
+  //   [hasMore, nextCursor, isFetching, isLoading]
+  // );
 
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(handleObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-    return () => observerRef.current?.disconnect();
-  }, [handleObserver]);
-
+  // useEffect(() => {
+  //   if (observerRef.current) observerRef.current.disconnect();
+  //   observerRef.current = new IntersectionObserver(handleObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
+  //   if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+  //   return () => observerRef.current?.disconnect();
+  // }, [handleObserver]);
+const handleLoadMore = useCallback(() => {
+    if (!hasMore || !nextCursor || isFetching) return;
+    setCursor(nextCursor);
+  }, [hasMore, nextCursor, isFetching]);
 
   useEffect(() => {
     const closeRowMenu = () => {
@@ -251,24 +281,24 @@ useEffect(() => {
 
   const party = data?.partyDetails;
 
-  const handleTransactionDoubleClick = (row, transactionId) => {
-    if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
-      openModal(row.Txn_Type, transactionId);
-      return;
-    }
+  // const handleTransactionDoubleClick = (row, transactionId) => {
+  //   if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+  //     openModal(row.Txn_Type, transactionId);
+  //     return;
+  //   }
 
-    const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+  //   const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
 
-    if (route) {
-      navigate(
-        {
-          pathname: `/${route}/edit/${transactionId}`,
-          search: searchParams.toString(),
-        },
-        { state: { from: "party-details", partyId } }
-      );
-    }
-  };
+  //   if (route) {
+  //     navigate(
+  //       {
+  //         pathname: `/${route}/edit/${transactionId}`,
+  //         search: searchParams.toString(),
+  //       },
+  //       { state: { from: "party-details", partyId } }
+  //     );
+  //   }
+  // };
 
   const handleSavePaymentIn = async (formData) => {
     try {
@@ -308,6 +338,7 @@ useEffect(() => {
   const [deletePurchaseReturn, { isLoading: isDeletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
   const [deletePaymentIn, { isLoading: isDeletingPaymentIn }] = useDeletePaymentInMutation();
   const [deletePaymentOut, { isLoading: isDeletingPaymentOut }] = useDeletePaymentOutMutation();
+  const [deleteExpense, { isLoading: isDeletingExpense }] = useDeleteExpenseMutation();
 
   const isDeleting =
     isDeletingSale ||
@@ -315,7 +346,8 @@ useEffect(() => {
     isDeletingSaleReturn ||
     isDeletingPurchaseReturn ||
     isDeletingPaymentIn ||
-    isDeletingPaymentOut;
+    isDeletingPaymentOut ||
+    isDeletingExpense;
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
 
@@ -331,6 +363,12 @@ useEffect(() => {
           res = await deletePurchase(
             deleteTarget.Id
           ).unwrap();
+          break;
+
+        case "Expense":
+          res = await deleteExpense({
+            id: deleteTarget.Id,
+          }).unwrap();
           break;
 
         case "Sale_Return":
@@ -396,9 +434,136 @@ useEffect(() => {
       // User should see the error and can close it manually.
     }
   };
-  
 
-  if (!partyId) {
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkPartyPrintRef,
+    documentTitle: `Party-Report`,
+    onAfterPrint: () => setShowPartyBulkPrintPreview(false),
+  });
+
+  /* trigger fetch on button click */
+  const handlePrintAllClick = async () => {
+    await triggerPartyPrintBulkReport({ Party_Id: partyId, search });
+    setShowPartyBulkPrintPreview(true);
+  };
+
+  /* fire print once report data has arrived */
+  useEffect(() => {
+    if (bulkPartyPrintReportData && showPartyBulkPrintReview) {
+      handleBulkPrint();
+    }
+  }, [bulkPartyPrintReportData, showPartyBulkPrintReview]);
+//  const rightPanelRef = useRef(null);
+   
+// const highlightedRowRef = useRef(null);
+//     useEffect(() => {
+        
+//         const rightEl = rightPanelRef.current;
+
+       
+//         const saveRight = () => {
+//             console.log("saveRight fired", rightEl.scrollTop, ledger.length);
+//             sessionStorage.setItem("partiesByPartyPayable:rightScroll", rightEl.scrollTop);
+//             sessionStorage.setItem("partiesByPartyPayablerightCount", ledger.length);
+//             // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
+//             // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
+//         };
+
+       
+//         rightEl?.addEventListener("scroll", saveRight);
+
+//         return () => {
+            
+//             rightEl?.removeEventListener("scroll", saveRight);
+//         };
+//     }, [ ledger.length]);
+// const hasRestoredRightRef = useRef(false);
+//  const [isRestoringRight, setIsRestoringRight] = useState(true);
+
+
+//   useLayoutEffect(() => {
+//     if (hasRestoredRightRef.current) {
+//         setIsRestoringRight(false);
+//         return;
+//     }
+//     if (isLoading || isFetching) return;
+
+//     const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:rightCount")) || 0;
+//      // keep waiting only if we might still get more data
+//     if (ledger.length < savedCount && hasMore) return;
+
+//     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+//     hasRestoredRightRef.current = true;
+//     setIsRestoringRight(false); // reveal now, correctly positioned
+// }, [isLoading, isFetching, ledger.length, hasMore]);
+  
+const virtualListRef = useRef(null);
+const hasScrolledToHighlightRef = useRef(false);
+
+useEffect(() => {
+  if (hasScrolledToHighlightRef.current) return;
+
+  const highlightTxnId =
+    searchParams.get("highlightTxn");
+
+  if (!highlightTxnId) return;
+  if (isLoading || isFetching) return;
+  if (!ledger?.length) return;
+
+  const targetIndex = ledger.findIndex((row) => {
+    const refId =
+      row.Sale_Id ||
+      row.Purchase_Id ||
+      row.Expense_Id ||
+      row.Sale_Return_Id ||
+      row.Purchase_Return_Id ||
+      row.Payment_In_Id ||
+      row.Payment_Out_Id;
+
+    const transactionId =
+      row.Expense_Id ||
+      row.Formatted_Reference_Id ||
+      refId;
+
+    return (
+      String(transactionId) ===
+      String(highlightTxnId)
+    );
+  });
+
+  if (targetIndex === -1) {
+    if (hasMore && !isFetching) {
+      handleLoadMore();
+    }
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    virtualListRef.current?.scrollToIndex(
+      targetIndex,
+      {
+        align: "center",
+        behavior: "auto",
+      }
+    );
+
+    hasScrolledToHighlightRef.current = true;
+  }, 100);
+
+  return () => clearTimeout(timer);
+}, [
+  ledger,
+  isLoading,
+  isFetching,
+  hasMore,
+  searchParams,
+  handleLoadMore,
+]);
+useEffect(() => {
+  hasScrolledToHighlightRef.current = false;
+}, [partyId]);
+
+if (!partyId) {
     return (
       <div
         className="flex flex-col items-center justify-center h-full text-gray-400 gap-3"
@@ -420,12 +585,40 @@ useEffect(() => {
       </div>
     );
   }
-const handlePrintClick = (row, transactionId) => {
-  console.log(row, "row", transactionId, "transactionId");
-  setPrintTarget({ type: row.Txn_Type, id: transactionId });
-};
+  const handlePrintClick = (row, transactionId) => {
+    console.log(row, "row", transactionId, "transactionId");
+    setPrintTarget({ type: row.Txn_Type, id: transactionId });
+  };
+  const handleExportPartyReportExcel = () => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+
+    const a = document.createElement("a");
+    a.href = `http://localhost:4000/api/party/export-party-report-excel/${partyId}?${params.toString()}`;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
   return (
-    <div className="flex flex-col h-full">
+    // <div ref={rightPanelRef}
+    <div 
+     className="flex flex-col"
+   
+    //    style={{
+    //   height: "100%",
+       
+    //   minHeight: 0,
+    //   overflow: "hidden",
+    // }}
+        style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -435,7 +628,7 @@ const handlePrintClick = (row, transactionId) => {
           >
             <Users size={26} style={{ color: "#4CA1AF" }} />
           </div>
-           {/* GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span> */}
+          {/* GSTIN: <span className="font-medium">{party?.GSTIN || "—"}</span> */}
           {/* <div>
             <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
               {party?.Party_Name}
@@ -446,7 +639,7 @@ const handlePrintClick = (row, transactionId) => {
               State: <span className="font-medium">{party?.State || "—"}</span>
             </p>
           </div> */}
-           <div>
+          <div>
             <h6
               className="font-bold text-gray-900"
               style={{ fontSize: 18, margin: 0 }}
@@ -462,7 +655,7 @@ const handlePrintClick = (row, transactionId) => {
                 </p>
               )}
 
-             
+
 
               {party?.addresses?.[0]?.Address_Text && (
                 <p className="m-0 truncate">
@@ -480,7 +673,7 @@ const handlePrintClick = (row, transactionId) => {
                   </span>
                 )}
 
-             
+
             </div>
           </div>
         </div>
@@ -526,10 +719,49 @@ const handlePrintClick = (row, transactionId) => {
           </div>
 
         </div>
+        <div className="flex justify-end gap-2 mr-2">
+          <button
+            type="button"
+            onClick={handleExportPartyReportExcel}
+            className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+                                                                        text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+            title="Export to Excel"
+          >
+            <FileSpreadsheet
+              size={16}
+              strokeWidth={2.2}
+              className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+            />
+            {/* Export Excel */}
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintAllClick}
+            disabled={isBulkPartyFetching}
+            className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+            title="Print  Reports"
+          >
+            <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+            {isBulkPartyFetching && <span>Loading...</span>}
+          </button>
+
+
+        </div>
       </div>
 
       {/* ── LEDGER TABLE ── */}
-      <div className="table-responsive table-desi">
+      <div ref={rightPanelRef} className="table-responsive table-desi"
+      
+           style={{
+        
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        visibility: isRestoringRight ? "hidden" : "visible",
+        // if using the placeholder above, also collapse height so it doesn't take double space
+       // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+    }}
+      >
         <table className="w-full min-w-[500px]">
           <thead>
             <tr>
@@ -559,27 +791,57 @@ const handlePrintClick = (row, transactionId) => {
 
                 const transactionId = row.Formatted_Reference_Id || refId;
                 const menuId = `${row.Txn_Type}-${transactionId || idx}`;
-
+                const isHighlighted = String(searchParams.get("highlightTxn")) === String(transactionId);
                 return (
+
                   <tr
                     key={`${row.Txn_Type}-${refId}-${idx}`}
+                  ref={isHighlighted ? highlightedRowRef : null}
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("highlightTxn", transactionId);
+
+                      setSearchParams(params, { replace: true });
+                    }}
+
                     onDoubleClick={() => {
                       if (MODAL_TXN_TYPES.includes(row.Txn_Type)) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+
+                        setSearchParams(params, { replace: true });
+
                         openModal(row.Txn_Type, transactionId);
                         return;
                       }
+
                       const route = TXN_TYPE_ROUTE_MAP[row.Txn_Type];
+
                       if (route) {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", transactionId);
+
                         navigate(
                           {
                             pathname: `/${route}/edit/${transactionId}`,
-                            search: searchParams.toString(),
+                            search: params.toString(),
                           },
-                          { state: { from: "party-details", partyId } }
+                          {
+                            state: {
+                              from: "party-payables",
+                              partyId,
+                            },
+                          }
                         );
                       }
                     }}
-                    style={{ cursor: "pointer" }}
+
+                    style={{
+                      cursor: "pointer",
+                      backgroundColor: isHighlighted
+                        ? "#4CA1AF22"
+                        : "transparent",
+                    }}
                   >
                     <td>{idx + 1}.</td>
                     <td>
@@ -603,7 +865,7 @@ const handlePrintClick = (row, transactionId) => {
                     <td>₹ {fmt(row.Amount)}</td>
                     <td>₹ {fmt(row.Balance_Due)}</td>
                     {/* THREE DOT MENU */}
-                    <td
+                    {row.Txn_Type !== "Opening_Balance" && (<td
                       className="py-2 px-2"
                       style={{
                         position: "relative",
@@ -656,8 +918,14 @@ const handlePrintClick = (row, transactionId) => {
                               type="button"
                               className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                               style={{ color: "#374151" }}
-                              onClick={() => {
+                               onClick={() => {
                                 setRowMenuOpen(null);
+
+                                const params = new URLSearchParams(searchParams);
+                                params.set("highlightTxn", transactionId);
+
+                                setSearchParams(params, { replace: true });
+
                                 openModal(row.Txn_Type, transactionId);
                               }}
                             >
@@ -668,7 +936,11 @@ const handlePrintClick = (row, transactionId) => {
                             <NavLink
                               to={{
                                 pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
-                                search: searchParams.toString(),
+                                search: (() => {
+                                  const params = new URLSearchParams(searchParams);
+                                  params.set("highlightTxn", transactionId);
+                                  return params.toString();
+                                })(),
                               }}
                               state={{
                                 from: "party-details",
@@ -681,6 +953,22 @@ const handlePrintClick = (row, transactionId) => {
                               <Eye size={13} style={{ color: "#4CA1AF" }} />
                               View / Edit
                             </NavLink>
+                            // <NavLink
+                            //   to={{
+                            //     pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
+                            //     search: searchParams.toString(),
+                            //   }}
+                            //   state={{
+                            //     from: "party-details",
+                            //     partyId,
+                            //   }}
+                            //   className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                            //   style={{ color: "#374151" }}
+                            //   onClick={() => setRowMenuOpen(null)}
+                            // >
+                            //   <Eye size={13} style={{ color: "#4CA1AF" }} />
+                            //   View / Edit
+                            // </NavLink>
                           )}
 
                           {/* PRINT */}
@@ -689,10 +977,10 @@ const handlePrintClick = (row, transactionId) => {
                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                             style={{ color: "#374151" }}
                             onClick={() => {
-                              
+
                               setRowMenuOpen(null);
                               handlePrintClick(row, transactionId);
-                            
+
                             }}
                           >
                             <Printer size={13} style={{ color: "#4CA1AF" }} />
@@ -719,7 +1007,7 @@ const handlePrintClick = (row, transactionId) => {
                           </button>
                         </div>
                       )}
-                    </td>
+                    </td>)}
                   </tr>
                 );
               })
@@ -775,8 +1063,8 @@ const handlePrintClick = (row, transactionId) => {
         //isDeleting={false}
         />
       )}
-           <div style={{ display: "none" }}>
-       
+      <div style={{ display: "none" }}>
+
         {/* SALE — Tax Invoice */}
         {printTarget.type === "Sale" && printSaleData?.invoicePartyDetails && (
           <InvoicePrintTemplate
@@ -789,7 +1077,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-       
+
         {/* PURCHASE — Bill */}
         {printTarget.type === "Purchase" && printPurchaseData?.billPurchaseDetails && (
           <InvoicePrintTemplate
@@ -802,7 +1090,13 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-       
+        {printTarget.type === "Expense" && printExpenseData?.expense && (
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        )}
+
         {/* SALE RETURN — Credit Note */}
         {printTarget.type === "Sale_Return" && printSaleReturnData?.saleReturn && (
           <CreditDebitNotePrintTemplate
@@ -815,7 +1109,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-       
+
         {/* PURCHASE RETURN — Debit Note */}
         {printTarget.type === "Purchase_Return" && printPurchaseReturnData?.purchaseReturn && (
           <CreditDebitNotePrintTemplate
@@ -828,7 +1122,7 @@ const handlePrintClick = (row, transactionId) => {
             }}
           />
         )}
-          {/* ✅ PAYMENT IN — Receipt */}
+        {/* ✅ PAYMENT IN — Receipt */}
         {printTarget.type === "Payment_In" && printPaymentInData?.paymentIn && (
           <PaymentInOutPrintTemplate
             ref={printRef}
@@ -836,7 +1130,7 @@ const handlePrintClick = (row, transactionId) => {
             type="in"
           />
         )}
-       
+
         {/* ✅ PAYMENT OUT — Receipt */}
         {printTarget.type === "Payment_Out" && printPaymentOutData?.paymentOut && (
           <PaymentInOutPrintTemplate
@@ -845,7 +1139,16 @@ const handlePrintClick = (row, transactionId) => {
             type="out"
           />
         )}
-       
+        {bulkPartyPrintReportData?.transactions?.length > 0 && (
+          <div style={{ display: "none" }}>
+            <PartyBulkReportPrintTemplate
+              ref={bulkPartyPrintRef}
+              data={bulkPartyPrintReportData}
+
+            />
+          </div>
+        )}
+
       </div>
 
     </div>
@@ -868,9 +1171,20 @@ export default function PartyPayablesLeft() {
   const [selectedPartyDetails, setSelectedPartyDetails] = useState(null);
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
-
-  const { data: partiesData, isLoading } = useGetAllPayablePartiesQuery({ search: leftSearch });
+  const [leftCursor, setLeftCursor] = useState(null);
+  const leftSentinelRef = useRef(null);
+  const leftObserverRef = useRef(null);
+   const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 10);
+  const { data: partiesData, isLoading: isLoading,
+    isFetching: isPartiesFetching
+  } =
+    useGetAllPayablePartiesQuery({
+      cursor: leftCursor,
+      search: leftSearch,
+      limit: leftCursor ? 10 : initialLeftLimit.current
+    });
   const parties = partiesData?.parties || [];
+  const totalParties = partiesData?.totalParties || 0;
   console.log("parties", parties);
   const menuRef = useRef(null);
   // auto-select the first party only if nothing is selected yet
@@ -898,14 +1212,53 @@ export default function PartyPayablesLeft() {
     }
     setSearchParams(next, { replace: true });
   };
+  const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
 
+  /* reset left cursor when item search changes */
+  useEffect(() => {
+    setLeftCursor(null);
+  }, [leftSearch]);
+
+  const handleLeftObserver = useCallback(
+    (entries) => {
+      if (
+        entries[0].isIntersecting &&
+        partiesHasMore &&
+        partiesNextCursor &&
+        !isPartiesFetching &&
+        !isLoading
+      ) {
+        setLeftCursor(partiesNextCursor);
+      }
+    },
+    [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
+  );
+
+  useEffect(() => {
+    if (leftObserverRef.current) {
+      leftObserverRef.current.disconnect();
+    }
+
+    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 0.1,
+    });
+
+    if (leftSentinelRef.current) {
+      leftObserverRef.current.observe(leftSentinelRef.current);
+    }
+
+    return () => leftObserverRef.current?.disconnect();
+  }, [handleLeftObserver]);
   const handleEdit = (party) => {
     console.log("Editing party:", party);
-     setPartyModal({
-    open: true,
-    mode: "edit",
-    data: party,   // <-- use clicked party
-  });
+    setPartyModal({
+      open: true,
+      mode: "edit",
+      data: party,   // <-- use clicked party
+    });
     //setPartyModal({ open: true, mode: "edit", data: selectedPartyDetails, });
     setOpenMenuId(null);
   };
@@ -925,11 +1278,50 @@ export default function PartyPayablesLeft() {
     };
   }, []);
 
-
+const leftListRef = useRef(null);
+      
+      const selectedItemRowRef = useRef(null);
+  
+      useEffect(() => {
+          const leftEl = leftListRef.current;
+          
+  
+          const saveLeft = () => {
+              sessionStorage.setItem("partiesByPartyPayable:leftScroll", leftEl.scrollTop);
+              sessionStorage.setItem("partiesByPartyPayable:leftCount", parties.length);
+          };
+         
+  
+          leftEl?.addEventListener("scroll", saveLeft);
+          
+  
+          return () => {
+              leftEl?.removeEventListener("scroll", saveLeft);
+              
+          };
+      }, [parties.length]);
+  
+  
+  
+  const hasRestoredLeftRef = useRef(false);
+  
+  useLayoutEffect(() => {
+      if (hasRestoredLeftRef.current) return; // only do this once per mount
+      if (isLoading || isPartiesFetching) return;
+  
+      const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 0;
+      if (parties.length < savedCount) return;
+  
+      selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  }, [isLoading, isPartiesFetching, parties.length, selectedId]);
 
   return (
     <>
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col bg-white"
+      //  style={{ minHeight: "100vh" }}
+       style={{ height: "100vh", overflow: "hidden" }}
+       >
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
           <div className="flex flex-row justify-between items-center">
@@ -949,9 +1341,16 @@ export default function PartyPayablesLeft() {
         </div>
 
         {/* ── SPLIT LAYOUT ── */}
-        <div className="flex flex-col lg:flex-row gap-0" style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}>
+        <div className="flex flex-col lg:flex-row gap-0" 
+         style={{
+            flex: 1,
+            minHeight:0,
+            height: "calc(100vh - 180px)",
+            borderTop: "1px solid #e2e8f0",
+          }}
+        >
           {/* ══ LEFT — 30% — party list ══ */}
-          <div
+          <div ref={leftListRef}
             className="w-full lg:w-[30%] overflow-y-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
@@ -1011,7 +1410,7 @@ export default function PartyPayablesLeft() {
               <Users size={15} style={{ color: "#4CA1AF" }} />
 
               <span className="text-xs font-semibold text-black uppercase tracking-wider">
-                Parties ({parties.length})
+                Parties ({totalParties})
               </span>
             </div>
 
@@ -1028,6 +1427,7 @@ export default function PartyPayablesLeft() {
                 return (
                   <div
                     key={party.Party_Id}
+                    ref={isSelected ? selectedItemRowRef : null}   //  add this
                     onClick={() => handleSelectParty(party.Party_Id)}
                     onDoubleClick={() => {
                       if (party.Party_Name === "Cash Sale") return;
@@ -1061,7 +1461,7 @@ export default function PartyPayablesLeft() {
                           {party.GSTIN || party.State || "—"}
                         </p>
                       </div> */}
-                       <div className="min-w-0">
+                      <div className="min-w-0">
                         <p
                           className="font-semibold text-gray-800 truncate text-sm"
                           style={{ margin: 0 }}
@@ -1142,11 +1542,29 @@ export default function PartyPayablesLeft() {
                 );
               })
             )}
+            <div ref={leftSentinelRef} style={{ height: "1px" }} />
+
+            {isPartiesFetching && leftCursor && (
+              <div className="flex justify-center py-3">
+                <span className="text-sm text-gray-400">Loading more...</span>
+              </div>
+            )}
+
+            {!partiesHasMore && parties.length > 0 && (
+              <div className="flex justify-center py-3">
+                <span className="text-xs text-gray-300">— End of parties —</span>
+              </div>
+            )}
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
-            <PartyDetailPanel partyId={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
+          {/* <div className="w-full lg:w-[70%] p-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 180px)" }}>
+            <PartyDetailPanel partyId={selectedId}  key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
+          </div> */}
+          <div className="w-full lg:w-[70%] p-1 overflow-y-auto" 
+          style={{ height: "100%", minHeight: 0 }}
+          >
+            <PartyDetailPanel partyId={selectedId} key={selectedId} setSelectedPartyDetails={setSelectedPartyDetails} />
           </div>
         </div>
       </div>
@@ -1157,8 +1575,8 @@ export default function PartyPayablesLeft() {
           editingParty={partyModal.mode === "edit"}
           onClose={() => {
             setPartyModal({ open: false, mode: "add", data: null })
-         //setSelectedPartyDetails(null);   // 🔹 add this}
-         }}
+            //setSelectedPartyDetails(null);   // 🔹 add this}
+          }}
         />
       )}
     </>
