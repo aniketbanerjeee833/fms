@@ -432,7 +432,12 @@ function BankDetailPanel({ bankId }) {
   useEffect(() => {
     hasScrolledToHighlightRef.current = false;
   }, [bankId]);
-  
+  useEffect(() => {
+    sessionStorage.setItem(
+        "banksByBank:rightCount",
+        ledger.length
+    );
+}, [ledger.length]);
   if (!bankId) {
     return (
       <div className="flex flex-col items-center justify-center text-gray-400 gap-3"

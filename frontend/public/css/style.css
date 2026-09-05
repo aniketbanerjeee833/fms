@@ -133,8 +133,9 @@ a:hover {
 }
 .sb2-1 {
     float: left;
-    /* width: 20%; */
-    width: 17%;
+     flex-shrink: 0;
+    
+    width: 16%;
     background: #e8edf2;
     color: #fff;
     height: 90%;
@@ -145,6 +146,7 @@ a:hover {
     transition: all 0.5s ease; */
     /* overflow-y: auto; */
 }
+
 .sb2-1 a {
     color: #cecece;
     /* -webkit-transition: all 0.5s ease;
@@ -296,8 +298,10 @@ a:hover {
     /* margin-left: 20%;  */
     margin-left: 16%; 
     background: #e8edf2;
+      box-sizing: border-box;
     /* overflow: hidden;
     box-sizing: border-box; */
+  
 }
 .sb2-2-1 {
     background: #fff;

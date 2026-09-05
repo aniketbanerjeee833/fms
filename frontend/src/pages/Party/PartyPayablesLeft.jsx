@@ -720,36 +720,36 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           </div>
 
         </div>
-       
+
       </div>
-       <div className="flex justify-end gap-2 mr-2">
-          <button
-            type="button"
-            onClick={handleExportPartyReportExcel}
-            className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+      <div className="flex justify-end gap-2 mr-2">
+        <button
+          type="button"
+          onClick={handleExportPartyReportExcel}
+          className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
                                                                         text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
-            title="Export to Excel"
-          >
-            <FileSpreadsheet
-              size={16}
-              strokeWidth={2.2}
-              className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
-            />
-            {/* Export Excel */}
-          </button>
-          <button
-            type="button"
-            onClick={handlePrintAllClick}
-            disabled={isBulkPartyFetching}
-            className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
-            title="Print  Reports"
-          >
-            <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
-            {isBulkPartyFetching && <span>Loading...</span>}
-          </button>
+          title="Export to Excel"
+        >
+          <FileSpreadsheet
+            size={16}
+            strokeWidth={2.2}
+            className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+          />
+          {/* Export Excel */}
+        </button>
+        <button
+          type="button"
+          onClick={handlePrintAllClick}
+          disabled={isBulkPartyFetching}
+          className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+          title="Print  Reports"
+        >
+          <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+          {isBulkPartyFetching && <span>Loading...</span>}
+        </button>
 
 
-        </div>
+      </div>
 
       {/* ── LEDGER TABLE ── */}
       {/* const GRID_COLUMNS =
@@ -1359,10 +1359,11 @@ export default function PartyPayablesLeft() {
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
   const [leftCursor, setLeftCursor] = useState(null);
-  const leftSentinelRef = useRef(null);
-  const leftObserverRef = useRef(null);
+  //const leftSentinelRef = useRef(null);
+  //const leftObserverRef = useRef(null);
   const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 10);
-  const { data: partiesData, isLoading: isLoading,
+  const { data: partiesData,
+    isLoading: isLoading,
     isFetching: isPartiesFetching
   } =
     useGetAllPayablePartiesQuery({
@@ -1401,44 +1402,48 @@ export default function PartyPayablesLeft() {
   };
   const partiesHasMore = partiesData?.hasMore ?? false;
   const partiesNextCursor = partiesData?.nextCursor ?? null;
+  const handleLeftLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
 
+    setLeftCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching])
   /* reset left cursor when item search changes */
-  useEffect(() => {
-    setLeftCursor(null);
-  }, [leftSearch]);
+  // useEffect(() => {
+  //   setLeftCursor(null);
+  // }, [leftSearch]);
 
-  const handleLeftObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        partiesHasMore &&
-        partiesNextCursor &&
-        !isPartiesFetching &&
-        !isLoading
-      ) {
-        setLeftCursor(partiesNextCursor);
-      }
-    },
-    [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
-  );
+  // const handleLeftObserver = useCallback(
+  //   (entries) => {
+  //     if (
+  //       entries[0].isIntersecting &&
+  //       partiesHasMore &&
+  //       partiesNextCursor &&
+  //       !isPartiesFetching &&
+  //       !isLoading
+  //     ) {
+  //       setLeftCursor(partiesNextCursor);
+  //     }
+  //   },
+  //   [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
+  // );
 
-  useEffect(() => {
-    if (leftObserverRef.current) {
-      leftObserverRef.current.disconnect();
-    }
+  // useEffect(() => {
+  //   if (leftObserverRef.current) {
+  //     leftObserverRef.current.disconnect();
+  //   }
 
-    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
+  //   leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
 
-    if (leftSentinelRef.current) {
-      leftObserverRef.current.observe(leftSentinelRef.current);
-    }
+  //   if (leftSentinelRef.current) {
+  //     leftObserverRef.current.observe(leftSentinelRef.current);
+  //   }
 
-    return () => leftObserverRef.current?.disconnect();
-  }, [handleLeftObserver]);
+  //   return () => leftObserverRef.current?.disconnect();
+  // }, [handleLeftObserver]);
   const handleEdit = (party) => {
     console.log("Editing party:", party);
     setPartyModal({
@@ -1465,44 +1470,89 @@ export default function PartyPayablesLeft() {
     };
   }, []);
 
-  const leftListRef = useRef(null);
+  //const leftListRef = useRef(null);
 
-  const selectedItemRowRef = useRef(null);
+  //const selectedItemRowRef = useRef(null);
+
+  // useEffect(() => {
+  //   const leftEl = leftListRef.current;
+
+
+  //   const saveLeft = () => {
+  //     sessionStorage.setItem("partiesByPartyPayable:leftScroll", leftEl.scrollTop);
+  //     sessionStorage.setItem("partiesByPartyPayable:leftCount", parties.length);
+  //   };
+
+
+  //   leftEl?.addEventListener("scroll", saveLeft);
+
+
+  //   return () => {
+  //     leftEl?.removeEventListener("scroll", saveLeft);
+
+  //   };
+  // }, [parties.length]);
+
+
+
+  // const hasRestoredLeftRef = useRef(false);
+
+  // useLayoutEffect(() => {
+  //   if (hasRestoredLeftRef.current) return; // only do this once per mount
+  //   if (isLoading || isPartiesFetching) return;
+
+  //   const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 0;
+  //   if (parties.length < savedCount) return;
+
+  //   selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //   hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  // }, [isLoading, isPartiesFetching, parties.length, selectedId]);
+  const virtualLeftListRef = useRef(null);
+  const hasScrolledToSelectedRef = useRef(false);
+  useEffect(() => {
+    hasScrolledToSelectedRef.current = false;
+  }, [leftSearch]);
 
   useEffect(() => {
-    const leftEl = leftListRef.current;
-
-
-    const saveLeft = () => {
-      sessionStorage.setItem("partiesByPartyPayable:leftScroll", leftEl.scrollTop);
-      sessionStorage.setItem("partiesByPartyPayable:leftCount", parties.length);
-    };
-
-
-    leftEl?.addEventListener("scroll", saveLeft);
-
-
-    return () => {
-      leftEl?.removeEventListener("scroll", saveLeft);
-
-    };
-  }, [parties.length]);
-
-
-
-  const hasRestoredLeftRef = useRef(false);
-
-  useLayoutEffect(() => {
-    if (hasRestoredLeftRef.current) return; // only do this once per mount
+    if (hasScrolledToSelectedRef.current) return;
     if (isLoading || isPartiesFetching) return;
+    if (!selectedId || !parties.length) return;
 
-    const savedCount = Number(sessionStorage.getItem("partiesByPartyPayable:leftCount")) || 0;
-    if (parties.length < savedCount) return;
+    const targetIndex = parties.findIndex(
+      (party) => String(party.Party_Id) === String(selectedId)
+    );
 
-    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-  }, [isLoading, isPartiesFetching, parties.length, selectedId]);
+    if (targetIndex === -1) {
+      if (partiesHasMore && partiesNextCursor && !isPartiesFetching) {
+        setLeftCursor(partiesNextCursor);
+      }
+      return;
+    }
 
+    const timer = setTimeout(() => {
+      virtualLeftListRef.current?.scrollToIndex(targetIndex, {
+        align: "center",
+        behavior: "auto",
+      });
+
+      hasScrolledToSelectedRef.current = true;
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [
+    parties,
+    isLoading,
+    isPartiesFetching,
+    selectedId,
+    partiesHasMore,
+    partiesNextCursor,
+  ]);
+  useEffect(() => {
+    sessionStorage.setItem(
+      "partiesByPartyPayable:leftCount",
+      parties.length
+    );
+  }, [parties.length]);
   return (
     <>
       <div className="flex flex-col bg-white"
@@ -1532,17 +1582,27 @@ export default function PartyPayablesLeft() {
           style={{
             flex: 1,
             minHeight: 0,
-            height: "calc(100vh - 180px)",
+             overflowY: "auto",
+            //height: "calc(100vh - 180px)",
             borderTop: "1px solid #e2e8f0",
           }}
         >
           {/* ══ LEFT — 30% — party list ══ */}
-          <div ref={leftListRef}
+          {/* <div
             className="w-full lg:w-[30%] overflow-y-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
               minHeight: "500px",
               maxHeight: "calc(100vh - 180px)",
+            }}
+          > */}
+                  <div
+            className="w-full lg:w-[30%] flex flex-col"
+            style={{
+              borderRight: "1px solid #e2e8f0",
+              height: "100%",
+              minHeight: 0,
+              minWidth: 0,
             }}
           >
             {/* search */}
@@ -1601,135 +1661,182 @@ export default function PartyPayablesLeft() {
               </span>
             </div>
 
-            {isLoading ? (
+            {/* {isLoading ? (
               <div className="p-4 text-gray-400 text-sm">Loading parties...</div>
             ) : parties.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
                 <Users size={36} strokeWidth={1.2} />
                 <p className="text-sm">No parties yet</p>
               </div>
-            ) : (
-              parties.map((party) => {
-                const isSelected = selectedId === party.Party_Id;
-                return (
-                  <div
-                    key={party.Party_Id}
-                    ref={isSelected ? selectedItemRowRef : null}   //  add this
-                    onClick={() => handleSelectParty(party.Party_Id)}
-                    onDoubleClick={() => {
-                      if (party.Party_Name === "Cash Sale") return;
-                      handleSelectParty(party.Party_Id);
-                      handleEdit(party);
-                      setOpenMenuId(null);
-                    }}
-                    className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
-                    style={{
-                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                      borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                      borderBottom: "1px solid #f1f5f9",
-                    }}
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div
-                        className="flex items-center justify-center rounded-lg flex-shrink-0"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
-                        }}
-                      >
-                        <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-                      </div>
-                      {/* <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-                          {party.Party_Name}
-                        </p>
-                        <p className="text-xs truncate text-gray-400">
-                          {party.GSTIN || party.State || "—"}
-                        </p>
-                      </div> */}
-                      <div className="min-w-0">
-                        <p
-                          className="font-semibold text-gray-800 truncate text-sm"
-                          style={{ margin: 0 }}
-                        >
-                          {party.Party_Name}
-                        </p>
+            ) : ( */}
+              <VirtualScrollList
+                ref={virtualLeftListRef}
+                items={parties}
+                rowHeight={64}
+                height="100%"
+                onLoadMore={handleLeftLoadMore}
+                isFetching={isPartiesFetching}
+                hasMore={partiesHasMore}
+                getItemKey={(party) => party.Party_Id}
+                emptyMessage="No parties yet"
+                endMessage="— End of parties —"
+                isRowActive={(party) => openMenuId === party.Party_Id}
+                renderRow={(party) => {
+                  const isSelected =
+                    String(selectedId) === String(party.Party_Id);
 
-                        <p
-                          className="text-xs truncate font-medium"
+                  return (
+                    <div
+                      key={party.Party_Id}
+                      onClick={() => handleSelectParty(party.Party_Id)}
+                      onDoubleClick={() => {
+                        if (party.Party_Name === "Cash Sale") return;
+
+                        handleSelectParty(party.Party_Id);
+                        handleEdit(party);
+                        setOpenMenuId(null);
+                      }}
+                      className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
+                      style={{
+                        backgroundColor: isSelected
+                          ? "#f0f9ff"
+                          : "transparent",
+                        borderLeft: isSelected
+                          ? "3px solid #4CA1AF"
+                          : "3px solid transparent",
+                        borderBottom: "1px solid #f1f5f9",
+                        boxSizing: "border-box",
+                        minHeight: 64,
+                      }}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div
+                          className="flex items-center justify-center rounded-lg flex-shrink-0"
                           style={{
-                            color:
-                              Number(party.Current_Balance) < 0
-                                ? "#dc2626" // red
-                                : "#16a34a", // green
+                            width: 36,
+                            height: 36,
+                            backgroundColor: isSelected
+                              ? "#4CA1AF22"
+                              : "#f1f5f9",
                           }}
                         >
-                          ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
+                          <Users
+                            size={18}
+                            style={{
+                              color: isSelected
+                                ? "#4CA1AF"
+                                : "#94a3b8",
+                            }}
+                          />
+                        </div>
 
-                    {/* 3-dot menu */}
-
-                    {party.Party_Name !== "Cash Sale" && (
-                      <div ref={openMenuId === party.Party_Id ? menuRef : null}
-                        className="flex items-center ml-2 flex-shrink-0 relative">
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-
-                            // Select this party
-                            handleSelectParty(party.Party_Id);
-
-                            // Open/close menu
-                            setOpenMenuId(
-                              openMenuId === party.Party_Id ? null : party.Party_Id
-                            );
-                          }}
-                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                          style={{ backgroundColor: "transparent" }}
-                        >
-                          <MoreVertical size={16} style={{ color: "#374151" }} />
-                        </button>
-
-                        {openMenuId === party.Party_Id && (
-                          <div
-                            className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
-                            style={{ border: "1px solid #e2e8f0", minWidth: 120 }}
-                            onClick={(e) => e.stopPropagation()}
+                        <div className="min-w-0">
+                          <p
+                            className="font-semibold text-gray-800 truncate text-sm"
+                            style={{ margin: 0 }}
                           >
-                            <button
-                              type="button"
-                              //onClick={handleEdit}
-                              onClick={() => handleEdit(party)}
-                              className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-                              style={{ backgroundColor: "transparent" }}
-                            >
-                              <SquarePen size={14} style={{ color: "#4CA1AF" }} /> Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuId(null);
-                              }}
-                              className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-                              style={{ backgroundColor: "transparent" }}
-                            >
-                              <Trash2 size={14} style={{ color: "#dc2626" }} /> Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                            {party.Party_Name}
+                          </p>
 
-                  </div>
-                );
-              })
-            )}
-            <div ref={leftSentinelRef} style={{ height: "1px" }} />
+                          <p
+                            className="text-xs truncate font-medium"
+                            style={{
+                              color:
+                                Number(party.Current_Balance) < 0
+                                  ? "#dc2626"
+                                  : "#16a34a",
+                            }}
+                          >
+                            ₹{" "}
+                            {Math.abs(
+                              Number(party.Current_Balance || 0)
+                            ).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 3-dot menu */}
+                      {party.Party_Name !== "Cash Sale" && (
+                        <div
+                          ref={
+                            openMenuId === party.Party_Id
+                              ? menuRef
+                              : null
+                          }
+                          className="flex items-center ml-2 flex-shrink-0 relative"
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+
+                              handleSelectParty(party.Party_Id);
+
+                              setOpenMenuId(
+                                openMenuId === party.Party_Id
+                                  ? null
+                                  : party.Party_Id
+                              );
+                            }}
+                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                            style={{ backgroundColor: "transparent" }}
+                          >
+                            <MoreVertical
+                              size={16}
+                              style={{ color: "#374151" }}
+                            />
+                          </button>
+
+                          {openMenuId === party.Party_Id && (
+                            <div
+                              className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
+                              style={{
+                                border: "1px solid #e2e8f0",
+                                minWidth: 120,
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(party)}
+                                className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+                                style={{ backgroundColor: "transparent" }}
+                              >
+                                <SquarePen
+                                  size={14}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+                                style={{ backgroundColor: "transparent" }}
+                              >
+                                <Trash2
+                                  size={14}
+                                  style={{ color: "#dc2626" }}
+                                />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+
+            {/* )} */}
+            {/* <div ref={leftSentinelRef} style={{ height: "1px" }} />
 
             {isPartiesFetching && leftCursor && (
               <div className="flex justify-center py-3">
@@ -1741,7 +1848,7 @@ export default function PartyPayablesLeft() {
               <div className="flex justify-center py-3">
                 <span className="text-xs text-gray-300">— End of parties —</span>
               </div>
-            )}
+            )} */}
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
@@ -1775,3 +1882,130 @@ export default function PartyPayablesLeft() {
     </>
   );
 }
+
+
+
+
+
+
+
+
+// parties.map((party) => {
+//                 const isSelected = selectedId === party.Party_Id;
+//                 return (
+//                   <div
+//                     key={party.Party_Id}
+//                     ref={isSelected ? selectedItemRowRef : null}   //  add this
+//                     onClick={() => handleSelectParty(party.Party_Id)}
+//                     onDoubleClick={() => {
+//                       if (party.Party_Name === "Cash Sale") return;
+//                       handleSelectParty(party.Party_Id);
+//                       handleEdit(party);
+//                       setOpenMenuId(null);
+//                     }}
+//                     className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
+//                     style={{
+//                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+//                       borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+//                       borderBottom: "1px solid #f1f5f9",
+//                     }}
+//                   >
+//                     <div className="flex items-center gap-3 flex-1 min-w-0">
+//                       <div
+//                         className="flex items-center justify-center rounded-lg flex-shrink-0"
+//                         style={{
+//                           width: 36,
+//                           height: 36,
+//                           backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+//                         }}
+//                       >
+//                         <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+//                       </div>
+//                       {/* <div className="min-w-0">
+//                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+//                           {party.Party_Name}
+//                         </p>
+//                         <p className="text-xs truncate text-gray-400">
+//                           {party.GSTIN || party.State || "—"}
+//                         </p>
+//                       </div> */}
+//                       <div className="min-w-0">
+//                         <p
+//                           className="font-semibold text-gray-800 truncate text-sm"
+//                           style={{ margin: 0 }}
+//                         >
+//                           {party.Party_Name}
+//                         </p>
+
+//                         <p
+//                           className="text-xs truncate font-medium"
+//                           style={{
+//                             color:
+//                               Number(party.Current_Balance) < 0
+//                                 ? "#dc2626" // red
+//                                 : "#16a34a", // green
+//                           }}
+//                         >
+//                           ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                         </p>
+//                       </div>
+//                     </div>
+
+//                     {/* 3-dot menu */}
+
+//                     {party.Party_Name !== "Cash Sale" && (
+//                       <div ref={openMenuId === party.Party_Id ? menuRef : null}
+//                         className="flex items-center ml-2 flex-shrink-0 relative">
+
+//                         <button
+//                           type="button"
+//                           onClick={(e) => {
+//                             e.stopPropagation();
+
+//                             // Select this party
+//                             handleSelectParty(party.Party_Id);
+
+//                             // Open/close menu
+//                             setOpenMenuId(
+//                               openMenuId === party.Party_Id ? null : party.Party_Id
+//                             );
+//                           }}
+//                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                           style={{ backgroundColor: "transparent" }}
+//                         >
+//                           <MoreVertical size={16} style={{ color: "#374151" }} />
+//                         </button>
+
+//                         {openMenuId === party.Party_Id && (
+//                           <div
+//                             className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
+//                             style={{ border: "1px solid #e2e8f0", minWidth: 120 }}
+//                             onClick={(e) => e.stopPropagation()}
+//                           >
+//                             <button
+//                               type="button"
+//                               //onClick={handleEdit}
+//                               onClick={() => handleEdit(party)}
+//                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+//                               style={{ backgroundColor: "transparent" }}
+//                             >
+//                               <SquarePen size={14} style={{ color: "#4CA1AF" }} /> Edit
+//                             </button>
+//                             <button
+//                               type="button"
+//                               onClick={() => {
+//                                 setOpenMenuId(null);
+//                               }}
+//                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+//                               style={{ backgroundColor: "transparent" }}
+//                             >
+//                               <Trash2 size={14} style={{ color: "#dc2626" }} /> Delete
+//                             </button>
+//                           </div>
+//                         )}
+//                       </div>
+//                     )}
+
+//                   </div>
+//                 );
+//               })

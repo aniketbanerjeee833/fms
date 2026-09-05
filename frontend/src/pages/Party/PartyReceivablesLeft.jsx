@@ -144,11 +144,11 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const { data: banks = [] } = useGetAllBankAccountsQuery();
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
- const initialRightLimit = useRef(
-  Number(sessionStorage.getItem("partiesByPartyReceivable:rightCount")) || 10
-    );
+  const initialRightLimit = useRef(
+    Number(sessionStorage.getItem("partiesByPartyReceivable:rightCount")) || 10
+  );
   const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
-    { Party_Id: partyId, cursor, search,limit: initialRightLimit.current },
+    { Party_Id: partyId, cursor, search, limit: initialRightLimit.current },
     { skip: !partyId }
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
@@ -247,7 +247,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const ledger = data?.transactions || [];
   const hasMore = data?.hasMore ?? false;
   const nextCursor = data?.nextCursor ?? null;
-const handleLoadMore = useCallback(() => {
+  const handleLoadMore = useCallback(() => {
     if (!hasMore || !nextCursor || isFetching) return;
     setCursor(nextCursor);
   }, [hasMore, nextCursor, isFetching]);
@@ -457,13 +457,13 @@ const handleLoadMore = useCallback(() => {
     }
   }, [bulkPartyPrintReportData, showPartyBulkPrintReview]);
   // const rightPanelRef = useRef(null);
-     
+
   // const highlightedRowRef = useRef(null);
   //     useEffect(() => {
-          
+
   //         const rightEl = rightPanelRef.current;
-  
-         
+
+
   //         const saveRight = () => {
   //             console.log("saveRight fired", rightEl.scrollTop, ledger.length);
   //             sessionStorage.setItem("partiesByPartyReceivable:rightScroll", rightEl.scrollTop);
@@ -471,99 +471,99 @@ const handleLoadMore = useCallback(() => {
   //             // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
   //             // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
   //         };
-  
-         
+
+
   //         rightEl?.addEventListener("scroll", saveRight);
-  
+
   //         return () => {
-              
+
   //             rightEl?.removeEventListener("scroll", saveRight);
   //         };
   //     }, [ ledger.length]);
   // const hasRestoredRightRef = useRef(false);
   //  const [isRestoringRight, setIsRestoringRight] = useState(true);
-  
-  
+
+
   //  useLayoutEffect(() => {
   //     if (hasRestoredRightRef.current) {
   //         setIsRestoringRight(false);
   //         return;
   //     }
   //     if (isLoading || isFetching) return;
-  
+
   //     const savedCount = Number(sessionStorage.getItem("partiesByPartyReceivable:rightCount")) || 0;
   //      // keep waiting only if we might still get more data
   //     if (ledger.length < savedCount && hasMore) return;
-  
+
   //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
   //     hasRestoredRightRef.current = true;
   //     setIsRestoringRight(false); // reveal now, correctly positioned
   // }, [isLoading, isFetching, ledger.length, hasMore]);
   const virtualListRef = useRef(null);
-    const hasScrolledToHighlightRef = useRef(false);
-  
-    useEffect(() => {
-      if (hasScrolledToHighlightRef.current) return;
-  
-      const highlightTxnId =
-        searchParams.get("highlightTxn");
-  
-      if (!highlightTxnId) return;
-      if (isLoading || isFetching) return;
-      if (!ledger?.length) return;
-  
-      const targetIndex = ledger.findIndex((row) => {
-        const refId =
-          row.Sale_Id ||
-          row.Purchase_Id ||
-          row.Expense_Id ||
-          row.Sale_Return_Id ||
-          row.Purchase_Return_Id ||
-          row.Payment_In_Id ||
-          row.Payment_Out_Id;
-  
-        const transactionId =
-          row.Expense_Id ||
-          row.Formatted_Reference_Id ||
-          refId;
-  
-        return (
-          String(transactionId) ===
-          String(highlightTxnId)
-        );
-      });
-  
-      if (targetIndex === -1) {
-        if (hasMore && !isFetching) {
-          handleLoadMore();
-        }
-        return;
+  const hasScrolledToHighlightRef = useRef(false);
+
+  useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+
+    const highlightTxnId =
+      searchParams.get("highlightTxn");
+
+    if (!highlightTxnId) return;
+    if (isLoading || isFetching) return;
+    if (!ledger?.length) return;
+
+    const targetIndex = ledger.findIndex((row) => {
+      const refId =
+        row.Sale_Id ||
+        row.Purchase_Id ||
+        row.Expense_Id ||
+        row.Sale_Return_Id ||
+        row.Purchase_Return_Id ||
+        row.Payment_In_Id ||
+        row.Payment_Out_Id;
+
+      const transactionId =
+        row.Expense_Id ||
+        row.Formatted_Reference_Id ||
+        refId;
+
+      return (
+        String(transactionId) ===
+        String(highlightTxnId)
+      );
+    });
+
+    if (targetIndex === -1) {
+      if (hasMore && !isFetching) {
+        handleLoadMore();
       }
-  
-      const timer = setTimeout(() => {
-        virtualListRef.current?.scrollToIndex(
-          targetIndex,
-          {
-            align: "center",
-            behavior: "auto",
-          }
-        );
-  
-        hasScrolledToHighlightRef.current = true;
-      }, 100);
-  
-      return () => clearTimeout(timer);
-    }, [
-      ledger,
-      isLoading,
-      isFetching,
-      hasMore,
-      searchParams,
-      handleLoadMore,
-    ]);
-    useEffect(() => {
-      hasScrolledToHighlightRef.current = false;
-    }, [partyId]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      virtualListRef.current?.scrollToIndex(
+        targetIndex,
+        {
+          align: "center",
+          behavior: "auto",
+        }
+      );
+
+      hasScrolledToHighlightRef.current = true;
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [
+    ledger,
+    isLoading,
+    isFetching,
+    hasMore,
+    searchParams,
+    handleLoadMore,
+  ]);
+  useEffect(() => {
+    hasScrolledToHighlightRef.current = false;
+  }, [partyId]);
   if (!partyId) {
     return (
       <div
@@ -601,12 +601,12 @@ const handleLoadMore = useCallback(() => {
     a.click();
     document.body.removeChild(a);
   };
-  
+
   return (
     // <div ref={rightPanelRef}
-    <div 
-     className="flex flex-col "
-      
+    <div
+      className="flex flex-col "
+
       style={{
         flex: 1,
         minHeight: 0,
@@ -714,39 +714,39 @@ const handleLoadMore = useCallback(() => {
           </div>
 
         </div>
-       
+
       </div>
-       <div className="flex justify-end gap-2 mr-2">
-          <button
-            type="button"
-            onClick={handleExportPartyReportExcel}
-            className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
+      <div className="flex justify-end gap-2 mr-2">
+        <button
+          type="button"
+          onClick={handleExportPartyReportExcel}
+          className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 
                                                                                 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
-            title="Export to Excel"
-          >
-            <FileSpreadsheet
-              size={16}
-              strokeWidth={2.2}
-              className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
-            />
-            {/* Export Excel */}
-          </button>
-          <button
-            type="button"
-            onClick={handlePrintAllClick}
-            disabled={isBulkPartyFetching}
-            className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
-            title="Print  Reports"
-          >
-            <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
-            {isBulkPartyFetching && <span>Loading...</span>}
-          </button>
+          title="Export to Excel"
+        >
+          <FileSpreadsheet
+            size={16}
+            strokeWidth={2.2}
+            className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+          />
+          {/* Export Excel */}
+        </button>
+        <button
+          type="button"
+          onClick={handlePrintAllClick}
+          disabled={isBulkPartyFetching}
+          className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+          title="Print  Reports"
+        >
+          <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600 transition-transform duration-200 group-hover:scale-110" />
+          {isBulkPartyFetching && <span>Loading...</span>}
+        </button>
 
 
-        </div>
+      </div>
 
       {/* ── LEDGER TABLE ── */}
-      
+
       <div
         style={{
           flex: 1,
@@ -1351,9 +1351,9 @@ export default function PartyReceivablesLeft() {
   const [openMenuId, setOpenMenuId] = useState(null); // 3-dot menu
   const [partyModal, setPartyModal] = useState({ open: false, mode: "add", data: null });
   const [leftCursor, setLeftCursor] = useState(null);
-  const leftSentinelRef = useRef(null);
-  const leftObserverRef = useRef(null);
-   const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByPartyReceivable:leftCount")) || 10);
+  //const leftSentinelRef = useRef(null);
+  //const leftObserverRef = useRef(null);
+  const initialLeftLimit = useRef(Number(sessionStorage.getItem("partiesByPartyReceivable:leftCount")) || 10);
   const { data: partiesData, isLoading: isLoading,
     isFetching: isPartiesFetching } =
     useGetAllReceivablePartiesQuery({
@@ -1392,43 +1392,47 @@ export default function PartyReceivablesLeft() {
   };
   const partiesHasMore = partiesData?.hasMore ?? false;
   const partiesNextCursor = partiesData?.nextCursor ?? null;
+  const handleLeftLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
 
-  useEffect(() => {
-    setLeftCursor(null);
-  }, [leftSearch]);
+    setLeftCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching])
+  // useEffect(() => {
+  //   setLeftCursor(null);
+  // }, [leftSearch]);
 
-  const handleLeftObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        partiesHasMore &&
-        partiesNextCursor &&
-        !isPartiesFetching &&
-        !isLoading
-      ) {
-        setLeftCursor(partiesNextCursor);
-      }
-    },
-    [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
-  );
+  // const handleLeftObserver = useCallback(
+  //   (entries) => {
+  //     if (
+  //       entries[0].isIntersecting &&
+  //       partiesHasMore &&
+  //       partiesNextCursor &&
+  //       !isPartiesFetching &&
+  //       !isLoading
+  //     ) {
+  //       setLeftCursor(partiesNextCursor);
+  //     }
+  //   },
+  //   [partiesHasMore, partiesNextCursor, isPartiesFetching, isLoading]
+  // );
 
-  useEffect(() => {
-    if (leftObserverRef.current) {
-      leftObserverRef.current.disconnect();
-    }
+  // useEffect(() => {
+  //   if (leftObserverRef.current) {
+  //     leftObserverRef.current.disconnect();
+  //   }
 
-    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
+  //   leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
 
-    if (leftSentinelRef.current) {
-      leftObserverRef.current.observe(leftSentinelRef.current);
-    }
+  //   if (leftSentinelRef.current) {
+  //     leftObserverRef.current.observe(leftSentinelRef.current);
+  //   }
 
-    return () => leftObserverRef.current?.disconnect();
-  }, [handleLeftObserver]);
+  //   return () => leftObserverRef.current?.disconnect();
+  // }, [handleLeftObserver]);
   const handleEdit = (party) => {
     console.log("Editing party:", party);
     setPartyModal({
@@ -1455,51 +1459,96 @@ export default function PartyReceivablesLeft() {
     };
   }, []);
 
- const leftListRef = useRef(null);
-      
-      const selectedItemRowRef = useRef(null);
-  
-      useEffect(() => {
-          const leftEl = leftListRef.current;
-          
-  
-          const saveLeft = () => {
-              sessionStorage.setItem("partiesByPartyReceivable:leftScroll", leftEl.scrollTop);
-              sessionStorage.setItem("partiesByPartyReceivable:leftCount", parties.length);
-          };
-         
-  
-          leftEl?.addEventListener("scroll", saveLeft);
-          
-  
-          return () => {
-              leftEl?.removeEventListener("scroll", saveLeft);
-              
-          };
-      }, [parties.length]);
-  
-  
-  
-  const hasRestoredLeftRef = useRef(false);
-  
-  useLayoutEffect(() => {
-      if (hasRestoredLeftRef.current) return; // only do this once per mount
-      if (isLoading || isPartiesFetching) return;
-  
-      const savedCount = Number(sessionStorage.getItem("partiesByPartyReceivable:leftCount")) || 0;
-      if (parties.length < savedCount) return;
-  
-      selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-      hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-  }, [isLoading, isPartiesFetching, parties.length, selectedId]);
-  
+  //  const leftListRef = useRef(null);
 
+  //       const selectedItemRowRef = useRef(null);
+
+  //       useEffect(() => {
+  //           const leftEl = leftListRef.current;
+
+
+  //           const saveLeft = () => {
+  //               sessionStorage.setItem("partiesByPartyReceivable:leftScroll", leftEl.scrollTop);
+  //               sessionStorage.setItem("partiesByPartyReceivable:leftCount", parties.length);
+  //           };
+
+
+  //           leftEl?.addEventListener("scroll", saveLeft);
+
+
+  //           return () => {
+  //               leftEl?.removeEventListener("scroll", saveLeft);
+
+  //           };
+  //       }, [parties.length]);
+
+
+
+  //   const hasRestoredLeftRef = useRef(false);
+
+  //   useLayoutEffect(() => {
+  //       if (hasRestoredLeftRef.current) return; // only do this once per mount
+  //       if (isLoading || isPartiesFetching) return;
+
+  //       const savedCount = Number(sessionStorage.getItem("partiesByPartyReceivable:leftCount")) || 0;
+  //       if (parties.length < savedCount) return;
+
+  //       selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //       hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  //   }, [isLoading, isPartiesFetching, parties.length, selectedId]);
+
+  const virtualLeftListRef = useRef(null);
+  const hasScrolledToSelectedRef = useRef(false);
+  useEffect(() => {
+    hasScrolledToSelectedRef.current = false;
+  }, [leftSearch]);
+
+  useEffect(() => {
+    if (hasScrolledToSelectedRef.current) return;
+    if (isLoading || isPartiesFetching) return;
+    if (!selectedId || !parties.length) return;
+
+    const targetIndex = parties.findIndex(
+      (party) => String(party.Party_Id) === String(selectedId)
+    );
+
+    if (targetIndex === -1) {
+      if (partiesHasMore && partiesNextCursor && !isPartiesFetching) {
+        setLeftCursor(partiesNextCursor);
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      virtualLeftListRef.current?.scrollToIndex(targetIndex, {
+        align: "center",
+        behavior: "auto",
+      });
+
+      hasScrolledToSelectedRef.current = true;
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [
+    parties,
+    isLoading,
+    isPartiesFetching,
+    selectedId,
+    partiesHasMore,
+    partiesNextCursor,
+  ]);
+  useEffect(() => {
+    sessionStorage.setItem(
+      "partiesByPartyReceivable:leftCount",
+      parties.length
+    );
+  }, [parties.length]);
   return (
     <>
       <div className="flex flex-col bg-white"
-       style={{ height: "100vh", overflow: "hidden" }}
+        style={{ height: "100vh", overflow: "hidden" }}
       //  style={{ minHeight: "100vh" }}
-       >
+      >
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
           <div className="flex flex-row justify-between items-center">
@@ -1519,19 +1568,24 @@ export default function PartyReceivablesLeft() {
         </div>
 
         {/* ── SPLIT LAYOUT ── */}
-        <div 
-        className="flex flex-col lg:flex-row gap-0"
-             style={{
+        <div
+          className="flex flex-col lg:flex-row gap-0"
+          style={{
             flex: 1,
-            minHeight:0,
+            minHeight: 0,
             height: "calc(100vh - 180px)",
             borderTop: "1px solid #e2e8f0",
           }}
-         >
+        >
           {/* ══ LEFT — 30% — party list ══ */}
-          <div ref={leftListRef}
-            className="w-full lg:w-[30%] overflow-y-auto"
-          
+          <div
+            className="w-full lg:w-[30%] flex flex-col"
+             style={{
+              borderRight: "1px solid #e2e8f0",
+              height: "100%",
+              minHeight: 0,
+              minWidth: 0,
+            }}
           >
             {/* search */}
             <div
@@ -1589,135 +1643,202 @@ export default function PartyReceivablesLeft() {
               </span>
             </div>
 
-            {isLoading ? (
+            {/* {isLoading ? (
               <div className="p-4 text-gray-400 text-sm">Loading parties...</div>
             ) : parties.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
                 <Users size={36} strokeWidth={1.2} />
                 <p className="text-sm">No parties yet</p>
               </div>
-            ) : (
-              parties.map((party) => {
-                const isSelected = selectedId === party.Party_Id;
-                return (
-                  <div
-                    key={party.Party_Id}
-                    ref={isSelected ? selectedItemRowRef : null} 
-                    onClick={() => handleSelectParty(party.Party_Id)}
-                    onDoubleClick={() => {
-                      if (party.Party_Name === "Cash Sale") return;
-                      handleSelectParty(party.Party_Id);
-                      handleEdit(party);
-                      setOpenMenuId(null);
-                    }}
-                    className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
-                    style={{
-                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                      borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                      borderBottom: "1px solid #f1f5f9",
-                    }}
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
+            ) : ( */}
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  height: 0,
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                
+                <VirtualScrollList
+                  ref={virtualLeftListRef}
+                  items={parties}
+                  rowHeight={64}
+                  height="100%"
+                  onLoadMore={handleLeftLoadMore}
+                  isFetching={isPartiesFetching}
+                  hasMore={partiesHasMore}
+                  getItemKey={(party) => party.Party_Id}
+                  emptyMessage="No parties yet"
+                  endMessage="— End of parties —"
+                  isRowActive={(party) => openMenuId === party.Party_Id}
+                  renderRow={(party) => {
+                    const isSelected =
+                      String(selectedId) === String(party.Party_Id);
+
+                    return (
                       <div
-                        className="flex items-center justify-center rounded-lg flex-shrink-0"
+                        key={party.Party_Id}
+                        onClick={() => handleSelectParty(party.Party_Id)}
+                        onDoubleClick={() => {
+                          if (party.Party_Name === "Cash Sale") return;
+
+                          handleSelectParty(party.Party_Id);
+                          handleEdit(party);
+                          setOpenMenuId(null);
+                        }}
+                        className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
                         style={{
-                          width: 36,
-                          height: 36,
-                          backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+                          backgroundColor: isSelected
+                            ? "#f0f9ff"
+                            : "transparent",
+                          borderLeft: isSelected
+                            ? "3px solid #4CA1AF"
+                            : "3px solid transparent",
+                          borderBottom: "1px solid #f1f5f9",
+                          boxSizing: "border-box",
+                          minHeight: 64,
                         }}
                       >
-                        <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-                      </div>
-                      {/* <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-                          {party.Party_Name}
-                        </p>
-                        <p className="text-xs truncate text-gray-400">
-                          {party.GSTIN || party.State || "—"}
-                        </p>
-                      </div> */}
-                      <div className="min-w-0">
-                        <p
-                          className="font-semibold text-gray-800 truncate text-sm"
-                          style={{ margin: 0 }}
-                        >
-                          {party.Party_Name}
-                        </p>
-
-                        <p
-                          className="text-xs truncate font-medium"
-                          style={{
-                            color:
-                              Number(party.Current_Balance) < 0
-                                ? "#dc2626" // red
-                                : "#16a34a", // green
-                          }}
-                        >
-                          ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 3-dot menu */}
-
-                    {party.Party_Name !== "Cash Sale" && (
-                      <div ref={openMenuId === party.Party_Id ? menuRef : null}
-                        className="flex items-center ml-2 flex-shrink-0 relative">
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-
-                            // Select this party
-                            handleSelectParty(party.Party_Id);
-
-                            // Open/close menu
-                            setOpenMenuId(
-                              openMenuId === party.Party_Id ? null : party.Party_Id
-                            );
-                          }}
-                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                          style={{ backgroundColor: "transparent" }}
-                        >
-                          <MoreVertical size={16} style={{ color: "#374151" }} />
-                        </button>
-
-                        {openMenuId === party.Party_Id && (
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div
-                            className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
-                            style={{ border: "1px solid #e2e8f0", minWidth: 120 }}
-                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center justify-center rounded-lg flex-shrink-0"
+                            style={{
+                              width: 36,
+                              height: 36,
+                              backgroundColor: isSelected
+                                ? "#4CA1AF22"
+                                : "#f1f5f9",
+                            }}
+                          >
+                            <Users
+                              size={18}
+                              style={{
+                                color: isSelected
+                                  ? "#4CA1AF"
+                                  : "#94a3b8",
+                              }}
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <p
+                              className="font-semibold text-gray-800 truncate text-sm"
+                              style={{ margin: 0 }}
+                            >
+                              {party.Party_Name}
+                            </p>
+
+                            <p
+                              className="text-xs truncate font-medium"
+                              style={{
+                                color:
+                                  Number(party.Current_Balance) < 0
+                                    ? "#dc2626"
+                                    : "#16a34a",
+                              }}
+                            >
+                              ₹{" "}
+                              {Math.abs(
+                                Number(party.Current_Balance || 0)
+                              ).toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 3-dot menu */}
+                        {party.Party_Name !== "Cash Sale" && (
+                          <div
+                            ref={
+                              openMenuId === party.Party_Id
+                                ? menuRef
+                                : null
+                            }
+                            className="flex items-center ml-2 flex-shrink-0 relative"
                           >
                             <button
                               type="button"
-                              //onClick={handleEdit}
-                              onClick={() => handleEdit(party)}
-                              className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-                              style={{ backgroundColor: "transparent" }}
-                            >
-                              <SquarePen size={14} style={{ color: "#4CA1AF" }} /> Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuId(null);
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                handleSelectParty(party.Party_Id);
+
+                                setOpenMenuId(
+                                  openMenuId === party.Party_Id
+                                    ? null
+                                    : party.Party_Id
+                                );
                               }}
-                              className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-                              style={{ backgroundColor: "transparent" }}
+                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                              }}
                             >
-                              <Trash2 size={14} style={{ color: "#dc2626" }} /> Delete
+                              <MoreVertical
+                                size={16}
+                                style={{ color: "#374151" }}
+                              />
                             </button>
+
+                            {openMenuId === party.Party_Id && (
+                              <div
+                                className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
+                                style={{
+                                  border: "1px solid #e2e8f0",
+                                  minWidth: 120,
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleEdit(party);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+                                  style={{
+                                    backgroundColor: "transparent",
+                                  }}
+                                >
+                                  <SquarePen
+                                    size={14}
+                                    style={{ color: "#4CA1AF" }}
+                                  />
+                                  Edit
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+                                  style={{
+                                    backgroundColor: "transparent",
+                                  }}
+                                >
+                                  <Trash2
+                                    size={14}
+                                    style={{ color: "#dc2626" }}
+                                  />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-
-                  </div>
-                );
-              })
-            )}
-            <div ref={leftSentinelRef} style={{ height: "1px" }} />
+                    );
+                  }}
+                />
+                
+              </div>
+            {/* // )} */}
+            {/* <div ref={leftSentinelRef} style={{ height: "1px" }} />
 
             {isPartiesFetching && leftCursor && (
               <div className="flex justify-center py-3">
@@ -1729,14 +1850,14 @@ export default function PartyReceivablesLeft() {
               <div className="flex justify-center py-3">
                 <span className="text-xs text-gray-300">— End of parties —</span>
               </div>
-            )}
+            )} */}
           </div>
 
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           <div className="w-full lg:w-[70%] p-1"
-          // style={{ height: "100%", minHeight: 0 }}
-           style={{
+            // style={{ height: "100%", minHeight: 0 }}
+            style={{
               height: "100%",
               minHeight: 0,
               display: "flex",        // 👈 add this
@@ -1762,3 +1883,130 @@ export default function PartyReceivablesLeft() {
     </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// <div
+//                     key={party.Party_Id}
+//                     ref={isSelected ? selectedItemRowRef : null}
+//                     onClick={() => handleSelectParty(party.Party_Id)}
+//                     onDoubleClick={() => {
+//                       if (party.Party_Name === "Cash Sale") return;
+//                       handleSelectParty(party.Party_Id);
+//                       handleEdit(party);
+//                       setOpenMenuId(null);
+//                     }}
+//                     className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
+//                     style={{
+//                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+//                       borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+//                       borderBottom: "1px solid #f1f5f9",
+//                     }}
+//                   >
+//                     <div className="flex items-center gap-3 flex-1 min-w-0">
+//                       <div
+//                         className="flex items-center justify-center rounded-lg flex-shrink-0"
+//                         style={{
+//                           width: 36,
+//                           height: 36,
+//                           backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+//                         }}
+//                       >
+//                         <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+//                       </div>
+//                       {/* <div className="min-w-0">
+//                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+//                           {party.Party_Name}
+//                         </p>
+//                         <p className="text-xs truncate text-gray-400">
+//                           {party.GSTIN || party.State || "—"}
+//                         </p>
+//                       </div> */}
+//                       <div className="min-w-0">
+//                         <p
+//                           className="font-semibold text-gray-800 truncate text-sm"
+//                           style={{ margin: 0 }}
+//                         >
+//                           {party.Party_Name}
+//                         </p>
+
+//                         <p
+//                           className="text-xs truncate font-medium"
+//                           style={{
+//                             color:
+//                               Number(party.Current_Balance) < 0
+//                                 ? "#dc2626" // red
+//                                 : "#16a34a", // green
+//                           }}
+//                         >
+//                           ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                         </p>
+//                       </div>
+//                     </div>
+
+//                     {/* 3-dot menu */}
+
+//                     {party.Party_Name !== "Cash Sale" && (
+//                       <div ref={openMenuId === party.Party_Id ? menuRef : null}
+//                         className="flex items-center ml-2 flex-shrink-0 relative">
+
+//                         <button
+//                           type="button"
+//                           onClick={(e) => {
+//                             e.stopPropagation();
+
+//                             // Select this party
+//                             handleSelectParty(party.Party_Id);
+
+//                             // Open/close menu
+//                             setOpenMenuId(
+//                               openMenuId === party.Party_Id ? null : party.Party_Id
+//                             );
+//                           }}
+//                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                           style={{ backgroundColor: "transparent" }}
+//                         >
+//                           <MoreVertical size={16} style={{ color: "#374151" }} />
+//                         </button>
+
+//                         {openMenuId === party.Party_Id && (
+//                           <div
+//                             className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
+//                             style={{ border: "1px solid #e2e8f0", minWidth: 120 }}
+//                             onClick={(e) => e.stopPropagation()}
+//                           >
+//                             <button
+//                               type="button"
+//                               //onClick={handleEdit}
+//                               onClick={() => handleEdit(party)}
+//                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+//                               style={{ backgroundColor: "transparent" }}
+//                             >
+//                               <SquarePen size={14} style={{ color: "#4CA1AF" }} /> Edit
+//                             </button>
+//                             <button
+//                               type="button"
+//                               onClick={() => {
+//                                 setOpenMenuId(null);
+//                               }}
+//                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+//                               style={{ backgroundColor: "transparent" }}
+//                             >
+//                               <Trash2 size={14} style={{ color: "#dc2626" }} /> Delete
+//                             </button>
+//                           </div>
+//                         )}
+//                       </div>
+//                     )}
+
+//                   </div>

@@ -40,7 +40,7 @@ import { useReactToPrint } from "react-to-print";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
-
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 const fmt = (n) =>
     Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -93,8 +93,8 @@ export default function ItemsByItem() {
     };
     /* ── LEFT — item list cursor pagination (mirrors the right-side bills pattern) ── */
     const [leftCursor, setLeftCursor] = useState(null);
-    const leftSentinelRef = useRef(null);
-    const leftObserverRef = useRef(null);
+    //const leftSentinelRef = useRef(null);
+    //const leftObserverRef = useRef(null);
     const initialLeftLimit = useRef(Number(sessionStorage.getItem("itemsByItem:leftCount")) || 10);
     const {
         data: itemsResponse,
@@ -112,7 +112,11 @@ export default function ItemsByItem() {
     const totalItems = itemsResponse?.totalItems || 0;
     const itemsHasMore = itemsResponse?.hasMore ?? false;
     const itemsNextCursor = itemsResponse?.nextCursor ?? null;
+    const handleLeftLoadMore = useCallback(() => {
+        if (!itemsHasMore || !itemsNextCursor || isItemsFetching) return;
 
+        setLeftCursor(itemsNextCursor);
+    }, [itemsHasMore, itemsNextCursor, isItemsFetching]);
     // reset left cursor whenever the item search changes — starts a fresh page-1 fetch
     // (matches serializeQueryArgs, which keys the cache purely on `search`)
     // useEffect(() => {
@@ -127,46 +131,47 @@ export default function ItemsByItem() {
             setSearchParams(next, { replace: true });
         }
     }, [items, selectedItemId, itemTypeTab]);
+
     useEffect(() => {
         setLeftCursor(null);
     }, [itemSearch, itemTypeTab]);
 
 
-    const handleLeftObserver = useCallback(
+    // const handleLeftObserver = useCallback(
 
-        (entries) => {
-            //if (isRestoringLeft) return;
-            if (
+    //     (entries) => {
+    //         //if (isRestoringLeft) return;
+    //         if (
 
-                entries[0].isIntersecting &&
-                itemsHasMore &&
-                itemsNextCursor &&
-                !isItemsFetching &&
-                !isLoading
-            ) {
-                setLeftCursor(itemsNextCursor);
-            }
-        },
-        [itemsHasMore, itemsNextCursor, isItemsFetching, isLoading]
-    );
+    //             entries[0].isIntersecting &&
+    //             itemsHasMore &&
+    //             itemsNextCursor &&
+    //             !isItemsFetching &&
+    //             !isLoading
+    //         ) {
+    //             setLeftCursor(itemsNextCursor);
+    //         }
+    //     },
+    //     [itemsHasMore, itemsNextCursor, isItemsFetching, isLoading]
+    // );
 
-    useEffect(() => {
-        if (leftObserverRef.current) {
-            leftObserverRef.current.disconnect();
-        }
+    // useEffect(() => {
+    //     if (leftObserverRef.current) {
+    //         leftObserverRef.current.disconnect();
+    //     }
 
-        leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
-            root: null,
-            rootMargin: "0px",
-            threshold: 0.1,
-        });
+    //     leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+    //         root: null,
+    //         rootMargin: "0px",
+    //         threshold: 0.1,
+    //     });
 
-        if (leftSentinelRef.current) {
-            leftObserverRef.current.observe(leftSentinelRef.current);
-        }
+    //     if (leftSentinelRef.current) {
+    //         leftObserverRef.current.observe(leftSentinelRef.current);
+    //     }
 
-        return () => leftObserverRef.current?.disconnect();
-    }, [handleLeftObserver]);
+    //     return () => leftObserverRef.current?.disconnect();
+    // }, [handleLeftObserver]);
 
     const [menuOpen, setMenuOpen] = useState(null);
     const [rowMenuOpen, setRowMenuOpen] = useState(null);
@@ -178,8 +183,8 @@ export default function ItemsByItem() {
     ///const [selectedItemMeta, setSelectedItemMeta] = useState(null);
     // ── RIGHT — transactions cursor pagination (unchanged) ──
     const [cursor, setCursor] = useState(null);
-    const sentinelRef = useRef(null);
-    const observerRef = useRef(null);
+    //const sentinelRef = useRef(null);
+    //const observerRef = useRef(null);
     const itemRef = useRef(selectedItemId);
 
     const effectiveCursor = itemRef.current === selectedItemId ? cursor : null;
@@ -230,49 +235,55 @@ export default function ItemsByItem() {
         setCursor(null);
     }, [selectedItemId, txnSearch]);
 
-    const handleObserver = useCallback(
-        (entries) => {
-            //if(isRestoringRight) return;
-            if (
+    const handleRightLoadMore = useCallback(() => {
+        if (!hasMore || !nextCursor || isBillsFetching) return;
 
-                entries[0].isIntersecting &&
-                hasMore &&
-                nextCursor &&
-                !isBillsFetching &&
-                !isBillsLoading
-            ) {
-                setCursor(nextCursor);
-            }
-        },
-        [
-            hasMore,
-            nextCursor,
-            isBillsFetching,
-            isBillsLoading,
+        setCursor(nextCursor);
+    }, [hasMore, nextCursor, isBillsFetching]);
 
-        ]
-    );
+    // const handleObserver = useCallback(
+    //     (entries) => {
+    //         //if(isRestoringRight) return;
+    //         if (
 
-    useEffect(() => {
-        if (observerRef.current) {
-            observerRef.current.disconnect();
-        }
+    //             entries[0].isIntersecting &&
+    //             hasMore &&
+    //             nextCursor &&
+    //             !isBillsFetching &&
+    //             !isBillsLoading
+    //         ) {
+    //             setCursor(nextCursor);
+    //         }
+    //     },
+    //     [
+    //         hasMore,
+    //         nextCursor,
+    //         isBillsFetching,
+    //         isBillsLoading,
 
-        observerRef.current = new IntersectionObserver(
-            handleObserver,
-            {
-                root: null,
-                rootMargin: "0px",
-                threshold: 0.1,
-            }
-        );
+    //     ]
+    // );
 
-        if (sentinelRef.current) {
-            observerRef.current.observe(sentinelRef.current);
-        }
+    // useEffect(() => {
+    //     if (observerRef.current) {
+    //         observerRef.current.disconnect();
+    //     }
 
-        return () => observerRef.current?.disconnect();
-    }, [handleObserver]);
+    //     observerRef.current = new IntersectionObserver(
+    //         handleObserver,
+    //         {
+    //             root: null,
+    //             rootMargin: "0px",
+    //             threshold: 0.1,
+    //         }
+    //     );
+
+    //     if (sentinelRef.current) {
+    //         observerRef.current.observe(sentinelRef.current);
+    //     }
+
+    //     return () => observerRef.current?.disconnect();
+    // }, [handleObserver]);
 
 
     useEffect(() => {
@@ -620,82 +631,155 @@ export default function ItemsByItem() {
     };
     console.log("selectedItemMeta", selectedItemMeta);
 
-    const leftListRef = useRef(null);
-    const rightPanelRef = useRef(null);
-    const selectedItemRowRef = useRef(null);
-    const highlightedRowRef = useRef(null);
-    useEffect(() => {
-        const leftEl = leftListRef.current;
-        const rightEl = rightPanelRef.current;
+    //const leftListRef = useRef(null);
+    //const rightPanelRef = useRef(null);
+    //const selectedItemRowRef = useRef(null);
+    //const highlightedRowRef = useRef(null);
+    // useEffect(() => {
+    //     //const leftEl = leftListRef.current;
+    //     const rightEl = rightPanelRef.current;
 
-        const saveLeft = () => {
-            sessionStorage.setItem("itemsByItem:leftScroll", leftEl.scrollTop);
-            sessionStorage.setItem("itemsByItem:leftCount", items.length);
-        };
-        const saveRight = () => {
-            console.log("saveRight fired", rightEl.scrollTop, transactions.length);
-            sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
-            sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
-            // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
-            // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
-        };
+    //     // const saveLeft = () => {
+    //     //     sessionStorage.setItem("itemsByItem:leftScroll", leftEl.scrollTop);
+    //     //     sessionStorage.setItem("itemsByItem:leftCount", items.length);
+    //     // };
+    //     const saveRight = () => {
+    //         console.log("saveRight fired", rightEl.scrollTop, transactions.length);
+    //         sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
+    //         sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
+    //         // sessionStorage.setItem("itemsByItem:rightScroll", rightEl.scrollTop);
+    //         // sessionStorage.setItem("itemsByItem:rightCount", transactions.length);
+    //     };
 
-        leftEl?.addEventListener("scroll", saveLeft);
-        rightEl?.addEventListener("scroll", saveRight);
+    //     //leftEl?.addEventListener("scroll", saveLeft);
+    //     rightEl?.addEventListener("scroll", saveRight);
 
-        return () => {
-            leftEl?.removeEventListener("scroll", saveLeft);
-            rightEl?.removeEventListener("scroll", saveRight);
-        };
-    }, [items.length, transactions.length]);
+    //     return () => {
+    //         //leftEl?.removeEventListener("scroll", saveLeft);
+    //         rightEl?.removeEventListener("scroll", saveRight);
+    //     };
+    // }, [transactions.length]);
+    //items.length,
 
 
+    //const hasRestoredLeftRef = useRef(false);
 
-    const hasRestoredLeftRef = useRef(false);
-
-    useLayoutEffect(() => {
-        if (hasRestoredLeftRef.current) return; // only do this once per mount
-        if (isLoading || isItemsFetching) return;
-
-        const savedCount = Number(sessionStorage.getItem("itemsByItem:leftCount")) || 0;
-        if (items.length < savedCount) return;
-
-        selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-        hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-    }, [isLoading, isItemsFetching, items.length, selectedItemId]);
-
-    const hasRestoredRightRef = useRef(false);
-    const [isRestoringRight, setIsRestoringRight] = useState(true);
     // useLayoutEffect(() => {
-    //     if (hasRestoredRightRef.current) return;
+    //     if (hasRestoredLeftRef.current) return; // only do this once per mount
+    //     if (isLoading || isItemsFetching) return;
+
+    //     const savedCount = Number(sessionStorage.getItem("itemsByItem:leftCount")) || 0;
+    //     if (items.length < savedCount) return;
+
+    //     //selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    //     hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+    // }, [isLoading, isItemsFetching, items.length, selectedItemId]);
+
+    //const hasRestoredRightRef = useRef(false);
+    //const [isRestoringRight, setIsRestoringRight] = useState(true);
+    ;
+    // useLayoutEffect(() => {
+    //     if (hasRestoredRightRef.current) {
+    //         setIsRestoringRight(false);
+    //         return;
+    //     }
     //     if (isBillsLoading || isBillsFetching) return;
 
     //     const savedCount = Number(sessionStorage.getItem("itemsByItem:rightCount")) || 0;
-    //     if (transactions.length < savedCount) return;
+    //     // keep waiting only if we might still get more data
+    //     if (transactions.length < savedCount && hasMore) return;
 
     //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
     //     hasRestoredRightRef.current = true;
-    // }, [isBillsLoading, isBillsFetching, transactions.length]);
-    useLayoutEffect(() => {
-        if (hasRestoredRightRef.current) {
-            setIsRestoringRight(false);
+    //     setIsRestoringRight(false); // reveal now, correctly positioned
+    // }, [isBillsLoading, isBillsFetching, transactions.length, hasMore]);
+    const virtualLeftListRef = useRef(null);
+    const hasScrolledToSelectedRef = useRef(false);
+
+    useEffect(() => {
+        if (hasScrolledToSelectedRef.current) return;
+        if (isLoading || isItemsFetching) return;
+        if (!selectedItemId || !items.length) return;
+
+        const targetIndex = items.findIndex(
+            (it) => String(it.Item_Id) === String(selectedItemId)
+        );
+
+        if (targetIndex === -1) {
+            if (itemsHasMore && !isItemsFetching) {
+                setLeftCursor(itemsNextCursor);
+            }
             return;
         }
+
+        virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
+        hasScrolledToSelectedRef.current = true;
+    }, [items, isLoading, isItemsFetching, selectedItemId, itemsHasMore, itemsNextCursor]);
+
+    useEffect(() => {
+        hasScrolledToSelectedRef.current = false;
+    }, [itemTypeTab]);
+    useEffect(() => {
+        sessionStorage.setItem("itemsByItem:leftCount", items.length);
+    }, [items.length]);
+
+
+    const virtualRightListRef = useRef(null);
+    const hasScrolledToHighlightRef = useRef(false);
+
+    const highlightTxnId = searchParams.get("highlightTxn");
+
+    useEffect(() => {
+        hasScrolledToHighlightRef.current = false;
+    }, [selectedItemId, highlightTxnId, txnSearch]);
+
+    useEffect(() => {
+        if (hasScrolledToHighlightRef.current) return;
+        if (!highlightTxnId) return;
         if (isBillsLoading || isBillsFetching) return;
+        if (!transactions.length) return;
 
-        const savedCount = Number(sessionStorage.getItem("itemsByItem:rightCount")) || 0;
-        // keep waiting only if we might still get more data
-        if (transactions.length < savedCount && hasMore) return;
+        const targetIndex = transactions.findIndex(
+            (txn) =>
+                String(txn.Ledger_Id) ===
+                String(highlightTxnId)
+        );
 
-        highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-        hasRestoredRightRef.current = true;
-        setIsRestoringRight(false); // reveal now, correctly positioned
-    }, [isBillsLoading, isBillsFetching, transactions.length, hasMore]);
+        if (targetIndex === -1) {
+            if (hasMore && nextCursor && !isBillsFetching) {
+                setCursor(nextCursor);
+            }
 
+            return;
+        }
+
+        virtualRightListRef.current?.scrollToIndex(
+            targetIndex,
+            {
+                align: "center",
+                behavior: "auto",
+            }
+        );
+
+        hasScrolledToHighlightRef.current = true;
+    }, [
+        transactions,
+        highlightTxnId,
+        isBillsLoading,
+        isBillsFetching,
+        hasMore,
+        nextCursor,
+    ]);
+    useEffect(() => {
+        sessionStorage.setItem(
+            "itemsByItem:rightCount",
+            transactions.length
+        );
+    }, [transactions.length]);
     return (
         <>
-            <div className="flex flex-col bg-white" 
-              style={{ height: "100vh", overflow: "hidden" }}
+            <div className="flex flex-col bg-white"
+                style={{ height: "100vh", overflow: "hidden" }}
             // style={{ minHeight: "100vh" }}
             >
                 <div className="flex" style={{ borderBottom: "1px solid #f1f5f9" }}>
@@ -747,81 +831,86 @@ export default function ItemsByItem() {
                 {/* ── SPLIT LAYOUT ── */}
                 <div
                     className="flex flex-col lg:flex-row gap-0"
-                    style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        overflowY: "auto",
+                        //overflow:"auto",
+                        //height: "calc(100vh - 180px)",
+                        borderTop: "1px solid #e2e8f0"
+                    }}
                 >
 
                     {/* ══ LEFT — 30% — item list (now infinite scroll) ══ */}
-                    <div ref={leftListRef}
-                        className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+                    {/* ══ LEFT — 30% — item list (virtualized) ══ */}
+                    {/* <div
+                        className="w-full lg:w-[30%] flex flex-col"
                         style={{
                             borderRight: "1px solid #e2e8f0",
                             minHeight: 0,
-                            //minHeight: "500px",
-                            maxHeight: "calc(100vh - 180px)",
+                             flexShrink: 0,
+                              height: "50vh",
+                            ///maxHeight: "calc(100vh - 180px)",
+                            boxSizing: "border-box",
+                        }}
+                    > */}
+                    <div
+                        className="w-full lg:w-[30%] flex flex-col flex-none  h-[50vh] lg:h-auto"
+                        style={{
+                            borderRight: "1px solid #e2e8f0",
+                            minHeight: 0,
                             boxSizing: "border-box",
                         }}
                     >
-                        {/* search */}
+                        {/* search — stays fixed, outside the scrolling list */}
                         <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
                             <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
-                                <Search
-                                    size={14}
-                                    style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
-                                />
+                                <Search size={14} style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }} />
                                 <input
                                     type="text"
                                     value={itemSearch}
                                     onChange={(e) => {
                                         const value = e.target.value;
                                         const next = new URLSearchParams(searchParams);
-                                        if (value) {
-                                            next.set("q", value);
-                                        } else {
-                                            next.delete("q");
-                                        }
+                                        if (value) next.set("q", value); else next.delete("q");
                                         setSearchParams(next, { replace: true });
                                     }}
                                     placeholder="Search Item"
                                     className="border rounded-md text-sm outline-none"
-                                    style={{
-                                        width: "100%",
-                                        height: 34,
-                                        paddingLeft: 30,
-                                        paddingRight: 8,
-                                        borderColor: "#000000",
-                                        boxSizing: "border-box",
-                                    }}
+                                    style={{ width: "100%", height: 34, paddingLeft: 30, paddingRight: 8, borderColor: "#000000", boxSizing: "border-box" }}
                                 />
                             </div>
                         </div>
 
-                        {/* list header */}
-                        <div
-                            className="px-4 py-3 flex items-center gap-2"
-                            style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
-                        >
+                        {/* list header — stays fixed */}
+                        <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}>
                             <Package size={15} style={{ color: "#4CA1AF" }} />
                             <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Items ({totalItems})
                             </span>
                         </div>
 
-                        {isLoading && !leftCursor ? (
-                            <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
-                        ) : filteredItems.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
-                                <Package size={36} strokeWidth={1.2} />
-                                <p className="text-sm">No items found</p>
-                            </div>
-                        ) : (
-                            <>
-                                {filteredItems.map((item) => {
+                        {/* VIRTUALIZED SCROLLING LIST — only the items scroll */}
+                        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", position: "relative" }}>
+                            <VirtualScrollList
+                                ref={virtualLeftListRef}
+                                items={filteredItems}
+                                rowHeight={64}
+                                height="100%"
+                                onLoadMore={handleLeftLoadMore}
+
+                                isFetching={isItemsFetching}
+                                hasMore={itemsHasMore}
+                                getItemKey={(item) => item.Item_Id}
+                                emptyMessage="No items found"
+                                endMessage="— End of items —"
+                                isRowActive={(item) => menuOpen === item.Item_Id}
+                                renderRow={(item) => {
                                     const isSelected = selectedItemId === item.Item_Id;
 
                                     return (
                                         <div
                                             key={item.Item_Id}
-                                            ref={isSelected ? selectedItemRowRef : null}
                                             onClick={() => handleSelectItem(item)}
                                             onDoubleClick={() => {
                                                 handleSelectItem(item);
@@ -844,20 +933,11 @@ export default function ItemsByItem() {
                                                     <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p
-                                                        className="font-semibold text-black truncate text-sm"
-                                                        style={{ margin: 0 }}
-                                                    >
+                                                    <p className="font-semibold text-black truncate text-sm" style={{ margin: 0 }}>
                                                         {item.Item_Name}
                                                     </p>
-
-                                                    {/* <p className="text-xs text-gray-600 truncate">
-                                                        {item.Item_Category || "N/A"}
-                                                    </p> */}
                                                     {item.Item_Category?.trim() && (
-                                                        <p className="text-xs text-gray-600 truncate">
-                                                            {item.Item_Category}
-                                                        </p>
+                                                        <p className="text-xs text-gray-600 truncate">{item.Item_Category}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -867,16 +947,11 @@ export default function ItemsByItem() {
                                                     type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-
                                                         const next = new URLSearchParams(searchParams);
                                                         next.set("itemId", item.Item_Id);
                                                         next.delete("txnSearch");
-
                                                         setSearchParams(next);
-
-                                                        setMenuOpen(
-                                                            menuOpen === item.Item_Id ? null : item.Item_Id
-                                                        );
+                                                        setMenuOpen(menuOpen === item.Item_Id ? null : item.Item_Id);
                                                     }}
                                                     className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                     style={{ backgroundColor: "transparent" }}
@@ -884,7 +959,6 @@ export default function ItemsByItem() {
                                                 >
                                                     <MoreVertical size={14} style={{ color: "#374151" }} />
                                                 </button>
-
                                                 <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
                                             </div>
 
@@ -910,516 +984,600 @@ export default function ItemsByItem() {
                                                         className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
                                                         title="Delete item"
                                                         style={{ cursor: "pointer", color: "#dc2626" }}
-                                                        // onClick={() => {
-                                                        //     console.log("Delete item:", item.Item_Id);
-                                                        // }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setMenuOpen(null);
                                                             setDeleteItemTarget({ Item_Id: item.Item_Id, Item_Name: item.Item_Name });
                                                         }}
-
                                                     >
                                                         <Trash2 size={13} style={{ color: "#dc2626" }} />
                                                         Delete
                                                     </button>
                                                 </div>
                                             )}
-
                                         </div>
                                     );
-                                })}
-
-                                {/* ── LEFT SENTINEL + LOADING/END INDICATORS ── */}
-                                <div ref={leftSentinelRef} style={{ height: "1px" }} />
-
-                                {isItemsFetching && leftCursor && (
-                                    <div className="flex justify-center py-4">
-                                        <span className="text-sm text-gray-400">Loading more...</span>
-                                    </div>
-                                )}
-
-                                {!itemsHasMore && filteredItems.length > 0 && (
-                                    <div className="flex justify-center py-4">
-                                        <span className="text-xs text-gray-300">— End of items —</span>
-                                    </div>
-                                )}
-                            </>
-                        )}
+                                }}
+                            />
+                        </div>
                     </div>
 
                     {/* ══ RIGHT — 70% — detail panel ══ */}
-                    <div
-                        className="w-full lg:w-[70%] p-1 overflow-y-auto overflow-x-hidden"
+                    {/* ── ITEM LEDGER TABLE — VIRTUALIZED ── */}
+                    {/* <div className="w-full lg:w-[70%] p-1 overflow-y-auto"
                         style={{
-                            maxHeight: "calc(100vh - 180px)",
-                            minHeight: 0,      // 👈 add this
-                            minWidth: 0
+                            flex: 1,
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            minWidth: 0,
+                            //overflow: "hidden",
+                            //overflowX: "auto",
+                            //overflowY: "hidden",
+                        }}
+                    > */}
+                    <div
+                        className="w-full lg:w-[70%] p-1 flex-none lg:flex-1 h-auto"
+                        style={{
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            minWidth: 0,
                         }}
                     >
-                        <div className="flex flex-col"
-                            style={{
-                                height: "100%",
+                        {(liveItem || selectedItemMeta) && (
+                            <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
 
-                                minHeight: 0,
-                                overflow: "hidden",
+                                <div className="grid grid-cols-[1fr_auto] items-start gap-3 min-w-0">
 
+                                    <div className="flex items-center gap-4 min-w-0">
 
-                            }}
-                        >
-
-                            {/* ── ITEM SUMMARY CARD ── */}
-
-                            {(liveItem || selectedItemMeta) && (
-                                <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
-
-                                    <div className="grid grid-cols-[1fr_auto] items-start gap-3 min-w-0">
-
-                                        <div className="flex items-center gap-4 min-w-0">
-
-                                            <div
-                                                className="flex items-center justify-center rounded-xl flex-shrink-0"
-                                                style={{
-                                                    width: 44,
-                                                    height: 44,
-                                                    backgroundColor: "#4CA1AF22"
-                                                }}
-                                            >
-                                                <Package size={22} style={{ color: "#4CA1AF" }} />
-                                            </div>
-
-                                            <div className="min-w-0">
-                                                <h6
-                                                    className="font-bold text-black break-words whitespace-normal"
-                                                    style={{ fontSize: 15, margin: 0 }}
-                                                >
-                                                    {liveItem?.Item_Name || selectedItemMeta?.Item_Name}
-                                                </h6>
-
-                                                {(liveItem?.Item_Category ?? selectedItemMeta?.Item_Category)?.trim() && (
-                                                    <p className="text-gray-600 text-sm mt-0.5">
-                                                        {liveItem?.Item_Category ?? selectedItemMeta?.Item_Category}
-                                                    </p>
-                                                )}
-                                            </div>
-
+                                        <div
+                                            className="flex items-center justify-center rounded-xl flex-shrink-0"
+                                            style={{
+                                                width: 44,
+                                                height: 44,
+                                                backgroundColor: "#4CA1AF22"
+                                            }}
+                                        >
+                                            <Package size={22} style={{ color: "#4CA1AF" }} />
                                         </div>
 
-                                        {itemTypeTab === "Product" && (
-                                            <button
-                                                type="button"
-                                                onClick={handleAdjustItem}
-                                                className="text-white px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap"
-                                                style={{
-                                                    backgroundColor: "#4CA1AF",
-                                                    outline: "none",
-                                                    boxShadow: "none"
-                                                }}
+                                        <div className="min-w-0">
+                                            <h6
+                                                className="font-bold text-black break-words whitespace-normal"
+                                                style={{ fontSize: 15, margin: 0 }}
                                             >
-                                                + Adjust Item
-                                            </button>
-                                        )}
+                                                {liveItem?.Item_Name || selectedItemMeta?.Item_Name}
+                                            </h6>
+
+                                            {(liveItem?.Item_Category ?? selectedItemMeta?.Item_Category)?.trim() && (
+                                                <p className="text-gray-600 text-sm mt-0.5">
+                                                    {liveItem?.Item_Category ?? selectedItemMeta?.Item_Category}
+                                                </p>
+                                            )}
+                                        </div>
 
                                     </div>
 
-                                    <div className="
+                                    {itemTypeTab === "Product" && (
+                                        <button
+                                            type="button"
+                                            onClick={handleAdjustItem}
+                                            className="text-white px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap"
+                                            style={{
+                                                backgroundColor: "#4CA1AF",
+                                                outline: "none",
+                                                boxShadow: "none"
+                                            }}
+                                        >
+                                            + Adjust Item
+                                        </button>
+                                    )}
+
+                                </div>
+
+                                <div className="
             grid grid-cols-2 gap-x-4 gap-y-3 mt-3
             sm:flex sm:items-center sm:justify-between
         ">
 
-                                        {/* Sale + Purchase Price */}
-                                        <div className="contents sm:block">
+                                    {/* Sale + Purchase Price */}
+                                    <div className="contents sm:block">
+                                        <div>
+                                            <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
+                                                SALE PRICE:{" "}
+                                                <span style={{ color: "#4CA1AF" }}>
+                                                    ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta?.Sale_Price)}
+                                                </span>
+                                            </p>
+                                        </div>
+
+                                        {!isService && (
                                             <div>
-                                                <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
-                                                    SALE PRICE:{" "}
+                                                <p className="text-xs" style={{ fontSize: 13 }}>
+                                                    PURCHASE PRICE:{" "}
                                                     <span style={{ color: "#4CA1AF" }}>
-                                                        ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta?.Sale_Price)}
+                                                        ₹ {fmt(liveItem?.Purchase_Price ?? selectedItemMeta?.Purchase_Price)}
                                                     </span>
                                                 </p>
                                             </div>
-
-                                            {!isService && (
-                                                <div>
-                                                    <p className="text-xs" style={{ fontSize: 13 }}>
-                                                        PURCHASE PRICE:{" "}
-                                                        <span style={{ color: "#4CA1AF" }}>
-                                                            ₹ {fmt(liveItem?.Purchase_Price ?? selectedItemMeta?.Purchase_Price)}
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Stock */}
-                                        {!isService && (
-                                            <div className="col-span-1 sm:col-span-1 text-left">
-                                                <p className="text-xs uppercase text-black mb-1">
-                                                    Stock
-                                                </p>
-
-                                                <p
-                                                    className="font-bold"
-                                                    style={{
-                                                        color:
-                                                            (liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity) < 0
-                                                                ? "#dc2626"
-                                                                : "#4CA1AF",
-                                                        fontSize: 15
-                                                    }}
-                                                >
-                                                    {liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity}{" "}
-                                                    {liveItem?.Primary_Unit ||
-                                                        liveItem?.Item_Unit ||
-                                                        selectedItemMeta?.Primary_Unit ||
-                                                        selectedItemMeta?.Item_Unit ||
-                                                        ""}
-                                                </p>
-                                            </div>
                                         )}
-
-                                        {/* Search */}
-                                        <div
-                                            className="col-span-1 relative w-full sm:col-span-1 sm:w-[220px] sm:max-w-[220px]"
-                                            style={{ height: 56 }}
-                                        >
-                                            <Search
-                                                size={14}
-                                                style={{
-                                                    position: "absolute",
-                                                    left: 10,
-                                                    top: 15,
-                                                    color: "#94a3b8",
-                                                    pointerEvents: "none"
-                                                }}
-                                            />
-
-                                            <input
-                                                type="text"
-                                                value={txnSearch}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    const next = new URLSearchParams(searchParams);
-
-                                                    if (value) {
-                                                        next.set("txnSearch", value);
-                                                    } else {
-                                                        next.delete("txnSearch");
-                                                    }
-
-                                                    setSearchParams(next, { replace: true });
-                                                }}
-                                                placeholder="Search"
-                                                className="w-full h-full border rounded-md text-sm outline-none"
-                                                style={{
-                                                    paddingLeft: 34,
-                                                    paddingRight: 10,
-                                                    borderColor: "#000000",
-                                                    boxSizing: "border-box",
-                                                    marginTop: "0px"
-                                                }}
-                                            />
-                                        </div>
                                     </div>
 
+                                    {/* Stock */}
+                                    {!isService && (
+                                        <div className="col-span-1 sm:col-span-1 text-left">
+                                            <p className="text-xs uppercase text-black mb-1">
+                                                Stock
+                                            </p>
+
+                                            <p
+                                                className="font-bold"
+                                                style={{
+                                                    color:
+                                                        (liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity) < 0
+                                                            ? "#dc2626"
+                                                            : "#4CA1AF",
+                                                    fontSize: 15
+                                                }}
+                                            >
+                                                {liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity}{" "}
+                                                {liveItem?.Primary_Unit ||
+                                                    liveItem?.Item_Unit ||
+                                                    selectedItemMeta?.Primary_Unit ||
+                                                    selectedItemMeta?.Item_Unit ||
+                                                    ""}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Search */}
+                                    <div
+                                        className="col-span-1 relative w-full sm:col-span-1 sm:w-[220px] sm:max-w-[220px]"
+                                        style={{ height: 56 }}
+                                    >
+                                        <Search
+                                            size={14}
+                                            style={{
+                                                position: "absolute",
+                                                left: 10,
+                                                top: 15,
+                                                color: "#94a3b8",
+                                                pointerEvents: "none"
+                                            }}
+                                        />
+
+                                        <input
+                                            type="text"
+                                            value={txnSearch}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                const next = new URLSearchParams(searchParams);
+
+                                                if (value) {
+                                                    next.set("txnSearch", value);
+                                                } else {
+                                                    next.delete("txnSearch");
+                                                }
+
+                                                setSearchParams(next, { replace: true });
+                                            }}
+                                            placeholder="Search"
+                                            className="w-full h-full border rounded-md text-sm outline-none"
+                                            style={{
+                                                paddingLeft: 34,
+                                                paddingRight: 10,
+                                                borderColor: "#000000",
+                                                boxSizing: "border-box",
+                                                marginTop: "0px"
+                                            }}
+                                        />
+                                    </div>
                                 </div>
-                            )}
-
-                            {/* ── ITEM LEDGER TABLE ── */}
-                            <div ref={rightPanelRef}
-                                className="table-responsive table-desi"
-                                style={{
-
-                                    flex: 1,
-                                    minHeight: 0,
-                                    overflowY: "auto",
-                                    visibility: isRestoringRight ? "hidden" : "visible",
-                                    // if using the placeholder above, also collapse height so it doesn't take double space
-                                    // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
-                                }}
-                            >
-                                <table className="w-full min-w-[700px]">
-                                    <thead>
-                                        <tr>
-                                            {[
-                                                "Sl No.",
-                                                "Date",
-                                                "Bill No.",
-                                                "Party",
-                                                "Type",
-                                                "Qty",
-                                                "Price/Unit",
-                                                ""
-                                            ].map((h, index) => (
-                                                <th
-                                                    key={index}
-                                                    style={{
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: "0.05em",
-                                                        whiteSpace: "nowrap"
-                                                    }}
-                                                >
-                                                    {h}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {isBillsLoading && !cursor ? (
-                                            <tr>
-                                                <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                                                    Loading...
-                                                </td>
-                                            </tr>
-                                        ) : transactions.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                                                    No transactions to show
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            transactions.map((txn, idx) => {
-                                                //const isHighlighted = String(searchParams.get("highlightTxn")) === String(txn.Ledger_Id);
-                                                const isHighlighted =
-                                                    String(searchParams.get("highlightTxn")) ===
-                                                    String(txn.Ledger_Id);
-                                                return (
-                                                    // <tr
-                                                    //     key={txn.Ledger_Id}
-                                                    //     onDoubleClick={() => handleTransactionEdit(txn)}
-                                                    //     style={{
-                                                    //         borderBottom: "1px solid #f1f5f9",
-                                                    //         position: "relative",
-                                                    //         cursor: "pointer",
-                                                    //     }}
-                                                    //     className="hover:bg-gray-50 transition-colors"
-                                                    // >
-                                                    <tr
-                                                        key={txn.Ledger_Id}
-                                                        ref={isHighlighted ? highlightedRowRef : null}
-
-                                                        // SINGLE CLICK → highlight only
-                                                        onClick={() => {
-                                                            const params = new URLSearchParams(searchParams);
-
-                                                            params.set(
-                                                                "highlightTxn",
-                                                                txn.Ledger_Id
-                                                            );
-
-                                                            setSearchParams(params, { replace: true });
-                                                        }}
-
-                                                        // DOUBLE CLICK → highlight + edit
-                                                        onDoubleClick={() => {
-                                                            const params = new URLSearchParams(searchParams);
-
-                                                            params.set(
-                                                                "highlightTxn",
-                                                                txn.Ledger_Id
-                                                            );
-
-                                                            setSearchParams(params, { replace: true });
-
-                                                            handleTransactionEdit(txn);
-                                                        }}
-
-                                                        style={{
-                                                            borderBottom: "1px solid #f1f5f9",
-                                                            position: "relative",
-                                                            cursor: "pointer",
-
-                                                            // HIGHLIGHT
-                                                            backgroundColor: isHighlighted
-                                                                ? "#4CA1AF22"
-                                                                : "transparent",
-                                                        }}
-
-                                                        className="hover:bg-gray-50 transition-colors"
-                                                    >
-                                                        <td>{idx + 1}.</td>
-                                                        <td style={{ whiteSpace: "nowrap" }}>
-                                                            {fmtDate(txn.Txn_Date)}
-                                                        </td>
-
-                                                        <td style={{ whiteSpace: "nowrap" }}>
-                                                            {txn.Number || "—"}
-                                                        </td>
-
-                                                        <td>
-                                                            {txn.Party_Name || "—"}
-                                                        </td>
-
-                                                        <td
-                                                            style={{
-                                                                color: txn.Direction === "In" ? "#16a34a" : "#dc2626",
-                                                            }}
-                                                        >
-                                                            {txn.Txn_Type || "—"}
-                                                        </td>
-
-                                                        <td>
-                                                            {fmt(txn.Quantity)}({txn.Selected_Unit})
-                                                        </td>
-
-                                                        <td>
-                                                            {txn.Rate !== null
-                                                                ? `₹ ${fmt(txn.Rate)}`
-                                                                : "—"}
-                                                        </td>
-
-                                                        {txn.Txn_Type !== "Opening_Stock" && (
-                                                            <td
-                                                                style={{
-                                                                    position: "relative",
-                                                                    width: 50,
-                                                                    textAlign: "center",
-                                                                }}
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-
-                                                                        setRowMenuOpen(
-                                                                            rowMenuOpen === txn.Ledger_Id
-                                                                                ? null
-                                                                                : txn.Ledger_Id
-                                                                        );
-                                                                    }}
-                                                                    className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                                                                    style={{
-                                                                        backgroundColor: "transparent",
-                                                                        border: "none",
-                                                                        cursor: "pointer",
-                                                                    }}
-                                                                    title="More"
-                                                                >
-                                                                    <MoreVertical
-                                                                        size={16}
-                                                                        style={{ color: "#374151" }}
-                                                                    />
-                                                                </button>
-
-                                                                {rowMenuOpen === txn.Ledger_Id && (
-                                                                    <div
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        className="absolute bg-white shadow-lg rounded-md"
-                                                                        style={{
-                                                                            right: 10,
-                                                                            top: 36,
-                                                                            width: 150,
-                                                                            zIndex: 100,
-                                                                            border: "1px solid #e2e8f0",
-                                                                            overflow: "hidden",
-                                                                        }}
-                                                                    >
-                                                                        {/* <button
-                                                                            type="button"
-                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                            style={{ color: "#374151" }}
-                                                                            onClick={() => handleTransactionEdit(txn)}
-                                                                        >
-                                                                            <Eye size={13} style={{ color: "#4CA1AF" }} />
-                                                                            View / Edit
-                                                                        </button> */}
-                                                                        <button
-                                                                            type="button"
-                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                            style={{ color: "#374151" }}
-                                                                            onClick={() => {
-                                                                                setRowMenuOpen(null);
-
-                                                                                const params = new URLSearchParams(searchParams);
-
-                                                                                params.set(
-                                                                                    "highlightTxn",
-                                                                                    txn.Ledger_Id
-                                                                                );
-
-                                                                                setSearchParams(params, { replace: true });
-
-                                                                                handleTransactionEdit(txn);
-                                                                            }}
-                                                                        >
-                                                                            <Eye
-                                                                                size={13}
-                                                                                style={{ color: "#4CA1AF" }}
-                                                                            />
-
-                                                                            View / Edit
-                                                                        </button>
-
-                                                                        {![
-                                                                            "Add_Adjustment",
-                                                                            "Reduce_Adjustment",
-                                                                            "Opening Stock"
-                                                                        ].includes(txn.Txn_Type) && (<button
-                                                                            type="button"
-                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                            style={{ color: "#374151" }}
-                                                                            onClick={() => {
-                                                                                setRowMenuOpen(null);
-                                                                                handlePrintClick(txn, txn.Document_Id);
-                                                                            }}
-                                                                        >
-                                                                            <Printer size={13} style={{ color: "#4CA1AF" }} />
-                                                                            Print
-                                                                        </button>)}
-
-                                                                        <button
-                                                                            type="button"
-                                                                            className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                                                            title="Delete transaction"
-                                                                            style={{ cursor: "pointer", color: "#dc2626" }}
-                                                                            onClick={() =>
-                                                                                setDeleteTarget({
-                                                                                    Id:
-                                                                                        txn.Txn_Type === "Add_Adjustment" ||
-                                                                                            txn.Txn_Type === "Reduce_Adjustment"
-                                                                                            ? txn.Source_Id
-                                                                                            : txn.Document_Id,
-                                                                                    Txn_Type: txn.Txn_Type,
-                                                                                })
-                                                                            }
-                                                                        >
-                                                                            <Trash2 size={13} style={{ color: "#dc2626" }} />
-                                                                            Delete
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                )
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-
-                                <div
-                                    ref={sentinelRef}
-                                    style={{ height: "1px" }}
-                                />
-
-                                {isBillsFetching && cursor && (
-                                    <div className="flex justify-center py-4">
-                                        <span className="text-sm text-gray-400">
-                                            Loading more...
-                                        </span>
-                                    </div>
-                                )}
-
-                                {!hasMore && transactions.length > 0 && (
-                                    <div className="flex justify-center py-4">
-                                        <span className="text-xs text-gray-300">
-                                            — End of transactions —
-                                        </span>
-                                    </div>
-                                )}
 
                             </div>
+                        )}
+                        {/* FIXED HEADER */}
+                        {/* <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "0.6fr 1.1fr 1.2fr 2.8fr 1.3fr 1.1fr 1.2fr 50px",
+                                width: "100%",
+                                //minWidth: "850px",
+                                boxSizing: "border-box",
+                                alignItems: "center",
+                                minHeight: 40,
+                                padding: "0 8px",
+                                flexShrink: 0,
+                                borderBottom: "2px solid #e2e8f0",
+                                fontWeight: 600,
+                                fontSize: 13,
+                                color: "#333",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                            }}
+                        > */}
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "0.6fr 1.1fr 1.2fr 2.8fr 1.3fr 1.1fr 1.2fr 50px",
+                                //columnGap: "12px",   // 👈 same value as row
+                                width: "100%",
+                                boxSizing: "border-box",
+                                alignItems: "center",  // header stays single-line, center is fine here
+                                minHeight: 40,
+                                padding: "0 8px",
+                                flexShrink: 0,
+                                borderBottom: "2px solid #e2e8f0",
+                                fontWeight: 600,
+                                fontSize: 13,
+                                color: "#333",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                            }}
+                        >
+                            <div>Sl No.</div>
+                            <div>Date</div>
+                            <div>Bill No.</div>
+                            <div>Party</div>
+                            <div>Type</div>
+                            <div>Qty</div>
+                            <div>Price/Unit</div>
+                            <div style={{
+                                position: "sticky",
+                                right: 0,
 
+                            }} />
+                        </div>
+
+                        {/* VIRTUALIZED BODY */}
+                        <div
+                            style={{
+                                flex: 1,
+                                minHeight: 0,
+                                //height: 0,
+                                overflow: "hidden",
+                                position: "relative",
+                            }}
+                        >
+                            <VirtualScrollList
+                                ref={virtualRightListRef}
+                                items={transactions}
+                                rowHeight={48}
+                                height="100%"
+                                onLoadMore={handleRightLoadMore}
+                                isFetching={isBillsFetching}
+                                hasMore={hasMore}
+                                dynamicHeight={true}
+                                getItemKey={(txn) => txn.Ledger_Id}
+                                emptyMessage={
+                                    isBillsLoading
+                                        ? "Loading..."
+                                        : "No transactions to show"
+                                }
+                                endMessage="— End of transactions —"
+                                isRowActive={(txn) =>
+                                    rowMenuOpen === txn.Ledger_Id
+                                }
+                                renderRow={(txn, idx) => {
+                                    const isHighlighted =
+                                        String(highlightTxnId) ===
+                                        String(txn.Ledger_Id);
+
+                                    const canShowMenu =
+                                        txn.Txn_Type !== "Opening_Stock";
+
+                                    return (
+                                        <div
+                                            key={txn.Ledger_Id}
+                                            onClick={() => {
+                                                const params =
+                                                    new URLSearchParams(searchParams);
+
+                                                params.set(
+                                                    "highlightTxn",
+                                                    txn.Ledger_Id
+                                                );
+
+                                                setSearchParams(params, {
+                                                    replace: true,
+                                                });
+                                            }}
+                                            onDoubleClick={() => {
+                                                const params =
+                                                    new URLSearchParams(searchParams);
+
+                                                params.set(
+                                                    "highlightTxn",
+                                                    txn.Ledger_Id
+                                                );
+
+                                                setSearchParams(params, {
+                                                    replace: true,
+                                                });
+
+                                                handleTransactionEdit(txn);
+                                            }}
+                                            className="hover:bg-gray-50 transition-colors"
+                                            style={{
+                                                display: "grid",
+                                                gridTemplateColumns: "0.6fr 1.1fr 1.2fr 2.8fr 1.3fr 1.1fr 1.2fr 50px",
+                                                width: "100%",
+
+                                                //minWidth: "850px",
+                                                minHeight: 52,
+                                                boxSizing: "border-box",
+                                                alignItems: "center",
+                                                //columnGap: "12px", 
+
+                                                padding: "0 8px",
+                                                borderBottom: "1px solid #f1f5f9",
+                                                cursor: "pointer",
+                                                backgroundColor: isHighlighted
+                                                    ? "#4CA1AF22"
+                                                    : "transparent",
+                                            }}
+
+                                        >
+                                            {/* SL NO */}
+                                            <div className="table-desi-cell"
+                                                style={{ padding: "0 5px" }}
+                                            >
+                                                {idx + 1}.
+                                            </div>
+
+                                            {/* DATE */}
+                                            <div className="table-desi-cell"
+                                                style={{ padding: "0 5px" }}
+                                            >
+                                                {fmtDate(txn.Txn_Date)}
+                                            </div>
+
+                                            {/* BILL NO */}
+                                            <div className="table-desi-cell"
+                                                style={{ padding: "0 5px" }}
+                                            >
+                                                {txn.Number || "—"}
+                                            </div>
+
+                                            {/* PARTY */}
+                                            <div className="table-desi-cell"
+                                                style={{
+                                                    overflowWrap: "break-word",
+                                                    wordBreak: "break-word",
+                                                    padding: "0 5px"
+
+                                                }}
+                                                title={txn.Party_Name || ""}
+                                            >
+                                                {txn.Party_Name || "—"}
+                                            </div>
+
+                                            {/* TYPE */}
+                                            <div className="table-desi-cell"
+                                                style={{
+                                                    padding: "0 5px",
+                                                    //whiteSpace: "nowrap",
+                                                    color:
+                                                        txn.Direction === "In"
+                                                            ? "#16a34a"
+                                                            : "#dc2626",
+                                                }}
+                                            >
+                                                {txn.Txn_Type || "—"}
+                                            </div>
+
+                                            {/* QTY */}
+                                            <div className="table-desi-cell"
+                                                style={{
+                                                    padding: "0 5px",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {fmt(txn.Quantity)}
+                                                {txn.Selected_Unit
+                                                    ? ` (${txn.Selected_Unit})`
+                                                    : ""}
+                                            </div>
+
+                                            {/* PRICE */}
+                                            <div
+                                                style={{
+                                                    padding: "0 5px",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {txn.Rate !== null
+                                                    ? `₹ ${fmt(txn.Rate)}`
+                                                    : "—"}
+                                            </div>
+
+                                            {/* MENU COLUMN */}
+                                            <div className="py-2 px-2 table-desi-cell"
+                                                style={{
+                                                    position: "sticky",   // 👈 was "relative", now sticky
+                                                    right: 0,              // 👈 pins to the right edge of the SCROLL viewport
+                                                    width: 50,
+                                                    //position: "relative",
+                                                    //width: 50,
+                                                    textAlign: "center",
+                                                }}
+                                            >
+                                                {canShowMenu && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+
+                                                                setRowMenuOpen(
+                                                                    rowMenuOpen ===
+                                                                        txn.Ledger_Id
+                                                                        ? null
+                                                                        : txn.Ledger_Id
+                                                                );
+                                                            }}
+                                                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    "transparent",
+                                                                border: "none",
+                                                                cursor: "pointer",
+                                                            }}
+                                                            title="More"
+                                                        >
+                                                            <MoreVertical
+                                                                size={16}
+                                                                style={{
+                                                                    color: "#374151",
+                                                                }}
+                                                            />
+                                                        </button>
+
+                                                        {rowMenuOpen ===
+                                                            txn.Ledger_Id && (
+                                                                <div
+                                                                    onClick={(e) =>
+                                                                        e.stopPropagation()
+                                                                    }
+                                                                    className="absolute bg-white shadow-lg rounded-md"
+                                                                    style={{
+                                                                        right: 10,
+                                                                        top: 36,
+                                                                        width: 150,
+                                                                        zIndex: 100,
+                                                                        border:
+                                                                            "1px solid #e2e8f0",
+                                                                        overflow: "hidden",
+                                                                    }}
+                                                                >
+                                                                    {/* VIEW / EDIT */}
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                        style={{
+                                                                            color: "#374151",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(
+                                                                                null
+                                                                            );
+
+                                                                            const params =
+                                                                                new URLSearchParams(
+                                                                                    searchParams
+                                                                                );
+
+                                                                            params.set(
+                                                                                "highlightTxn",
+                                                                                txn.Ledger_Id
+                                                                            );
+
+                                                                            setSearchParams(
+                                                                                params,
+                                                                                {
+                                                                                    replace: true,
+                                                                                }
+                                                                            );
+
+                                                                            handleTransactionEdit(
+                                                                                txn
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Eye
+                                                                            size={13}
+                                                                            style={{
+                                                                                color: "#4CA1AF",
+                                                                            }}
+                                                                        />
+                                                                        View / Edit
+                                                                    </button>
+
+                                                                    {/* PRINT */}
+                                                                    {![
+                                                                        "Add_Adjustment",
+                                                                        "Reduce_Adjustment",
+                                                                        "Opening_Stock",
+                                                                    ].includes(
+                                                                        txn.Txn_Type
+                                                                    ) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                                                                style={{
+                                                                                    color: "#374151",
+                                                                                }}
+                                                                                onClick={() => {
+                                                                                    setRowMenuOpen(
+                                                                                        null
+                                                                                    );
+
+                                                                                    handlePrintClick(
+                                                                                        txn,
+                                                                                        txn.Document_Id
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <Printer
+                                                                                    size={
+                                                                                        13
+                                                                                    }
+                                                                                    style={{
+                                                                                        color:
+                                                                                            "#4CA1AF",
+                                                                                    }}
+                                                                                />
+                                                                                Print
+                                                                            </button>
+                                                                        )}
+
+                                                                    {/* DELETE */}
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                        title="Delete transaction"
+                                                                        style={{
+                                                                            cursor: "pointer",
+                                                                            color: "#dc2626",
+                                                                        }}
+                                                                        onClick={() => {
+                                                                            setRowMenuOpen(
+                                                                                null
+                                                                            );
+
+                                                                            setDeleteTarget({
+                                                                                Id:
+                                                                                    txn.Txn_Type ===
+                                                                                        "Add_Adjustment" ||
+                                                                                        txn.Txn_Type ===
+                                                                                        "Reduce_Adjustment"
+                                                                                        ? txn.Source_Id
+                                                                                        : txn.Document_Id,
+
+                                                                                Txn_Type:
+                                                                                    txn.Txn_Type,
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <Trash2
+                                                                            size={13}
+                                                                            style={{
+                                                                                color: "#dc2626",
+                                                                            }}
+                                                                        />
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                }}
+                            />
                         </div>
                     </div>
 
@@ -1550,3 +1708,690 @@ export default function ItemsByItem() {
         </>
     );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+//  <div ref={leftListRef}
+//                         className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+//                         style={{
+//                             borderRight: "1px solid #e2e8f0",
+//                             minHeight: 0,
+//                             //minHeight: "500px",
+//                             maxHeight: "calc(100vh - 180px)",
+//                             boxSizing: "border-box",
+//                         }}
+//                     >
+//                         {/* search */}
+//                         <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
+//                             <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
+//                                 <Search
+//                                     size={14}
+//                                     style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+//                                 />
+//                                 <input
+//                                     type="text"
+//                                     value={itemSearch}
+//                                     onChange={(e) => {
+//                                         const value = e.target.value;
+//                                         const next = new URLSearchParams(searchParams);
+//                                         if (value) {
+//                                             next.set("q", value);
+//                                         } else {
+//                                             next.delete("q");
+//                                         }
+//                                         setSearchParams(next, { replace: true });
+//                                     }}
+//                                     placeholder="Search Item"
+//                                     className="border rounded-md text-sm outline-none"
+//                                     style={{
+//                                         width: "100%",
+//                                         height: 34,
+//                                         paddingLeft: 30,
+//                                         paddingRight: 8,
+//                                         borderColor: "#000000",
+//                                         boxSizing: "border-box",
+//                                     }}
+//                                 />
+//                             </div>
+//                         </div>
+
+//                         {/* list header */}
+//                         <div
+//                             className="px-4 py-3 flex items-center gap-2"
+//                             style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
+//                         >
+//                             <Package size={15} style={{ color: "#4CA1AF" }} />
+//                             <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+//                                 Items ({totalItems})
+//                             </span>
+//                         </div>
+
+//                         {isLoading && !leftCursor ? (
+//                             <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
+//                         ) : filteredItems.length === 0 ? (
+//                             <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
+//                                 <Package size={36} strokeWidth={1.2} />
+//                                 <p className="text-sm">No items found</p>
+//                             </div>
+//                         ) : (
+//                             <>
+//                                 {filteredItems.map((item) => {
+//                                     const isSelected = selectedItemId === item.Item_Id;
+
+//                                     return (
+//                                         <div
+//                                             key={item.Item_Id}
+//                                             ref={isSelected ? selectedItemRowRef : null}
+//                                             onClick={() => handleSelectItem(item)}
+//                                             onDoubleClick={() => {
+//                                                 handleSelectItem(item);
+//                                                 setEditingItem(item);
+//                                                 setShowEditItemModal(true);
+//                                                 setMenuOpen(null);
+//                                             }}
+//                                             className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+//                                             style={{
+//                                                 backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+//                                                 borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+//                                                 borderBottom: "1px solid #f1f5f9",
+//                                             }}
+//                                         >
+//                                             <div className="flex items-center gap-3 flex-1 min-w-0">
+//                                                 <div
+//                                                     className="flex items-center justify-center rounded-lg flex-shrink-0"
+//                                                     style={{ width: 36, height: 36, backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9" }}
+//                                                 >
+//                                                     <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+//                                                 </div>
+//                                                 <div className="min-w-0">
+//                                                     <p
+//                                                         className="font-semibold text-black truncate text-sm"
+//                                                         style={{ margin: 0 }}
+//                                                     >
+//                                                         {item.Item_Name}
+//                                                     </p>
+
+//                                                     {/* <p className="text-xs text-gray-600 truncate">
+//                                                         {item.Item_Category || "N/A"}
+//                                                     </p> */}
+//                                                     {item.Item_Category?.trim() && (
+//                                                         <p className="text-xs text-gray-600 truncate">
+//                                                             {item.Item_Category}
+//                                                         </p>
+//                                                     )}
+//                                                 </div>
+//                                             </div>
+
+//                                             <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+//                                                 <button
+//                                                     type="button"
+//                                                     onClick={(e) => {
+//                                                         e.stopPropagation();
+
+//                                                         const next = new URLSearchParams(searchParams);
+//                                                         next.set("itemId", item.Item_Id);
+//                                                         next.delete("txnSearch");
+
+//                                                         setSearchParams(next);
+
+//                                                         setMenuOpen(
+//                                                             menuOpen === item.Item_Id ? null : item.Item_Id
+//                                                         );
+//                                                     }}
+//                                                     className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                                                     style={{ backgroundColor: "transparent" }}
+//                                                     title="More"
+//                                                 >
+//                                                     <MoreVertical size={14} style={{ color: "#374151" }} />
+//                                                 </button>
+
+//                                                 <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
+//                                             </div>
+
+//                                             {menuOpen === item.Item_Id && (
+//                                                 <div
+//                                                     onClick={(e) => e.stopPropagation()}
+//                                                     className="absolute bg-white shadow-lg rounded-md"
+//                                                     style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0", overflow: "hidden" }}
+//                                                 >
+//                                                     <button
+//                                                         className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                                         style={{ color: "#374151" }}
+//                                                         onClick={() => {
+//                                                             setEditingItem(item);
+//                                                             setShowEditItemModal(true);
+//                                                             setMenuOpen(null);
+//                                                         }}
+//                                                     >
+//                                                         <SquarePen size={13} style={{ color: "#4CA1AF" }} />
+//                                                         Edit
+//                                                     </button>
+//                                                     <button
+//                                                         className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+//                                                         title="Delete item"
+//                                                         style={{ cursor: "pointer", color: "#dc2626" }}
+//                                                         // onClick={() => {
+//                                                         //     console.log("Delete item:", item.Item_Id);
+//                                                         // }}
+//                                                         onClick={(e) => {
+//                                                             e.stopPropagation();
+//                                                             setMenuOpen(null);
+//                                                             setDeleteItemTarget({ Item_Id: item.Item_Id, Item_Name: item.Item_Name });
+//                                                         }}
+
+//                                                     >
+//                                                         <Trash2 size={13} style={{ color: "#dc2626" }} />
+//                                                         Delete
+//                                                     </button>
+//                                                 </div>
+//                                             )}
+
+//                                         </div>
+//                                     );
+//                                 })}
+
+//                                 {/* ── LEFT SENTINEL + LOADING/END INDICATORS ── */}
+//                                 <div ref={leftSentinelRef} style={{ height: "1px" }} />
+
+//                                 {isItemsFetching && leftCursor && (
+//                                     <div className="flex justify-center py-4">
+//                                         <span className="text-sm text-gray-400">Loading more...</span>
+//                                     </div>
+//                                 )}
+
+//                                 {!itemsHasMore && filteredItems.length > 0 && (
+//                                     <div className="flex justify-center py-4">
+//                                         <span className="text-xs text-gray-300">— End of items —</span>
+//                                     </div>
+//                                 )}
+//                             </>
+//                         )}
+//                     </div>
+
+
+
+
+
+
+//   <div
+//                         className="w-full lg:w-[70%] p-1 overflow-y-auto overflow-x-hidden"
+//                         style={{
+//                             maxHeight: "calc(100vh - 180px)",
+//                             minHeight: 0,      // 👈 add this
+//                             minWidth: 0
+//                         }}
+//                     >
+//                         <div className="flex flex-col"
+//                             style={{
+//                                 height: "100%",
+
+//                                 minHeight: 0,
+//                                 overflow: "hidden",
+
+
+//                             }}
+//                         >
+
+//                             {/* ── ITEM SUMMARY CARD ── */}
+
+//                             {(liveItem || selectedItemMeta) && (
+//                                 <div className="rounded-xl p-2 mb-2 flex flex-col gap-2">
+
+//                                     <div className="grid grid-cols-[1fr_auto] items-start gap-3 min-w-0">
+
+//                                         <div className="flex items-center gap-4 min-w-0">
+
+//                                             <div
+//                                                 className="flex items-center justify-center rounded-xl flex-shrink-0"
+//                                                 style={{
+//                                                     width: 44,
+//                                                     height: 44,
+//                                                     backgroundColor: "#4CA1AF22"
+//                                                 }}
+//                                             >
+//                                                 <Package size={22} style={{ color: "#4CA1AF" }} />
+//                                             </div>
+
+//                                             <div className="min-w-0">
+//                                                 <h6
+//                                                     className="font-bold text-black break-words whitespace-normal"
+//                                                     style={{ fontSize: 15, margin: 0 }}
+//                                                 >
+//                                                     {liveItem?.Item_Name || selectedItemMeta?.Item_Name}
+//                                                 </h6>
+
+//                                                 {(liveItem?.Item_Category ?? selectedItemMeta?.Item_Category)?.trim() && (
+//                                                     <p className="text-gray-600 text-sm mt-0.5">
+//                                                         {liveItem?.Item_Category ?? selectedItemMeta?.Item_Category}
+//                                                     </p>
+//                                                 )}
+//                                             </div>
+
+//                                         </div>
+
+//                                         {itemTypeTab === "Product" && (
+//                                             <button
+//                                                 type="button"
+//                                                 onClick={handleAdjustItem}
+//                                                 className="text-white px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap"
+//                                                 style={{
+//                                                     backgroundColor: "#4CA1AF",
+//                                                     outline: "none",
+//                                                     boxShadow: "none"
+//                                                 }}
+//                                             >
+//                                                 + Adjust Item
+//                                             </button>
+//                                         )}
+
+//                                     </div>
+
+//                                     <div className="
+//             grid grid-cols-2 gap-x-4 gap-y-3 mt-3
+//             sm:flex sm:items-center sm:justify-between
+//         ">
+
+//                                         {/* Sale + Purchase Price */}
+//                                         <div className="contents sm:block">
+//                                             <div>
+//                                                 <p className="text-xs mb-0.5" style={{ fontSize: 13 }}>
+//                                                     SALE PRICE:{" "}
+//                                                     <span style={{ color: "#4CA1AF" }}>
+//                                                         ₹ {fmt(liveItem?.Sale_Price ?? selectedItemMeta?.Sale_Price)}
+//                                                     </span>
+//                                                 </p>
+//                                             </div>
+
+//                                             {!isService && (
+//                                                 <div>
+//                                                     <p className="text-xs" style={{ fontSize: 13 }}>
+//                                                         PURCHASE PRICE:{" "}
+//                                                         <span style={{ color: "#4CA1AF" }}>
+//                                                             ₹ {fmt(liveItem?.Purchase_Price ?? selectedItemMeta?.Purchase_Price)}
+//                                                         </span>
+//                                                     </p>
+//                                                 </div>
+//                                             )}
+//                                         </div>
+
+//                                         {/* Stock */}
+//                                         {!isService && (
+//                                             <div className="col-span-1 sm:col-span-1 text-left">
+//                                                 <p className="text-xs uppercase text-black mb-1">
+//                                                     Stock
+//                                                 </p>
+
+//                                                 <p
+//                                                     className="font-bold"
+//                                                     style={{
+//                                                         color:
+//                                                             (liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity) < 0
+//                                                                 ? "#dc2626"
+//                                                                 : "#4CA1AF",
+//                                                         fontSize: 15
+//                                                     }}
+//                                                 >
+//                                                     {liveItem?.Stock_Quantity ?? selectedItemMeta?.Stock_Quantity}{" "}
+//                                                     {liveItem?.Primary_Unit ||
+//                                                         liveItem?.Item_Unit ||
+//                                                         selectedItemMeta?.Primary_Unit ||
+//                                                         selectedItemMeta?.Item_Unit ||
+//                                                         ""}
+//                                                 </p>
+//                                             </div>
+//                                         )}
+
+//                                         {/* Search */}
+//                                         <div
+//                                             className="col-span-1 relative w-full sm:col-span-1 sm:w-[220px] sm:max-w-[220px]"
+//                                             style={{ height: 56 }}
+//                                         >
+//                                             <Search
+//                                                 size={14}
+//                                                 style={{
+//                                                     position: "absolute",
+//                                                     left: 10,
+//                                                     top: 15,
+//                                                     color: "#94a3b8",
+//                                                     pointerEvents: "none"
+//                                                 }}
+//                                             />
+
+//                                             <input
+//                                                 type="text"
+//                                                 value={txnSearch}
+//                                                 onChange={(e) => {
+//                                                     const value = e.target.value;
+//                                                     const next = new URLSearchParams(searchParams);
+
+//                                                     if (value) {
+//                                                         next.set("txnSearch", value);
+//                                                     } else {
+//                                                         next.delete("txnSearch");
+//                                                     }
+
+//                                                     setSearchParams(next, { replace: true });
+//                                                 }}
+//                                                 placeholder="Search"
+//                                                 className="w-full h-full border rounded-md text-sm outline-none"
+//                                                 style={{
+//                                                     paddingLeft: 34,
+//                                                     paddingRight: 10,
+//                                                     borderColor: "#000000",
+//                                                     boxSizing: "border-box",
+//                                                     marginTop: "0px"
+//                                                 }}
+//                                             />
+//                                         </div>
+//                                     </div>
+
+//                                 </div>
+//                             )}
+
+//                             {/* ── ITEM LEDGER TABLE ── */}
+//                             <div ref={rightPanelRef}
+//                                 className="table-responsive table-desi"
+//                                 style={{
+
+//                                     flex: 1,
+//                                     minHeight: 0,
+//                                     overflowY: "auto",
+//                                     visibility: isRestoringRight ? "hidden" : "visible",
+//                                     // if using the placeholder above, also collapse height so it doesn't take double space
+//                                     // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+//                                 }}
+//                             >
+//                                 <table className="w-full min-w-[700px]">
+//                                     <thead>
+//                                         <tr>
+//                                             {[
+//                                                 "Sl No.",
+//                                                 "Date",
+//                                                 "Bill No.",
+//                                                 "Party",
+//                                                 "Type",
+//                                                 "Qty",
+//                                                 "Price/Unit",
+//                                                 ""
+//                                             ].map((h, index) => (
+//                                                 <th
+//                                                     key={index}
+//                                                     style={{
+//                                                         textTransform: "uppercase",
+//                                                         letterSpacing: "0.05em",
+//                                                         whiteSpace: "nowrap"
+//                                                     }}
+//                                                 >
+//                                                     {h}
+//                                                 </th>
+//                                             ))}
+//                                         </tr>
+//                                     </thead>
+//                                     <tbody>
+//                                         {isBillsLoading && !cursor ? (
+//                                             <tr>
+//                                                 <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+//                                                     Loading...
+//                                                 </td>
+//                                             </tr>
+//                                         ) : transactions.length === 0 ? (
+//                                             <tr>
+//                                                 <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+//                                                     No transactions to show
+//                                                 </td>
+//                                             </tr>
+//                                         ) : (
+//                                             transactions.map((txn, idx) => {
+//                                                 //const isHighlighted = String(searchParams.get("highlightTxn")) === String(txn.Ledger_Id);
+//                                                 const isHighlighted =
+//                                                     String(searchParams.get("highlightTxn")) ===
+//                                                     String(txn.Ledger_Id);
+//                                                 return (
+//                                                     // <tr
+//                                                     //     key={txn.Ledger_Id}
+//                                                     //     onDoubleClick={() => handleTransactionEdit(txn)}
+//                                                     //     style={{
+//                                                     //         borderBottom: "1px solid #f1f5f9",
+//                                                     //         position: "relative",
+//                                                     //         cursor: "pointer",
+//                                                     //     }}
+//                                                     //     className="hover:bg-gray-50 transition-colors"
+//                                                     // >
+//                                                     <tr
+//                                                         key={txn.Ledger_Id}
+//                                                         ref={isHighlighted ? highlightedRowRef : null}
+
+//                                                         // SINGLE CLICK → highlight only
+//                                                         onClick={() => {
+//                                                             const params = new URLSearchParams(searchParams);
+
+//                                                             params.set(
+//                                                                 "highlightTxn",
+//                                                                 txn.Ledger_Id
+//                                                             );
+
+//                                                             setSearchParams(params, { replace: true });
+//                                                         }}
+
+//                                                         // DOUBLE CLICK → highlight + edit
+//                                                         onDoubleClick={() => {
+//                                                             const params = new URLSearchParams(searchParams);
+
+//                                                             params.set(
+//                                                                 "highlightTxn",
+//                                                                 txn.Ledger_Id
+//                                                             );
+
+//                                                             setSearchParams(params, { replace: true });
+
+//                                                             handleTransactionEdit(txn);
+//                                                         }}
+
+//                                                         style={{
+//                                                             borderBottom: "1px solid #f1f5f9",
+//                                                             position: "relative",
+//                                                             cursor: "pointer",
+
+//                                                             // HIGHLIGHT
+//                                                             backgroundColor: isHighlighted
+//                                                                 ? "#4CA1AF22"
+//                                                                 : "transparent",
+//                                                         }}
+
+//                                                         className="hover:bg-gray-50 transition-colors"
+//                                                     >
+//                                                         <td>{idx + 1}.</td>
+//                                                         <td style={{ whiteSpace: "nowrap" }}>
+//                                                             {fmtDate(txn.Txn_Date)}
+//                                                         </td>
+
+//                                                         <td style={{ whiteSpace: "nowrap" }}>
+//                                                             {txn.Number || "—"}
+//                                                         </td>
+
+//                                                         <td>
+//                                                             {txn.Party_Name || "—"}
+//                                                         </td>
+
+//                                                         <td
+//                                                             style={{
+//                                                                 color: txn.Direction === "In" ? "#16a34a" : "#dc2626",
+//                                                             }}
+//                                                         >
+//                                                             {txn.Txn_Type || "—"}
+//                                                         </td>
+
+//                                                         <td>
+//                                                             {fmt(txn.Quantity)}({txn.Selected_Unit})
+//                                                         </td>
+
+//                                                         <td>
+//                                                             {txn.Rate !== null
+//                                                                 ? `₹ ${fmt(txn.Rate)}`
+//                                                                 : "—"}
+//                                                         </td>
+
+//                                                         {txn.Txn_Type !== "Opening_Stock" && (
+//                                                             <td
+//                                                                 style={{
+//                                                                     position: "relative",
+//                                                                     width: 50,
+//                                                                     textAlign: "center",
+//                                                                 }}
+//                                                             >
+//                                                                 <button
+//                                                                     type="button"
+//                                                                     onClick={(e) => {
+//                                                                         e.stopPropagation();
+
+//                                                                         setRowMenuOpen(
+//                                                                             rowMenuOpen === txn.Ledger_Id
+//                                                                                 ? null
+//                                                                                 : txn.Ledger_Id
+//                                                                         );
+//                                                                     }}
+//                                                                     className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                                                                     style={{
+//                                                                         backgroundColor: "transparent",
+//                                                                         border: "none",
+//                                                                         cursor: "pointer",
+//                                                                     }}
+//                                                                     title="More"
+//                                                                 >
+//                                                                     <MoreVertical
+//                                                                         size={16}
+//                                                                         style={{ color: "#374151" }}
+//                                                                     />
+//                                                                 </button>
+
+//                                                                 {rowMenuOpen === txn.Ledger_Id && (
+//                                                                     <div
+//                                                                         onClick={(e) => e.stopPropagation()}
+//                                                                         className="absolute bg-white shadow-lg rounded-md"
+//                                                                         style={{
+//                                                                             right: 10,
+//                                                                             top: 36,
+//                                                                             width: 150,
+//                                                                             zIndex: 100,
+//                                                                             border: "1px solid #e2e8f0",
+//                                                                             overflow: "hidden",
+//                                                                         }}
+//                                                                     >
+//                                                                         {/* <button
+//                                                                             type="button"
+//                                                                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                                                             style={{ color: "#374151" }}
+//                                                                             onClick={() => handleTransactionEdit(txn)}
+//                                                                         >
+//                                                                             <Eye size={13} style={{ color: "#4CA1AF" }} />
+//                                                                             View / Edit
+//                                                                         </button> */}
+//                                                                         <button
+//                                                                             type="button"
+//                                                                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                                                             style={{ color: "#374151" }}
+//                                                                             onClick={() => {
+//                                                                                 setRowMenuOpen(null);
+
+//                                                                                 const params = new URLSearchParams(searchParams);
+
+//                                                                                 params.set(
+//                                                                                     "highlightTxn",
+//                                                                                     txn.Ledger_Id
+//                                                                                 );
+
+//                                                                                 setSearchParams(params, { replace: true });
+
+//                                                                                 handleTransactionEdit(txn);
+//                                                                             }}
+//                                                                         >
+//                                                                             <Eye
+//                                                                                 size={13}
+//                                                                                 style={{ color: "#4CA1AF" }}
+//                                                                             />
+
+//                                                                             View / Edit
+//                                                                         </button>
+
+//                                                                         {![
+//                                                                             "Add_Adjustment",
+//                                                                             "Reduce_Adjustment",
+//                                                                             "Opening Stock"
+//                                                                         ].includes(txn.Txn_Type) && (<button
+//                                                                             type="button"
+//                                                                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+//                                                                             style={{ color: "#374151" }}
+//                                                                             onClick={() => {
+//                                                                                 setRowMenuOpen(null);
+//                                                                                 handlePrintClick(txn, txn.Document_Id);
+//                                                                             }}
+//                                                                         >
+//                                                                             <Printer size={13} style={{ color: "#4CA1AF" }} />
+//                                                                             Print
+//                                                                         </button>)}
+
+//                                                                         <button
+//                                                                             type="button"
+//                                                                             className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+//                                                                             title="Delete transaction"
+//                                                                             style={{ cursor: "pointer", color: "#dc2626" }}
+//                                                                             onClick={() =>
+//                                                                                 setDeleteTarget({
+//                                                                                     Id:
+//                                                                                         txn.Txn_Type === "Add_Adjustment" ||
+//                                                                                             txn.Txn_Type === "Reduce_Adjustment"
+//                                                                                             ? txn.Source_Id
+//                                                                                             : txn.Document_Id,
+//                                                                                     Txn_Type: txn.Txn_Type,
+//                                                                                 })
+//                                                                             }
+//                                                                         >
+//                                                                             <Trash2 size={13} style={{ color: "#dc2626" }} />
+//                                                                             Delete
+//                                                                         </button>
+//                                                                     </div>
+//                                                                 )}
+
+//                                                             </td>
+//                                                         )}
+//                                                     </tr>
+//                                                 )
+//                                             })
+//                                         )}
+//                                     </tbody>
+//                                 </table>
+
+//                                 <div
+//                                     ref={sentinelRef}
+//                                     style={{ height: "1px" }}
+//                                 />
+
+//                                 {isBillsFetching && cursor && (
+//                                     <div className="flex justify-center py-4">
+//                                         <span className="text-sm text-gray-400">
+//                                             Loading more...
+//                                         </span>
+//                                     </div>
+//                                 )}
+
+//                                 {!hasMore && transactions.length > 0 && (
+//                                     <div className="flex justify-center py-4">
+//                                         <span className="text-xs text-gray-300">
+//                                             — End of transactions —
+//                                         </span>
+//                                     </div>
+//                                 )}
+
+//                             </div>
+
+//                         </div>
+//                     </div>
