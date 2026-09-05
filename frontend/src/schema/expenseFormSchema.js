@@ -135,6 +135,14 @@ const expenseBaseSchema = z.object({
   Category_Type: z.enum(["Direct", "Indirect"]).optional().default("Indirect"),
 
   Total_Amount: digitsOnly("Total_Amount", false).default(0),   // 🔻 was: required, must be >0
+  Round_Off: z
+      .union([z.string(), z.number()])
+      .optional()
+      .transform((val) => {
+        if (val === "" || val === undefined || val === null) return 0;
+        const n = Number(val);
+        return isNaN(n) ? 0 : n;
+      }),
 
   Total_Paid: z
     .union([z.string(), z.number()])

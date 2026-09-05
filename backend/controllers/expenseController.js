@@ -1787,56 +1787,98 @@ const getExpenseItemUsage = async (req, res, next) => {
         like  // Expense Date
       );
     }
+//ei.Amount AS Item_Amount,
+    // const [rows] = await connection.query(
+    //   `
+    //   SELECT
+    //     ei.id,
+    //     ei.Quantity,
+    //     ei.Price,
+    //     ei.Amount,
 
-    const [rows] = await connection.query(
-      `
-      SELECT
-        ei.id,
-        ei.Quantity,
-        ei.Price,
-        ei.Amount,
+    //     eim.Item_Name,
+    //     eim.Item_HSN,
 
-        eim.Item_Name,
-        eim.Item_HSN,
+    //     e.id AS Expense_Id,
+    //     e.Expense_Number,
+    //     e.Expense_Date,
 
-        e.id AS Expense_Id,
-        e.Expense_Number,
-        e.Expense_Date,
+    //     ec.Category_Name,
 
-        ec.Category_Name,
+    //     a.Party_Name
 
-        a.Party_Name
+    //   FROM expense_items ei
 
-      FROM expense_items ei
+    //   LEFT JOIN expense_item_master eim
+    //     ON eim.id = ei.Expense_Item_Master_Id
 
-      LEFT JOIN expense_item_master eim
-        ON eim.id = ei.Expense_Item_Master_Id
+    //   JOIN expenses e
+    //     ON ei.Expense_Id = e.id
 
-      JOIN expenses e
-        ON ei.Expense_Id = e.id
+    //   LEFT JOIN expense_categories ec
+    //     ON e.Category_Id = ec.id
 
-      LEFT JOIN expense_categories ec
-        ON e.Category_Id = ec.id
+    //   LEFT JOIN add_party a
+    //     ON e.Party_Id = a.Party_Id
 
-      LEFT JOIN add_party a
-        ON e.Party_Id = a.Party_Id
+    //   WHERE ${whereClauses.join(" AND ")}
 
-      WHERE ${whereClauses.join(" AND ")}
+    //   ORDER BY ei.id DESC
 
-      ORDER BY ei.id DESC
-
-      LIMIT ?
-      `,
-      // [...params, PAGE_SIZE + 1]
-      [...params, limit + 1]
-    );
+    //   LIMIT ?
+    //   `,
+    //   // [...params, PAGE_SIZE + 1]
+    //   [...params, limit + 1]
+    // );
 
     // const hasMore = rows.length > PAGE_SIZE;
 
     // const pageRows = hasMore
     //   ? rows.slice(0, PAGE_SIZE)
     //   : rows;
+const [rows] = await connection.query(
+  `
+  SELECT 
+    ei.id,
+    ei.Quantity,
+    ei.Price,
+    
 
+    e.Total_Amount AS Amount,
+
+    eim.Item_Name,
+    eim.Item_HSN,
+
+    e.id AS Expense_Id,
+    e.Expense_Number,
+    e.Expense_Date,
+
+    ec.Category_Name,
+
+    a.Party_Name
+
+  FROM expense_items ei
+
+  LEFT JOIN expense_item_master eim
+    ON eim.id = ei.Expense_Item_Master_Id
+
+  JOIN expenses e
+    ON ei.Expense_Id = e.id
+
+  LEFT JOIN expense_categories ec
+    ON e.Category_Id = ec.id
+
+  LEFT JOIN add_party a
+    ON e.Party_Id = a.Party_Id
+
+  WHERE ${whereClauses.join(" AND ")}
+
+  ORDER BY ei.id DESC
+
+  LIMIT ?
+  `,
+  [...params, limit + 1]
+);
       const hasMore = rows.length > limit;
 
     const pageRows = hasMore

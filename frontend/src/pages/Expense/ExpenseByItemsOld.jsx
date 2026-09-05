@@ -1,40 +1,41 @@
-import { useMemo, useState, useEffect } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { useMemo, useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import { useReactToPrint } from "react-to-print";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
-  LayoutDashboard,
   Search,
   MoreVertical,
   ChevronRight,
   Package,
   Eye,
   Trash2,
-  Copy,
-  FileText,
   Printer,
-  History,
+
 } from "lucide-react";
 
-import {
-  useGetAllExpenseItemMastersQuery,
-  useGetExpenseItemUsageQuery
-} from "../../redux/api/expenseApi";
-
 import EditExpenseItemModal from "../../components/Modal/EditExpenseItemModal";
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
+import { toast } from "react-toastify";
 
-
+import {
+  useGetAllExpenseItemMastersCursorQuery,
+  useGetExpenseItemUsageQuery,
+  useGetExpenseByIdQuery,
+  useDeleteExpenseMutation,
+  useDeleteExpenseItemMasterMutation
+} from "../../redux/api/expenseApi";
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/* row-action menu options, mapped to icons */
 const ROW_ACTIONS = [
   { key: "view", label: "View/Edit", icon: Eye },
   { key: "delete", label: "Delete", icon: Trash2, danger: true },
-  { key: "duplicate", label: "Duplicate", icon: Copy },
-  { key: "pdf", label: "Open PDF", icon: FileText },
-  { key: "preview", label: "Preview", icon: Eye },
+  //{ key: "duplicate", label: "Duplicate", icon: Copy },
+  //{ key: "pdf", label: "Open PDF", icon: FileText },
+  //{ key: "preview", label: "Preview", icon: Eye },
   { key: "print", label: "Print", icon: Printer },
-  { key: "history", label: "View History", icon: History },
+  //{ key: "history", label: "View History", icon: History },
 ];
 
 /* ════════════════════════════════════════════════════════════
@@ -44,41 +45,298 @@ export default function ExpensesByItems() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  /* ── EXPENSE PRINT ── */
+  const [printExpenseId, setPrintExpenseId] = useState(null);
+  const printRef = useRef(null);
+
+  // ── state now lives in the URL ──
+  const selectedItemId = searchParams.get("itemId") || null;
+  const itemSearch = searchParams.get("q") || "";
+  const txnSearch = searchParams.get("txnSearch") || "";
+
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [rowMenuOpen, setRowMenuOpen] = useState(null);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  /* ── helpers for merging into existing search params ── */
+  const setSelectedItemId = (id) => {
+    const next = new URLSearchParams(searchParams);
+    if (id === null) {
+      next.delete("itemId");
+    } else {
+      next.set("itemId", id);
+    }
+    setSearchParams(next);
+  };
+
+  const handleItemSearchChange = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set("q", value);
+    } else {
+      next.delete("q");
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleTxnSearchChange = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) {
+      next.set("txnSearch", value);
+    } else {
+      next.delete("txnSearch");
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  /* ── LEFT SIDE — cursor-based infinite scroll (item list) ── */
+  const [leftCursor, setLeftCursor] = useState(null);
+  const leftSentinelRef = useRef(null);
+  const leftObserverRef = useRef(null);
+  const initialLeftLimit = useRef(Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 10);
 
   const {
     data: itemResponse,
-    //isLoading,
-    //error,
-  } = useGetAllExpenseItemMastersQuery();
-
-  // console.log("itemResponse:", itemResponse);
-  // console.log("itemError:", error);
+    isLoading: isItemsLoading,
+    isFetching: isItemsFetching,
+  } = useGetAllExpenseItemMastersCursorQuery({
+    cursor: leftCursor,
+    search: itemSearch,
+    limit: leftCursor ? 10 : initialLeftLimit.current
+    //limit: 10,
+  });
 
   const items = itemResponse?.items || [];
-  const [selectedItemId, setSelectedItemId] = useState(null);
+  const totalItems = itemResponse?.totalItems || 0;
+  const itemsHasMore = itemResponse?.hasMore ?? false;
+  const itemsNextCursor = itemResponse?.nextCursor ?? null;
+
+  /* reset left cursor when item search changes */
+  useEffect(() => {
+    setLeftCursor(null);
+  }, [itemSearch]);
+
+  const handleLeftObserver = useCallback(
+    (entries) => {
+      if (
+        entries[0].isIntersecting &&
+        itemsHasMore &&
+        itemsNextCursor &&
+        !isItemsFetching &&
+        !isItemsLoading
+      ) {
+        setLeftCursor(itemsNextCursor);
+      }
+    },
+    [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]
+  );
+
+  useEffect(() => {
+    if (leftObserverRef.current) {
+      leftObserverRef.current.disconnect();
+    }
+
+    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 0.1,
+    });
+
+    if (leftSentinelRef.current) {
+      leftObserverRef.current.observe(leftSentinelRef.current);
+    }
+
+    return () => leftObserverRef.current?.disconnect();
+  }, [handleLeftObserver]);
+
+  /* ── RIGHT SIDE — cursor-based infinite scroll (transactions/usage) ── */
+  const [rightCursor, setRightCursor] = useState(null);
+  const rightSentinelRef = useRef(null);
+  const rightObserverRef = useRef(null);
+  const initialRightLimit = useRef(
+    Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
+  );
+
   const {
     data: usageResponse,
-    //isLoading: isUsageLoading,
+    isLoading: isUsageLoading,
+    isFetching: isUsageFetching,
   } = useGetExpenseItemUsageQuery(
-    { masterItemId: selectedItemId },
-    { skip: !selectedItemId }
+    {
+      masterItemId: selectedItemId,
+
+      cursor: rightCursor,
+      search: txnSearch, // ← add
+      limit: initialRightLimit.current
+    },
+    {
+      skip: !selectedItemId,
+    }
   );
+
+  const [deleteExpense, { isLoading: isDeletingExpense }] =
+    useDeleteExpenseMutation();
+
+  const [deleteExpenseItem, { isLoading: isDeletingExpenseItem }] =
+    useDeleteExpenseItemMasterMutation();
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      /* =====================================================
+         DELETE EXPENSE ITEM MASTER
+      ===================================================== */
+      if (deleteTarget.type === "item") {
+
+        // Reset left-side pagination
+        setLeftCursor(null);
+
+        const res = await deleteExpenseItem({
+          id: deleteTarget.itemId,
+        }).unwrap();
+
+        toast.success(
+          res?.message || "Expense item deleted successfully"
+        );
+
+        // If the deleted item was selected,
+        // clear selection so another item can be selected.
+        if (
+          String(selectedItemId) ===
+          String(deleteTarget.itemId)
+        ) {
+          setSelectedItemId(null);
+        }
+
+        setMenuOpen(null);
+        setDeleteTarget(null);
+
+        return;
+      }
+
+      /* =====================================================
+         DELETE EXPENSE TRANSACTION
+      ===================================================== */
+      setRightCursor(null);
+
+      const res = await deleteExpense({
+        id: deleteTarget.expenseId,
+      }).unwrap();
+
+      toast.success(
+        res?.message || "Expense deleted successfully"
+      );
+
+      setDeleteTarget(null);
+
+    } catch (error) {
+      console.error("Failed to delete:", error);
+
+      toast.error(
+        error?.data?.message ||
+        "Failed to delete. Please try again."
+      );
+
+      // Close the confirmation modal even when deletion fails
+      setDeleteTarget(null);
+
+    }
+  };
+
+  /* ── EXPENSE PRINT DATA ── */
+
+  const {
+    data: printExpenseData,
+    isFetching: isPrintExpenseFetching,
+  } = useGetExpenseByIdQuery(printExpenseId, {
+    skip: !printExpenseId,
+  });
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+
+    documentTitle: printExpenseId
+      ? `Expense-${printExpenseId}`
+      : "Expense",
+
+    onAfterPrint: () => {
+      setPrintExpenseId(null);
+    },
+  });
+
+  useEffect(() => {
+    if (
+      printExpenseData?.expense &&
+      printExpenseId &&
+      !isPrintExpenseFetching
+    ) {
+      handlePrint();
+    }
+  }, [
+    printExpenseData,
+    printExpenseId,
+    isPrintExpenseFetching,
+    handlePrint,
+  ]);
+
 
   const itemUsage = usageResponse?.usage || [];
 
-  // console.log("usageResponse:", usageResponse);
-  // console.log("itemUsage", itemUsage);
+  const usageHasMore = usageResponse?.hasMore ?? false;
+  const usageNextCursor = usageResponse?.nextCursor ?? null;
 
+  /* reset right cursor when selected item changes */
+  useEffect(() => {
+    setRightCursor(null);
+  }, [selectedItemId, txnSearch]);
+
+
+  const handleRightObserver = useCallback(
+    (entries) => {
+      if (
+        entries[0].isIntersecting &&
+        usageHasMore &&
+        usageNextCursor &&
+        !isUsageFetching &&
+        !isUsageLoading
+      ) {
+        setRightCursor(usageNextCursor);
+      }
+    },
+    [usageHasMore, usageNextCursor, isUsageFetching, isUsageLoading]
+  );
+
+  useEffect(() => {
+    if (rightObserverRef.current) {
+      rightObserverRef.current.disconnect();
+    }
+
+    rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
+      root: null,
+      rootMargin: "0px",
+      threshold: 0.1,
+    });
+
+    if (rightSentinelRef.current) {
+      rightObserverRef.current.observe(rightSentinelRef.current);
+    }
+
+    return () => rightObserverRef.current?.disconnect();
+  }, [handleRightObserver]);
+
+  /* ── auto-select first item / restore from navigation state ── */
   useEffect(() => {
     if (!items.length) return;
 
-    if (
-      selectedItemId === null &&
-      location.state?.itemId
-    ) {
+    if (!selectedItemId && location.state?.itemId) {
       setSelectedItemId(location.state.itemId);
 
-      navigate(location.pathname, {
+      navigate(location.pathname + location.search, {
         replace: true,
         state: null,
       });
@@ -86,26 +344,13 @@ export default function ExpensesByItems() {
       return;
     }
 
-    if (selectedItemId === null) {
+    if (!selectedItemId) {
       setSelectedItemId(items[0].id);
     }
-  }, [
-    items,
-    selectedItemId,
-    navigate,
-    location.pathname,
-    location.state,
-  ]);
-
-  const [itemSearch, setItemSearch] = useState("");
-  const [txnSearch, setTxnSearch] = useState("");
-  const [menuOpen, setMenuOpen] = useState(null);
-  const [rowMenuOpen, setRowMenuOpen] = useState(null);
-  const [showEditItemModal, setShowEditItemModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, selectedItemId, navigate, location.pathname, location.state]);
 
   useEffect(() => {
-
     const closeMenus = () => {
       setMenuOpen(null);
       setRowMenuOpen(null);
@@ -116,13 +361,13 @@ export default function ExpensesByItems() {
     return () => {
       document.removeEventListener("click", closeMenus);
     };
-
   }, []);
 
-
+  /* items no longer need client-side name filtering — search now
+     happens server-side via the cursor query's `search` param */
   const itemsWithTotals = useMemo(() => {
     return items.map((item) => {
-      const isSelected = item.id === selectedItemId;
+      const isSelected = String(item.id) === String(selectedItemId);
       const usageForThisItem = isSelected ? itemUsage : [];
 
       return {
@@ -138,7 +383,8 @@ export default function ExpensesByItems() {
           0
         ),
         transactions: usageForThisItem.map((u) => ({
-          id: u.id,
+          id: u.id,                    // expense item/usage ID
+          expenseId: u.Expense_Id,     // actual expense ID
           date: u.Expense_Date,
           expNo: u.Expense_Number,
           party: u.Party_Name || "—",
@@ -150,44 +396,122 @@ export default function ExpensesByItems() {
     });
   }, [items, itemUsage, selectedItemId]);
 
-
   const selectedItem =
-    itemsWithTotals.find((it) => it.id === selectedItemId) || itemsWithTotals[0];
+    itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
 
-  const filteredItems = useMemo(() => {
-    return itemsWithTotals.filter((it) =>
-      it.name.toLowerCase().includes(itemSearch.toLowerCase())
-    );
-  }, [itemsWithTotals, itemSearch]);
-
-  const filteredTransactions = useMemo(() => {
-    if (!selectedItem) return [];
-    return selectedItem.transactions.filter(
-      (t) =>
-        (t.party || "").toLowerCase().includes(txnSearch.toLowerCase()) ||
-        (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
-    );
-  }, [selectedItem, txnSearch]);
+  /* transaction search still client-side filters the currently-loaded
+     page(s) of usage rows — server-side date filter is separate (date param) */
+  // const filteredTransactions = useMemo(() => {
+  //   if (!selectedItem) return [];
+  //   return selectedItem.transactions.filter(
+  //     (t) =>
+  //       (t.party || "").toLowerCase().includes(txnSearch.toLowerCase()) ||
+  //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
+  //   );
+  // }, [selectedItem, txnSearch]);
+  const filteredTransactions = selectedItem?.transactions || [];
+  const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
 
   const fmtDate = (d) =>
     d
       ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
       : "—";
 
+  // const handleSelectItem = (item) => {
+  //   setSelectedItemId(item.id);
+  //   handleTxnSearchChange("");
+  //   setMenuOpen(null);
+  //   setRowMenuOpen(null);
+  // };
   const handleSelectItem = (item) => {
-    setSelectedItemId(item.id);
-    setTxnSearch("");
+    const next = new URLSearchParams(searchParams);
+    next.set("itemId", item.id);
+    next.delete("txnSearch");
+    setSearchParams(next);
+
     setMenuOpen(null);
     setRowMenuOpen(null);
   };
 
 
+  const leftListRef = useRef(null);
+  const rightPanelRef = useRef(null);
+  const selectedItemRowRef = useRef(null);
+  const highlightedRowRef = useRef(null);
+  useEffect(() => {
+    const leftEl = leftListRef.current;
+    const rightEl = rightPanelRef.current;
+
+    const saveLeft = () => {
+      sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
+      sessionStorage.setItem("expensesByExpense:leftCount", items.length);
+    };
+    const saveRight = () => {
+      console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+      sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+      sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
+      // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+      // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
+    };
+
+    leftEl?.addEventListener("scroll", saveLeft);
+    rightEl?.addEventListener("scroll", saveRight);
+
+    return () => {
+      leftEl?.removeEventListener("scroll", saveLeft);
+      rightEl?.removeEventListener("scroll", saveRight);
+    };
+  }, [items.length, filteredTransactions.length]);
+
+
+
+  const hasRestoredLeftRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (hasRestoredLeftRef.current) return; // only do this once per mount
+    if (isItemsLoading || isItemsFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
+    if (items.length < savedCount) return;
+
+    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  }, [isItemsLoading, isItemsFetching, selectedItemId, items.length]);
+  const hasRestoredRightRef = useRef(false);
+  const [isRestoringRight, setIsRestoringRight] = useState(true);
+
+  // useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) return;
+  //     if (isUsageLoading || isUsageFetching) return;
+
+  //     const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+  //     if (filteredTransactions.length < savedCount) return;
+
+  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //     hasRestoredRightRef.current = true;
+  // }, [isUsageLoading, isUsageFetching, filteredTransactions.length]);
+  useLayoutEffect(() => {
+    if (hasRestoredRightRef.current) {
+      setIsRestoringRight(false);
+      return;
+    }
+    if (isUsageLoading || isUsageFetching) return;
+
+    const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+    // keep waiting only if we might still get more data
+    if (filteredTransactions.length < savedCount && usageHasMore) return;
+
+    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+    hasRestoredRightRef.current = true;
+    setIsRestoringRight(false); // reveal now, correctly positioned
+  }, [isUsageLoading, isUsageFetching, filteredTransactions.length, usageHasMore]);
+
   return (
     <>
-      {/* ── BREADCRUMB ── */}
-
-
-      <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
+      <div className="flex flex-col bg-white"
+        style={{ height: "100%", minHeight: 0 }}
+      // style={{ minHeight: "100vh" }}
+      >
 
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">
@@ -205,7 +529,7 @@ export default function ExpensesByItems() {
                     from: location.pathname,
                   },
                 })}
-              className="text-white px-4 py-2 rounded-md text-sm font-medium"
+              className="text-white px-4 py-2 rounded-md"
               style={{
                 backgroundColor: "#4CA1AF",
                 outline: "none",
@@ -225,7 +549,7 @@ export default function ExpensesByItems() {
         >
 
           {/* ══ LEFT — 30% — item list ══ */}
-          <div
+          <div ref={leftListRef}
             className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
             style={{
               borderRight: "1px solid #e2e8f0",
@@ -250,7 +574,7 @@ export default function ExpensesByItems() {
                 <input
                   type="text"
                   value={itemSearch}
-                  onChange={(e) => setItemSearch(e.target.value)}
+                  onChange={(e) => handleItemSearchChange(e.target.value)}
                   placeholder="Search Item"
                   className="border rounded-md text-sm outline-none"
                   style={{
@@ -271,237 +595,375 @@ export default function ExpensesByItems() {
               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
             >
               <Package size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Items ({filteredItems.length})
+              <span className="text-xs font-semibold  uppercase tracking-wider">
+                Items ({totalItems})
               </span>
             </div>
 
-            {filteredItems.length === 0 ? (
+            {isItemsLoading ? (
+              <div className="p-4 text-gray-400 text-sm">Loading items...</div>
+            ) : itemsWithTotals.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
                 <Package size={36} strokeWidth={1.2} />
                 <p className="text-sm">No items found</p>
               </div>
             ) : (
-              filteredItems.map((item) => {
-                const isSelected =
-                  selectedItemId === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleSelectItem(item)}
+              <>
+                {itemsWithTotals.map((item) => {
+                  const isSelected = String(selectedItemId) === String(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      ref={isSelected ? selectedItemRowRef : null}
+                      onClick={() => handleSelectItem(item)}
 
-                    onDoubleClick={() => {
+                      onDoubleClick={() => {
 
-                      // Select the item
-                      handleSelectItem(item);
+                        handleSelectItem(item);
 
-                      // Get original object from API response
-                      const originalItem = items.find(
-                        (i) => i.id === item.id
-                      );
+                        const originalItem = items.find(
+                          (i) => i.id === item.id
+                        );
 
-                      setEditingItem(originalItem);
+                        setEditingItem(originalItem);
 
-                      setShowEditItemModal(true);
+                        setShowEditItemModal(true);
 
-                      setMenuOpen(null);
+                        setMenuOpen(null);
 
-                    }}
+                      }}
 
-                    className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
-                    style={{
-                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                      borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                      borderBottom: "1px solid #f1f5f9",
-                    }}
-                  >
-                    {/* left: icon + name */}
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div
-                        className="flex items-center justify-center rounded-lg flex-shrink-0"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
-                        }}
-                      >
-                        <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-                          {item.name}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* right: amount + actions */}
-                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      {/* <span className="text-sm text-gray-600 mr-1">
-                        ₹ {fmt(item.amount)}
-                      </span> */}
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-
-                          e.stopPropagation();
-
-                          // Select immediately (Vyapar behaviour)
-                          setSelectedItemId(item.id);
-
-                          setTxnSearch("");
-
-                          setMenuOpen(
-                            menuOpen === item.id
-                              ? null
-                              : item.id
-                          );
-
-                        }}
-                        className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                        style={{ backgroundColor: "transparent" }}
-                        title="More"
-                      >
-                        <MoreVertical size={14} style={{ color: "#94a3b8" }} />
-                      </button>
-
-                      <ChevronRight
-                        size={14}
-                        style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
-                      />
-                    </div>
-
-                    {menuOpen === item.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute bg-white shadow-lg rounded-md"
-                        style={{
-                          right: 10,
-                          top: 48,
-                          width: 140,
-                          zIndex: 50,
-                          border: "1px solid #e2e8f0",
-                        }}
-                      >
-                        <button
-                          className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
-                          onClick={() => {
-
-                            const originalItem = items.find(
-                              (i) => i.id === item.id
-                            );
-
-                            setEditingItem(originalItem);
-
-                            setShowEditItemModal(true);
-
-                            setMenuOpen(null);
-
+                      className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+                      style={{
+                        backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+                        borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+                        borderBottom: "1px solid #f1f5f9",
+                      }}
+                    >
+                      {/* left: icon + name */}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div
+                          className="flex items-center justify-center rounded-lg flex-shrink-0"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
                           }}
                         >
-                          View/Edit
-                        </button>
-                        <button className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500">
-                          Delete
-                        </button>
+                          <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+                            {item.name}
+                          </p>
+                        </div>
                       </div>
-                    )}
+
+                      {/* right: actions */}
+                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            const next = new URLSearchParams(searchParams);
+                            next.set("itemId", item.id);
+                            next.delete("txnSearch");
+                            setSearchParams(next);
+
+                            setMenuOpen(
+                              menuOpen === item.id ? null : item.id
+                            );
+                          }}
+                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          style={{ backgroundColor: "transparent" }}
+                          title="More"
+                        >
+                          <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+                        </button>
+
+                        <ChevronRight
+                          size={14}
+                          style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
+                        />
+                      </div>
+
+                      {menuOpen === item.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute bg-white shadow-lg rounded-md"
+                          style={{
+                            right: 10,
+                            top: 48,
+                            width: 140,
+                            zIndex: 50,
+                            border: "1px solid #e2e8f0",
+                          }}
+                        >
+                          <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                            onClick={() => {
+
+                              const originalItem = items.find(
+                                (i) => i.id === item.id
+                              );
+
+                              setEditingItem(originalItem);
+
+                              setShowEditItemModal(true);
+
+                              setMenuOpen(null);
+
+                            }}
+                          >
+                            View/Edit
+                          </button>
+
+                          <button
+                            className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+                            onClick={() => {
+                              setDeleteTarget({
+                                type: "item",
+                                itemId: item.id,
+                                itemName: item.name,
+                              });
+
+                              setMenuOpen(null);
+                            }}
+                          >
+                            Delete
+                          </button>
+
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* ── SENTINEL + LOADING INDICATOR (LEFT) ── */}
+                <div ref={leftSentinelRef} style={{ height: "1px" }} />
+
+                {isItemsFetching && leftCursor && (
+                  <div className="flex justify-center py-3">
+                    <span className="text-xs text-gray-400">Loading more...</span>
                   </div>
-                );
-              })
+                )}
+
+                {!itemsHasMore && itemsWithTotals.length > 0 && (
+                  <div className="flex justify-center py-3">
+                    <span className="text-xs text-gray-300">— End of items —</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
+          {/* <div ref={rightPanelRef} */}
           <div
             className="w-full lg:w-[70%] p-1 overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 180px)" }}
+            style={{
+              maxHeight: "calc(100vh - 180px)",
+              minHeight: 0,      // 👈 add this
+              minWidth: 0
+            }}
+          //style={{ maxHeight: "calc(100vh - 180px)" }}
           >
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col"
+              style={{
+                height: "100%",
+
+                minHeight: 0,
+                overflow: "hidden",
+              }}
+            >
 
               {/* ── ITEM SUMMARY CARD ── */}
+
               {selectedItem && (
-                <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="flex items-center justify-center rounded-xl"
-                      style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
-                    >
-                      <Package size={22} style={{ color: "#4CA1AF" }} />
-                    </div>
-                    <div>
-                      <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
-                        {selectedItem?.name}
-                      </h6>
-                      <p className="text-gray-500 text-sm mt-0.5">
-                        Expense Item
-                      </p>
-                    </div>
-                  </div>
+                <div className="rounded-xl p-2 mb-2">
 
-                  <div className="flex items-center gap-8">
-                    <div className="text-right">
-                      <p className="text-xs uppercase text-gray-400 mb-1">Total</p>
-                      <p className="font-bold" style={{ color: "#4CA1AF", fontSize: 18 }}>
-                        ₹ {(selectedItem?.total ?? 0).toLocaleString()}
-                      </p>
-                    </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
 
-                    <div className="text-right">
-                      <p className="text-xs uppercase text-gray-400 mb-1">Balance</p>
-                      <p
-                        className="font-bold"
+                    {/* Item Name */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="flex items-center justify-center rounded-xl flex-shrink-0"
                         style={{
-                          color: (selectedItem?.balance ?? 0) > 0 ? "#dc2626" : "#16a34a",
-                          fontSize: 18,
+                          width: 44,
+                          height: 44,
+                          backgroundColor: "#4CA1AF22"
                         }}
                       >
-                        ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
-                      </p>
+                        <Package
+                          size={22}
+                          style={{ color: "#4CA1AF" }}
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <h6
+                          className="font-bold text-gray-900 break-words"
+                          style={{
+                            fontSize: 18,
+                            margin: 0
+                          }}
+                        >
+                          {selectedItem?.name}
+                        </h6>
+
+                        <p className="text-gray-500 text-sm mt-0.5">
+                          Expense Item
+                        </p>
+                      </div>
                     </div>
+
+                    {/* Total + Balance */}
+                    <div className="flex items-center gap-6 text-right shrink-0">
+
+                      {/* Total */}
+                      <div>
+                        <p className="text-xs uppercase text-gray-400 mb-1">
+                          Total
+                        </p>
+
+                        <p
+                          className="font-bold"
+                          style={{
+                            color: "#4CA1AF",
+                            fontSize: 18
+                          }}
+                        >
+                          ₹ {(selectedItem?.total ?? 0).toLocaleString()}
+                        </p>
+                      </div>
+
+                      {/* Balance */}
+                      <div>
+                        <p className="text-xs uppercase text-gray-400 mb-1">
+                          Balance
+                        </p>
+
+                        <p
+                          className="font-bold"
+                          style={{
+                            color:
+                              (selectedItem?.balance ?? 0) > 0
+                                ? "#dc2626"
+                                : "#16a34a",
+                            fontSize: 18
+                          }}
+                        >
+                          ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
+                        </p>
+                      </div>
+
+                    </div>
+
                   </div>
                 </div>
               )}
 
-              {/* ── SEARCH TRANSACTIONS ── */}
-              <div className="px-1 py-2" style={{ borderBottom: "1px solid #e2e8f0" }}>
-                <div className="relative" style={{ width: "40%", minWidth: 220, maxWidth: 300, height: 36 }}>
-                  <Search
-                    size={16}
+              {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+              <div
+                className="px-1 py-2"
+                style={{
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+
+                  {/* SEARCH */}
+                  <div
+                    className="relative"
                     style={{
-                      position: "absolute",
-                      left: 10,
-                      top: 10,
-                      color: "#94a3b8",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={txnSearch}
-                    onChange={(e) => setTxnSearch(e.target.value)}
-                    placeholder="Search"
-                    className="w-full h-full border rounded-md text-sm outline-none"
-                    style={{
+                      width: "40%",
+                      minWidth: 220,
+                      maxWidth: 300,
                       height: 36,
-                      paddingLeft: 34,
-                      paddingRight: 10,
-                      borderColor: "#dbe3ea",
                     }}
-                  />
+                  >
+                    <Search
+                      size={16}
+                      style={{
+                        position: "absolute",
+                        left: 10,
+                        top: 10,
+                        color: "#94a3b8",
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={txnSearch}
+                      onChange={(e) => handleTxnSearchChange(e.target.value)}
+                      placeholder="Search"
+                      className="w-full h-full border rounded-md text-sm outline-none"
+                      style={{
+                        height: 36,
+                        paddingLeft: 34,
+                        paddingRight: 10,
+                        borderColor: "#dbe3ea",
+                      }}
+                    />
+                  </div>
+
+                  {/* EXCEL + PRINT BUTTONS */}
+                  <div className="flex items-center gap-2">
+
+                    {/* EXCEL */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+                      title="Export to Excel"
+                    >
+                      <FileSpreadsheet
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                    {/* PRINT */}
+                    {/* <button
+                      type="button"
+                      className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
+                      title="Print Reports"
+                    >
+                      <PrinterIcon
+                        size={16}
+                        strokeWidth={2.2}
+                        className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
+                      />
+                    </button> */}
+
+                  </div>
+
                 </div>
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div className="flex-1 overflow-x-auto" style={{ position: "relative" }}>
-                <table className="w-full min-w-[600px]" style={{ fontSize: 13, borderCollapse: "collapse" }}>
+              <div ref={rightPanelRef}
+                className="table-responsive table-desi"
+                style={{
+
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                  visibility: isRestoringRight ? "hidden" : "visible",
+                  // if using the placeholder above, also collapse height so it doesn't take double space
+                  // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+                }}
+              >
+                <table className="w-full  min-w-[700px]" >
                   <thead>
-                    <tr style={{ borderBottom: "2px solid #e2e8f0" }}>
-                      {["Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
+                    <tr >
+                      {["Sl No.", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
                         <th
                           key={h}
-                          className="text-left py-2 px-3 font-semibold text-gray-500"
-                          style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          //className="text-left py-2 px-3 "
+                          style={{ textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}
                         >
                           {h}
                         </th>
@@ -509,42 +971,88 @@ export default function ExpensesByItems() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTransactions.length === 0 ? (
+                    {isUsageLoading && !rightCursor ? (
                       <tr>
-                        <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : filteredTransactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
                           No transactions to show
                         </td>
                       </tr>
                     ) : (
-                      filteredTransactions.map((txn) => (
+
+                      filteredTransactions.map((txn, idx) => (
+
+
                         <tr
                           key={txn.id}
-                          style={{ borderBottom: "1px solid #f1f5f9" }}
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
-                          onDoubleClick={() => {
-                            navigate(`/expense/edit/${txn.id}`, {
-                              state: {
-                                from: location.pathname,
-                                itemId: selectedItemId,
-                                txnSearch,
-                                itemSearch,
-                              },
-                            });
+                          ref={isHighlighted ? highlightedRowRef : null}
+
+                          onClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              String(txn.expenseId)
+                            );
+
+                            setSearchParams(params, { replace: true });
                           }}
+
+                          onDoubleClick={() => {
+                            const params = new URLSearchParams(searchParams);
+
+                            params.set(
+                              "highlightTxn",
+                              String(txn.expenseId)
+                            );
+
+                            navigate(
+                              {
+                                pathname: `/expense/edit/${txn.expenseId}`,
+                                search: params.toString(),
+                              },
+                              {
+                                state: {
+                                  from: "expense-items",
+                                  itemId: selectedItemId,
+                                  txnSearch,
+                                  itemSearch,
+                                },
+                              }
+                            );
+                          }}
+
+                          style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            position: "relative",
+                            cursor: "pointer",
+
+                            backgroundColor: isHighlighted(txn.expenseId)
+                              ? "#4CA1AF22"
+                              : "transparent",
+                          }}
+
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
                         >
-                          <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
+                          <td>{idx + 1}.</td>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             {fmtDate(txn.date)}
                           </td>
-                          <td className="py-2 px-3 text-gray-700">{txn.expNo || "—"}</td>
-                          <td className="py-2 px-3 text-gray-700">{txn.party || "—"}</td>
-                          <td className="py-2 px-3 text-gray-500">{txn.paymentType || "—"}</td>
-                          <td className="py-2 px-3 font-semibold" style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+                          <td >{txn.expNo || "—"}</td>
+                          <td >{txn.party || "—"}</td>
+                          <td >{txn.paymentType || "—"}</td>
+                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.amount)}
                           </td>
-                          <td className="py-2 px-3" style={{ whiteSpace: "nowrap" }}>
+                          <td style={{ whiteSpace: "nowrap" }}>
                             ₹ {fmt(txn.balance)}
                           </td>
-                          <td className="py-2 px-3" style={{ position: "relative" }}>
+                          <td style={{ position: "relative" }}>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -570,7 +1078,7 @@ export default function ExpensesByItems() {
                                 className="absolute bg-white shadow-lg rounded-md"
                                 style={{
                                   right: 10,
-                                  top: 36,
+                                  top: 66,
                                   width: 160,
                                   zIndex: 50,
                                   border: "1px solid #e2e8f0",
@@ -583,44 +1091,60 @@ export default function ExpensesByItems() {
                                     key={key}
                                     className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
                                     style={{ color: danger ? "#dc2626" : "#374151" }}
-                                    onClick={() => {
+                                    onClick={async () => {
                                       setRowMenuOpen(null);
 
-                                      if (key === "view") {
-                                        navigate(`/expense/edit/${txn.id}`, {
-                                          state: {
-                                            from: location.pathname,
-                                            itemId: selectedItemId,
-                                            txnSearch,
-                                            itemSearch,
-                                          },
-                                        });
-                                      }
-                                      if (key === "preview") {
-                                        navigate(`/expense/preview/${txn.id}`, {
-                                          state: {
-                                            from: location.pathname,
-                                            itemId: selectedItemId,
-                                            txnSearch,
-                                            itemSearch,
-                                          },
-                                        });
-                                      }
-                                      if (key === "print") {
-                                        const url = `/expense/preview/${txn.id}?autoPrint=1`;
-                                        window.open(url, "_blank");
-                                      }
-                                      // if (key === "print") {
-                                      //   navigate(`/expense/preview/${txn.id}`, {
-                                      //     state: {
-                                      //       from: location.pathname,
-                                      //       itemId: selectedItemId,
-                                      //       txnSearch,
-                                      //       itemSearch,
-                                      //       autoPrint: true,
+                                      // if (key === "view") {
+                                      //   navigate(
+                                      //     {
+                                      //       pathname: `/expense/edit/${txn.expenseId}`,
+                                      //       search: searchParams.toString(),
                                       //     },
-                                      //   });
+                                      //     {
+                                      //       state: {
+                                      //         from: "expense-items",
+                                      //         itemId: selectedItemId,
+                                      //         txnSearch,
+                                      //         itemSearch,
+                                      //       },
+                                      //     }
+                                      //   );
                                       // }
+                                      if (key === "view") {
+                                        const params = new URLSearchParams(searchParams);
+
+                                        params.set(
+                                          "highlightTxn",
+                                          String(txn.expenseId)
+                                        );
+
+                                        navigate(
+                                          {
+                                            pathname: `/expense/edit/${txn.expenseId}`,
+                                            search: params.toString(),
+                                          },
+                                          {
+                                            state: {
+                                              from: "expense-items",
+                                              itemId: selectedItemId,
+                                              txnSearch,
+                                              itemSearch,
+                                            },
+                                          }
+                                        );
+                                      }
+
+                                      if (key === "delete") {
+                                        setDeleteTarget({
+                                          expenseId: txn.expenseId,
+                                        });
+
+                                        return;
+                                      }
+
+                                      if (key === "print") {
+                                        setPrintExpenseId(txn.expenseId);
+                                      }
                                     }}
                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
@@ -637,6 +1161,21 @@ export default function ExpensesByItems() {
                     )}
                   </tbody>
                 </table>
+
+                {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
+                <div ref={rightSentinelRef} style={{ height: "1px" }} />
+
+                {isUsageFetching && rightCursor && (
+                  <div className="flex justify-center py-4">
+                    <span className="text-sm text-gray-400">Loading more...</span>
+                  </div>
+                )}
+
+                {!usageHasMore && itemUsage.length > 0 && (
+                  <div className="flex justify-center py-4">
+                    <span className="text-xs text-gray-300">— End of transactions —</span>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -653,6 +1192,44 @@ export default function ExpensesByItems() {
             setEditingItem(null);
           }}
         />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          title={
+            deleteTarget.type === "item"
+              ? "Delete Expense Item"
+              : "Delete Expense"
+          }
+          message={
+            deleteTarget.type === "item"
+              ? `Are you sure you want to delete "${deleteTarget.itemName}"? This action cannot be undone.`
+              : "Are you sure you want to delete this expense? This action cannot be undone."
+          }
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          isDeleting={
+            deleteTarget.type === "item"
+              ? isDeletingExpenseItem
+              : isDeletingExpense
+          }
+        />
+      )}
+
+      {/* ── EXPENSE PRINT TEMPLATE ── */}
+      {printExpenseData?.expense && (
+        <div
+          style={{
+            position: "absolute",
+            left: "-99999px",
+            top: 0,
+          }}
+        >
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={printExpenseData.expense}
+          />
+        </div>
       )}
 
     </>

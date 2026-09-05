@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef, useCallback, useLayoutEffect } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -143,9 +143,9 @@ function BankDetailPanel({ bankId }) {
   const [cursor, setCursor] = useState(null);
   //const sentinelRef = useRef(null);
   //const observerRef = useRef(null);
-  const itemRef = useRef(bankId);
+  //const itemRef = useRef(bankId);
 
-  const effectiveCursor = itemRef.current === bankId ? cursor : null;
+  //const effectiveCursor = itemRef.current === bankId ? cursor : null;
 
   const [modalState, setModalState] = useState({ open: false, type: null, id: null });
   const openModal = (type, id) => setModalState({ open: true, type, id });
@@ -171,12 +171,22 @@ function BankDetailPanel({ bankId }) {
   const initialRightLimit = useRef(
     Number(sessionStorage.getItem("banksByBank:rightCount")) || 10
   );
+  // const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
+  //   //{ Bank_Account_Id: bankId, cursor },
+  //   {
+  //     Bank_Account_Id: bankId,
+  //     cursor: effectiveCursor,
+  //     limit: effectiveCursor ? 10 : initialRightLimit.current
+  //   },
+  //   { skip: !bankId }
+  // );
+
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
     //{ Bank_Account_Id: bankId, cursor },
     {
       Bank_Account_Id: bankId,
-      cursor: effectiveCursor,
-      limit: effectiveCursor ? 10 : initialRightLimit.current
+      cursor: cursor,
+      limit: cursor ? 10 : initialRightLimit.current
     },
     { skip: !bankId }
   );
@@ -199,7 +209,7 @@ function BankDetailPanel({ bankId }) {
   //   setCursor(null);
   // }, [bankId]);
   useEffect(() => {
-    itemRef.current = bankId;
+    //itemRef.current = bankId;
     setCursor(null);
   }, [bankId]);
 

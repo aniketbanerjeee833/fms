@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useReactToPrint } from "react-to-print";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -24,6 +24,7 @@ import {
   useDeleteExpenseMutation,
   useDeleteExpenseItemMasterMutation
 } from "../../redux/api/expenseApi";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -95,8 +96,8 @@ export default function ExpensesByItems() {
 
   /* ── LEFT SIDE — cursor-based infinite scroll (item list) ── */
   const [leftCursor, setLeftCursor] = useState(null);
-  const leftSentinelRef = useRef(null);
-  const leftObserverRef = useRef(null);
+  //const leftSentinelRef = useRef(null);
+  //const leftObserverRef = useRef(null);
   const initialLeftLimit = useRef(Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 10);
 
   const {
@@ -119,44 +120,63 @@ export default function ExpensesByItems() {
   useEffect(() => {
     setLeftCursor(null);
   }, [itemSearch]);
-
-  const handleLeftObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        itemsHasMore &&
-        itemsNextCursor &&
-        !isItemsFetching &&
-        !isItemsLoading
-      ) {
-        setLeftCursor(itemsNextCursor);
-      }
-    },
-    [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]
-  );
-
-  useEffect(() => {
-    if (leftObserverRef.current) {
-      leftObserverRef.current.disconnect();
+  const handleLeftLoadMore = useCallback(() => {
+    if (
+      isItemsFetching ||
+      isItemsLoading ||
+      !itemsHasMore ||
+      !itemsNextCursor
+    ) {
+      return;
     }
 
-    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
+    setLeftCursor(itemsNextCursor);
+  }, [
+    isItemsFetching,
+    isItemsLoading,
+    itemsHasMore,
+    itemsNextCursor,
+  ]);
+  // const handleLeftObserver = useCallback(
+  //   (entries) => {
+  //     if (
+  //       entries[0].isIntersecting &&
+  //       itemsHasMore &&
+  //       itemsNextCursor &&
+  //       !isItemsFetching &&
+  //       !isItemsLoading
+  //     ) {
+  //       setLeftCursor(itemsNextCursor);
+  //     }
+  //   },
+  //   [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]
+  // );
 
-    if (leftSentinelRef.current) {
-      leftObserverRef.current.observe(leftSentinelRef.current);
-    }
+  // useEffect(() => {
+  //   if (leftObserverRef.current) {
+  //     leftObserverRef.current.disconnect();
+  //   }
 
-    return () => leftObserverRef.current?.disconnect();
-  }, [handleLeftObserver]);
+  //   leftObserverRef.current = new IntersectionObserver(handleLeftObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
+
+  //   if (leftSentinelRef.current) {
+  //     leftObserverRef.current.observe(leftSentinelRef.current);
+  //   }
+
+  //   return () => leftObserverRef.current?.disconnect();
+  // }, [handleLeftObserver]);
 
   /* ── RIGHT SIDE — cursor-based infinite scroll (transactions/usage) ── */
   const [rightCursor, setRightCursor] = useState(null);
-  const rightSentinelRef = useRef(null);
-  const rightObserverRef = useRef(null);
+  //const rightSentinelRef = useRef(null);
+  //const rightObserverRef = useRef(null);
+  //const itemRef = useRef(selectedItemId);
+  
+      //const effectiveCursor = itemRef.current === selectedItemId ? rightCursor : null;
   const initialRightLimit = useRef(
     Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
   );
@@ -171,13 +191,35 @@ export default function ExpensesByItems() {
 
       cursor: rightCursor,
       search: txnSearch, // ← add
-      limit: initialRightLimit.current
+      limit: rightCursor ? 10 : initialRightLimit.current
     },
     {
       skip: !selectedItemId,
     }
   );
+  const itemUsage = usageResponse?.usage || [];
+  const usageHasMore = usageResponse?.hasMore ?? false;
+  const usageNextCursor = usageResponse?.nextCursor ?? null;
+  useEffect(() => {
+    setRightCursor(null);
+  }, [selectedItemId, txnSearch]);
+  const handleRightLoadMore = useCallback(() => {
+    if (
+      isUsageFetching ||
+      isUsageLoading ||
+      !usageHasMore ||
+      !usageNextCursor
+    ) {
+      return;
+    }
 
+    setRightCursor(usageNextCursor);
+  }, [
+    isUsageFetching,
+    isUsageLoading,
+    usageHasMore,
+    usageNextCursor
+  ]);
   const [deleteExpense, { isLoading: isDeletingExpense }] =
     useDeleteExpenseMutation();
 
@@ -285,49 +327,49 @@ export default function ExpensesByItems() {
   ]);
 
 
-  const itemUsage = usageResponse?.usage || [];
 
-  const usageHasMore = usageResponse?.hasMore ?? false;
-  const usageNextCursor = usageResponse?.nextCursor ?? null;
+
+  //const usageHasMore = usageResponse?.hasMore ?? false;
+  //const usageNextCursor = usageResponse?.nextCursor ?? null;
 
   /* reset right cursor when selected item changes */
-  useEffect(() => {
-    setRightCursor(null);
-  }, [selectedItemId, txnSearch]);
+  // useEffect(() => {
+  //   setRightCursor(null);
+  // }, [selectedItemId, txnSearch]);
 
 
-  const handleRightObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        usageHasMore &&
-        usageNextCursor &&
-        !isUsageFetching &&
-        !isUsageLoading
-      ) {
-        setRightCursor(usageNextCursor);
-      }
-    },
-    [usageHasMore, usageNextCursor, isUsageFetching, isUsageLoading]
-  );
+  // const handleRightObserver = useCallback(
+  //   (entries) => {
+  //     if (
+  //       entries[0].isIntersecting &&
+  //       usageHasMore &&
+  //       usageNextCursor &&
+  //       !isUsageFetching &&
+  //       !isUsageLoading
+  //     ) {
+  //       setRightCursor(usageNextCursor);
+  //     }
+  //   },
+  //   [usageHasMore, usageNextCursor, isUsageFetching, isUsageLoading]
+  // );
 
-  useEffect(() => {
-    if (rightObserverRef.current) {
-      rightObserverRef.current.disconnect();
-    }
+  // useEffect(() => {
+  //   if (rightObserverRef.current) {
+  //     rightObserverRef.current.disconnect();
+  //   }
 
-    rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
+  //   rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
 
-    if (rightSentinelRef.current) {
-      rightObserverRef.current.observe(rightSentinelRef.current);
-    }
+  //   if (rightSentinelRef.current) {
+  //     rightObserverRef.current.observe(rightSentinelRef.current);
+  //   }
 
-    return () => rightObserverRef.current?.disconnect();
-  }, [handleRightObserver]);
+  //   return () => rightObserverRef.current?.disconnect();
+  // }, [handleRightObserver]);
 
   /* ── auto-select first item / restore from navigation state ── */
   useEffect(() => {
@@ -410,7 +452,7 @@ export default function ExpensesByItems() {
   //   );
   // }, [selectedItem, txnSearch]);
   const filteredTransactions = selectedItem?.transactions || [];
-  const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
+  //const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
 
   const fmtDate = (d) =>
     d
@@ -434,82 +476,123 @@ export default function ExpensesByItems() {
   };
 
 
-  const leftListRef = useRef(null);
-  const rightPanelRef = useRef(null);
-  const selectedItemRowRef = useRef(null);
-  const highlightedRowRef = useRef(null);
+
+  const virtualLeftListRef = useRef(null);
+  const hasScrolledToSelectedRef = useRef(false);
+
   useEffect(() => {
-    const leftEl = leftListRef.current;
-    const rightEl = rightPanelRef.current;
-
-    const saveLeft = () => {
-      sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
-      sessionStorage.setItem("expensesByExpense:leftCount", items.length);
-    };
-    const saveRight = () => {
-      console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
-      sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
-      sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
-      // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
-      // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
-    };
-
-    leftEl?.addEventListener("scroll", saveLeft);
-    rightEl?.addEventListener("scroll", saveRight);
-
-    return () => {
-      leftEl?.removeEventListener("scroll", saveLeft);
-      rightEl?.removeEventListener("scroll", saveRight);
-    };
-  }, [items.length, filteredTransactions.length]);
-
-
-
-  const hasRestoredLeftRef = useRef(false);
-
-  useLayoutEffect(() => {
-    if (hasRestoredLeftRef.current) return; // only do this once per mount
+    if (hasScrolledToSelectedRef.current) return;
     if (isItemsLoading || isItemsFetching) return;
+    if (!selectedItemId || !items.length) return;
 
-    const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
-    if (items.length < savedCount) return;
+    const targetIndex = items.findIndex(
+      (item) =>
+        String(item.id) === String(selectedItemId)
+    );
 
-    selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-  }, [isItemsLoading, isItemsFetching, selectedItemId, items.length]);
-  const hasRestoredRightRef = useRef(false);
-  const [isRestoringRight, setIsRestoringRight] = useState(true);
+    if (targetIndex === -1) {
+      if (
+        itemsHasMore &&
+        itemsNextCursor &&
+        !isItemsFetching
+      ) {
+        setLeftCursor(itemsNextCursor);
+      }
 
-  // useLayoutEffect(() => {
-  //     if (hasRestoredRightRef.current) return;
-  //     if (isUsageLoading || isUsageFetching) return;
-
-  //     const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
-  //     if (filteredTransactions.length < savedCount) return;
-
-  //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-  //     hasRestoredRightRef.current = true;
-  // }, [isUsageLoading, isUsageFetching, filteredTransactions.length]);
-  useLayoutEffect(() => {
-    if (hasRestoredRightRef.current) {
-      setIsRestoringRight(false);
       return;
     }
+
+    virtualLeftListRef.current?.scrollToIndex(
+      targetIndex,
+      {
+        align: "center",
+        behavior: "auto",
+      }
+    );
+
+    hasScrolledToSelectedRef.current = true;
+  }, [
+    items,
+    isItemsLoading,
+    isItemsFetching,
+    selectedItemId,
+    itemsHasMore,
+    itemsNextCursor,
+  ]);
+
+  useEffect(() => {
+    hasScrolledToSelectedRef.current = false;
+  }, [itemSearch]);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      "expensesByExpense:leftCount",
+      items.length
+    );
+  }, [items.length]);
+  const virtualRightListRef = useRef(null);
+  const hasScrolledToHighlightRef = useRef(false);
+
+  const highlightTxnId = searchParams.get("highlightTxn");
+
+  useEffect(() => {
+    hasScrolledToHighlightRef.current = false;
+  }, [
+    selectedItemId,
+    highlightTxnId,
+    txnSearch,
+  ]);
+
+  useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+    if (!highlightTxnId) return;
     if (isUsageLoading || isUsageFetching) return;
+    if (!itemUsage.length) return;
 
-    const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
-    // keep waiting only if we might still get more data
-    if (filteredTransactions.length < savedCount && usageHasMore) return;
+   const targetIndex = itemUsage.findIndex(
+  (txn) =>
+    String(txn.Expense_Id) === String(highlightTxnId)
+);
+    if (targetIndex === -1) {
+      if (
+        usageHasMore &&
+        usageNextCursor &&
+        !isUsageFetching
+      ) {
+        setRightCursor(usageNextCursor);
+      }
 
-    highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-    hasRestoredRightRef.current = true;
-    setIsRestoringRight(false); // reveal now, correctly positioned
-  }, [isUsageLoading, isUsageFetching, filteredTransactions.length, usageHasMore]);
+      return;
+    }
 
+    virtualRightListRef.current?.scrollToIndex(
+      targetIndex,
+      {
+        align: "center",
+        behavior: "auto",
+      }
+    );
+
+    hasScrolledToHighlightRef.current = true;
+  }, [
+    itemUsage,
+    highlightTxnId,
+    isUsageLoading,
+    isUsageFetching,
+    usageHasMore,
+    usageNextCursor,
+  ]);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      "expensesByExpense:rightCount",
+      itemUsage.length
+    );
+  }, [itemUsage.length]);
   return (
     <>
       <div className="flex flex-col bg-white"
-        style={{ height: "100%", minHeight: 0 }}
+        style={{ height: "100vh", overflow: "hidden" }}
       // style={{ minHeight: "100vh" }}
       >
 
@@ -545,16 +628,20 @@ export default function ExpensesByItems() {
         {/* ── SPLIT LAYOUT ── */}
         <div
           className="flex flex-col lg:flex-row gap-0"
-          style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+          style={{
+            flex: 1, minHeight: 0,
+            overflowY: "auto", borderTop: "1px solid #e2e8f0"
+          }}
         >
 
           {/* ══ LEFT — 30% — item list ══ */}
-          <div ref={leftListRef}
-            className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+          <div
+            className="w-full lg:w-[30%] flex flex-col flex-none  h-[50vh] lg:h-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
-              minHeight: "500px",
-              maxHeight: "calc(100vh - 180px)",
+              minHeight: 0,
+              //minHeight: "500px",
+              //maxHeight: "calc(100vh - 180px)",
               boxSizing: "border-box",
             }}
           >
@@ -600,25 +687,39 @@ export default function ExpensesByItems() {
               </span>
             </div>
 
-            {isItemsLoading ? (
-              <div className="p-4 text-gray-400 text-sm">Loading items...</div>
-            ) : itemsWithTotals.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
-                <Package size={36} strokeWidth={1.2} />
-                <p className="text-sm">No items found</p>
-              </div>
-            ) : (
-              <>
-                {itemsWithTotals.map((item) => {
-                  const isSelected = String(selectedItemId) === String(item.id);
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                height: 0,
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <VirtualScrollList
+                ref={virtualLeftListRef}
+                items={itemsWithTotals}
+                rowHeight={64}
+                height="100%"
+                onLoadMore={handleLeftLoadMore}
+                isFetching={isItemsFetching}
+                hasMore={itemsHasMore}
+                getItemKey={(item) => item.id}
+                emptyMessage="No items found"
+                endMessage="— End of items —"
+                isRowActive={(item) =>
+                  String(selectedItemId) === String(item.id)
+                }
+                renderRow={(item) => {
+                  const isSelected =
+                    String(selectedItemId) === String(item.id);
+
                   return (
                     <div
                       key={item.id}
-                      ref={isSelected ? selectedItemRowRef : null}
+
                       onClick={() => handleSelectItem(item)}
-
                       onDoubleClick={() => {
-
                         handleSelectItem(item);
 
                         const originalItem = items.find(
@@ -626,18 +727,20 @@ export default function ExpensesByItems() {
                         );
 
                         setEditingItem(originalItem);
-
                         setShowEditItemModal(true);
-
                         setMenuOpen(null);
-
                       }}
-
                       className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                       style={{
-                        backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                        borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+                        backgroundColor: isSelected
+                          ? "#f0f9ff"
+                          : "transparent",
+                        borderLeft: isSelected
+                          ? "3px solid #4CA1AF"
+                          : "3px solid transparent",
                         borderBottom: "1px solid #f1f5f9",
+                        boxSizing: "border-box",
+                        minHeight: 64,
                       }}
                     >
                       {/* left: icon + name */}
@@ -647,13 +750,26 @@ export default function ExpensesByItems() {
                           style={{
                             width: 36,
                             height: 36,
-                            backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+                            backgroundColor: isSelected
+                              ? "#4CA1AF22"
+                              : "#f1f5f9",
                           }}
                         >
-                          <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+                          <Package
+                            size={18}
+                            style={{
+                              color: isSelected
+                                ? "#4CA1AF"
+                                : "#94a3b8",
+                            }}
+                          />
                         </div>
+
                         <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+                          <p
+                            className="font-semibold text-gray-800 truncate text-sm"
+                            style={{ margin: 0 }}
+                          >
                             {item.name}
                           </p>
                         </div>
@@ -679,12 +795,19 @@ export default function ExpensesByItems() {
                           style={{ backgroundColor: "transparent" }}
                           title="More"
                         >
-                          <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+                          <MoreVertical
+                            size={14}
+                            style={{ color: "#94a3b8" }}
+                          />
                         </button>
 
                         <ChevronRight
                           size={14}
-                          style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
+                          style={{
+                            color: isSelected
+                              ? "#4CA1AF"
+                              : "#cbd5e1",
+                          }}
                         />
                       </div>
 
@@ -703,17 +826,13 @@ export default function ExpensesByItems() {
                           <button
                             className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
                             onClick={() => {
-
                               const originalItem = items.find(
                                 (i) => i.id === item.id
                               );
 
                               setEditingItem(originalItem);
-
                               setShowEditItemModal(true);
-
                               setMenuOpen(null);
-
                             }}
                           >
                             View/Edit
@@ -733,187 +852,166 @@ export default function ExpensesByItems() {
                           >
                             Delete
                           </button>
-
                         </div>
                       )}
                     </div>
                   );
-                })}
-
-                {/* ── SENTINEL + LOADING INDICATOR (LEFT) ── */}
-                <div ref={leftSentinelRef} style={{ height: "1px" }} />
-
-                {isItemsFetching && leftCursor && (
-                  <div className="flex justify-center py-3">
-                    <span className="text-xs text-gray-400">Loading more...</span>
-                  </div>
-                )}
-
-                {!itemsHasMore && itemsWithTotals.length > 0 && (
-                  <div className="flex justify-center py-3">
-                    <span className="text-xs text-gray-300">— End of items —</span>
-                  </div>
-                )}
-              </>
-            )}
+                }}
+              />
+            </div>
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           {/* <div ref={rightPanelRef} */}
+          {/* ── EXPENSE LEDGER TABLE ── */}
           <div
-            className="w-full lg:w-[70%] p-1 overflow-y-auto"
+            className="w-full lg:w-[70%] p-1 flex-none lg:flex-1 h-auto"
             style={{
-              maxHeight: "calc(100vh - 180px)",
-              minHeight: 0,      // 👈 add this
-              minWidth: 0
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
             }}
           //style={{ maxHeight: "calc(100vh - 180px)" }}
           >
-            <div className="flex flex-col"
-              style={{
-                height: "100%",
 
-                minHeight: 0,
-                overflow: "hidden",
-              }}
-            >
 
-              {/* ── ITEM SUMMARY CARD ── */}
+            {/* ── ITEM SUMMARY CARD ── */}
 
-              {selectedItem && (
-                <div className="rounded-xl p-2 mb-2">
+            {selectedItem && (
+              <div className="rounded-xl p-2 mb-2">
 
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
 
-                    {/* Item Name */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className="flex items-center justify-center rounded-xl flex-shrink-0"
+                  {/* Item Name */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="flex items-center justify-center rounded-xl flex-shrink-0"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        backgroundColor: "#4CA1AF22"
+                      }}
+                    >
+                      <Package
+                        size={22}
+                        style={{ color: "#4CA1AF" }}
+                      />
+                    </div>
+
+                    <div className="min-w-0">
+                      <h6
+                        className="font-bold text-gray-900 break-words"
                         style={{
-                          width: 44,
-                          height: 44,
-                          backgroundColor: "#4CA1AF22"
+                          fontSize: 18,
+                          margin: 0
                         }}
                       >
-                        <Package
-                          size={22}
-                          style={{ color: "#4CA1AF" }}
-                        />
-                      </div>
+                        {selectedItem?.name}
+                      </h6>
 
-                      <div className="min-w-0">
-                        <h6
-                          className="font-bold text-gray-900 break-words"
-                          style={{
-                            fontSize: 18,
-                            margin: 0
-                          }}
-                        >
-                          {selectedItem?.name}
-                        </h6>
+                      <p className="text-gray-500 text-sm mt-0.5">
+                        Expense Item
+                      </p>
+                    </div>
+                  </div>
 
-                        <p className="text-gray-500 text-sm mt-0.5">
-                          Expense Item
-                        </p>
-                      </div>
+                  {/* Total + Balance */}
+                  <div className="flex items-center gap-6 text-right shrink-0">
+
+                    {/* Total */}
+                    <div>
+                      <p className="text-xs uppercase text-gray-400 mb-1">
+                        Total
+                      </p>
+
+                      <p
+                        className="font-bold"
+                        style={{
+                          color: "#4CA1AF",
+                          fontSize: 18
+                        }}
+                      >
+                        ₹ {(selectedItem?.total ?? 0).toLocaleString()}
+                      </p>
                     </div>
 
-                    {/* Total + Balance */}
-                    <div className="flex items-center gap-6 text-right shrink-0">
+                    {/* Balance */}
+                    <div>
+                      <p className="text-xs uppercase text-gray-400 mb-1">
+                        Balance
+                      </p>
 
-                      {/* Total */}
-                      <div>
-                        <p className="text-xs uppercase text-gray-400 mb-1">
-                          Total
-                        </p>
-
-                        <p
-                          className="font-bold"
-                          style={{
-                            color: "#4CA1AF",
-                            fontSize: 18
-                          }}
-                        >
-                          ₹ {(selectedItem?.total ?? 0).toLocaleString()}
-                        </p>
-                      </div>
-
-                      {/* Balance */}
-                      <div>
-                        <p className="text-xs uppercase text-gray-400 mb-1">
-                          Balance
-                        </p>
-
-                        <p
-                          className="font-bold"
-                          style={{
-                            color:
-                              (selectedItem?.balance ?? 0) > 0
-                                ? "#dc2626"
-                                : "#16a34a",
-                            fontSize: 18
-                          }}
-                        >
-                          ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
-                        </p>
-                      </div>
-
+                      <p
+                        className="font-bold"
+                        style={{
+                          color:
+                            (selectedItem?.balance ?? 0) > 0
+                              ? "#dc2626"
+                              : "#16a34a",
+                          fontSize: 18
+                        }}
+                      >
+                        ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
+                      </p>
                     </div>
 
                   </div>
+
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
-              <div
-                className="px-1 py-2"
-                style={{
-                  borderBottom: "1px solid #e2e8f0",
-                }}
-              >
-                <div className="flex items-center justify-between gap-3">
+            {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+            <div
+              className="px-1 py-2"
+              style={{
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
 
-                  {/* SEARCH */}
-                  <div
-                    className="relative"
+                {/* SEARCH */}
+                <div
+                  className="relative"
+                  style={{
+                    width: "40%",
+                    minWidth: 220,
+                    maxWidth: 300,
+                    height: 36,
+                  }}
+                >
+                  <Search
+                    size={16}
                     style={{
-                      width: "40%",
-                      minWidth: 220,
-                      maxWidth: 300,
-                      height: 36,
+                      position: "absolute",
+                      left: 10,
+                      top: 10,
+                      color: "#94a3b8",
+                      pointerEvents: "none",
                     }}
-                  >
-                    <Search
-                      size={16}
-                      style={{
-                        position: "absolute",
-                        left: 10,
-                        top: 10,
-                        color: "#94a3b8",
-                        pointerEvents: "none",
-                      }}
-                    />
+                  />
 
-                    <input
-                      type="text"
-                      value={txnSearch}
-                      onChange={(e) => handleTxnSearchChange(e.target.value)}
-                      placeholder="Search"
-                      className="w-full h-full border rounded-md text-sm outline-none"
-                      style={{
-                        height: 36,
-                        paddingLeft: 34,
-                        paddingRight: 10,
-                        borderColor: "#dbe3ea",
-                      }}
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={txnSearch}
+                    onChange={(e) => handleTxnSearchChange(e.target.value)}
+                    placeholder="Search"
+                    className="w-full h-full border rounded-md text-sm outline-none"
+                    style={{
+                      height: 36,
+                      paddingLeft: 34,
+                      paddingRight: 10,
+                      borderColor: "#dbe3ea",
+                    }}
+                  />
+                </div>
 
-                  {/* EXCEL + PRINT BUTTONS */}
-                  <div className="flex items-center gap-2">
+                {/* EXCEL + PRINT BUTTONS */}
+                <div className="flex items-center gap-2">
 
-                    {/* EXCEL */}
-                    {/* <button
+                  {/* EXCEL */}
+                  {/* <button
                       type="button"
                       className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
                       title="Export to Excel"
@@ -925,8 +1023,8 @@ export default function ExpensesByItems() {
                       />
                     </button> */}
 
-                    {/* PRINT */}
-                    {/* <button
+                  {/* PRINT */}
+                  {/* <button
                       type="button"
                       className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
                       title="Print Reports"
@@ -938,249 +1036,324 @@ export default function ExpensesByItems() {
                       />
                     </button> */}
 
-                  </div>
-
                 </div>
+
               </div>
-
-              {/* ── EXPENSE LEDGER TABLE ── */}
-              <div ref={rightPanelRef}
-                className="table-responsive table-desi"
-                style={{
-
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                  visibility: isRestoringRight ? "hidden" : "visible",
-                  // if using the placeholder above, also collapse height so it doesn't take double space
-                  // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
-                }}
-              >
-                <table className="w-full  min-w-[700px]" >
-                  <thead>
-                    <tr >
-                      {["Sl No.", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
-                        <th
-                          key={h}
-                          //className="text-left py-2 px-3 "
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isUsageLoading && !rightCursor ? (
-                      <tr>
-                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : filteredTransactions.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
-                          No transactions to show
-                        </td>
-                      </tr>
-                    ) : (
-
-                      filteredTransactions.map((txn, idx) => (
-
-
-                        <tr
-                          key={txn.id}
-                          ref={isHighlighted ? highlightedRowRef : null}
-
-                          onClick={() => {
-                            const params = new URLSearchParams(searchParams);
-
-                            params.set(
-                              "highlightTxn",
-                              String(txn.expenseId)
-                            );
-
-                            setSearchParams(params, { replace: true });
-                          }}
-
-                          onDoubleClick={() => {
-                            const params = new URLSearchParams(searchParams);
-
-                            params.set(
-                              "highlightTxn",
-                              String(txn.expenseId)
-                            );
-
-                            navigate(
-                              {
-                                pathname: `/expense/edit/${txn.expenseId}`,
-                                search: params.toString(),
-                              },
-                              {
-                                state: {
-                                  from: "expense-items",
-                                  itemId: selectedItemId,
-                                  txnSearch,
-                                  itemSearch,
-                                },
-                              }
-                            );
-                          }}
-
-                          style={{
-                            borderBottom: "1px solid #f1f5f9",
-                            position: "relative",
-                            cursor: "pointer",
-
-                            backgroundColor: isHighlighted(txn.expenseId)
-                              ? "#4CA1AF22"
-                              : "transparent",
-                          }}
-
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        >
-                          <td>{idx + 1}.</td>
-                          <td style={{ whiteSpace: "nowrap" }}>
-                            {fmtDate(txn.date)}
-                          </td>
-                          <td >{txn.expNo || "—"}</td>
-                          <td >{txn.party || "—"}</td>
-                          <td >{txn.paymentType || "—"}</td>
-                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
-                            ₹ {fmt(txn.amount)}
-                          </td>
-                          <td style={{ whiteSpace: "nowrap" }}>
-                            ₹ {fmt(txn.balance)}
-                          </td>
-                          <td style={{ position: "relative" }}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-
-                                e.stopPropagation();
-
-                                setRowMenuOpen(
-                                  rowMenuOpen === txn.id
-                                    ? null
-                                    : txn.id
-                                );
-
-                              }}
-                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                              style={{ backgroundColor: "transparent" }}
-                              title="More"
-                            >
-                              <MoreVertical size={14} style={{ color: "#94a3b8" }} />
-                            </button>
-
-                            {rowMenuOpen === txn.id && (
-                              <div
-                                className="absolute bg-white shadow-lg rounded-md"
-                                style={{
-                                  right: 10,
-                                  top: 66,
-                                  width: 160,
-                                  zIndex: 50,
-                                  border: "1px solid #e2e8f0",
-                                  overflow: "hidden",
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {ROW_ACTIONS.map(({ key, label, icon: Icon, danger }) => (
-                                  <button
-                                    key={key}
-                                    className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
-                                    style={{ color: danger ? "#dc2626" : "#374151" }}
-                                    onClick={async () => {
-                                      setRowMenuOpen(null);
-
-                                      // if (key === "view") {
-                                      //   navigate(
-                                      //     {
-                                      //       pathname: `/expense/edit/${txn.expenseId}`,
-                                      //       search: searchParams.toString(),
-                                      //     },
-                                      //     {
-                                      //       state: {
-                                      //         from: "expense-items",
-                                      //         itemId: selectedItemId,
-                                      //         txnSearch,
-                                      //         itemSearch,
-                                      //       },
-                                      //     }
-                                      //   );
-                                      // }
-                                      if (key === "view") {
-                                        const params = new URLSearchParams(searchParams);
-
-                                        params.set(
-                                          "highlightTxn",
-                                          String(txn.expenseId)
-                                        );
-
-                                        navigate(
-                                          {
-                                            pathname: `/expense/edit/${txn.expenseId}`,
-                                            search: params.toString(),
-                                          },
-                                          {
-                                            state: {
-                                              from: "expense-items",
-                                              itemId: selectedItemId,
-                                              txnSearch,
-                                              itemSearch,
-                                            },
-                                          }
-                                        );
-                                      }
-
-                                      if (key === "delete") {
-                                        setDeleteTarget({
-                                          expenseId: txn.expenseId,
-                                        });
-
-                                        return;
-                                      }
-
-                                      if (key === "print") {
-                                        setPrintExpenseId(txn.expenseId);
-                                      }
-                                    }}
-                                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
-                                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                  >
-                                    <Icon size={13} style={{ color: danger ? "#dc2626" : "#4CA1AF" }} />
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-
-                {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
-                <div ref={rightSentinelRef} style={{ height: "1px" }} />
-
-                {isUsageFetching && rightCursor && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-sm text-gray-400">Loading more...</span>
-                  </div>
-                )}
-
-                {!usageHasMore && itemUsage.length > 0 && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-xs text-gray-300">— End of transactions —</span>
-                  </div>
-                )}
-              </div>
-
             </div>
-          </div>
+            {/* FIXED HEADER */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 50px",
+                width: "100%",
+                //minWidth: "700px",
+                boxSizing: "border-box",
+                alignItems: "center",
+                minHeight: 40,
+                padding: "0 8px",
+                flexShrink: 0,
+                borderBottom: "2px solid #e2e8f0",
+                fontWeight: 600,
+                fontSize: 13,
+                color: "#333",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              <div>Sl No.</div>
+              <div>Date</div>
+              <div>Exp No.</div>
+              <div>Party</div>
+              <div>Payment Type</div>
+              <div>Amount</div>
+              <div>Balance</div>
+              <div
+                style={{
+                  position: "sticky",
+                  right: 0,
+                }}
+              />
+            </div>
+            {/* VIRTUALIZED BODY */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <VirtualScrollList
+                ref={virtualRightListRef}
+                items={filteredTransactions}
+                rowHeight={48}
+                height="100%"
+                onLoadMore={handleRightLoadMore}
+                isFetching={isUsageFetching}
+                hasMore={usageHasMore}
+                dynamicHeight={true}
+                getItemKey={(txn) => txn.id}
+                emptyMessage="No transactions to show"
+                endMessage="— End of transactions —"
+                isRowActive={(txn) =>
+                  rowMenuOpen === txn.expenseId
+                }
+                // isRowActive={(txn) =>
+                //   isHighlighted(txn.expenseId)
+                // }
+                renderRow={(txn, idx) => {
+                  const isHighlighted =
+                    String(highlightTxnId) ===
+                    String(txn.expenseId);
+                  //const highlighted = isHighlighted(txn.expenseId);
 
+                  return (
+                    <div
+                      key={txn.id}
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams);
+
+                        params.set(
+                          "highlightTxn",
+                          String(txn.expenseId)
+                        );
+
+                        setSearchParams(params, { replace: true });
+                      }}
+                      onDoubleClick={() => {
+                        const params = new URLSearchParams(searchParams);
+
+                        params.set(
+                          "highlightTxn",
+                          String(txn.expenseId)
+                        );
+
+                        navigate(
+                          {
+                            pathname: `/expense/edit/${txn.expenseId}`,
+                            search: params.toString(),
+                          },
+                          {
+                            state: {
+                              from: "expense-items",
+                              itemId: selectedItemId,
+                              txnSearch,
+                              itemSearch,
+                            },
+                          }
+                        );
+                      }}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                        width: "100%",
+                        //minWidth: "700px",
+                        alignItems: "center",
+                        minHeight: 48,
+                        boxSizing: "border-box",
+                        borderBottom: "1px solid #f1f5f9",
+                        position: "relative",
+                        cursor: "pointer",
+                        backgroundColor: isHighlighted
+                          ? "#4CA1AF22"
+                          : "transparent",
+                        // backgroundColor: highlighted
+                        //   ? "#4CA1AF22"
+                        //   : "transparent",
+                      }}
+                    >
+                      {/* Sl No. */}
+                      <div className="table-desi-cell">
+                        {idx + 1}.
+                      </div>
+
+                      {/* Date */}
+                      <div className="table-desi-cell"
+                        style={{ whiteSpace: "nowrap" }}>
+                        {fmtDate(txn.date)}
+                      </div>
+
+                      {/* Exp No. */}
+                      <div className="table-desi-cell">
+                        {txn.expNo || "—"}
+                      </div>
+
+                      {/* Party */}
+                      <div className="table-desi-cell"
+                        style={{
+                          overflowWrap: "break-word",
+                          wordBreak: "break-word",
+                          padding: "0 5px"
+
+                        }}
+                      >
+                        {txn.party || "—"}
+                      </div>
+
+                      {/* Payment Type */}
+                      <div className="table-desi-cell" style={{ minWidth: 0 }}>
+                        {txn.paymentType || "—"}
+                      </div>
+
+                      {/* Amount */}
+                      <div
+                        style={{
+                          color: "#4CA1AF",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        ₹ {fmt(txn.amount)}
+                      </div>
+
+                      {/* Balance */}
+                      <div className="table-desi-cell" style={{ whiteSpace: "nowrap" }}>
+                        ₹ {fmt(txn.balance)}
+                      </div>
+
+                      {/* Menu */}
+                      <div className="py-2 px-2 table-desi-cell"
+                        style={{
+                          position: "sticky",   // 👈 was "relative", now sticky
+                          right: 0,              // 👈 pins to the right edge of the SCROLL viewport
+                          width: 50,
+                          //position: "relative",
+                          //width: 50,
+                          textAlign: "center",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            setRowMenuOpen(
+                              rowMenuOpen === txn.id
+                                ? null
+                                : txn.id
+                            );
+                          }}
+                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          style={{
+                            backgroundColor: "transparent",
+                          }}
+                          title="More"
+                        >
+                          <MoreVertical
+                            size={14}
+                            style={{ color: "#94a3b8" }}
+                          />
+                        </button>
+
+                        {rowMenuOpen === txn.id && (
+                          <div
+                            className="absolute bg-white shadow-lg rounded-md"
+                            style={{
+                              right: 10,
+                              top: 42,
+                              width: 160,
+                              zIndex: 50,
+                              border: "1px solid #e2e8f0",
+                              overflow: "hidden",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {ROW_ACTIONS.map(
+                              ({
+                                key,
+                                label,
+                                icon: Icon,
+                                danger,
+                              }) => (
+                                <button
+                                  key={key}
+                                  className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
+                                  style={{
+                                    color: danger
+                                      ? "#dc2626"
+                                      : "#374151",
+                                  }}
+                                  onClick={async () => {
+                                    setRowMenuOpen(null);
+
+                                    if (key === "view") {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        String(txn.expenseId)
+                                      );
+
+                                      navigate(
+                                        {
+                                          pathname: `/expense/edit/${txn.expenseId}`,
+                                          search: params.toString(),
+                                        },
+                                        {
+                                          state: {
+                                            from: "expense-items",
+                                            itemId: selectedItemId,
+                                            txnSearch,
+                                            itemSearch,
+                                          },
+                                        }
+                                      );
+                                    }
+
+                                    if (key === "delete") {
+                                      setDeleteTarget({
+                                        expenseId: txn.expenseId,
+                                      });
+
+                                      return;
+                                    }
+
+                                    if (key === "print") {
+                                      setPrintExpenseId(
+                                        txn.expenseId
+                                      );
+                                    }
+                                  }}
+                                  onMouseOver={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    danger
+                                      ? "#fef2f2"
+                                      : "#f8fafc")
+                                  }
+                                  onMouseOut={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    "transparent")
+                                  }
+                                >
+                                  <Icon
+                                    size={13}
+                                    style={{
+                                      color: danger
+                                        ? "#dc2626"
+                                        : "#4CA1AF",
+                                    }}
+                                  />
+
+                                  {label}
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                }}
+              />
+            </div>
+
+
+          </div>
         </div>
       </div>
 
@@ -1235,3 +1408,665 @@ export default function ExpensesByItems() {
     </>
   );
 }
+
+
+
+//  {isItemsLoading ? (
+//               <div className="p-4 text-gray-400 text-sm">Loading items...</div>
+//             ) : itemsWithTotals.length === 0 ? (
+//               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
+//                 <Package size={36} strokeWidth={1.2} />
+//                 <p className="text-sm">No items found</p>
+//               </div>
+//             ) : (
+//               <>
+//                 {itemsWithTotals.map((item) => {
+//                   const isSelected = String(selectedItemId) === String(item.id);
+//                   return (
+//                     <div
+//                       key={item.id}
+//                       ref={isSelected ? selectedItemRowRef : null}
+//                       onClick={() => handleSelectItem(item)}
+
+//                       onDoubleClick={() => {
+
+//                         handleSelectItem(item);
+
+//                         const originalItem = items.find(
+//                           (i) => i.id === item.id
+//                         );
+
+//                         setEditingItem(originalItem);
+
+//                         setShowEditItemModal(true);
+
+//                         setMenuOpen(null);
+
+//                       }}
+
+//                       className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+//                       style={{
+//                         backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+//                         borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+//                         borderBottom: "1px solid #f1f5f9",
+//                       }}
+//                     >
+//                       {/* left: icon + name */}
+//                       <div className="flex items-center gap-3 flex-1 min-w-0">
+//                         <div
+//                           className="flex items-center justify-center rounded-lg flex-shrink-0"
+//                           style={{
+//                             width: 36,
+//                             height: 36,
+//                             backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
+//                           }}
+//                         >
+//                           <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+//                         </div>
+//                         <div className="min-w-0">
+//                           <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+//                             {item.name}
+//                           </p>
+//                         </div>
+//                       </div>
+
+//                       {/* right: actions */}
+//                       <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+//                         <button
+//                           type="button"
+//                           onClick={(e) => {
+//                             e.stopPropagation();
+
+//                             const next = new URLSearchParams(searchParams);
+//                             next.set("itemId", item.id);
+//                             next.delete("txnSearch");
+//                             setSearchParams(next);
+
+//                             setMenuOpen(
+//                               menuOpen === item.id ? null : item.id
+//                             );
+//                           }}
+//                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                           style={{ backgroundColor: "transparent" }}
+//                           title="More"
+//                         >
+//                           <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+//                         </button>
+
+//                         <ChevronRight
+//                           size={14}
+//                           style={{ color: isSelected ? "#4CA1AF" : "#cbd5e1" }}
+//                         />
+//                       </div>
+
+//                       {menuOpen === item.id && (
+//                         <div
+//                           onClick={(e) => e.stopPropagation()}
+//                           className="absolute bg-white shadow-lg rounded-md"
+//                           style={{
+//                             right: 10,
+//                             top: 48,
+//                             width: 140,
+//                             zIndex: 50,
+//                             border: "1px solid #e2e8f0",
+//                           }}
+//                         >
+//                           <button
+//                             className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+//                             onClick={() => {
+
+//                               const originalItem = items.find(
+//                                 (i) => i.id === item.id
+//                               );
+
+//                               setEditingItem(originalItem);
+
+//                               setShowEditItemModal(true);
+
+//                               setMenuOpen(null);
+
+//                             }}
+//                           >
+//                             View/Edit
+//                           </button>
+
+//                           <button
+//                             className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
+//                             onClick={() => {
+//                               setDeleteTarget({
+//                                 type: "item",
+//                                 itemId: item.id,
+//                                 itemName: item.name,
+//                               });
+
+//                               setMenuOpen(null);
+//                             }}
+//                           >
+//                             Delete
+//                           </button>
+
+//                         </div>
+//                       )}
+//                     </div>
+//                   );
+//                 })}
+
+//                 {/* ── SENTINEL + LOADING INDICATOR (LEFT) ── */}
+//                 <div ref={leftSentinelRef} style={{ height: "1px" }} />
+
+//                 {isItemsFetching && leftCursor && (
+//                   <div className="flex justify-center py-3">
+//                     <span className="text-xs text-gray-400">Loading more...</span>
+//                   </div>
+//                 )}
+
+//                 {!itemsHasMore && itemsWithTotals.length > 0 && (
+//                   <div className="flex justify-center py-3">
+//                     <span className="text-xs text-gray-300">— End of items —</span>
+//                   </div>
+//                 )}
+//               </>
+//             )}
+
+
+
+
+
+
+
+
+
+//  <div
+//             className="w-full lg:w-[70%] p-1 overflow-y-auto"
+//             style={{
+//               maxHeight: "calc(100vh - 180px)",
+//               minHeight: 0,      // 👈 add this
+//               minWidth: 0
+//             }}
+//           //style={{ maxHeight: "calc(100vh - 180px)" }}
+//           >
+//             <div className="flex flex-col"
+//               style={{
+//                 height: "100%",
+
+//                 minHeight: 0,
+//                 overflow: "hidden",
+//               }}
+//             >
+
+//               {/* ── ITEM SUMMARY CARD ── */}
+
+//               {selectedItem && (
+//                 <div className="rounded-xl p-2 mb-2">
+
+//                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+
+//                     {/* Item Name */}
+//                     <div className="flex items-center gap-3 min-w-0">
+//                       <div
+//                         className="flex items-center justify-center rounded-xl flex-shrink-0"
+//                         style={{
+//                           width: 44,
+//                           height: 44,
+//                           backgroundColor: "#4CA1AF22"
+//                         }}
+//                       >
+//                         <Package
+//                           size={22}
+//                           style={{ color: "#4CA1AF" }}
+//                         />
+//                       </div>
+
+//                       <div className="min-w-0">
+//                         <h6
+//                           className="font-bold text-gray-900 break-words"
+//                           style={{
+//                             fontSize: 18,
+//                             margin: 0
+//                           }}
+//                         >
+//                           {selectedItem?.name}
+//                         </h6>
+
+//                         <p className="text-gray-500 text-sm mt-0.5">
+//                           Expense Item
+//                         </p>
+//                       </div>
+//                     </div>
+
+//                     {/* Total + Balance */}
+//                     <div className="flex items-center gap-6 text-right shrink-0">
+
+//                       {/* Total */}
+//                       <div>
+//                         <p className="text-xs uppercase text-gray-400 mb-1">
+//                           Total
+//                         </p>
+
+//                         <p
+//                           className="font-bold"
+//                           style={{
+//                             color: "#4CA1AF",
+//                             fontSize: 18
+//                           }}
+//                         >
+//                           ₹ {(selectedItem?.total ?? 0).toLocaleString()}
+//                         </p>
+//                       </div>
+
+//                       {/* Balance */}
+//                       <div>
+//                         <p className="text-xs uppercase text-gray-400 mb-1">
+//                           Balance
+//                         </p>
+
+//                         <p
+//                           className="font-bold"
+//                           style={{
+//                             color:
+//                               (selectedItem?.balance ?? 0) > 0
+//                                 ? "#dc2626"
+//                                 : "#16a34a",
+//                             fontSize: 18
+//                           }}
+//                         >
+//                           ₹ {(selectedItem?.balance ?? 0).toLocaleString()}
+//                         </p>
+//                       </div>
+
+//                     </div>
+
+//                   </div>
+//                 </div>
+//               )}
+
+//               {/* ── SEARCH TRANSACTIONS + EXPORT BUTTONS ── */}
+//               <div
+//                 className="px-1 py-2"
+//                 style={{
+//                   borderBottom: "1px solid #e2e8f0",
+//                 }}
+//               >
+//                 <div className="flex items-center justify-between gap-3">
+
+//                   {/* SEARCH */}
+//                   <div
+//                     className="relative"
+//                     style={{
+//                       width: "40%",
+//                       minWidth: 220,
+//                       maxWidth: 300,
+//                       height: 36,
+//                     }}
+//                   >
+//                     <Search
+//                       size={16}
+//                       style={{
+//                         position: "absolute",
+//                         left: 10,
+//                         top: 10,
+//                         color: "#94a3b8",
+//                         pointerEvents: "none",
+//                       }}
+//                     />
+
+//                     <input
+//                       type="text"
+//                       value={txnSearch}
+//                       onChange={(e) => handleTxnSearchChange(e.target.value)}
+//                       placeholder="Search"
+//                       className="w-full h-full border rounded-md text-sm outline-none"
+//                       style={{
+//                         height: 36,
+//                         paddingLeft: 34,
+//                         paddingRight: 10,
+//                         borderColor: "#dbe3ea",
+//                       }}
+//                     />
+//                   </div>
+
+//                   {/* EXCEL + PRINT BUTTONS */}
+//                   <div className="flex items-center gap-2">
+
+//                     {/* EXCEL */}
+//                     {/* <button
+//                       type="button"
+//                       className="group flex items-center gap-2 rounded-lg bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-all duration-200 hover:bg-emerald-100 hover:ring-emerald-300 active:scale-95"
+//                       title="Export to Excel"
+//                     >
+//                       <FileSpreadsheet
+//                         size={16}
+//                         strokeWidth={2.2}
+//                         className="text-emerald-600 transition-transform duration-200 group-hover:scale-110"
+//                       />
+//                     </button> */}
+
+//                     {/* PRINT */}
+//                     {/* <button
+//                       type="button"
+//                       className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95"
+//                       title="Print Reports"
+//                     >
+//                       <PrinterIcon
+//                         size={16}
+//                         strokeWidth={2.2}
+//                         className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
+//                       />
+//                     </button> */}
+
+//                   </div>
+
+//                 </div>
+//               </div>
+
+//               {/* ── EXPENSE LEDGER TABLE ── */}
+//               <div ref={rightPanelRef}
+//                 className="table-responsive table-desi"
+//                 style={{
+
+//                   flex: 1,
+//                   minHeight: 0,
+//                   overflowY: "auto",
+//                   visibility: isRestoringRight ? "hidden" : "visible",
+//                   // if using the placeholder above, also collapse height so it doesn't take double space
+//                   // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+//                 }}
+//               >
+//                 <table className="w-full  min-w-[700px]" >
+//                   <thead>
+//                     <tr >
+//                       {["Sl No.", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h) => (
+//                         <th
+//                           key={h}
+//                           //className="text-left py-2 px-3 "
+//                           style={{ textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}
+//                         >
+//                           {h}
+//                         </th>
+//                       ))}
+//                     </tr>
+//                   </thead>
+//                   <tbody>
+//                     {isUsageLoading && !rightCursor ? (
+//                       <tr>
+//                         <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
+//                           Loading...
+//                         </td>
+//                       </tr>
+//                     ) : filteredTransactions.length === 0 ? (
+//                       <tr>
+//                         <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
+//                           No transactions to show
+//                         </td>
+//                       </tr>
+//                     ) : (
+
+//                       filteredTransactions.map((txn, idx) => (
+
+
+//                         <tr
+//                           key={txn.id}
+//                           ref={isHighlighted ? highlightedRowRef : null}
+
+//                           onClick={() => {
+//                             const params = new URLSearchParams(searchParams);
+
+//                             params.set(
+//                               "highlightTxn",
+//                               String(txn.expenseId)
+//                             );
+
+//                             setSearchParams(params, { replace: true });
+//                           }}
+
+//                           onDoubleClick={() => {
+//                             const params = new URLSearchParams(searchParams);
+
+//                             params.set(
+//                               "highlightTxn",
+//                               String(txn.expenseId)
+//                             );
+
+//                             navigate(
+//                               {
+//                                 pathname: `/expense/edit/${txn.expenseId}`,
+//                                 search: params.toString(),
+//                               },
+//                               {
+//                                 state: {
+//                                   from: "expense-items",
+//                                   itemId: selectedItemId,
+//                                   txnSearch,
+//                                   itemSearch,
+//                                 },
+//                               }
+//                             );
+//                           }}
+
+//                           style={{
+//                             borderBottom: "1px solid #f1f5f9",
+//                             position: "relative",
+//                             cursor: "pointer",
+
+//                             backgroundColor: isHighlighted(txn.expenseId)
+//                               ? "#4CA1AF22"
+//                               : "transparent",
+//                           }}
+
+//                           className="hover:bg-gray-50 transition-colors cursor-pointer"
+//                         >
+//                           <td>{idx + 1}.</td>
+//                           <td style={{ whiteSpace: "nowrap" }}>
+//                             {fmtDate(txn.date)}
+//                           </td>
+//                           <td >{txn.expNo || "—"}</td>
+//                           <td >{txn.party || "—"}</td>
+//                           <td >{txn.paymentType || "—"}</td>
+//                           <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>
+//                             ₹ {fmt(txn.amount)}
+//                           </td>
+//                           <td style={{ whiteSpace: "nowrap" }}>
+//                             ₹ {fmt(txn.balance)}
+//                           </td>
+//                           <td style={{ position: "relative" }}>
+//                             <button
+//                               type="button"
+//                               onClick={(e) => {
+
+//                                 e.stopPropagation();
+
+//                                 setRowMenuOpen(
+//                                   rowMenuOpen === txn.id
+//                                     ? null
+//                                     : txn.id
+//                                 );
+
+//                               }}
+//                               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                               style={{ backgroundColor: "transparent" }}
+//                               title="More"
+//                             >
+//                               <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+//                             </button>
+
+//                             {rowMenuOpen === txn.id && (
+//                               <div
+//                                 className="absolute bg-white shadow-lg rounded-md"
+//                                 style={{
+//                                   right: 10,
+//                                   top: 66,
+//                                   width: 160,
+//                                   zIndex: 50,
+//                                   border: "1px solid #e2e8f0",
+//                                   overflow: "hidden",
+//                                 }}
+//                                 onClick={(e) => e.stopPropagation()}
+//                               >
+//                                 {ROW_ACTIONS.map(({ key, label, icon: Icon, danger }) => (
+//                                   <button
+//                                     key={key}
+//                                     className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
+//                                     style={{ color: danger ? "#dc2626" : "#374151" }}
+//                                     onClick={async () => {
+//                                       setRowMenuOpen(null);
+
+//                                       // if (key === "view") {
+//                                       //   navigate(
+//                                       //     {
+//                                       //       pathname: `/expense/edit/${txn.expenseId}`,
+//                                       //       search: searchParams.toString(),
+//                                       //     },
+//                                       //     {
+//                                       //       state: {
+//                                       //         from: "expense-items",
+//                                       //         itemId: selectedItemId,
+//                                       //         txnSearch,
+//                                       //         itemSearch,
+//                                       //       },
+//                                       //     }
+//                                       //   );
+//                                       // }
+//                                       if (key === "view") {
+//                                         const params = new URLSearchParams(searchParams);
+
+//                                         params.set(
+//                                           "highlightTxn",
+//                                           String(txn.expenseId)
+//                                         );
+
+//                                         navigate(
+//                                           {
+//                                             pathname: `/expense/edit/${txn.expenseId}`,
+//                                             search: params.toString(),
+//                                           },
+//                                           {
+//                                             state: {
+//                                               from: "expense-items",
+//                                               itemId: selectedItemId,
+//                                               txnSearch,
+//                                               itemSearch,
+//                                             },
+//                                           }
+//                                         );
+//                                       }
+
+//                                       if (key === "delete") {
+//                                         setDeleteTarget({
+//                                           expenseId: txn.expenseId,
+//                                         });
+
+//                                         return;
+//                                       }
+
+//                                       if (key === "print") {
+//                                         setPrintExpenseId(txn.expenseId);
+//                                       }
+//                                     }}
+//                                     onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
+//                                     onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+//                                   >
+//                                     <Icon size={13} style={{ color: danger ? "#dc2626" : "#4CA1AF" }} />
+//                                     {label}
+//                                   </button>
+//                                 ))}
+//                               </div>
+//                             )}
+//                           </td>
+//                         </tr>
+//                       ))
+//                     )}
+//                   </tbody>
+//                 </table>
+
+//                 {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
+//                 <div ref={rightSentinelRef} style={{ height: "1px" }} />
+
+//                 {isUsageFetching && rightCursor && (
+//                   <div className="flex justify-center py-4">
+//                     <span className="text-sm text-gray-400">Loading more...</span>
+//                   </div>
+//                 )}
+
+//                 {!usageHasMore && itemUsage.length > 0 && (
+//                   <div className="flex justify-center py-4">
+//                     <span className="text-xs text-gray-300">— End of transactions —</span>
+//                   </div>
+//                 )}
+//               </div>
+
+//             </div>
+//           </div>
+
+
+
+
+
+
+
+
+
+
+
+
+  // const leftListRef = useRef(null);
+  // //const rightPanelRef = useRef(null);
+  // const selectedItemRowRef = useRef(null);
+  // const highlightedRowRef = useRef(null);
+  // useEffect(() => {
+  //   const leftEl = leftListRef.current;
+  //   //const rightEl = rightPanelRef.current;
+
+  //   const saveLeft = () => {
+  //     sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
+  //     sessionStorage.setItem("expensesByExpense:leftCount", items.length);
+  //   };
+  //   // const saveRight = () => {
+  //   //   console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+  //   //   sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+  //   //   sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
+  //   //   // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+  //   //   // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
+  //   // };
+
+  //   leftEl?.addEventListener("scroll", saveLeft);
+  //   //rightEl?.addEventListener("scroll", saveRight);
+
+  //   return () => {
+  //     leftEl?.removeEventListener("scroll", saveLeft);
+  //     //rightEl?.removeEventListener("scroll", saveRight);
+  //   };
+  // }, [items.length, filteredTransactions.length]);
+
+
+
+  // const hasRestoredLeftRef = useRef(false);
+
+  // useLayoutEffect(() => {
+  //   if (hasRestoredLeftRef.current) return; // only do this once per mount
+  //   if (isItemsLoading || isItemsFetching) return;
+
+  //   const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
+  //   if (items.length < savedCount) return;
+
+  //   selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //   hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+  // }, [isItemsLoading, isItemsFetching, selectedItemId, items.length]);
+  //const hasRestoredRightRef = useRef(false);
+  //const [isRestoringRight, setIsRestoringRight] = useState(true);
+
+
+  // useLayoutEffect(() => {
+  //   if (hasRestoredRightRef.current) {
+  //     setIsRestoringRight(false);
+  //     return;
+  //   }
+  //   if (isUsageLoading || isUsageFetching) return;
+
+  //   const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+  //   // keep waiting only if we might still get more data
+  //   if (filteredTransactions.length < savedCount && usageHasMore) return;
+
+  //   highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+  //   hasRestoredRightRef.current = true;
+  //   setIsRestoringRight(false); // reveal now, correctly positioned
+  // }, [isUsageLoading, isUsageFetching, filteredTransactions.length, usageHasMore]);

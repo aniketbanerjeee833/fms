@@ -750,11 +750,12 @@ export default function EditExpense() {
 
             const payload = {
                 ...data,
+             
             };
 
             // console.log("Submitting Expense :", payload);
             // console.log(payload.items);
-
+            console.log("Editing expense:", payload);
             const response = await editExpense({
                 id,
                 body: payload,
@@ -863,6 +864,8 @@ export default function EditExpense() {
     ];
 
 
+const formValues=watch()
+  console.log("Current form values:", formValues);
 
     return (
         <>
