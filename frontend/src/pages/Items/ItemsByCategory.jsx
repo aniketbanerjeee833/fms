@@ -19,6 +19,7 @@ import {
 import AddItemCategoryModal from "../../components/Modal/AddItemCategoryModal";
 //import ItemModal from "../../components/Modal/ItemModal";
 import MoveToCategoryModal from "../../components/Modal/MoveToCategoryModal";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 
 
@@ -48,33 +49,50 @@ export default function ItemsByCategory() {
   //const [showEditItemModal, setShowEditItemModal] = useState(false);
   //const [editingItem, setEditingItem] = useState(null);
   const [leftCursor, setLeftCursor] = useState(null);
-  const leftSentinelRef = useRef(null);
-  const leftObserverRef = useRef(null);
+  //const leftSentinelRef = useRef(null);
+  //const leftObserverRef = useRef(null);
 
   const {
     data: categoryResponse,
     isLoading: isCategoriesLoading,
     isFetching: isCategoriesFetching,
+     refetch: refetchCategories,
   } = useGetAllCategoriesCursorQuery({ cursor: leftCursor, search: categorySearch, limit: 10 });
 
   const categories = categoryResponse?.categories || [];
   const categoriesHasMore = categoryResponse?.hasMore ?? false;
   const categoriesNextCursor = categoryResponse?.nextCursor ?? null;
-
-  useEffect(() => { setLeftCursor(null); }, [categorySearch]);
-
-  const handleLeftObserver = useCallback((entries) => {
-    if (entries[0].isIntersecting && categoriesHasMore && categoriesNextCursor && !isCategoriesFetching && !isCategoriesLoading) {
-      setLeftCursor(categoriesNextCursor);
+const handleLeftLoadMore = useCallback(() => {
+    if (
+        isCategoriesFetching ||
+        isCategoriesLoading ||
+        !categoriesHasMore ||
+        !categoriesNextCursor
+    ) {
+        return;
     }
-  }, [categoriesHasMore, categoriesNextCursor, isCategoriesFetching, isCategoriesLoading]);
 
-  useEffect(() => {
-    if (leftObserverRef.current) leftObserverRef.current.disconnect();
-    leftObserverRef.current = new IntersectionObserver(handleLeftObserver, { threshold: 0.1 });
-    if (leftSentinelRef.current) leftObserverRef.current.observe(leftSentinelRef.current);
-    return () => leftObserverRef.current?.disconnect();
-  }, [handleLeftObserver]);
+    setLeftCursor(categoriesNextCursor);
+}, [
+    isCategoriesFetching,
+    isCategoriesLoading,
+    categoriesHasMore,
+    categoriesNextCursor,
+]);
+  // useEffect(() => { setLeftCursor(null); }, [categorySearch]);
+
+  // const handleLeftObserver = useCallback((entries) => {
+  //   if (entries[0].isIntersecting && categoriesHasMore && categoriesNextCursor && !isCategoriesFetching && !isCategoriesLoading) {
+  //     setLeftCursor(categoriesNextCursor);
+  //   }
+  // }, [categoriesHasMore, categoriesNextCursor, isCategoriesFetching, isCategoriesLoading]);
+
+  // useEffect(() => {
+  //   if (leftObserverRef.current) leftObserverRef.current.disconnect();
+  //   leftObserverRef.current = new IntersectionObserver(handleLeftObserver, { threshold: 0.1 });
+  //   if (leftSentinelRef.current) leftObserverRef.current.observe(leftSentinelRef.current);
+  //   return () => leftObserverRef.current?.disconnect();
+  // }, [handleLeftObserver]);
 
   // const {
   //   data: itemsResponse,
@@ -93,8 +111,8 @@ export default function ItemsByCategory() {
   /* ── RIGHT — items under selected category, cursor infinite scroll ── */
 
   const [rightCursor, setRightCursor] = useState(null);
-  const rightSentinelRef = useRef(null);
-  const rightObserverRef = useRef(null);
+  //const rightSentinelRef = useRef(null);
+  //const rightObserverRef = useRef(null);
   const rightCategoryRef = useRef(selectedCategoryId);
 
   // If the category just changed (ref hasn't caught up yet), force cursor to null
@@ -112,25 +130,41 @@ export default function ItemsByCategory() {
   //const categoryInfo = itemsResponse?.category;
   const itemsHasMore = itemsResponse?.hasMore ?? false;
   const itemsNextCursor = itemsResponse?.nextCursor ?? null;
+const handleRightLoadMore = useCallback(() => {
+  if (
+    isItemsFetching ||
+    isItemsLoading ||
+    !itemsHasMore ||
+    !itemsNextCursor
+  ) {
+    return;
+  }
 
+  setRightCursor(itemsNextCursor);
+}, [
+  isItemsFetching,
+  isItemsLoading,
+  itemsHasMore,
+  itemsNextCursor,
+]);
   //useEffect(() => { setRightCursor(null); }, [selectedCategoryId, itemSearch]);
   useEffect(() => {
     rightCategoryRef.current = selectedCategoryId;
     setRightCursor(null);
   }, [selectedCategoryId, itemSearch]);
 
-  const handleRightObserver = useCallback((entries) => {
-    if (entries[0].isIntersecting && itemsHasMore && itemsNextCursor && !isItemsFetching && !isItemsLoading) {
-      setRightCursor(itemsNextCursor);
-    }
-  }, [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]);
+  // const handleRightObserver = useCallback((entries) => {
+  //   if (entries[0].isIntersecting && itemsHasMore && itemsNextCursor && !isItemsFetching && !isItemsLoading) {
+  //     setRightCursor(itemsNextCursor);
+  //   }
+  // }, [itemsHasMore, itemsNextCursor, isItemsFetching, isItemsLoading]);
 
-  useEffect(() => {
-    if (rightObserverRef.current) rightObserverRef.current.disconnect();
-    rightObserverRef.current = new IntersectionObserver(handleRightObserver, { threshold: 0.1 });
-    if (rightSentinelRef.current) rightObserverRef.current.observe(rightSentinelRef.current);
-    return () => rightObserverRef.current?.disconnect();
-  }, [handleRightObserver]);
+  // useEffect(() => {
+  //   if (rightObserverRef.current) rightObserverRef.current.disconnect();
+  //   rightObserverRef.current = new IntersectionObserver(handleRightObserver, { threshold: 0.1 });
+  //   if (rightSentinelRef.current) rightObserverRef.current.observe(rightSentinelRef.current);
+  //   return () => rightObserverRef.current?.disconnect();
+  // }, [handleRightObserver]);
 
   // const filteredCategories = useMemo(() => {
   //   // "All" and "Uncategorized" are always pinned at the top, unaffected by cursor pagination
@@ -162,16 +196,7 @@ export default function ItemsByCategory() {
     return () => document.removeEventListener("click", closeMenu);
   }, []);
 
-  // const sidebarCategories = useMemo(() => {
-  //   const all = { Category_Id: "all", Item_Category: "All Items" };
-  //   return [all, ...categories];
-  // }, [categories]);
 
-  // const filteredCategories = useMemo(() => {
-  //   return sidebarCategories.filter((c) =>
-  //     c.Item_Category.toLowerCase().includes(categorySearch.toLowerCase())
-  //   );
-  // }, [sidebarCategories, categorySearch]);
   const filteredCategories = categories
   console.log("filteredCategories", filteredCategories)
   const totalCategories = categoryResponse?.totalCategories || 0
@@ -191,20 +216,91 @@ export default function ItemsByCategory() {
     setMenuOpen(null);
   };
 
-  // const handleCategoryAdded = (savedCategory) => {
-  //   setShowAddCategoryModal(false);
+    const virtualLeftListRef = useRef(null);
+   const hasScrolledToSelectedCategoryRef = useRef(false);
 
-  //   if (savedCategory?.Category_Id) {
-  //     const next = new URLSearchParams(searchParams);
+useEffect(() => {
+    hasScrolledToSelectedCategoryRef.current = false;
+}, [selectedCategoryId, categorySearch]);
 
-  //     next.set("categoryId", savedCategory.Category_Id);
+useEffect(() => {
+    if (hasScrolledToSelectedCategoryRef.current) return;
+    if (isCategoriesLoading || isCategoriesFetching) return;
+    if (!selectedCategoryId || !categories.length) return;
 
-  //     next.delete("itemSearch");
+    const targetIndex = categories.findIndex(
+        (category) =>String(category.Category_Id) === String(selectedCategoryId)
+    );
 
-  //     setSearchParams(next);
-  //   }
-  // };
+    if (targetIndex === -1) {
+        if (categoriesHasMore && categoriesNextCursor) {
+            handleLeftLoadMore();
+        }
+        return;
+    }
 
+    const timer = setTimeout(() => {
+        virtualLeftListRef.current?.scrollToIndex(targetIndex, {
+            align: "center",
+            behavior: "auto",
+        });
+
+        hasScrolledToSelectedCategoryRef.current = true;
+    }, 100);
+
+    return () => clearTimeout(timer);
+}, [
+    categories,
+    isCategoriesLoading,
+    isCategoriesFetching,
+    selectedCategoryId,
+    categoriesHasMore,
+    categoriesNextCursor,
+    handleLeftLoadMore,
+]);
+const virtualRightListRef = useRef(null);
+const hasScrolledToSelectedItemRef = useRef(false);
+
+useEffect(() => {
+  hasScrolledToSelectedItemRef.current = false;
+}, [selectedCategoryId, itemSearch]);
+
+useEffect(() => {
+  if (hasScrolledToSelectedItemRef.current) return;
+  if (isItemsLoading || isItemsFetching) return;
+  if (!selectedItemId || !items.length) return;
+
+  const targetIndex = items.findIndex(
+    (item) =>
+      String(item.Item_Id) === String(selectedItemId)
+  );
+
+  if (targetIndex === -1) {
+    if (itemsHasMore && itemsNextCursor) {
+      handleRightLoadMore();
+    }
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    virtualRightListRef.current?.scrollToIndex(targetIndex, {
+      align: "center",
+      behavior: "auto",
+    });
+
+    hasScrolledToSelectedItemRef.current = true;
+  }, 100);
+
+  return () => clearTimeout(timer);
+}, [
+  items,
+  isItemsLoading,
+  isItemsFetching,
+  selectedItemId,
+  itemsHasMore,
+  itemsNextCursor,
+  handleRightLoadMore,
+]);
   console.log(selectedCategory)
 
   return (
@@ -260,222 +356,297 @@ export default function ItemsByCategory() {
         >
 
           {/* ══ LEFT — 30% — category list ══ */}
-          <div
-            className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
-            style={{
-              borderRight: "1px solid #e2e8f0",
-              height: "100%",
-              minHeight: 0,
-              //minHeight: "500px",
-              //maxHeight: "calc(100vh - 180px)",
-              //boxSizing: "border-box",
-            }}
-          >
-            {/* search */}
-            <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
-              <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
-                <Search
-                  size={14}
-                  style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
-                />
-                <input
-                  type="text"
-                  value={categorySearch}
-                  onChange={(e) => {
-                    const value = e.target.value;
+         <div
+  className="w-full lg:w-[30%] flex flex-col"
+  style={{
+    borderRight: "1px solid #e2e8f0",
+    height: "100%",
+    minHeight: 0,
+    minWidth: 0,
+  }}
+>
+  {/* Search */}
+  <div
+    className="p-3"
+    style={{
+      borderBottom: "1px solid #f1f5f9",
+      boxSizing: "border-box",
+      flexShrink: 0,
+    }}
+  >
+    <div
+      className="relative"
+      style={{ width: "100%", maxWidth: 180, height: 34 }}
+    >
+      <Search
+        size={14}
+        style={{
+          position: "absolute",
+          left: 9,
+          top: 10,
+          color: "#94a3b8",
+          pointerEvents: "none",
+        }}
+      />
 
-                    const next = new URLSearchParams(searchParams);
+      <input
+        type="text"
+        value={categorySearch}
+        onChange={(e) => {
+          const value = e.target.value;
+          const next = new URLSearchParams(searchParams);
 
-                    if (value) {
-                      next.set("q", value);
-                    } else {
-                      next.delete("q");
-                    }
+          if (value) next.set("q", value);
+          else next.delete("q");
 
-                    setSearchParams(next, { replace: true });
-                  }}
-                  placeholder="Search Category"
-                  className="border rounded-md text-sm outline-none"
-                  style={{
-                    width: "100%",
-                    height: 34,
-                    paddingLeft: 30,
-                    paddingRight: 8,
-                    borderColor: "#dbe3ea",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-            </div>
+          setSearchParams(next, { replace: true });
+        }}
+        placeholder="Search Category"
+        className="border rounded-md text-sm outline-none"
+        style={{
+          width: "100%",
+          height: 34,
+          paddingLeft: 30,
+          paddingRight: 8,
+          borderColor: "#dbe3ea",
+          boxSizing: "border-box",
+        }}
+      />
+    </div>
+  </div>
 
-            {/* list header */}
+  {/* Header */}
+  <div
+    className="px-4 py-3 flex items-center gap-2"
+    style={{
+      borderBottom: "1px solid #f1f5f9",
+      backgroundColor: "#fafafa",
+      flexShrink: 0,
+    }}
+  >
+    <Tags size={15} style={{ color: "#4CA1AF" }} />
+
+    <span className="text-xs font-semibold text-black uppercase tracking-wider">
+      Categories ({totalCategories})
+    </span>
+  </div>
+
+  {/* Virtual List */}
+  <div
+    style={{
+      flex: 1,
+      minHeight: 0,
+      height: 0,
+      overflow: "hidden",
+      position: "relative",
+    }}
+  >
+    {isCategoriesLoading ? (
+      <div className="p-10 text-center text-gray-400 text-sm">
+        Loading...
+      </div>
+    ) : (
+      <VirtualScrollList
+        ref={virtualLeftListRef}
+        items={filteredCategories}
+        rowHeight={64}
+        height="100%"
+        onLoadMore={handleLeftLoadMore}
+        isFetching={isCategoriesFetching}
+        hasMore={categoriesHasMore}
+        getItemKey={(category) => category.Category_Id}
+        emptyMessage="No categories found"
+        endMessage="— End of categories —"
+        isRowActive={(category) =>
+          String(selectedCategoryId) ===
+          String(category.Category_Id)
+        }
+        renderRow={(category) => {
+          const isSelected =
+            String(selectedCategoryId) ===
+            String(category.Category_Id);
+
+          const isUncategorized =
+            category.Category_Id === "uncategorized";
+
+          return (
             <div
-              className="px-4 py-3 flex items-center gap-2"
-              style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
+              key={category.Category_Id}
+              onClick={() => handleSelectCategory(category)}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+
+                if (isUncategorized) return;
+
+                setCategoryModal({
+                  open: true,
+                  mode: "edit",
+                  data: {
+                    Category_Id: category.Category_Id,
+                    Item_Category: category.Item_Category,
+                  },
+                });
+              }}
+              className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+              style={{
+                backgroundColor: isSelected
+                  ? "#f0f9ff"
+                  : "transparent",
+                borderLeft: isSelected
+                  ? "3px solid #4CA1AF"
+                  : "3px solid transparent",
+                borderBottom: "1px solid #f1f5f9",
+                minHeight: 64,
+                boxSizing: "border-box",
+              }}
             >
-              <Tags size={15} style={{ color: "#4CA1AF" }} />
-              <span className="text-xs font-semibold text-black uppercase tracking-wider">
-                Categories ({totalCategories})
-              </span>
-            </div>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div
+                  className="flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    backgroundColor: isSelected
+                      ? "#4CA1AF22"
+                      : "#f1f5f9",
+                  }}
+                >
+                  <Tags
+                    size={18}
+                    style={{
+                      color: isSelected
+                        ? "#4CA1AF"
+                        : "#94a3b8",
+                    }}
+                  />
+                </div>
 
-            {isCategoriesLoading ? (
-              <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
-            ) : filteredCategories.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
-                <Tags size={36} strokeWidth={1.2} />
-                <p className="text-sm">No categories found</p>
+                <div className="min-w-0">
+                  <p
+                    className="font-semibold text-gray-800 truncate text-sm"
+                    style={{ margin: 0 }}
+                  >
+                    {category.Item_Category}
+                  </p>
+                </div>
               </div>
-            ) : (
-              filteredCategories.map((category) => {
-                const isSelected = selectedCategoryId === category.Category_Id;
-                //const isAllBucket = category.Category_Id === "all";
-                const isUncategorized = category.Category_Id === "uncategorized";
 
-                return (
-                  <div
-                    key={category.Category_Id}
-                    onClick={() => handleSelectCategory(category)}
-                    onDoubleClick={(e) => {
+              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                {!isUncategorized && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
                       e.stopPropagation();
-                      if (category.Category_Id === "uncategorized") return; // can't edit the virtual bucket
+
+                      const next = new URLSearchParams(
+                        searchParams
+                      );
+
+                      next.set(
+                        "categoryId",
+                        category.Category_Id
+                      );
+                      next.delete("itemSearch");
+
+                      setSearchParams(next);
+
+                      setMenuOpen(
+                        menuOpen === category.Category_Id
+                          ? null
+                          : category.Category_Id
+                      );
+                    }}
+                    className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                    style={{ backgroundColor: "transparent" }}
+                  >
+                    <MoreVertical
+                      size={14}
+                      style={{ color: "#374151" }}
+                    />
+                  </button>
+                )}
+
+                <ChevronRight
+                  size={14}
+                  style={{
+                    color: isSelected
+                      ? "#4CA1AF"
+                      : "#a5aab1",
+                  }}
+                />
+              </div>
+
+              {menuOpen === category.Category_Id && (
+                <div
+                  className="absolute bg-white shadow-lg rounded-md"
+                  style={{
+                    right: 10,
+                    top: 48,
+                    width: 140,
+                    zIndex: 50,
+                    border: "1px solid #e2e8f0",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
+                    onClick={() => {
                       setCategoryModal({
                         open: true,
                         mode: "edit",
-                        data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+                        data: {
+                          Category_Id: category.Category_Id,
+                          Item_Category: category.Item_Category,
+                        },
                       });
+
+                      setMenuOpen(null);
                     }}
-                    className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
                     style={{
-                      backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                      borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                      borderBottom: "1px solid #f1f5f9",
+                      color: "#374151",
+                      cursor: "pointer",
                     }}
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div
-                        className="flex items-center justify-center rounded-lg flex-shrink-0"
-                        style={{ width: 36, height: 36, backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9" }}
-                      >
-                        <Tags size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-                          {category.Item_Category}
-                        </p>
-                      </div>
-                    </div>
+                    View/Edit
+                  </button>
 
-                    <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      {/* {!isAllBucket && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-
-                            const next = new URLSearchParams(searchParams);
-
-                            next.set("categoryId", category.Category_Id);
-                            next.delete("itemSearch");
-
-                            setSearchParams(next);
-
-                            setMenuOpen(
-                              menuOpen === category.Category_Id
-                                ? null
-                                : category.Category_Id
-                            );
-                          }}
-                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                          style={{ backgroundColor: "transparent" }}
-                          title="More"
-                        >
-                          <MoreVertical size={14} style={{ color: "#374151" }} />
-                        </button>
-                      )} */}
-                      {!isUncategorized && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-
-                            const next = new URLSearchParams(searchParams);
-
-                            next.set("categoryId", category.Category_Id);
-                            next.delete("itemSearch");
-
-                            setSearchParams(next);
-
-                            setMenuOpen(
-                              menuOpen === category.Category_Id
-                                ? null
-                                : category.Category_Id
-                            );
-                          }}
-                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                          style={{ backgroundColor: "transparent" }}
-                          title="More"
-                        >
-                          <MoreVertical size={14} style={{ color: "#374151" }} />
-                        </button>
-                      )}
-
-                      <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
-                    </div>
-
-                    {menuOpen === category.Category_Id && (
-                      <div
-                        className="absolute bg-white shadow-lg rounded-md"
-                        style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0" }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCategoryModal({
-                              open: true,
-                              mode: "edit",
-                              data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
-                            });
-                            setMenuOpen(null);
-                          }}
-                          //disabled
-                          title="Edit category"
-                          style={{ color: "#374151", cursor: "pointer" }}
-                        >
-                          View/Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
-                          disabled
-                          title="Delete category — coming soon"
-                          style={{ opacity: 0.5, cursor: "not-allowed" }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-            <div ref={leftSentinelRef} style={{ height: 1 }} />
-            {isCategoriesFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
-          </div>
+                  <button
+                    type="button"
+                    className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500"
+                    disabled
+                    style={{
+                      opacity: 0.5,
+                      cursor: "not-allowed",
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        }}
+      />
+    )}
+  </div>
+</div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
           <div
-            className="w-full lg:w-[70%] p-1 overflow-y-auto"
+            className="w-full lg:w-[70%] p-1 flex-none lg:flex-1 h-auto "
             //style={{ height: "100%", minHeight: 0 }}
+            // style={{
+            //   maxHeight: "calc(100vh - 180px)",
+            //   minHeight: 0,      // 👈 add this
+            //   minWidth: 0
+            // }}
             style={{
-              maxHeight: "calc(100vh - 180px)",
-              minHeight: 0,      // 👈 add this
-              minWidth: 0
-            }}
-          //style={{ maxHeight: "calc(100vh - 180px)" }}
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            minWidth: 0,
+                        }}
           >
             <div
               className="flex flex-col"
@@ -584,7 +755,202 @@ export default function ItemsByCategory() {
               </div>
 
               {/* ── ITEMS TABLE ── */}
-              <div className="table-responsive table-desi"
+ <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "0.7fr 3fr 1.2fr 1.5fr",
+    width: "100%",
+    minWidth: "700px",
+    boxSizing: "border-box",
+    alignItems: "center",
+    minHeight: 40,
+    padding: "0 8px",
+    flexShrink: 0,
+    borderBottom: "2px solid #e2e8f0",
+    fontWeight: 600,
+    fontSize: 13,
+    color: "#333",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+  }}
+>
+  <div>Sl No.</div>
+  <div>Item Name</div>
+  <div>Stock</div>
+  <div>Stock Value</div>
+</div>             
+                  
+<div
+  style={{
+    flex: 1,
+    minHeight: 0,
+    height: 0,
+    overflow: "hidden",
+    position: "relative",
+  }}
+>
+  <VirtualScrollList
+    ref={virtualRightListRef}
+    items={items}
+    rowHeight={48}
+    height="100%"
+    onLoadMore={handleRightLoadMore}
+    isFetching={isItemsFetching}
+    hasMore={itemsHasMore}
+    getItemKey={(item) => item.Item_Id}
+    emptyMessage="No items to show"
+    endMessage="— End of items —"
+    isRowActive={(item) =>
+      String(selectedItemId) === String(item.Item_Id)
+    }
+    renderRow={(item, idx) => {
+      const isSelected =
+        String(selectedItemId) === String(item.Item_Id);
+
+      return (
+        <div
+          key={item.Item_Id}
+          onClick={() => {
+            setSelectedItemId(item.Item_Id);
+          }}
+          className="grid items-center cursor-pointer hover:bg-gray-50 transition-colors"
+          style={{
+            gridTemplateColumns:
+              "0.7fr 3fr 1.2fr 1.5fr",
+            minWidth: "700px",
+            minHeight: 48,
+            borderBottom: "1px solid #f1f5f9",
+            backgroundColor: isSelected
+              ? "#4CA1AF22"
+              : "transparent",
+            boxSizing: "border-box",
+          }}
+        >
+          {/* Sl.No */}
+          <div className="px-3">
+            {idx + 1}.
+          </div>
+
+          {/* Item Name */}
+          <div className="px-3 text-black truncate">
+            {item.Item_Name}
+          </div>
+
+          {/* Stock */}
+          <div
+            className="px-3"
+            style={{
+              color:
+                Number(item.Stock_Quantity) < 0
+                  ? "#dc2626"
+                  : "#000000",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.Stock_Quantity} {item.Unit || ""}
+          </div>
+
+          {/* Stock Value */}
+          <div
+            className="px-3 text-right"
+            style={{
+              color: "#000000",
+              whiteSpace: "nowrap",
+            }}
+          >
+            ₹ {fmt(item.Stock_Value)}
+          </div>
+        </div>
+      );
+    }}
+  />
+</div>
+            </div>
+            {/* <div ref={rightSentinelRef} style={{ height: 1 }} />
+            {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+            {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>} */}
+          </div>
+
+        </div>
+      </div >
+
+      {/* {showAddCategoryModal && (
+        <AddItemCategoryModal
+          onClose={() => setShowAddCategoryModal(false)}
+          onSave={handleCategoryAdded}
+        />
+
+      )} */}
+      {
+        categoryModal.open && (
+          <AddItemCategoryModal
+            mode={categoryModal.mode}
+            categoryData={categoryModal.data}
+            onClose={() => setCategoryModal({ open: false, mode: "add", data: null })}
+            // onSave={(savedCategory) => {
+            //   setCategoryModal({ open: false, mode: "add", data: null });
+
+            //   if (savedCategory?.Category_Id) {
+            //     const next = new URLSearchParams(searchParams);
+            //     next.set("categoryId", savedCategory.Category_Id);
+            //     next.delete("itemSearch");
+            //     setSearchParams(next);
+            //   }
+            // }}
+            onSave={async (savedCategory) => {
+  setCategoryModal({
+    open: false,
+    mode: "add",
+    data: null,
+  });
+
+  if (savedCategory?.Category_Id) {
+    const next = new URLSearchParams(searchParams);
+    next.set("categoryId", savedCategory.Category_Id);
+    next.delete("itemSearch");
+    setSearchParams(next);
+  }
+
+  // Refresh category list immediately
+  await refetchCategories();
+}}
+          />
+        )
+      }
+
+      {
+        showMoveModal && (
+          <MoveToCategoryModal
+            targetCategory={selectedCategory}
+            onClose={() => setShowMoveModal(false)}
+            onMoved={() => {
+              setShowMoveModal(false);
+              setRightCursor(null); // reset pagination
+              // refetch category items if needed
+              refetchItems?.();
+            }}
+          />
+        )
+      }
+
+    </>
+  );
+}
+
+
+
+  // const sidebarCategories = useMemo(() => {
+  //   const all = { Category_Id: "all", Item_Category: "All Items" };
+  //   return [all, ...categories];
+  // }, [categories]);
+
+  // const filteredCategories = useMemo(() => {
+  //   return sidebarCategories.filter((c) =>
+  //     c.Item_Category.toLowerCase().includes(categorySearch.toLowerCase())
+  //   );
+  // }, [sidebarCategories, categorySearch]);
+
+{/* <div className="table-responsive table-desi"
                 style={{
                   flex: 1,
                   minHeight: 0,
@@ -700,59 +1066,186 @@ export default function ItemsByCategory() {
                     )}
                   </tbody>
                 </table>
-              </div>
+              </div> */}
+//  <div
+//             className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+//             style={{
+//               borderRight: "1px solid #e2e8f0",
+//               height: "100%",
+//               minHeight: 0,
+//               //minHeight: "500px",
+//               //maxHeight: "calc(100vh - 180px)",
+//               //boxSizing: "border-box",
+//             }}
+//           >
+//             {/* search */}
+//             <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
+//               <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
+//                 <Search
+//                   size={14}
+//                   style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+//                 />
+//                 <input
+//                   type="text"
+//                   value={categorySearch}
+//                   onChange={(e) => {
+//                     const value = e.target.value;
 
-            </div>
-            <div ref={rightSentinelRef} style={{ height: 1 }} />
-            {isItemsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
-            {!itemsHasMore && items.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of items —</div>}
-          </div>
+//                     const next = new URLSearchParams(searchParams);
 
-        </div>
-      </div >
+//                     if (value) {
+//                       next.set("q", value);
+//                     } else {
+//                       next.delete("q");
+//                     }
 
-      {/* {showAddCategoryModal && (
-        <AddItemCategoryModal
-          onClose={() => setShowAddCategoryModal(false)}
-          onSave={handleCategoryAdded}
-        />
+//                     setSearchParams(next, { replace: true });
+//                   }}
+//                   placeholder="Search Category"
+//                   className="border rounded-md text-sm outline-none"
+//                   style={{
+//                     width: "100%",
+//                     height: 34,
+//                     paddingLeft: 30,
+//                     paddingRight: 8,
+//                     borderColor: "#dbe3ea",
+//                     boxSizing: "border-box",
+//                   }}
+//                 />
+//               </div>
+//             </div>
 
-      )} */}
-      {
-        categoryModal.open && (
-          <AddItemCategoryModal
-            mode={categoryModal.mode}
-            categoryData={categoryModal.data}
-            onClose={() => setCategoryModal({ open: false, mode: "add", data: null })}
-            onSave={(savedCategory) => {
-              setCategoryModal({ open: false, mode: "add", data: null });
+//             {/* list header */}
+//             <div
+//               className="px-4 py-3 flex items-center gap-2"
+//               style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
+//             >
+//               <Tags size={15} style={{ color: "#4CA1AF" }} />
+//               <span className="text-xs font-semibold text-black uppercase tracking-wider">
+//                 Categories ({totalCategories})
+//               </span>
+//             </div>
 
-              if (savedCategory?.Category_Id) {
-                const next = new URLSearchParams(searchParams);
-                next.set("categoryId", savedCategory.Category_Id);
-                next.delete("itemSearch");
-                setSearchParams(next);
-              }
-            }}
-          />
-        )
-      }
+//             {isCategoriesLoading ? (
+//               <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
+//             ) : filteredCategories.length === 0 ? (
+//               <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
+//                 <Tags size={36} strokeWidth={1.2} />
+//                 <p className="text-sm">No categories found</p>
+//               </div>
+//             ) : (
+//               filteredCategories.map((category) => {
+//                 const isSelected = selectedCategoryId === category.Category_Id;
+//                 //const isAllBucket = category.Category_Id === "all";
+//                 const isUncategorized = category.Category_Id === "uncategorized";
 
-      {
-        showMoveModal && (
-          <MoveToCategoryModal
-            targetCategory={selectedCategory}
-            onClose={() => setShowMoveModal(false)}
-            onMoved={() => {
-              setShowMoveModal(false);
-              setRightCursor(null); // reset pagination
-              // refetch category items if needed
-              refetchItems?.();
-            }}
-          />
-        )
-      }
+//                 return (
+//                   <div
+//                     key={category.Category_Id}
+//                     onClick={() => handleSelectCategory(category)}
+//                     onDoubleClick={(e) => {
+//                       e.stopPropagation();
+//                       if (category.Category_Id === "uncategorized") return; // can't edit the virtual bucket
+//                       setCategoryModal({
+//                         open: true,
+//                         mode: "edit",
+//                         data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+//                       });
+//                     }}
+//                     className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+//                     style={{
+//                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
+//                       borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
+//                       borderBottom: "1px solid #f1f5f9",
+//                     }}
+//                   >
+//                     <div className="flex items-center gap-3 flex-1 min-w-0">
+//                       <div
+//                         className="flex items-center justify-center rounded-lg flex-shrink-0"
+//                         style={{ width: 36, height: 36, backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9" }}
+//                       >
+//                         <Tags size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
+//                       </div>
+//                       <div className="min-w-0">
+//                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
+//                           {category.Item_Category}
+//                         </p>
+//                       </div>
+//                     </div>
 
-    </>
-  );
-}
+//                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                     
+//                       {!isUncategorized && (
+//                         <button
+//                           type="button"
+//                           onClick={(e) => {
+//                             e.stopPropagation();
+
+//                             const next = new URLSearchParams(searchParams);
+
+//                             next.set("categoryId", category.Category_Id);
+//                             next.delete("itemSearch");
+
+//                             setSearchParams(next);
+
+//                             setMenuOpen(
+//                               menuOpen === category.Category_Id
+//                                 ? null
+//                                 : category.Category_Id
+//                             );
+//                           }}
+//                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+//                           style={{ backgroundColor: "transparent" }}
+//                           title="More"
+//                         >
+//                           <MoreVertical size={14} style={{ color: "#374151" }} />
+//                         </button>
+//                       )}
+
+//                       <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
+//                     </div>
+
+//                     {menuOpen === category.Category_Id && (
+//                       <div
+//                         className="absolute bg-white shadow-lg rounded-md"
+//                         style={{ right: 10, top: 48, width: 140, zIndex: 50, border: "1px solid #e2e8f0" }}
+//                         onClick={(e) => e.stopPropagation()}
+//                       >
+//                         <button
+//                           type="button"
+//                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
+//                           onClick={(e) => {
+//                             e.stopPropagation();
+//                             setCategoryModal({
+//                               open: true,
+//                               mode: "edit",
+//                               data: { Category_Id: category.Category_Id, Item_Category: category.Item_Category },
+//                             });
+//                             setMenuOpen(null);
+//                           }}
+//                           //disabled
+//                           title="Edit category"
+//                           style={{ color: "#374151", cursor: "pointer" }}
+//                         >
+//                           View/Edit
+//                         </button>
+//                         <button
+//                           type="button"
+//                           className="w-full px-4 py-3 text-left text-sm hover:bg-red-50 text-red-500 transition-colors"
+//                           disabled
+//                           title="Delete category — coming soon"
+//                           style={{ opacity: 0.5, cursor: "not-allowed" }}
+//                         >
+//                           Delete
+//                         </button>
+//                       </div>
+//                     )}
+//                   </div>
+//                 );
+//               })
+//             )}
+//             {/* <div ref={leftSentinelRef} style={{ height: 1 }} />
+//             {isCategoriesFetching && leftCursor && 
+//             <div className="text-center text-xs text-gray-400 py-2">
+//               Loading more...</div>} */}
+//           </div>

@@ -1179,25 +1179,7 @@ export default function ItemsByItem() {
                             </div>
                         )}
                         {/* FIXED HEADER */}
-                        {/* <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "0.6fr 1.1fr 1.2fr 2.8fr 1.3fr 1.1fr 1.2fr 50px",
-                                width: "100%",
-                                //minWidth: "850px",
-                                boxSizing: "border-box",
-                                alignItems: "center",
-                                minHeight: 40,
-                                padding: "0 8px",
-                                flexShrink: 0,
-                                borderBottom: "2px solid #e2e8f0",
-                                fontWeight: 600,
-                                fontSize: 13,
-                                color: "#333",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.05em",
-                            }}
-                        > */}
+                    
                         <div
                             style={{
                                 display: "grid",
