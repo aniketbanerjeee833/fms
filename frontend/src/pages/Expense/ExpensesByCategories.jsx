@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import {  useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -28,6 +28,7 @@ import {
 } from "../../redux/api/expenseApi";
 
 import EditExpenseCategoryModal from "../../components/Modal/EditExpenseCategoryModal";
+import VirtualScrollList from "../../components/VirtualScrollList";
 
 
 
@@ -135,8 +136,8 @@ export default function ExpensesByCategories() {
 
   /* ── RIGHT SIDE — cursor-based infinite scroll (transactions) ── */
   const [rightCursor, setRightCursor] = useState(null);
-  const rightSentinelRef = useRef(null);
-  const rightObserverRef = useRef(null);
+  //const rightSentinelRef = useRef(null);
+  //const rightObserverRef = useRef(null);
   const initialRightLimit = useRef(
             Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 10
         );
@@ -165,6 +166,24 @@ export default function ExpensesByCategories() {
   const expensesHasMore = expenseResponse?.hasMore ?? false;
   const expensesNextCursor = expenseResponse?.nextCursor ?? null;
 
+
+const handleRightLoadMore = useCallback(() => {
+  if (
+    isExpensesFetching ||
+    isExpensesLoading ||
+    !expensesHasMore ||
+    !expensesNextCursor
+  ) {
+    return;
+  }
+
+  setRightCursor(expensesNextCursor);
+}, [
+  isExpensesFetching,
+  isExpensesLoading,
+  expensesHasMore,
+  expensesNextCursor,
+]);
   const [deleteExpense, { isLoading: isDeletingExpense }] =
     useDeleteExpenseMutation();
 
@@ -304,42 +323,42 @@ export default function ExpensesByCategories() {
   //         // categoryRef.current = selectedCategoryId;
   //         setRightCursor(null);
   //     }, [selectedCategoryId, txnSearch]);
-  useEffect(() => {
-    setRightCursor(null);
-  }, [selectedCategoryId, txnSearch]);
+  // useEffect(() => {
+  //   setRightCursor(null);
+  // }, [selectedCategoryId, txnSearch]);
 
-  const handleRightObserver = useCallback(
-    (entries) => {
-      if (
-        entries[0].isIntersecting &&
-        expensesHasMore &&
-        expensesNextCursor &&
-        !isExpensesFetching &&
-        !isExpensesLoading
-      ) {
-        setRightCursor(expensesNextCursor);
-      }
-    },
-    [expensesHasMore, expensesNextCursor, isExpensesFetching, isExpensesLoading]
-  );
+  // const handleRightObserver = useCallback(
+  //   (entries) => {
+  //     if (
+  //       entries[0].isIntersecting &&
+  //       expensesHasMore &&
+  //       expensesNextCursor &&
+  //       !isExpensesFetching &&
+  //       !isExpensesLoading
+  //     ) {
+  //       setRightCursor(expensesNextCursor);
+  //     }
+  //   },
+  //   [expensesHasMore, expensesNextCursor, isExpensesFetching, isExpensesLoading]
+  // );
 
-  useEffect(() => {
-    if (rightObserverRef.current) {
-      rightObserverRef.current.disconnect();
-    }
+  // useEffect(() => {
+  //   if (rightObserverRef.current) {
+  //     rightObserverRef.current.disconnect();
+  //   }
 
-    rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
-      root: null,
-      rootMargin: "0px",
-      threshold: 0.1,
-    });
+  //   rightObserverRef.current = new IntersectionObserver(handleRightObserver, {
+  //     root: null,
+  //     rootMargin: "0px",
+  //     threshold: 0.1,
+  //   });
 
-    if (rightSentinelRef.current) {
-      rightObserverRef.current.observe(rightSentinelRef.current);
-    }
+  //   if (rightSentinelRef.current) {
+  //     rightObserverRef.current.observe(rightSentinelRef.current);
+  //   }
 
-    return () => rightObserverRef.current?.disconnect();
-  }, [handleRightObserver]);
+  //   return () => rightObserverRef.current?.disconnect();
+  // }, [handleRightObserver]);
 
   useEffect(() => {
     const closeMenu = () => {
@@ -352,69 +371,119 @@ export default function ExpensesByCategories() {
   }, []);
 
     
-        const rightPanelRef = useRef(null);
+    //     const rightPanelRef = useRef(null);
    
-    const highlightedRowRef = useRef(null);
-        useEffect(() => {
+    // const highlightedRowRef = useRef(null);
+    //     useEffect(() => {
             
-            const rightEl = rightPanelRef.current;
+    //         const rightEl = rightPanelRef.current;
     
             
-            const saveRight = () => {
-                console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
-                sessionStorage.setItem("expensesByCategory:rightScroll", rightEl.scrollTop);
-                sessionStorage.setItem("expensesByCategory:rightCount", filteredTransactions.length);
-                // sessionStorage.setItem("expensesByCategory:rightScroll", rightEl.scrollTop);
-                // sessionStorage.setItem("expensesByCategory:rightCount", transactions.length);
-            };
+    //         const saveRight = () => {
+    //             console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+    //             sessionStorage.setItem("expensesByCategory:rightScroll", rightEl.scrollTop);
+    //             sessionStorage.setItem("expensesByCategory:rightCount", filteredTransactions.length);
+    //             // sessionStorage.setItem("expensesByCategory:rightScroll", rightEl.scrollTop);
+    //             // sessionStorage.setItem("expensesByCategory:rightCount", transactions.length);
+    //         };
     
             
-            rightEl?.addEventListener("scroll", saveRight);
+    //         rightEl?.addEventListener("scroll", saveRight);
     
-            return () => {
+    //         return () => {
 
-                rightEl?.removeEventListener("scroll", saveRight);
-            };
-        }, [categories.length, filteredTransactions.length]);
+    //             rightEl?.removeEventListener("scroll", saveRight);
+    //         };
+    //     }, [categories.length, filteredTransactions.length]);
     
     
     
     
     
     
-    const hasRestoredRightRef = useRef(false);
-   const [isRestoringRight, setIsRestoringRight] = useState(true);
-  // useLayoutEffect(() => {
-  //     if (hasRestoredRightRef.current) return;
+  //   const hasRestoredRightRef = useRef(false);
+  //  const [isRestoringRight, setIsRestoringRight] = useState(true);
+
+
+  //   useLayoutEffect(() => {
+  //     if (hasRestoredRightRef.current) {
+  //       setIsRestoringRight(false);
+  //       return;
+  //     }
   //     if (isExpensesLoading || isExpensesFetching) return;
   
   //     const savedCount = Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 0;
-  //     if (filteredTransactions.length < savedCount) return;
+  //     // keep waiting only if we might still get more data
+  //     if (filteredTransactions.length < savedCount && expensesHasMore) return;
   
   //     highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
   //     hasRestoredRightRef.current = true;
-  // }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length]);
+  //     setIsRestoringRight(false); // reveal now, correctly positioned
+  //   }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length, expensesHasMore]);
+  const virtualRightListRef = useRef(null);
+const hasScrolledToHighlightRef = useRef(false);
 
-    useLayoutEffect(() => {
-      if (hasRestoredRightRef.current) {
-        setIsRestoringRight(false);
-        return;
+const highlightTxnId = searchParams.get("highlightTxn");
+
+useEffect(() => {
+  hasScrolledToHighlightRef.current = false;
+}, [selectedCategoryId, highlightTxnId, txnSearch]);
+
+useEffect(() => {
+  if (hasScrolledToHighlightRef.current) return;
+  if (!highlightTxnId) return;
+  if (isExpensesLoading || isExpensesFetching) return;
+  if (!filteredTransactions.length) return;
+
+  const targetIndex = filteredTransactions.findIndex(
+    (txn) =>
+      String(txn.id) === String(highlightTxnId)
+  );
+
+  if (targetIndex === -1) {
+    if (
+      expensesHasMore &&
+      expensesNextCursor &&
+      !isExpensesFetching
+    ) {
+      handleRightLoadMore();
+    }
+
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    virtualRightListRef.current?.scrollToIndex(
+      targetIndex,
+      {
+        align: "center",
+        behavior: "auto",
       }
-      if (isExpensesLoading || isExpensesFetching) return;
-  
-      const savedCount = Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 0;
-      // keep waiting only if we might still get more data
-      if (filteredTransactions.length < savedCount && expensesHasMore) return;
-  
-      highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-      hasRestoredRightRef.current = true;
-      setIsRestoringRight(false); // reveal now, correctly positioned
-    }, [isExpensesLoading, isExpensesFetching, filteredTransactions.length, expensesHasMore]);
-  
+    );
+
+    hasScrolledToHighlightRef.current = true;
+  }, 100);
+
+  return () => clearTimeout(timer);
+}, [
+  filteredTransactions,
+  highlightTxnId,
+  isExpensesLoading,
+  isExpensesFetching,
+  expensesHasMore,
+  expensesNextCursor,
+  handleRightLoadMore,
+]);
+useEffect(() => {
+  sessionStorage.setItem(
+    "expensesByCategory:rightCount",
+    filteredTransactions.length
+  );
+}, [filteredTransactions.length]);
   return (
     <>
       <div className="flex flex-col bg-white"
-      style={{ height: "100%", minHeight: 0 }}
+      style={{ height: "100%",overflow: "hidden" }}
         //style={{ minHeight: "100vh" }}
     //      style={{
     //  height: "100vh",
@@ -449,21 +518,27 @@ export default function ExpensesByCategories() {
         {/* ── SPLIT LAYOUT ── */}
         <div
           className="flex flex-col lg:flex-row gap-0"
-          style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+          style={{ flex: 1,  minHeight: 0,  borderTop: "1px solid #e2e8f0" }}
         >
 
           {/* ══ LEFT — 30% — category list (client-side filtered) ══ */}
-          <div
-            className="w-full lg:w-[30%] overflow-y-auto"
-            style={{
-              borderRight: "1px solid #e2e8f0",
-              minHeight: "500px",
-              maxHeight: "calc(100vh - 180px)",
-              //borderRight: "1px solid #e2e8f0",
-              //height: "100%",
-              //minHeight: 0,
-              //boxSizing: "border-box",
-            }}
+          {/* */}
+          <div className="w-full lg:w-[30%] flex flex-col flex-none  h-[50vh] lg:h-auto "
+          // w-full lg:w-[30%] overflow-y-auto
+            // style={{
+            //   borderRight: "1px solid #e2e8f0",
+            //   minHeight: "500px",
+            //   maxHeight: "calc(100vh - 180px)",
+            //   //borderRight: "1px solid #e2e8f0",
+            //   //height: "100%",
+            //   //minHeight: 0,
+            //   //boxSizing: "border-box",
+            // }}
+             style={{
+                            borderRight: "1px solid #e2e8f0",
+                            minHeight: 0,
+                            boxSizing: "border-box",
+                        }}
           >
             {/* search */}
             <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
@@ -611,32 +686,33 @@ export default function ExpensesByCategories() {
           </div>
 
           {/* ══ RIGHT — 70% — detail panel ══ */}
-          <div 
+          {/* <div 
           className="w-full lg:w-[70%] p-1"
             // style={{ maxHeight: "calc(100vh - 180px)" }}
-            //style={{ height: "100%", minHeight: 0 }}
-          //     style={{
-          //   height: "100%",
-          //   minHeight: 0,
-          //   overflow: "hidden",   // was overflow-y-auto — remove, this is not the scroll container
-          //   display: "flex",
-          //   flexDirection: "column"
            
-          // }}
            style={{
               maxHeight: "calc(100vh - 180px)",
               minHeight: 0,      // 👈 add this
               minWidth: 0
             }}
-          >
-            <div className="flex flex-col"
+          > */}
+            <div className="w-full lg:w-[70%] p-1 flex-none lg:flex-1 h-auto"
+                        style={{
+                            minHeight: 0,
+                            display: "flex",
+                            flexDirection: "column",
+                            minWidth: 0,
+                            
+                        }}
+                    >
+            {/* <div className="flex flex-col"
                style={{
                 height: "100%",
 
                 minHeight: 0,
                 overflow: "hidden",
               }}
-            >
+            > */}
 
               {/* ── CATEGORY SUMMARY CARD ── */}
              
@@ -799,69 +875,241 @@ export default function ExpensesByCategories() {
               </div>
 
               {/* ── EXPENSE LEDGER TABLE ── */}
-              <div ref={rightPanelRef} className="table-responsive table-desi"
-                // style={{
-                //   flex: 1,
-                //   minHeight: 0,
-                //   overflowY: "auto",
-                // }}
-                style={{
+ 
+  {/* RIGHT HEADER */}
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns:
+        "0.6fr 1.1fr 1.2fr 2.8fr 1.3fr 1.3fr 1.3fr 50px",
+      width: "100%",
+      //minWidth: "850px",
+      boxSizing: "border-box",
+      alignItems: "center",
+      minHeight: 40,
+      padding: "0 8px",
+      flexShrink: 0,
+      borderBottom: "2px solid #e2e8f0",
+      fontWeight: 600,
+      fontSize: 13,
+      color: "#333",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+    }}
+  >
+    <div>Sl.No</div>
+    <div>Date</div>
+    <div>Exp No.</div>
+    <div>Party</div>
+    <div>Payment Type</div>
+    <div>Amount</div>
+    <div>Balance</div>
+    <div style={{
+                                position: "sticky",
+                                right: 0,
 
-                  flex: 1,
-                  minHeight: 0,
-                  overflowY: "auto",
-                  visibility: isRestoringRight ? "hidden" : "visible",
-                  // if using the placeholder above, also collapse height so it doesn't take double space
-                  // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+                            }} />
+  </div>
+
+  {/* RIGHT VIRTUAL LIST */}
+              <div
+  style={{
+    flex: 1,
+    minHeight: 0,
+    //height: 0,
+    overflow: "hidden",
+    position: "relative",
+  }}
+>
+  <VirtualScrollList
+    ref={virtualRightListRef}
+    items={filteredTransactions}
+    rowHeight={48}
+    height="100%"
+    onLoadMore={handleRightLoadMore}
+    isFetching={isExpensesFetching}
+    hasMore={expensesHasMore}
+    dynamicHeight={true}
+    getItemKey={(txn) => txn.id}
+    emptyMessage="No transactions to show"
+    endMessage="— End of transactions —"
+    isRowActive={(txn) => isHighlighted(txn.id)}
+    renderRow={(txn, idx) => (
+      <div
+        key={txn.id}
+        onClick={() => {
+          const params = new URLSearchParams(searchParams);
+
+          params.set(
+            "highlightTxn",
+            String(txn.id)
+          );
+
+          setSearchParams(params, {
+            replace: true,
+          });
+        }}
+        onDoubleClick={() => {
+          const params = new URLSearchParams(searchParams);
+
+          params.set(
+            "highlightTxn",
+            String(txn.id)
+          );
+
+          navigate(
+            {
+              pathname: `/expense/edit/${txn.id}`,
+              search: params.toString(),
+            },
+            {
+              state: {
+                from: "expense-categories",
+                categoryId: selectedCategoryId,
+                txnSearch,
+                categorySearch,
+              },
+            }
+          );
+        }}
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "0.6fr 1.1fr 1.2fr 2.8fr 1.3fr 1.3fr 1.3fr 50px",
+          //minWidth: "850px",
+          width: "100%",
+          minHeight: 48,
+          boxSizing: "border-box",
+          alignItems: "center",
+          padding: "0 8px",
+          borderBottom: "1px solid #f1f5f9",
+          position: "relative",
+          cursor: "pointer",
+          backgroundColor: isHighlighted(txn.id)
+            ? "#4CA1AF22"
+            : "transparent",
+        }}
+        className="hover:bg-gray-50 transition-colors"
+      >
+        <div className="table-desi-cell">
+          {idx + 1}.
+        </div>
+
+        <div
+          className="table-desi-cell"
+          style={{ whiteSpace: "nowrap" }}
+        >
+          {fmtDate(txn.date)}
+        </div>
+
+        <div className="table-desi-cell">
+          {txn.expNo || "—"}
+        </div>
+
+        <div className="table-desi-cell"
+         style={{
+            overflowWrap: "break-word",
+            wordBreak: "break-word",
+             padding: "0 5px"
+  }}
+        >
+          {txn.party || "—"}
+        </div>
+
+        <div lassName="table-desi-cell"
+          style={{
+           overflowWrap: "break-word",
+             wordBreak: "break-word",
+              padding: "0 5px"
+          }}
+        >
+          {txn.paymentType || "—"}
+        </div>
+
+        <div lassName="table-desi-cell"
+          style={{
+            color: "#4CA1AF",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ₹ {fmt(txn.amount)}
+        </div>
+
+        <div style={{ whiteSpace: "nowrap" }}>
+          ₹ {fmt(txn.balance)}
+        </div>
+
+        {/* MENU */}
+        <div>
+          <div className="py-2 px-2 table-desi-cell">
+            <div 
+            style={{
+                position: "sticky",   // 👈 was "relative", now sticky
+                 right: 0,              // 👈 pins to the right edge of the SCROLL viewport
+                 width: 50,
+                  //position: "relative",
+                     //width: 50,
+                     textAlign: "center",
+                     }}
+            >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.currentTarget.blur();
+
+                  setTransactionMenu(
+                    transactionMenu === txn.id
+                      ? null
+                      : txn.id
+                  );
+                }}
+                className="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none"
+                style={{
+                  background: "transparent",
+                  boxShadow: "none",
                 }}
               >
-                <table className="w-full min-w-[600px]">
-                  <thead>
-                    <tr>
-                      {["Sl.No", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h, index) => (
-                        <th
-                          key={index}
-                          className="text-left py-2 px-3"
-                          style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace: "nowrap" }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isExpensesLoading && !rightCursor ? (
-                      <tr>
-                        <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : filteredTransactions.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                          No transactions to show
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredTransactions.map((txn,idx) => (
-                        
-                        <tr
-                          key={txn.id}
-                           ref={isHighlighted ? highlightedRowRef : null}
+                <MoreVertical
+                  size={14}
+                  style={{ color: "#94a3b8" }}
+                />
+              </button>
 
-                          onClick={() => {
-                            const params = new URLSearchParams(searchParams);
+              {transactionMenu === txn.id && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
+                  style={{
+                    width: 180,
+                    zIndex: 999,
+                    borderColor: "#e5e7eb",
+                  }}
+                >
+                  {ROW_ACTIONS.map(
+                    ({
+                      key,
+                      label,
+                      icon: Icon,
+                      danger,
+                    }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
+                        style={{
+                          color: danger
+                            ? "#dc2626"
+                            : "#374151",
+                        }}
+                        onClick={() => {
+                          setTransactionMenu(null);
 
-                            params.set(
-                              "highlightTxn",
-                              String(txn.id)
-                            );
-
-                            setSearchParams(params, { replace: true });
-                          }}
-
-                          onDoubleClick={() => {
-                            const params = new URLSearchParams(searchParams);
+                          if (key === "view") {
+                            const params =
+                              new URLSearchParams(
+                                searchParams
+                              );
 
                             params.set(
                               "highlightTxn",
@@ -876,155 +1124,62 @@ export default function ExpensesByCategories() {
                               {
                                 state: {
                                   from: "expense-categories",
-                                  categoryId: selectedCategoryId,
+                                  categoryId:
+                                    selectedCategoryId,
                                   txnSearch,
                                   categorySearch,
                                 },
                               }
                             );
-                          }}
+                          }
 
+                          if (key === "delete") {
+                            setDeleteTarget({
+                              type: "expense",
+                              expenseId: txn.id,
+                            });
+
+                            return;
+                          }
+
+                          if (key === "print") {
+                            setPrintExpenseId(txn.id);
+                          }
+                        }}
+                        onMouseOver={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            danger
+                              ? "#fef2f2"
+                              : "#f8fafc")
+                        }
+                        onMouseOut={(e) =>
+                          (e.currentTarget.style.backgroundColor =
+                            "transparent")
+                        }
+                      >
+                        <Icon
+                          size={13}
                           style={{
-                            borderBottom: "1px solid #f1f5f9",
-                            position: "relative",
-                            cursor: "pointer",
-
-                            backgroundColor: isHighlighted(txn.id)
-                              ? "#4CA1AF22"
-                              : "transparent",
+                            color: danger
+                              ? "#dc2626"
+                              : "#4CA1AF",
                           }}
-
-                          className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        >
-                          <td>{idx + 1}.</td>
-                          <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
-                            {fmtDate(txn.date)}
-                          </td>
-                          <td>{txn.expNo || "—"}</td>
-                          <td>{txn.party || "—"}</td>
-                          <td>{txn.paymentType || "—"}</td>
-                          <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>₹ {fmt(txn.amount)}</td>
-                          <td style={{ whiteSpace: "nowrap" }}>₹ {fmt(txn.balance)}</td>
-                          <td>
-                            <div className="flex items-center gap-1">
-                              <div className="relative">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.currentTarget.blur();
-                                    setTransactionMenu(transactionMenu === txn.id ? null : txn.id);
-                                  }}
-                                  className="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none"
-                                  style={{ background: "transparent", boxShadow: "none" }}
-                                >
-                                  <MoreVertical size={14} style={{ color: "#94a3b8" }} />
-                                </button>
-
-                                {transactionMenu === txn.id && (
-                                  <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
-                                    style={{ width: 180, zIndex: 999, borderColor: "#e5e7eb" }}
-                                  >
-                                    {ROW_ACTIONS.map(({ key, label, icon: Icon, danger }) => (
-                                      <button
-                                        key={key}
-                                        type="button"
-                                        className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
-                                        style={{ color: danger ? "#dc2626" : "#374151" }}
-
-                                        onClick={() => {
-                                          setTransactionMenu(null);
-
-                                          // if (key === "view") {
-                                          //   navigate(
-                                          //     {
-                                          //       pathname: `/expense/edit/${txn.id}`,
-                                          //       search: searchParams.toString(),
-                                          //     },
-                                          //     {
-                                          //       state: {
-                                          //         from: "expense-categories",
-                                          //         categoryId: selectedCategoryId,
-                                          //         txnSearch,
-                                          //         categorySearch,
-                                          //       },
-                                          //     }
-                                          //   );
-                                          // }
-                                          if (key === "view") {
-                                            const params = new URLSearchParams(searchParams);
-
-                                            params.set(
-                                              "highlightTxn",
-                                              String(txn.id)
-                                            );
-
-                                            navigate(
-                                              {
-                                                pathname: `/expense/edit/${txn.id}`,
-                                                search: params.toString(),
-                                              },
-                                              {
-                                                state: {
-                                                  from: "expense-categories",
-                                                  categoryId: selectedCategoryId,
-                                                  txnSearch,
-                                                  categorySearch,
-                                                },
-                                              }
-                                            );
-                                          }
-
-                                          if (key === "delete") {
-                                            setDeleteTarget({
-                                              type: "expense",
-                                              expenseId: txn.id,
-                                            });
-
-                                            return;
-                                          }
-
-                                          if (key === "print") {
-                                            setPrintExpenseId(txn.id);
-                                          }
-                                        }}
-                                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
-                                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                                      >
-                                        <Icon size={13} style={{ color: danger ? "#dc2626" : "#4CA1AF" }} />
-                                        {label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-
-                {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
-                <div ref={rightSentinelRef} style={{ height: "1px" }} />
-
-                {isExpensesFetching && rightCursor && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-sm text-gray-400">Loading more...</span>
-                  </div>
-                )}
-
-                {!expensesHasMore && categoryExpenses.length > 0 && (
-                  <div className="flex justify-center py-4">
-                    <span className="text-xs text-gray-300">— End of transactions —</span>
-                  </div>
-                )}
-              </div>
-
+                        />
+                        {label}
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
+    )}
+  />
+</div>
+
+            {/* </div> */}
           </div>
 
         </div>
@@ -1081,3 +1236,231 @@ export default function ExpensesByCategories() {
     </>
   );
 }
+
+
+
+
+//  <div ref={rightPanelRef} className="table-responsive table-desi"
+//                 // style={{
+//                 //   flex: 1,
+//                 //   minHeight: 0,
+//                 //   overflowY: "auto",
+//                 // }}
+//                 style={{
+
+//                   flex: 1,
+//                   minHeight: 0,
+//                   overflowY: "auto",
+//                   visibility: isRestoringRight ? "hidden" : "visible",
+//                   // if using the placeholder above, also collapse height so it doesn't take double space
+//                   // ...(isRestoringRight ? { position: "absolute", height: 0, overflow: "hidden" } : {}),
+//                 }}
+//               >
+//                 <table className="w-full min-w-[600px]">
+//                   <thead>
+//                     <tr>
+//                       {["Sl.No", "Date", "Exp No.", "Party", "Payment Type", "Amount", "Balance", ""].map((h, index) => (
+//                         <th
+//                           key={index}
+//                           className="text-left py-2 px-3"
+//                           style={{ textTransform: "uppercase", letterSpacing: "0.05em",whiteSpace: "nowrap" }}
+//                         >
+//                           {h}
+//                         </th>
+//                       ))}
+//                     </tr>
+//                   </thead>
+//                   <tbody>
+//                     {isExpensesLoading && !rightCursor ? (
+//                       <tr>
+//                         <td colSpan={7} className="text-center" style={{ padding: "48px 0" }}>
+//                           Loading...
+//                         </td>
+//                       </tr>
+//                     ) : filteredTransactions.length === 0 ? (
+//                       <tr>
+//                         <td colSpan={7} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
+//                           No transactions to show
+//                         </td>
+//                       </tr>
+//                     ) : (
+//                       filteredTransactions.map((txn,idx) => (
+                        
+//                         <tr
+//                           key={txn.id}
+//                            ref={isHighlighted ? highlightedRowRef : null}
+
+//                           onClick={() => {
+//                             const params = new URLSearchParams(searchParams);
+
+//                             params.set(
+//                               "highlightTxn",
+//                               String(txn.id)
+//                             );
+
+//                             setSearchParams(params, { replace: true });
+//                           }}
+
+//                           onDoubleClick={() => {
+//                             const params = new URLSearchParams(searchParams);
+
+//                             params.set(
+//                               "highlightTxn",
+//                               String(txn.id)
+//                             );
+
+//                             navigate(
+//                               {
+//                                 pathname: `/expense/edit/${txn.id}`,
+//                                 search: params.toString(),
+//                               },
+//                               {
+//                                 state: {
+//                                   from: "expense-categories",
+//                                   categoryId: selectedCategoryId,
+//                                   txnSearch,
+//                                   categorySearch,
+//                                 },
+//                               }
+//                             );
+//                           }}
+
+//                           style={{
+//                             borderBottom: "1px solid #f1f5f9",
+//                             position: "relative",
+//                             cursor: "pointer",
+
+//                             backgroundColor: isHighlighted(txn.id)
+//                               ? "#4CA1AF22"
+//                               : "transparent",
+//                           }}
+
+//                           className="hover:bg-gray-50 transition-colors cursor-pointer"
+//                         >
+//                           <td>{idx + 1}.</td>
+//                           <td className="py-2 px-3 text-gray-500" style={{ whiteSpace: "nowrap" }}>
+//                             {fmtDate(txn.date)}
+//                           </td>
+//                           <td>{txn.expNo || "—"}</td>
+//                           <td>{txn.party || "—"}</td>
+//                           <td>{txn.paymentType || "—"}</td>
+//                           <td style={{ color: "#4CA1AF", whiteSpace: "nowrap" }}>₹ {fmt(txn.amount)}</td>
+//                           <td style={{ whiteSpace: "nowrap" }}>₹ {fmt(txn.balance)}</td>
+//                           <td>
+//                             <div className="flex items-center gap-1">
+//                               <div className="relative">
+//                                 <button
+//                                   type="button"
+//                                   onClick={(e) => {
+//                                     e.stopPropagation();
+//                                     e.currentTarget.blur();
+//                                     setTransactionMenu(transactionMenu === txn.id ? null : txn.id);
+//                                   }}
+//                                   className="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none"
+//                                   style={{ background: "transparent", boxShadow: "none" }}
+//                                 >
+//                                   <MoreVertical size={14} style={{ color: "#94a3b8" }} />
+//                                 </button>
+
+//                                 {transactionMenu === txn.id && (
+//                                   <div
+//                                     onClick={(e) => e.stopPropagation()}
+//                                     className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
+//                                     style={{ width: 180, zIndex: 999, borderColor: "#e5e7eb" }}
+//                                   >
+//                                     {ROW_ACTIONS.map(({ key, label, icon: Icon, danger }) => (
+//                                       <button
+//                                         key={key}
+//                                         type="button"
+//                                         className="w-full text-left px-3 py-2 text-sm flex items-center gap-2"
+//                                         style={{ color: danger ? "#dc2626" : "#374151" }}
+
+//                                         onClick={() => {
+//                                           setTransactionMenu(null);
+
+//                                           // if (key === "view") {
+//                                           //   navigate(
+//                                           //     {
+//                                           //       pathname: `/expense/edit/${txn.id}`,
+//                                           //       search: searchParams.toString(),
+//                                           //     },
+//                                           //     {
+//                                           //       state: {
+//                                           //         from: "expense-categories",
+//                                           //         categoryId: selectedCategoryId,
+//                                           //         txnSearch,
+//                                           //         categorySearch,
+//                                           //       },
+//                                           //     }
+//                                           //   );
+//                                           // }
+//                                           if (key === "view") {
+//                                             const params = new URLSearchParams(searchParams);
+
+//                                             params.set(
+//                                               "highlightTxn",
+//                                               String(txn.id)
+//                                             );
+
+//                                             navigate(
+//                                               {
+//                                                 pathname: `/expense/edit/${txn.id}`,
+//                                                 search: params.toString(),
+//                                               },
+//                                               {
+//                                                 state: {
+//                                                   from: "expense-categories",
+//                                                   categoryId: selectedCategoryId,
+//                                                   txnSearch,
+//                                                   categorySearch,
+//                                                 },
+//                                               }
+//                                             );
+//                                           }
+
+//                                           if (key === "delete") {
+//                                             setDeleteTarget({
+//                                               type: "expense",
+//                                               expenseId: txn.id,
+//                                             });
+
+//                                             return;
+//                                           }
+
+//                                           if (key === "print") {
+//                                             setPrintExpenseId(txn.id);
+//                                           }
+//                                         }}
+//                                         onMouseOver={(e) => (e.currentTarget.style.backgroundColor = danger ? "#fef2f2" : "#f8fafc")}
+//                                         onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+//                                       >
+//                                         <Icon size={13} style={{ color: danger ? "#dc2626" : "#4CA1AF" }} />
+//                                         {label}
+//                                       </button>
+//                                     ))}
+//                                   </div>
+//                                 )}
+//                               </div>
+//                             </div>
+//                           </td>
+//                         </tr>
+//                       ))
+//                     )}
+//                   </tbody>
+//                 </table>
+
+//                 {/* ── SENTINEL + LOADING INDICATOR (RIGHT) ── */}
+//                 <div ref={rightSentinelRef} style={{ height: "1px" }} />
+
+//                 {isExpensesFetching && rightCursor && (
+//                   <div className="flex justify-center py-4">
+//                     <span className="text-sm text-gray-400">Loading more...</span>
+//                   </div>
+//                 )}
+
+//                 {!expensesHasMore && categoryExpenses.length > 0 && (
+//                   <div className="flex justify-center py-4">
+//                     <span className="text-xs text-gray-300">— End of transactions —</span>
+//                   </div>
+//                 )}
+//               </div>
