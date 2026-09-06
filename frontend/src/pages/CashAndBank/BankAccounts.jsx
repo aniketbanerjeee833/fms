@@ -51,10 +51,12 @@ const TYPE_META = {
   purchase_return: { label: "Purchase Return", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
   sale_return: { label: "Sale Return", color: "#dc2626", bg: "#fff1f2", dir: "out" },
   adjustment: { label: "Adjustment", color: "#4CA1AF", bg: "#f0f9ff", dir: "in" },
+  expense: { label: "Expense", color: "#dc2626", bg: "#fff1f2", dir: "out" },
 };
 const TXN_TYPE_ROUTE_MAP = {
   Sale: "sale",
   Purchase: "purchase",
+  Expense: "expense",
 
   Sale_Return: "sale/return",
   Purchase_Return: "purchase/return",
@@ -172,7 +174,7 @@ function BankDetailPanel({ bankId }) {
     Number(sessionStorage.getItem("banksByBank:rightCount")) || 10
   );
   const { data, isLoading, isFetching } = useGetBankAccountByIdQuery(
-   
+
     {
       Bank_Account_Id: bankId,
       cursor: effectiveCursor,
@@ -413,9 +415,14 @@ function BankDetailPanel({ bankId }) {
   // }, [isLoading, isFetching, ledger.length, hasMore]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
+  const skipHighlightScrollRef = useRef(false);
 
   // find the target row's index once ledger is loaded
   useEffect(() => {
+    if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
     if (hasScrolledToHighlightRef.current) return;
 
     const highlightTxnId = searchParams.get("highlightTxn");
@@ -444,10 +451,10 @@ function BankDetailPanel({ bankId }) {
   }, [bankId]);
   useEffect(() => {
     sessionStorage.setItem(
-        "banksByBank:rightCount",
-        ledger.length
+      "banksByBank:rightCount",
+      ledger.length
     );
-}, [ledger.length]);
+  }, [ledger.length]);
   if (!bankId) {
     return (
       <div className="flex flex-col items-center justify-center text-gray-400 gap-3"
@@ -777,225 +784,242 @@ function BankDetailPanel({ bankId }) {
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
-         
+
           overflow: "hidden",
         }}
       >
-          <div
-        style={{
+        <div
+          style={{
             flex: 1,
             minHeight: 0,
             display: "flex",
             flexDirection: "column",
             overflowX: "auto",
             overflowY: "hidden",
-        }}
-    >
-        {/* TABLE HEADER */}
-       
-         <div
+          }}
+        >
+          {/* TABLE HEADER */}
+
+          <div
             style={{
-                minWidth: 720, // 70+120+300(party min)+110+120+50 — adjust to taste
-                display: "flex",
-                flexDirection: "column",
+              minWidth: 720, // 70+120+300(party min)+110+120+50 — adjust to taste
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            {/* <table className="w-full min-w-[500px] table-responsive table-desi"
+          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}> */}
+            {/* //<table className="w-full min-w-[500px]"> */}
+            <table
+              className="w-full min-w-[500px] table-responsive table-desi"
+              style={{
+                flexShrink: 0,
+              }}
+            >
+
+              <thead style={{ fontWeight: "700", fontSize: "12px", color: "#333" }}>
+                <tr>
+                  <th className="text-left" style={{ width: 70 }}>SL.NO</th>
+                  <th className="text-left" style={{ width: 120 }}>TYPE</th>
+                  <th className="text-left">PARTY</th>
+                  <th className="text-left" style={{ width: 110 }}>DATE</th>
+                  <th className="text-left" style={{ width: 120 }}>AMOUNT</th>
+                  <th style={{ width: 50 }}></th>
+                </tr>
+              </thead>
+            </table>
+            {/* </div> */}
+            <div
+              style={{
                 flex: 1,
                 minHeight: 0,
-            }}
-        >
-        {/* <table className="w-full min-w-[500px] table-responsive table-desi"
-          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}> */}
-          {/* //<table className="w-full min-w-[500px]"> */}
-           <table
-          className="w-full min-w-[500px] table-responsive table-desi"
-          style={{
-            flexShrink: 0,
-          }}
-        >
-          
-          <thead style={{ fontWeight: "700", fontSize: "12px", color: "#333" }}>
-            <tr>
-              <th className="text-left" style={{ width: 70 }}>SL.NO</th>
-              <th className="text-left" style={{ width: 120 }}>TYPE</th>
-              <th className="text-left">PARTY</th>
-              <th className="text-left" style={{ width: 110 }}>DATE</th>
-              <th className="text-left" style={{ width: 120 }}>AMOUNT</th>
-              <th style={{ width: 50 }}></th>
-            </tr>
-          </thead>
-        </table>
-        {/* </div> */}
-         <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          height: 0,
-          overflow: "hidden",
-          position: "relative",
-        }}
-      >
-        {/* VIRTUALIZED TABLE BODY */}
-        <VirtualScrollList
-          ref={virtualListRef}
-          items={ledger}
-          rowHeight={52}
-          height="100%"
-          onLoadMore={handleLoadMore}
-          dynamicHeight={true}    // 👈 opt in
-          isFetching={isFetching}
-          hasMore={hasMore}
-          getItemKey={(row) => row.id}
-          emptyMessage="No transactions found"
-          endMessage="— End of transactions —"
-          isRowActive={(row, idx) =>
-            rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`
-          }
-          renderRow={(row, idx) => {
-            const meta =
-              TYPE_META[row.Txn_Type?.toLowerCase()] ?? {
-                label: row.Txn_Type,
-                color: "#6b7280",
-                dir: row.Direction === "Credit" ? "in" : "out",
-              };
+                height: 0,
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              {/* VIRTUALIZED TABLE BODY */}
+              <VirtualScrollList
+                ref={virtualListRef}
+                items={ledger}
+                rowHeight={52}
+                height="100%"
+                onLoadMore={handleLoadMore}
+                dynamicHeight={true}    // 👈 opt in
+                isFetching={isFetching}
+                hasMore={hasMore}
+                getItemKey={(row) => row.id}
+                emptyMessage="No transactions found"
+                endMessage="— End of transactions —"
+                isRowActive={(row, idx) =>
+                  rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`
+                }
+                renderRow={(row, idx) => {
+                  const meta =
+                    TYPE_META[row.Txn_Type?.toLowerCase()] ?? {
+                      label: row.Txn_Type,
+                      color: "#6b7280",
+                      dir: row.Direction === "Credit" ? "in" : "out",
+                    };
 
-            const isHighlighted =
-              String(searchParams.get("highlightTxn")) === String(row.id);
+                  const isHighlighted =
+                    String(searchParams.get("highlightTxn")) === String(row.id);
 
-            return (
-              <div
-                key={row.id}
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set("highlightTxn", row.id);
-                  setSearchParams(params, { replace: true });
-                }}
-                onDoubleClick={() => handleTransactionEdit(row)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "70px 120px minmax(150px, 1fr) 110px 120px 50px",
-                  alignItems: "center",
-                  minHeight: "52px",
-                  // columnGap removed — padding on cells handles spacing instead, matching header
-                  width: "100%",
-                  cursor: "pointer",
-                  backgroundColor: isHighlighted ? "#4CA1AF22" : "transparent",
-                  borderBottom: "1px solid #f1f5f9",
-                  boxSizing: "border-box",
-                }}
-
-              >
-                {/* SL.NO */}
-                <div className="table-desi-cell" style={{ padding: "0 5px" }}>{idx + 1}.</div>
-                <div className="table-desi-cell" style={{ padding: "0 5px" }}>{meta.label}</div>
-                <div className="table-desi-cell" style={{ padding: "0 5px", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                  {row.Party_Name || "N/A"}
-                </div>
-
-                {/* DATE */}
-                <div className="table-desi-cell" style={{ padding: "0 5px" }}>
-                  {row.Txn_Date
-                    ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "numeric",
-                      year: "numeric",
-                    })
-                    : "N/A"}
-                </div>
-
-                {/* AMOUNT */}
-                <div style={{ color: meta.color, fontWeight: 600,padding: "0 5px" }}>
-                  ₹ {fmt(row.Amount)}
-                </div>
-
-                {/* THREE DOT MENU */}
-                <div
-                  className="py-2 px-2 table-desi-cell"
-                  style={{ position: "relative", width: 50, textAlign: "center" }}
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
-                      setRowMenuOpen(rowMenuOpen === menuId ? null : menuId);
-                    }}
-                    className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                    style={{ backgroundColor: "transparent", border: "none", cursor: "pointer" }}
-                    title="More"
-                  >
-                    <MoreVertical size={16} style={{ color: "#374151" }} />
-                  </button>
-
-                  {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
+                  return (
                     <div
-                      onClick={(e) => e.stopPropagation()}
-                      className="absolute bg-white shadow-lg rounded-md"
-                      style={{
-                        right: 0,
-                        top: 32,
-                        width: 150,
-                        zIndex: 100,
-                        border: "1px solid #e2e8f0",
-                        overflow: "hidden",
+                      key={row.id}
+                      onClick={() => {
+                        const params = new URLSearchParams(searchParams);
+                        params.set("highlightTxn", row.id);
+                        setSearchParams(params, { replace: true });
                       }}
+                      onDoubleClick={() => handleTransactionEdit(row)}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "70px 120px minmax(150px, 1fr) 110px 120px 50px",
+                        alignItems: "center",
+                        minHeight: "52px",
+                        // columnGap removed — padding on cells handles spacing instead, matching header
+                        width: "100%",
+                        cursor: "pointer",
+                        backgroundColor: isHighlighted ? "#4CA1AF22" : "transparent",
+                        borderBottom: "1px solid #f1f5f9",
+                        boxSizing: "border-box",
+                      }}
+
                     >
-                      {/* VIEW / EDIT — single button now, works for BOTH modal and route types
-                                since handleTransactionEdit itself branches internally */}
-                      {row.Formatted_Reference_Id && (
+                      {/* SL.NO */}
+                      <div className="table-desi-cell" style={{ padding: "0 5px" }}>{idx + 1}.</div>
+                      <div className="table-desi-cell" style={{ padding: "0 5px" }}>{meta.label}</div>
+                      <div className="table-desi-cell" style={{ padding: "0 5px", overflowWrap: "break-word", wordBreak: "break-word" }}>
+                        {row.Party_Name || "N/A"}
+                      </div>
+
+                      {/* DATE */}
+                      <div className="table-desi-cell" style={{ padding: "0 5px" }}>
+                        {row.Txn_Date
+                          ? new Date(row.Txn_Date).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "numeric",
+                            year: "numeric",
+                          })
+                          : "N/A"}
+                      </div>
+
+                      {/* AMOUNT */}
+                      <div style={{ color: meta.color, fontWeight: 600, padding: "0 5px" }}>
+                        ₹ {fmt(row.Amount)}
+                      </div>
+
+                      {/* THREE DOT MENU */}
+                      <div
+                        className="py-2 px-2 table-desi-cell"
+                        style={{ position: "relative", width: 50, textAlign: "center" }}
+                      >
                         <button
                           type="button"
-                          className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                          style={{ color: "#374151" }}
-                          onClick={() => {
-                            setRowMenuOpen(null);
-                            handleTransactionEdit(row);
+                          // onClick={(e) => {
+                          //   e.stopPropagation();
+                          //   const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
+                          //   setRowMenuOpen(rowMenuOpen === menuId ? null : menuId);
+                          // }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            // Highlight this row, but DON'T scroll
+                            skipHighlightScrollRef.current = true;
+
+                            const next = new URLSearchParams(searchParams);
+                            next.set("highlightTxn", row?.id);
+
+                            setSearchParams(next, { replace: true });
+
+                            const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
+
+                            setRowMenuOpen(
+                              rowMenuOpen === menuId ? null : menuId
+                            );
                           }}
+                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          style={{ backgroundColor: "transparent", border: "none", cursor: "pointer" }}
+                          title="More"
                         >
-                          <Eye size={13} style={{ color: "#4CA1AF" }} />
-                          View / Edit
+                          <MoreVertical size={16} style={{ color: "#374151" }} />
                         </button>
-                      )}
 
-                      {/* PRINT */}
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                        style={{ color: "#374151" }}
-                        onClick={() => {
-                          setRowMenuOpen(null);
-                          console.log("Print transaction:", row);
-                        }}
-                      >
-                        <Printer size={13} style={{ color: "#4CA1AF" }} />
-                        Print
-                      </button>
+                        {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute bg-white shadow-lg rounded-md"
+                            style={{
+                              right: 0,
+                              top: 32,
+                              width: 150,
+                              zIndex: 100,
+                              border: "1px solid #e2e8f0",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {/* VIEW / EDIT — single button now, works for BOTH modal and route types
+                                since handleTransactionEdit itself branches internally */}
+                            {row.Formatted_Reference_Id && (
+                              <button
+                                type="button"
+                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                style={{ color: "#374151" }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+                                  handleTransactionEdit(row);
+                                }}
+                              >
+                                <Eye size={13} style={{ color: "#4CA1AF" }} />
+                                View / Edit
+                              </button>
+                            )}
 
-                      {/* DELETE */}
-                      <button
-                        type="button"
-                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                        title="Delete transaction"
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                        onClick={() => {
-                          setRowMenuOpen(null);
-                          setDeleteTarget({
-                            Id: row.Formatted_Reference_Id,
-                            Txn_Type: row.Txn_Type,
-                          });
-                        }}
-                      >
-                        <Trash2 size={13} style={{ color: "#dc2626" }} />
-                        Delete
-                      </button>
+                            {/* PRINT */}
+                            <button
+                              type="button"
+                              className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                              style={{ color: "#374151" }}
+                              onClick={() => {
+                                setRowMenuOpen(null);
+                                console.log("Print transaction:", row);
+                              }}
+                            >
+                              <Printer size={13} style={{ color: "#4CA1AF" }} />
+                              Print
+                            </button>
+
+                            {/* DELETE */}
+                            <button
+                              type="button"
+                              className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                              title="Delete transaction"
+                              style={{ cursor: "pointer", color: "#dc2626" }}
+                              onClick={() => {
+                                setRowMenuOpen(null);
+                                setDeleteTarget({
+                                  Id: row.Formatted_Reference_Id,
+                                  Txn_Type: row.Txn_Type,
+                                });
+                              }}
+                            >
+                              <Trash2 size={13} style={{ color: "#dc2626" }} />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          }}
-        />
+                  );
+                }}
+              />
+            </div>
+          </div>
         </div>
-      </div>
-      </div>
       </div>
 
       {/* sentinel */}

@@ -304,6 +304,8 @@ import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
             WHEN 'Payment_Out'     THEN po.id
             WHEN 'Sale_Return'     THEN sr.id
             WHEN 'Purchase_Return' THEN pr.id
+            WHEN 'Expense'         THEN e.id
+
             ELSE NULL
           END AS Formatted_Reference_Id
 
@@ -318,7 +320,8 @@ import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
             'Sale_Return',
             'Purchase_Return',
             'Payment_In',
-            'Payment_Out'
+            'Payment_Out',
+            'Expense'
           )
 
         -- parent tables
@@ -329,6 +332,10 @@ import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
         LEFT JOIN add_purchase p
           ON ct.Txn_Type = 'Purchase'
           AND ps.Source_Id = p.id
+
+        LEFT JOIN expenses e
+  ON ct.Txn_Type = 'Expense'
+  AND ps.Source_Id = e.id
 
         LEFT JOIN payment_in pi
           ON ct.Txn_Type = 'Payment_In'

@@ -1,13 +1,12 @@
 
 import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
-    Download,
+
     Eye,
-    FileSpreadsheet,
-    LayoutDashboard,
+
     MoreVertical,
     Printer,
-    SquarePen,
+
     Trash2,
     Undo2
 } from "lucide-react";
@@ -73,15 +72,18 @@ export default function CashInHand() {
     const TYPE_META = {
         row: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         purchase: { label: "Purchase", color: "#dc2626", bg: "#fff1f2", dir: "out" },
+         sale: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         payment_in: { label: "Payment In", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         payment_out: { label: "Payment Out", color: "#dc2626", bg: "#fff1f2", dir: "out" },
         purchase_return: { label: "Purchase Return", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         sale_return: { label: "Sale Return", color: "#dc2626", bg: "#fff1f2", dir: "out" },
         adjustment: { label: "Adjustment", color: "#4CA1AF", bg: "#f0f9ff", dir: "in" },
+         expense: { label: "Expense", color: "#dc2626", bg: "#fff1f2", dir: "out" },
     };
     const TXN_TYPE_ROUTE_MAP = {
         Sale: "sale",
         Purchase: "purchase",
+         Expense: "expense",
 
         Sale_Return: "sale/return",
         Purchase_Return: "purchase/return",
@@ -370,10 +372,16 @@ export default function CashInHand() {
 
     const virtualListRef = useRef(null);
     const hasScrolledToHighlightRef = useRef(false);
+    const skipHighlightScrollRef = useRef(false);
 
     const highlightTxnId = searchParams.get("highlightTxn");
 
     useEffect(() => {
+        if (skipHighlightScrollRef.current) {
+            skipHighlightScrollRef.current = false;
+            return;
+        }
+
         if (hasScrolledToHighlightRef.current) return;
         if (!highlightTxnId) return;
         if (isLoading || isFetching) return;
@@ -661,7 +669,7 @@ export default function CashInHand() {
                                         borderBottom: "2px solid #e2e8f0",
                                         fontWeight: 600,
                                         fontSize: 13,
-                                        color:  "#333",
+                                        color: "#333",
                                         textTransform: "uppercase",
                                     }}
                                 >
@@ -671,10 +679,10 @@ export default function CashInHand() {
                                     <div>Date</div>
                                     <div>Amount</div>
                                     <div style={{
-                                            position: "sticky",
-                                            right: 0,
-                                            //backgroundColor: "#fff",
-                                        }}></div>
+                                        position: "sticky",
+                                        right: 0,
+                                        //backgroundColor: "#fff",
+                                    }}></div>
                                 </div>
 
                                 {/* ---------- VIRTUAL LIST ---------- */}
@@ -852,9 +860,9 @@ export default function CashInHand() {
 
                                                     <div
                                                         className="py-2 px-2 table-desi-cell"
-                                                          style={{
-                                                            position: "sticky",   
-                                                            right: 0,              
+                                                        style={{
+                                                            position: "sticky",
+                                                            right: 0,
                                                             width: 50,
                                                             //position: "relative",
                                                             //width: 50,
@@ -863,12 +871,30 @@ export default function CashInHand() {
                                                     >
                                                         <button
                                                             type="button"
+                                                            // onClick={(e) => {
+                                                            //     e.stopPropagation();
+
+                                                            //     setRowMenuOpen(
+                                                            //         rowMenuOpen ===
+                                                            //             menuId
+                                                            //             ? null
+                                                            //             : menuId
+                                                            //     );
+                                                            // }}
+
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
 
+                                                                // Highlight this row, but DON'T scroll
+                                                                skipHighlightScrollRef.current = true;
+
+                                                                const next = new URLSearchParams(searchParams);
+                                                                next.set("highlightTxn", row?.id);
+
+                                                                setSearchParams(next, { replace: true });
+
                                                                 setRowMenuOpen(
-                                                                    rowMenuOpen ===
-                                                                        menuId
+                                                                    rowMenuOpen === menuId
                                                                         ? null
                                                                         : menuId
                                                                 );

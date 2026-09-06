@@ -135,6 +135,22 @@ export default function EditExpense() {
             };
         }
 
+        if (from === "cash-in-hand") {
+        
+        return {
+            pathname: "/cash-bank/cash-in-hand",
+            search: location.search,
+            state: {},
+        }
+      }
+      if(from === "bank-accounts"){
+        return {
+            pathname: "/cash-bank/bank-accounts",
+            search: location.search,
+            state: {},
+        }
+      }
+
         // fallback — unknown/missing "from"
         return {
             pathname: "/expense/categories",

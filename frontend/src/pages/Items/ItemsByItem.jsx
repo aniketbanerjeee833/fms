@@ -207,22 +207,22 @@ export default function ItemsByItem() {
             skip: !selectedItemId,
         },
     );
-//     const {
-//     data: billsResponse,
-//     isLoading: isBillsLoading,
-//     isFetching: isBillsFetching,
-//     refetch: refetchBills,
-// } = useGetItemBillsQuery(
-//     {
-//         Item_Id: selectedItemId,
-//         cursor,
-//         search: txnSearch,
-//         limit: cursor ? 10 : initialRightLimit.current,
-//     },
-//     {
-//         skip: !selectedItemId,
-//     }
-// );
+    //     const {
+    //     data: billsResponse,
+    //     isLoading: isBillsLoading,
+    //     isFetching: isBillsFetching,
+    //     refetch: refetchBills,
+    // } = useGetItemBillsQuery(
+    //     {
+    //         Item_Id: selectedItemId,
+    //         cursor,
+    //         search: txnSearch,
+    //         limit: cursor ? 10 : initialRightLimit.current,
+    //     },
+    //     {
+    //         skip: !selectedItemId,
+    //     }
+    // );
 
 
     const transactions = billsResponse?.transactions || [];
@@ -743,6 +743,7 @@ export default function ItemsByItem() {
 
     const virtualRightListRef = useRef(null);
     const hasScrolledToHighlightRef = useRef(false);
+    const skipHighlightScrollRef = useRef(false);
 
     const highlightTxnId = searchParams.get("highlightTxn");
 
@@ -751,6 +752,10 @@ export default function ItemsByItem() {
     }, [selectedItemId, highlightTxnId, txnSearch]);
 
     useEffect(() => {
+        if (skipHighlightScrollRef.current) {
+            skipHighlightScrollRef.current = false;
+            return;
+        }
         if (hasScrolledToHighlightRef.current) return;
         if (!highlightTxnId) return;
         if (isBillsLoading || isBillsFetching) return;
@@ -1196,7 +1201,7 @@ export default function ItemsByItem() {
                             </div>
                         )}
                         {/* FIXED HEADER */}
-                    
+
                         <div
                             style={{
                                 display: "grid",
@@ -1407,12 +1412,30 @@ export default function ItemsByItem() {
                                                     <>
                                                         <button
                                                             type="button"
+                                                            // onClick={(e) => {
+                                                            //     e.stopPropagation();
+
+                                                            //     setRowMenuOpen(
+                                                            //         rowMenuOpen ===
+                                                            //             txn.Ledger_Id
+                                                            //             ? null
+                                                            //             : txn.Ledger_Id
+                                                            //     );
+                                                            // }}
+
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
 
+                                                                // Highlight this row, but DON'T scroll
+                                                                skipHighlightScrollRef.current = true;
+
+                                                                const next = new URLSearchParams(searchParams);
+                                                                next.set("highlightTxn", txn.Ledger_Id);
+
+                                                                setSearchParams(next, { replace: true });
+
                                                                 setRowMenuOpen(
-                                                                    rowMenuOpen ===
-                                                                        txn.Ledger_Id
+                                                                    rowMenuOpen === txn.Ledger_Id
                                                                         ? null
                                                                         : txn.Ledger_Id
                                                                 );
@@ -1446,7 +1469,7 @@ export default function ItemsByItem() {
                                                                         top: 36,
                                                                         width: 150,
                                                                         zIndex: 100,
-                                                                        border:"1px solid #e2e8f0",
+                                                                        border: "1px solid #e2e8f0",
                                                                         overflow: "hidden",
                                                                     }}
                                                                 >

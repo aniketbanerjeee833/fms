@@ -187,10 +187,15 @@ export default function AllSaleList() {
   }, [bulkSaleReportData, showSaleBulkPrintPreview]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-
+ const skipHighlightScrollRef = useRef(false);
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
+     if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
+
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
@@ -699,8 +704,26 @@ export default function AllSaleList() {
                             >
                               <button
                                 type="button"
-                                onClick={(e) => {
+                                // onClick={(e) => {
+                                //   e.stopPropagation();
+
+                                //   setRowMenuOpen(
+                                //     rowMenuOpen === sale?.Sale_Id
+                                //       ? null
+                                //       : sale?.Sale_Id
+                                //   );
+                                // }}
+
+                                 onClick={(e) => {
                                   e.stopPropagation();
+
+                                  // Highlight this row, but DON'T scroll
+                                  skipHighlightScrollRef.current = true;
+
+                                  const next = new URLSearchParams(searchParams);
+                                  next.set("highlightTxn", sale?.Sale_Id);
+
+                                  setSearchParams(next, { replace: true });
 
                                   setRowMenuOpen(
                                     rowMenuOpen === sale?.Sale_Id

@@ -670,8 +670,8 @@ export default function PaymentIn() {
                                                     <div
                                                         className="py-2 px-2 table-desi-cell"
                                                         style={{
-                                                            position: "sticky",   
-                                                            right: 0,              
+                                                            position: "sticky",
+                                                            right: 0,
                                                             width: 50,
                                                             //position: "relative",
                                                             //width: 50,
@@ -685,13 +685,24 @@ export default function PaymentIn() {
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
 
+                                                                const next = new URLSearchParams(searchParams);
+                                                                next.set("highlightTxn", paymentIn?.id);
+                                                                setSearchParams(next, { replace: true });
+
                                                                 setRowMenuOpen(
-                                                                    rowMenuOpen ===
-                                                                        paymentIn?.id
-                                                                        ? null
-                                                                        : paymentIn?.id
+                                                                    rowMenuOpen === paymentIn?.id ? null : paymentIn?.id
                                                                 );
                                                             }}
+                                                            // onClick={(e) => {
+                                                            //     e.stopPropagation();
+
+                                                            //     setRowMenuOpen(
+                                                            //         rowMenuOpen ===
+                                                            //             paymentIn?.id
+                                                            //             ? null
+                                                            //             : paymentIn?.id
+                                                            //     );
+                                                            // }}
                                                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                             style={{
                                                                 backgroundColor:

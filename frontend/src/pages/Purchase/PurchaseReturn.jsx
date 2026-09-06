@@ -198,10 +198,15 @@ export default function PurchaseReturn() {
 
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-
+const skipHighlightScrollRef = useRef(false);
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
+
+     if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
@@ -934,16 +939,24 @@ export default function PurchaseReturn() {
                         >
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                  
+                             onClick={(e) => {
+                                  e.stopPropagation();
 
-                              setRowMenuOpen(
-                                rowMenuOpen ===
-                                  purchaseReturn.id
-                                  ? null
-                                  : purchaseReturn.id
-                              );
-                            }}
+                                  // Highlight this row, but DON'T scroll
+                                  skipHighlightScrollRef.current = true;
+
+                                  const next = new URLSearchParams(searchParams);
+                                  next.set("highlightTxn", purchaseReturn.id);
+
+                                  setSearchParams(next, { replace: true });
+
+                                  setRowMenuOpen(
+                                    rowMenuOpen === purchaseReturn.id
+                                      ? null
+                                      : purchaseReturn.id
+                                  );
+                                }}
                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                             style={{
                               backgroundColor: "transparent",

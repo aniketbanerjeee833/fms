@@ -291,7 +291,7 @@ ORDER BY ba.Account_Display_Name;
 const getBankAccountById = async (req, res, next) => {
   try {
     const { Bank_Account_Id } = req.params;
-     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
     //const limit = Number(req.query.limit) || 10;
 
     // 🔹 decode cursor
@@ -352,7 +352,7 @@ const getBankAccountById = async (req, res, next) => {
            ON bt.Reference_Id = ps.id
            AND bt.Txn_Type IN (
              'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
-             'Payment_In', 'Payment_Out'
+             'Payment_In', 'Payment_Out', 'Expense'
            )
          WHERE bt.Bank_Account_Id = ?
            ${cursorSQL}
@@ -362,6 +362,7 @@ const getBankAccountById = async (req, res, next) => {
          CASE txn.Txn_Type
            WHEN 'Sale'            THEN s.Sale_Id
            WHEN 'Purchase'        THEN p.Purchase_Id
+           WHEN 'Expense'         THEN e.id
            WHEN 'Sale_Return'     THEN sr.id
            WHEN 'Purchase_Return' THEN pr.id
            WHEN 'Payment_In'      THEN pi.id
@@ -380,6 +381,9 @@ const getBankAccountById = async (req, res, next) => {
          ON txn.Txn_Type = 'Payment_In' AND txn.Source_Id = pi.Id
        LEFT JOIN payment_out po
          ON txn.Txn_Type = 'Payment_Out' AND txn.Source_Id = po.id
+
+LEFT JOIN expenses e
+  ON txn.Txn_Type = 'Expense' AND txn.Source_Id = e.id
        ORDER BY txn.id DESC
        LIMIT ?`,
       queryParams
@@ -412,10 +416,10 @@ const getBankAccountById = async (req, res, next) => {
       : Number(account.Opening_Balance);
 
     res.status(200).json({
-      success:        true,
-      bankAccount:    account,
+      success: true,
+      bankAccount: account,
       currentBalance,
-      transactions:   pageRows,
+      transactions: pageRows,
       hasMore,
       nextCursor,
     });

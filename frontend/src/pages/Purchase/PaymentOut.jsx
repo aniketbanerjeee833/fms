@@ -542,48 +542,7 @@ export default function PaymentOut() {
                             >
                                 {/* ---------- HEADER ---------- */}
 
-                                {/* <table className="w-full min-w-[800px] table-responsive table-desi">
-                                    <thead>
-                                        <tr>
-                                            <th
-                                                className="text-left"
-                                                style={{ width: 70 }}
-                                            >
-                                                Sl.No
-                                            </th>
 
-                                            <th
-                                                className="text-left"
-                                                style={{ width: 120 }}
-                                            >
-                                                Date
-                                            </th>
-
-                                            <th
-                                                className="text-left"
-                                                style={{ width: 300 }}
-                                            >
-                                                Party Name
-                                            </th>
-
-                                            <th
-                                                className="text-left"
-                                                style={{ width: 160 }}
-                                            >
-                                                Payment Type
-                                            </th>
-
-                                            <th
-                                                className="text-left"
-                                            // style={{ width: 262 }}
-                                            >
-                                                Total Paid
-                                            </th>
-
-                                            <th style={{ width: 50 }}></th>
-                                        </tr>
-                                    </thead>
-                                </table> */}
                                 <div
                                     style={{
                                         display: "grid",
@@ -784,13 +743,15 @@ export default function PaymentOut() {
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
 
+                                                                const next = new URLSearchParams(searchParams);
+                                                                next.set("highlightTxn", paymentOut?.id);
+                                                                setSearchParams(next, { replace: true });
+
                                                                 setRowMenuOpen(
-                                                                    rowMenuOpen ===
-                                                                        paymentOut?.id
-                                                                        ? null
-                                                                        : paymentOut?.id
+                                                                    rowMenuOpen === paymentOut?.id ? null : paymentOut?.id
                                                                 );
                                                             }}
+                                                          
                                                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                             style={{
                                                                 backgroundColor:

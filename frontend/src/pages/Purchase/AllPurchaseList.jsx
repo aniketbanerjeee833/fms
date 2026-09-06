@@ -79,6 +79,10 @@ export default function AllPurchaseList() {
   //     toDate,
   //   });
   // };
+
+  //   const initialPurchaseLimit = useRef(
+  //   Number(sessionStorage.getItem("purchaseListCount")) || 10
+  // );
   const {
     data: purchases,
     isLoading,
@@ -89,6 +93,7 @@ export default function AllPurchaseList() {
     fromDate,
     toDate,
     limit: 10,
+    // limit: cursor ? 10 : initialPurchaseLimit.current,
   });
   const purchaseList = purchases?.purchases ?? [];
   const hasMore = purchases?.hasMore ?? false;
@@ -213,11 +218,55 @@ export default function AllPurchaseList() {
   }, [bulkPurchaseReportData, showPurchaseBulkPrintReview]);
 
   const virtualListRef = useRef(null);
+
   const hasScrolledToHighlightRef = useRef(false);
+  const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
 
+  // useEffect(() => {
+  //   if (hasScrolledToHighlightRef.current) return;
+  //   if (!highlightTxnId) return;
+  //   if (isLoading || isFetching) return;
+
+  //   const targetIndex = purchaseList.findIndex(
+  //     (purchase) =>
+  //       String(purchase?.Purchase_Id) === String(highlightTxnId)
+  //   );
+  //   console.log("Target index for highlight:", targetIndex);
+  //   if (targetIndex === -1) {
+  //     if (hasMore && nextCursor && !isFetching) {
+  //       handleLoadMore();
+  //     }
+  //     return;
+  //   }
+
+  //   // Wait until VirtualScrollList has rendered the new data
+  //   const timer = setTimeout(() => {
+  //     virtualListRef.current?.scrollToIndex(targetIndex, {
+  //       align: "center",
+  //       behavior: "auto",
+  //     });
+
+  //     hasScrolledToHighlightRef.current = true;
+  //   }, 100);
+
+  //   return () => clearTimeout(timer);
+  // }, [
+  //   purchaseList,
+  //   highlightTxnId,
+  //   isLoading,
+  //   isFetching,
+  //   hasMore,
+  //   nextCursor,
+  //   handleLoadMore,
+  // ]);
   useEffect(() => {
+    if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
+
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
@@ -226,7 +275,7 @@ export default function AllPurchaseList() {
       (purchase) =>
         String(purchase?.Purchase_Id) === String(highlightTxnId)
     );
-    console.log("Target index for highlight:", targetIndex);
+
     if (targetIndex === -1) {
       if (hasMore && nextCursor && !isFetching) {
         handleLoadMore();
@@ -234,7 +283,6 @@ export default function AllPurchaseList() {
       return;
     }
 
-    // Wait until VirtualScrollList has rendered the new data
     const timer = setTimeout(() => {
       virtualListRef.current?.scrollToIndex(targetIndex, {
         align: "center",
@@ -254,10 +302,16 @@ export default function AllPurchaseList() {
     nextCursor,
     handleLoadMore,
   ]);
+
   useEffect(() => {
     hasScrolledToHighlightRef.current = false;
   }, [highlightTxnId, searchTerm, fromDate, toDate]);
-
+  // useEffect(() => {
+  //   sessionStorage.setItem(
+  //     "purchaseListCount",
+  //     String(purchaseList.length)
+  //   );
+  // }, [purchaseList.length]);
   return (
     <>
       <div className="flex flex-col bg-white"
@@ -661,7 +715,7 @@ export default function AllPurchaseList() {
                             }}
                             style={{
                               display: "grid",
-                              gridTemplateColumns:"0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                              gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
                               alignItems: "center",
                               minHeight: "52px",
                               columnGap: "10px",
@@ -729,7 +783,7 @@ export default function AllPurchaseList() {
                             <div
                               className="py-2 px-2 table-desi-cell"
                               style={{
-                                 position: "sticky",   // 👈 was "relative", now sticky
+                                position: "sticky",   // 👈 was "relative", now sticky
                                 right: 0,              // 👈 pins to the right edge of the SCROLL viewport
                                 width: 50,
                                 //position: "relative",
@@ -739,8 +793,25 @@ export default function AllPurchaseList() {
                             >
                               <button
                                 type="button"
+                                // onClick={(e) => {
+                                //   e.stopPropagation();
+
+                                //   setRowMenuOpen(
+                                //     rowMenuOpen === purchase?.Purchase_Id
+                                //       ? null
+                                //       : purchase?.Purchase_Id
+                                //   );
+                                // }}
                                 onClick={(e) => {
                                   e.stopPropagation();
+
+                                  // Highlight this row, but DON'T scroll
+                                  skipHighlightScrollRef.current = true;
+
+                                  const next = new URLSearchParams(searchParams);
+                                  next.set("highlightTxn", purchase?.Purchase_Id);
+
+                                  setSearchParams(next, { replace: true });
 
                                   setRowMenuOpen(
                                     rowMenuOpen === purchase?.Purchase_Id

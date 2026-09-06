@@ -194,10 +194,15 @@ export default function SaleReturn() {
   }, [bulkSaleReturnReportData, showSaleReturnBulkPrintPreview]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
+  const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
+      if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
@@ -667,16 +672,34 @@ export default function SaleReturn() {
                           >
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
+                              // onClick={(e) => {
+                              //   e.stopPropagation();
 
-                                setRowMenuOpen(
-                                  rowMenuOpen ===
-                                    saleReturn.id
-                                    ? null
-                                    : saleReturn.id
-                                );
-                              }}
+                              //   setRowMenuOpen(
+                              //     rowMenuOpen ===
+                              //       saleReturn.id
+                              //       ? null
+                              //       : saleReturn.id
+                              //   );
+                              // }}
+
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  // Highlight this row, but DON'T scroll
+                                  skipHighlightScrollRef.current = true;
+
+                                  const next = new URLSearchParams(searchParams);
+                                  next.set("highlightTxn", saleReturn.id);
+
+                                  setSearchParams(next, { replace: true });
+
+                                  setRowMenuOpen(
+                                    rowMenuOpen === saleReturn.id
+                                      ? null
+                                      : saleReturn.id
+                                  );
+                                }}
                               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                               style={{
                                 backgroundColor:
