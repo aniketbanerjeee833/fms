@@ -174,9 +174,9 @@ export default function ExpensesByItems() {
   const [rightCursor, setRightCursor] = useState(null);
   //const rightSentinelRef = useRef(null);
   //const rightObserverRef = useRef(null);
-  //const itemRef = useRef(selectedItemId);
-  
-      //const effectiveCursor = itemRef.current === selectedItemId ? rightCursor : null;
+  const itemRef = useRef(selectedItemId);
+
+  const effectiveCursor = itemRef.current === selectedItemId ? rightCursor : null;
   const initialRightLimit = useRef(
     Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
   );
@@ -189,9 +189,9 @@ export default function ExpensesByItems() {
     {
       masterItemId: selectedItemId,
 
-      cursor: rightCursor,
+      cursor: effectiveCursor,
       search: txnSearch, // ← add
-      limit: rightCursor ? 10 : initialRightLimit.current
+      limit: effectiveCursor ? 10 : initialRightLimit.current
     },
     {
       skip: !selectedItemId,
@@ -201,6 +201,7 @@ export default function ExpensesByItems() {
   const usageHasMore = usageResponse?.hasMore ?? false;
   const usageNextCursor = usageResponse?.nextCursor ?? null;
   useEffect(() => {
+    itemRef.current = selectedItemId;
     setRightCursor(null);
   }, [selectedItemId, txnSearch]);
   const handleRightLoadMore = useCallback(() => {
@@ -549,10 +550,10 @@ export default function ExpensesByItems() {
     if (isUsageLoading || isUsageFetching) return;
     if (!itemUsage.length) return;
 
-   const targetIndex = itemUsage.findIndex(
-  (txn) =>
-    String(txn.Expense_Id) === String(highlightTxnId)
-);
+    const targetIndex = itemUsage.findIndex(
+      (txn) =>
+        String(txn.Expense_Id) === String(highlightTxnId)
+    );
     if (targetIndex === -1) {
       if (
         usageHasMore &&
@@ -1097,7 +1098,7 @@ export default function ExpensesByItems() {
                 emptyMessage="No transactions to show"
                 endMessage="— End of transactions —"
                 isRowActive={(txn) =>
-                  rowMenuOpen === txn.expenseId
+                  rowMenuOpen === txn.id
                 }
                 // isRowActive={(txn) =>
                 //   isHighlighted(txn.expenseId)
@@ -1199,7 +1200,7 @@ export default function ExpensesByItems() {
                       </div>
 
                       {/* Amount */}
-                      <div
+                      <div className="table-desi-cell"
                         style={{
                           color: "#4CA1AF",
                           whiteSpace: "nowrap",
@@ -1252,9 +1253,9 @@ export default function ExpensesByItems() {
                             className="absolute bg-white shadow-lg rounded-md"
                             style={{
                               right: 10,
-                              top: 42,
+                              top: 36,
                               width: 160,
-                              zIndex: 50,
+                              zIndex: 100,
                               border: "1px solid #e2e8f0",
                               overflow: "hidden",
                             }}
@@ -2008,65 +2009,65 @@ export default function ExpensesByItems() {
 
 
 
-  // const leftListRef = useRef(null);
-  // //const rightPanelRef = useRef(null);
-  // const selectedItemRowRef = useRef(null);
-  // const highlightedRowRef = useRef(null);
-  // useEffect(() => {
-  //   const leftEl = leftListRef.current;
-  //   //const rightEl = rightPanelRef.current;
+// const leftListRef = useRef(null);
+// //const rightPanelRef = useRef(null);
+// const selectedItemRowRef = useRef(null);
+// const highlightedRowRef = useRef(null);
+// useEffect(() => {
+//   const leftEl = leftListRef.current;
+//   //const rightEl = rightPanelRef.current;
 
-  //   const saveLeft = () => {
-  //     sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
-  //     sessionStorage.setItem("expensesByExpense:leftCount", items.length);
-  //   };
-  //   // const saveRight = () => {
-  //   //   console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
-  //   //   sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
-  //   //   sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
-  //   //   // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
-  //   //   // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
-  //   // };
+//   const saveLeft = () => {
+//     sessionStorage.setItem("expensesByExpense:leftScroll", leftEl.scrollTop);
+//     sessionStorage.setItem("expensesByExpense:leftCount", items.length);
+//   };
+//   // const saveRight = () => {
+//   //   console.log("saveRight fired", rightEl.scrollTop, filteredTransactions.length);
+//   //   sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+//   //   sessionStorage.setItem("expensesByExpense:rightCount", filteredTransactions.length);
+//   //   // sessionStorage.setItem("expensesByExpense:rightScroll", rightEl.scrollTop);
+//   //   // sessionStorage.setItem("expensesByExpense:rightCount", transactions.length);
+//   // };
 
-  //   leftEl?.addEventListener("scroll", saveLeft);
-  //   //rightEl?.addEventListener("scroll", saveRight);
+//   leftEl?.addEventListener("scroll", saveLeft);
+//   //rightEl?.addEventListener("scroll", saveRight);
 
-  //   return () => {
-  //     leftEl?.removeEventListener("scroll", saveLeft);
-  //     //rightEl?.removeEventListener("scroll", saveRight);
-  //   };
-  // }, [items.length, filteredTransactions.length]);
-
-
-
-  // const hasRestoredLeftRef = useRef(false);
-
-  // useLayoutEffect(() => {
-  //   if (hasRestoredLeftRef.current) return; // only do this once per mount
-  //   if (isItemsLoading || isItemsFetching) return;
-
-  //   const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
-  //   if (items.length < savedCount) return;
-
-  //   selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-  //   hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
-  // }, [isItemsLoading, isItemsFetching, selectedItemId, items.length]);
-  //const hasRestoredRightRef = useRef(false);
-  //const [isRestoringRight, setIsRestoringRight] = useState(true);
+//   return () => {
+//     leftEl?.removeEventListener("scroll", saveLeft);
+//     //rightEl?.removeEventListener("scroll", saveRight);
+//   };
+// }, [items.length, filteredTransactions.length]);
 
 
-  // useLayoutEffect(() => {
-  //   if (hasRestoredRightRef.current) {
-  //     setIsRestoringRight(false);
-  //     return;
-  //   }
-  //   if (isUsageLoading || isUsageFetching) return;
 
-  //   const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
-  //   // keep waiting only if we might still get more data
-  //   if (filteredTransactions.length < savedCount && usageHasMore) return;
+// const hasRestoredLeftRef = useRef(false);
 
-  //   highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
-  //   hasRestoredRightRef.current = true;
-  //   setIsRestoringRight(false); // reveal now, correctly positioned
-  // }, [isUsageLoading, isUsageFetching, filteredTransactions.length, usageHasMore]);
+// useLayoutEffect(() => {
+//   if (hasRestoredLeftRef.current) return; // only do this once per mount
+//   if (isItemsLoading || isItemsFetching) return;
+
+//   const savedCount = Number(sessionStorage.getItem("expensesByExpense:leftCount")) || 0;
+//   if (items.length < savedCount) return;
+
+//   selectedItemRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+//   hasRestoredLeftRef.current = true; // mark done — won't fire again this mount
+// }, [isItemsLoading, isItemsFetching, selectedItemId, items.length]);
+//const hasRestoredRightRef = useRef(false);
+//const [isRestoringRight, setIsRestoringRight] = useState(true);
+
+
+// useLayoutEffect(() => {
+//   if (hasRestoredRightRef.current) {
+//     setIsRestoringRight(false);
+//     return;
+//   }
+//   if (isUsageLoading || isUsageFetching) return;
+
+//   const savedCount = Number(sessionStorage.getItem("expensesByExpense:rightCount")) || 0;
+//   // keep waiting only if we might still get more data
+//   if (filteredTransactions.length < savedCount && usageHasMore) return;
+
+//   highlightedRowRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+//   hasRestoredRightRef.current = true;
+//   setIsRestoringRight(false); // reveal now, correctly positioned
+// }, [isUsageLoading, isUsageFetching, filteredTransactions.length, usageHasMore]);

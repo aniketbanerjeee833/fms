@@ -185,44 +185,44 @@ export default function ItemsByItem() {
     const [cursor, setCursor] = useState(null);
     //const sentinelRef = useRef(null);
     //const observerRef = useRef(null);
-    //const itemRef = useRef(selectedItemId);
+    const itemRef = useRef(selectedItemId);
 
-    //const effectiveCursor = itemRef.current === selectedItemId ? cursor : null;
+    const effectiveCursor = itemRef.current === selectedItemId ? cursor : null;
     const initialRightLimit = useRef(
         Number(sessionStorage.getItem("itemsByItem:rightCount")) || 10
     );
-    // const {
-    //     data: billsResponse,
-    //     isLoading: isBillsLoading,
-    //     isFetching: isBillsFetching,
-    //     refetch: refetchBills,
-    // } = useGetItemBillsQuery(
-    //     {
-    //         Item_Id: selectedItemId,
-    //         cursor: effectiveCursor,
-    //         search: txnSearch,
-    //         limit: effectiveCursor ? 10 : initialRightLimit.current
-    //     },
-    //     {
-    //         skip: !selectedItemId,
-    //     },
-    // );
     const {
-    data: billsResponse,
-    isLoading: isBillsLoading,
-    isFetching: isBillsFetching,
-    refetch: refetchBills,
-} = useGetItemBillsQuery(
-    {
-        Item_Id: selectedItemId,
-        cursor,
-        search: txnSearch,
-        limit: cursor ? 10 : initialRightLimit.current,
-    },
-    {
-        skip: !selectedItemId,
-    }
-);
+        data: billsResponse,
+        isLoading: isBillsLoading,
+        isFetching: isBillsFetching,
+        refetch: refetchBills,
+    } = useGetItemBillsQuery(
+        {
+            Item_Id: selectedItemId,
+            cursor: effectiveCursor,
+            search: txnSearch,
+            limit: effectiveCursor ? 10 : initialRightLimit.current
+        },
+        {
+            skip: !selectedItemId,
+        },
+    );
+//     const {
+//     data: billsResponse,
+//     isLoading: isBillsLoading,
+//     isFetching: isBillsFetching,
+//     refetch: refetchBills,
+// } = useGetItemBillsQuery(
+//     {
+//         Item_Id: selectedItemId,
+//         cursor,
+//         search: txnSearch,
+//         limit: cursor ? 10 : initialRightLimit.current,
+//     },
+//     {
+//         skip: !selectedItemId,
+//     }
+// );
 
 
     const transactions = billsResponse?.transactions || [];
@@ -248,7 +248,7 @@ export default function ItemsByItem() {
     //     setCursor(null);
     // }, [selectedItemId, txnSearch]);
     useEffect(() => {
-        //itemRef.current = selectedItemId;
+        itemRef.current = selectedItemId;
         setCursor(null);
     }, [selectedItemId, txnSearch]);
 
@@ -1446,8 +1446,7 @@ export default function ItemsByItem() {
                                                                         top: 36,
                                                                         width: 150,
                                                                         zIndex: 100,
-                                                                        border:
-                                                                            "1px solid #e2e8f0",
+                                                                        border:"1px solid #e2e8f0",
                                                                         overflow: "hidden",
                                                                     }}
                                                                 >

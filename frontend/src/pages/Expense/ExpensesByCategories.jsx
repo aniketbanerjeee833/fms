@@ -141,9 +141,9 @@ export default function ExpensesByCategories() {
   const initialRightLimit = useRef(
             Number(sessionStorage.getItem("expensesByCategory:rightCount")) || 10
         );
-    // const categoryRef = useRef(selectedCategoryId);
+    const categoryRef = useRef(selectedCategoryId);
     
-    // const effectiveCursor = categoryRef.current === selectedCategoryId ? rightCursor : null;
+    const effectiveCursor = categoryRef.current === selectedCategoryId ? rightCursor : null;
 
   const {
     data: expenseResponse,
@@ -153,9 +153,9 @@ export default function ExpensesByCategories() {
     {
       categoryId: selectedCategoryId,
     
-      cursor: rightCursor,
+      cursor: effectiveCursor,
       search: txnSearch,
-       limit: initialRightLimit.current
+       limit: effectiveCursor ? initialRightLimit.current : 10
     },
     {
       skip: !selectedCategoryId,
@@ -184,6 +184,12 @@ const handleRightLoadMore = useCallback(() => {
   expensesHasMore,
   expensesNextCursor,
 ]);
+
+ /* reset right cursor when selected category or txn search changes */
+   useEffect(() => {
+          categoryRef.current = selectedCategoryId;
+          setRightCursor(null);
+      }, [selectedCategoryId, txnSearch]);
   const [deleteExpense, { isLoading: isDeletingExpense }] =
     useDeleteExpenseMutation();
 
@@ -318,11 +324,7 @@ const handleRightLoadMore = useCallback(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, selectedCategoryId, navigate, location.pathname, location.state]);
 
-  /* reset right cursor when selected category or txn search changes */
-  //  useEffect(() => {
-  //         // categoryRef.current = selectedCategoryId;
-  //         setRightCursor(null);
-  //     }, [selectedCategoryId, txnSearch]);
+ 
   // useEffect(() => {
   //   setRightCursor(null);
   // }, [selectedCategoryId, txnSearch]);
@@ -1046,8 +1048,16 @@ useEffect(() => {
     getItemKey={(txn) => txn.id}
     emptyMessage="No transactions to show"
     endMessage="— End of transactions —"
-    isRowActive={(txn) => isHighlighted(txn.id)}
-    renderRow={(txn, idx) => (
+    // isRowActive={(txn) => isHighlighted(txn.id)}
+    // renderRow={(txn, idx) => (
+        isRowActive={(txn) =>
+    transactionMenu === txn.id
+  }
+  renderRow={(txn, idx) => {
+    const isHighlighted =
+      String(highlightTxnId) ===
+      String(txn.id);
+     return ( 
       <div
         key={txn.id}
         onClick={() => {
@@ -1098,9 +1108,12 @@ useEffect(() => {
           borderBottom: "1px solid #f1f5f9",
           position: "relative",
           cursor: "pointer",
-          backgroundColor: isHighlighted(txn.id)
-            ? "#4CA1AF22"
-            : "transparent",
+          backgroundColor: isHighlighted
+  ? "#4CA1AF22"
+  : "transparent",
+          // backgroundColor: isHighlighted(txn.id)
+          //   ? "#4CA1AF22"
+          //   : "transparent",
         }}
         className="hover:bg-gray-50 transition-colors"
       >
@@ -1153,9 +1166,9 @@ useEffect(() => {
         </div>
 
         {/* MENU */}
-        <div>
-          <div className="py-2 px-2 table-desi-cell">
-            <div 
+        
+         
+            <div className="py-2 px-2 table-desi-cell"
             style={{
                 position: "sticky",   // 👈 was "relative", now sticky
                  right: 0,              // 👈 pins to the right edge of the SCROLL viewport
@@ -1193,11 +1206,19 @@ useEffect(() => {
                 <div
                   onClick={(e) => e.stopPropagation()}
                   className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
-                  style={{
-                    width: 180,
-                    zIndex: 999,
-                    borderColor: "#e5e7eb",
-                  }}
+                  // style={{
+                  //   width: 180,
+                  //   zIndex: 999,
+                  //   borderColor: "#e5e7eb",
+                  // }}
+                    style={{
+        right: 10,
+        top: 36,
+        width: 150,
+        zIndex: 100,
+        border: "1px solid #e2e8f0",
+        overflow: "hidden",
+      }}
                 >
                   {ROW_ACTIONS.map(
                     ({
@@ -1284,11 +1305,12 @@ useEffect(() => {
                   )}
                 </div>
               )}
-            </div>
+           
           </div>
-        </div>
+        
       </div>
-    )}
+     )
+  }}
   />
 </div>
 
