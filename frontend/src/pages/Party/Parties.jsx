@@ -610,22 +610,24 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
   return (
 
-    <div
-      className="flex flex-col"
-      // style={{
-      //   height: "100%",
+    // <div
+    //   className="flex flex-col"
+    //   // style={{
+    //   //   height: "100%",
 
-      //   minHeight: 0,
-      //   overflow: "hidden",
-      // }}
-      style={{
-        flex: 1,
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
+    //   //   minHeight: 0,
+    //   //   overflow: "hidden",
+    //   // }}
+    //   style={{
+    //     flex: 1,
+    //     minHeight: 0,
+    //     display: "flex",
+    //     flexDirection: "column",
+    //     overflow: "hidden",
+    //   }}
+    // >
+
+       <>
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -777,7 +779,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             display: "grid",
             gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
             width: "100%",
-            //minWidth: "850px",
+            minWidth: "850px",
             boxSizing: "border-box",
             alignItems: "center",
             minHeight: 40,
@@ -810,8 +812,10 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           style={{
             flex: 1,
             minHeight: 0,
-            height: 0,
-            overflow: "hidden",
+            overflowX: "visible",   // ← don't clip, don't scroll — let Layer 1 handle it
+            overflowY: "hidden",    // ← don't scroll vertically here either — Layer 3 handles it
+            //height: 0,
+            //overflow: "hidden",
             position: "relative",
           }}
         >
@@ -829,10 +833,14 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             emptyMessage="No transactions found"
             endMessage="— End of transactions —"
             onLoadMore={handleLoadMore}
-            isRowActive={(row, idx) =>
-              rowMenuOpen ===
-              `${row.Txn_Type}-${row.Formatted_Reference_Id || row.id}-${idx}`
-            }
+            
+            isRowActive={(row, idx) => {
+  const refId = row.Sale_Id || row.Purchase_Id || row.Expense_Id ||
+    row.Sale_Return_Id || row.Purchase_Return_Id || row.Payment_In_Id || row.Payment_Out_Id;
+  const transactionId = row.Expense_Id || row.Formatted_Reference_Id || refId;
+  const menuId = `${row.Txn_Type}-${transactionId || idx}`;
+  return rowMenuOpen === menuId;
+}}
             renderRow={(row, idx) => {
               const meta =
                 PARTY_TYPE_META[row.Txn_Type] ?? {
@@ -936,7 +944,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     display: "grid",
                     gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
-                    //minWidth: "850px",
+                    minWidth: "850px",
                     minHeight: 52,
                     alignItems: "center",
                     boxSizing: "border-box",
@@ -1022,7 +1030,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     style={{
                       position: "sticky",
                       right: 0,
-                      width: "100%",
+                     width: 50,
                       textAlign: "center",
                     }}
                   >
@@ -1084,8 +1092,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               }
                               className="absolute bg-white shadow-lg rounded-md"
                               style={{
-                                right: 0,
-                                top: 32,
+                                right: 10,
+                                top: 36,
                                 width: 150,
                                 zIndex: 100,
                                 border:
@@ -1103,8 +1111,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                   style={{
                                     color: "#374151",
                                   }}
-                                  onClick={() => {
-                                    //e.stopPropagation();
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setRowMenuOpen(null);
 
                                     const params =
@@ -1145,6 +1153,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setRowMenuOpen(null);
+                                    console.log("navigating:", {
+                                      route: TXN_TYPE_ROUTE_MAP[row.Txn_Type],
+                                      transactionId,
+                                      txnType: row.Txn_Type,
+                                      fullPath: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
+                                    });
                                     navigate(
                                       {
                                         pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
@@ -1398,7 +1412,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
       </div>
 
-    </div >
+    </>
   );
 }
 
@@ -1688,7 +1702,8 @@ export default function Parties() {
           style={{
             flex: 1,
             minHeight: 0,
-            height: "calc(100vh - 180px)",
+            overflowY: "auto",
+            //height: "calc(100vh - 180px)",
             borderTop: "1px solid #e2e8f0",
           }}
         >
@@ -1703,11 +1718,12 @@ export default function Parties() {
               //maxHeight: "calc(100vh - 180px)",
             }}
           > */}
+          {/* w-full lg:w-[30%] flex flex-col */}
           <div
-            className="w-full lg:w-[30%] flex flex-col"
+            className="w-full lg:w-[30%] flex flex-col flex-none  h-[40vh] lg:h-auto"
             style={{
               borderRight: "1px solid #e2e8f0",
-              height: "100%",
+              //height: "100%",
               minHeight: 0,
               minWidth: 0,
             }}
@@ -1990,10 +2006,11 @@ export default function Parties() {
           </div> */}
           <div
             //className="w-full lg:w-[70%] p-1" 
-            className="w-full lg:w-[70%] p-1 overflow-y-auto"
+            className="w-full lg:w-[70%] p-1"
             //style={{ height: "100%", minHeight: 0 }}
             style={{
-              height: "100%",
+              overflowY: "auto",
+              //height: "100%",
               minHeight: 0,
               display: "flex",        // 👈 add this
               flexDirection: "column", // 👈 add this

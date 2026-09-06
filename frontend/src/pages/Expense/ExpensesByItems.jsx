@@ -200,6 +200,7 @@ export default function ExpensesByItems() {
   const itemUsage = usageResponse?.usage || [];
   const usageHasMore = usageResponse?.hasMore ?? false;
   const usageNextCursor = usageResponse?.nextCursor ?? null;
+
   useEffect(() => {
     itemRef.current = selectedItemId;
     setRightCursor(null);
@@ -408,39 +409,95 @@ export default function ExpensesByItems() {
 
   /* items no longer need client-side name filtering — search now
      happens server-side via the cursor query's `search` param */
-  const itemsWithTotals = useMemo(() => {
-    return items.map((item) => {
-      const isSelected = String(item.id) === String(selectedItemId);
-      const usageForThisItem = isSelected ? itemUsage : [];
+  // const itemsWithTotals = useMemo(() => {
+  //   return items.map((item) => {
+  //     const isSelected = String(item.id) === String(selectedItemId);
+  //     const usageForThisItem = isSelected ? itemUsage : [];
 
-      return {
-        id: item.id,
-        name: item.Item_Name,
-        amount: 0,
-        total: usageForThisItem.reduce(
-          (sum, u) => sum + Number(u.Amount || 0),
-          0
-        ),
-        balance: usageForThisItem.reduce(
-          (sum, u) => sum + Number(u.Balance_Due || 0),
-          0
-        ),
-        transactions: usageForThisItem.map((u) => ({
-          id: u.id,                    // expense item/usage ID
-          expenseId: u.Expense_Id,     // actual expense ID
-          date: u.Expense_Date,
-          expNo: u.Expense_Number,
-          party: u.Party_Name || "—",
-          paymentType: u.Payment_Type_Display || "—",
-          amount: u.Amount,
-          balance: u.Balance_Due,
-        })),
-      };
+  //     return {
+  //       id: item.id,
+  //       name: item.Item_Name,
+  //       amount: 0,
+  //       total: usageForThisItem.reduce(
+  //         (sum, u) => sum + Number(u.Amount || 0),
+  //         0
+  //       ),
+  //       balance: usageForThisItem.reduce(
+  //         (sum, u) => sum + Number(u.Balance_Due || 0),
+  //         0
+  //       ),
+  //       transactions: usageForThisItem.map((u) => ({
+  //         id: u.id,                    // expense item/usage ID
+  //         expenseId: u.Expense_Id,     // actual expense ID
+  //         date: u.Expense_Date,
+  //         expNo: u.Expense_Number,
+  //         party: u.Party_Name || "—",
+  //         paymentType: u.Payment_Type_Display || "—",
+  //         amount: u.Amount,
+  //         balance: u.Balance_Due,
+  //       })),
+  //     };
+  //   });
+  // }, [items, itemUsage, selectedItemId]);
+const itemsWithTotals = useMemo(() => {
+  const mapped = items.map((item) => {
+    const isSelected = String(item.id) === String(selectedItemId);
+    const usageForThisItem = isSelected ? itemUsage : [];
+
+    return {
+      id: item.id,
+      name: item.Item_Name,
+      amount: 0,
+      total: usageForThisItem.reduce((sum, u) => sum + Number(u.Amount || 0), 0),
+      balance: usageForThisItem.reduce((sum, u) => sum + Number(u.Balance_Due || 0), 0),
+      transactions: usageForThisItem.map((u) => ({
+        id: u.id,
+        expenseId: u.Expense_Id,
+        date: u.Expense_Date,
+        expNo: u.Expense_Number,
+        party: u.Party_Name || "—",
+        paymentType: u.Payment_Type_Display || "—",
+        amount: u.Amount,
+        balance: u.Balance_Due,
+      })),
+    };
+  });
+
+  // If the selected item isn't in the loaded left-side page yet,
+  // inject a synthetic entry built straight from itemUsage so the
+  // right panel doesn't silently fall back to itemsWithTotals[0].
+  const hasSelected = mapped.some(
+    (it) => String(it.id) === String(selectedItemId)
+  );
+
+  if (selectedItemId && !hasSelected && itemUsage.length >= 0) {
+    mapped.push({
+      id: selectedItemId,
+      name: itemUsage[0]?.Item_Name || "", // adjust field name if usage rows carry the item name
+      amount: 0,
+      total: itemUsage.reduce((sum, u) => sum + Number(u.Amount || 0), 0),
+      balance: itemUsage.reduce((sum, u) => sum + Number(u.Balance_Due || 0), 0),
+      transactions: itemUsage.map((u) => ({
+        id: u.id,
+        expenseId: u.Expense_Id,
+        date: u.Expense_Date,
+        expNo: u.Expense_Number,
+        party: u.Party_Name || "—",
+        paymentType: u.Payment_Type_Display || "—",
+        amount: u.Amount,
+        balance: u.Balance_Due,
+      })),
     });
-  }, [items, itemUsage, selectedItemId]);
+  }
 
-  const selectedItem =
-    itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
+  return mapped;
+}, [items, itemUsage, selectedItemId]);
+
+const selectedItem =
+  itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
+  const filteredTransactions = selectedItem?.transactions || [];
+  
+  //const selectedItem =itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
 
   /* transaction search still client-side filters the currently-loaded
      page(s) of usage rows — server-side date filter is separate (date param) */
@@ -452,20 +509,19 @@ export default function ExpensesByItems() {
   //       (t.expNo || "").toLowerCase().includes(txnSearch.toLowerCase())
   //   );
   // }, [selectedItem, txnSearch]);
-  const filteredTransactions = selectedItem?.transactions || [];
+  //const filteredTransactions = selectedItem?.transactions || [];
   //const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
+// Instead of itemsWithTotals + selectedItem.transactions:
+
+; // straight from the query, no left-list dependency
+
 
   const fmtDate = (d) =>
     d
       ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
       : "—";
 
-  // const handleSelectItem = (item) => {
-  //   setSelectedItemId(item.id);
-  //   handleTxnSearchChange("");
-  //   setMenuOpen(null);
-  //   setRowMenuOpen(null);
-  // };
+
   const handleSelectItem = (item) => {
     const next = new URLSearchParams(searchParams);
     next.set("itemId", item.id);
@@ -480,8 +536,10 @@ export default function ExpensesByItems() {
 
   const virtualLeftListRef = useRef(null);
   const hasScrolledToSelectedRef = useRef(false);
+  
 
   useEffect(() => {
+     
     if (hasScrolledToSelectedRef.current) return;
     if (isItemsLoading || isItemsFetching) return;
     if (!selectedItemId || !items.length) return;
@@ -533,6 +591,7 @@ export default function ExpensesByItems() {
   }, [items.length]);
   const virtualRightListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
+   const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
 
@@ -545,6 +604,10 @@ export default function ExpensesByItems() {
   ]);
 
   useEffect(() => {
+    if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isUsageLoading || isUsageFetching) return;
@@ -1227,15 +1290,32 @@ export default function ExpensesByItems() {
                       >
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          // onClick={(e) => {
+                          //   e.stopPropagation();
 
-                            setRowMenuOpen(
-                              rowMenuOpen === txn.id
-                                ? null
-                                : txn.id
-                            );
-                          }}
+                          //   setRowMenuOpen(
+                          //     rowMenuOpen === txn.id
+                          //       ? null
+                          //       : txn.id
+                          //   );
+                          // }}
+                                             onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  // Highlight this row, but DON'T scroll
+                                  skipHighlightScrollRef.current = true;
+
+                                  const next = new URLSearchParams(searchParams);
+                                   next.set("highlightTxn", String(txn.expenseId));;
+
+                                  setSearchParams(next, { replace: true });
+
+                                  setRowMenuOpen(
+                                    rowMenuOpen === txn.id
+                                      ? null
+                                      : txn.id
+                                  );
+                                }}
                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                           style={{
                             backgroundColor: "transparent",

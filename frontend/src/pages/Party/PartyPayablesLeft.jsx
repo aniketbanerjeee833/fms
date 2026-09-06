@@ -500,8 +500,13 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
+  const skipHighlightScrollRef = useRef(false);
 
   useEffect(() => {
+    if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
     if (hasScrolledToHighlightRef.current) return;
 
     const highlightTxnId =
@@ -603,23 +608,24 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   };
   return (
     // <div ref={rightPanelRef}
-    <div
-      className="flex flex-col"
+    // <div
+    //   className="flex flex-col"
 
-      //    style={{
-      //   height: "100%",
+    //   //    style={{
+    //   //   height: "100%",
 
-      //   minHeight: 0,
-      //   overflow: "hidden",
-      // }}
-      style={{
-        flex: 1,
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
+    //   //   minHeight: 0,
+    //   //   overflow: "hidden",
+    //   // }}
+    //   style={{
+    //     flex: 1,
+    //     minHeight: 0,
+    //     display: "flex",
+    //     flexDirection: "column",
+    //     overflow: "hidden",
+    //   }}
+    // >
+    <>
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -773,7 +779,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
             width: "100%",
             //minWidth: "710px",  
-            //minWidth: "650px",
+            minWidth: "850px",
             boxSizing: "border-box",
             alignItems: "center",
             minHeight: 40,
@@ -823,10 +829,22 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             emptyMessage="No transactions found"
             endMessage="— End of transactions —"
             onLoadMore={handleLoadMore}
-            isRowActive={(row, idx) =>
-              rowMenuOpen ===
-              `${row.Txn_Type}-${row.Formatted_Reference_Id || row.id}-${idx}`
-            }
+            
+            isRowActive={(row, idx) => {
+              const refId =
+                row.Sale_Id ||
+                row.Purchase_Id ||
+                row.Sale_Return_Id ||
+                row.Purchase_Return_Id ||
+                row.Payment_In_Id ||
+                row.Payment_Out_Id;
+
+              const transactionId = row.Formatted_Reference_Id || refId;
+
+              const menuId = `${row.Txn_Type}-${transactionId || idx}`;
+
+              return rowMenuOpen === menuId;
+            }}
             renderRow={(row, idx) => {
               const meta =
                 PARTY_TYPE_META[row.Txn_Type] ?? {
@@ -928,7 +946,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
                     //minWidth: "710px",  
-                    //minWidth: "850px",
+                    minWidth: "850px",
                     minHeight: 52,
                     alignItems: "center",
                     boxSizing: "border-box",
@@ -1023,8 +1041,25 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                         <>
                           <button
                             type="button"
+                            // onClick={(e) => {
+                            //   e.stopPropagation();
+
+                            //   setRowMenuOpen(
+                            //     rowMenuOpen === menuId
+                            //       ? null
+                            //       : menuId
+                            //   );
+                            // }}
                             onClick={(e) => {
                               e.stopPropagation();
+
+                              // Highlight this row, but DON'T scroll
+                              skipHighlightScrollRef.current = true;
+
+                              const next = new URLSearchParams(searchParams);
+                              next.set("highlightTxn", transactionId);
+
+                              setSearchParams(next, { replace: true });
 
                               setRowMenuOpen(
                                 rowMenuOpen === menuId
@@ -1056,8 +1091,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               }
                               className="absolute bg-white shadow-lg rounded-md"
                               style={{
-                                right: 0,
-                                top: 32,
+                                right: 10,
+                                top: 36,
                                 width: 150,
                                 zIndex: 100,
                                 border:
@@ -1338,7 +1373,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
       </div>
 
-    </div>
+    </>
   );
 }
 
@@ -1582,7 +1617,7 @@ export default function PartyPayablesLeft() {
           style={{
             flex: 1,
             minHeight: 0,
-             overflowY: "auto",
+            overflowY: "auto",
             //height: "calc(100vh - 180px)",
             borderTop: "1px solid #e2e8f0",
           }}
@@ -1596,7 +1631,7 @@ export default function PartyPayablesLeft() {
               maxHeight: "calc(100vh - 180px)",
             }}
           > */}
-                  <div
+          <div
             className="w-full lg:w-[30%] flex flex-col"
             style={{
               borderRight: "1px solid #e2e8f0",
@@ -1669,171 +1704,171 @@ export default function PartyPayablesLeft() {
                 <p className="text-sm">No parties yet</p>
               </div>
             ) : ( */}
-              <VirtualScrollList
-                ref={virtualLeftListRef}
-                items={parties}
-                rowHeight={64}
-                height="100%"
-                onLoadMore={handleLeftLoadMore}
-                isFetching={isPartiesFetching}
-                hasMore={partiesHasMore}
-                getItemKey={(party) => party.Party_Id}
-                emptyMessage="No parties yet"
-                endMessage="— End of parties —"
-                isRowActive={(party) => openMenuId === party.Party_Id}
-                renderRow={(party) => {
-                  const isSelected =
-                    String(selectedId) === String(party.Party_Id);
+            <VirtualScrollList
+              ref={virtualLeftListRef}
+              items={parties}
+              rowHeight={64}
+              height="100%"
+              onLoadMore={handleLeftLoadMore}
+              isFetching={isPartiesFetching}
+              hasMore={partiesHasMore}
+              getItemKey={(party) => party.Party_Id}
+              emptyMessage="No parties yet"
+              endMessage="— End of parties —"
+              isRowActive={(party) => openMenuId === party.Party_Id}
+              renderRow={(party) => {
+                const isSelected =
+                  String(selectedId) === String(party.Party_Id);
 
-                  return (
-                    <div
-                      key={party.Party_Id}
-                      onClick={() => handleSelectParty(party.Party_Id)}
-                      onDoubleClick={() => {
-                        if (party.Party_Name === "Cash Sale") return;
+                return (
+                  <div
+                    key={party.Party_Id}
+                    onClick={() => handleSelectParty(party.Party_Id)}
+                    onDoubleClick={() => {
+                      if (party.Party_Name === "Cash Sale") return;
 
-                        handleSelectParty(party.Party_Id);
-                        handleEdit(party);
-                        setOpenMenuId(null);
-                      }}
-                      className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
-                      style={{
-                        backgroundColor: isSelected
-                          ? "#f0f9ff"
-                          : "transparent",
-                        borderLeft: isSelected
-                          ? "3px solid #4CA1AF"
-                          : "3px solid transparent",
-                        borderBottom: "1px solid #f1f5f9",
-                        boxSizing: "border-box",
-                        minHeight: 64,
-                      }}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div
-                          className="flex items-center justify-center rounded-lg flex-shrink-0"
+                      handleSelectParty(party.Party_Id);
+                      handleEdit(party);
+                      setOpenMenuId(null);
+                    }}
+                    className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
+                    style={{
+                      backgroundColor: isSelected
+                        ? "#f0f9ff"
+                        : "transparent",
+                      borderLeft: isSelected
+                        ? "3px solid #4CA1AF"
+                        : "3px solid transparent",
+                      borderBottom: "1px solid #f1f5f9",
+                      boxSizing: "border-box",
+                      minHeight: 64,
+                    }}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div
+                        className="flex items-center justify-center rounded-lg flex-shrink-0"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          backgroundColor: isSelected
+                            ? "#4CA1AF22"
+                            : "#f1f5f9",
+                        }}
+                      >
+                        <Users
+                          size={18}
                           style={{
-                            width: 36,
-                            height: 36,
-                            backgroundColor: isSelected
-                              ? "#4CA1AF22"
-                              : "#f1f5f9",
+                            color: isSelected
+                              ? "#4CA1AF"
+                              : "#94a3b8",
                           }}
-                        >
-                          <Users
-                            size={18}
-                            style={{
-                              color: isSelected
-                                ? "#4CA1AF"
-                                : "#94a3b8",
-                            }}
-                          />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p
-                            className="font-semibold text-gray-800 truncate text-sm"
-                            style={{ margin: 0 }}
-                          >
-                            {party.Party_Name}
-                          </p>
-
-                          <p
-                            className="text-xs truncate font-medium"
-                            style={{
-                              color:
-                                Number(party.Current_Balance) < 0
-                                  ? "#dc2626"
-                                  : "#16a34a",
-                            }}
-                          >
-                            ₹{" "}
-                            {Math.abs(
-                              Number(party.Current_Balance || 0)
-                            ).toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        </div>
+                        />
                       </div>
 
-                      {/* 3-dot menu */}
-                      {party.Party_Name !== "Cash Sale" && (
-                        <div
-                          ref={
-                            openMenuId === party.Party_Id
-                              ? menuRef
-                              : null
-                          }
-                          className="flex items-center ml-2 flex-shrink-0 relative"
+                      <div className="min-w-0">
+                        <p
+                          className="font-semibold text-gray-800 truncate text-sm"
+                          style={{ margin: 0 }}
                         >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                          {party.Party_Name}
+                        </p>
 
-                              handleSelectParty(party.Party_Id);
-
-                              setOpenMenuId(
-                                openMenuId === party.Party_Id
-                                  ? null
-                                  : party.Party_Id
-                              );
-                            }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                            style={{ backgroundColor: "transparent" }}
-                          >
-                            <MoreVertical
-                              size={16}
-                              style={{ color: "#374151" }}
-                            />
-                          </button>
-
-                          {openMenuId === party.Party_Id && (
-                            <div
-                              className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
-                              style={{
-                                border: "1px solid #e2e8f0",
-                                minWidth: 120,
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleEdit(party)}
-                                className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-                                style={{ backgroundColor: "transparent" }}
-                              >
-                                <SquarePen
-                                  size={14}
-                                  style={{ color: "#4CA1AF" }}
-                                />
-                                Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                }}
-                                className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-                                style={{ backgroundColor: "transparent" }}
-                              >
-                                <Trash2
-                                  size={14}
-                                  style={{ color: "#dc2626" }}
-                                />
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                        <p
+                          className="text-xs truncate font-medium"
+                          style={{
+                            color:
+                              Number(party.Current_Balance) < 0
+                                ? "#dc2626"
+                                : "#16a34a",
+                          }}
+                        >
+                          ₹{" "}
+                          {Math.abs(
+                            Number(party.Current_Balance || 0)
+                          ).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                      </div>
                     </div>
-                  );
-                }}
-              />
+
+                    {/* 3-dot menu */}
+                    {party.Party_Name !== "Cash Sale" && (
+                      <div
+                        ref={
+                          openMenuId === party.Party_Id
+                            ? menuRef
+                            : null
+                        }
+                        className="flex items-center ml-2 flex-shrink-0 relative"
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+
+                            handleSelectParty(party.Party_Id);
+
+                            setOpenMenuId(
+                              openMenuId === party.Party_Id
+                                ? null
+                                : party.Party_Id
+                            );
+                          }}
+                          className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                          style={{ backgroundColor: "transparent" }}
+                        >
+                          <MoreVertical
+                            size={16}
+                            style={{ color: "#374151" }}
+                          />
+                        </button>
+
+                        {openMenuId === party.Party_Id && (
+                          <div
+                            className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
+                            style={{
+                              border: "1px solid #e2e8f0",
+                              minWidth: 120,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(party)}
+                              className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+                              style={{ backgroundColor: "transparent" }}
+                            >
+                              <SquarePen
+                                size={14}
+                                style={{ color: "#4CA1AF" }}
+                              />
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                              }}
+                              className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
+                              style={{ backgroundColor: "transparent" }}
+                            >
+                              <Trash2
+                                size={14}
+                                style={{ color: "#dc2626" }}
+                              />
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            />
 
             {/* )} */}
             {/* <div ref={leftSentinelRef} style={{ height: "1px" }} />

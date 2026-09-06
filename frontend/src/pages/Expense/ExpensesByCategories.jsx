@@ -281,7 +281,7 @@ const handleRightLoadMore = useCallback(() => {
     categoriesWithTotals[0];
 
   const filteredTransactions = selectedCategory?.transactions || [];
-  const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
+  //const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
   // 🔹 left side stays CLIENT-SIDE filtered — no server search param for categories
   const filteredCategories = useMemo(() => {
     return categoriesWithTotals.filter((item) =>
@@ -426,6 +426,7 @@ const handleRightLoadMore = useCallback(() => {
   const virtualLeftListRef = useRef(null);
 const hasScrolledToSelectedRef = useRef(false);
 
+
 useEffect(() => {
   if (hasScrolledToSelectedRef.current) return;
   if (!selectedCategoryId || !categories.length) return;
@@ -450,7 +451,7 @@ useEffect(() => {
 }, [selectedCategoryId]);
   const virtualRightListRef = useRef(null);
 const hasScrolledToHighlightRef = useRef(false);
-
+const skipHighlightScrollRef = useRef(false);
 const highlightTxnId = searchParams.get("highlightTxn");
 
 useEffect(() => {
@@ -458,6 +459,10 @@ useEffect(() => {
 }, [selectedCategoryId, highlightTxnId, txnSearch]);
 
 useEffect(() => {
+  if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
   if (hasScrolledToHighlightRef.current) return;
   if (!highlightTxnId) return;
   if (isExpensesLoading || isExpensesFetching) return;
@@ -820,14 +825,7 @@ useEffect(() => {
                             
                         }}
                     >
-            {/* <div className="flex flex-col"
-               style={{
-                height: "100%",
-
-                minHeight: 0,
-                overflow: "hidden",
-              }}
-            > */}
+            
 
               {/* ── CATEGORY SUMMARY CARD ── */}
              
@@ -1180,16 +1178,33 @@ useEffect(() => {
             >
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.currentTarget.blur();
+                // onClick={(e) => {
+                //   e.stopPropagation();
+                //   e.currentTarget.blur();
 
-                  setTransactionMenu(
-                    transactionMenu === txn.id
-                      ? null
-                      : txn.id
-                  );
-                }}
+                //   setTransactionMenu(
+                //     transactionMenu === txn.id
+                //       ? null
+                //       : txn.id
+                //   );
+                // }}
+                               onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  // Highlight this row, but DON'T scroll
+                                  skipHighlightScrollRef.current = true;
+
+                                  const next = new URLSearchParams(searchParams);
+                                   next.set("highlightTxn", String(txn.id));;
+
+                                  setSearchParams(next, { replace: true });
+
+                                  setTransactionMenu(
+                                    transactionMenu  === txn.id
+                                      ? null
+                                      : txn.id
+                                  );
+                                }}
                 className="p-1.5 rounded-md hover:bg-gray-100 focus:outline-none"
                 style={{
                   background: "transparent",

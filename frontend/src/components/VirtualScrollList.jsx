@@ -61,6 +61,7 @@ const VirtualScrollList = forwardRef(function VirtualScrollList({
                 height: "100%",
                 width: "100%",
                 minWidth: "fit-content",  // 👈 add this
+                //minWidth: "max-content", 
                 padding: 4,
                 ...style,
             }}
@@ -75,8 +76,8 @@ const VirtualScrollList = forwardRef(function VirtualScrollList({
                     minHeight: 0,
                     height: height !== undefined ? height : calculatedHeight,
                     overflowY: "auto",
-                    //overflowX: "visible",
-                    overflowX: "hidden",
+                    overflowX: "visible",
+                    //overflowX: "hidden",
                     position: "relative",
                     width: "100%",
                 }}

@@ -501,8 +501,13 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   // }, [isLoading, isFetching, ledger.length, hasMore]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
+   const skipHighlightScrollRef = useRef(false);
 
   useEffect(() => {
+    if (skipHighlightScrollRef.current) {
+      skipHighlightScrollRef.current = false;
+      return;
+    }
     if (hasScrolledToHighlightRef.current) return;
 
     const highlightTxnId =
@@ -604,17 +609,18 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
   return (
     // <div ref={rightPanelRef}
-    <div
-      className="flex flex-col "
+    // <div
+    //   className="flex flex-col "
 
-      style={{
-        flex: 1,
-        minHeight: 0,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-      }}
-    >
+    //   style={{
+    //     flex: 1,
+    //     minHeight: 0,
+    //     display: "flex",
+    //     flexDirection: "column",
+    //     overflow: "hidden",
+    //   }}
+    // >
+    <>
       {/* ── PARTY SUMMARY CARD ── */}
       <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -764,7 +770,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             display: "grid",
             gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
             width: "100%",
-            //minWidth: "850px",
+            minWidth: "850px",
             boxSizing: "border-box",
             alignItems: "center",
             minHeight: 40,
@@ -797,8 +803,10 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           style={{
             flex: 1,
             minHeight: 0,
-            height: 0,
-            overflow: "hidden",
+           
+            overflowX: "visible",   // ← don't clip, don't scroll — let Layer 1 handle it
+            overflowY: "hidden",    // ← don't scroll vertically here either — Layer 3 handles it
+            //overflow: "hidden",
             position: "relative",
           }}
         >
@@ -816,10 +824,22 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             emptyMessage="No transactions found"
             endMessage="— End of transactions —"
             onLoadMore={handleLoadMore}
-            isRowActive={(row, idx) =>
-              rowMenuOpen ===
-              `${row.Txn_Type}-${row.Formatted_Reference_Id || row.id}-${idx}`
-            }
+          
+             isRowActive={(row, idx) => {
+              const refId =
+                row.Sale_Id ||
+                row.Purchase_Id ||
+                row.Sale_Return_Id ||
+                row.Purchase_Return_Id ||
+                row.Payment_In_Id ||
+                row.Payment_Out_Id;
+
+              const transactionId = row.Formatted_Reference_Id || refId;
+
+              const menuId = `${row.Txn_Type}-${transactionId || idx}`;
+
+              return rowMenuOpen === menuId;
+            }}
             renderRow={(row, idx) => {
               const meta =
                 PARTY_TYPE_META[row.Txn_Type] ?? {
@@ -923,7 +943,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     display: "grid",
                     gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
-                    //minWidth: "850px",
+                    minWidth: "850px",
                     minHeight: 52,
                     alignItems: "center",
                     boxSizing: "border-box",
@@ -1018,8 +1038,25 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                         <>
                           <button
                             type="button"
+                            // onClick={(e) => {
+                            //   e.stopPropagation();
+
+                            //   setRowMenuOpen(
+                            //     rowMenuOpen === menuId
+                            //       ? null
+                            //       : menuId
+                            //   );
+                            // }}
                             onClick={(e) => {
                               e.stopPropagation();
+
+                              // Highlight this row, but DON'T scroll
+                              skipHighlightScrollRef.current = true;
+
+                              const next = new URLSearchParams(searchParams);
+                              next.set("highlightTxn", transactionId);
+
+                              setSearchParams(next, { replace: true });
 
                               setRowMenuOpen(
                                 rowMenuOpen === menuId
@@ -1051,8 +1088,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               }
                               className="absolute bg-white shadow-lg rounded-md"
                               style={{
-                                right: 0,
-                                top: 32,
+                                right: 10,
+                                top: 36,
                                 width: 150,
                                 zIndex: 100,
                                 border:
@@ -1330,7 +1367,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
       </div>
 
-    </div>
+    </>
   );
 }
 
@@ -1573,7 +1610,7 @@ export default function PartyReceivablesLeft() {
           style={{
             flex: 1,
             minHeight: 0,
-            height: "calc(100vh - 180px)",
+            //height: "calc(100vh - 180px)",
             borderTop: "1px solid #e2e8f0",
           }}
         >
