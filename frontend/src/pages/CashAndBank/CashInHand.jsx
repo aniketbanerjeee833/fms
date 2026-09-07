@@ -8,7 +8,7 @@ import {
     Printer,
 
     Trash2,
-    Undo2
+
 } from "lucide-react";
 
 import { cashInHandApi, useGetCashBalanceQuery, useGetCashInHandQuery } from "../../redux/api/cashInHandApi";
@@ -72,18 +72,18 @@ export default function CashInHand() {
     const TYPE_META = {
         row: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         purchase: { label: "Purchase", color: "#dc2626", bg: "#fff1f2", dir: "out" },
-         sale: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
+        sale: { label: "Sale", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         payment_in: { label: "Payment In", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         payment_out: { label: "Payment Out", color: "#dc2626", bg: "#fff1f2", dir: "out" },
         purchase_return: { label: "Purchase Return", color: "#16a34a", bg: "#f0fdf4", dir: "in" },
         sale_return: { label: "Sale Return", color: "#dc2626", bg: "#fff1f2", dir: "out" },
         adjustment: { label: "Adjustment", color: "#4CA1AF", bg: "#f0f9ff", dir: "in" },
-         expense: { label: "Expense", color: "#dc2626", bg: "#fff1f2", dir: "out" },
+        expense: { label: "Expense", color: "#dc2626", bg: "#fff1f2", dir: "out" },
     };
     const TXN_TYPE_ROUTE_MAP = {
         Sale: "sale",
         Purchase: "purchase",
-         Expense: "expense",
+        Expense: "expense",
 
         Sale_Return: "sale/return",
         Purchase_Return: "purchase/return",
@@ -372,15 +372,15 @@ export default function CashInHand() {
 
     const virtualListRef = useRef(null);
     const hasScrolledToHighlightRef = useRef(false);
-    const skipHighlightScrollRef = useRef(false);
+    //const skipHighlightScrollRef = useRef(false);
 
     const highlightTxnId = searchParams.get("highlightTxn");
-
+    const [clickHighlightId, setClickHighlightId] = useState(null)
     useEffect(() => {
-        if (skipHighlightScrollRef.current) {
-            skipHighlightScrollRef.current = false;
-            return;
-        }
+        // if (skipHighlightScrollRef.current) {
+        //     skipHighlightScrollRef.current = false;
+        //     return;
+        // }
 
         if (hasScrolledToHighlightRef.current) return;
         if (!highlightTxnId) return;
@@ -726,14 +726,18 @@ export default function CashInHand() {
                                                             ? "in"
                                                             : "out",
                                                 };
-
                                             const isHighlighted =
-                                                String(
-                                                    searchParams.get(
-                                                        "highlightTxn"
-                                                    )
-                                                ) ===
-                                                String(row?.id);
+                                                clickHighlightId !== null
+                                                    ? String(clickHighlightId) === String(row?.id)
+                                                    : String(searchParams.get("highlightTxn")) ===
+                                                    String(row?.id);
+                                            // const isHighlighted =
+                                            //     String(
+                                            //         searchParams.get(
+                                            //             "highlightTxn"
+                                            //         )
+                                            //     ) ===
+                                            //     String(row?.id);
 
                                             const menuId = `${row?.Txn_Type}-${row?.Formatted_Reference_Id}-${row?.id}`;
 
@@ -741,24 +745,26 @@ export default function CashInHand() {
                                                 <div
                                                     key={row?.id}
                                                     onClick={() => {
-                                                        const params =
-                                                            new URLSearchParams(
-                                                                searchParams
-                                                            );
+                                                        setClickHighlightId(row?.id)
+                                                        // const params =
+                                                        //     new URLSearchParams(
+                                                        //         searchParams
+                                                        //     );
 
-                                                        params.set(
-                                                            "highlightTxn",
-                                                            row?.id
-                                                        );
+                                                        // params.set(
+                                                        //     "highlightTxn",
+                                                        //     row?.id
+                                                        // );
 
-                                                        setSearchParams(
-                                                            params,
-                                                            {
-                                                                replace: true,
-                                                            }
-                                                        );
+                                                        // setSearchParams(
+                                                        //     params,
+                                                        //     {
+                                                        //         replace: true,
+                                                        //     }
+                                                        // );
                                                     }}
                                                     onDoubleClick={() => {
+                                                        setClickHighlightId(null);
                                                         const params =
                                                             new URLSearchParams(
                                                                 searchParams
@@ -884,14 +890,14 @@ export default function CashInHand() {
 
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-
+                                                                setClickHighlightId(row?.id);
                                                                 // Highlight this row, but DON'T scroll
-                                                                skipHighlightScrollRef.current = true;
+                                                                //skipHighlightScrollRef.current = true;
 
-                                                                const next = new URLSearchParams(searchParams);
-                                                                next.set("highlightTxn", row?.id);
+                                                                // const next = new URLSearchParams(searchParams);
+                                                                // next.set("highlightTxn", row?.id);
 
-                                                                setSearchParams(next, { replace: true });
+                                                                // setSearchParams(next, { replace: true });
 
                                                                 setRowMenuOpen(
                                                                     rowMenuOpen === menuId
@@ -953,9 +959,8 @@ export default function CashInHand() {
                                                                                     cursor: "pointer",
                                                                                 }}
                                                                                 onClick={() => {
-                                                                                    setRowMenuOpen(
-                                                                                        null
-                                                                                    );
+                                                                                     setClickHighlightId(null);
+                                                                                    setRowMenuOpen(null);
 
                                                                                     const params =
                                                                                         new URLSearchParams(
@@ -1021,11 +1026,11 @@ export default function CashInHand() {
                                                                                     textDecoration:
                                                                                         "none",
                                                                                 }}
-                                                                                onClick={() =>
-                                                                                    setRowMenuOpen(
-                                                                                        null
-                                                                                    )
-                                                                                }
+                                                                                onClick={() =>{
+                                                                                     setClickHighlightId(null)
+                                                                                    setRowMenuOpen(null)
+                                                                                }}
+                                                                                   
                                                                             >
                                                                                 <Eye
                                                                                     size={

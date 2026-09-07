@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 import { partyApi, useGetAllPartiesQuery, useGetAllReceivablePartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
@@ -753,7 +753,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
       {/* ── LEDGER TABLE ── */}
 
-      <div
+      {/* <div
         style={{
           flex: 1,
           minHeight: 0,
@@ -763,14 +763,15 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           overflowX: "auto",
           overflowY: "hidden",
         }}
-      >
+      > */}
+      <>
         {/* HEADER */}
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
             width: "100%",
-            minWidth: "850px",
+            //minWidth: "850px",
             boxSizing: "border-box",
             alignItems: "center",
             minHeight: 40,
@@ -943,7 +944,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     display: "grid",
                     gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
-                    minWidth: "850px",
+                    //minWidth: "850px",
                     minHeight: 52,
                     alignItems: "center",
                     boxSizing: "border-box",
@@ -1245,7 +1246,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         </div>
-      </div>
+      {/* </div> */}
+      </>
 
       {/* ── MODALS ── */}
       {modalState.open && modalState.type === "Payment_In" && (

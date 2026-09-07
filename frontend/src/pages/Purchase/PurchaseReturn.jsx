@@ -198,23 +198,24 @@ export default function PurchaseReturn() {
 
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-const skipHighlightScrollRef = useRef(false);
+  const [clickHighlightId, setClickHighlightId] = useState(null);
+  //const skipHighlightScrollRef = useRef(false);
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
 
-     if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+    //  if (skipHighlightScrollRef.current) {
+    //   skipHighlightScrollRef.current = false;
+    //   return;
+    // }
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
 
     const targetIndex = purchaseReturnList.findIndex(
-  (purchaseReturn) =>
-    String(purchaseReturn?.id) === String(highlightTxnId)
-);
+      (purchaseReturn) =>
+        String(purchaseReturn?.id) === String(highlightTxnId)
+    );
     console.log("Target index for highlight:", targetIndex);
     if (targetIndex === -1) {
       if (hasMore && nextCursor && !isFetching) {
@@ -719,19 +720,19 @@ const skipHighlightScrollRef = useRef(false);
               No purchase returns found.
             </p>
           ) : (
-             <div
-    style={{
-        flex: 1,
-        minHeight: 0,
-        overflowX: "auto",
-        overflowY: "hidden",   // fine to keep — this hides the OUTER wrapper's own vertical scrollbar
-        display: "flex",
-        flexDirection: "column",
-    }}
->
-             <div style={{ minWidth: 962, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              {/* ---------- HEADER ---------- */}
-              {/* <table className="w-full min-w-[800px] table-responsive table-desi">
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowX: "auto",
+                overflowY: "hidden",   // fine to keep — this hides the OUTER wrapper's own vertical scrollbar
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div style={{ minWidth: 962, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                {/* ---------- HEADER ---------- */}
+                {/* <table className="w-full min-w-[800px] table-responsive table-desi">
               
                 <thead>
                     <tr>
@@ -746,357 +747,359 @@ const skipHighlightScrollRef = useRef(false);
                     </tr>
                   </thead>
               </table> */}
-              <div
-    style={{
-        display: "grid",
-        gridTemplateColumns:
-            "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
-        width: "100%",
-        //minWidth: "1062px",
-        boxSizing: "border-box",
-        alignItems: "center",
-        minHeight: 40,
-        padding: "0 8px",
-        flexShrink: 0,
-        borderBottom: "2px solid #e2e8f0",
-        fontWeight: 600,
-        fontSize: 13,
-        color: "#333",
-        textTransform: "uppercase",
-    }}
->
-    <div>Sl.No</div>
-    <div>Bill Date</div>
-    <div>Party Name</div>
-    <div>Payment Type</div>
-    <div>Amount</div>
-    <div>Received</div>
-    <div>Balance Due</div>
-    <div
-        style={{
-            position: "sticky",
-            right: 0,
-            //backgroundColor: "#fff",
-        }}
-    />
-</div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
+                    width: "100%",
+                    //minWidth: "1062px",
+                    boxSizing: "border-box",
+                    alignItems: "center",
+                    minHeight: 40,
+                    padding: "0 8px",
+                    flexShrink: 0,
+                    borderBottom: "2px solid #e2e8f0",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: "#333",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  <div>Sl.No</div>
+                  <div>Bill Date</div>
+                  <div>Party Name</div>
+                  <div>Payment Type</div>
+                  <div>Amount</div>
+                  <div>Received</div>
+                  <div>Balance Due</div>
+                  <div
+                    style={{
+                      position: "sticky",
+                      right: 0,
+                      //backgroundColor: "#fff",
+                    }}
+                  />
+                </div>
 
-              {/* ---------- VIRTUAL LIST ---------- */}
-              <div
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  height: 0,
-                  overflow: "hidden",
-                  position: "relative",
-                }}
-              >
-                <VirtualScrollList
-                  ref={virtualListRef}
-                  items={purchaseReturnList}
-                  rowHeight={52}
-                  height="100%"
-                  dynamicHeight={true}
-                  isFetching={isFetching}
-                  hasMore={hasMore}
-                  getItemKey={(purchaseReturn) => purchaseReturn?.id}
-                  emptyMessage="No purchase returns found"
-                  endMessage="— End of purchase returns —"
-                  onLoadMore={handleLoadMore}
-                  isRowActive={(purchaseReturn) =>
-                    rowMenuOpen === purchaseReturn?.id
-                  }
-                  // isRowActive={(purchaseReturn) =>
-                  //   String(
-                  //     searchParams.get("highlightTxn")
-                  //   ) === String(purchaseReturn?.id)
-                  // }
-                  renderRow={(purchaseReturn, idx) => {
-                    const isHighlighted =
-                      String(
-                        searchParams.get("highlightTxn")
-                      ) === String(purchaseReturn?.id);
+                {/* ---------- VIRTUAL LIST ---------- */}
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    height: 0,
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                >
+                  <VirtualScrollList
+                    ref={virtualListRef}
+                    items={purchaseReturnList}
+                    rowHeight={52}
+                    height="100%"
+                    dynamicHeight={true}
+                    isFetching={isFetching}
+                    hasMore={hasMore}
+                    getItemKey={(purchaseReturn) => purchaseReturn?.id}
+                    emptyMessage="No purchase returns found"
+                    endMessage="— End of purchase returns —"
+                    onLoadMore={handleLoadMore}
+                    isRowActive={(purchaseReturn) =>
+                      rowMenuOpen === purchaseReturn?.id
+                    }
 
-                    return (
-                      <div
-                      key={purchaseReturn?.id}
-                        onClick={() => {
-                          const params =
-                            new URLSearchParams(searchParams);
+                    renderRow={(purchaseReturn, idx) => {
+                      // const isHighlighted =
+                      //   String(
+                      //     searchParams.get("highlightTxn")
+                      //   ) === String(purchaseReturn?.id);
+                      const isHighlighted =
+                        clickHighlightId !== null
+                          ? String(clickHighlightId) === String(purchaseReturn?.id)
+                          : String(searchParams.get("highlightTxn")) ===
+                          String(purchaseReturn?.id);
+                      return (
+                        <div
+                          key={purchaseReturn?.id}
+                          onClick={() => {
+                            setClickHighlightId(purchaseReturn?.id)
+                            // const params =
+                            //   new URLSearchParams(searchParams);
 
-                          params.set(
-                            "highlightTxn",
-                            purchaseReturn?.id
-                          );
+                            // params.set(
+                            //   "highlightTxn",
+                            //   purchaseReturn?.id
+                            // );
 
-                          setSearchParams(params, {
-                            replace: true,
-                          });
-                        }}
-                        onDoubleClick={() => {
-                          const params =
-                            new URLSearchParams(searchParams);
+                            // setSearchParams(params, {
+                            //   replace: true,
+                            // });
+                          }}
+                          onDoubleClick={() => {
+                            setClickHighlightId(null);
+                            const params = new URLSearchParams(searchParams);
 
-                          params.set(
-                            "highlightTxn",
-                            purchaseReturn?.id
-                          );
+                            params.set(
+                              "highlightTxn",
+                              purchaseReturn?.id
+                            );
 
-                          navigate(
-                            `/purchase/return/edit/${purchaseReturn?.id}?${params.toString()}`,
-                            {
-                              state: {
-                                from: "all-purchase-return-list",
-                              },
-                            }
-                          );
-                        }}
-                        style={{
-                          display: "grid",
-                            gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
-                          //gridTemplateColumns:"70px 120px minmax(180px, 1fr) 160px 120px 120px 120px 50px",
-                          alignItems: "center",
-                          minHeight: 52,
-                          padding: "0 8px",
-                          cursor: "pointer",
-                          borderBottom:
-                            "1px solid #f1f5f9",
-                          backgroundColor:
-                            isHighlighted
-                              ? "#4CA1AF22"
-                              : "transparent",
-                        }}
-                      >
-                        {/* SL.NO */}
-                        <div>
-                          {idx + 1}.
-                        </div>
-
-                        {/* BILL DATE */}
-                        <div>
-                          {purchaseReturn?.Bill_Date
-                            ? new Date(
-                              purchaseReturn.Bill_Date
-                            ).toLocaleDateString(
-                              "en-IN",
+                            navigate(
+                              `/purchase/return/edit/${purchaseReturn?.id}?${params.toString()}`,
                               {
-                                day: "numeric",
-                                month: "numeric",
-                                year: "numeric",
+                                state: {
+                                  from: "all-purchase-return-list",
+                                },
                               }
-                            )
-                            : "N/A"}
-                        </div>
-
-                        {/* PARTY */}
-                        <div className="table-desi-cell"
+                            );
+                          }}
                           style={{
-                            overflowWrap: "break-word",
-                            wordBreak: "break-word",
-                          }}>
-                          {purchaseReturn?.Party_Name ||
-                            "N/A"}
-                        </div>
-
-                        {/* PAYMENT TYPE */}
-                        <div className="table-desi-cell">
-                          {purchaseReturn
-                            ?.Payment_Type_Display ||
-                            "N/A"}
-                        </div>
-
-                        {/* AMOUNT */}
-                        <div className="table-desi-cell">
-                          ₹
-                          {purchaseReturn?.Total_Amount ??
-                            "N/A"}
-                        </div>
-
-                        {/* RECEIVED */}
-                        <div className="table-desi-cell">
-                          ₹
-                          {purchaseReturn?.Total_Received ??
-                            "N/A"}
-                        </div>
-
-                        {/* BALANCE */}
-                        <div className="table-desi-cell">
-                          ₹
-                          {purchaseReturn?.Balance_Due ??
-                            "N/A"}
-                        </div>
-
-                        {/* MENU */}
-                        <div className="py-2 px-2 table-desi-cell"
-                          style={{
-                             position: "sticky",   // 👈 was "relative", now sticky
-                                right: 0,              // 👈 pins to the right edge of the SCROLL viewport
-                                width: 50,
-                                //position: "relative",
-                                //width: 50,
-                                textAlign: "center",
+                            display: "grid",
+                            gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
+                            //gridTemplateColumns:"70px 120px minmax(180px, 1fr) 160px 120px 120px 120px 50px",
+                            alignItems: "center",
+                            minHeight: 52,
+                            padding: "0 8px",
+                            cursor: "pointer",
+                            borderBottom:
+                              "1px solid #f1f5f9",
+                            backgroundColor:
+                              isHighlighted
+                                ? "#4CA1AF22"
+                                : "transparent",
                           }}
                         >
-                          <button
-                            type="button"
-                  
-                             onClick={(e) => {
-                                  e.stopPropagation();
+                          {/* SL.NO */}
+                          <div>
+                            {idx + 1}.
+                          </div>
 
-                                  // Highlight this row, but DON'T scroll
-                                  skipHighlightScrollRef.current = true;
-
-                                  const next = new URLSearchParams(searchParams);
-                                  next.set("highlightTxn", purchaseReturn.id);
-
-                                  setSearchParams(next, { replace: true });
-
-                                  setRowMenuOpen(
-                                    rowMenuOpen === purchaseReturn.id
-                                      ? null
-                                      : purchaseReturn.id
-                                  );
-                                }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                            style={{
-                              backgroundColor: "transparent",
-                              border: "none",
-                              cursor: "pointer",
-                            }}
-                            title="More"
-                          >
-                            <MoreVertical
-                              size={16}
-                              style={{
-                                color: "#374151",
-                              }}
-                            />
-                          </button>
-
-                          {/* ROW MENU */}
-                          {rowMenuOpen ===
-                            purchaseReturn.id && (
-                              <div
-                                onClick={(e) =>
-                                  e.stopPropagation()
+                          {/* BILL DATE */}
+                          <div>
+                            {purchaseReturn?.Bill_Date
+                              ? new Date(
+                                purchaseReturn.Bill_Date
+                              ).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "numeric",
+                                  month: "numeric",
+                                  year: "numeric",
                                 }
-                                className="absolute bg-white shadow-lg rounded-md"
+                              )
+                              : "N/A"}
+                          </div>
+
+                          {/* PARTY */}
+                          <div className="table-desi-cell"
+                            style={{
+                              overflowWrap: "break-word",
+                              wordBreak: "break-word",
+                            }}>
+                            {purchaseReturn?.Party_Name ||
+                              "N/A"}
+                          </div>
+
+                          {/* PAYMENT TYPE */}
+                          <div className="table-desi-cell">
+                            {purchaseReturn
+                              ?.Payment_Type_Display ||
+                              "N/A"}
+                          </div>
+
+                          {/* AMOUNT */}
+                          <div className="table-desi-cell">
+                            ₹
+                            {purchaseReturn?.Total_Amount ??
+                              "N/A"}
+                          </div>
+
+                          {/* RECEIVED */}
+                          <div className="table-desi-cell">
+                            ₹
+                            {purchaseReturn?.Total_Received ??
+                              "N/A"}
+                          </div>
+
+                          {/* BALANCE */}
+                          <div className="table-desi-cell">
+                            ₹
+                            {purchaseReturn?.Balance_Due ??
+                              "N/A"}
+                          </div>
+
+                          {/* MENU */}
+                          <div className="py-2 px-2 table-desi-cell"
+                            style={{
+                              position: "sticky",   // 👈 was "relative", now sticky
+                              right: 0,              // 👈 pins to the right edge of the SCROLL viewport
+                              width: 50,
+                              //position: "relative",
+                              //width: 50,
+                              textAlign: "center",
+                            }}
+                          >
+                            <button
+                              type="button"
+
+                              onClick={(e) => {
+                                e.stopPropagation();
+
+                                // Highlight this row, but DON'T scroll
+                                //skipHighlightScrollRef.current = true;
+                                setClickHighlightId(purchaseReturn.id)
+                                // const next = new URLSearchParams(searchParams);
+                                // next.set("highlightTxn", purchaseReturn.id);
+
+                                // setSearchParams(next, { replace: true });
+
+                                setRowMenuOpen(
+                                  rowMenuOpen === purchaseReturn.id
+                                    ? null
+                                    : purchaseReturn.id
+                                );
+                              }}
+                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                              title="More"
+                            >
+                              <MoreVertical
+                                size={16}
                                 style={{
-                                  right: 0,
-                                  top: "100%",
-                                  //top: 32,
-                                  width: 150,
-                                  zIndex: 100,
-                                  border: "1px solid #e2e8f0",
-                                  overflow: "hidden",
+                                  color: "#374151",
                                 }}
-                              >
-                                {/* VIEW / EDIT */}
-                                <NavLink
-                                  to={{
-                                    pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
-                                    search: (() => {
-                                      const params =
-                                        new URLSearchParams(
-                                          searchParams
+                              />
+                            </button>
+
+                            {/* ROW MENU */}
+                            {rowMenuOpen ===
+                              purchaseReturn.id && (
+                                <div
+                                  onClick={(e) =>
+                                    e.stopPropagation()
+                                  }
+                                  className="absolute bg-white shadow-lg rounded-md"
+                                  style={{
+                                    right: 0,
+                                    top: "100%",
+                                    //top: 32,
+                                    width: 150,
+                                    zIndex: 100,
+                                    border: "1px solid #e2e8f0",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {/* VIEW / EDIT */}
+                                  <NavLink
+                                    to={{
+                                      pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
+                                      search: (() => {
+                                        const params =
+                                          new URLSearchParams(
+                                            searchParams
+                                          );
+
+                                        params.set(
+                                          "highlightTxn",
+                                          purchaseReturn?.id
                                         );
 
-                                      params.set(
-                                        "highlightTxn",
-                                        purchaseReturn?.id
+                                        return params.toString();
+                                      })(),
+                                    }}
+                                    state={{
+                                      from: "all-purchase-return-list",
+                                    }}
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    style={{
+                                      color: "#374151",
+                                      textDecoration:
+                                        "none",
+                                    }}
+                                    onClick={() => {
+                                      setClickHighlightId(null);
+                                      setRowMenuOpen(null)
+                                    }}
+                                  >
+                                    <Eye
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+                                    View / Edit
+                                  </NavLink>
+
+                                  {/* PRINT */}
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                    style={{
+                                      color: "#374151",
+                                      backgroundColor: "transparent",
+                                      border: "none",
+                                      cursor: "pointer",
+                                    }}
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setPrintPurchaseReturnId(
+                                        purchaseReturn.id
                                       );
-
-                                      return params.toString();
-                                    })(),
-                                  }}
-                                  state={{
-                                    from: "all-purchase-return-list",
-                                  }}
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    textDecoration:
-                                      "none",
-                                  }}
-                                  onClick={() =>
-                                    setRowMenuOpen(null)
-                                  }
-                                >
-                                  <Eye
-                                    size={13}
-                                    style={{
-                                      color: "#4CA1AF",
                                     }}
-                                  />
-                                  View / Edit
-                                </NavLink>
+                                  >
+                                    <Printer
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+                                    Print
+                                  </button>
 
-                                {/* PRINT */}
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                  style={{
-                                    color: "#374151",
-                                    backgroundColor: "transparent",
-                                    border: "none",
-                                    cursor: "pointer",
-                                  }}
-                                  onClick={() => {
-                                    setRowMenuOpen(null);
-
-                                    setPrintPurchaseReturnId(
-                                      purchaseReturn.id
-                                    );
-                                  }}
-                                >
-                                  <Printer
-                                    size={13}
+                                  {/* DELETE */}
+                                  <button
+                                    type="button"
+                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                    title="Delete purchase return"
                                     style={{
-                                      color: "#4CA1AF",
-                                    }}
-                                  />
-                                  Print
-                                </button>
-
-                                {/* DELETE */}
-                                <button
-                                  type="button"
-                                  className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                  title="Delete purchase return"
-                                  style={{
-                                    cursor: "pointer",
-                                    color: "#dc2626",
-                                    backgroundColor:
-                                      "transparent",
-                                    border: "none",
-                                  }}
-                                  onClick={() => {
-                                    setRowMenuOpen(null);
-
-                                    setDeleteTarget({
-                                      Purchase_Return_Id:
-                                        purchaseReturn.id,
-                                    });
-                                  }}
-                                >
-                                  <Trash2
-                                    size={13}
-                                    style={{
+                                      cursor: "pointer",
                                       color: "#dc2626",
+                                      backgroundColor:
+                                        "transparent",
+                                      border: "none",
                                     }}
-                                  />
-                                  Delete
-                                </button>
-                              </div>
-                            )}
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setDeleteTarget({
+                                        Purchase_Return_Id:
+                                          purchaseReturn.id,
+                                      });
+                                    }}
+                                  >
+                                    <Trash2
+                                      size={13}
+                                      style={{
+                                        color: "#dc2626",
+                                      }}
+                                    />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  }}
-                />
+                      );
+                    }}
+                  />
+                </div>
               </div>
             </div>
-             </div>
           )}
         </div>
         <div className="flex justify-center align-center p-4">

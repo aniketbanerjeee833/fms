@@ -25,6 +25,7 @@ import VirtualScrollList from "../../components/VirtualScrollList";
 
 
 
+
 export default function SaleReturn() {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -194,15 +195,16 @@ export default function SaleReturn() {
   }, [bulkSaleReturnReportData, showSaleReturnBulkPrintPreview]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-  const skipHighlightScrollRef = useRef(false);
+   const [clickHighlightId, setClickHighlightId] = useState(null);
+  //const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
-      if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+    //   if (skipHighlightScrollRef.current) {
+    //   skipHighlightScrollRef.current = false;
+    //   return;
+    // }
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isLoading || isFetching) return;
@@ -534,30 +536,32 @@ export default function SaleReturn() {
                       rowMenuOpen === saleReturn?.id
                     }
                     renderRow={(saleReturn, idx) => {
-                      const isHighlighted =
-                        String(
-                          searchParams.get("highlightTxn")
-                        ) === String(saleReturn?.id);
+                     const isHighlighted =
+                        clickHighlightId !== null
+                          ? String(clickHighlightId) === String(saleReturn?.id)
+                          : String(searchParams.get("highlightTxn")) ===
+                          String(saleReturn?.id);
 
                       return (
                         <div
                           key={saleReturn?.id}
                           onClick={() => {
-                            const params =
-                              new URLSearchParams(searchParams);
+                            setClickHighlightId(saleReturn?.id);
+                            // const params =
+                            //   new URLSearchParams(searchParams);
 
-                            params.set(
-                              "highlightTxn",
-                              saleReturn?.id
-                            );
+                            // params.set(
+                            //   "highlightTxn",
+                            //   saleReturn?.id
+                            // );
 
-                            setSearchParams(params, {
-                              replace: true,
-                            });
+                            // setSearchParams(params, {
+                            //   replace: true,
+                            // });
                           }}
                           onDoubleClick={() => {
-                            const params =
-                              new URLSearchParams(searchParams);
+                            setClickHighlightId(null);
+                            const params =new URLSearchParams(searchParams);
 
                             params.set(
                               "highlightTxn",
@@ -687,12 +691,12 @@ export default function SaleReturn() {
                                   e.stopPropagation();
 
                                   // Highlight this row, but DON'T scroll
-                                  skipHighlightScrollRef.current = true;
+                                  //skipHighlightScrollRef.current = true;
+                                  setClickHighlightId(saleReturn.id);
+                                  // const next = new URLSearchParams(searchParams);
+                                  // next.set("highlightTxn", saleReturn.id);
 
-                                  const next = new URLSearchParams(searchParams);
-                                  next.set("highlightTxn", saleReturn.id);
-
-                                  setSearchParams(next, { replace: true });
+                                  // setSearchParams(next, { replace: true });
 
                                   setRowMenuOpen(
                                     rowMenuOpen === saleReturn.id
@@ -764,9 +768,10 @@ export default function SaleReturn() {
                                       color: "#374151",
                                       textDecoration: "none",
                                     }}
-                                    onClick={() =>
+                                    onClick={() => {
+                                      setClickHighlightId(null);
                                       setRowMenuOpen(null)
-                                    }
+                                    }}
                                   >
                                     <Eye
                                       size={13}

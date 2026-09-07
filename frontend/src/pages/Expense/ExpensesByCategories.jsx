@@ -448,10 +448,12 @@ useEffect(() => {
 
 useEffect(() => {
   hasScrolledToSelectedRef.current = false;
-}, [selectedCategoryId]);
+}, [categories]);
+
   const virtualRightListRef = useRef(null);
 const hasScrolledToHighlightRef = useRef(false);
-const skipHighlightScrollRef = useRef(false);
+const [clickHighlightId, setClickHighlightId] = useState(null);
+//const skipHighlightScrollRef = useRef(false);
 const highlightTxnId = searchParams.get("highlightTxn");
 
 useEffect(() => {
@@ -459,10 +461,10 @@ useEffect(() => {
 }, [selectedCategoryId, highlightTxnId, txnSearch]);
 
 useEffect(() => {
-  if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+  // if (skipHighlightScrollRef.current) {
+  //     skipHighlightScrollRef.current = false;
+  //     return;
+  //   }
   if (hasScrolledToHighlightRef.current) return;
   if (!highlightTxnId) return;
   if (isExpensesLoading || isExpensesFetching) return;
@@ -1018,10 +1020,9 @@ useEffect(() => {
     <div>Amount</div>
     <div>Balance</div>
     <div style={{
-                                position: "sticky",
-                                right: 0,
-
-                            }} />
+     position: "sticky",
+     right: 0,
+      }} />
   </div>
 
   {/* RIGHT VIRTUAL LIST */}
@@ -1052,25 +1053,30 @@ useEffect(() => {
     transactionMenu === txn.id
   }
   renderRow={(txn, idx) => {
-    const isHighlighted =
-      String(highlightTxnId) ===
-      String(txn.id);
+    // const isHighlighted =
+    //   String(highlightTxnId) ===
+    //   String(txn.id);
+    const isHighlighted =clickHighlightId !== null
+                                            ? String(clickHighlightId) === String(txn.id)
+                                            : String(highlightTxnId) === String(txn.id)
      return ( 
       <div
         key={txn.id}
         onClick={() => {
-          const params = new URLSearchParams(searchParams);
+          setClickHighlightId(txn.id);
+          // const params = new URLSearchParams(searchParams);
 
-          params.set(
-            "highlightTxn",
-            String(txn.id)
-          );
+          // params.set(
+          //   "highlightTxn",
+          //   String(txn.id)
+          // );
 
-          setSearchParams(params, {
-            replace: true,
-          });
+          // setSearchParams(params, {
+          //   replace: true,
+          // });
         }}
         onDoubleClick={() => {
+          setClickHighlightId(null);
           const params = new URLSearchParams(searchParams);
 
           params.set(
@@ -1190,14 +1196,14 @@ useEffect(() => {
                 // }}
                                onClick={(e) => {
                                   e.stopPropagation();
-
+                                  setClickHighlightId(txn.id);
                                   // Highlight this row, but DON'T scroll
-                                  skipHighlightScrollRef.current = true;
+                                  //skipHighlightScrollRef.current = true;
 
-                                  const next = new URLSearchParams(searchParams);
-                                   next.set("highlightTxn", String(txn.id));;
+                                  // const next = new URLSearchParams(searchParams);
+                                  //  next.set("highlightTxn", String(txn.id));;
 
-                                  setSearchParams(next, { replace: true });
+                                  // setSearchParams(next, { replace: true });
 
                                   setTransactionMenu(
                                     transactionMenu  === txn.id
@@ -1252,6 +1258,7 @@ useEffect(() => {
                             : "#374151",
                         }}
                         onClick={() => {
+                          setClickHighlightId(null);
                           setTransactionMenu(null);
 
                           if (key === "view") {

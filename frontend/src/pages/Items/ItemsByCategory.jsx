@@ -51,13 +51,18 @@ export default function ItemsByCategory() {
   const [leftCursor, setLeftCursor] = useState(null);
   //const leftSentinelRef = useRef(null);
   //const leftObserverRef = useRef(null);
-
+    const initialLeftLimit = useRef(Number(sessionStorage.getItem("itemsByCategory:leftCount")) || 10);
   const {
     data: categoryResponse,
     isLoading: isCategoriesLoading,
     isFetching: isCategoriesFetching,
      refetch: refetchCategories,
-  } = useGetAllCategoriesCursorQuery({ cursor: leftCursor, search: categorySearch, limit: 10 });
+  } = useGetAllCategoriesCursorQuery({ 
+    cursor: leftCursor, 
+    search: categorySearch, 
+    //limit: 10 
+    limit: leftCursor ? 10 : initialLeftLimit.current
+  });
 
   const categories = categoryResponse?.categories || [];
   const categoriesHasMore = categoryResponse?.hasMore ?? false;
@@ -221,7 +226,7 @@ const handleRightLoadMore = useCallback(() => {
 
 useEffect(() => {
     hasScrolledToSelectedCategoryRef.current = false;
-}, [selectedCategoryId, categorySearch]);
+}, [categorySearch]);
 
 useEffect(() => {
     if (hasScrolledToSelectedCategoryRef.current) return;
@@ -239,16 +244,18 @@ useEffect(() => {
         return;
     }
 
-    const timer = setTimeout(() => {
-        virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-            align: "center",
-            behavior: "auto",
-        });
+    // const timer = setTimeout(() => {
+    //     virtualLeftListRef.current?.scrollToIndex(targetIndex, {
+    //         align: "center",
+    //         behavior: "auto",
+    //     });
 
+    //     hasScrolledToSelectedCategoryRef.current = true;
+    // }, 100);
+
+    // return () => clearTimeout(timer);
+     virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
         hasScrolledToSelectedCategoryRef.current = true;
-    }, 100);
-
-    return () => clearTimeout(timer);
 }, [
     categories,
     isCategoriesLoading,
@@ -258,6 +265,11 @@ useEffect(() => {
     categoriesNextCursor,
     handleLeftLoadMore,
 ]);
+
+    useEffect(() => {
+        sessionStorage.setItem("itemsByCategory:leftCount", categories.length);
+    }, [categories.length]);
+
 const virtualRightListRef = useRef(null);
 const hasScrolledToSelectedItemRef = useRef(false);
 

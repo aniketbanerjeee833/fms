@@ -187,14 +187,15 @@ export default function AllSaleList() {
   }, [bulkSaleReportData, showSaleBulkPrintPreview]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
- const skipHighlightScrollRef = useRef(false);
+  const [clickHighlightId, setClickHighlightId] = useState(null);
+ //const skipHighlightScrollRef = useRef(false);
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
-     if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+    //  if (skipHighlightScrollRef.current) {
+    //   skipHighlightScrollRef.current = false;
+    //   return;
+    // }
 
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
@@ -577,31 +578,36 @@ export default function AllSaleList() {
                         rowMenuOpen === sale?.Sale_Id
                       }
                       renderRow={(sale, idx) => {
-                        const isHighlighted =
-                          String(searchParams.get("highlightTxn")) ===
-                          String(sale?.Sale_Id);
+                        // const isHighlighted =
+                        //   String(searchParams.get("highlightTxn")) ===
+                        //   String(sale?.Sale_Id);
+                          const isHighlighted =
+                          clickHighlightId !== null
+                            ? String(clickHighlightId) === String(sale?.Sale_Id)
+                            : String(searchParams.get("highlightTxn")) ===
+                            String(sale?.Sale_Id);
 
                         return (
                           <div
                             key={sale?.Sale_Id}
                             onClick={() => {
-                              const params = new URLSearchParams(
-                                searchParams
-                              );
+                              setClickHighlightId(sale?.Sale_Id)
+                              // const params = new URLSearchParams(
+                              //   searchParams
+                              // );
 
-                              params.set(
-                                "highlightTxn",
-                                sale?.Sale_Id
-                              );
+                              // params.set(
+                              //   "highlightTxn",
+                              //   sale?.Sale_Id
+                              // );
 
-                              setSearchParams(params, {
-                                replace: true,
-                              });
+                              // setSearchParams(params, {
+                              //   replace: true,
+                              // });
                             }}
                             onDoubleClick={() => {
-                              const params = new URLSearchParams(
-                                searchParams
-                              );
+                                setClickHighlightId(null);
+                              const params = new URLSearchParams(searchParams);
 
                               params.set(
                                 "highlightTxn",
@@ -716,14 +722,14 @@ export default function AllSaleList() {
 
                                  onClick={(e) => {
                                   e.stopPropagation();
-
+                                  setClickHighlightId(sale?.Sale_Id)
                                   // Highlight this row, but DON'T scroll
-                                  skipHighlightScrollRef.current = true;
+                                  //skipHighlightScrollRef.current = true;
 
-                                  const next = new URLSearchParams(searchParams);
-                                  next.set("highlightTxn", sale?.Sale_Id);
+                                  // const next = new URLSearchParams(searchParams);
+                                  // next.set("highlightTxn", sale?.Sale_Id);
 
-                                  setSearchParams(next, { replace: true });
+                                  // setSearchParams(next, { replace: true });
 
                                   setRowMenuOpen(
                                     rowMenuOpen === sale?.Sale_Id
@@ -790,9 +796,10 @@ export default function AllSaleList() {
                                       color: "#374151",
                                       textDecoration: "none",
                                     }}
-                                    onClick={() =>
-                                      setRowMenuOpen(null)
-                                    }
+                                    onClick={() =>{
+                                      setClickHighlightId(null);
+                                       setRowMenuOpen(null)
+                                      }}
                                   >
                                     <Eye
                                       size={13}

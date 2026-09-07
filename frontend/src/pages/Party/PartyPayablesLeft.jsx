@@ -761,7 +761,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       {/* const GRID_COLUMNS =
   ; */}
 
-      <div
+      {/* <div
         style={{
           flex: 1,
           minHeight: 0,
@@ -771,7 +771,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           overflowX: "auto",
           overflowY: "hidden",
         }}
-      >
+      > */}
+      <>
         {/* HEADER */}
         <div
           style={{
@@ -779,7 +780,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
             width: "100%",
             //minWidth: "710px",  
-            minWidth: "850px",
+            //minWidth: "850px",
             boxSizing: "border-box",
             alignItems: "center",
             minHeight: 40,
@@ -946,7 +947,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
                     //minWidth: "710px",  
-                    minWidth: "850px",
+                    //minWidth: "850px",
                     minHeight: 52,
                     alignItems: "center",
                     boxSizing: "border-box",
@@ -1250,7 +1251,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         </div>
-      </div>
+      {/* </div> */}
+      </>
 
       {/* ── MODALS ── */}
       {modalState.open && modalState.type === "Payment_In" && (

@@ -153,7 +153,7 @@ function BankDetailPanel({ bankId }) {
   const openModal = (type, id) => setModalState({ open: true, type, id });
   const closeModal = () => setModalState({ open: false, type: null, id: null });
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
-
+   const [clickHighlightId, setClickHighlightId] = useState(null);
   useEffect(() => {
     const closeRowMenu = () => {
       setRowMenuOpen(null);
@@ -242,6 +242,7 @@ function BankDetailPanel({ bankId }) {
   //   return () => observerRef.current?.disconnect();
   // }, [handleObserver]);
   const handleTransactionEdit = (row) => {
+    setClickHighlightId(null)
     if (!row?.Formatted_Reference_Id) return;
     const currentParams = new URLSearchParams(searchParams);
     currentParams.set("highlightTxn", row.id);
@@ -415,14 +416,14 @@ function BankDetailPanel({ bankId }) {
   // }, [isLoading, isFetching, ledger.length, hasMore]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-  const skipHighlightScrollRef = useRef(false);
-
+  //const skipHighlightScrollRef = useRef(false);
+ 
   // find the target row's index once ledger is loaded
   useEffect(() => {
-    if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+    // if (skipHighlightScrollRef.current) {
+    //   skipHighlightScrollRef.current = false;
+    //   return;
+    // }
     if (hasScrolledToHighlightRef.current) return;
 
     const highlightTxnId = searchParams.get("highlightTxn");
@@ -864,16 +865,19 @@ function BankDetailPanel({ bankId }) {
                       dir: row.Direction === "Credit" ? "in" : "out",
                     };
 
-                  const isHighlighted =
-                    String(searchParams.get("highlightTxn")) === String(row.id);
-
+                  // const isHighlighted =
+                  //   String(searchParams.get("highlightTxn")) === String(row.id);
+                    const isHighlighted =clickHighlightId !== null
+                                            ? String(clickHighlightId) === String(row.id)
+                                            : searchParams.get("highlightTxn") === String(row.id);
                   return (
                     <div
                       key={row.id}
                       onClick={() => {
-                        const params = new URLSearchParams(searchParams);
-                        params.set("highlightTxn", row.id);
-                        setSearchParams(params, { replace: true });
+                        setClickHighlightId(row.id);
+                        // const params = new URLSearchParams(searchParams);
+                        // params.set("highlightTxn", row.id);
+                        // setSearchParams(params, { replace: true });
                       }}
                       onDoubleClick={() => handleTransactionEdit(row)}
                       style={{
@@ -929,12 +933,12 @@ function BankDetailPanel({ bankId }) {
                             e.stopPropagation();
 
                             // Highlight this row, but DON'T scroll
-                            skipHighlightScrollRef.current = true;
+                            //skipHighlightScrollRef.current = true;
+                            setClickHighlightId(row.id);
+                            // const next = new URLSearchParams(searchParams);
+                            // next.set("highlightTxn", row?.id);
 
-                            const next = new URLSearchParams(searchParams);
-                            next.set("highlightTxn", row?.id);
-
-                            setSearchParams(next, { replace: true });
+                            // setSearchParams(next, { replace: true });
 
                             const menuId = `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}`;
 
@@ -971,6 +975,7 @@ function BankDetailPanel({ bankId }) {
                                 style={{ color: "#374151" }}
                                 onClick={() => {
                                   setRowMenuOpen(null);
+                                  setClickHighlightId(null);
                                   handleTransactionEdit(row);
                                 }}
                               >

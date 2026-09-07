@@ -220,8 +220,8 @@ export default function AllPurchaseList() {
   const virtualListRef = useRef(null);
 
   const hasScrolledToHighlightRef = useRef(false);
-  const skipHighlightScrollRef = useRef(false);
-
+  //const skipHighlightScrollRef = useRef(false);
+  const [clickHighlightId, setClickHighlightId] = useState(null);
   const highlightTxnId = searchParams.get("highlightTxn");
 
   // useEffect(() => {
@@ -262,10 +262,10 @@ export default function AllPurchaseList() {
   //   handleLoadMore,
   // ]);
   useEffect(() => {
-    if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+    // if (skipHighlightScrollRef.current) {
+    //   skipHighlightScrollRef.current = false;
+    //   return;
+    // }
 
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
@@ -304,6 +304,7 @@ export default function AllPurchaseList() {
   ]);
 
   useEffect(() => {
+
     hasScrolledToHighlightRef.current = false;
   }, [highlightTxnId, searchTerm, fromDate, toDate]);
   // useEffect(() => {
@@ -679,24 +680,30 @@ export default function AllPurchaseList() {
                         rowMenuOpen === purchase?.Purchase_Id
                       }
                       renderRow={(purchase, idx) => {
+                        // const isHighlighted =
+                        //   String(searchParams.get("highlightTxn")) ===
+                        //   String(purchase?.Purchase_Id);
                         const isHighlighted =
-                          String(searchParams.get("highlightTxn")) ===
-                          String(purchase?.Purchase_Id);
-
+                          clickHighlightId !== null
+                            ? String(clickHighlightId) === String(purchase?.Purchase_Id)
+                            : String(searchParams.get("highlightTxn")) ===
+                            String(purchase?.Purchase_Id);
                         return (
                           <div
                             key={purchase?.Purchase_Id}
                             onClick={() => {
-                              const params = new URLSearchParams(searchParams);
+                              setClickHighlightId(purchase?.Purchase_Id)
+                              // const params = new URLSearchParams(searchParams);
 
-                              params.set(
-                                "highlightTxn",
-                                purchase?.Purchase_Id
-                              );
+                              // params.set(
+                              //   "highlightTxn",
+                              //   purchase?.Purchase_Id
+                              // );
 
-                              setSearchParams(params, { replace: true });
+                              // setSearchParams(params, { replace: true });
                             }}
                             onDoubleClick={() => {
+                              setClickHighlightId(null);
                               const params = new URLSearchParams(searchParams);
 
                               params.set(
@@ -802,16 +809,17 @@ export default function AllPurchaseList() {
                                 //       : purchase?.Purchase_Id
                                 //   );
                                 // }}
+
                                 onClick={(e) => {
                                   e.stopPropagation();
 
                                   // Highlight this row, but DON'T scroll
-                                  skipHighlightScrollRef.current = true;
+                                  //skipHighlightScrollRef.current = true;
+                                  setClickHighlightId(purchase?.Purchase_Id)
+                                  // const next = new URLSearchParams(searchParams);
+                                  // next.set("highlightTxn", purchase?.Purchase_Id);
 
-                                  const next = new URLSearchParams(searchParams);
-                                  next.set("highlightTxn", purchase?.Purchase_Id);
-
-                                  setSearchParams(next, { replace: true });
+                                  // setSearchParams(next, { replace: true });
 
                                   setRowMenuOpen(
                                     rowMenuOpen === purchase?.Purchase_Id
@@ -870,7 +878,11 @@ export default function AllPurchaseList() {
                                       color: "#374151",
                                       textDecoration: "none",
                                     }}
-                                    onClick={() => setRowMenuOpen(null)}
+                                    onClick={() =>{
+                                      setClickHighlightId(null);
+                                       setRowMenuOpen(null)
+                                      }}
+                                      
                                   >
                                     <Eye
                                       size={13}
@@ -879,6 +891,7 @@ export default function AllPurchaseList() {
 
                                     View / Edit
                                   </NavLink>
+                                
 
                                   {/* PRINT */}
                                   <button

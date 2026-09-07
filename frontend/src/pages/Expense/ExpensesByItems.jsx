@@ -591,7 +591,8 @@ const selectedItem =
   }, [items.length]);
   const virtualRightListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-   const skipHighlightScrollRef = useRef(false);
+  const [clickHighlightId, setClickHighlightId] = useState(null);
+   //const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
 
@@ -604,10 +605,10 @@ const selectedItem =
   ]);
 
   useEffect(() => {
-    if (skipHighlightScrollRef.current) {
-      skipHighlightScrollRef.current = false;
-      return;
-    }
+    // if (skipHighlightScrollRef.current) {
+    //   skipHighlightScrollRef.current = false;
+    //   return;
+    // }
     if (hasScrolledToHighlightRef.current) return;
     if (!highlightTxnId) return;
     if (isUsageLoading || isUsageFetching) return;
@@ -1167,25 +1168,29 @@ const selectedItem =
                 //   isHighlighted(txn.expenseId)
                 // }
                 renderRow={(txn, idx) => {
-                  const isHighlighted =
-                    String(highlightTxnId) ===
-                    String(txn.expenseId);
-                  //const highlighted = isHighlighted(txn.expenseId);
+                  // const isHighlighted =
+                  //   String(highlightTxnId) ===
+                  //   String(txn.expenseId);
+                  const isHighlighted =clickHighlightId !== null
+                                            ? String(clickHighlightId) === String(txn.expenseId)
+                                            : String(highlightTxnId) === String(txn.expenseId);
 
                   return (
                     <div
                       key={txn.id}
                       onClick={() => {
-                        const params = new URLSearchParams(searchParams);
+                        setClickHighlightId(txn.expenseId);
+                        // const params = new URLSearchParams(searchParams);
 
-                        params.set(
-                          "highlightTxn",
-                          String(txn.expenseId)
-                        );
+                        // params.set(
+                        //   "highlightTxn",
+                        //   String(txn.expenseId)
+                        // );
 
-                        setSearchParams(params, { replace: true });
+                        // setSearchParams(params, { replace: true });
                       }}
                       onDoubleClick={() => {
+                        setClickHighlightId(null);
                         const params = new URLSearchParams(searchParams);
 
                         params.set(
@@ -1299,16 +1304,16 @@ const selectedItem =
                           //       : txn.id
                           //   );
                           // }}
-                                             onClick={(e) => {
+                                 onClick={(e) => {
                                   e.stopPropagation();
-
+                                  setClickHighlightId(txn.expenseId);
                                   // Highlight this row, but DON'T scroll
-                                  skipHighlightScrollRef.current = true;
+                                  //skipHighlightScrollRef.current = true;
 
-                                  const next = new URLSearchParams(searchParams);
-                                   next.set("highlightTxn", String(txn.expenseId));;
+                                  // const next = new URLSearchParams(searchParams);
+                                  //  next.set("highlightTxn", String(txn.expenseId));;
 
-                                  setSearchParams(next, { replace: true });
+                                  // setSearchParams(next, { replace: true });
 
                                   setRowMenuOpen(
                                     rowMenuOpen === txn.id
@@ -1357,6 +1362,7 @@ const selectedItem =
                                       : "#374151",
                                   }}
                                   onClick={async () => {
+                                    setClickHighlightId(null);
                                     setRowMenuOpen(null);
 
                                     if (key === "view") {

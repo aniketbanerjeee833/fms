@@ -743,8 +743,9 @@ export default function ItemsByItem() {
 
     const virtualRightListRef = useRef(null);
     const hasScrolledToHighlightRef = useRef(false);
-    const skipHighlightScrollRef = useRef(false);
-
+    //const skipHighlightScrollRef = useRef(false);
+    // Add local state for click-to-highlight (visual only, no scroll side-effects)
+    const [clickHighlightId, setClickHighlightId] = useState(null);
     const highlightTxnId = searchParams.get("highlightTxn");
 
     useEffect(() => {
@@ -752,10 +753,10 @@ export default function ItemsByItem() {
     }, [selectedItemId, highlightTxnId, txnSearch]);
 
     useEffect(() => {
-        if (skipHighlightScrollRef.current) {
-            skipHighlightScrollRef.current = false;
-            return;
-        }
+        // if (skipHighlightScrollRef.current) {
+        //     skipHighlightScrollRef.current = false;
+        //     return;
+        // }
         if (hasScrolledToHighlightRef.current) return;
         if (!highlightTxnId) return;
         if (isBillsLoading || isBillsFetching) return;
@@ -1265,10 +1266,14 @@ export default function ItemsByItem() {
                                     rowMenuOpen === txn.Ledger_Id
                                 }
                                 renderRow={(txn, idx) => {
+                                    // const isHighlighted =
+                                    //     String(highlightTxnId) ===
+                                    //     String(txn.Ledger_Id)
+                                    //     || clickHighlightId === txn.Ledger_Id;
                                     const isHighlighted =
-                                        String(highlightTxnId) ===
-                                        String(txn.Ledger_Id);
-
+                                        clickHighlightId !== null
+                                            ? String(clickHighlightId) === String(txn.Ledger_Id)
+                                            : String(highlightTxnId) === String(txn.Ledger_Id);
                                     const canShowMenu =
                                         txn.Txn_Type !== "Opening_Stock";
 
@@ -1276,19 +1281,21 @@ export default function ItemsByItem() {
                                         <div
                                             key={txn.Ledger_Id}
                                             onClick={() => {
-                                                const params =
-                                                    new URLSearchParams(searchParams);
+                                                setClickHighlightId(txn.Ledger_Id)
+                                                // const params =
+                                                //     new URLSearchParams(searchParams);
 
-                                                params.set(
-                                                    "highlightTxn",
-                                                    txn.Ledger_Id
-                                                );
+                                                // params.set(
+                                                //     "highlightTxn",
+                                                //     txn.Ledger_Id
+                                                // );
 
-                                                setSearchParams(params, {
-                                                    replace: true,
-                                                });
+                                                // setSearchParams(params, {
+                                                //     replace: true,
+                                                // });
                                             }}
                                             onDoubleClick={() => {
+                                                setClickHighlightId(null);
                                                 const params =
                                                     new URLSearchParams(searchParams);
 
@@ -1425,14 +1432,14 @@ export default function ItemsByItem() {
 
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-
+                                                                setClickHighlightId(txn.Ledger_Id)
                                                                 // Highlight this row, but DON'T scroll
-                                                                skipHighlightScrollRef.current = true;
+                                                                // skipHighlightScrollRef.current = true;
 
-                                                                const next = new URLSearchParams(searchParams);
-                                                                next.set("highlightTxn", txn.Ledger_Id);
+                                                                // const next = new URLSearchParams(searchParams);
+                                                                // next.set("highlightTxn", txn.Ledger_Id);
 
-                                                                setSearchParams(next, { replace: true });
+                                                                // setSearchParams(next, { replace: true });
 
                                                                 setRowMenuOpen(
                                                                     rowMenuOpen === txn.Ledger_Id
@@ -1484,7 +1491,7 @@ export default function ItemsByItem() {
                                                                             setRowMenuOpen(
                                                                                 null
                                                                             );
-
+                                                                            setClickHighlightId(null);
                                                                             const params =
                                                                                 new URLSearchParams(
                                                                                     searchParams

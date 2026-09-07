@@ -761,7 +761,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
       {/* ── LEDGER TABLE ── */}
 
-
+{/* 
       <div
         style={{
           flex: 1,
@@ -772,14 +772,16 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
           overflowX: "auto",
           overflowY: "hidden",
         }}
-      >
+      > */}
+        <>
+
         {/* HEADER */}
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
             width: "100%",
-            minWidth: "850px",
+            //minWidth: "850px",
             boxSizing: "border-box",
             alignItems: "center",
             minHeight: 40,
@@ -944,7 +946,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                     display: "grid",
                     gridTemplateColumns: "0.7fr 1.2fr 1.5fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
-                    minWidth: "850px",
+                    //minWidth: "850px",
                     minHeight: 52,
                     alignItems: "center",
                     boxSizing: "border-box",
@@ -1283,7 +1285,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         </div>
-      </div>
+      {/* </div> */}
+      </>
 
 
       {/* ── MODALS ── */}
