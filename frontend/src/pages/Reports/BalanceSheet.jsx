@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useGetBalanceSheetQuery } from "../../redux/api/reportApi";
-import { useGetAllFinancialYearsQuery } from "../../redux/api/settingsApi";
+import { useGetAllFinancialYearsQuery } from "../../redux/api/Settings/settingsApi";
 import { useEffect } from "react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
