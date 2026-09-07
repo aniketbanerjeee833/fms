@@ -650,9 +650,9 @@ const selectedItem =
   useEffect(() => {
     sessionStorage.setItem(
       "expensesByExpense:rightCount",
-      itemUsage.length
+      filteredTransactions.length
     );
-  }, [itemUsage.length]);
+  }, [filteredTransactions.length]);
   return (
     <>
       <div className="flex flex-col bg-white"
