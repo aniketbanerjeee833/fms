@@ -953,7 +953,7 @@ function BankDetailPanel({ bankId }) {
                           <MoreVertical size={16} style={{ color: "#374151" }} />
                         </button>
 
-                        {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
+                        {/* {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
                           <div
                             onClick={(e) => e.stopPropagation()}
                             className="absolute bg-white shadow-lg rounded-md"
@@ -966,8 +966,7 @@ function BankDetailPanel({ bankId }) {
                               overflow: "hidden",
                             }}
                           >
-                            {/* VIEW / EDIT — single button now, works for BOTH modal and route types
-                                since handleTransactionEdit itself branches internally */}
+                          
                             {row.Formatted_Reference_Id && (
                               <button
                                 type="button"
@@ -984,7 +983,7 @@ function BankDetailPanel({ bankId }) {
                               </button>
                             )}
 
-                            {/* PRINT */}
+                           
                             <button
                               type="button"
                               className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -998,7 +997,7 @@ function BankDetailPanel({ bankId }) {
                               Print
                             </button>
 
-                            {/* DELETE */}
+                          
                             <button
                               type="button"
                               className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -1016,7 +1015,77 @@ function BankDetailPanel({ bankId }) {
                               Delete
                             </button>
                           </div>
-                        )}
+                        )} */}
+                        {rowMenuOpen === `${row.Txn_Type}-${row.Formatted_Reference_Id}-${idx}` && (
+  <div
+    onClick={(e) => e.stopPropagation()}
+    className="absolute bg-white shadow-lg rounded-md"
+    style={{
+      right: 0,
+      top: 32,
+      width: 150,
+      zIndex: 100,
+      border: "1px solid #e2e8f0",
+      overflow: "hidden",
+    }}
+  >
+    {/* VIEW / EDIT — single button now, works for BOTH modal and route types
+        since handleTransactionEdit itself branches internally */}
+    {row.Formatted_Reference_Id && (
+      <button
+        type="button"
+        className="row-menu-item"
+        onClick={() => {
+          setRowMenuOpen(null);
+          setClickHighlightId(null);
+          handleTransactionEdit(row);
+        }}
+      >
+        <Eye
+          size={13}
+          style={{ color: "#4CA1AF" }}
+        />
+        View / Edit
+      </button>
+    )}
+
+    {/* PRINT */}
+    {/* <button
+      type="button"
+      className="row-menu-item"
+      onClick={() => {
+        setRowMenuOpen(null);
+        console.log("Print transaction:", row);
+      }}
+    >
+      <Printer
+        size={13}
+        style={{ color: "#4CA1AF" }}
+      />
+      Print
+    </button> */}
+
+    {/* DELETE */}
+    <button
+      type="button"
+      className="row-menu-item delete-item"
+      title="Delete transaction"
+      onClick={() => {
+        setRowMenuOpen(null);
+        setDeleteTarget({
+          Id: row.Formatted_Reference_Id,
+          Txn_Type: row.Txn_Type,
+        });
+      }}
+    >
+      <Trash2
+        size={13}
+        style={{ color: "#dc2626" }}
+      />
+      Delete
+    </button>
+  </div>
+)}
                       </div>
                     </div>
                   );

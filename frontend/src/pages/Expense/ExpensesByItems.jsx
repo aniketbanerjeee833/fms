@@ -9,6 +9,7 @@ import {
   Eye,
   Trash2,
   Printer,
+  SquarePen,
 
 } from "lucide-react";
 
@@ -31,11 +32,12 @@ const fmt = (n) =>
 
 const ROW_ACTIONS = [
   { key: "view", label: "View/Edit", icon: Eye },
-  { key: "delete", label: "Delete", icon: Trash2, danger: true },
+
   //{ key: "duplicate", label: "Duplicate", icon: Copy },
   //{ key: "pdf", label: "Open PDF", icon: FileText },
   //{ key: "preview", label: "Preview", icon: Eye },
   { key: "print", label: "Print", icon: Printer },
+  { key: "delete", label: "Delete", icon: Trash2, danger: true },
   //{ key: "history", label: "View History", icon: History },
 ];
 
@@ -439,64 +441,64 @@ export default function ExpensesByItems() {
   //     };
   //   });
   // }, [items, itemUsage, selectedItemId]);
-const itemsWithTotals = useMemo(() => {
-  const mapped = items.map((item) => {
-    const isSelected = String(item.id) === String(selectedItemId);
-    const usageForThisItem = isSelected ? itemUsage : [];
+  const itemsWithTotals = useMemo(() => {
+    const mapped = items.map((item) => {
+      const isSelected = String(item.id) === String(selectedItemId);
+      const usageForThisItem = isSelected ? itemUsage : [];
 
-    return {
-      id: item.id,
-      name: item.Item_Name,
-      amount: 0,
-      total: usageForThisItem.reduce((sum, u) => sum + Number(u.Amount || 0), 0),
-      balance: usageForThisItem.reduce((sum, u) => sum + Number(u.Balance_Due || 0), 0),
-      transactions: usageForThisItem.map((u) => ({
-        id: u.id,
-        expenseId: u.Expense_Id,
-        date: u.Expense_Date,
-        expNo: u.Expense_Number,
-        party: u.Party_Name || "—",
-        paymentType: u.Payment_Type_Display || "—",
-        amount: u.Amount,
-        balance: u.Balance_Due,
-      })),
-    };
-  });
-
-  // If the selected item isn't in the loaded left-side page yet,
-  // inject a synthetic entry built straight from itemUsage so the
-  // right panel doesn't silently fall back to itemsWithTotals[0].
-  const hasSelected = mapped.some(
-    (it) => String(it.id) === String(selectedItemId)
-  );
-
-  if (selectedItemId && !hasSelected && itemUsage.length >= 0) {
-    mapped.push({
-      id: selectedItemId,
-      name: itemUsage[0]?.Item_Name || "", // adjust field name if usage rows carry the item name
-      amount: 0,
-      total: itemUsage.reduce((sum, u) => sum + Number(u.Amount || 0), 0),
-      balance: itemUsage.reduce((sum, u) => sum + Number(u.Balance_Due || 0), 0),
-      transactions: itemUsage.map((u) => ({
-        id: u.id,
-        expenseId: u.Expense_Id,
-        date: u.Expense_Date,
-        expNo: u.Expense_Number,
-        party: u.Party_Name || "—",
-        paymentType: u.Payment_Type_Display || "—",
-        amount: u.Amount,
-        balance: u.Balance_Due,
-      })),
+      return {
+        id: item.id,
+        name: item.Item_Name,
+        amount: 0,
+        total: usageForThisItem.reduce((sum, u) => sum + Number(u.Amount || 0), 0),
+        balance: usageForThisItem.reduce((sum, u) => sum + Number(u.Balance_Due || 0), 0),
+        transactions: usageForThisItem.map((u) => ({
+          id: u.id,
+          expenseId: u.Expense_Id,
+          date: u.Expense_Date,
+          expNo: u.Expense_Number,
+          party: u.Party_Name || "—",
+          paymentType: u.Payment_Type_Display || "—",
+          amount: u.Amount,
+          balance: u.Balance_Due,
+        })),
+      };
     });
-  }
 
-  return mapped;
-}, [items, itemUsage, selectedItemId]);
+    // If the selected item isn't in the loaded left-side page yet,
+    // inject a synthetic entry built straight from itemUsage so the
+    // right panel doesn't silently fall back to itemsWithTotals[0].
+    const hasSelected = mapped.some(
+      (it) => String(it.id) === String(selectedItemId)
+    );
 
-const selectedItem =
-  itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
+    if (selectedItemId && !hasSelected && itemUsage.length >= 0) {
+      mapped.push({
+        id: selectedItemId,
+        name: itemUsage[0]?.Item_Name || "", // adjust field name if usage rows carry the item name
+        amount: 0,
+        total: itemUsage.reduce((sum, u) => sum + Number(u.Amount || 0), 0),
+        balance: itemUsage.reduce((sum, u) => sum + Number(u.Balance_Due || 0), 0),
+        transactions: itemUsage.map((u) => ({
+          id: u.id,
+          expenseId: u.Expense_Id,
+          date: u.Expense_Date,
+          expNo: u.Expense_Number,
+          party: u.Party_Name || "—",
+          paymentType: u.Payment_Type_Display || "—",
+          amount: u.Amount,
+          balance: u.Balance_Due,
+        })),
+      });
+    }
+
+    return mapped;
+  }, [items, itemUsage, selectedItemId]);
+
+  const selectedItem =
+    itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
   const filteredTransactions = selectedItem?.transactions || [];
-  
+
   //const selectedItem =itemsWithTotals.find((it) => String(it.id) === String(selectedItemId)) || itemsWithTotals[0];
 
   /* transaction search still client-side filters the currently-loaded
@@ -511,9 +513,9 @@ const selectedItem =
   // }, [selectedItem, txnSearch]);
   //const filteredTransactions = selectedItem?.transactions || [];
   //const isHighlighted = (expenseId) => String(searchParams.get("highlightTxn")) === String(expenseId);
-// Instead of itemsWithTotals + selectedItem.transactions:
+  // Instead of itemsWithTotals + selectedItem.transactions:
 
-; // straight from the query, no left-list dependency
+  ; // straight from the query, no left-list dependency
 
 
   const fmtDate = (d) =>
@@ -536,10 +538,10 @@ const selectedItem =
 
   const virtualLeftListRef = useRef(null);
   const hasScrolledToSelectedRef = useRef(false);
-  
+
 
   useEffect(() => {
-     
+
     if (hasScrolledToSelectedRef.current) return;
     if (isItemsLoading || isItemsFetching) return;
     if (!selectedItemId || !items.length) return;
@@ -592,7 +594,7 @@ const selectedItem =
   const virtualRightListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
   const [clickHighlightId, setClickHighlightId] = useState(null);
-   //const skipHighlightScrollRef = useRef(false);
+  //const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
 
@@ -756,7 +758,7 @@ const selectedItem =
               style={{
                 flex: 1,
                 minHeight: 0,
-                height: 0,
+                //height: 0,
                 overflow: "hidden",
                 position: "relative",
               }}
@@ -865,7 +867,7 @@ const selectedItem =
                             style={{ color: "#94a3b8" }}
                           />
                         </button>
-
+{/* 
                         <ChevronRight
                           size={14}
                           style={{
@@ -873,10 +875,10 @@ const selectedItem =
                               ? "#4CA1AF"
                               : "#cbd5e1",
                           }}
-                        />
+                        /> */}
                       </div>
 
-                      {menuOpen === item.id && (
+                      {/* {menuOpen === item.id && (
                         <div
                           onClick={(e) => e.stopPropagation()}
                           className="absolute bg-white shadow-lg rounded-md"
@@ -918,7 +920,64 @@ const selectedItem =
                             Delete
                           </button>
                         </div>
-                      )}
+                      )} */}
+                      {menuOpen === item.id && (
+  <div
+    onClick={(e) => e.stopPropagation()}
+    className="absolute bg-white shadow-lg rounded-md"
+    style={{
+      right: 10,
+      top: 48,
+      width: 140,
+      zIndex: 50,
+      border: "1px solid #e2e8f0",
+    }}
+  >
+    <button
+      type="button"
+      className="row-menu-item"
+      onClick={() => {
+        const originalItem = items.find(
+          (i) => i.id === item.id
+        );
+
+        setEditingItem(originalItem);
+        setShowEditItemModal(true);
+        setMenuOpen(null);
+      }}
+    >
+      <SquarePen
+        size={14}
+        style={{
+          color: "#4CA1AF",
+        }}
+      />
+      View/Edit
+    </button>
+
+    <button
+      type="button"
+      className="row-menu-item delete-item"
+      onClick={() => {
+        setDeleteTarget({
+          type: "item",
+          itemId: item.id,
+          itemName: item.name,
+        });
+
+        setMenuOpen(null);
+      }}
+    >
+      <Trash2
+        size={14}
+        style={{
+          color: "#dc2626",
+        }}
+      />
+      Delete
+    </button>
+  </div>
+)}
                     </div>
                   );
                 }}
@@ -1171,9 +1230,9 @@ const selectedItem =
                   // const isHighlighted =
                   //   String(highlightTxnId) ===
                   //   String(txn.expenseId);
-                  const isHighlighted =clickHighlightId !== null
-                                            ? String(clickHighlightId) === String(txn.expenseId)
-                                            : String(highlightTxnId) === String(txn.expenseId);
+                  const isHighlighted = clickHighlightId !== null
+                    ? String(clickHighlightId) === String(txn.expenseId)
+                    : String(highlightTxnId) === String(txn.expenseId);
 
                   return (
                     <div
@@ -1304,23 +1363,23 @@ const selectedItem =
                           //       : txn.id
                           //   );
                           // }}
-                                 onClick={(e) => {
-                                  e.stopPropagation();
-                                  setClickHighlightId(txn.expenseId);
-                                  // Highlight this row, but DON'T scroll
-                                  //skipHighlightScrollRef.current = true;
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClickHighlightId(txn.expenseId);
+                            // Highlight this row, but DON'T scroll
+                            //skipHighlightScrollRef.current = true;
 
-                                  // const next = new URLSearchParams(searchParams);
-                                  //  next.set("highlightTxn", String(txn.expenseId));;
+                            // const next = new URLSearchParams(searchParams);
+                            //  next.set("highlightTxn", String(txn.expenseId));;
 
-                                  // setSearchParams(next, { replace: true });
+                            // setSearchParams(next, { replace: true });
 
-                                  setRowMenuOpen(
-                                    rowMenuOpen === txn.id
-                                      ? null
-                                      : txn.id
-                                  );
-                                }}
+                            setRowMenuOpen(
+                              rowMenuOpen === txn.id
+                                ? null
+                                : txn.id
+                            );
+                          }}
                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                           style={{
                             backgroundColor: "transparent",
@@ -1333,7 +1392,7 @@ const selectedItem =
                           />
                         </button>
 
-                        {rowMenuOpen === txn.id && (
+                        {/* {rowMenuOpen === txn.id && (
                           <div
                             className="absolute bg-white shadow-lg rounded-md"
                             style={{
@@ -1391,7 +1450,11 @@ const selectedItem =
                                         }
                                       );
                                     }
-
+                                    if (key === "print") {
+                                      setPrintExpenseId(
+                                        txn.expenseId
+                                      );
+                                    }
                                     if (key === "delete") {
                                       setDeleteTarget({
                                         expenseId: txn.expenseId,
@@ -1400,10 +1463,102 @@ const selectedItem =
                                       return;
                                     }
 
+                                    
+                                  }}
+                                  onMouseOver={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    danger
+                                      ? "#fef2f2"
+                                      : "#f8fafc")
+                                  }
+                                  onMouseOut={(e) =>
+                                  (e.currentTarget.style.backgroundColor =
+                                    "transparent")
+                                  }
+                                >
+                                  <Icon
+                                    size={13}
+                                    style={{
+                                      color: danger
+                                        ? "#dc2626"
+                                        : "#4CA1AF",
+                                    }}
+                                  />
+
+                                  {label}
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )} */}
+                        {rowMenuOpen === txn.id && (
+                          <div
+                            className="absolute bg-white shadow-lg rounded-md"
+                            style={{
+                              right: 10,
+                              top: 36,
+                              width: 160,
+                              zIndex: 100,
+                              border: "1px solid #e2e8f0",
+                              overflow: "hidden",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {ROW_ACTIONS.map(
+                              ({
+                                key,
+                                label,
+                                icon: Icon,
+                                danger,
+                              }) => (
+                                <button
+                                  key={key}
+                                  className={`row-menu-item${danger ? " delete-item" : ""
+                                    }`}
+                                  onClick={async () => {
+                                    setClickHighlightId(null);
+                                    setRowMenuOpen(null);
+
+                                    if (key === "view") {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        String(txn.expenseId)
+                                      );
+
+                                      navigate(
+                                        {
+                                          pathname: `/expense/edit/${txn.expenseId}`,
+                                          search: params.toString(),
+                                        },
+                                        {
+                                          state: {
+                                            from: "expense-items",
+                                            itemId: selectedItemId,
+                                            txnSearch,
+                                            itemSearch,
+                                          },
+                                        }
+                                      );
+                                    }
+
                                     if (key === "print") {
                                       setPrintExpenseId(
                                         txn.expenseId
                                       );
+                                    }
+
+                                    if (key === "delete") {
+                                      setDeleteTarget({
+                                        expenseId:
+                                          txn.expenseId,
+                                      });
+
+                                      return;
                                     }
                                   }}
                                   onMouseOver={(e) =>

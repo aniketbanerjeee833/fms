@@ -830,7 +830,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             emptyMessage="No transactions found"
             endMessage="— End of transactions —"
             onLoadMore={handleLoadMore}
-            
+
             isRowActive={(row, idx) => {
               const refId =
                 row.Sale_Id ||
@@ -1085,7 +1085,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                             />
                           </button>
 
-                          {rowMenuOpen === menuId && (
+                          {/* {rowMenuOpen === menuId && (
                             <div
                               onClick={(e) =>
                                 e.stopPropagation()
@@ -1101,7 +1101,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                 overflow: "hidden",
                               }}
                             >
-                              {/* VIEW / EDIT */}
+                             
                               {MODAL_TXN_TYPES.includes(
                                 row.Txn_Type
                               ) ? (
@@ -1189,7 +1189,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                 </NavLink>
                               )}
 
-                              {/* PRINT */}
+                              
                               <button
                                 type="button"
                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -1214,7 +1214,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                 Print
                               </button>
 
-                              {/* DELETE */}
+                             
                               <button
                                 type="button"
                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -1223,6 +1223,149 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                   cursor: "pointer",
                                   color: "#dc2626",
                                 }}
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  setDeleteTarget({
+                                    Id: transactionId,
+                                    Txn_Type:
+                                      row.Txn_Type,
+                                  });
+                                }}
+                              >
+                                <Trash2
+                                  size={13}
+                                  style={{
+                                    color: "#dc2626",
+                                  }}
+                                />
+                                Delete
+                              </button>
+                            </div>
+                          )} */}
+                          {rowMenuOpen === menuId && (
+                            <div
+                              onClick={(e) =>
+                                e.stopPropagation()
+                              }
+                              className="absolute bg-white shadow-lg rounded-md"
+                              style={{
+                                right: 10,
+                                top: 36,
+                                width: 150,
+                                zIndex: 100,
+                                border:
+                                  "1px solid #e2e8f0",
+                                overflow: "hidden",
+                              }}
+                            >
+
+                              {MODAL_TXN_TYPES.includes(
+                                row.Txn_Type
+                              ) ? (
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    const params =
+                                      new URLSearchParams(
+                                        searchParams
+                                      );
+
+                                    params.set(
+                                      "highlightTxn",
+                                      transactionId
+                                    );
+
+                                    setSearchParams(
+                                      params,
+                                      {
+                                        replace: true,
+                                      }
+                                    );
+
+                                    openModal(
+                                      row.Txn_Type,
+                                      transactionId
+                                    );
+                                  }}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+                                  View / Edit
+                                </button>
+                              ) : (
+                                <NavLink
+                                  to={{
+                                    pathname:
+                                      `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`,
+                                    search: (() => {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        transactionId
+                                      );
+
+                                      return `?${params.toString()}`;
+                                    })(),
+                                  }}
+                                  state={{
+                                    from:
+                                      "party-payables",
+                                    partyId,
+                                  }}
+                                  className="row-menu-item"
+                                  onClick={() =>
+                                    setRowMenuOpen(null)
+                                  }
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+                                  View / Edit
+                                </NavLink>
+                              )}
+
+
+                              <button
+                                type="button"
+                                className="row-menu-item"
+                                onClick={() => {
+                                  setRowMenuOpen(null);
+
+                                  handlePrintClick(
+                                    row,
+                                    transactionId
+                                  );
+                                }}
+                              >
+                                <Printer
+                                  size={13}
+                                  style={{
+                                    color: "#4CA1AF",
+                                  }}
+                                />
+                                Print
+                              </button>
+
+
+                              <button
+                                type="button"
+                                className="row-menu-item delete-item"
+                                title="Delete transaction"
                                 onClick={() => {
                                   setRowMenuOpen(null);
 
@@ -1251,7 +1394,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
             }}
           />
         </div>
-      {/* </div> */}
+        {/* </div> */}
       </>
 
       {/* ── MODALS ── */}
@@ -1827,7 +1970,7 @@ export default function PartyPayablesLeft() {
                           />
                         </button>
 
-                        {openMenuId === party.Party_Id && (
+                        {/* {openMenuId === party.Party_Id && (
                           <div
                             className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
                             style={{
@@ -1864,7 +2007,44 @@ export default function PartyPayablesLeft() {
                               Delete
                             </button>
                           </div>
+                        )} */}
+                        {openMenuId === party.Party_Id && (
+                          <div
+                            className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
+                            style={{
+                              border: "1px solid #e2e8f0",
+                              minWidth: 120,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(party)}
+                              className="row-menu-item"
+                            >
+                              <SquarePen
+                                size={14}
+                                style={{ color: "#4CA1AF" }}
+                              />
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuId(null);
+                              }}
+                              className="row-menu-item delete-item"
+                            >
+                              <Trash2
+                                size={14}
+                                style={{ color: "#dc2626" }}
+                              />
+                              Delete
+                            </button>
+                          </div>
                         )}
+
                       </div>
                     )}
                   </div>

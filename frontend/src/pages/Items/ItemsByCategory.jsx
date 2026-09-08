@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { NavLink, useSearchParams } from "react-router-dom";
+import {  useSearchParams } from "react-router-dom";
 import {
 
   Search,
   MoreVertical,
-  ChevronRight,
+  
   Package,
   Tags,
 
@@ -578,14 +578,14 @@ useEffect(() => {
                   </button>
                 )}
 
-                <ChevronRight
+                {/* <ChevronRight
                   size={14}
                   style={{
                     color: isSelected
                       ? "#4CA1AF"
                       : "#a5aab1",
                   }}
-                />
+                /> */}
               </div>
 
               {menuOpen === category.Category_Id && (

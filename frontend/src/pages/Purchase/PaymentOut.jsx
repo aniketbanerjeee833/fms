@@ -751,7 +751,7 @@ export default function PaymentOut() {
                                                                     rowMenuOpen === paymentOut?.id ? null : paymentOut?.id
                                                                 );
                                                             }}
-                                                          
+
                                                             className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                             style={{
                                                                 backgroundColor:
@@ -771,6 +771,7 @@ export default function PaymentOut() {
 
                                                         {/* ROW MENU */}
 
+                                                  
                                                         {rowMenuOpen ===
                                                             paymentOut?.id && (
                                                                 <div
@@ -789,18 +790,10 @@ export default function PaymentOut() {
                                                                             "hidden",
                                                                     }}
                                                                 >
-                                                                    {/* VIEW / EDIT */}
 
                                                                     <button
                                                                         type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                        style={{
-                                                                            color: "#374151",
-                                                                            backgroundColor:
-                                                                                "transparent",
-                                                                            border: "none",
-                                                                            cursor: "pointer",
-                                                                        }}
+                                                                        className="row-menu-item"
                                                                         onClick={() => {
                                                                             setRowMenuOpen(
                                                                                 null
@@ -840,18 +833,11 @@ export default function PaymentOut() {
                                                                         View / Edit
                                                                     </button>
 
-                                                                    {/* PRINT */}
+
 
                                                                     <button
                                                                         type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                        style={{
-                                                                            color: "#374151",
-                                                                            backgroundColor:
-                                                                                "transparent",
-                                                                            border: "none",
-                                                                            cursor: "pointer",
-                                                                        }}
+                                                                        className="row-menu-item"
                                                                         onClick={() => {
                                                                             setRowMenuOpen(
                                                                                 null
@@ -872,19 +858,12 @@ export default function PaymentOut() {
                                                                         Print
                                                                     </button>
 
-                                                                    {/* DELETE */}
+
 
                                                                     <button
                                                                         type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                        className="row-menu-item delete-item"
                                                                         title="Delete payment out"
-                                                                        style={{
-                                                                            cursor: "pointer",
-                                                                            color: "#dc2626",
-                                                                            backgroundColor:
-                                                                                "transparent",
-                                                                            border: "none",
-                                                                        }}
                                                                         onClick={() => {
                                                                             setRowMenuOpen(
                                                                                 null

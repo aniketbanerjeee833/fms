@@ -148,6 +148,26 @@ const updateCurrentFinancialYear = async (req, res, next) => {
 
 
 // =========================================================
+// LINKED SETTINGS RULES CONFIG
+// Add new rules here — no need to touch updateSetting logic
+// =========================================================
+const SETTING_RULES = {
+  show_mrp: {
+    onDisable: ['calculate_sale_price_from_mrp_disc'], // cascade off when this turns off
+  },
+  calculate_sale_price_from_mrp_disc: {
+    requiresEnabled: ['show_mrp'], // can't turn this on unless these are already on
+  },
+  // future example:
+  // enable_gst: {
+  //   onDisable: ['show_gst_breakup', 'auto_calculate_gst'],
+  // },
+  // show_discount_column: {
+  //   requiresEnabled: ['show_mrp'],
+  // },
+};
+
+// =========================================================
 // GET ALL SETTINGS (active only, ordered)
 // =========================================================
 const getAllSettings = async (req, res, next) => {
@@ -186,8 +206,9 @@ const updateSetting = async (req, res, next) => {
   try {
     const { setting_key } = req.params;
     const { setting_value } = req.body; // expects 0 or 1
+    const newValue = Number(setting_value);
 
-    if (![0, 1].includes(Number(setting_value))) {
+    if (![0, 1].includes(newValue)) {
       return res.status(400).json({
         success: false,
         message: "setting_value must be 0 or 1",
@@ -197,9 +218,9 @@ const updateSetting = async (req, res, next) => {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    // fetch current setting + related MRP setting for the linked-rule check
+    // lock the target row while we work with it
     const [[targetSetting]] = await connection.query(
-      `SELECT setting_key, setting_value FROM app_settings WHERE setting_key = ? LIMIT 1`,
+      `SELECT setting_key, setting_value FROM app_settings WHERE setting_key = ? LIMIT 1 FOR UPDATE`,
       [setting_key]
     );
 
@@ -211,32 +232,29 @@ const updateSetting = async (req, res, next) => {
       });
     }
 
-    // =====================================================
-    // LINKED RULE:
-    // show_mrp OFF  → calculate_sale_price_from_mrp_disc OFF too
-    // calculate_sale_price_from_mrp_disc ON requires show_mrp already ON
-    // =====================================================
+    const rule = SETTING_RULES[setting_key];
 
-    if (setting_key === "show_mrp" && Number(setting_value) === 0) {
-      // turning MRP off — cascade off the dependent setting too
-      await connection.execute(
-        `UPDATE app_settings SET setting_value = 0 WHERE setting_key = 'calculate_sale_price_from_mrp_disc'`
-      );
-    }
-
-    if (
-      setting_key === "calculate_sale_price_from_mrp_disc" &&
-      Number(setting_value) === 1
-    ) {
-      const [[mrpSetting]] = await connection.query(
-        `SELECT setting_value FROM app_settings WHERE setting_key = 'show_mrp' LIMIT 1`
+    // =====================================================
+    // RULE: requiresEnabled — block turning this ON unless
+    // all listed dependencies are already ON
+    // =====================================================
+    if (rule?.requiresEnabled?.length && newValue === 1) {
+      const placeholders = rule.requiresEnabled.map(() => "?").join(",");
+      const [depRows] = await connection.query(
+        `SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN (${placeholders}) FOR UPDATE`,
+        rule.requiresEnabled
       );
 
-      if (!mrpSetting || Number(mrpSetting.setting_value) === 0) {
+      const disabledDep = rule.requiresEnabled.find((key) => {
+        const dep = depRows.find((r) => r.setting_key === key);
+        return !dep || Number(dep.setting_value) === 0;
+      });
+
+      if (disabledDep) {
         await connection.rollback();
         return res.status(400).json({
           success: false,
-          message: "Enable MRP before turning on this setting.",
+          message: `Enable "${disabledDep}" before turning on this setting.`,
         });
       }
     }
@@ -244,8 +262,20 @@ const updateSetting = async (req, res, next) => {
     // update the target setting itself
     await connection.execute(
       `UPDATE app_settings SET setting_value = ? WHERE setting_key = ?`,
-      [Number(setting_value), setting_key]
+      [newValue, setting_key]
     );
+
+    // =====================================================
+    // RULE: onDisable — cascade OFF dependent settings when
+    // this setting is turned OFF
+    // =====================================================
+    if (rule?.onDisable?.length && newValue === 0) {
+      const placeholders = rule.onDisable.map(() => "?").join(",");
+      await connection.execute(
+        `UPDATE app_settings SET setting_value = 0 WHERE setting_key IN (${placeholders})`,
+        rule.onDisable
+      );
+    }
 
     await connection.commit();
 

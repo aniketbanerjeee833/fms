@@ -1134,3 +1134,39 @@ a:hover {
 .ad-hom-col-2 i{}
 .ad-hom-col-3 i{}
 .ad-hom-col-4 i{}
+
+/* ── ROW ACTION MENU ── */
+
+.row-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 14px;
+    box-sizing: border-box;
+    border: none;
+    text-decoration: none;
+    cursor: pointer;
+    background-color: #fff !important;
+    color: #374151 !important;
+}
+
+.row-menu-item:hover {
+    background-color: #E8F6F8 !important;
+    color: #4CA1AF !important;
+}
+
+.row-menu-item:hover svg {
+    color: #4CA1AF !important;
+}
+
+.row-menu-item.delete-item:hover {
+    background-color: #fee2e2 !important;
+    color: #dc2626 !important;
+}
+
+.row-menu-item.delete-item:hover svg {
+    color: #dc2626 !important;
+}

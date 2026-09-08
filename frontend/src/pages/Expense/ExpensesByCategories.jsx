@@ -12,6 +12,7 @@ import {
   Eye,
   Trash2,
   Printer,
+  SquarePen,
  
 } from "lucide-react";
 
@@ -41,8 +42,9 @@ const fmt = (n) =>
 export default function ExpensesByCategories() {
   const ROW_ACTIONS = [
     { key: "view", label: "View/Edit", icon: Eye },
-    { key: "delete", label: "Delete", icon: Trash2, danger: true },
+    
     { key: "print", label: "Print", icon: Printer },
+    { key: "delete", label: "Delete", icon: Trash2, danger: true },
   ];
 
   const navigate = useNavigate();
@@ -561,7 +563,7 @@ useEffect(() => {
           {/* ══ LEFT — 30% — category list (client-side filtered) ══ */}
           {/* */}
          <div
-  className="w-full lg:w-[30%] flex flex-col flex-none lg:h-auto"
+  className="w-full lg:w-[30%] flex flex-col flex-none  h-[50vh] lg:h-auto"
   style={{
     borderRight: "1px solid #e2e8f0",
     minHeight: 0,
@@ -635,6 +637,7 @@ useEffect(() => {
     style={{
       flex: 1,
       minHeight: 0,
+       //height: 0,
       overflow: "hidden",
       position: "relative",
     }}
@@ -744,17 +747,17 @@ useEffect(() => {
                 />
               </button>
 
-              <ChevronRight
+              {/* <ChevronRight
                 size={14}
                 style={{
                   color: isSelected
                     ? "#4CA1AF"
                     : "#cbd5e1",
                 }}
-              />
+              /> */}
             </div>
 
-            {menuOpen === category.id && (
+            {/* {menuOpen === category.id && (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="absolute bg-white shadow-lg rounded-md"
@@ -799,7 +802,70 @@ useEffect(() => {
                   Delete
                 </button>
               </div>
-            )}
+            )} */}
+{menuOpen === category.id && (
+  <div
+    onClick={(e) => e.stopPropagation()}
+    className="absolute bg-white shadow-lg rounded-md"
+    style={{
+      right: 10,
+      top: 48,
+      width: 140,
+      zIndex: 50,
+      border: "1px solid #e2e8f0",
+    }}
+  >
+    <button
+      type="button"
+      className="row-menu-item"
+      onClick={() => {
+        const originalCategory =
+          categories.find(
+            (c) => c.id === category.id
+          );
+
+        setEditingCategory(
+          originalCategory
+        );
+        setShowEditCategoryModal(
+          true
+        );
+        setMenuOpen(null);
+      }}
+    >
+      <SquarePen
+        size={14}
+        style={{
+          color: "#4CA1AF",
+        }}
+      />
+      View/Edit
+    </button>
+
+    <button
+      type="button"
+      className="row-menu-item delete-item"
+      onClick={() => {
+        setDeleteTarget({
+          type: "category",
+          categoryId: category.id,
+          categoryName:
+            category.name,
+        });
+
+        setMenuOpen(null);
+      }}
+    >
+      <Trash2
+        size={14}
+        style={{
+          color: "#dc2626",
+        }}
+      />
+      Delete
+    </button>
+  </div>
+)}
           </div>
         );
       }}
@@ -1223,15 +1289,11 @@ useEffect(() => {
                 />
               </button>
 
-              {transactionMenu === txn.id && (
+              {/* {transactionMenu === txn.id && (
                 <div
                   onClick={(e) => e.stopPropagation()}
                   className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
-                  // style={{
-                  //   width: 180,
-                  //   zIndex: 999,
-                  //   borderColor: "#e5e7eb",
-                  // }}
+                 
                     style={{
         right: 10,
         top: 36,
@@ -1326,7 +1388,105 @@ useEffect(() => {
                     )
                   )}
                 </div>
-              )}
+              )} */}
+              {transactionMenu === txn.id && (
+  <div
+    onClick={(e) => e.stopPropagation()}
+    className="absolute right-0 top-8 bg-white rounded-lg shadow-xl border overflow-hidden"
+    style={{
+      right: 10,
+      top: 36,
+      width: 150,
+      zIndex: 100,
+      border: "1px solid #e2e8f0",
+      overflow: "hidden",
+    }}
+  >
+    {ROW_ACTIONS.map(
+      ({
+        key,
+        label,
+        icon: Icon,
+        danger,
+      }) => (
+        <button
+          key={key}
+          type="button"
+          className={`row-menu-item${
+            danger ? " delete-item" : ""
+          }`}
+          onClick={() => {
+            setClickHighlightId(null);
+            setTransactionMenu(null);
+
+            if (key === "view") {
+              const params =
+                new URLSearchParams(
+                  searchParams
+                );
+
+              params.set(
+                "highlightTxn",
+                String(txn.id)
+              );
+
+              navigate(
+                {
+                  pathname: `/expense/edit/${txn.id}`,
+                  search: params.toString(),
+                },
+                {
+                  state: {
+                    from: "expense-categories",
+                    categoryId:
+                      selectedCategoryId,
+                    txnSearch,
+                    categorySearch,
+                  },
+                }
+              );
+            }
+
+            if (key === "delete") {
+              setDeleteTarget({
+                type: "expense",
+                expenseId: txn.id,
+              });
+
+              return;
+            }
+
+            if (key === "print") {
+              setPrintExpenseId(
+                txn.id
+              );
+            }
+          }}
+          onMouseOver={(e) =>
+            (e.currentTarget.style.backgroundColor =
+              danger
+                ? "#fef2f2"
+                : "#f8fafc")
+          }
+          onMouseOut={(e) =>
+            (e.currentTarget.style.backgroundColor =
+              "transparent")
+          }
+        >
+          <Icon
+            size={13}
+            style={{
+              color: danger
+                ? "#dc2626"
+                : "#4CA1AF",
+            }}
+          />
+          {label}
+        </button>
+      )
+    )}
+  </div>
+)}
            
           </div>
         

@@ -188,7 +188,7 @@ export default function AllSaleList() {
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
   const [clickHighlightId, setClickHighlightId] = useState(null);
- //const skipHighlightScrollRef = useRef(false);
+  //const skipHighlightScrollRef = useRef(false);
   const highlightTxnId = searchParams.get("highlightTxn");
 
   useEffect(() => {
@@ -581,7 +581,7 @@ export default function AllSaleList() {
                         // const isHighlighted =
                         //   String(searchParams.get("highlightTxn")) ===
                         //   String(sale?.Sale_Id);
-                          const isHighlighted =
+                        const isHighlighted =
                           clickHighlightId !== null
                             ? String(clickHighlightId) === String(sale?.Sale_Id)
                             : String(searchParams.get("highlightTxn")) ===
@@ -606,7 +606,7 @@ export default function AllSaleList() {
                               // });
                             }}
                             onDoubleClick={() => {
-                                setClickHighlightId(null);
+                              setClickHighlightId(null);
                               const params = new URLSearchParams(searchParams);
 
                               params.set(
@@ -720,7 +720,7 @@ export default function AllSaleList() {
                                 //   );
                                 // }}
 
-                                 onClick={(e) => {
+                                onClick={(e) => {
                                   e.stopPropagation();
                                   setClickHighlightId(sale?.Sale_Id)
                                   // Highlight this row, but DON'T scroll
@@ -754,7 +754,7 @@ export default function AllSaleList() {
                                 />
                               </button>
 
-                              {rowMenuOpen === sale?.Sale_Id && (
+                              {/* {rowMenuOpen === sale?.Sale_Id && (
                                 <div
                                   onClick={(e) =>
                                     e.stopPropagation()
@@ -770,7 +770,7 @@ export default function AllSaleList() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {/* VIEW / EDIT */}
+                                  
                                   <NavLink
                                     to={{
                                       pathname: `/sale/edit/${sale?.Sale_Id}`,
@@ -811,7 +811,7 @@ export default function AllSaleList() {
                                     View / Edit
                                   </NavLink>
 
-                                  {/* RETURN */}
+                                 
                                   <NavLink
                                     to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
                                     state={{
@@ -836,7 +836,6 @@ export default function AllSaleList() {
                                     Return
                                   </NavLink>
 
-                                  {/* PRINT */}
                                   <button
                                     type="button"
                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -864,7 +863,7 @@ export default function AllSaleList() {
                                     Print
                                   </button>
 
-                                  {/* DELETE */}
+                                
                                   <button
                                     type="button"
                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -892,6 +891,135 @@ export default function AllSaleList() {
                                     />
 
                                     Delete
+                                  </button>
+                                </div>
+                              )} */}
+                              {rowMenuOpen === sale?.Sale_Id && (
+                                <div
+                                  onClick={(e) =>
+                                    e.stopPropagation()
+                                  }
+                                  className="absolute bg-white shadow-lg rounded-md"
+                                  style={{
+                                    right: 0,
+                                    top: "100%",
+                                    width: 150,
+                                    zIndex: 100,
+                                    border: "1px solid #e2e8f0",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {/* VIEW / EDIT */}
+                                  <NavLink
+                                    to={{
+                                      pathname: `/sale/edit/${sale?.Sale_Id}`,
+                                      search: (() => {
+                                        const params =
+                                          new URLSearchParams(
+                                            searchParams
+                                          );
+
+                                        params.set(
+                                          "highlightTxn",
+                                          sale?.Sale_Id
+                                        );
+
+                                        return params.toString();
+                                      })(),
+                                    }}
+                                    state={{
+                                      from: "all-sale-list",
+                                    }}
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setClickHighlightId(null);
+                                      setRowMenuOpen(null);
+                                    }}
+                                  >
+                                    <Eye
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+
+                                    <span>
+                                      View / Edit
+                                    </span>
+                                  </NavLink>
+
+
+                                  {/* RETURN */}
+                                  <NavLink
+                                    to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
+                                    state={{
+                                      from: "sale-return-list",
+                                    }}
+                                    className="row-menu-item"
+                                    onClick={() =>
+                                      setRowMenuOpen(null)
+                                    }
+                                  >
+                                    <Undo2
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+
+                                    <span>
+                                      Return
+                                    </span>
+                                  </NavLink>
+
+
+                                  {/* PRINT */}
+                                  <button
+                                    type="button"
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+                                      setPrintSaleId(
+                                        sale.Sale_Id
+                                      );
+                                    }}
+                                  >
+                                    <Printer
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+
+                                    <span>
+                                      Print
+                                    </span>
+                                  </button>
+
+
+                                  {/* DELETE */}
+                                  <button
+                                    type="button"
+                                    className="row-menu-item delete-item"
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setDeleteTarget({
+                                        Sale_Id:
+                                          sale?.Sale_Id,
+                                      });
+                                    }}
+                                  >
+                                    <Trash2
+                                      size={13}
+                                      style={{
+                                        color: "#dc2626",
+                                      }}
+                                    />
+
+                                    <span>
+                                      Delete
+                                    </span>
                                   </button>
                                 </div>
                               )}

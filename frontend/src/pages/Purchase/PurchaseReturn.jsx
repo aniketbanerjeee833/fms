@@ -976,7 +976,7 @@ export default function PurchaseReturn() {
                             </button>
 
                             {/* ROW MENU */}
-                            {rowMenuOpen ===
+                            {/* {rowMenuOpen ===
                               purchaseReturn.id && (
                                 <div
                                   onClick={(e) =>
@@ -993,7 +993,7 @@ export default function PurchaseReturn() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {/* VIEW / EDIT */}
+                                
                                   <NavLink
                                     to={{
                                       pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
@@ -1034,7 +1034,7 @@ export default function PurchaseReturn() {
                                     View / Edit
                                   </NavLink>
 
-                                  {/* PRINT */}
+                                  
                                   <button
                                     type="button"
                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
@@ -1061,7 +1061,7 @@ export default function PurchaseReturn() {
                                     Print
                                   </button>
 
-                                  {/* DELETE */}
+                                 
                                   <button
                                     type="button"
                                     className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
@@ -1091,7 +1091,114 @@ export default function PurchaseReturn() {
                                     Delete
                                   </button>
                                 </div>
-                              )}
+                              )} */}
+                               {rowMenuOpen === purchaseReturn.id && (
+                              <div
+                                onClick={(e) =>
+                                  e.stopPropagation()
+                                }
+                                className="absolute bg-white shadow-lg rounded-md"
+                                style={{
+                                  right: 0,
+                                  top: "100%",
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {/* VIEW / EDIT */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
+                                    search: (() => {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        purchaseReturn?.id
+                                      );
+
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-purchase-return-list",
+                                  }}
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setClickHighlightId(null);
+                                    setRowMenuOpen(null);
+                                  }}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+
+                                  <span>
+                                    View / Edit
+                                  </span>
+                                </NavLink>
+
+
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setPrintPurchaseReturnId(
+                                      purchaseReturn.id
+                                    );
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+
+                                  <span>
+                                    Print
+                                  </span>
+                                </button>
+
+
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item delete-item"
+                                  title="Delete purchase return"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setDeleteTarget({
+                                      Purchase_Return_Id:
+                                        purchaseReturn.id,
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{
+                                      color: "#dc2626",
+                                    }}
+                                  />
+
+                                  <span>
+                                    Delete
+                                  </span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

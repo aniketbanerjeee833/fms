@@ -5,7 +5,7 @@ import {
 
     Search,
     MoreVertical,
-    ChevronRight,
+    
     Package,
     Eye,
     SquarePen,
@@ -982,7 +982,7 @@ export default function ItemsByItem() {
                                                 >
                                                     <MoreVertical size={14} style={{ color: "#374151" }} />
                                                 </button>
-                                                <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} />
+                                                {/* <ChevronRight size={14} style={{ color: isSelected ? "#4CA1AF" : "#a5aab1" }} /> */}
                                             </div>
 
                                             {menuOpen === item.Item_Id && (
@@ -1464,6 +1464,7 @@ export default function ItemsByItem() {
                                                             />
                                                         </button>
 
+                                                       
                                                         {rowMenuOpen ===
                                                             txn.Ledger_Id && (
                                                                 <div
@@ -1480,18 +1481,17 @@ export default function ItemsByItem() {
                                                                         overflow: "hidden",
                                                                     }}
                                                                 >
-                                                                    {/* VIEW / EDIT */}
+
                                                                     <button
                                                                         type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                        style={{
-                                                                            color: "#374151",
-                                                                        }}
+                                                                        className="row-menu-item"
                                                                         onClick={() => {
                                                                             setRowMenuOpen(
                                                                                 null
                                                                             );
+
                                                                             setClickHighlightId(null);
+
                                                                             const params =
                                                                                 new URLSearchParams(
                                                                                     searchParams
@@ -1523,7 +1523,8 @@ export default function ItemsByItem() {
                                                                         View / Edit
                                                                     </button>
 
-                                                                    {/* PRINT */}
+
+
                                                                     {![
                                                                         "Add_Adjustment",
                                                                         "Reduce_Adjustment",
@@ -1533,10 +1534,7 @@ export default function ItemsByItem() {
                                                                     ) && (
                                                                             <button
                                                                                 type="button"
-                                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                                                                style={{
-                                                                                    color: "#374151",
-                                                                                }}
+                                                                                className="row-menu-item"
                                                                                 onClick={() => {
                                                                                     setRowMenuOpen(
                                                                                         null
@@ -1549,9 +1547,7 @@ export default function ItemsByItem() {
                                                                                 }}
                                                                             >
                                                                                 <Printer
-                                                                                    size={
-                                                                                        13
-                                                                                    }
+                                                                                    size={13}
                                                                                     style={{
                                                                                         color:
                                                                                             "#4CA1AF",
@@ -1561,15 +1557,12 @@ export default function ItemsByItem() {
                                                                             </button>
                                                                         )}
 
-                                                                    {/* DELETE */}
+
+
                                                                     <button
                                                                         type="button"
-                                                                        className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
+                                                                        className="row-menu-item delete-item"
                                                                         title="Delete transaction"
-                                                                        style={{
-                                                                            cursor: "pointer",
-                                                                            color: "#dc2626",
-                                                                        }}
                                                                         onClick={() => {
                                                                             setRowMenuOpen(
                                                                                 null
@@ -1592,7 +1585,8 @@ export default function ItemsByItem() {
                                                                         <Trash2
                                                                             size={13}
                                                                             style={{
-                                                                                color: "#dc2626",
+                                                                                color:
+                                                                                    "#dc2626",
                                                                             }}
                                                                         />
                                                                         Delete

@@ -924,7 +924,7 @@ export default function CashInHand() {
 
                                                         {/* ROW MENU */}
 
-                                                        {rowMenuOpen ===
+                                                        {/* {rowMenuOpen ===
                                                             menuId && (
                                                                 <div
                                                                     onClick={(e) =>
@@ -942,7 +942,7 @@ export default function CashInHand() {
                                                                             "hidden",
                                                                     }}
                                                                 >
-                                                                    {/* VIEW / EDIT */}
+                                                                   
 
                                                                     {row.Formatted_Reference_Id &&
                                                                         (MODAL_TXN_TYPES.includes(
@@ -1046,7 +1046,7 @@ export default function CashInHand() {
                                                                             </NavLink>
                                                                         ))}
 
-                                                                    {/* PRINT */}
+                                                                   
 
                                                                     <button
                                                                         type="button"
@@ -1081,7 +1081,7 @@ export default function CashInHand() {
                                                                         Print
                                                                     </button>
 
-                                                                    {/* DELETE */}
+                                                                    
 
                                                                     <button
                                                                         type="button"
@@ -1120,7 +1120,162 @@ export default function CashInHand() {
                                                                         Delete
                                                                     </button>
                                                                 </div>
-                                                            )}
+                                                            )} */}
+                                                        {rowMenuOpen === menuId && (
+                                                            <div
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
+                                                                className="absolute bg-white shadow-lg rounded-md"
+                                                                style={{
+                                                                    right: 0,
+                                                                    top: "100%",
+                                                                    width: 150,
+                                                                    zIndex: 100,
+                                                                    border: "1px solid #e2e8f0",
+                                                                    overflow: "hidden",
+                                                                }}
+                                                            >
+
+                                                                {row.Formatted_Reference_Id &&
+                                                                    (MODAL_TXN_TYPES.includes(
+                                                                        row.Txn_Type
+                                                                    ) ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="row-menu-item"
+                                                                            onClick={() => {
+                                                                                setClickHighlightId(null);
+                                                                                setRowMenuOpen(null);
+
+                                                                                const params =
+                                                                                    new URLSearchParams(
+                                                                                        searchParams
+                                                                                    );
+
+                                                                                params.set(
+                                                                                    "highlightTxn",
+                                                                                    row?.id
+                                                                                );
+
+                                                                                setSearchParams(
+                                                                                    params,
+                                                                                    {
+                                                                                        replace: true,
+                                                                                    }
+                                                                                );
+
+                                                                                openModal(
+                                                                                    row.Txn_Type,
+                                                                                    row.Formatted_Reference_Id
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <Eye
+                                                                                size={13}
+                                                                                style={{
+                                                                                    color: "#4CA1AF",
+                                                                                }}
+                                                                            />
+
+                                                                            View /
+                                                                            Edit
+                                                                        </button>
+                                                                    ) : (
+                                                                        <NavLink
+                                                                            to={{
+                                                                                pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${row.Formatted_Reference_Id}`,
+                                                                                search: (() => {
+                                                                                    const params =
+                                                                                        new URLSearchParams(
+                                                                                            searchParams
+                                                                                        );
+
+                                                                                    params.set(
+                                                                                        "highlightTxn",
+                                                                                        row?.id
+                                                                                    );
+
+                                                                                    return `?${params.toString()}`;
+                                                                                })(),
+                                                                            }}
+                                                                            state={{
+                                                                                from: "cash-in-hand",
+                                                                                highlightTxn:
+                                                                                    row?.id,
+                                                                            }}
+                                                                            className="row-menu-item"
+                                                                            onClick={() => {
+                                                                                setClickHighlightId(null);
+                                                                                setRowMenuOpen(null);
+                                                                            }}
+                                                                        >
+                                                                            <Eye
+                                                                                size={13}
+                                                                                style={{
+                                                                                    color: "#4CA1AF",
+                                                                                }}
+                                                                            />
+
+                                                                            View /
+                                                                            Edit
+                                                                        </NavLink>
+                                                                    ))}
+
+                                                                {/* <button
+                                                                    type="button"
+                                                                    className="row-menu-item"
+                                                                    onClick={() => {
+                                                                        setRowMenuOpen(
+                                                                            null
+                                                                        );
+
+                                                                        console.log(
+                                                                            "Print transaction:",
+                                                                            row
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Printer
+                                                                        size={13}
+                                                                        style={{
+                                                                            color: "#4CA1AF",
+                                                                        }}
+                                                                    />
+
+                                                                    Print
+                                                                </button> */}
+
+                                                                <button
+                                                                    type="button"
+                                                                    className="row-menu-item delete-item"
+                                                                    title="Delete transaction"
+                                                                    onClick={() => {
+                                                                        setRowMenuOpen(
+                                                                            null
+                                                                        );
+
+                                                                        setDeleteTarget(
+                                                                            {
+                                                                                Id: row.Formatted_Reference_Id,
+                                                                                Txn_Type:
+                                                                                    row.Txn_Type,
+                                                                            }
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Trash2
+                                                                        size={13}
+                                                                        style={{
+                                                                            color: "#dc2626",
+                                                                        }}
+                                                                    />
+
+                                                                    Delete
+                                                                </button>
+
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );

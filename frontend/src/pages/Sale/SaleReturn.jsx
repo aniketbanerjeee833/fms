@@ -195,7 +195,7 @@ export default function SaleReturn() {
   }, [bulkSaleReturnReportData, showSaleReturnBulkPrintPreview]);
   const virtualListRef = useRef(null);
   const hasScrolledToHighlightRef = useRef(false);
-   const [clickHighlightId, setClickHighlightId] = useState(null);
+  const [clickHighlightId, setClickHighlightId] = useState(null);
   //const skipHighlightScrollRef = useRef(false);
 
   const highlightTxnId = searchParams.get("highlightTxn");
@@ -536,7 +536,7 @@ export default function SaleReturn() {
                       rowMenuOpen === saleReturn?.id
                     }
                     renderRow={(saleReturn, idx) => {
-                     const isHighlighted =
+                      const isHighlighted =
                         clickHighlightId !== null
                           ? String(clickHighlightId) === String(saleReturn?.id)
                           : String(searchParams.get("highlightTxn")) ===
@@ -561,7 +561,7 @@ export default function SaleReturn() {
                           }}
                           onDoubleClick={() => {
                             setClickHighlightId(null);
-                            const params =new URLSearchParams(searchParams);
+                            const params = new URLSearchParams(searchParams);
 
                             params.set(
                               "highlightTxn",
@@ -687,23 +687,23 @@ export default function SaleReturn() {
                               //   );
                               // }}
 
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                              onClick={(e) => {
+                                e.stopPropagation();
 
-                                  // Highlight this row, but DON'T scroll
-                                  //skipHighlightScrollRef.current = true;
-                                  setClickHighlightId(saleReturn.id);
-                                  // const next = new URLSearchParams(searchParams);
-                                  // next.set("highlightTxn", saleReturn.id);
+                                // Highlight this row, but DON'T scroll
+                                //skipHighlightScrollRef.current = true;
+                                setClickHighlightId(saleReturn.id);
+                                // const next = new URLSearchParams(searchParams);
+                                // next.set("highlightTxn", saleReturn.id);
 
-                                  // setSearchParams(next, { replace: true });
+                                // setSearchParams(next, { replace: true });
 
-                                  setRowMenuOpen(
-                                    rowMenuOpen === saleReturn.id
-                                      ? null
-                                      : saleReturn.id
-                                  );
-                                }}
+                                setRowMenuOpen(
+                                  rowMenuOpen === saleReturn.id
+                                    ? null
+                                    : saleReturn.id
+                                );
+                              }}
                               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                               style={{
                                 backgroundColor:
@@ -723,7 +723,7 @@ export default function SaleReturn() {
 
                             {/* ROW MENU */}
 
-                            {rowMenuOpen ===
+                            {/* {rowMenuOpen ===
                               saleReturn.id && (
                                 <div
                                   onClick={(e) =>
@@ -740,7 +740,7 @@ export default function SaleReturn() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {/* VIEW / EDIT */}
+                                
 
                                   <NavLink
                                     to={{
@@ -783,7 +783,7 @@ export default function SaleReturn() {
                                     View / Edit
                                   </NavLink>
 
-                                  {/* PRINT */}
+                                 
 
                                   <button
                                     type="button"
@@ -813,7 +813,7 @@ export default function SaleReturn() {
                                     Print
                                   </button>
 
-                                  {/* DELETE */}
+                                  
 
                                   <button
                                     type="button"
@@ -845,7 +845,114 @@ export default function SaleReturn() {
                                     Delete
                                   </button>
                                 </div>
-                              )}
+                              )} */}
+                            {rowMenuOpen === saleReturn.id && (
+                              <div
+                                onClick={(e) =>
+                                  e.stopPropagation()
+                                }
+                                className="absolute bg-white shadow-lg rounded-md"
+                                style={{
+                                  right: 0,
+                                  top: "100%",
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {/* VIEW / EDIT */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/sale/return/edit/${saleReturn?.id}`,
+                                    search: (() => {
+                                      const params =
+                                        new URLSearchParams(
+                                          searchParams
+                                        );
+
+                                      params.set(
+                                        "highlightTxn",
+                                        saleReturn?.id
+                                      );
+
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-sale-return-list",
+                                  }}
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setClickHighlightId(null);
+                                    setRowMenuOpen(null);
+                                  }}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+
+                                  <span>
+                                    View / Edit
+                                  </span>
+                                </NavLink>
+
+
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setPrintSaleReturnId(
+                                      saleReturn.id
+                                    );
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
+
+                                  <span>
+                                    Print
+                                  </span>
+                                </button>
+
+
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item delete-item"
+                                  title="Delete sale return"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
+
+                                    setDeleteTarget({
+                                      Sale_Return_Id:
+                                        saleReturn.id,
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{
+                                      color: "#dc2626",
+                                    }}
+                                  />
+
+                                  <span>
+                                    Delete
+                                  </span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

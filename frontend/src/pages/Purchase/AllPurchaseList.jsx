@@ -855,7 +855,7 @@ export default function AllPurchaseList() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {/* VIEW / EDIT */}
+                                  {/* ── VIEW / EDIT ── */}
                                   <NavLink
                                     to={{
                                       pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
@@ -873,36 +873,27 @@ export default function AllPurchaseList() {
                                     state={{
                                       from: "all-purchase-list",
                                     }}
-                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                    style={{
-                                      color: "#374151",
-                                      textDecoration: "none",
-                                    }}
-                                    onClick={() =>{
+                                    className="row-menu-item"
+                                    onClick={() => {
                                       setClickHighlightId(null);
-                                       setRowMenuOpen(null)
-                                      }}
-                                      
+                                      setRowMenuOpen(null);
+                                    }}
                                   >
                                     <Eye
                                       size={13}
                                       style={{ color: "#4CA1AF" }}
                                     />
 
-                                    View / Edit
+                                    <span>
+                                      View / Edit
+                                    </span>
                                   </NavLink>
-                                
 
-                                  {/* PRINT */}
+
+                                  {/* ── PRINT ── */}
                                   <button
                                     type="button"
-                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                    style={{
-                                      color: "#374151",
-                                      backgroundColor: "transparent",
-                                      border: "none",
-                                      cursor: "pointer",
-                                    }}
+                                    className="row-menu-item"
                                     onClick={() => {
                                       setRowMenuOpen(null);
                                       setPrintPurchaseId(
@@ -915,20 +906,19 @@ export default function AllPurchaseList() {
                                       style={{ color: "#4CA1AF" }}
                                     />
 
-                                    Print
+                                    <span>
+                                      Print
+                                    </span>
                                   </button>
 
-                                  {/* RETURN */}
+
+                                  {/* ── RETURN ── */}
                                   <NavLink
                                     to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
                                     state={{
                                       from: "purchase-return-list",
                                     }}
-                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                    style={{
-                                      color: "#374151",
-                                      textDecoration: "none",
-                                    }}
+                                    className="row-menu-item"
                                     onClick={() => setRowMenuOpen(null)}
                                   >
                                     <Undo2
@@ -936,19 +926,16 @@ export default function AllPurchaseList() {
                                       style={{ color: "#4CA1AF" }}
                                     />
 
-                                    Return
+                                    <span>
+                                      Return
+                                    </span>
                                   </NavLink>
 
-                                  {/* DELETE */}
+
+                                  {/* ── DELETE ── */}
                                   <button
                                     type="button"
-                                    className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                    style={{
-                                      cursor: "pointer",
-                                      color: "#dc2626",
-                                      backgroundColor: "transparent",
-                                      border: "none",
-                                    }}
+                                    className="row-menu-item delete-item"
                                     onClick={() => {
                                       setRowMenuOpen(null);
 
@@ -963,7 +950,9 @@ export default function AllPurchaseList() {
                                       style={{ color: "#dc2626" }}
                                     />
 
-                                    Delete
+                                    <span>
+                                      Delete
+                                    </span>
                                   </button>
                                 </div>
                               )}
@@ -1137,6 +1126,7 @@ export default function AllPurchaseList() {
           />
         </div>
       )}
+
     </>
 
 
