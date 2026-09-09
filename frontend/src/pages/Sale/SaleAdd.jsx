@@ -1668,6 +1668,7 @@ setRows(
 
     setShowScanCodeModal(false);
   };
+  console.log(saleMode)
   return (
     <>
 
