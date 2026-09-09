@@ -158,6 +158,13 @@ const SETTING_RULES = {
   calculate_sale_price_from_mrp_disc: {
     requiresEnabled: ['show_mrp'], // can't turn this on unless these are already on
   },
+  barcode_scan: {
+    onDisable: ["direct_barcode_scan"],
+  },
+
+  direct_barcode_scan: {
+    requiresEnabled: ["barcode_scan"],
+  },
   // future example:
   // enable_gst: {
   //   onDisable: ['show_gst_breakup', 'auto_calculate_gst'],

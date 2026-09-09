@@ -15,7 +15,19 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
-
+const optionalDigitsOnly = (fieldName) =>
+  z
+    .union([z.string(), z.number(), z.null(), z.undefined()])
+    .transform((val) => String(val ?? "").trim())
+    .refine(
+      (val) => val === "" || /^-?\d+(\.\d{1,3})?$/.test(val),
+      {
+        message: `${fieldName} must be a valid number with up to 3 decimals`,
+      }
+    )
+    .transform((val) =>
+      val === "" ? null : Number(val)
+    );
 
 const paymentSplitSchema = z
   .object({
@@ -67,6 +79,14 @@ const purchaseSchema = z.object({
   State_Of_Supply: z.string().nullable().optional(),
 
   // 🔹 Totals can legitimately be 0 for an empty bill
+  Transaction_Discount_Percentage: optionalDigitsOnly(
+  "Transaction_Discount_Percentage"
+),
+
+Transaction_Discount_Amount: optionalDigitsOnly(
+  "Transaction_Discount_Amount"
+),
+
   Total_Amount: digitsOnly("Total_Amount", false).default(0),
   Round_Off: z
     .union([z.string(), z.number()])

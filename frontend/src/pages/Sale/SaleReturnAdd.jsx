@@ -24,7 +24,7 @@ import { saleReturnApi, useCreateSaleReturnMutation } from "../../redux/api/sale
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { Trash2 } from "lucide-react";
+import { ScanLine, Trash2 } from "lucide-react";
 import AddItemModal from "../../components/Modal/AddItemModal";
 import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
@@ -33,6 +33,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -426,7 +427,7 @@ export default function SaleReturnAdd() {
     }
 
   })
-  const { fields, append, remove,replace } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -488,6 +489,12 @@ export default function SaleReturnAdd() {
         (s) => s.setting_key === "show_mrp"
       )?.setting_value
     ) === 1;
+  const barcodeScanEnabled =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "barcode_scan"
+      )?.setting_value
+    ) === 1;
 
   const calculateSalePriceFromMRP =
     Number(
@@ -495,6 +502,37 @@ export default function SaleReturnAdd() {
         (s) =>
           s.setting_key ===
           "calculate_sale_price_from_mrp_disc"
+      )?.setting_value
+    ) === 1;
+
+  const {
+    data: taxesGSTSettingsData,
+  } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
+
+  const enableGST =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key === "enable_gst"
+      )?.setting_value
+    ) === 1;
+
+  // const enableHSNSAC =
+  //   Number(
+  //     taxesGSTSettings.find(
+  //       (s) =>
+  //         s.setting_key === "enable_hsn_sac"
+  //     )?.setting_value
+  //   ) === 1;
+
+  const enablePlaceOfSupply =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_place_of_supply"
       )?.setting_value
     ) === 1;
 
@@ -672,32 +710,7 @@ export default function SaleReturnAdd() {
     });
   };
 
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
-
-  // const handleDeleteRow = (i) => {
-  //   // 1. get current items BEFORE removal
-  //   const currentItems = watch("items");
-
-  //   // 2. calculate new total excluding the deleted row
-  //   const newTotal = currentItems.reduce((sum, row, idx) => {
-  //     if (idx === i) return sum;                    // skip deleted row
-  //     return sum + parseFloat(row.Amount || 0);
-  //   }, 0);
-
-  //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  //   const newBalanceDue = newTotal - currentTotalPaid;
-
-  //   // 3. remove from UI state and form
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
-  //   remove(i);
-
-  //   // 4. update totals
-  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-  //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  // };
+ 
   const handleDeleteRow = (i) => {
     // 1. get current items BEFORE removal
     const currentItems = watch("items");
@@ -782,11 +795,14 @@ export default function SaleReturnAdd() {
     isUnitLocked: false,
     isExistingItem: false,
   });
+    const originalTaxTypesRef = useRef([]);
   useEffect(() => {
     if (sale) {
-
+       originalTaxTypesRef.current = (sale?.items || []).map(
+        (item) => item?.Tax_Type || "None"
+      );
       setPartySearch(sale.invoicePartyDetails.Party_Name);
-     
+
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item, index) => {
 
@@ -958,8 +974,8 @@ export default function SaleReturnAdd() {
 
   useEffect(() => {
     if (sale) {
-
-      // setValue("GSTIN", sale.GSTIN ? String(sale.GSTIN) : "");
+      
+    
       setShowGSTIN(sale.GSTIN ? String(sale.GSTIN) : "");
     }
   }, [sale]);
@@ -1258,7 +1274,7 @@ export default function SaleReturnAdd() {
   const handleOpenScanModal = () => {
     setShowScanCodeModal(true);
   };
- 
+
   const handleScanSave = (scannedItems) => {
     if (!scannedItems?.length) return;
 
@@ -1294,7 +1310,7 @@ export default function SaleReturnAdd() {
 
         // MRP only when greater than 0
         //MRP: mrp > 0 ? mrp : "",
-         MRP:showMRP && mrp > 0? mrp: "",
+        MRP: showMRP && mrp > 0 ? mrp : "",
 
         // ✅ MRP discount from master
         Discount_On_MRP_For_Sale_Percentage:
@@ -1560,61 +1576,61 @@ export default function SaleReturnAdd() {
     //   return filledRows;
     // });
 
-       setRows(
-  combinedItems.map((item) => ({
-    itemSearch: item.Item_Name || "",
+    setRows(
+      combinedItems.map((item) => ({
+        itemSearch: item.Item_Name || "",
 
-    itemOpen: false,
+        itemOpen: false,
 
-    isExistingItem: true,
-    isHSNLocked: false,
-    isUnitLocked: false,
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
 
-    CategoryOpen: false,
-    categorySearch: item.Item_Category || "",
+        CategoryOpen: false,
+        categorySearch: item.Item_Category || "",
 
-    unitOpen: false,
-    unitSearch: "",
+        unitOpen: false,
+        unitSearch: "",
 
-    Item_Id: item.Item_Id || "",
+        Item_Id: item.Item_Id || "",
 
-    Item_Name: item.Item_Name || "",
-    Item_Category: item.Item_Category || "",
-    Item_HSN: item.Item_HSN || "",
+        Item_Name: item.Item_Name || "",
+        Item_Category: item.Item_Category || "",
+        Item_HSN: item.Item_HSN || "",
 
-    // Current MRP setting controls newly scanned items
-    MRP:showMRP && Number(item.MRP) > 0
-        ? Number(item.MRP)
-        : "",
+        // Current MRP setting controls newly scanned items
+        MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
-    // MRP discount
-    Discount_On_MRP_For_Sale_Percentage:
-      showMRP &&
-      calculateSalePriceFromMRP &&
-      Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
-        ? item.Discount_On_MRP_For_Sale_Percentage
-        : "",
+        // MRP discount
+        Discount_On_MRP_For_Sale_Percentage:
+          showMRP &&
+            calculateSalePriceFromMRP &&
+            Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
+            ? item.Discount_On_MRP_For_Sale_Percentage
+            : "",
 
-    Primary_Unit: item.Primary_Unit || null,
-    Secondary_Unit: item.Secondary_Unit || null,
-    Conversion_Rate: item.Conversion_Rate || null,
+        Primary_Unit: item.Primary_Unit || null,
+        Secondary_Unit: item.Secondary_Unit || null,
+        Conversion_Rate: item.Conversion_Rate || null,
 
-    Available_Units: Array.isArray(item.Available_Units)
-      ? item.Available_Units
-      : [],
+        Available_Units: Array.isArray(item.Available_Units)
+          ? item.Available_Units
+          : [],
 
-    Sale_Price: item.Sale_Price || "",
+        Sale_Price: item.Sale_Price || "",
 
-    Discount_On_Sale_Price:
-      item.Discount_On_Sale_Price ?? "",
+        Discount_On_Sale_Price:
+          item.Discount_On_Sale_Price ?? "",
 
-    Discount_Type_On_Sale_Price:
-      item.Discount_Type_On_Sale_Price ||
-      "Percentage",
+        Discount_Type_On_Sale_Price:
+          item.Discount_Type_On_Sale_Price ||
+          "Percentage",
 
-    Tax_Type: item.Tax_Type || "None",
-  }))
-);
+        Tax_Type: item.Tax_Type || "None",
+      }))
+    );
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1773,7 +1789,7 @@ export default function SaleReturnAdd() {
         </div>
         <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+            <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
               {/* <div className="row"> */}
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
                 <div className=" flex flex-col relative mt-2 gap-2 party-class"
@@ -2089,7 +2105,8 @@ export default function SaleReturnAdd() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center w-full gap-3 justify-end
+                {enablePlaceOfSupply && (
+                  <div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
                   {/* <div className="row w-1/2"> */}
 
@@ -2118,7 +2135,7 @@ export default function SaleReturnAdd() {
                             {errors?.State_Of_Supply?.message}
                           </p>
                         )} */}
-                </div>
+                </div>)}
 
 
               </div>
@@ -2135,12 +2152,15 @@ export default function SaleReturnAdd() {
               <table className="table table-hover">
                 <thead>
                   <tr>
-
                     <th
-                      className=" cursor-pointer"
+                      className="cursor-pointer"
                       onClick={handleOpenScanModal}
                     >
-                      Sl.No
+                      {barcodeScanEnabled ? (
+                        <ScanLine size={18} />
+                      ) : (
+                        "Sl.No"
+                      )}
                     </th>
                     <th>Category</th>
                     <th>Item</th>
@@ -3596,7 +3616,7 @@ export default function SaleReturnAdd() {
                                 const mrp = Number(it.MRP) || 0;
                                 const mrpDiscount = Number(it.Discount_On_MRP_For_Sale) || 0;
 
-                                  const calculatedSalePrice =
+                                const calculatedSalePrice =
                                   calculateSalePriceFromMRP && mrp > 0
                                     ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
                                     : (it.Sale_Price || 0);
@@ -4782,7 +4802,7 @@ export default function SaleReturnAdd() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Tax_Type`} // ✅ remove disabled here
@@ -4837,6 +4857,94 @@ export default function SaleReturnAdd() {
                               <option value="IGST40">IGST @40%</option>
                             </select>
                           )}
+                        />
+                      </td> */}
+
+                      {/* Tax Amount Entry */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`}
+                          render={({ field }) => {
+                            const originalTaxType =
+                              originalTaxTypesRef.current[i] || "None";
+
+                            return (
+                              <select
+                                {...field}
+                                className="form-select bg-gray-100 text-gray-700"
+                                onChange={(e) => {
+                                  field.onChange(e);
+
+                                  // Recalculate amounts on Tax_Type change
+                                  const {
+                                    Tax_Amount,
+                                    Amount,
+                                  } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Tax_Type: e.target.value,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  setValue(`items.${i}.Amount`, Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  syncTotalsAfterItemChange();
+                                }}
+                              >
+                                {/* Always show None */}
+                                <option value="None">None</option>
+
+                                {enableGST ? (
+                                  <>
+                                    <option value="GST0">GST @0%</option>
+                                    <option value="IGST0">IGST @0%</option>
+
+                                    <option value="GST0.25">GST @0.25%</option>
+                                    <option value="IGST0.25">IGST @0.25%</option>
+
+                                    <option value="GST3">GST @3%</option>
+                                    <option value="IGST3">IGST @3%</option>
+
+                                    <option value="GST5">GST @5%</option>
+                                    <option value="IGST5">IGST @5%</option>
+
+                                    <option value="GST12">GST @12%</option>
+                                    <option value="IGST12">IGST @12%</option>
+
+                                    <option value="GST18">GST @18%</option>
+                                    <option value="IGST18">IGST @18%</option>
+
+                                    <option value="GST28">GST @28%</option>
+                                    <option value="IGST28">IGST @28%</option>
+
+                                    <option value="GST40">GST @40%</option>
+                                    <option value="IGST40">IGST @40%</option>
+                                  </>
+                                ) : (
+                                  /* GST OFF:
+                                     Show None + original saved tax type */
+                                  originalTaxType !== "None" && (
+                                    <option value={originalTaxType}>
+                                      {originalTaxType.startsWith("GST")
+                                        ? `GST @${originalTaxType.replace("GST", "")}%`
+                                        : originalTaxType.startsWith("IGST")
+                                          ? `IGST @${originalTaxType.replace("IGST", "")}%`
+                                          : originalTaxType}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            );
+                          }}
                         />
                       </td>
 

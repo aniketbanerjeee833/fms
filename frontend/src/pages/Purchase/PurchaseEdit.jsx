@@ -20,7 +20,7 @@ import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { Trash2 } from "lucide-react";
+import { ScanLine, Trash2 } from "lucide-react";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 import AddItemModal from "../../components/Modal/AddItemModal";
@@ -30,6 +30,7 @@ import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 
 function ItemDropdownVirtualized({
 
@@ -407,10 +408,46 @@ export default function PurchaseEdit() {
         (s) => s.setting_key === "show_mrp"
       )?.setting_value
     ) === 1;
+  const barcodeScanEnabled =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "barcode_scan"
+      )?.setting_value
+    ) === 1;
   const hasHistoricalMRP =
     purchase?.items?.some(
       (item) => item.hasHistoricalMRP === true
     );
+  const {
+    data: taxesGSTSettingsData,
+  } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
+
+  const enableGST =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key === "enable_gst"
+      )?.setting_value
+    ) === 1;
+
+  // const enableHSNSAC =
+  //   Number(
+  //     taxesGSTSettings.find(
+  //       (s) =>
+  //         s.setting_key === "enable_hsn_sac"
+  //     )?.setting_value
+  //   ) === 1;
+
+  const enablePlaceOfSupply =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_place_of_supply"
+      )?.setting_value
+    ) === 1;
 
   const shouldShowMRP = showMRP || hasHistoricalMRP;
   const handleRowChange = (index, field, value) => {
@@ -832,8 +869,12 @@ export default function PurchaseEdit() {
     isUnitLocked: false,
     isExistingItem: false,
   });
+  const originalTaxTypesRef = useRef([]);
   useEffect(() => {
     if (purchase) {
+      originalTaxTypesRef.current = (purchase?.items || []).map(
+        (item) => item?.Tax_Type || "None"
+      );
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
 
 
@@ -1831,7 +1872,7 @@ export default function PurchaseEdit() {
         </div>
         <div style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+            <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
 
 
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
@@ -2106,8 +2147,7 @@ export default function PurchaseEdit() {
 
 
 
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
+                {enablePlaceOfSupply && (<div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
                   <span className="whitespace-nowrap ">
                     State of Supply
@@ -2125,17 +2165,14 @@ export default function PurchaseEdit() {
                         {state}
                       </option>
                     ))}
-                    {/* <option value="West Bengal">West Bengal</option>
-                        <option value="Maharashtra">Maharashtra</option>
-                        <option value="Karnataka">Karnataka</option>
-                        <option value="Delhi">Delhi</option> */}
+        
                   </select>
                   {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
                       {errors?.State_Of_Supply?.message}
                     </p>
                   )}
-                </div>
+                </div>)}
               </div>
 
 
@@ -2156,10 +2193,14 @@ export default function PurchaseEdit() {
                   <tr>
 
                     <th
-                      className=" cursor-pointer"
+                      className="cursor-pointer"
                       onClick={handleOpenScanModal}
                     >
-                      Sl.No
+                      {barcodeScanEnabled ? (
+                        <ScanLine size={18} />
+                      ) : (
+                        "Sl.No"
+                      )}
                     </th>
                     <th>Category</th>
                     <th>Item</th>
@@ -3980,7 +4021,7 @@ export default function PurchaseEdit() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Tax_Type`}
@@ -3993,7 +4034,7 @@ export default function PurchaseEdit() {
                                 field.onChange(e); // ✅ update RHF value
 
 
-                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                const { Tax_Amount, Amount } = calculateRowAmount(
                                   { ...itemsValues[i], Tax_Type: e.target.value },
                                   i,
                                   itemsValues
@@ -4024,6 +4065,93 @@ export default function PurchaseEdit() {
                               <option value="IGST40">IGST @40%</option>
                             </select>
                           )}
+                        />
+                      </td> */}
+                      {/* Tax Amount Entry */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`}
+                          render={({ field }) => {
+                            const originalTaxType =
+                              originalTaxTypesRef.current[i] || "None";
+
+                            return (
+                              <select
+                                {...field}
+                                className="form-select bg-gray-100 text-gray-700"
+                                onChange={(e) => {
+                                  field.onChange(e);
+
+                                  // Recalculate amounts on Tax_Type change
+                                  const {
+                                    Tax_Amount,
+                                    Amount,
+                                  } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Tax_Type: e.target.value,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  setValue(`items.${i}.Amount`, Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  syncTotalsAfterItemChange();
+                                }}
+                              >
+                                {/* Always show None */}
+                                <option value="None">None</option>
+
+                                {enableGST ? (
+                                  <>
+                                    <option value="GST0">GST @0%</option>
+                                    <option value="IGST0">IGST @0%</option>
+
+                                    <option value="GST0.25">GST @0.25%</option>
+                                    <option value="IGST0.25">IGST @0.25%</option>
+
+                                    <option value="GST3">GST @3%</option>
+                                    <option value="IGST3">IGST @3%</option>
+
+                                    <option value="GST5">GST @5%</option>
+                                    <option value="IGST5">IGST @5%</option>
+
+                                    <option value="GST12">GST @12%</option>
+                                    <option value="IGST12">IGST @12%</option>
+
+                                    <option value="GST18">GST @18%</option>
+                                    <option value="IGST18">IGST @18%</option>
+
+                                    <option value="GST28">GST @28%</option>
+                                    <option value="IGST28">IGST @28%</option>
+
+                                    <option value="GST40">GST @40%</option>
+                                    <option value="IGST40">IGST @40%</option>
+                                  </>
+                                ) : (
+                                  /* GST OFF:
+                                     Show None + original saved tax type */
+                                  originalTaxType !== "None" && (
+                                    <option value={originalTaxType}>
+                                      {originalTaxType.startsWith("GST")
+                                        ? `GST @${originalTaxType.replace("GST", "")}%`
+                                        : originalTaxType.startsWith("IGST")
+                                          ? `IGST @${originalTaxType.replace("IGST", "")}%`
+                                          : originalTaxType}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            );
+                          }}
                         />
                       </td>
 

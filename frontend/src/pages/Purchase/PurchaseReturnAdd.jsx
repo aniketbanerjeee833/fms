@@ -21,7 +21,7 @@ import { purchaseReturnApi, useCreatePurchaseReturnMutation } from "../../redux/
 import { purchaseReturnFormSchema } from "../../schema/purchaseReturnFormScema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { Trash2 } from "lucide-react"
+import { ScanLine, Trash2 } from "lucide-react"
 import AddItemModal from "../../components/Modal/AddItemModal";
 import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 
@@ -30,6 +30,7 @@ import { useCallback } from "react";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -421,6 +422,42 @@ export default function PurchaseReturnAdd() {
         (s) => s.setting_key === "show_mrp"
       )?.setting_value
     ) === 1;
+     const barcodeScanEnabled =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "barcode_scan"
+      )?.setting_value
+    ) === 1;
+      const {
+        data: taxesGSTSettingsData,
+      } = useGetAllTaxesAndGSTSettingsQuery();
+    
+      const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
+    
+      const enableGST =
+        Number(
+          taxesGSTSettings.find(
+            (s) =>
+              s.setting_key === "enable_gst"
+          )?.setting_value
+        ) === 1;
+    
+      // const enableHSNSAC =
+      //   Number(
+      //     taxesGSTSettings.find(
+      //       (s) =>
+      //         s.setting_key === "enable_hsn_sac"
+      //     )?.setting_value
+      //   ) === 1;
+    
+      const enablePlaceOfSupply =
+        Number(
+          taxesGSTSettings.find(
+            (s) =>
+              s.setting_key ===
+              "enable_place_of_supply"
+          )?.setting_value
+        ) === 1;
   const hasHistoricalMRP =
     purchase?.items?.some(
       (item) => item.hasHistoricalMRP === true
@@ -724,23 +761,15 @@ export default function PurchaseReturnAdd() {
     isUnitLocked: false,
     isExistingItem: false,
   });
+  const originalTaxTypesRef = useRef([]);
   useEffect(() => {
     if (purchase) {
+       originalTaxTypesRef.current = (purchase?.items || []).map(
+        (item) => item?.Tax_Type || "None"
+      );
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name);
 
-      // const prefilledRows = purchase?.items?.length > 0
-      //   ? purchase.items.map((item) => ({
-      //     ...item,
-      //     Item_Unit: item.Selected_Unit || "",
-      //     itemSearch: item.Item_Name,
-      //     itemOpen: false,
-      //     CategoryOpen: false,
-      //     isHSNLocked: false,
-      //     isUnitLocked: false,
-      //     isExistingItem: true,
-      //   }))
-      //   : [emptyRow()];
-      // setRows(prefilledRows);
+     
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item, index) => {
 
@@ -2036,7 +2065,7 @@ export default function PurchaseReturnAdd() {
 
 
 
-                <div className="flex items-center w-full gap-3 justify-end
+                {enablePlaceOfSupply && (<div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
                   <span className="whitespace-nowrap ">
                     State of Supply
@@ -2054,17 +2083,10 @@ export default function PurchaseReturnAdd() {
                         {state}
                       </option>
                     ))}
-                    {/* <option value="West Bengal">West Bengal</option>
-                        <option value="Maharashtra">Maharashtra</option>
-                        <option value="Karnataka">Karnataka</option>
-                        <option value="Delhi">Delhi</option> */}
+               
                   </select>
-                  {/* {errors?.State_Of_Supply && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.State_Of_Supply?.message}
-                    </p>
-                  )} */}
-                </div>
+                
+                </div>)}
               </div>
 
 
@@ -2083,11 +2105,15 @@ export default function PurchaseReturnAdd() {
                 <thead>
                   <tr>
 
-                    <th
-                      className=" cursor-pointer"
+                     <th
+                      className="cursor-pointer"
                       onClick={handleOpenScanModal}
                     >
-                      Sl.No
+                      {barcodeScanEnabled ? (
+                        <ScanLine size={18} />
+                      ) : (
+                        "Sl.No"
+                      )}
                     </th>
                     <th>Category</th>
                     <th>Item</th>
@@ -4012,7 +4038,7 @@ export default function PurchaseReturnAdd() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Tax_Type`}
@@ -4057,7 +4083,95 @@ export default function PurchaseReturnAdd() {
                             </select>
                           )}
                         />
-                      </td>
+                      </td> */}
+
+                       {/* Tax Amount Entry */}
+                                            <td style={{ padding: "0px", width: "12%" }}>
+                                              <Controller
+                                                control={control}
+                                                name={`items.${i}.Tax_Type`}
+                                                render={({ field }) => {
+                                                  const originalTaxType =
+                                                    originalTaxTypesRef.current[i] || "None";
+                      
+                                                  return (
+                                                    <select
+                                                      {...field}
+                                                      className="form-select bg-gray-100 text-gray-700"
+                                                      onChange={(e) => {
+                                                        field.onChange(e);
+                      
+                                                        // Recalculate amounts on Tax_Type change
+                                                        const {
+                                                          Tax_Amount,
+                                                          Amount,
+                                                        } = calculateRowAmount(
+                                                          {
+                                                            ...itemsValues[i],
+                                                            Tax_Type: e.target.value,
+                                                          },
+                                                          i,
+                                                          itemsValues
+                                                        );
+                      
+                                                        setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                                          shouldValidate: true,
+                                                        });
+                      
+                                                        setValue(`items.${i}.Amount`, Amount, {
+                                                          shouldValidate: true,
+                                                        });
+                      
+                                                        syncTotalsAfterItemChange();
+                                                      }}
+                                                    >
+                                                      {/* Always show None */}
+                                                      <option value="None">None</option>
+                      
+                                                      {enableGST ? (
+                                                        <>
+                                                          <option value="GST0">GST @0%</option>
+                                                          <option value="IGST0">IGST @0%</option>
+                      
+                                                          <option value="GST0.25">GST @0.25%</option>
+                                                          <option value="IGST0.25">IGST @0.25%</option>
+                      
+                                                          <option value="GST3">GST @3%</option>
+                                                          <option value="IGST3">IGST @3%</option>
+                      
+                                                          <option value="GST5">GST @5%</option>
+                                                          <option value="IGST5">IGST @5%</option>
+                      
+                                                          <option value="GST12">GST @12%</option>
+                                                          <option value="IGST12">IGST @12%</option>
+                      
+                                                          <option value="GST18">GST @18%</option>
+                                                          <option value="IGST18">IGST @18%</option>
+                      
+                                                          <option value="GST28">GST @28%</option>
+                                                          <option value="IGST28">IGST @28%</option>
+                      
+                                                          <option value="GST40">GST @40%</option>
+                                                          <option value="IGST40">IGST @40%</option>
+                                                        </>
+                                                      ) : (
+                                                        /* GST OFF:
+                                                           Show None + original saved tax type */
+                                                        originalTaxType !== "None" && (
+                                                          <option value={originalTaxType}>
+                                                            {originalTaxType.startsWith("GST")
+                                                              ? `GST @${originalTaxType.replace("GST", "")}%`
+                                                              : originalTaxType.startsWith("IGST")
+                                                                ? `IGST @${originalTaxType.replace("IGST", "")}%`
+                                                                : originalTaxType}
+                                                          </option>
+                                                        )
+                                                      )}
+                                                    </select>
+                                                  );
+                                                }}
+                                              />
+                                            </td>
 
                       {/* Tax Amount */}
                       <td style={{ width: "8%" }}>

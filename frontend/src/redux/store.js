@@ -24,6 +24,8 @@ import { expenseApi } from "./api/expenseApi";
 import { termsConditionsApi } from "./api/termsConditionsApi";
 import { settingsApi } from "./api/Settings/settingsApi";
 import { barcodeSettingsApi } from "./api/Settings/barcodeSettingsApi";
+import { taxesAndGSTSettingsApi } from "./api/Settings/taxesAndGSTSettingsApi";
+import { transactionsSettingApi } from "./api/Settings/transactionsSettingApi";
 
 
 // ✅ Combine reducers
@@ -48,6 +50,8 @@ const rootReducer = combineReducers({
   [reportApi.reducerPath]: reportApi.reducer,
   [settingsApi.reducerPath]: settingsApi.reducer,
   [barcodeSettingsApi.reducerPath]: barcodeSettingsApi.reducer,
+  [taxesAndGSTSettingsApi.reducerPath]: taxesAndGSTSettingsApi.reducer,
+  [transactionsSettingApi.reducerPath]: transactionsSettingApi.reducer,
   [termsConditionsApi.reducerPath]: termsConditionsApi.reducer
 
  
@@ -85,6 +89,8 @@ const store = configureStore({
       expenseApi.middleware,
       reportApi.middleware,
       settingsApi.middleware,
+      taxesAndGSTSettingsApi.middleware,
+      transactionsSettingApi.middleware,
       barcodeSettingsApi.middleware,
       termsConditionsApi.middleware
      

@@ -16,7 +16,7 @@ import { toast } from "react-toastify";
 
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, ScanLine } from "lucide-react";
 import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 
@@ -36,6 +36,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -424,7 +425,7 @@ export default function PurchaseReturndEdit() {
       ],
     },
   });
-  const { fields, append, remove,replace } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -487,6 +488,42 @@ export default function PurchaseReturndEdit() {
     Number(
       settings.find(
         (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
+  const barcodeScanEnabled =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "barcode_scan"
+      )?.setting_value
+    ) === 1;
+  const {
+    data: taxesGSTSettingsData,
+  } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
+
+  const enableGST =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key === "enable_gst"
+      )?.setting_value
+    ) === 1;
+
+  // const enableHSNSAC =
+  //   Number(
+  //     taxesGSTSettings.find(
+  //       (s) =>
+  //         s.setting_key === "enable_hsn_sac"
+  //     )?.setting_value
+  //   ) === 1;
+
+  const enablePlaceOfSupply =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_place_of_supply"
       )?.setting_value
     ) === 1;
   const hasHistoricalMRP =
@@ -738,23 +775,14 @@ export default function PurchaseReturndEdit() {
     isUnitLocked: false,
     isExistingItem: false,
   });
+  const originalTaxTypesRef = useRef([]);
   useEffect(() => {
     if (purchase) {
-
+      originalTaxTypesRef.current = (purchase?.purchaseReturn?.items || []).map(
+        (item) => item?.Tax_Type || "None"
+      );
       setPartySearch(purchase.purchaseReturn.Party_Name);
-      // const prefilledRows = purchase.purchaseReturn.items.length > 0
-      //   ? purchase.purchaseReturn.items.map((item) => ({
-      //     ...item,
-      //     Item_Unit: item.Selected_Unit || "",
-      //     itemSearch: item.Item_Name,
-      //     itemOpen: false,
-      //     CategoryOpen: false,
-      //     isHSNLocked: false,
-      //     isUnitLocked: false,
-      //     isExistingItem: true,
-      //   }))
-      //   : [emptyRow()];
-      // setRows(prefilledRows);
+
       const prefilledRows = purchase?.purchaseReturn?.items.length > 0
         ? purchase?.purchaseReturn.items.map((item, index) => {
 
@@ -904,8 +932,6 @@ export default function PurchaseReturndEdit() {
       setShowSplitBox((purchase?.purchaseReturn?.splits?.length || 0) > 1);
     }
   }, [purchase]);
-  //const Invoice_Number=purchase.purchaseReturn?.Invoice_Number 
-  //const Invoice_Date=purchase?.purchaseReturn?.Invoice_Date
 
 
   console.log("Current form values:", formValues);
@@ -1447,187 +1473,54 @@ export default function PurchaseReturndEdit() {
     // );
     replace(calculatedItems);
 
-    // =====================================================
-    // CREATE UI ROWS
-    // =====================================================
-
-    // const scannedUiRows = scannedItems.map(
-    //   (item) => ({
-    //     itemSearch:
-    //       item.Item_Name || "",
-
-    //     itemOpen: false,
-
-    //     isExistingItem: true,
-    //     isHSNLocked: false,
-    //     isUnitLocked: false,
-
-    //     CategoryOpen: false,
-    //     categorySearch:
-    //       item.Item_Category || "",
-
-    //     unitOpen: false,
-    //     unitSearch: "",
-
-    //     Item_Id:
-    //       item.Item_Id || "",
-
-    //     Item_Name:
-    //       item.Item_Name || "",
-
-    //     Item_Category:
-    //       item.Item_Category || "",
-
-    //     Item_HSN:
-    //       item.Item_HSN || "",
-
-    //     // MRP: Number(item.MRP) > 0
-    //     //   ? Number(item.MRP)
-    //     //   : "",
-    //     MRP: showMRP && Number(item.MRP) > 0
-    //       ? Number(item.MRP)
-    //       : "",
-
-    //     Primary_Unit:
-    //       item.Primary_Unit || null,
-
-    //     Secondary_Unit:
-    //       item.Secondary_Unit || null,
-
-    //     Conversion_Rate:
-    //       item.Conversion_Rate || null,
-
-    //     Available_Units:
-    //       Array.isArray(item.Available_Units)
-    //         ? item.Available_Units
-    //         : [],
-
-    //     // ✅ PURCHASE PRICE
-    //     Purchase_Price:
-    //       Number(item.Purchase_Price) || 0,
-
-    //     // ✅ PURCHASE DISCOUNT
-    //     Discount_On_Purchase_Price:
-    //       item.Discount_On_Purchase_Price ?? "",
-
-    //     Discount_Type_On_Purchase_Price:
-    //       item.Discount_Type_On_Purchase_Price ||
-    //       "Percentage",
-
-    //     Tax_Type:
-    //       item.Tax_Type || "None",
-    //   })
-    // );
-
-    // =====================================================
-    // UPDATE UI ROWS
-    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
-    // =====================================================
-
-    // setRows((prev) => {
-    //   const updatedRows = [...prev];
-
-    //   let uiScanIndex = 0;
-
-    //   // ---------------------------------------------------
-    //   // Fill existing blank rows
-    //   // ---------------------------------------------------
-
-    //   for (
-    //     let i = 0;
-    //     i < updatedRows.length &&
-    //     uiScanIndex < scannedUiRows.length;
-    //     i++
-    //   ) {
-    //     const row = updatedRows[i];
-
-    //     const isBlankRow =
-    //       !row?.Item_Name ||
-    //       !row.Item_Name.trim();
-
-    //     if (isBlankRow) {
-    //       updatedRows[i] =
-    //         scannedUiRows[uiScanIndex];
-
-    //       uiScanIndex++;
-    //     }
-    //   }
-
-    //   // ---------------------------------------------------
-    //   // Remove remaining blank rows
-    //   // ---------------------------------------------------
-
-    //   const filledRows =
-    //     updatedRows.filter(
-    //       (row) =>
-    //         row?.Item_Name &&
-    //         row.Item_Name.trim()
-    //     );
-
-    //   // ---------------------------------------------------
-    //   // Append remaining scanned rows
-    //   // ---------------------------------------------------
-
-    //   if (
-    //     uiScanIndex <
-    //     scannedUiRows.length
-    //   ) {
-    //     filledRows.push(
-    //       ...scannedUiRows.slice(
-    //         uiScanIndex
-    //       )
-    //     );
-    //   }
-
-    //   return filledRows;
-    // });
+    
     setRows(() => {
-  return combinedItems.map((item) => ({
-    itemSearch: item.Item_Name || "",
+      return combinedItems.map((item) => ({
+        itemSearch: item.Item_Name || "",
 
-    itemOpen: false,
+        itemOpen: false,
 
-    isExistingItem: true,
-    isHSNLocked: false,
-    isUnitLocked: false,
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
 
-    CategoryOpen: false,
-    categorySearch: item.Item_Category || "",
+        CategoryOpen: false,
+        categorySearch: item.Item_Category || "",
 
-    unitOpen: false,
-    unitSearch: "",
+        unitOpen: false,
+        unitSearch: "",
 
-    Item_Id: item.Item_Id || "",
+        Item_Id: item.Item_Id || "",
 
-    Item_Name: item.Item_Name || "",
+        Item_Name: item.Item_Name || "",
 
-    Item_Category: item.Item_Category || "",
+        Item_Category: item.Item_Category || "",
 
-    Item_HSN: item.Item_HSN || "",
+        Item_HSN: item.Item_HSN || "",
 
-    MRP: showMRP && Number(item.MRP) > 0
-      ? Number(item.MRP)
-      : "",
+        MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
-    Primary_Unit: item.Primary_Unit || null,
-    Secondary_Unit: item.Secondary_Unit || null,
-    Conversion_Rate: item.Conversion_Rate || null,
+        Primary_Unit: item.Primary_Unit || null,
+        Secondary_Unit: item.Secondary_Unit || null,
+        Conversion_Rate: item.Conversion_Rate || null,
 
-    Available_Units: Array.isArray(item.Available_Units)
-      ? item.Available_Units
-      : [],
+        Available_Units: Array.isArray(item.Available_Units)
+          ? item.Available_Units
+          : [],
 
-    Purchase_Price: Number(item.Purchase_Price) || 0,
+        Purchase_Price: Number(item.Purchase_Price) || 0,
 
-    Discount_On_Purchase_Price:
-      item.Discount_On_Purchase_Price ?? "",
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price ?? "",
 
-    Discount_Type_On_Purchase_Price:
-      item.Discount_Type_On_Purchase_Price || "Percentage",
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price || "Percentage",
 
-    Tax_Type: item.Tax_Type || "None",
-  }));
-});
+        Tax_Type: item.Tax_Type || "None",
+      }));
+    });
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1851,7 +1744,7 @@ export default function PurchaseReturndEdit() {
         </div>
         <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+            <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
               {/* <div className="row"> */}
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
                 <div className=" flex flex-col relative mt-2 gap-2 party-class"
@@ -2168,7 +2061,7 @@ export default function PurchaseReturndEdit() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center w-full gap-3 justify-end
+                {enablePlaceOfSupply && (<div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
                   {/* <div className="row w-1/2"> */}
 
@@ -2197,7 +2090,7 @@ export default function PurchaseReturndEdit() {
                       {errors?.State_Of_Supply?.message}
                     </p>
                   )} */}
-                </div>
+                </div>)}
 
 
               </div>
@@ -2216,10 +2109,14 @@ export default function PurchaseReturndEdit() {
                   <tr>
 
                     <th
-                      className=" cursor-pointer"
+                      className="cursor-pointer"
                       onClick={handleOpenScanModal}
                     >
-                      Sl.No
+                      {barcodeScanEnabled ? (
+                        <ScanLine size={18} />
+                      ) : (
+                        "Sl.No"
+                      )}
                     </th>
                     <th>Category</th>
                     <th>Item</th>
@@ -3895,7 +3792,7 @@ export default function PurchaseReturndEdit() {
                       </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Tax_Type`} // ✅ remove disabled here
@@ -3903,14 +3800,7 @@ export default function PurchaseReturndEdit() {
                             <select
                               {...field}
                               className="form-select bg-gray-100 text-gray-700"
-                              // style={{
-                              //   width: "100%",
-                              //   fontSize: "12px",
-                              //   marginBottom: "0px",
-                              //   pointerEvents: "none", // ✅ visually disabled
-                              //   cursor: "not-allowed",
-                              //   backgroundColor: "#f3f4f6", // light gray
-                              // }}
+                             
                               onChange={(e) => {
                                 field.onChange(e);
 
@@ -3950,6 +3840,94 @@ export default function PurchaseReturndEdit() {
                               <option value="IGST40">IGST @40%</option>
                             </select>
                           )}
+                        />
+                      </td> */}
+
+                      {/* Tax Amount Entry */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`}
+                          render={({ field }) => {
+                            const originalTaxType =
+                              originalTaxTypesRef.current[i] || "None";
+
+                            return (
+                              <select
+                                {...field}
+                                className="form-select bg-gray-100 text-gray-700"
+                                onChange={(e) => {
+                                  field.onChange(e);
+
+                                  // Recalculate amounts on Tax_Type change
+                                  const {
+                                    Tax_Amount,
+                                    Amount,
+                                  } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Tax_Type: e.target.value,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  setValue(`items.${i}.Amount`, Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  syncTotalsAfterItemChange();
+                                }}
+                              >
+                                {/* Always show None */}
+                                <option value="None">None</option>
+
+                                {enableGST ? (
+                                  <>
+                                    <option value="GST0">GST @0%</option>
+                                    <option value="IGST0">IGST @0%</option>
+
+                                    <option value="GST0.25">GST @0.25%</option>
+                                    <option value="IGST0.25">IGST @0.25%</option>
+
+                                    <option value="GST3">GST @3%</option>
+                                    <option value="IGST3">IGST @3%</option>
+
+                                    <option value="GST5">GST @5%</option>
+                                    <option value="IGST5">IGST @5%</option>
+
+                                    <option value="GST12">GST @12%</option>
+                                    <option value="IGST12">IGST @12%</option>
+
+                                    <option value="GST18">GST @18%</option>
+                                    <option value="IGST18">IGST @18%</option>
+
+                                    <option value="GST28">GST @28%</option>
+                                    <option value="IGST28">IGST @28%</option>
+
+                                    <option value="GST40">GST @40%</option>
+                                    <option value="IGST40">IGST @40%</option>
+                                  </>
+                                ) : (
+                                  /* GST OFF:
+                                     Show None + original saved tax type */
+                                  originalTaxType !== "None" && (
+                                    <option value={originalTaxType}>
+                                      {originalTaxType.startsWith("GST")
+                                        ? `GST @${originalTaxType.replace("GST", "")}%`
+                                        : originalTaxType.startsWith("IGST")
+                                          ? `IGST @${originalTaxType.replace("IGST", "")}%`
+                                          : originalTaxType}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            );
+                          }}
                         />
                       </td>
 

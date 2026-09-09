@@ -76,6 +76,10 @@ const BankAccounts= lazy(() => import('./pages/CashAndBank/BankAccounts'));
 
 const BarcodeGenerator = lazy(() => import('./pages/Utilities/BarcodeGenerator'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
+const FinancialYear = lazy(() => import('./pages/Settings/FinancialYear'));
+const Items = lazy(() => import('./pages/Settings/Items'));
+const TaxesAndGST = lazy(() => import('./pages/Settings/TaxesAndGST'));
+const Transactions= lazy(() => import('./pages/Settings/Transactions'));
 // const Reports = lazy(() => import('./pages/Reports'));
 
 
@@ -531,25 +535,42 @@ function RouterWrapper() {
               }
             />
 
-             <Route
-              path="/settings"
-              element={
-                <Layout>
-                  <Settings/>
-                </Layout>
-              }
-            />
+          
+
+ <Route
+  path="/settings"
+  element={
+    <Layout>
+      <Settings />
+    </Layout>
+  }
+>
+  <Route
+    index
+    element={<Navigate to="financial-year" replace />}
+  />
+
+  <Route
+    path="financial-year"
+    element={<FinancialYear />}
+  />
+
+  <Route
+    path="items"
+    element={<Items />}
+  />
+   <Route
+    path="taxes&GST"
+    element={<TaxesAndGST/>}
+  />
+   <Route
+    path="transactions"
+    element={<Transactions/>}
+  />
+</Route>
 
            
 
-              {/* <Route
-              path="/barcode-scanner"
-              element={
-                <Layout>
-                  <BarcodeScannerInput/>
-                </Layout>
-              }
-            /> */}
           </Route>
 
           {/* Fallback */}

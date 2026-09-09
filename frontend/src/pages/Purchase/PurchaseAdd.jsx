@@ -24,7 +24,7 @@ import AddUnitModal from "../../components/Modal/AddUnitModal";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
-import { Trash2 } from "lucide-react";
+import { ScanLine, Trash2 } from "lucide-react";
 
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
@@ -34,6 +34,8 @@ import BankAccountModal from "../../components/Modal/BankAccountModal";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
+import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -377,6 +379,45 @@ export default function PurchaseAdd() {
         (s) => s.setting_key === "show_mrp"
       )?.setting_value
     ) === 1;
+  const barcodeScanEnabled =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "barcode_scan"
+      )?.setting_value
+    ) === 1;
+  const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings =
+    taxesGSTSettingsData?.settings || [];
+
+  const enableGST =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key === "enable_gst"
+      )?.setting_value
+    ) === 1;
+  const enablePlaceOfSupply =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_place_of_supply"
+      )?.setting_value
+    ) === 1;
+
+  const { data: transactionsSettingsData } = useGetAllTransactionsSettingsQuery();
+
+  const transactionsSettings =
+    transactionsSettingsData?.settings || [];
+
+  const enableTransactionWiseDiscount =
+    Number(
+      transactionsSettings.find(
+        (s) =>
+          s.setting_key === "transaction_wise_discount"
+      )?.setting_value
+    ) === 1;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
       const updated = [...prev];
@@ -451,6 +492,8 @@ export default function PurchaseAdd() {
       Bill_Number: "",
       Bill_Date: new Date().toISOString().slice(0, 10),
       State_Of_Supply: "",
+      Transaction_Discount_Percentage: "",
+      Transaction_Discount_Amount: "",
       Total_Amount: "",
       Balance_Due: "",
       Total_Paid: "",
@@ -549,23 +592,84 @@ export default function PurchaseAdd() {
     return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
   };
 
+  // const applyRoundOff = (roundOffValue) => {
+  //   const rawTotal = getRawTotal();
+  //   const totalPaid = Number(watch("Total_Paid")) || 0;
+  //   const newTotal = rawTotal + roundOffValue;
+
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  // };
   const applyRoundOff = (roundOffValue) => {
     const rawTotal = getRawTotal();
+
+    const discountAmount =
+      Number(watch("Transaction_Discount_Amount")) || 0;
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
     const totalPaid = Number(watch("Total_Paid")) || 0;
-    const newTotal = rawTotal + roundOffValue;
+
+    const newTotal = afterDiscount + Number(roundOffValue || 0);
+
 
     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
     setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
   };
-  const syncTotalsAfterItemChange = () => {
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      applyRoundOff(currentRoundOff);
-    } else {
-      const rawTotal = getRawTotal();
-      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
+  // const syncTotalsAfterItemChange = () => {
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     applyRoundOff(currentRoundOff);
+  //   } else {
+  //     const rawTotal = getRawTotal();
+  //     setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+  // };
+  const syncTotalsAfterItemChange = (
+    discountAmountOverride = null
+  ) => {
+    const rawTotal = getRawTotal();
+
+    const discountAmount =
+      discountAmountOverride !== null
+        ? Number(discountAmountOverride) || 0
+        : Number(watch("Transaction_Discount_Amount")) || 0;
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
+    const roundOff = isRoundOff
+      ? Number(watch("Round_Off")) || 0
+      : 0;
+
+    const finalTotal = afterDiscount + roundOff;
+
+    const totalPaid =
+      Number(watch("Total_Paid")) || 0;
+
+    setValue(
+      "Total_Amount",
+      finalTotal.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    setValue(
+      "Balance_Due",
+      (finalTotal - totalPaid).toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
   };
   const handleAddRow = () => {
     setRows((prev) => [
@@ -606,28 +710,7 @@ export default function PurchaseAdd() {
     });
   };
 
-  // const handleDeleteRow = (i) => {
-  //   // 1. get current items BEFORE removal
-  //   //const currentItems = watch("items");
 
-  //   // 2. calculate new total excluding the deleted row
-  //   // const newTotal = currentItems.reduce((sum, row, idx) => {
-  //   //   if (idx === i) return sum;                    // skip deleted row
-  //   //   return sum + parseFloat(row.Amount || 0);
-  //   // }, 0);
-
-  //   //const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  //   //const newBalanceDue = newTotal - currentTotalPaid;
-
-  //   // 3. remove from UI state and form
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
-  //   remove(i);
-
-  //   // 4. update totals
-  //   syncTotalsAfterItemChange();
-  //   // setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-  //   // setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
-  // };
 
   const handleDeleteRow = (i) => {
     // 1. get current items BEFORE removal
@@ -1219,55 +1302,55 @@ export default function PurchaseAdd() {
       }
     }
 
-  
+
     combinedItems = combinedItems.filter(
       (row) =>
         row?.Item_Name &&
         row.Item_Name.trim()
     );
 
-    
+
     if (scanIndex < scannedRows.length) {
       combinedItems.push(
         ...scannedRows.slice(scanIndex)
       );
     }
-// let combinedItems = [...currentItems];
+    // let combinedItems = [...currentItems];
 
-// let scanIndex = 0;
+    // let scanIndex = 0;
 
-// // 1. Fill existing blank rows first
-// for (
-//   let i = 0;
-//   i < combinedItems.length && scanIndex < scannedRows.length;
-//   i++
-// ) {
-//   const row = combinedItems[i];
+    // // 1. Fill existing blank rows first
+    // for (
+    //   let i = 0;
+    //   i < combinedItems.length && scanIndex < scannedRows.length;
+    //   i++
+    // ) {
+    //   const row = combinedItems[i];
 
-//   const isBlankRow =
-//     !row?.Item_Name ||
-//     !row.Item_Name.trim();
+    //   const isBlankRow =
+    //     !row?.Item_Name ||
+    //     !row.Item_Name.trim();
 
-//   if (isBlankRow) {
-//     combinedItems[i] = scannedRows[scanIndex];
-//     scanIndex++;
-//   }
-// }
+    //   if (isBlankRow) {
+    //     combinedItems[i] = scannedRows[scanIndex];
+    //     scanIndex++;
+    //   }
+    // }
 
-// // 2. Remove only the blank rows that are still unused
-// combinedItems = combinedItems.filter(
-//   (row) =>
-//     row?.Item_Name &&
-//     row.Item_Name.trim()
-// );
+    // // 2. Remove only the blank rows that are still unused
+    // combinedItems = combinedItems.filter(
+    //   (row) =>
+    //     row?.Item_Name &&
+    //     row.Item_Name.trim()
+    // );
 
-// // 3. Append every scanned item that wasn't used above
-// if (scanIndex < scannedRows.length) {
-//   combinedItems = [
-//     ...combinedItems,
-//     ...scannedRows.slice(scanIndex),
-//   ];
-// }
+    // // 3. Append every scanned item that wasn't used above
+    // if (scanIndex < scannedRows.length) {
+    //   combinedItems = [
+    //     ...combinedItems,
+    //     ...scannedRows.slice(scanIndex),
+    //   ];
+    // }
 
     // =====================================================
     // CALCULATE ROW AMOUNTS
@@ -1430,53 +1513,53 @@ export default function PurchaseAdd() {
     // =====================================================
     // CALCULATE GRAND TOTAL
     // =====================================================
-setRows(() => {
-  return combinedItems.map((item) => ({
-    itemSearch: item.Item_Name || "",
+    setRows(() => {
+      return combinedItems.map((item) => ({
+        itemSearch: item.Item_Name || "",
 
-    itemOpen: false,
+        itemOpen: false,
 
-    isExistingItem: true,
-    isHSNLocked: false,
-    isUnitLocked: false,
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
 
-    CategoryOpen: false,
-    categorySearch: item.Item_Category || "",
+        CategoryOpen: false,
+        categorySearch: item.Item_Category || "",
 
-    unitOpen: false,
-    unitSearch: "",
+        unitOpen: false,
+        unitSearch: "",
 
-    Item_Id: item.Item_Id || "",
+        Item_Id: item.Item_Id || "",
 
-    Item_Name: item.Item_Name || "",
+        Item_Name: item.Item_Name || "",
 
-    Item_Category: item.Item_Category || "",
+        Item_Category: item.Item_Category || "",
 
-    Item_HSN: item.Item_HSN || "",
+        Item_HSN: item.Item_HSN || "",
 
-    MRP: showMRP && Number(item.MRP) > 0
-      ? Number(item.MRP)
-      : "",
+        MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
-    Primary_Unit: item.Primary_Unit || null,
-    Secondary_Unit: item.Secondary_Unit || null,
-    Conversion_Rate: item.Conversion_Rate || null,
+        Primary_Unit: item.Primary_Unit || null,
+        Secondary_Unit: item.Secondary_Unit || null,
+        Conversion_Rate: item.Conversion_Rate || null,
 
-    Available_Units: Array.isArray(item.Available_Units)
-      ? item.Available_Units
-      : [],
+        Available_Units: Array.isArray(item.Available_Units)
+          ? item.Available_Units
+          : [],
 
-    Purchase_Price: Number(item.Purchase_Price) || 0,
+        Purchase_Price: Number(item.Purchase_Price) || 0,
 
-    Discount_On_Purchase_Price:
-      item.Discount_On_Purchase_Price ?? "",
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price ?? "",
 
-    Discount_Type_On_Purchase_Price:
-      item.Discount_Type_On_Purchase_Price || "Percentage",
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price || "Percentage",
 
-    Tax_Type: item.Tax_Type || "None",
-  }));
-});
+        Tax_Type: item.Tax_Type || "None",
+      }));
+    });
     const rawTotal =
       calculatedItems.reduce(
         (sum, item) =>
@@ -1757,7 +1840,7 @@ setRows(() => {
         <div style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} className="tab-inn">
           <form onSubmit={handleSubmit(onSubmit)}>
             {/* <div className="row"> */}
-            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+            <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
               {/* <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "> */}
               <div className="flex flex-col gap-4 w-full lg:w-2/3">
 
@@ -2080,36 +2163,37 @@ setRows(() => {
 
 
 
-                <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
-                  {/* <div className="row w-1/2"> */}
+                {enablePlaceOfSupply && (
+                  <div className="flex items-center w-full gap-3 justify-end state-of-supply-class">
+                    {/* <div className="row w-1/2"> */}
 
-                  <span className=" whitespace-nowrap active">
-                    State of Supply
-                    {/* <span className="text-red-500">*</span> */}
-                  </span>
-                  <select
-                    style={{ marginBottom: "0px", width: "50%", border: "none" }}
-                    id="stateOfSupply"
-                    className="validate mt-2"
-                    {...register("State_Of_Supply")}
-                  >
-                    <option value="">Select State</option>
-                    {states.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                    {/* <option value="West Bengal">West Bengal</option>
+                    <span className=" whitespace-nowrap active">
+                      State of Supply
+                      {/* <span className="text-red-500">*</span> */}
+                    </span>
+                    <select
+                      style={{ marginBottom: "0px", width: "50%", border: "none" }}
+                      id="stateOfSupply"
+                      className="validate mt-2"
+                      {...register("State_Of_Supply")}
+                    >
+                      <option value="">Select State</option>
+                      {states.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                      {/* <option value="West Bengal">West Bengal</option>
                           <option value="Maharashtra">Maharashtra</option>
                           <option value="Karnataka">Karnataka</option>
                           <option value="Delhi">Delhi</option> */}
-                  </select>
-                  {/* {errors?.State_Of_Supply && (
+                    </select>
+                    {/* {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
                       {errors?.State_Of_Supply?.message}
                     </p>
                   )} */}
-                </div>
+                  </div>)}
 
 
 
@@ -2129,10 +2213,14 @@ setRows(() => {
                   <tr>
 
                     <th
-                      className=" cursor-pointer"
+                      className="cursor-pointer"
                       onClick={handleOpenScanModal}
                     >
-                      Sl.No
+                      {barcodeScanEnabled ? (
+                        <ScanLine size={18} />
+                      ) : (
+                        "Sl.No"
+                      )}
                     </th>
                     <th>Category</th>
                     <th>Item</th>
@@ -3849,7 +3937,7 @@ setRows(() => {
                         </td>
 
 
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        {/* <td style={{ padding: "0px", width: "12%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -3895,6 +3983,88 @@ setRows(() => {
                                 <option value="IGST28">IGST @28%</option>
                                 <option value="GST40">GST @40%</option>
                                 <option value="IGST40">IGST @40%</option>
+                              </select>
+                            )}
+                          />
+                        </td> */}
+                        {/* Tax Amount Entry*/}
+                        <td style={{ padding: "0px", width: "12%" }}>
+                          <Controller
+                            control={control}
+                            name={`items.${i}.Tax_Type`}
+                            render={({ field }) => (
+                              <select
+                                {...field}
+                                className="form-select"
+                                onChange={(e) => {
+                                  field.onChange(e);
+
+                                  const {
+                                    Tax_Amount,
+                                    Amount
+
+                                  } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Tax_Type: e.target.value,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Tax_Amount`,
+                                    Tax_Amount,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    `items.${i}.Amount`,
+                                    Amount,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  syncTotalsAfterItemChange();
+                                }}
+                              >
+                                {/* =========================================
+                                    NONE IS ALWAYS AVAILABLE
+                                ========================================= */}
+
+                                <option value="None">
+                                  None
+                                </option>
+
+                                {/* =========================================
+                                    GST OFF → DO NOT SHOW ANY GST OPTIONS
+                                ========================================= */}
+
+                                {enableGST && (
+                                  <>
+                                    <option value="GST0">GST @0%</option>
+                                    <option value="IGST0">IGST @0%</option>
+                                    <option value="GST0.25">GST @0.25%</option>
+                                    <option value="IGST0.25">IGST @0.25%</option>
+                                    <option value="GST3">GST @3%</option>
+                                    <option value="IGST3">IGST @3%</option>
+                                    <option value="GST5">GST @5%</option>
+                                    <option value="IGST5">IGST @5%</option>
+                                    <option value="GST12">GST @12%</option>
+                                    <option value="IGST12">IGST @12%</option>
+                                    <option value="GST18">GST @18%</option>
+                                    <option value="IGST18">IGST @18%</option>
+                                    <option value="GST28">GST @28%</option>
+                                    <option value="IGST28">IGST @28%</option>
+                                    <option value="GST40">GST @40%</option>
+                                    <option value="IGST40">IGST @40%</option>
+                                  </>
+                                )}
                               </select>
                             )}
                           />
@@ -4227,73 +4397,15 @@ setRows(() => {
                   > */}
 
                 <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
+                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 p-2"
                 >
+
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
+
+
                     {/* <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
-
-                          if (!totalAmount || isNaN(totalAmount)) return;
-
-                          if (isChecked) {
-                            setOriginalTotal(totalAmount);
-
-                            // Round off to nearest integer
-                            const rounded = Math.round(totalAmount);
-
-                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
-                            
-                          } else {
-                            if (originalTotal !== null) {
-                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
-
-                              setValue(
-                                "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
-                                { shouldValidate: true }
-                              );
-                            }
-                          }
-                        }}
-                      />
-
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
-
-
-                      <input
-
-                        type="text"
-
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="w-3  border border-gray-300  text-right text-sm"
-                        {...register("Round_Off")}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
-
-                          if (isNaN(totalAmount)) return;
-
-                          // New Total
-                          const newTotal = totalAmount + val;
-
-                          setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                        }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
-                      />
-                    </div> */}
-                    <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -4332,9 +4444,10 @@ setRows(() => {
                           applyRoundOff(numVal);
                         }}
                       />
-                    </div>
+                    </div> */}
 
-                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+                    {/* <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+                     
                       <div className="flex gap-3 items-center  w-full sm:w-auto">
 
                         <div style={{ width: "100%" }} className="flex gap-2 ">
@@ -4462,6 +4575,394 @@ setRows(() => {
                           className="form-control  "
                           {...register("Balance_Due")}
 
+                          readOnly
+                        />
+                      </div>
+                    </div> */}
+                    <div
+                      style={{ width: "100%" }}
+                      className="flex flex-col gap-4 mt-3 w-full"
+                    >
+                      {/* Transaction Wise Discount */}
+                      {enableTransactionWiseDiscount && (
+                        <div
+                          style={{ width: "50%" }}
+                          className="flex items-center gap-2 justify-end ml-auto"
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Discount
+                          </span>
+
+                          {/* Discount Percentage */}
+                          <input
+                            type="text"
+                            placeholder="%"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Percentage")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
+
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
+
+                              e.target.value = val;
+
+                              const percentage = Number(val) || 0;
+                              const subtotal = getRawTotal();
+
+                              const discountAmount =
+                                (subtotal * percentage) / 100;
+
+                              setValue(
+                                "Transaction_Discount_Percentage",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              setValue(
+                                "Transaction_Discount_Amount",
+                                discountAmount > 0
+                                  ? discountAmount.toFixed(2)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              syncTotalsAfterItemChange(discountAmount);
+                            }}
+                          />
+
+                          {/* Discount Amount */}
+                          <input
+                            type="text"
+                            placeholder="Amount"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Amount")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
+
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
+
+                              e.target.value = val;
+
+                              const amount = Number(val) || 0;
+                              const subtotal = getRawTotal();
+
+                              const percentage =
+                                subtotal > 0
+                                  ? (amount / subtotal) * 100
+                                  : 0;
+
+                              setValue(
+                                "Transaction_Discount_Amount",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              setValue(
+                                "Transaction_Discount_Percentage",
+                                amount > 0
+                                  ? percentage.toFixed(3)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              syncTotalsAfterItemChange(amount);
+                            }}
+                          />
+                        </div>
+                      )}
+                      {/* Round Off + Total Amount */}
+                      <div
+                        style={{ width: "100%" }}
+                        className="flex justify-between items-center gap-6 w-full mr-4"
+                      >
+                        {/* Round Off */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="roundOffCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={isRoundOff}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setIsRoundOff(isChecked);
+
+                              if (isChecked) {
+                                const rawTotal = getRawTotal();
+
+                                const discountAmount =
+                                  Number(watch("Transaction_Discount_Amount")) || 0;
+
+                                const totalBeforeRoundOff = Math.max(
+                                  0,
+                                  rawTotal - discountAmount
+                                );
+
+                                const rounded = Math.round(totalBeforeRoundOff);
+
+                                const diff = Number(
+                                  (rounded - totalBeforeRoundOff).toFixed(2)
+                                );
+
+                                setValue(
+                                  "Round_Off",
+                                  diff !== 0 ? diff.toFixed(2) : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                applyRoundOff(diff);
+                              } else {
+                                setValue("Round_Off", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                applyRoundOff(0);
+                              }
+                            }}
+                          />
+
+                          <span className="font-medium whitespace-nowrap">
+                            Round Off
+                          </span>
+
+                          <input
+                            type="text"
+                            style={{
+                              marginTop: "10px",
+                              height: "1.5rem",
+                            }}
+                            className="border border-gray-300 text-right text-sm"
+                            {...register("Round_Off")}
+                            disabled={!isRoundOff}
+                            onChange={(e) => {
+                              const val = e.target.value;
+
+                              setValue("Round_Off", val, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              const numVal = parseFloat(val) || 0;
+
+                              applyRoundOff(numVal);
+                            }}
+                          />
+                        </div>
+
+                        {/* Total Amount */}
+                        <div
+                          style={{ width: "100%" }}
+                          className="flex items-center gap-2"
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Total Amount
+                          </span>
+
+                          <input
+                            style={{
+                              backgroundColor: "transparent",
+                              height: "1rem",
+                              marginTop: "10px",
+                            }}
+                            type="text"
+                            className="form-control"
+                            {...register("Total_Amount")}
+                            readOnly
+                          />
+                        </div>
+                      </div>
+
+                      {/* Total Paid */}
+                      <div
+                        style={{ width: "100%" }}
+                        className="flex items-center gap-3 relative ml-auto"
+                      >
+                        <div className="flex items-center gap-2 relative">
+                          <input
+                            type="checkbox"
+                            id="totalPaidCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            disabled={splitsWatch.length > 1}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              const totalAmount = parseFloat(
+                                watch("Total_Amount")
+                              );
+
+                              if (!totalAmount || isNaN(totalAmount)) {
+                                setValue("Total_Paid", "");
+                                setValue("Balance_Due", "");
+
+                                if (splitsWatch.length === 1) {
+                                  setValue("splits.0.Amount", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }
+
+                                return;
+                              }
+
+                              if (isChecked) {
+                                setValue(
+                                  "Total_Paid",
+                                  totalAmount.toFixed(2)
+                                );
+
+                                setValue("Balance_Due", 0);
+                              } else {
+                                setValue("Total_Paid", "");
+                                setValue(
+                                  "Balance_Due",
+                                  totalAmount.toFixed(2)
+                                );
+                              }
+
+                              if (splitsWatch.length === 1) {
+                                setValue(
+                                  "splits.0.Amount",
+                                  isChecked ? totalAmount.toFixed(2) : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }
+                            }}
+                          />
+
+                          <span
+                            htmlFor="totalPaidCheck"
+                            className="font-medium whitespace-nowrap"
+                          >
+                            Total Paid
+                          </span>
+                        </div>
+
+                        <input
+                          type="text"
+                          {...register("Total_Paid")}
+                          style={{
+                            marginBottom: "0px",
+                            height: "1rem",
+                            width: "100%",
+                          }}
+                          readOnly={splitsWatch.length > 1}
+                          onChange={(e) => {
+                            if (splitsWatch.length > 1) return;
+
+                            let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                            const parts = val.split(".");
+                            if (parts.length > 2) {
+                              val =
+                                parts[0] +
+                                "." +
+                                parts.slice(1).join("");
+                            }
+
+                            if (val.includes(".")) {
+                              const [int, dec] = val.split(".");
+                              val = int + "." + dec.slice(0, 2);
+                            }
+
+                            e.target.value = val;
+
+                            setValue("Total_Paid", val);
+
+                            const totalReceived = parseFloat(val || 0);
+                            const totalAmount = parseFloat(
+                              watch("Total_Amount") || 0
+                            );
+
+                            setValue(
+                              "Balance_Due",
+                              (totalAmount - totalReceived).toFixed(2)
+                            );
+
+                            if (splitsWatch.length === 1) {
+                              setValue(
+                                "splits.0.Amount",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+                            }
+
+                            clearErrors("splits.0.Amount");
+                          }}
+                          className="form-control"
+                        />
+                      </div>
+
+                      {/* Balance Due */}
+                      <div
+                        style={{ width: "100%" }}
+                        className="flex gap-2 items-center"
+                      >
+                        <span className="font-medium whitespace-nowrap">
+                          Balance Due
+                        </span>
+
+                        <input
+                          style={{
+                            backgroundColor: "transparent",
+                            marginBottom: "0px",
+                            height: "1rem",
+                            width: "100%",
+                          }}
+                          type="text"
+                          className="form-control"
+                          {...register("Balance_Due")}
                           readOnly
                         />
                       </div>

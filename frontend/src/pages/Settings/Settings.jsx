@@ -298,24 +298,19 @@
 //     </div>
 //   );
 // }
-import { useState } from "react";
-import FinancialYear from "./FinancialYear";
-import Items from "./Items";
+
+import { NavLink, Outlet } from "react-router-dom";
 
 export default function Settings() {
-  const [activeSection, setActiveSection] =
-    useState("financialYear");
-
   return (
     <div
-      className="flex bg-white"
+      className="flex flex-col lg:flex-row bg-white"
       style={{ minHeight: "90vh" }}
     >
       {/* ══ LEFT NAV ══ */}
       <div
-        className="flex flex-col"
+        className="flex flex-col w-full lg:w-[220px]"
         style={{
-          width: 220,
           borderRight: "1px solid #e2e8f0",
           flexShrink: 0,
         }}
@@ -329,69 +324,197 @@ export default function Settings() {
           </h4>
         </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            setActiveSection("financialYear")
-          }
+        <NavLink
+          to="/settings/financial-year"
           className="text-left px-4 py-3 text-sm font-medium"
-          style={{
-            backgroundColor:
-              activeSection === "financialYear"
-                ? "#f0f9ff"
-                : "transparent",
-            borderLeft:
-              activeSection === "financialYear"
-                ? "3px solid #4CA1AF"
-                : "3px solid transparent",
-            color:
-              activeSection === "financialYear"
-                ? "#4CA1AF"
-                : "#374151",
-            border: "none",
-            cursor: "pointer",
-          }}
+          style={({ isActive }) => ({
+            backgroundColor: isActive
+              ? "#f0f9ff"
+              : "transparent",
+
+            borderLeft: isActive
+              ? "3px solid #4CA1AF"
+              : "3px solid transparent",
+
+            color: isActive
+              ? "#4CA1AF"
+              : "#374151",
+
+            textDecoration: "none",
+          })}
         >
           Financial Year
-        </button>
+        </NavLink>
 
-        <button
-          type="button"
-          onClick={() =>
-            setActiveSection("Items")
-          }
+        <NavLink
+          to="/settings/items"
           className="text-left px-4 py-3 text-sm font-medium"
-          style={{
-            backgroundColor:
-              activeSection === "Items"
-                ? "#f0f9ff"
-                : "transparent",
-            borderLeft:
-              activeSection === "Items"
-                ? "3px solid #4CA1AF"
-                : "3px solid transparent",
-            color:
-              activeSection === "Items"
-                ? "#4CA1AF"
-                : "#374151",
-            border: "none",
-            cursor: "pointer",
-          }}
+          style={({ isActive }) => ({
+            backgroundColor: isActive
+              ? "#f0f9ff"
+              : "transparent",
+
+            borderLeft: isActive
+              ? "3px solid #4CA1AF"
+              : "3px solid transparent",
+
+            color: isActive
+              ? "#4CA1AF"
+              : "#374151",
+
+            textDecoration: "none",
+          })}
         >
           Items
-        </button>
+        </NavLink>
+
+         <NavLink
+          to="/settings/taxes&GST"
+          className="text-left px-4 py-3 text-sm font-medium"
+          style={({ isActive }) => ({
+            backgroundColor: isActive
+              ? "#f0f9ff"
+              : "transparent",
+
+            borderLeft: isActive
+              ? "3px solid #4CA1AF"
+              : "3px solid transparent",
+
+            color: isActive
+              ? "#4CA1AF"
+              : "#374151",
+
+            textDecoration: "none",
+            border:"none"
+          })}
+        >
+          Taxes & GST
+        </NavLink>
+         <NavLink
+          to="/settings/transactions"
+          className="text-left px-4 py-3 text-sm font-medium"
+          style={({ isActive }) => ({
+            backgroundColor: isActive
+              ? "#f0f9ff"
+              : "transparent",
+
+            borderLeft: isActive
+              ? "3px solid #4CA1AF"
+              : "3px solid transparent",
+
+            color: isActive
+              ? "#4CA1AF"
+              : "#374151",
+
+            textDecoration: "none",
+            border:"none"
+          })}
+        >
+          Transactions
+        </NavLink>
       </div>
 
       {/* ══ RIGHT CONTENT ══ */}
-      <div className="flex-1 p-6">
-        {activeSection === "financialYear" && (
-          <FinancialYear />
-        )}
-
-        {activeSection === "Items" && (
-          <Items />
-        )}
+      <div className="flex-1 p-6 min-w-0">
+        <Outlet />
       </div>
     </div>
   );
 }
+// import { useState } from "react";
+// import FinancialYear from "./FinancialYear";
+// import Items from "./Items";
+
+// export default function Settings() {
+//   const [activeSection, setActiveSection] =
+//     useState("financialYear");
+
+//   return (
+//     <div
+//       className="flex bg-white"
+//       style={{ minHeight: "90vh" }}
+//     >
+//       {/* ══ LEFT NAV ══ */}
+//       <div
+//         className="flex flex-col"
+//         style={{
+//           width: 220,
+//           borderRight: "1px solid #e2e8f0",
+//           flexShrink: 0,
+//         }}
+//       >
+//         <div
+//           className="inn-title"
+//           style={{ padding: "1rem" }}
+//         >
+//           <h4 className="text-lg font-bold">
+//             Preferences
+//           </h4>
+//         </div>
+
+//         <button
+//           type="button"
+//           onClick={() =>
+//             setActiveSection("financialYear")
+//           }
+//           className="text-left px-4 py-3 text-sm font-medium"
+//           style={{
+//             backgroundColor:
+//               activeSection === "financialYear"
+//                 ? "#f0f9ff"
+//                 : "transparent",
+//             borderLeft:
+//               activeSection === "financialYear"
+//                 ? "3px solid #4CA1AF"
+//                 : "3px solid transparent",
+//             color:
+//               activeSection === "financialYear"
+//                 ? "#4CA1AF"
+//                 : "#374151",
+//             border: "none",
+//             cursor: "pointer",
+//           }}
+//         >
+//           Financial Year
+//         </button>
+
+//         <button
+//           type="button"
+//           onClick={() =>
+//             setActiveSection("Items")
+//           }
+//           className="text-left px-4 py-3 text-sm font-medium"
+//           style={{
+//             backgroundColor:
+//               activeSection === "Items"
+//                 ? "#f0f9ff"
+//                 : "transparent",
+//             borderLeft:
+//               activeSection === "Items"
+//                 ? "3px solid #4CA1AF"
+//                 : "3px solid transparent",
+//             color:
+//               activeSection === "Items"
+//                 ? "#4CA1AF"
+//                 : "#374151",
+//             border: "none",
+//             cursor: "pointer",
+//           }}
+//         >
+//           Items
+//         </button>
+//       </div>
+
+//       {/* ══ RIGHT CONTENT ══ */}
+//       <div className="flex-1 p-6">
+//         {activeSection === "financialYear" && (
+//           <FinancialYear />
+//         )}
+
+//         {activeSection === "Items" && (
+//           <Items />
+//         )}
+//       </div>
+//     </div>
+//   );
+// }

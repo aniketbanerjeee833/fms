@@ -16,6 +16,8 @@ import cashInHandRoutes from "./routes/cashInHandRoutes.js";
 import bankAccountRoutes from "./routes/bankAccountRoutes.js";
 import dailyExpenseRoutes from "./routes/dailyExpense.js";
 import settingRoutes from "./routes/Settings/settingRoutes.js";
+import taxesAndGSTSettingsRoutes from "./routes/Settings/taxesAndGSTSettingRoutes.js";
+import transactionsSettingRoutes from "./routes/Settings/transactionsSettingRoutes.js";
 import barcodeSettingsRoutes from "./routes/Settings/barcodeSettingRoutes.js";
 // import settingRoutes from "./routes/Settings/settingRoutes.js";
 import miscellaneousRoutes from "./routes/miscellaneousRoutes.js";
@@ -148,6 +150,8 @@ app.use("/api/bank", bankAccountRoutes);
 app.use("/api/daily-expense",dailyExpenseRoutes);
 ///app.use("/api/settings",financialYearRoutes)
 app.use("/api/settings",settingRoutes)
+app.use("/api/taxes-gst-settings",taxesAndGSTSettingsRoutes)
+app.use("/api/transactions-settings",transactionsSettingRoutes)
 app.use("/api/barcode-settings", barcodeSettingsRoutes);
 app.use("/api/misc",miscellaneousRoutes)
 

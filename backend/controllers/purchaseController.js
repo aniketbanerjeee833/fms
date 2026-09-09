@@ -502,6 +502,8 @@ const addPurchase = async (req, res, next) => {
       Bill_Number,
       Bill_Date,
       State_Of_Supply,
+      Transaction_Discount_Percentage,
+Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       Total_Paid,
@@ -609,13 +611,14 @@ const addPurchase = async (req, res, next) => {
     // ── PURCHASE HEADER — unchanged ──
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase
-       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply,
+       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply, Transaction_Discount_Percentage,
+     Transaction_Discount_Amount,
         Total_Amount, Round_Off,Total_Paid, Balance_Due, Terms_Conditions_Id, Terms_Conditions_Description,
         created_at, updated_at)
-       VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?,?, ?,?,?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply),
-        totalAmount,roundOffValue,totalPaid, balanceDue, termsId, termsDescription,
+        Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply), Transaction_Discount_Percentage,
+    Transaction_Discount_Amount,totalAmount,roundOffValue,totalPaid, balanceDue, termsId, termsDescription,
       ]
     );
 
