@@ -81,9 +81,9 @@ a:hover {
     transition: all 0.5s ease;
 }
 /* width */
-::-webkit-scrollbar {
+/* ::-webkit-scrollbar {
     width: 2px;
-}
+} */
 
 /* Track */
 ::-webkit-scrollbar-track {
@@ -275,12 +275,28 @@ a:hover {
     margin-right: 8px;
     width: 16px;
 }
-.sb2-2 {
+/* .sb2-2 {
     
-    /* width: 80%; */
+  
     padding: 40px;
-    /* margin-left: 20%; */
+  
     background: #e8edf2;
+} */
+ .sb2-2 {
+    min-height: 100vh;
+    
+    /* height: 100vh; */
+    float: left; 
+     /* width: 80% ; */
+      width: 84% ;
+    padding: 10px;
+    /* margin-left: 20%;  */
+    margin-left: 16%; 
+    background: #e8edf2;
+      box-sizing: border-box;
+    /* overflow: hidden;
+    box-sizing: border-box; */
+  
 }
 .sb2-2-1 {
     background: #fff;

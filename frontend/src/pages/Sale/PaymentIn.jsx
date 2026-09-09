@@ -236,7 +236,7 @@ export default function PaymentIn() {
 
     return (
         <>
-            <div className="flex flex-col bg-white"
+            {/* <div className="flex flex-col bg-white"
                 style={{
                     flex: 1,
                     minHeight: 0,
@@ -246,7 +246,15 @@ export default function PaymentIn() {
                     flexDirection: "column",
                     overflow: "hidden",
                 }}
-            >
+            > */}
+                <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
 
 
                 <div className="inn-title">

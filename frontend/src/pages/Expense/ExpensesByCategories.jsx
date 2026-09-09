@@ -519,14 +519,17 @@ useEffect(() => {
 }, [filteredTransactions.length]);
   return (
     <>
-      <div className="flex flex-col bg-white"
+      {/* <div className="flex flex-col bg-white"
       style={{ height: "100vh",overflow: "hidden" }}
-        //style={{ minHeight: "100vh" }}
-    //      style={{
-    //  height: "100vh",
-    //   //minHeight: 0,
-    //   overflow: "hidden",
-    // }}
+   
+      > */}
+        <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
       >
 
         {/* ── PAGE HEADER ── */}

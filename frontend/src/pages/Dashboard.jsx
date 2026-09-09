@@ -347,13 +347,21 @@ export default function Dashboard() {
     <>
      
 
-      <div className="flex flex-col bg-white"
+      {/* <div className="flex flex-col bg-white"
     //    style={{
     //   height: "100%",
     //   minHeight: 0,
     //   overflow: "hidden",
     // }}
-      >
+      > */}
+                        <div
+  className="flex flex-col bg-white"
+  style={{
+    height: "100%",
+    minHeight: 0,
+    overflow: "hidden",
+  }}
+>
         {/* Header */}
 
 

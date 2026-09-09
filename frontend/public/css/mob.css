@@ -67,6 +67,71 @@
         width: 75%;
     }
 }
+
+@media screen and (max-width: 992px) {
+    .tab-hide {
+        display: none;
+    }
+
+    /* Mobile Sidebar */
+    .app-sidebar {
+        position: fixed;
+        width: 240px;
+        height: 100%;
+        top: 0;
+        left: -350px;
+        z-index: 9999;
+        overflow-y: auto;
+        background: #e8edf2;
+        box-shadow: 10px 50px 100px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Mobile Main Content */
+    .app-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .app-content {
+        width: 100%;
+        padding: 10px 5px;
+    }
+
+    .sb1-1 {
+        padding: 15px;
+    }
+
+    .tab-menu {
+        display: inline-block;
+        color: #fff;
+        background: #0e76a8;
+        padding: 5px 8px;
+        cursor: pointer;
+        font-size: 18px;
+        border-radius: 2px;
+    }
+
+    .sb1 {
+        position: fixed;
+        width: 100%;
+        top: 0;
+    }
+
+    .logo img {
+        width: 60%;
+    }
+
+    .db-2 ul li {
+        width: 50%;
+    }
+
+    .sp-top-30 {
+        margin-top: 30px;
+    }
+
+    .blog-login-in {
+        width: 75%;
+    }
+}
 /*-------------------------------------------------------*/
 /* When the browser is between 0px and 768px wide,below css will be applied.
 /*-------------------------------------------------------*/

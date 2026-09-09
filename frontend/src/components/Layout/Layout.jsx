@@ -51,26 +51,43 @@ import SideMenu from "../SideMenu/SideMenu";
 //     </>
 //   );
 // }
-
 export default function Layout({ children }) {
   return (
-    <div
-      className="container-fluid sb2"
-      style={{
-        padding: 0,
-        display: "flex",
-        minHeight: "100vh",
-      }}
-    >
-      {/* Sidebar */}
-      <div className="sb2-1">
+    <div className="app-layout">
+      {/* LEFT SIDEBAR */}
+      <aside className="app-sidebar">
         <SideMenu />
-      </div>
+      </aside>
 
-      {/* Main content */}
-      <div className="sb2-2">
+      {/* RIGHT CONTENT */}
+      <main className="app-content">
         {children}
-      </div>
+      </main>
     </div>
   );
 }
+// export default function Layout({ children }) {
+//   return (
+//     <div
+//       className="container-fluid sb2"
+//       style={{
+//         padding: 0,
+//         display: "flex",
+//         //minHeight: "100vh",
+//       }}
+//     >
+//       {/* Sidebar */}
+//       <div className="sb2-1">
+//         <SideMenu />
+//       </div>
+
+//       {/* Main content */}
+//       <div
+//         className="sb2-2"
+        
+//       >
+//         {children}
+//       </div>
+//     </div>
+//   );
+// }

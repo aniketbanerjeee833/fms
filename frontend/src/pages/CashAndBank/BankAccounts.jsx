@@ -1201,10 +1201,18 @@ export default function BankAccounts() {
     <>
       {/* ── BREADCRUMB ── */}
 
-
+{/* 
       <div className="flex flex-col bg-white"
         style={{ height: "100vh", overflow: "hidden" }}
-      //  style={{ minHeight: "100vh" }}
+      
+      > */}
+          <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
       >
 
         {/* ── PAGE HEADER ── */}

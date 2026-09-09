@@ -240,7 +240,7 @@ export default function AllSaleList() {
   return (
     <>
 
-      <div className="flex flex-col bg-white"
+      {/* <div className="flex flex-col bg-white"
         //style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
         style={{
           flex: 1,
@@ -248,6 +248,14 @@ export default function AllSaleList() {
           height: "calc(100vh - 20px)",
           display: "flex",
           flexDirection: "column",
+          overflow: "hidden",
+        }}
+      > */}
+         <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
           overflow: "hidden",
         }}
       >

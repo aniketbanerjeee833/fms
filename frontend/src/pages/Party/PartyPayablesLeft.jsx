@@ -1735,9 +1735,17 @@ export default function PartyPayablesLeft() {
   }, [parties.length]);
   return (
     <>
-      <div className="flex flex-col bg-white"
-        //  style={{ minHeight: "100vh" }}
+      {/* <div className="flex flex-col bg-white"
+        
         style={{ height: "100vh", overflow: "hidden" }}
+      > */}
+      <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
       >
         {/* ── PAGE HEADER ── */}
         <div className="inn-title">

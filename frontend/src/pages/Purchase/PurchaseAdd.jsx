@@ -4405,185 +4405,12 @@ export default function PurchaseAdd() {
                     className="flex justify-between items-start gap-6 w-full mr-4">
 
 
-                    {/* <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        checked={isRoundOff}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setIsRoundOff(isChecked);
-
-                          const rawTotal = getRawTotal();
-
-                          if (isChecked) {
-                            const rounded = Math.round(rawTotal);
-                            const diff = Number((rounded - rawTotal).toFixed(2));
-                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(diff);
-                          } else {
-                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(0);
-                          }
-                        }}
-                      />
-
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
-
-                      <input
-                        type="text"
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="border border-gray-300 text-right text-sm"
-                        {...register("Round_Off")}
-                        disabled={!isRoundOff}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
-                          const numVal = parseFloat(val) || 0;
-                          applyRoundOff(numVal);
-                        }}
-                      />
-                    </div> */}
-
-                    {/* <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                     
-                      <div className="flex gap-3 items-center  w-full sm:w-auto">
-
-                        <div style={{ width: "100%" }} className="flex gap-2 ">
-                          <span className="font-medium whitespace-nowrap">Total Amount</span>
-
-                          <input
-                            style={{ backgroundColor: "transparent", height: "1rem" }}
-                            type="text"
-                            className="form-control"
-                            {...register("Total_Amount")}
-                            readOnly
-                          />
-                        </div>
-                      </div>
-
-
-
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
-
-                        <div className="flex items-center gap-2 relative">
-
-                          <input
-                            type="checkbox"
-
-
-                            id="totalPaidCheck"
-                            className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
-                            onChange={(e) => {
-
-                              const isChecked = e.target.checked;
-                              const totalAmount = parseFloat(watch("Total_Amount"));
-
-                              // 🧠 If no total amount entered, do nothing
-                              if (!totalAmount || isNaN(totalAmount)) {
-                                // Optional: visually reset the checkbox
-
-
-                                // Clear both fields to stay consistent
-                                setValue("Total_Paid", "");
-                                setValue("Balance_Due", "");
-                                if (splitsWatch.length === 1) {
-                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
-                                }
-                                return;
-                              }
-
-                              if (isChecked) {
-                                // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
-                                setValue("Total_Paid", totalAmount.toFixed(2));
-                                setValue("Balance_Due", 0);
-                              } else {
-                                // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                setValue("Total_Paid", "");
-                                setValue("Balance_Due", totalAmount.toFixed(2));
-                              }
-                              if (splitsWatch.length === 1) {
-                                setValue(
-                                  "splits.0.Amount",
-                                  isChecked ? totalAmount.toFixed(2) : "",
-                                  { shouldValidate: true, shouldDirty: true }
-                                );
-                              }
-                            }}
-                          />
-                          <span
-                            htmlFor="totalPaidCheck"
-                            className="font-medium whitespace-nowrap"
-                          >
-                            Total Paid
-                          </span>
-
-                        </div>
-
-
-                        <input
-                          type="text"
-                          {...register("Total_Paid")}
-                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
-                          onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
-                            let val = e.target.value.replace(/[^0-9.]/g, "");
-
-                            // Allow only one dot
-                            const parts = val.split(".");
-                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-                            // Limit to 2 decimals
-                            if (val.includes(".")) {
-                              const [int, dec] = val.split(".");
-                              val = int + "." + dec.slice(0, 2);
-                            }
-
-                            e.target.value = val;
-                            setValue("Total_Paid", val);
-
-                            const totalReceived = parseFloat(val || 0);
-                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
-                            clearErrors("splits.0.Amount"); // already there ✅
-                          }}
-                          className="form-control"
-                        />
-                      </div>
-
-
-
-
-                      <div style={{ width: "100%" }}
-                        className="flex  gap-2 items-center ">
-
-                        <span className="font-medium whitespace-nowrap">Balance Due</span>
-                        <input
-                          style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
-                          }}
-                          type="text"
-                          className="form-control  "
-                          {...register("Balance_Due")}
-
-                          readOnly
-                        />
-                      </div>
-                    </div> */}
+                  
                     <div
                       style={{ width: "100%" }}
                       className="flex flex-col gap-4 mt-3 w-full"
                     >
-                      {/* Transaction Wise Discount */}
+                     
                       {enableTransactionWiseDiscount && (
                         <div
                           style={{ width: "50%" }}
@@ -4714,7 +4541,7 @@ export default function PurchaseAdd() {
                           />
                         </div>
                       )}
-                      {/* Round Off + Total Amount */}
+                      
                       <div
                         style={{ width: "100%" }}
                         className="flex justify-between items-center gap-6 w-full mr-4"
@@ -4817,9 +4644,10 @@ export default function PurchaseAdd() {
                             readOnly
                           />
                         </div>
+                        
                       </div>
 
-                      {/* Total Paid */}
+                      
                       <div
                         style={{ width: "100%" }}
                         className="flex items-center gap-3 relative ml-auto"
@@ -4944,7 +4772,6 @@ export default function PurchaseAdd() {
                         />
                       </div>
 
-                      {/* Balance Due */}
                       <div
                         style={{ width: "100%" }}
                         className="flex gap-2 items-center"
@@ -5275,3 +5102,186 @@ export default function PurchaseAdd() {
     </>
   );
 }
+
+
+
+
+
+
+
+
+
+  {/* <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="roundOffCheck"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={isRoundOff}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setIsRoundOff(isChecked);
+
+                          const rawTotal = getRawTotal();
+
+                          if (isChecked) {
+                            const rounded = Math.round(rawTotal);
+                            const diff = Number((rounded - rawTotal).toFixed(2));
+                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(diff);
+                          } else {
+                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                            applyRoundOff(0);
+                          }
+                        }}
+                      />
+
+                      <span className="font-medium whitespace-nowrap">Round Off</span>
+
+                      <input
+                        type="text"
+                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                        className="border border-gray-300 text-right text-sm"
+                        {...register("Round_Off")}
+                        disabled={!isRoundOff}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                          const numVal = parseFloat(val) || 0;
+                          applyRoundOff(numVal);
+                        }}
+                      />
+                    </div> */}
+
+                    {/* <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+                     
+                      <div className="flex gap-3 items-center  w-full sm:w-auto">
+
+                        <div style={{ width: "100%" }} className="flex gap-2 ">
+                          <span className="font-medium whitespace-nowrap">Total Amount</span>
+
+                          <input
+                            style={{ backgroundColor: "transparent", height: "1rem" }}
+                            type="text"
+                            className="form-control"
+                            {...register("Total_Amount")}
+                            readOnly
+                          />
+                        </div>
+                      </div>
+
+
+
+                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+
+                        <div className="flex items-center gap-2 relative">
+
+                          <input
+                            type="checkbox"
+
+
+                            id="totalPaidCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            disabled={splitsWatch.length > 1}   // 🔹 add this
+
+                            onChange={(e) => {
+
+                              const isChecked = e.target.checked;
+                              const totalAmount = parseFloat(watch("Total_Amount"));
+
+                              // 🧠 If no total amount entered, do nothing
+                              if (!totalAmount || isNaN(totalAmount)) {
+                                // Optional: visually reset the checkbox
+
+
+                                // Clear both fields to stay consistent
+                                setValue("Total_Paid", "");
+                                setValue("Balance_Due", "");
+                                if (splitsWatch.length === 1) {
+                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                }
+                                return;
+                              }
+
+                              if (isChecked) {
+                                // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
+                                setValue("Total_Paid", totalAmount.toFixed(2));
+                                setValue("Balance_Due", 0);
+                              } else {
+                                // ✅ When unchecked, restore Balance_Due = Total_Amount
+                                setValue("Total_Paid", "");
+                                setValue("Balance_Due", totalAmount.toFixed(2));
+                              }
+                              if (splitsWatch.length === 1) {
+                                setValue(
+                                  "splits.0.Amount",
+                                  isChecked ? totalAmount.toFixed(2) : "",
+                                  { shouldValidate: true, shouldDirty: true }
+                                );
+                              }
+                            }}
+                          />
+                          <span
+                            htmlFor="totalPaidCheck"
+                            className="font-medium whitespace-nowrap"
+                          >
+                            Total Paid
+                          </span>
+
+                        </div>
+
+
+                        <input
+                          type="text"
+                          {...register("Total_Paid")}
+                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                          readOnly={splitsWatch.length > 1}
+                          onChange={(e) => {
+                            if (splitsWatch.length > 1) return;
+                            let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                            // Allow only one dot
+                            const parts = val.split(".");
+                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+
+                            // Limit to 2 decimals
+                            if (val.includes(".")) {
+                              const [int, dec] = val.split(".");
+                              val = int + "." + dec.slice(0, 2);
+                            }
+
+                            e.target.value = val;
+                            setValue("Total_Paid", val);
+
+                            const totalReceived = parseFloat(val || 0);
+                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
+                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                            if (splitsWatch.length === 1) {
+                              const val = e.target.value;
+                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                            }
+                            clearErrors("splits.0.Amount"); // already there ✅
+                          }}
+                          className="form-control"
+                        />
+                      </div>
+
+
+
+
+                      <div style={{ width: "100%" }}
+                        className="flex  gap-2 items-center ">
+
+                        <span className="font-medium whitespace-nowrap">Balance Due</span>
+                        <input
+                          style={{
+                            backgroundColor: "transparent", marginBottom: "0px",
+                            height: "1rem", width: "100%"
+                          }}
+                          type="text"
+                          className="form-control  "
+                          {...register("Balance_Due")}
+
+                          readOnly
+                        />
+                      </div>
+                    </div> */}

@@ -151,8 +151,15 @@ export default function ItemUnits() {
 
     return (
         <>
-            <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}>
-
+            {/* <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}> */}
+  <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
                 {/* ── PAGE HEADER ── */}
                 <div className="inn-title">
                     <div className="flex flex-row justify-between items-center">

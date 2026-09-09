@@ -1867,9 +1867,17 @@ export default function Parties() {
   }, [parties.length]);
   return (
     <>
-      <div className="flex flex-col bg-white"
+      {/* <div className="flex flex-col bg-white"
         style={{ height: "100vh", overflow: "hidden" }}
-      >
+      > */}
+      <div
+  className="flex flex-col bg-white"
+  style={{
+    height: "100%",
+    minHeight: 0,
+    overflow: "hidden",
+  }}
+>
 
         {/* <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}> */}
 

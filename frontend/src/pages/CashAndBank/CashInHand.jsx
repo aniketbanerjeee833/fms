@@ -427,7 +427,7 @@ export default function CashInHand() {
     return (
         <>
 
-            <div className="flex flex-col bg-white"
+            {/* <div className="flex flex-col bg-white"
                 style={{
                     flex: 1,
                     minHeight: 0,
@@ -437,8 +437,16 @@ export default function CashInHand() {
                     flexDirection: "column",
                     overflow: "hidden",
                 }}
-            //style={{ height: "100vh", minHeight: 0, overflow: "hidden" }}
-            >
+            
+            > */}
+                <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
 
                 <div className="inn-title" style={{ flexShrink: 0 }}>
                     <div className="flex flex-col sm:flex-col lg:flex-row justify-between lg:items-center">

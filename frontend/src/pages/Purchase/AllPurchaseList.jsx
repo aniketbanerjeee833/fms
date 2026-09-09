@@ -315,7 +315,7 @@ export default function AllPurchaseList() {
   // }, [purchaseList.length]);
   return (
     <>
-      <div className="flex flex-col bg-white"
+      {/* <div className="flex flex-col bg-white"
         style={{
           flex: 1,
           minHeight: 0,
@@ -323,6 +323,14 @@ export default function AllPurchaseList() {
           height: "calc(100vh - 20px)",
           display: "flex",
           flexDirection: "column",
+          overflow: "hidden",
+        }}
+      > */}
+        <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
           overflow: "hidden",
         }}
       >

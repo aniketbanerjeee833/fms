@@ -801,10 +801,18 @@ export default function ItemsByItem() {
     }, [transactions.length]);
     return (
         <>
-            <div className="flex flex-col bg-white"
+            {/* <div className="flex flex-col bg-white"
                 style={{ height: "100vh", overflow: "hidden" }}
-            // style={{ minHeight: "100vh" }}
-            >
+           
+            > */}
+               <div
+  className="flex flex-col bg-white"
+  style={{
+    height: "100%",
+    minHeight: 0,
+    overflow: "hidden",
+  }}
+>
                 <div className="flex" style={{ borderBottom: "1px solid #f1f5f9" }}>
                     {["Product", "Service"].map((type) => (
                         <button
