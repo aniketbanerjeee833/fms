@@ -1713,10 +1713,21 @@ const handleDeleteRow = (i) => {
             <div style={{ padding: "20px" }}
               className="box-inn-sp"> */}
 
-      <div style={{ padding: "20px" }}
-        className="flex flex-col bg-white ">
+      {/* <div style={{ padding: "20px" }}
+        className="flex flex-col bg-white "> */}
+                <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          padding: "20px",
+           boxSizing: "border-box",
+          //  marginTop: "2rem"
+        }}
+      >
 
-        <div className="inn-title w-full px-2 py-3">
+        <div style={{ marginTop: "2rem" }}  className="inn-title w-full px-2 py-2">
 
           <div className="
     flex flex-col sm:flex-row 
@@ -1797,8 +1808,40 @@ const handleDeleteRow = (i) => {
 
           </div>
         </div>
-        <div style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} className="tab-inn">
-          <form onSubmit={handleSubmit(onSubmit)}>
+        <div 
+        //style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} 
+        //className="tab-inn"
+            style={{
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    overflow: "hidden",
+    padding: "0px",
+    backgroundColor: "#f1f1f19d",
+  }}
+   className="tab-inn flex flex-col"
+        >
+          <form onSubmit={handleSubmit(onSubmit)}
+            className="flex flex-col"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            minWidth: 0,
+            overflow: "hidden",
+           
+          }}
+          >
+             {/* SCROLLABLE FORM CONTENT */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+               
+                minWidth: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+              }}
+            >
             <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
 
 
@@ -2149,7 +2192,7 @@ const handleDeleteRow = (i) => {
 
 
 
-            <div className="table-responsive table-desi mt-4">
+            <div className="table-responsive table-desi">
               <table className="table table-hover">
                 <thead>
                   <tr>
@@ -2177,7 +2220,9 @@ const handleDeleteRow = (i) => {
                     <th>Amount</th>
                   </tr>
                 </thead>
-                <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
+                <tbody 
+                //style={{ maxHeight: "10rem", overflowY: "scroll" }}
+                >
                   {fields.map((field, i) => (
                     <tr key={field.id}>
                       {/* Action + Serial Number */}
@@ -4926,7 +4971,15 @@ const handleDeleteRow = (i) => {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-4 ">
+              </div>
+              <div className="flex justify-end gap-4"
+                  style={{
+                //flexShrink: 0,
+                background: "#fff",
+                borderTop: "1px solid #e2e8f0",
+                padding: "8px",
+            }}
+              >
                 {/* <button
                       type="button"
                          onClick={() => {

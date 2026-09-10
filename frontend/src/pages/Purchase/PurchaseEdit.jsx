@@ -5082,7 +5082,7 @@ export default function PurchaseEdit() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-4 p-4"
+            <div className="flex justify-end gap-4"
                 style={{
                 //flexShrink: 0,
                 background: "#fff",

@@ -1757,7 +1757,7 @@ syncTotalsAfterItemChange(rawTotal)
   };
   return (
     <>
-      <div className="sb2-2-2">
+      {/* <div className="sb2-2-2">
         <ul>
 
           <NavLink style={{ display: "flex", flexDirection: "row" }}
@@ -1765,12 +1765,12 @@ syncTotalsAfterItemChange(rawTotal)
 
           >
             <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-            {/* <i className="fa fa-home mr-2" aria-hidden="true"></i> */}
+          
             Dashboard
           </NavLink>
 
         </ul>
-      </div>
+      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -1779,10 +1779,21 @@ syncTotalsAfterItemChange(rawTotal)
             <div style={{ padding: "20px" }}
               className="box-inn-sp"> */}
 
-      <div style={{ padding: "20px" }}
-        className="flex flex-col bg-white ">
+      {/* <div style={{ padding: "20px" }}
+        className="flex flex-col bg-white "> */}
+            <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          padding: "20px",
+           boxSizing: "border-box",
+          //  marginTop: "2rem"
+        }}
+      >
 
-        <div className="inn-title w-full px-2 py-3">
+        <div style={{ marginTop: "2rem" }} className="inn-title w-full px-2 py-2">
 
           <div className="
     flex flex-col sm:flex-row 
@@ -1918,8 +1929,29 @@ syncTotalsAfterItemChange(rawTotal)
 
           </div>
         </div>
-        <div style={{ padding: "0", backgroundColor: "#f1f1f19d" }} className="tab-inn">
-          <form onSubmit={handleSubmit(onSubmit)}>
+        <div 
+        //style={{ padding: "0", backgroundColor: "#f1f1f19d" }} 
+        //className="tab-inn"
+          style={{
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    overflow: "hidden",
+    padding: "0px",
+    backgroundColor: "#f1f1f19d",
+  }}
+   className="tab-inn flex flex-col"
+        >
+          <form onSubmit={handleSubmit(onSubmit)}
+           className="flex flex-col"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            minWidth: 0,
+            overflow: "hidden",
+           
+          }}
+          >
             <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
               {/* <div className="row"> */}
               <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
@@ -2277,9 +2309,19 @@ syncTotalsAfterItemChange(rawTotal)
 
 
 
-
-
-            <div className="table-responsive table-desi mt-4">
+              {/* SCROLLABLE FORM CONTENT */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+               
+                minWidth: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+              }}
+            >
+              
+            <div className="table-responsive table-desi">
               <table className="table table-hover">
                 <thead>
                   <tr>
@@ -2307,7 +2349,10 @@ syncTotalsAfterItemChange(rawTotal)
                     <th>Amount</th>
                   </tr>
                 </thead>
-                <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
+                <tbody 
+                //style={{ maxHeight: "10rem", overflowY: "scroll" }}
+                >
+                
                   {fields.map((field, i) => (
                     <tr key={field.id}>
                       {/* Action + Serial Number */}
@@ -4755,11 +4800,18 @@ syncTotalsAfterItemChange(rawTotal)
 
                 </div>
               </div>
-
+            </div>
 
 
             </div>
-            <div className="flex justify-end gap-4 mt-4">
+            <div className="flex justify-end gap-4"
+                 style={{
+                //flexShrink: 0,
+                background: "#fff",
+                borderTop: "1px solid #e2e8f0",
+                padding: "8px",
+            }}
+            >
               {/* <button
                       type="button"
                      
