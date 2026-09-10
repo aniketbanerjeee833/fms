@@ -38,6 +38,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
+import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -453,6 +454,18 @@ export default function SaleAdd() {
           "enable_place_of_supply"
       )?.setting_value
     ) === 1;
+  const { data: transactionsSettingsData } = useGetAllTransactionsSettingsQuery();
+
+  const transactionsSettings =
+    transactionsSettingsData?.settings || [];
+
+  const enableTransactionWiseDiscount =
+    Number(
+      transactionsSettings.find(
+        (s) =>
+          s.setting_key === "transaction_wise_discount"
+      )?.setting_value
+    ) === 1;
   console.log(settings, "settings")
   useEffect(() => {
     setValue("Invoice_Number", latestInvoiceNumber?.newInvoiceNumber);
@@ -561,6 +574,7 @@ export default function SaleAdd() {
     handleSubmit,
     setValue,
     watch,
+    getValues,
     clearErrors,
     formState: { errors },
   } = useForm({
@@ -575,8 +589,11 @@ export default function SaleAdd() {
       Invoice_Number: "",
       Invoice_Date: today,
       State_Of_Supply: "",
+      Transaction_Discount_Percentage: "",
+      Transaction_Discount_Amount: "",
       Total_Amount: "",
       Round_Off: "",
+
       Balance_Due: "",
       Total_Received: "",
       Terms_Conditions_Id: null,
@@ -670,30 +687,160 @@ export default function SaleAdd() {
     };
   };
 
+  
   const getRawTotal = () => {
-    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
-  };
+  const currentItems = getValues("items") || [];
 
+  return currentItems.reduce(
+    (sum, it) => sum + (Number(it.Amount) || 0),
+    0
+  );
+};
+  // const applyRoundOff = (roundOffValue) => {
+  //   const rawTotal = getRawTotal();
+  //   //const totalPaid = Number(watch("Total_Paid")) || 0;
+  //   const totalReceived = Number(watch("Total_Received")) || 0;
+  //   const newTotal = rawTotal + roundOffValue;
+
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   setValue("Balance_Due", (newTotal - totalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  // };
   const applyRoundOff = (roundOffValue) => {
     const rawTotal = getRawTotal();
-    //const totalPaid = Number(watch("Total_Paid")) || 0;
+
+    const discountAmount =
+      Number(watch("Transaction_Discount_Amount")) || 0;
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
     const totalReceived = Number(watch("Total_Received")) || 0;
-    const newTotal = rawTotal + roundOffValue;
+
+    const newTotal = afterDiscount + Number(roundOffValue || 0);
+
 
     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
     setValue("Balance_Due", (newTotal - totalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
   };
-  const syncTotalsAfterItemChange = () => {
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      applyRoundOff(currentRoundOff);
-    } else {
-      const rawTotal = getRawTotal();
-      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (rawTotal - Number(watch("Total_Received") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
-      //setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  // const syncTotalsAfterItemChange = () => {
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     applyRoundOff(currentRoundOff);
+  //   } else {
+  //     const rawTotal = getRawTotal();
+  //     setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (rawTotal - Number(watch("Total_Received") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+
+  //   }
+  // };
+  const syncTotalsAfterItemChange = (rawTotalOverride = null) => {
+  const rawTotal =
+    rawTotalOverride !== null
+      ? Number(rawTotalOverride) || 0
+      : getRawTotal();
+
+  // Existing transaction discount percentage
+  const discountPercentage =
+    Number(watch("Transaction_Discount_Percentage")) || 0;
+
+  // Recalculate discount amount
+  const discountAmount =
+    discountPercentage > 0
+      ? (rawTotal * discountPercentage) / 100
+      : 0;
+
+  setValue(
+    "Transaction_Discount_Amount",
+    discountAmount > 0
+      ? discountAmount.toFixed(2)
+      : "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
     }
-  };
+  );
+
+  // Subtotal - Discount
+  const afterDiscount = Math.max(
+    0,
+    rawTotal - discountAmount
+  );
+
+  // Keep existing Round Off value if Round Off is enabled
+  const roundOff = isRoundOff
+    ? Number(watch("Round_Off")) || 0
+    : 0;
+
+  // After Discount + Round Off
+  const finalTotal = Math.max(
+    0,
+    afterDiscount + roundOff
+  );
+
+  const totalReceived =
+    Number(watch("Total_Received")) || 0;
+
+  setValue(
+    "Total_Amount",
+    finalTotal.toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Balance_Due",
+    (finalTotal - totalReceived).toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+};
+  // const syncTotalsAfterItemChange = (
+  //   discountAmountOverride = null
+  // ) => {
+  //   const rawTotal = getRawTotal();
+
+  //   const discountAmount =
+  //     discountAmountOverride !== null
+  //       ? Number(discountAmountOverride) || 0
+  //       : Number(watch("Transaction_Discount_Amount")) || 0;
+
+  //   const afterDiscount = Math.max(
+  //     0,
+  //     rawTotal - discountAmount
+  //   );
+
+  //   const roundOff = isRoundOff
+  //     ? Number(watch("Round_Off")) || 0
+  //     : 0;
+
+  //   const finalTotal = afterDiscount + roundOff;
+
+  //   const totalReceived = Number(watch("Total_Received")) || 0;
+
+  //   setValue(
+  //     "Total_Amount",
+  //     finalTotal.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   setValue(
+  //     "Balance_Due",
+  //     (finalTotal - totalReceived).toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // };
 
   const handleAddRow = () => {
     setRows((prev) => [
@@ -735,35 +882,59 @@ export default function SaleAdd() {
   };
 
 
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   const currentItems = watch("items");
 
-    // 2. calculate new total excluding the deleted row
-    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //   // 2. calculate new total excluding the deleted row
+  //   const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;
+  //     return sum + parseFloat(row.Amount || 0);
+  //   }, 0);
+
+  //   const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+  //   //const newBalanceDue = newRawTotal - currentTotalReceived;
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     const newTotal = newRawTotal + currentRoundOff;
+  //     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   } else {
+  //     setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newRawTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+  // };
+const handleDeleteRow = (i) => {
+  // Get current items BEFORE removal
+  const currentItems = watch("items") || [];
+
+  // Calculate subtotal AFTER deleting this row
+  const newRawTotal = currentItems.reduce(
+    (sum, row, idx) => {
       if (idx === i) return sum;
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
 
-    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
-    //const newBalanceDue = newRawTotal - currentTotalReceived;
+      return sum + (Number(row.Amount) || 0);
+    },
+    0
+  );
 
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
+  // Remove from UI
+  setRows((prev) =>
+    prev.filter((_, idx) => idx !== i)
+  );
 
-    // 4. update totals
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      const newTotal = newRawTotal + currentRoundOff;
-      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newRawTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
-  };
+  // Remove from React Hook Form
+  remove(i);
 
+  // Recalculate discount + total + balance
+  syncTotalsAfterItemChange(newRawTotal);
+};
   const formValues = watch();
 
   const sanitizeAmount = (value) => {
@@ -967,8 +1138,7 @@ export default function SaleAdd() {
 
       items: itemsWithDefaults,
 
-      //Total_Amount: totalAmount,
-      //Total_Received: totalReceived,
+
       Total_Amount: Number(totalAmount.toFixed(2)),
       Total_Received: Number(totalReceived.toFixed(2)),
       Balance_Due: Number(balanceDue.toFixed(2)),
@@ -1452,154 +1622,6 @@ export default function SaleAdd() {
     // CREATE UI ROWS
     // =====================================================
 
-    // const scannedUiRows = scannedItems.map((item) => {
-    //   const mrp = Number(item.MRP) || 0;
-
-    //   const mrpDiscount =
-    //     Number(item.Discount_On_MRP_For_Sale) || 0;
-
-    //   const calculatedSalePrice =
-    //     calculateSalePriceFromMRP && mrp > 0
-    //       ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
-    //       : Number(item.Sale_Price) > 0
-    //         ? Number(item.Sale_Price).toFixed(2)
-    //         : "";
-
-    //   return {
-    //     itemSearch:
-    //       item.Item_Name || "",
-
-    //     itemOpen: false,
-
-    //     isExistingItem: true,
-    //     isHSNLocked: false,
-    //     isUnitLocked: false,
-
-    //     CategoryOpen: false,
-
-    //     categorySearch:
-    //       item.Item_Category || "",
-
-    //     unitOpen: false,
-    //     unitSearch: "",
-
-    //     Item_Id:
-    //       item.Item_Id || "",
-
-    //     Item_Name:
-    //       item.Item_Name || "",
-
-    //     Item_Category:
-    //       item.Item_Category || "",
-
-    //     Item_HSN:
-    //       item.Item_HSN || "",
-
-    //     // ✅ MRP from master
-    //     MRP:
-    //       mrp > 0
-    //         ? mrp
-    //         : "",
-
-    //     // ✅ MRP discount from master
-    //     Discount_On_MRP_For_Sale_Percentage:
-    //       calculateSalePriceFromMRP && mrp > 0 && mrpDiscount > 0
-    //         ? mrpDiscount
-    //         : "",
-
-    //     Primary_Unit:
-    //       item.Primary_Unit || null,
-
-    //     Secondary_Unit:
-    //       item.Secondary_Unit || null,
-
-    //     Conversion_Rate:
-    //       item.Conversion_Rate || null,
-
-    //     Available_Units:
-    //       Array.isArray(item.Available_Units)
-    //         ? item.Available_Units
-    //         : [],
-
-    //     // ✅ Calculated Sale Price
-    //     Sale_Price:
-    //       calculatedSalePrice,
-
-    //     // ✅ Separate Sale Price discount
-    //     Discount_On_Sale_Price:
-    //       item.Discount_On_Sale_Price ?? "",
-
-    //     Discount_Type_On_Sale_Price:
-    //       item.Discount_Type_On_Sale_Price ||
-    //       "Percentage",
-
-    //     Tax_Type:
-    //       item.Tax_Type || "None",
-    //   };
-    // });
-
-    // =====================================================
-    // UPDATE UI ROWS
-    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
-    // =====================================================
-
-    // setRows((prev) => {
-    //   const updatedRows = [...prev];
-
-    //   let uiScanIndex = 0;
-
-    //   // ---------------------------------------------------
-    //   // Fill existing blank rows
-    //   // ---------------------------------------------------
-
-    //   for (
-    //     let i = 0;
-    //     i < updatedRows.length &&
-    //     uiScanIndex < scannedUiRows.length;
-    //     i++
-    //   ) {
-    //     const row = updatedRows[i];
-
-    //     const isBlankRow =
-    //       !row?.Item_Name ||
-    //       !row.Item_Name.trim();
-
-    //     if (isBlankRow) {
-    //       updatedRows[i] =
-    //         scannedUiRows[uiScanIndex];
-
-    //       uiScanIndex++;
-    //     }
-    //   }
-
-    //   // ---------------------------------------------------
-    //   // Remove remaining blank rows
-    //   // ---------------------------------------------------
-
-    //   const filledRows =
-    //     updatedRows.filter(
-    //       (row) =>
-    //         row?.Item_Name &&
-    //         row.Item_Name.trim()
-    //     );
-
-    //   // ---------------------------------------------------
-    //   // Append remaining scanned rows
-    //   // ---------------------------------------------------
-
-    //   if (
-    //     uiScanIndex <
-    //     scannedUiRows.length
-    //   ) {
-    //     filledRows.push(
-    //       ...scannedUiRows.slice(
-    //         uiScanIndex
-    //       )
-    //     );
-    //   }
-
-    //   return filledRows;
-    // });
     // =====================================================
     // UPDATE UI ROWS
     // USE THE SAME combinedItems ORDER AS RHF
@@ -1674,49 +1696,49 @@ export default function SaleAdd() {
         0
       );
 
-    const roundOff = isRoundOff
-      ? Number(watch("Round_Off")) || 0
-      : 0;
+    // const roundOff = isRoundOff
+    //   ? Number(watch("Round_Off")) || 0
+    //   : 0;
 
-    const finalTotal =
-      rawTotal + roundOff;
+    // const finalTotal =
+    //   rawTotal + roundOff;
 
-    const totalReceived =
-      Number(watch("Total_Received")) || 0;
+    // const totalReceived =
+    //   Number(watch("Total_Received")) || 0;
 
-    const balanceDue =
-      finalTotal - totalReceived;
+    // const balanceDue =
+    //   finalTotal - totalReceived;
 
-    // =====================================================
-    // UPDATE TOTAL AMOUNT
-    // =====================================================
+    // // =====================================================
+    // // UPDATE TOTAL AMOUNT
+    // // =====================================================
 
-    setValue(
-      "Total_Amount",
-      finalTotal.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Total_Amount",
+    //   finalTotal.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
-    // =====================================================
-    // UPDATE BALANCE DUE
-    // =====================================================
+    // // =====================================================
+    // // UPDATE BALANCE DUE
+    // // =====================================================
 
-    setValue(
-      "Balance_Due",
-      balanceDue.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Balance_Due",
+    //   balanceDue.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
     // =====================================================
     // CLOSE SCAN MODAL
     // =====================================================
-
+syncTotalsAfterItemChange(rawTotal);
     setShowScanCodeModal(false);
   };
   const directBarcodeScanOpenedRef = useRef(false);
@@ -2449,107 +2471,107 @@ export default function SaleAdd() {
               {/* //flex flex-col gap-4 w-full lg:w-1/3 */}
               <div className="flex flex-col gap-4 w-full lg:w-1/3">
 
-  {/* Invoice Number */}
-  <div className="flex items-center w-full gap-3  ">
-    <span
-      className="whitespace-nowrap"
-      style={{
-        //width: "50%",
-        flexShrink: 0,
-      }}
-    >
-      Invoice Number
-    </span>
+                {/* Invoice Number */}
+                <div className="flex items-center w-full gap-3  ">
+                  <span
+                    className="whitespace-nowrap"
+                    style={{
+                      //width: "50%",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Invoice Number
+                  </span>
 
-    <input
-      type="text"
-      id="Invoice_Number"
-      {...register("Invoice_Number")}
-      placeholder="Invoice Number"
-      readOnly
-      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 w-full"
-      style={{ marginBottom: 0 }}
-    />
-  </div>
+                  <input
+                    type="text"
+                    id="Invoice_Number"
+                    {...register("Invoice_Number")}
+                    placeholder="Invoice Number"
+                    readOnly
+                    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 w-full"
+                    style={{ marginBottom: 0 }}
+                  />
+                </div>
 
-  {errors?.Invoice_Number && (
-    <p className="text-red-500 text-xs pl-[140px]">
-      {errors.Invoice_Number.message}
-    </p>
-  )}
+                {errors?.Invoice_Number && (
+                  <p className="text-red-500 text-xs pl-[140px]">
+                    {errors.Invoice_Number.message}
+                  </p>
+                )}
 
-  {/* Invoice Date */}
-  <div className="flex items-center w-full gap-3">
-    <span
-      className="whitespace-nowrap"
-      style={{
-        //width: "50%",
-        flexShrink: 0,
-      }}
-    >
-      Invoice Date
-    </span>
+                {/* Invoice Date */}
+                <div className="flex items-center w-full gap-3">
+                  <span
+                    className="whitespace-nowrap"
+                    style={{
+                      //width: "50%",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Invoice Date
+                  </span>
 
-    <input
-      type="date"
-      id="Invoice_Date"
-      {...register("Invoice_Date")}
-      className="invoice-date-class w-full outline-none text-gray-900 border-b-2"
-      style={{ marginBottom: 0 }}
-      min={
-        latestInvoiceNumber?.latestInvoiceInfo?.createdAt
-          ? new Date(
-              latestInvoiceNumber?.latestInvoiceInfo?.createdAt
-            )
-              .toISOString()
-              .split("T")[0]
-          : ""
-      }
-    />
-  </div>
+                  <input
+                    type="date"
+                    id="Invoice_Date"
+                    {...register("Invoice_Date")}
+                    className="invoice-date-class w-full outline-none text-gray-900 border-b-2"
+                    style={{ marginBottom: 0 }}
+                    min={
+                      latestInvoiceNumber?.latestInvoiceInfo?.createdAt
+                        ? new Date(
+                          latestInvoiceNumber?.latestInvoiceInfo?.createdAt
+                        )
+                          .toISOString()
+                          .split("T")[0]
+                        : ""
+                    }
+                  />
+                </div>
 
-  {errors?.Invoice_Date && (
-    <p className="text-red-500 text-xs pl-[140px]">
-      {errors?.Invoice_Date?.message}
-    </p>
-  )}
+                {errors?.Invoice_Date && (
+                  <p className="text-red-500 text-xs pl-[140px]">
+                    {errors?.Invoice_Date?.message}
+                  </p>
+                )}
 
-  {/* State of Supply */}
-  {enablePlaceOfSupply && (
-    <div className="flex items-center w-full gap-3">
-      <span
-        className="whitespace-nowrap"
-        style={{
-          //width: "50%",
-          flexShrink: 0,
-        }}
-      >
-        State of Supply
-      </span>
+                {/* State of Supply */}
+                {enablePlaceOfSupply && (
+                  <div className="flex items-center w-full gap-3">
+                    <span
+                      className="whitespace-nowrap"
+                      style={{
+                        //width: "50%",
+                        flexShrink: 0,
+                      }}
+                    >
+                      State of Supply
+                    </span>
 
-      <select
-        id="stateOfSupply"
-        className="validate w-full border-b-2"
-        style={{ marginBottom: 0 }}
-        {...register("State_Of_Supply")}
-      >
-        <option value="">
-          Select State
-        </option>
+                    <select
+                      id="stateOfSupply"
+                      className="validate w-full border-b-2"
+                      style={{ marginBottom: 0 }}
+                      {...register("State_Of_Supply")}
+                    >
+                      <option value="">
+                        Select State
+                      </option>
 
-        {states.map((state) => (
-          <option
-            key={state}
-            value={state}
-          >
-            {state}
-          </option>
-        ))}
-      </select>
-    </div>
-  )}
+                      {states.map((state) => (
+                        <option
+                          key={state}
+                          value={state}
+                        >
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-</div>
+              </div>
 
             </div>
 
@@ -4191,128 +4213,6 @@ export default function SaleAdd() {
                               }}
                             />
                           )}
-                          {/* {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "45rem" }}
-                              className="absolute z-20  w-full bg-white border
-                            border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                            >
-                              <div
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleRowChange(i, "itemOpen", true);
-                                  setActiveItemRow(i);
-                                  setShowItemAddModal(true);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
-                                style={{
-                                  borderBottom: "1px solid #e5e7eb",
-                                  color: "#4CA1AF",
-                                  fontWeight: 600,
-                                  fontSize: 13,
-                                  position: "sticky",
-                                  top: 0,
-                                  backgroundColor: "#fff",
-                                  zIndex: 1,
-                                }}
-                              >
-                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
-                                Add Item
-                              </div>
-                              <table className="w-full text-sm border-collapse">
-                                <thead className="bg-gray-100 border-b">
-                                  <tr>
-                                    <th>Sl.No</th>
-                                    <th className="text-left px-3 py-2">Item Name</th>
-                                    <th className="text-left px-3 py-2">Sale Price</th>
-                                    <th className="text-left px-3 py-2">Purchase Price</th>
-                                    <th className="text-left px-3 py-2">Stock</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items?.items
-                                    ?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    )
-                                    .map((it, idx) => (
-
-
-
-                                      <tr
-                                        key={idx}
-                                        onClick={() => {
-                                          if (it.Stock_Quantity <= 0 && it.Item_Type !== "Service") {
-                                            // show confirmation modal instead of directly adding
-                                            setConfirmModal({ open: true, item: it, rowIndex: i });
-                                            return;
-                                          }
-
-                                          // ✅ proceed directly if stock > 0
-                                          handleItemSelect(it, i);
-                                        }}
-                                        className="hover:bg-gray-100 cursor-pointer border-b"
-                                      >
-                                        <td>{idx + 1}</td>
-                                   
-                                          <td className="px-3 py-2">
-                                          {it.Item_Name}{" "}
-                                          {it.Item_Code && (
-                                            <span
-                                              style={{
-                                                color: "#9ca3af",
-
-                                                fontWeight: "400",
-                                              }}
-                                            >
-                                              ({it.Item_Code})
-                                            </span>
-                                          )}
-                                          </td>
-                                        <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                        <td className="px-3 py-2 text-gray-600">
-                                          {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
-                                        </td>
-
-                                        <td className="px-3 py-2" style={{
-                                          padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                          color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                          fontWeight: "500",
-                                        }}>
-                                          {it.Item_Type === "Service"
-                                            ? ""
-                                            : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
-                                        </td>
-                                        {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-
-                                        <td className="px-3 py-2 whitespace-nowrap"
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                        </td> 
-                                      </tr>
-                                    ))}
-
-                                  {items?.items?.filter((it) =>
-                                    it.Item_Name.toLowerCase().includes(
-                                      (rows[i]?.itemSearch || "").toLowerCase()
-                                    )
-                                  ).length === 0 && (
-                                      <tr>
-                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                          No Item found
-                                        </td>
-                                      </tr>
-                                    )}
-                                </tbody>
-                              </table>
-                            </div>
-                          )} */}
 
                           {confirmModal.open && (
                             <div
@@ -5231,7 +5131,7 @@ export default function SaleAdd() {
                           )}
                         />
                       </td> */}
-                       {/* Tax Amount Entry*/}
+                      {/* Tax Amount Entry*/}
                       <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
@@ -5246,7 +5146,7 @@ export default function SaleAdd() {
                                 const {
                                   Tax_Amount,
                                   Amount
-                                 
+
                                 } = calculateRowAmount(
                                   {
                                     ...itemsValues[i],
@@ -5290,24 +5190,24 @@ export default function SaleAdd() {
         ========================================= */}
 
                               {enableGST && (
-                          <>
-              <option value="GST0">GST @0%</option>
-              <option value="IGST0">IGST @0%</option>
-              <option value="GST0.25">GST @0.25%</option>
-              <option value="IGST0.25">IGST @0.25%</option>
-              <option value="GST3">GST @3%</option>
-              <option value="IGST3">IGST @3%</option>
-              <option value="GST5">GST @5%</option>
-              <option value="IGST5">IGST @5%</option>
-              <option value="GST12">GST @12%</option>
-              <option value="IGST12">IGST @12%</option>
-              <option value="GST18">GST @18%</option>
-              <option value="IGST18">IGST @18%</option>
-              <option value="GST28">GST @28%</option>
-              <option value="IGST28">IGST @28%</option>
-              <option value="GST40">GST @40%</option>
-              <option value="IGST40">IGST @40%</option>
-            </>
+                                <>
+                                  <option value="GST0">GST @0%</option>
+                                  <option value="IGST0">IGST @0%</option>
+                                  <option value="GST0.25">GST @0.25%</option>
+                                  <option value="IGST0.25">IGST @0.25%</option>
+                                  <option value="GST3">GST @3%</option>
+                                  <option value="IGST3">IGST @3%</option>
+                                  <option value="GST5">GST @5%</option>
+                                  <option value="IGST5">IGST @5%</option>
+                                  <option value="GST12">GST @12%</option>
+                                  <option value="IGST12">IGST @12%</option>
+                                  <option value="GST18">GST @18%</option>
+                                  <option value="IGST18">IGST @18%</option>
+                                  <option value="GST28">GST @28%</option>
+                                  <option value="IGST28">IGST @28%</option>
+                                  <option value="GST40">GST @40%</option>
+                                  <option value="IGST40">IGST @40%</option>
+                                </>
                               )}
                             </select>
                           )}
@@ -5628,126 +5528,264 @@ export default function SaleAdd() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    {/* <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                    <div
+                      style={{ width: "100%" }}
+                      className="flex flex-col gap-4 mt-3 w-full"
+                    >
 
-                          if (!totalAmount || isNaN(totalAmount)) return;
+                      {enableTransactionWiseDiscount && (
+                        <div
+                          style={{ width: "50%" }}
+                          className="flex items-center gap-2 justify-end ml-auto"
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Discount
+                          </span>
 
-                          if (isChecked) {
-                            setOriginalTotal(totalAmount);
+                          {/* Discount Percentage */}
+                          <input
+                            type="text"
+                            placeholder="%"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Percentage")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                            // Round off to nearest integer
-                            const rounded = Math.round(totalAmount);
+                              const parts = val.split(".");
 
-                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                              // Only one decimal point
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
 
-                          } else {
-                            if (originalTotal !== null) {
-                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+                              // Maximum 3 decimal places
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
+
+                              const numericValue = Number(val);
+
+                              //  Prevent ANY value greater than 100
+                              if (val !== "" && numericValue > 100) {
+                                toast.error("Discount percentage cannot be greater than 100%");
+
+                                // Restore previous valid value
+                                const previousValue =
+                                  watch("Transaction_Discount_Percentage") || "";
+
+                                e.target.value = previousValue;
+
+                                return;
+                              }
+
+                              e.target.value = val;
+
+                              const percentage = Number(val) || 0;
+                              const subtotal = getRawTotal();
+
+                              const discountAmount =
+                                (subtotal * percentage) / 100;
 
                               setValue(
-                                "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
-                                { shouldValidate: true }
+                                "Transaction_Discount_Percentage",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
                               );
-                            }
-                          }
-                        }}
-                      />
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                              setValue(
+                                "Transaction_Discount_Amount",
+                                discountAmount > 0
+                                  ? discountAmount.toFixed(2)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+                              //syncTotalsAfterItemChange(discountAmount);
+                              syncTotalsAfterItemChange();
+                            }}
+                          />
 
+                          {/* Discount Amount */}
+                          <input
+                            type="text"
+                            placeholder="Amount"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Amount")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                      <input
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
 
-                        type="text"
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
 
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="w-3  border border-gray-300  text-right text-sm"
-                        {...register("Round_Off")}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                              e.target.value = val;
 
-                          if (isNaN(totalAmount)) return;
+                              const amount = Number(val) || 0;
+                              const subtotal = getRawTotal();
 
-                          // New Total
-                          const newTotal = totalAmount + val;
+                              const percentage =
+                                subtotal > 0
+                                  ? (amount / subtotal) * 100
+                                  : 0;
 
-                          setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                        }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
-                      />
-                    </div> */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        checked={isRoundOff}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setIsRoundOff(isChecked);
+                              setValue(
+                                "Transaction_Discount_Amount",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
 
-                          const rawTotal = getRawTotal();
+                              setValue(
+                                "Transaction_Discount_Percentage",
+                                amount > 0
+                                  ? percentage.toFixed(3)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
 
-                          if (isChecked) {
-                            const rounded = Math.round(rawTotal);
-                            const diff = Number((rounded - rawTotal).toFixed(2));
-                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(diff);
-                          } else {
-                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(0);
-                          }
-                        }}
-                      />
+                              //syncTotalsAfterItemChange(amount);
+                               syncTotalsAfterItemChange();
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div
+                        style={{ width: "100%" }}
+                        className="flex justify-between items-center gap-6 w-full mr-4"
+                      >
+                        {/* Round Off */}
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="roundOffCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={isRoundOff}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setIsRoundOff(isChecked);
 
-                      <input
-                        type="text"
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="border border-gray-300 text-right text-sm"
-                        {...register("Round_Off")}
-                        disabled={!isRoundOff}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
-                          const numVal = parseFloat(val) || 0;
-                          applyRoundOff(numVal);
-                        }}
-                      />
-                    </div>
+                              if (isChecked) {
+                                const rawTotal = getRawTotal();
 
-                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                      <div className="flex gap-3 items-center  w-full sm:w-auto">
+                                const discountAmount =
+                                  Number(watch("Transaction_Discount_Amount")) || 0;
 
-                        <div style={{ width: "100%" }} className="flex gap-2 ">
+                                const totalBeforeRoundOff = Math.max(
+                                  0,
+                                  rawTotal - discountAmount
+                                );
+
+                                const rounded = Math.round(totalBeforeRoundOff);
+
+                                const diff = Number(
+                                  (rounded - totalBeforeRoundOff).toFixed(2)
+                                );
+
+                                setValue(
+                                  "Round_Off",
+                                  diff !== 0 ? diff.toFixed(2) : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                applyRoundOff(diff);
+                              } else {
+                                setValue("Round_Off", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                applyRoundOff(0);
+                              }
+                            }}
+                          />
+
+                          <span className="font-medium whitespace-nowrap">
+                            Round Off
+                          </span>
+
+                          <input
+                            type="text"
+                            style={{
+                              marginTop: "10px",
+                              height: "1.5rem",
+                            }}
+                            className="border border-gray-300 text-right text-sm"
+                            {...register("Round_Off")}
+                            disabled={!isRoundOff}
+                            onChange={(e) => {
+                              const val = e.target.value;
+
+                              setValue("Round_Off", val, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              const numVal = parseFloat(val) || 0;
+
+                              applyRoundOff(numVal);
+                            }}
+                          />
+                        </div>
+                        {/* Total Amount */}
+                        {/* <div style={{ width: "100%" }}
+                     className="flex flex-col gap-4 mt-3 w-full"
+                     > */}
+                        {/* <div className="flex items-center gap-2"
+                      // "flex gap-3 items-center  w-full sm:w-auto"
+                      > */}
+
+                        <div style={{ width: "100%" }} className="flex items-center gap-2">
                           <span className="font-medium whitespace-nowrap">Total Amount</span>
 
                           <input
-                            style={{ backgroundColor: "transparent", height: "1rem" }}
+                            style={{ marginBottom: "0px", backgroundColor: "transparent", height: "1rem", width: "100%" }}
                             type="text"
                             className="form-control"
                             {...register("Total_Amount")}
                             readOnly
                           />
                         </div>
+                        {/* </div> */}
+
+
                       </div>
-
-
-
                       {saleMode === "Credit" && (
                         <>
                           <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
@@ -5865,6 +5903,8 @@ export default function SaleAdd() {
                           </div>
                         </>
                       )}
+                      {/* </div> */}
+
                     </div>
                   </div>
 

@@ -75,137 +75,7 @@ const normalizeNumber = (val) =>
     String(val).trim() !== ""
     ? Number(val)
     : null;
-// const getAllPurchaseReturns = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
 
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-//     const search = req.query.search?.trim().toLowerCase() || "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     const whereClauses = [];
-//     const params = [];
-
-//     // if (search) {
-//     //   whereClauses.push(`(
-//     //     LOWER(a.Party_Name)           LIKE ? OR
-//     //     LOWER(pr.Return_Number)       LIKE ? OR
-//     //     LOWER(pr.Bill_Number)         LIKE ? OR
-//     //     CAST(pr.Total_Amount AS CHAR) LIKE ? OR
-//     //     CAST(pr.Balance_Due AS CHAR)  LIKE ? OR
-//     //     CAST(pr.Total_Received AS CHAR)  LIKE ?
-
-//     //   )`);
-//     //   const like = `%${search}%`;
-//     //   params.push(like, like, like, like, like, like);
-//     // }
-
-//     if (search) {
-//       whereClauses.push(`(
-//         a.Party_Name           LIKE ? OR
-//       pr.Return_Number       LIKE ? OR
-//       pr.Bill_Number         LIKE ? OR
-//         CAST(pr.Total_Amount AS CHAR) LIKE ? OR
-//         CAST(pr.Balance_Due AS CHAR)  LIKE ? OR
-//         CAST(pr.Total_Received AS CHAR)  LIKE ?
-
-//       )`);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like, like, like);
-//     }
-
-//     if (fromDate && toDate) {
-//       whereClauses.push(`DATE(pr.Return_Date) BETWEEN ? AND ?`);
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(pr.Return_Date) >= ?`);
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(pr.Return_Date) <= ?`);
-//       params.push(toDate);
-//     }
-
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-// //ORDER BY pr.created_at DESC
-//     const [rows] = await connection.query(
-//       `SELECT pr.*, a.Party_Name
-//        FROM purchase_return pr
-//        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
-//        ${whereSQL}
-//        ORDER BY pr.Bill_Date DESC
-//        LIMIT ? OFFSET ?`,
-//       [...params, limit, offset]
-//     );
-
-//     // attach split payment-type labels per row (same pattern as payment_in)
-//     const returnIds = rows.map((r) => r.id);
-
-//     if (returnIds.length > 0) {
-//       const placeholders = returnIds.map(() => "?").join(",");
-//       const [splits] = await connection.query(
-//         `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
-//          FROM payment_splits ps
-//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//          WHERE ps.Source_Type = 'Purchase_Return'
-//            AND ps.Source_Id IN (${placeholders})`,
-//         returnIds
-//       );
-
-//       const splitMap = {};
-//       for (const s of splits) {
-//         if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
-//         splitMap[s.Source_Id].push(
-//           s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-//         );
-//       }
-
-//       for (const row of rows) {
-//         const labels = splitMap[row.id] || [];
-//         const counts = {};
-//         labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
-//         row.Payment_Type_Display = Object.entries(counts)
-//           .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
-//           .join(" , ") || "—";
-//       }
-//     }
-
-//     const [[{ total }]] = await connection.query(
-//       `SELECT COUNT(*) AS total
-//        FROM purchase_return pr
-//        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     const [[totals]] = await connection.query(
-//       `SELECT
-//          COALESCE(SUM(pr.Total_Amount),   0) AS totalAmount,
-//          COALESCE(SUM(pr.Total_Received), 0) AS totalReceived,
-//          COALESCE(SUM(pr.Balance_Due),    0) AS totalBalance
-//        FROM purchase_return pr
-//        LEFT JOIN add_party a ON a.Party_Id = pr.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     return res.status(200).json({
-//       success: true,
-//       currentPage: page,
-//       totalPages: Math.ceil(total / limit),
-//       totalReturns: total,
-//       purchaseReturns: rows,
-//       totals,
-//     });
-//   } catch (err) {
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 const getAllPurchaseReturns = async (req, res, next) => {
   let connection;
@@ -587,6 +457,9 @@ const getPurchaseReturnById = async (req, res, next) => {
          pr.Round_Off,
          pr.Total_Received,
          pr.Balance_Due,
+         pr.Transaction_Discount_Percentage,
+         pr.Transaction_Discount_Amount,
+     
          pr.Party_Id,
          a.Party_Name,
      a.GSTIN,
@@ -621,61 +494,61 @@ const getPurchaseReturnById = async (req, res, next) => {
     //    — same source-of-truth pattern as purchase
     // =========================================================
 
-   
-  //   const [items] = await connection.query(
-  //     `
-  // SELECT
-  //     pri.id,
 
-  //     pri.Item_Id,
+    //   const [items] = await connection.query(
+    //     `
+    // SELECT
+    //     pri.id,
 
-  //     i.Item_Name,
-  //     i.Item_HSN,
-  //     i.Item_Unit,
-  //     i.Item_Category,
+    //     pri.Item_Id,
 
-  //     -- CURRENT MASTER
-  //     i.Primary_Unit AS Current_Primary_Unit,
-  //     i.Secondary_Unit AS Current_Secondary_Unit,
-  //     i.Conversion_Rate,
+    //     i.Item_Name,
+    //     i.Item_HSN,
+    //     i.Item_Unit,
+    //     i.Item_Category,
 
-  //     pri.Quantity,
+    //     -- CURRENT MASTER
+    //     i.Primary_Unit AS Current_Primary_Unit,
+    //     i.Secondary_Unit AS Current_Secondary_Unit,
+    //     i.Conversion_Rate,
 
-  //     -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
-  //     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
-  //     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
-  //     pu3.Unit_Shorthand AS Selected_Unit,
+    //     pri.Quantity,
 
-  //     pri.Purchase_Price,
-  //     pri.Discount_On_Purchase_Price,
-  //     pri.Discount_Type_On_Purchase_Price,
-  //     pri.Tax_Amount,
-  //     pri.Tax_Type,
-  //     pri.Amount,
-  //     pri.created_at
+    //     -- HISTORICAL SNAPSHOT (FROM UNIT IDS)
+    //     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
+    //     pu2.Unit_Shorthand AS Secondary_Unit_Snapshot,
+    //     pu3.Unit_Shorthand AS Selected_Unit,
 
-  // FROM purchase_return_items pri
+    //     pri.Purchase_Price,
+    //     pri.Discount_On_Purchase_Price,
+    //     pri.Discount_Type_On_Purchase_Price,
+    //     pri.Tax_Amount,
+    //     pri.Tax_Type,
+    //     pri.Amount,
+    //     pri.created_at
 
-  // LEFT JOIN add_item i
-  //   ON pri.Item_Id = i.Item_Id
+    // FROM purchase_return_items pri
 
-  // LEFT JOIN units pu1
-  //   ON pu1.id = pri.Primary_Unit_Snapshot_Id
+    // LEFT JOIN add_item i
+    //   ON pri.Item_Id = i.Item_Id
 
-  // LEFT JOIN units pu2
-  //   ON pu2.id = pri.Secondary_Unit_Snapshot_Id
+    // LEFT JOIN units pu1
+    //   ON pu1.id = pri.Primary_Unit_Snapshot_Id
 
-  // LEFT JOIN units pu3
-  //   ON pu3.id = pri.Selected_Unit_Id
+    // LEFT JOIN units pu2
+    //   ON pu2.id = pri.Secondary_Unit_Snapshot_Id
 
-  // WHERE pri.Purchase_Return_Id = ?
+    // LEFT JOIN units pu3
+    //   ON pu3.id = pri.Selected_Unit_Id
 
-  // ORDER BY pri.created_at DESC
-  // `,
-  //     [Purchase_Return_Id]
-  //   );
-  const [items] = await connection.query(
-  `
+    // WHERE pri.Purchase_Return_Id = ?
+
+    // ORDER BY pri.created_at DESC
+    // `,
+    //     [Purchase_Return_Id]
+    //   );
+    const [items] = await connection.query(
+      `
   SELECT
     pri.id,
     pri.Item_Id,
@@ -735,8 +608,8 @@ const getPurchaseReturnById = async (req, res, next) => {
 
   ORDER BY pri.created_at DESC
   `,
-  [Purchase_Return_Id]
-);
+      [Purchase_Return_Id]
+    );
 
     // =========================================================
     // 3. FETCH ALL UNITS (for edit dropdown — same as purchase)
@@ -775,7 +648,7 @@ const getPurchaseReturnById = async (req, res, next) => {
       const currentPrimary = it.Current_Primary_Unit || null;
 
       const currentSecondary = it.Current_Secondary_Unit || null;
-       const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
+      const hasHistoricalMRP = it.MRP !== null && Number(it.MRP) > 0;
       const price = Number(it.Purchase_Price || 0);
       let discountAmount = 0;
 
@@ -884,7 +757,7 @@ const getPurchaseReturnById = async (req, res, next) => {
           : 0,
         // Dropdown
         Available_Units: availableUnits,
-        MRP:it.MRP,
+        MRP: it.MRP,
         hasHistoricalMRP,
 
         Purchase_Price: it.Purchase_Price,
@@ -1007,6 +880,8 @@ const createPurchaseReturn = async (req, res, next) => {
       Bill_Date,
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
+      Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       splits,
@@ -1211,7 +1086,30 @@ const createPurchaseReturn = async (req, res, next) => {
     // =========================================================
     // 8. INSERT PURCHASE RETURN HEADER
     // =========================================================
+    const transactionDiscountPercentage =
+      normalizeNumber(Transaction_Discount_Percentage);
 
+    const transactionDiscountAmount =
+      normalizeNumber(Transaction_Discount_Amount);
+    if (
+      transactionDiscountPercentage !== null &&
+      transactionDiscountPercentage > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction discount percentage cannot be greater than 100%",
+      });
+    }
+
+    const cleanTransactionDiscountPercentage =
+      transactionDiscountPercentage > 0
+        ? transactionDiscountPercentage
+        : null;
+
+    const cleanTransactionDiscountAmount =
+      transactionDiscountAmount > 0
+        ? transactionDiscountAmount
+        : null;
     const [headerResult] = await connection.query(
       `INSERT INTO purchase_return
        (
@@ -1223,12 +1121,14 @@ const createPurchaseReturn = async (req, res, next) => {
          financial_year,
          Return_Date,
          State_Of_Supply,
+        Transaction_Discount_Percentage,
+        Transaction_Discount_Amount,
          Total_Amount,
          Round_Off,
          Total_Received,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?,?,?, ?, ?, ?, ?, ?, ?)`,
       [
         Purchase_Id,
         party.Party_Id,
@@ -1238,6 +1138,8 @@ const createPurchaseReturn = async (req, res, next) => {
         activeFY,
         Return_Date,
         State_Of_Supply || null,
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
         totalAmount,
         roundOffValue,
         totalReceived,
@@ -1583,8 +1485,8 @@ VALUES
       //
       // Therefore stock decreases.
       // =======================================================
-            await connection.execute(
-  `
+      await connection.execute(
+        `
   UPDATE add_item
   SET
     Item_Unit = ?,
@@ -1592,13 +1494,13 @@ VALUES
     Secondary_Unit = ?
   WHERE Item_Id = ?
   `,
-  [
-    resolvedSelectedUnit || null,
-    snapshot.Primary_Unit_Snapshot || null,
-    snapshot.Secondary_Unit_Snapshot || null,
-    Item_Id,
-  ]
-);
+        [
+          resolvedSelectedUnit || null,
+          snapshot.Primary_Unit_Snapshot || null,
+          snapshot.Secondary_Unit_Snapshot || null,
+          Item_Id,
+        ]
+      );
       await syncUnitIdsForItem(
         connection,
         Item_Id
@@ -1734,6 +1636,8 @@ const editPurchaseReturn = async (req, res, next) => {
       Bill_Date,
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
+       Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       splits,
@@ -1811,7 +1715,29 @@ const editPurchaseReturn = async (req, res, next) => {
     // =========================================================
     // 6. UPDATE HEADER
     // =========================================================
+       const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     await connection.query(
       `UPDATE purchase_return
        SET
@@ -1821,6 +1747,8 @@ const editPurchaseReturn = async (req, res, next) => {
          Bill_Date       = ?,
          Return_Date     = ?,
          State_Of_Supply = ?,
+         Transaction_Discount_Percentage = ?, 
+         Transaction_Discount_Amount = ?,
          Total_Amount    = ?,
          Round_Off       = ?,
          Total_Received  = ?,
@@ -1834,6 +1762,8 @@ const editPurchaseReturn = async (req, res, next) => {
         Bill_Date || null,
         Return_Date,
         State_Of_Supply || null,
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
         totalAmount,
         roundOffValue,
         totalReceived,
@@ -2073,7 +2003,7 @@ const editPurchaseReturn = async (req, res, next) => {
         // normalized values
         stockDelta,
         Quantity: Number(Quantity) || 0,
-         MRP:normalizeNumber(MRP) || null,
+        MRP: normalizeNumber(MRP) || null,
         Purchase_Price: Number(Purchase_Price) || 0,
         Discount_On_Purchase_Price: Number(Discount_On_Purchase_Price) || 0,
         Discount_Type_On_Purchase_Price: Discount_Type_On_Purchase_Price || "Percentage",
@@ -2151,7 +2081,7 @@ const editPurchaseReturn = async (req, res, next) => {
           oldSelected === oldSecondary
         ) {
 
-        
+
           const [[itemMaster]] =
             await connection.query(
               `
@@ -2259,8 +2189,8 @@ const editPurchaseReturn = async (req, res, next) => {
 
       const prItemId = insertResult.insertId;
 
-    await connection.execute(
-  `
+      await connection.execute(
+        `
   UPDATE add_item
   SET
     Item_Unit = ?,
@@ -2268,13 +2198,13 @@ const editPurchaseReturn = async (req, res, next) => {
     Secondary_Unit = ?
   WHERE Item_Id = ?
   `,
-  [
-    line.resolvedSelectedUnit || null,
-    line.Primary_Unit_Snapshot || null,
-    line.Secondary_Unit_Snapshot || null,
-    line.Item_Id,
-  ]
-);
+        [
+          line.resolvedSelectedUnit || null,
+          line.Primary_Unit_Snapshot || null,
+          line.Secondary_Unit_Snapshot || null,
+          line.Item_Id,
+        ]
+      );
       await syncUnitIdsForItem(
         connection,
         line.Item_Id

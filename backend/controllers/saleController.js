@@ -91,6 +91,8 @@ const addSale = async (req, res, next) => {
       Invoice_Number,
       Invoice_Date,
       State_Of_Supply,
+         Transaction_Discount_Percentage,
+Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       Total_Received,
@@ -614,7 +616,30 @@ const addSale = async (req, res, next) => {
     // Billing_Name / Phone_Number / Billing_Address stored here
     // as this invoice's own snapshot — independent of party master.
     // =========================================================
+     const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     const [saleResult] = await connection.execute(
       `INSERT INTO add_sale
        (
@@ -626,6 +651,8 @@ const addSale = async (req, res, next) => {
          Invoice_Date,
          Financial_Year,
          State_Of_Supply,
+         Transaction_Discount_Percentage,
+         Transaction_Discount_Amount,
          Total_Amount,
          Round_Off,
          Total_Received,
@@ -635,7 +662,7 @@ const addSale = async (req, res, next) => {
          created_at,
          updated_at
        )
-       VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?,?,?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?, NOW(), NOW())`,
       [
         Party_Id,
         cleanValue(Billing_Name),
@@ -645,6 +672,8 @@ const addSale = async (req, res, next) => {
         Invoice_Date,
         activeFY,
         cleanValue(State_Of_Supply),
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
         totalAmount,
         roundOffValue,
         totalReceived,
@@ -1958,6 +1987,8 @@ const getSingleSale = async (req, res, next) => {
      -- Terms saved on this invoice
      s.Terms_Conditions_Id,
      s.Terms_Conditions_Description,
+     s.Transaction_Discount_Percentage,
+        s.Transaction_Discount_Amount,
 
      -- Party master
          p.Party_Name,
@@ -2362,7 +2393,9 @@ const getSingleSale = async (req, res, next) => {
         Total_Received: saleHeader.Total_Received,
         Balance_Due: saleHeader.Balance_Due,
         Terms_Conditions_Id: saleHeader.Terms_Conditions_Id,
-        Terms_Conditions_Description: saleHeader.Terms_Conditions_Description
+        Terms_Conditions_Description: saleHeader.Terms_Conditions_Description,
+         Transaction_Discount_Percentage:saleHeader.Transaction_Discount_Percentage,
+        Transaction_Discount_Amount:saleHeader.Transaction_Discount_Amount
 
       },
 
@@ -3019,6 +3052,8 @@ const editSale = async (req, res, next) => {
       Billing_Address,     // ← add
       Invoice_Date,
       State_Of_Supply,
+      Transaction_Discount_Percentage,
+    Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       Total_Received,
@@ -3490,7 +3525,29 @@ const editSale = async (req, res, next) => {
     //
     // Whatever Edit Sale UI sends is saved on THIS invoice.
     // =========================================================
+const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     await connection.query(
       `UPDATE add_sale
    SET
@@ -3503,6 +3560,8 @@ const editSale = async (req, res, next) => {
       Invoice_Number = ?,
       Invoice_Date = ?,
       State_Of_Supply = ?,
+       Transaction_Discount_Percentage = ?, 
+       Transaction_Discount_Amount = ?,
 
       Total_Amount = ?,
       Round_Off = ?,
@@ -3525,6 +3584,8 @@ const editSale = async (req, res, next) => {
         Invoice_Number,
         Invoice_Date,
         cleanValue(State_Of_Supply),
+         cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
 
         totalAmount,
         roundOffValue,

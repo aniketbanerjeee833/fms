@@ -510,6 +510,8 @@ const getSaleReturnById = async (req, res, next) => {
      sr.Round_Off,
      sr.Total_Paid,
      sr.Balance_Due,
+     sr.Transaction_Discount_Percentage,
+    sr.Transaction_Discount_Amount,
      sr.Party_Id,
      a.Party_Name,
      a.GSTIN,
@@ -696,7 +698,7 @@ const getSaleReturnById = async (req, res, next) => {
       const currentPrimary = it.Current_Primary_Unit || null;
 
       const currentSecondary = it.Current_Secondary_Unit || null;
-      const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
+      const hasHistoricalMRP = it.MRP !== null && Number(it.MRP) > 0;
       const price = Number(it.Sale_Price || 0);
       let discountAmount = 0;
 
@@ -805,10 +807,10 @@ const getSaleReturnById = async (req, res, next) => {
           : 0,
         // Dropdown
         Available_Units: availableUnits,
-        MRP:it.MRP,
-        Discount_On_MRP_For_Sale_Percentage:it.Discount_On_MRP_For_Sale_Percentage,
-        Current_MRP_Discount:it.Current_MRP_Discount,
-         hasHistoricalMRP,
+        MRP: it.MRP,
+        Discount_On_MRP_For_Sale_Percentage: it.Discount_On_MRP_For_Sale_Percentage,
+        Current_MRP_Discount: it.Current_MRP_Discount,
+        hasHistoricalMRP,
 
         Sale_Price: it.Sale_Price,
 
@@ -931,6 +933,8 @@ const createSaleReturn = async (req, res, next) => {
       Invoice_Date,
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
+      Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       splits,
@@ -1049,7 +1053,30 @@ const createSaleReturn = async (req, res, next) => {
     // =========================================================
     // 8. INSERT SALE RETURN HEADER
     // =========================================================
+    const transactionDiscountPercentage =
+      normalizeNumber(Transaction_Discount_Percentage);
 
+    const transactionDiscountAmount =
+      normalizeNumber(Transaction_Discount_Amount);
+    if (
+      transactionDiscountPercentage !== null &&
+      transactionDiscountPercentage > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction discount percentage cannot be greater than 100%",
+      });
+    }
+
+    const cleanTransactionDiscountPercentage =
+      transactionDiscountPercentage > 0
+        ? transactionDiscountPercentage
+        : null;
+
+    const cleanTransactionDiscountAmount =
+      transactionDiscountAmount > 0
+        ? transactionDiscountAmount
+        : null;
     const [headerResult] = await connection.query(
       `INSERT INTO sale_return
        (
@@ -1061,12 +1088,14 @@ const createSaleReturn = async (req, res, next) => {
          financial_year,
          Return_Date,
          State_Of_Supply,
+         Transaction_Discount_Percentage,
+        Transaction_Discount_Amount,
          Total_Amount,
          Round_Off,
          Total_Paid,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?,?,?, ?, ?, ?, ?, ?, ?)`,
       [
         Sale_Id,
         party.Party_Id,
@@ -1076,6 +1105,8 @@ const createSaleReturn = async (req, res, next) => {
         activeFY,
         Return_Date,
         State_Of_Supply || null,
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
         totalAmount,
         roundOffValue,
         totalPaid,
@@ -1143,7 +1174,7 @@ const createSaleReturn = async (req, res, next) => {
         Item_Category,
         Item_HSN,
         Item_Unit,
-         MRP,
+        MRP,
         Discount_On_MRP_For_Sale_Percentage,
         Quantity,
         Sale_Price,
@@ -1319,8 +1350,8 @@ const createSaleReturn = async (req, res, next) => {
           snapshot.Secondary_Unit_Snapshot,  // step 6
           resolvedSelectedUnit,              // step 6
           Number(Quantity) || 0,
-           normalizeNumber(MRP) || null,
-           normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
+          normalizeNumber(MRP) || null,
+          normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
           Number(Sale_Price) || 0,
           Number(Discount_On_Sale_Price) || 0,
           Discount_Type_On_Sale_Price || "Percentage",
@@ -1490,6 +1521,8 @@ const editSaleReturn = async (req, res, next) => {
       Invoice_Date,
       Return_Date,
       State_Of_Supply,
+       Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       splits,
@@ -1566,7 +1599,29 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
     // 7. UPDATE HEADER — unchanged
     // =========================================================
+    const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     await connection.query(
       `UPDATE sale_return
        SET
@@ -1576,6 +1631,8 @@ const editSaleReturn = async (req, res, next) => {
          Invoice_Date = ?,
          Return_Date = ?,
          State_Of_Supply = ?,
+          Transaction_Discount_Percentage = ?, 
+         Transaction_Discount_Amount = ?,
          Total_Amount = ?,
          Round_Off = ?,
          Total_Paid = ?,
@@ -1589,6 +1646,8 @@ const editSaleReturn = async (req, res, next) => {
         Invoice_Date || null,
         Return_Date,
         State_Of_Supply || null,
+         cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
         totalAmount,
         roundOffValue,
         totalPaid,
@@ -1824,10 +1883,10 @@ const editSaleReturn = async (req, res, next) => {
 
         stockDelta,
         Quantity: Number(Quantity) || 0,
-         MRP: normalizeNumber(MRP) || null,
+        MRP: normalizeNumber(MRP) || null,
 
 
-        Discount_On_MRP_For_Sale_Percentage:normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
+        Discount_On_MRP_For_Sale_Percentage: normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
 
         Sale_Price: Number(Sale_Price) || 0,
         Discount_On_Sale_Price: Number(Discount_On_Sale_Price) || 0,

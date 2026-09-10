@@ -482,6 +482,7 @@ export default function PurchaseAdd() {
     setValue,
     watch,
     clearErrors,
+    getValues,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(purchaseFormSchema),
@@ -500,6 +501,7 @@ export default function PurchaseAdd() {
       Round_Off: "",   // 🔹 was "0.00"
       Terms_Conditions_Id: null,
       Terms_Conditions_Description: "",
+
       //Payment_Type: "Cash",
       //Bank_Account_Id: null,   // 🔹 added
       //Reference_Number: "",
@@ -589,8 +591,16 @@ export default function PurchaseAdd() {
     };
   };
   const getRawTotal = () => {
-    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
-  };
+  const currentItems = getValues("items") || [];
+
+  return currentItems.reduce(
+    (sum, it) => sum + (Number(it.Amount) || 0),
+    0
+  );
+};
+  // const getRawTotal = () => {
+  //   return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  // };
 
   // const applyRoundOff = (roundOffValue) => {
   //   const rawTotal = getRawTotal();
@@ -629,48 +639,114 @@ export default function PurchaseAdd() {
   //     setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
   //   }
   // };
-  const syncTotalsAfterItemChange = (
-    discountAmountOverride = null
-  ) => {
-    const rawTotal = getRawTotal();
 
-    const discountAmount =
-      discountAmountOverride !== null
-        ? Number(discountAmountOverride) || 0
-        : Number(watch("Transaction_Discount_Amount")) || 0;
+const syncTotalsAfterItemChange = (rawTotalOverride = null) => {
+  const rawTotal =
+    rawTotalOverride !== null
+      ? Number(rawTotalOverride) || 0
+      : getRawTotal();
 
-    const afterDiscount = Math.max(
-      0,
-      rawTotal - discountAmount
-    );
+  // Existing discount percentage
+  const discountPercentage =
+    Number(watch("Transaction_Discount_Percentage")) || 0;
 
-    const roundOff = isRoundOff
-      ? Number(watch("Round_Off")) || 0
+  // Recalculate discount amount
+  const discountAmount =
+    discountPercentage > 0
+      ? (rawTotal * discountPercentage) / 100
       : 0;
 
-    const finalTotal = afterDiscount + roundOff;
+  setValue(
+    "Transaction_Discount_Amount",
+    discountAmount > 0
+      ? discountAmount.toFixed(2)
+      : "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
 
-    const totalPaid =
-      Number(watch("Total_Paid")) || 0;
+  // Subtotal - Discount
+  const afterDiscount = Math.max(
+    0,
+    rawTotal - discountAmount
+  );
 
-    setValue(
-      "Total_Amount",
-      finalTotal.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+  // Use existing Round Off only if enabled
+  const roundOff = isRoundOff
+    ? Number(watch("Round_Off")) || 0
+    : 0;
 
-    setValue(
-      "Balance_Due",
-      (finalTotal - totalPaid).toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
-  };
+  // After Discount + Round Off
+  const finalTotal = Math.max(
+    0,
+    afterDiscount + roundOff
+  );
+
+  const totalPaid =
+    Number(watch("Total_Paid")) || 0;
+
+  setValue(
+    "Total_Amount",
+    finalTotal.toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Balance_Due",
+    (finalTotal - totalPaid).toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+};
+  // const syncTotalsAfterItemChange = (
+  //   discountAmountOverride = null
+  // ) => {
+  //   const rawTotal = getRawTotal();
+
+  //   const discountAmount =
+  //     discountAmountOverride !== null
+  //       ? Number(discountAmountOverride) || 0
+  //       : Number(watch("Transaction_Discount_Amount")) || 0;
+
+  //   const afterDiscount = Math.max(
+  //     0,
+  //     rawTotal - discountAmount
+  //   );
+
+  //   const roundOff = isRoundOff
+  //     ? Number(watch("Round_Off")) || 0
+  //     : 0;
+
+  //   const finalTotal = afterDiscount + roundOff;
+
+  //   const totalPaid =
+  //     Number(watch("Total_Paid")) || 0;
+
+  //   setValue(
+  //     "Total_Amount",
+  //     finalTotal.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   setValue(
+  //     "Balance_Due",
+  //     (finalTotal - totalPaid).toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // };
   const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
@@ -712,43 +788,72 @@ export default function PurchaseAdd() {
 
 
 
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   const currentItems = watch("items");
+
+  //   // 2. calculate new raw total excluding the deleted row
+  //   const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;
+  //     return sum + parseFloat(row.Amount || 0);
+  //   }, 0);
+
+  //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals — respecting Round Off if active
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     const newTotal = newRawTotal + currentRoundOff;
+  //     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   } else {
+  //     setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+
+  //   // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
+  //   // if (isTotalPaid) {
+  //   //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
+  //   //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
+  //   //   if ((watch("splits") || []).length === 1) {
+  //   //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   //   }
+  //   // }
+  // };
+
   const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
+  // Get current items BEFORE removal
+  const currentItems = watch("items") || [];
 
-    // 2. calculate new raw total excluding the deleted row
-    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  // Calculate raw total AFTER deleting this row
+  const newRawTotal = currentItems.reduce(
+    (sum, row, idx) => {
       if (idx === i) return sum;
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
 
-    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+      return sum + (Number(row.Amount) || 0);
+    },
+    0
+  );
 
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
+  // Remove from UI and React Hook Form
+  setRows((prev) =>
+    prev.filter((_, idx) => idx !== i)
+  );
 
-    // 4. update totals — respecting Round Off if active
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      const newTotal = newRawTotal + currentRoundOff;
-      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
+  remove(i);
 
-    // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
-    // if (isTotalPaid) {
-    //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
-    //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
-    //   if ((watch("splits") || []).length === 1) {
-    //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    //   }
-    // }
-  };
+  // Recalculate:
+  // Discount Amount
+  // Round Off
+  // Total Amount
+  // Balance Due
+  syncTotalsAfterItemChange(newRawTotal);
+};
 
   const formValues = watch();
 
@@ -946,6 +1051,7 @@ export default function PurchaseAdd() {
       ...data,
 
       Total_Paid: totalPaid,
+
 
       splits: validSplits,
     };
@@ -1383,132 +1489,7 @@ export default function PurchaseAdd() {
     // CREATE UI ROWS
     // =====================================================
 
-    // const scannedUiRows = scannedItems.map(
-    //   (item) => ({
-    //     itemSearch:
-    //       item.Item_Name || "",
-
-    //     itemOpen: false,
-
-    //     isExistingItem: true,
-    //     isHSNLocked: false,
-    //     isUnitLocked: false,
-
-    //     CategoryOpen: false,
-    //     categorySearch:
-    //       item.Item_Category || "",
-
-    //     unitOpen: false,
-    //     unitSearch: "",
-
-    //     Item_Id:
-    //       item.Item_Id || "",
-
-    //     Item_Name:
-    //       item.Item_Name || "",
-
-    //     Item_Category:
-    //       item.Item_Category || "",
-
-    //     Item_HSN: item.Item_HSN || "",
-
-    //     MRP: Number(item.MRP) > 0
-    //       ? Number(item.MRP)
-    //       : "",
-
-    //     Primary_Unit:
-    //       item.Primary_Unit || null,
-
-    //     Secondary_Unit:
-    //       item.Secondary_Unit || null,
-
-    //     Conversion_Rate:
-    //       item.Conversion_Rate || null,
-
-    //     Available_Units:
-    //       Array.isArray(item.Available_Units)
-    //         ? item.Available_Units
-    //         : [],
-
-    //     // ✅ PURCHASE PRICE
-    //     Purchase_Price:
-    //       Number(item.Purchase_Price) || 0,
-
-    //     // ✅ PURCHASE DISCOUNT
-    //     Discount_On_Purchase_Price:
-    //       item.Discount_On_Purchase_Price ?? "",
-
-    //     Discount_Type_On_Purchase_Price:
-    //       item.Discount_Type_On_Purchase_Price ||
-    //       "Percentage",
-
-    //     Tax_Type:
-    //       item.Tax_Type || "None",
-    //   })
-    // );
-
-    // =====================================================
-    // UPDATE UI ROWS
-    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
-    // =====================================================
-
-    // setRows((prev) => {
-    //   const updatedRows = [...prev];
-
-    //   let uiScanIndex = 0;
-
-    //   // ---------------------------------------------------
-    //   // Fill existing blank rows
-    //   // ---------------------------------------------------
-
-    //   for (
-    //     let i = 0;
-    //     i < updatedRows.length &&
-    //     uiScanIndex < scannedUiRows.length;
-    //     i++
-    //   ) {
-    //     const row = updatedRows[i];
-
-    //     const isBlankRow =
-    //       !row?.Item_Name ||
-    //       !row.Item_Name.trim();
-
-    //     if (isBlankRow) {
-    //       updatedRows[i] =
-    //         scannedUiRows[uiScanIndex];
-
-    //       uiScanIndex++;
-    //     }
-    //   }
-
-    //   // ---------------------------------------------------
-    //   // Remove remaining blank rows
-    //   // ---------------------------------------------------
-
-    //   const filledRows =
-    //     updatedRows.filter(
-    //       (row) =>
-    //         row?.Item_Name &&
-    //         row.Item_Name.trim()
-    //     );
-
-    //   // ---------------------------------------------------
-    //   // Append remaining scanned rows
-    //   // ---------------------------------------------------
-
-    //   if (
-    //     uiScanIndex <
-    //     scannedUiRows.length
-    //   ) {
-    //     filledRows.push(
-    //       ...scannedUiRows.slice(
-    //         uiScanIndex
-    //       )
-    //     );
-    //   }
-
-    //   return filledRows;
-    // });
+    
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1567,45 +1548,46 @@ export default function PurchaseAdd() {
           (Number(item.Amount) || 0),
         0
       );
+syncTotalsAfterItemChange(rawTotal);
 
-    const roundOff = isRoundOff
-      ? Number(watch("Round_Off")) || 0
-      : 0;
+    // const roundOff = isRoundOff
+    //   ? Number(watch("Round_Off")) || 0
+    //   : 0;
 
-    const finalTotal =
-      rawTotal + roundOff;
+    // const finalTotal =
+    //   rawTotal + roundOff;
 
-    const totalPaid =
-      Number(watch("Total_Paid")) || 0;
+    // const totalPaid =
+    //   Number(watch("Total_Paid")) || 0;
 
-    const balanceDue =
-      finalTotal - totalPaid;
+    // const balanceDue =
+    //   finalTotal - totalPaid;
 
-    // =====================================================
-    // UPDATE TOTAL
-    // =====================================================
+    // // =====================================================
+    // // UPDATE TOTAL
+    // // =====================================================
 
-    setValue(
-      "Total_Amount",
-      finalTotal.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Total_Amount",
+    //   finalTotal.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
-    // =====================================================
-    // UPDATE BALANCE
-    // =====================================================
+    // // =====================================================
+    // // UPDATE BALANCE
+    // // =====================================================
 
-    setValue(
-      "Balance_Due",
-      balanceDue.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Balance_Due",
+    //   balanceDue.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
     // =====================================================
     // CLOSE MODAL
@@ -2547,70 +2529,7 @@ export default function PurchaseAdd() {
                                 handleRowChange(i, "Secondary_Unit", null);
                                 handleRowChange(i, "Available_Units", []);
                               }}
-                              // onBlur={() => {
-                              //   setTimeout(() => {
-                              //     const typedValue = rows[i]?.itemSearch?.trim() || "";
-                              //     if (!typedValue) return;
-
-                              //     const matchedItem = items?.items?.find(
-                              //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //     );
-
-                              //     if (matchedItem) {
-                              //       // ✅ auto-fill exactly like clicking from dropdown
-                              //       setRows((prev) => {
-                              //         const updated = [...prev];
-                              //         updated[i] = {
-                              //           ...updated[i],
-                              //           itemSearch: matchedItem.Item_Name,   // normalize display
-                              //           Item_Category: matchedItem.Item_Category || "",
-                              //           Item_HSN: matchedItem.Item_HSN || "",
-                              //           categorySearch: matchedItem.Item_Category || "",
-                              //           isExistingItem: true,
-                              //           isHSNLocked: false,
-                              //           isUnitLocked: false,
-                              //           itemOpen: false,
-                              //           Primary_Unit: matchedItem.Primary_Unit || null,      // 🔹 add this
-                              //           Secondary_Unit: matchedItem.Secondary_Unit || null,  // 🔹 add this
-                              //           Conversion_Rate: matchedItem.Conversion_Rate || null,
-                              //           Available_Units: Array.isArray(matchedItem.Available_Units)
-                              //             ? matchedItem.Available_Units
-                              //             : [],
-
-                              //         };
-                              //         return updated;
-                              //       });
-
-                              //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                              //       //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit, { shouldValidate: true, shouldDirty: true });
-                              //       basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
-                              //       basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
-                              //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              //         {
-                              //           ...itemsValues[i],
-                              //           Item_Name: matchedItem.Item_Name,
-                              //           Purchase_Price: matchedItem.Purchase_Price || 0,
-                              //           Quantity: itemsValues[i]?.Quantity || 0,
-                              //         },
-                              //         i,
-                              //         itemsValues
-                              //       );
-
-                              //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              //       syncTotalsAfterItemChange();
-                              //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              //     } else {
-                              //       // no match — close dropdown
-                              //       handleRowChange(i, "itemOpen", false);
-                              //     }
-                              //   }, 150); // small delay so click-from-dropdown fires first
-                              // }}
+                          
                               onBlur={() => {
                                 setTimeout(async () => {
                                   const typedValue =
@@ -4405,12 +4324,12 @@ export default function PurchaseAdd() {
                     className="flex justify-between items-start gap-6 w-full mr-4">
 
 
-                  
+
                     <div
                       style={{ width: "100%" }}
                       className="flex flex-col gap-4 mt-3 w-full"
                     >
-                     
+
                       {enableTransactionWiseDiscount && (
                         <div
                           style={{ width: "50%" }}
@@ -4431,52 +4350,71 @@ export default function PurchaseAdd() {
                               textAlign: "right",
                             }}
                             {...register("Transaction_Discount_Percentage")}
-                            onChange={(e) => {
-                              let val = e.target.value.replace(/[^0-9.]/g, "");
+                           onChange={(e) => {
+  let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                              const parts = val.split(".");
-                              if (parts.length > 2) {
-                                val =
-                                  parts[0] +
-                                  "." +
-                                  parts.slice(1).join("");
-                              }
+  const parts = val.split(".");
 
-                              if (val.includes(".")) {
-                                const [int, dec] = val.split(".");
-                                val = int + "." + dec.slice(0, 3);
-                              }
+  // Only one decimal point
+  if (parts.length > 2) {
+    val =
+      parts[0] +
+      "." +
+      parts.slice(1).join("");
+  }
 
-                              e.target.value = val;
+  // Maximum 3 decimal places
+  if (val.includes(".")) {
+    const [int, dec] = val.split(".");
+    val = int + "." + dec.slice(0, 3);
+  }
 
-                              const percentage = Number(val) || 0;
-                              const subtotal = getRawTotal();
+  const numericValue = Number(val);
 
-                              const discountAmount =
-                                (subtotal * percentage) / 100;
+  //  Prevent ANY value greater than 100
+  if (val !== "" && numericValue > 100) {
+    toast.error("Discount percentage cannot be greater than 100%");
+    
+    // Restore previous valid value
+    const previousValue =
+      watch("Transaction_Discount_Percentage") || "";
 
-                              setValue(
-                                "Transaction_Discount_Percentage",
-                                val,
-                                {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                }
-                              );
+    e.target.value = previousValue;
 
-                              setValue(
-                                "Transaction_Discount_Amount",
-                                discountAmount > 0
-                                  ? discountAmount.toFixed(2)
-                                  : "",
-                                {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                }
-                              );
+    return;
+  }
 
-                              syncTotalsAfterItemChange(discountAmount);
-                            }}
+  e.target.value = val;
+
+  const percentage = Number(val) || 0;
+  const subtotal = getRawTotal();
+
+  const discountAmount =
+    (subtotal * percentage) / 100;
+
+  setValue(
+    "Transaction_Discount_Percentage",
+    val,
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Transaction_Discount_Amount",
+    discountAmount > 0
+      ? discountAmount.toFixed(2)
+      : "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  // syncTotalsAfterItemChange(discountAmount);
+   syncTotalsAfterItemChange();
+}}
                           />
 
                           {/* Discount Amount */}
@@ -4536,12 +4474,13 @@ export default function PurchaseAdd() {
                                 }
                               );
 
-                              syncTotalsAfterItemChange(amount);
+                              //syncTotalsAfterItemChange(amount);
+                              syncTotalsAfterItemChange();
                             }}
                           />
                         </div>
                       )}
-                      
+
                       <div
                         style={{ width: "100%" }}
                         className="flex justify-between items-center gap-6 w-full mr-4"
@@ -4633,21 +4572,22 @@ export default function PurchaseAdd() {
                           </span>
 
                           <input
-                            style={{
-                              backgroundColor: "transparent",
-                              height: "1rem",
-                              marginTop: "10px",
-                            }}
+                            // style={{
+                            //   backgroundColor: "transparent",
+                            //   height: "1rem",
+                            //   marginTop: "10px",
+                            // }}
+                            style={{ marginBottom: "0px", backgroundColor: "transparent", height: "1rem", width: "100%" }}
                             type="text"
                             className="form-control"
                             {...register("Total_Amount")}
                             readOnly
                           />
                         </div>
-                        
+
                       </div>
 
-                      
+
                       <div
                         style={{ width: "100%" }}
                         className="flex items-center gap-3 relative ml-auto"
@@ -5111,7 +5051,7 @@ export default function PurchaseAdd() {
 
 
 
-  {/* <div className="flex items-center gap-2">
+{/* <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         id="roundOffCheck"
@@ -5152,7 +5092,7 @@ export default function PurchaseAdd() {
                       />
                     </div> */}
 
-                    {/* <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
+{/* <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
                      
                       <div className="flex gap-3 items-center  w-full sm:w-auto">
 

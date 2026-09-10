@@ -31,6 +31,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback } from "react";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
+import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 
 function ItemDropdownVirtualized({
 
@@ -448,7 +449,17 @@ export default function PurchaseEdit() {
           "enable_place_of_supply"
       )?.setting_value
     ) === 1;
+  const { data: transactionsSettingsData } = useGetAllTransactionsSettingsQuery();
 
+  const transactionsSettings = transactionsSettingsData?.settings || [];
+
+  const enableTransactionWiseDiscount =
+    Number(
+      transactionsSettings.find(
+        (s) =>
+          s.setting_key === "transaction_wise_discount"
+      )?.setting_value
+    ) === 1;
   const shouldShowMRP = showMRP || hasHistoricalMRP;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -510,6 +521,7 @@ export default function PurchaseEdit() {
     setValue,
     watch,
     reset,
+    getValues,
     clearErrors,
     //getValues,
     formState: { errors },
@@ -521,6 +533,8 @@ export default function PurchaseEdit() {
       Bill_Number: "",
       Bill_Date: "",
       State_Of_Supply: "",
+      Transaction_Discount_Percentage: "",
+      Transaction_Discount_Amount: "",
       Total_Amount: "",
       Round_Off: "",
       Balance_Due: "",
@@ -610,28 +624,157 @@ export default function PurchaseEdit() {
       Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
+  // const getRawTotal = () => {
+  //   return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  // };
   const getRawTotal = () => {
-    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
-  };
+  const currentItems = getValues("items") || [];
 
+  return currentItems.reduce(
+    (sum, it) => sum + (Number(it.Amount) || 0),
+    0
+  );
+};
+
+  // const applyRoundOff = (roundOffValue) => {
+  //   const rawTotal = getRawTotal();
+  //   const totalPaid = Number(watch("Total_Paid")) || 0;
+  //   const newTotal = rawTotal + roundOffValue;
+
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  // };
   const applyRoundOff = (roundOffValue) => {
     const rawTotal = getRawTotal();
+
+    const discountAmount =
+      Number(watch("Transaction_Discount_Amount")) || 0;
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
     const totalPaid = Number(watch("Total_Paid")) || 0;
-    const newTotal = rawTotal + roundOffValue;
+
+    const newTotal = afterDiscount + Number(roundOffValue || 0);
+
 
     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
     setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
   };
-  const syncTotalsAfterItemChange = () => {
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      applyRoundOff(currentRoundOff);
-    } else {
-      const rawTotal = getRawTotal();
-      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  const syncTotalsAfterItemChange = (rawTotalOverride = null) => {
+  const rawTotal =
+    rawTotalOverride !== null
+      ? Number(rawTotalOverride) || 0
+      : getRawTotal();
+
+  const discountPercentage =
+    Number(watch("Transaction_Discount_Percentage")) || 0;
+
+  const discountAmount =
+    discountPercentage > 0
+      ? (rawTotal * discountPercentage) / 100
+      : 0;
+
+  setValue(
+    "Transaction_Discount_Amount",
+    discountAmount > 0
+      ? discountAmount.toFixed(2)
+      : "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
     }
-  };
+  );
+
+  const afterDiscount = Math.max(
+    0,
+    rawTotal - discountAmount
+  );
+
+  const roundOff = isRoundOff
+    ? Number(watch("Round_Off")) || 0
+    : 0;
+
+  const finalTotal = Math.max(
+    0,
+    afterDiscount + roundOff
+  );
+
+  const totalPaid =
+    Number(watch("Total_Paid")) || 0;
+
+  setValue(
+    "Total_Amount",
+    finalTotal.toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Balance_Due",
+    (finalTotal - totalPaid).toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+};
+  // const syncTotalsAfterItemChange = (
+  //   discountAmountOverride = null
+  // ) => {
+  //   const rawTotal = getRawTotal();
+
+  //   const discountAmount =
+  //     discountAmountOverride !== null
+  //       ? Number(discountAmountOverride) || 0
+  //       : Number(watch("Transaction_Discount_Amount")) || 0;
+
+  //   const afterDiscount = Math.max(
+  //     0,
+  //     rawTotal - discountAmount
+  //   );
+
+  //   const roundOff = isRoundOff
+  //     ? Number(watch("Round_Off")) || 0
+  //     : 0;
+
+  //   const finalTotal = afterDiscount + roundOff;
+
+  //   const totalPaid =
+  //     Number(watch("Total_Paid")) || 0;
+
+  //   setValue(
+  //     "Total_Amount",
+  //     finalTotal.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   setValue(
+  //     "Balance_Due",
+  //     (finalTotal - totalPaid).toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // };
+  // const syncTotalsAfterItemChange = () => {
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     applyRoundOff(currentRoundOff);
+  //   } else {
+  //     const rawTotal = getRawTotal();
+  //     setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+  // };
   const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
@@ -673,44 +816,68 @@ export default function PurchaseEdit() {
   };
 
 
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   const currentItems = watch("items");
 
-    // 2. calculate new raw total excluding the deleted row
-    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //   // 2. calculate new raw total excluding the deleted row
+  //   const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;
+  //     return sum + parseFloat(row.Amount || 0);
+  //   }, 0);
+
+  //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals — respecting Round Off if active
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     const newTotal = newRawTotal + currentRoundOff;
+  //     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   } else {
+  //     setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+
+  //   // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
+  //   // if (isTotalPaid) {
+  //   //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
+  //   //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
+  //   //   if ((watch("splits") || []).length === 1) {
+  //   //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   //   }
+  //   // }
+  // };
+const handleDeleteRow = (i) => {
+  // Get current items BEFORE removal
+  const currentItems = watch("items") || [];
+
+  // Calculate subtotal AFTER deleting this row
+  const newRawTotal = currentItems.reduce(
+    (sum, row, idx) => {
       if (idx === i) return sum;
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
 
-    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+      return sum + (Number(row.Amount) || 0);
+    },
+    0
+  );
 
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
+  // Remove from UI
+  setRows((prev) =>
+    prev.filter((_, idx) => idx !== i)
+  );
 
-    // 4. update totals — respecting Round Off if active
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      const newTotal = newRawTotal + currentRoundOff;
-      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
+  // Remove from React Hook Form
+  remove(i);
 
-    // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
-    // if (isTotalPaid) {
-    //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
-    //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
-    //   if ((watch("splits") || []).length === 1) {
-    //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    //   }
-    // }
-  };
-
+  // Recalculate discount + total + balance
+  syncTotalsAfterItemChange(newRawTotal);
+};
 
 
   const formValues = watch();
@@ -870,10 +1037,26 @@ export default function PurchaseEdit() {
     isExistingItem: false,
   });
   const originalTaxTypesRef = useRef([]);
+  const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   useEffect(() => {
     if (purchase) {
       originalTaxTypesRef.current = (purchase?.items || []).map(
         (item) => item?.Tax_Type || "None"
+      );
+      const savedDiscountAmount =
+        Number(
+          purchase?.billPurchaseDetails?.Transaction_Discount_Amount
+        ) || 0;
+
+      const savedDiscountPercentage =
+        Number(
+          purchase?.billPurchaseDetails?.Transaction_Discount_Percentage
+        ) || 0;
+
+      setShowTransactionDiscount(
+        enableTransactionWiseDiscount ||
+        savedDiscountAmount > 0 ||
+        savedDiscountPercentage > 0
       );
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
 
@@ -884,23 +1067,7 @@ export default function PurchaseEdit() {
           // Original purchase price saved in this purchase line
           const purchasePrice = Number(item.Purchase_Price) || 0;
 
-          // If this purchase was saved in secondary unit,
-          // convert its price back to PRIMARY price.
-          // const primaryUnit = item.Primary_Unit || "";
-          // const secondaryUnit = item.Secondary_Unit || "";
-          //       const primaryUnit =
-          //   item.Primary_Unit ||
-          //   availableUnits[0]?.Unit_Shorthand ||
-          //   "";
 
-          // const secondaryUnit =
-          //   item.Secondary_Unit ||
-          //   availableUnits.find(
-          //     (u) => u.Unit_Shorthand !== primaryUnit
-          //   )?.Unit_Shorthand ||
-          //   "";
-          //       const conversionRate = Number(item.Conversion_Rate) || 0;
-          //       const selectedUnit = item.Selected_Unit || primaryUnit;
           const conversionRate = Number(item.Conversion_Rate) || 0;
 
           const availableUnits = Array.isArray(item.Available_Units)
@@ -1001,6 +1168,15 @@ export default function PurchaseEdit() {
         Terms_Conditions_Id: purchase?.billPurchaseDetails?.Terms_Conditions_Id ?? null,
 
         Terms_Conditions_Description: purchase?.billPurchaseDetails?.Terms_Conditions_Description ?? "",
+        Transaction_Discount_Amount:
+          Number(purchase?.billPurchaseDetails?.Transaction_Discount_Amount) > 0
+            ? purchase?.billPurchaseDetails?.Transaction_Discount_Amount
+            : "",
+
+        Transaction_Discount_Percentage:
+          Number(purchase?.billPurchaseDetails?.Transaction_Discount_Percentage) > 0
+            ? purchase?.billPurchaseDetails?.Transaction_Discount_Percentage
+            : "",
         //Payment_Type: purchase?.billPurchaseDetails?.Payment_Type,
         //Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id, // ✅ Add this
         //Reference_Number: purchase?.billPurchaseDetails?.Reference_Number,
@@ -1652,44 +1828,46 @@ export default function PurchaseEdit() {
         0
       );
 
-    const roundOff = isRoundOff
-      ? Number(watch("Round_Off")) || 0
-      : 0;
+    // const roundOff = isRoundOff
+    //   ? Number(watch("Round_Off")) || 0
+    //   : 0;
 
-    const finalTotal =
-      rawTotal + roundOff;
+    // const finalTotal =
+    //   rawTotal + roundOff;
 
-    const totalPaid =
-      Number(watch("Total_Paid")) || 0;
+    // const totalPaid =
+    //   Number(watch("Total_Paid")) || 0;
 
-    const balanceDue =
-      finalTotal - totalPaid;
+    // const balanceDue =
+    //   finalTotal - totalPaid;
 
-    // =====================================================
-    // UPDATE TOTAL
-    // =====================================================
+    // // =====================================================
+    // // UPDATE TOTAL
+    // // =====================================================
 
-    setValue(
-      "Total_Amount",
-      finalTotal.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Total_Amount",
+    //   finalTotal.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
-    // =====================================================
-    // UPDATE BALANCE
-    // =====================================================
+    // // =====================================================
+    // // UPDATE BALANCE
+    // // =====================================================
 
-    setValue(
-      "Balance_Due",
-      balanceDue.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Balance_Due",
+    //   balanceDue.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
+    // Total Amount and Balance Due
+syncTotalsAfterItemChange(rawTotal);
 
     // =====================================================
     // CLOSE MODAL
@@ -1711,6 +1889,7 @@ export default function PurchaseEdit() {
 
       <div style={{ padding: "20px" }}
         className="flex flex-col bg-white ">
+           
 
         <div className="inn-title w-full px-2 py-3">
 
@@ -1817,13 +1996,7 @@ export default function PurchaseEdit() {
                       search: location.search,
                     });
                   }
-                  // else if (from === "cash-in-hand") {
-                  //   // 🔹 new — return to Bank Accounts page with the same account selected
-                  //   navigate({
-                  //     pathname: `/cash-bank/cash-in-hand`,
 
-                  //   });
-                  // }
                   else {
                     navigate({
                       pathname: "/purchase/all-purchases",
@@ -2165,7 +2338,7 @@ export default function PurchaseEdit() {
                         {state}
                       </option>
                     ))}
-        
+
                   </select>
                   {errors?.State_Of_Supply && (
                     <p className="text-red-500 text-xs mt-1">
@@ -4440,117 +4613,293 @@ export default function PurchaseEdit() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    {/* <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+                    <div
+                      style={{ width: "100%" }}
+                      className="flex flex-col gap-4 mt-3 w-full"
+                    >
+                      {showTransactionDiscount && (
+                        <div
+                          style={{ width: "50%" }}
+                          className="flex items-center gap-2 justify-end ml-auto"
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Discount
+                          </span>
 
+                          {/* Discount Percentage */}
+                          <input
+                            type="text"
+                            placeholder="%"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Percentage")}
+                                                     onChange={(e) => {
+  let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                          if (!totalAmount || isNaN(totalAmount)) return;
+  const parts = val.split(".");
 
-                          if (isChecked) {
-                            setOriginalTotal(totalAmount);
+  // Only one decimal point
+  if (parts.length > 2) {
+    val =
+      parts[0] +
+      "." +
+      parts.slice(1).join("");
+  }
 
-                            // Round off to nearest integer
-                            const rounded = Math.round(totalAmount);
+  // Maximum 3 decimal places
+  if (val.includes(".")) {
+    const [int, dec] = val.split(".");
+    val = int + "." + dec.slice(0, 3);
+  }
 
-                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+  const numericValue = Number(val);
 
-                          } else {
-                            if (originalTotal !== null) {
-                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+  //  Prevent ANY value greater than 100
+  if (val !== "" && numericValue > 100) {
+    toast.error("Discount percentage cannot be greater than 100%");
+    
+    // Restore previous valid value
+    const previousValue =
+      watch("Transaction_Discount_Percentage") || "";
+
+    e.target.value = previousValue;
+
+    return;
+  }
+
+  e.target.value = val;
+
+  const percentage = Number(val) || 0;
+  const subtotal = getRawTotal();
+
+  const discountAmount =
+    (subtotal * percentage) / 100;
+
+  setValue(
+    "Transaction_Discount_Percentage",
+    val,
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Transaction_Discount_Amount",
+    discountAmount > 0
+      ? discountAmount.toFixed(2)
+      : "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  // syncTotalsAfterItemChange(discountAmount);
+  syncTotalsAfterItemChange();
+}}
+                          />
+
+                          {/* Discount Amount */}
+                          <input
+                            type="text"
+                            placeholder="Amount"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Amount")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
+
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
+
+                              e.target.value = val;
+
+                              const amount = Number(val) || 0;
+                              const subtotal = getRawTotal();
+
+                              const percentage =
+                                subtotal > 0
+                                  ? (amount / subtotal) * 100
+                                  : 0;
 
                               setValue(
-                                "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
-                                { shouldValidate: true }
+                                "Transaction_Discount_Amount",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
                               );
-                            }
-                          }
-                        }}
-                      />
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                              setValue(
+                                "Transaction_Discount_Percentage",
+                                amount > 0
+                                  ? percentage.toFixed(3)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              // syncTotalsAfterItemChange(amount);
+                              syncTotalsAfterItemChange();
+                            }}
+                          />
+                        </div>
+                      )}
 
 
-                      <input
+                      {/* <div style={{ width: "100%" }} 
+                    className="flex flex-col gap-4 mt-3 w-full"> */}
+                      <div style={{ width: "100%" }}
+                        className="flex justify-between items-center gap-6 w-full mr-4"
+                      >
+                        {/* <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="roundOffCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={isRoundOff}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setIsRoundOff(isChecked);
 
-                        type="text"
+                              const rawTotal = getRawTotal();
 
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="w-3  border border-gray-300  text-right text-sm"
-                        {...register("Round_Off")}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+                              if (isChecked) {
+                                const rounded = Math.round(rawTotal);
+                                const diff = Number((rounded - rawTotal).toFixed(2));
+                                setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                                applyRoundOff(diff);
+                              } else {
+                                setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                                applyRoundOff(0);
+                              }
+                            }}
+                          />
 
-                          if (isNaN(totalAmount)) return;
-
-                          // New Total
-                          const newTotal = totalAmount + val;
-
-                          setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                        }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
-                      />
-                    </div> */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        checked={isRoundOff}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setIsRoundOff(isChecked);
-
-                          const rawTotal = getRawTotal();
-
-                          if (isChecked) {
-                            const rounded = Math.round(rawTotal);
-                            const diff = Number((rounded - rawTotal).toFixed(2));
-                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(diff);
-                          } else {
-                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(0);
-                          }
-                        }}
-                      />
-
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
-
-                      <input
-                        type="text"
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="border border-gray-300 text-right text-sm"
-                        {...register("Round_Off")}
-                        disabled={!isRoundOff}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
-                          const numVal = parseFloat(val) || 0;
-                          applyRoundOff(numVal);
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                      <div className="flex gap-3 items-center  w-full sm:w-auto">
-
-                        <div style={{ width: "100%" }} className="flex gap-2 ">
-                          <span className="font-medium whitespace-nowrap">Total Amount</span>
+                          <span className="font-medium whitespace-nowrap">Round Off</span>
 
                           <input
-                            style={{ backgroundColor: "transparent", height: "1rem" }}
+                            type="text"
+                            style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                            className="border border-gray-300 text-right text-sm"
+                            {...register("Round_Off")}
+                            disabled={!isRoundOff}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                              const numVal = parseFloat(val) || 0;
+                              applyRoundOff(numVal);
+                            }}
+                          />
+                        </div> */}
+                         <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="roundOffCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={isRoundOff}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setIsRoundOff(isChecked);
+
+                              if (isChecked) {
+                                const rawTotal = getRawTotal();
+
+                                const discountAmount =
+                                  Number(watch("Transaction_Discount_Amount")) || 0;
+
+                                const totalBeforeRoundOff = Math.max(
+                                  0,
+                                  rawTotal - discountAmount
+                                );
+
+                                const rounded = Math.round(totalBeforeRoundOff);
+
+                                const diff = Number(
+                                  (rounded - totalBeforeRoundOff).toFixed(2)
+                                );
+
+                                setValue(
+                                  "Round_Off",
+                                  diff !== 0 ? diff.toFixed(2) : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                applyRoundOff(diff);
+                              } else {
+                                setValue("Round_Off", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                applyRoundOff(0);
+                              }
+                            }}
+                          />
+
+                          <span className="font-medium whitespace-nowrap">
+                            Round Off
+                          </span>
+
+                          <input
+                            type="text"
+                            style={{
+                              marginTop: "10px",
+                              height: "1.5rem",
+                            }}
+                            className="border border-gray-300 text-right text-sm"
+                            {...register("Round_Off")}
+                            disabled={!isRoundOff}
+                            onChange={(e) => {
+                              const val = e.target.value;
+
+                              setValue("Round_Off", val, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              const numVal = parseFloat(val) || 0;
+
+                              applyRoundOff(numVal);
+                            }}
+                          />
+                        </div>
+                        {/* Total Amount */}
+                        <div
+                          style={{ width: "100%" }}
+                          className="flex items-center gap-2"
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Total Amount
+                          </span>
+
+                          <input
+                            style={{ marginBottom: "0px", backgroundColor: "transparent", height: "1rem", width: "100%" }}
                             type="text"
                             className="form-control"
                             {...register("Total_Amount")}
@@ -4673,6 +5022,7 @@ export default function PurchaseEdit() {
                           readOnly
                         />
                       </div>
+                      {/* </div> */}
                     </div>
                   </div>
 

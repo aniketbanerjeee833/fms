@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import {  useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,6 +31,7 @@ import BankAccountModal from "../../components/Modal/BankAccountModal";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
+import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -422,42 +423,53 @@ export default function PurchaseReturnAdd() {
         (s) => s.setting_key === "show_mrp"
       )?.setting_value
     ) === 1;
-     const barcodeScanEnabled =
+  const barcodeScanEnabled =
     Number(
       settings.find(
         (s) => s.setting_key === "barcode_scan"
       )?.setting_value
     ) === 1;
-      const {
-        data: taxesGSTSettingsData,
-      } = useGetAllTaxesAndGSTSettingsQuery();
-    
-      const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
-    
-      const enableGST =
-        Number(
-          taxesGSTSettings.find(
-            (s) =>
-              s.setting_key === "enable_gst"
-          )?.setting_value
-        ) === 1;
-    
-      // const enableHSNSAC =
-      //   Number(
-      //     taxesGSTSettings.find(
-      //       (s) =>
-      //         s.setting_key === "enable_hsn_sac"
-      //     )?.setting_value
-      //   ) === 1;
-    
-      const enablePlaceOfSupply =
-        Number(
-          taxesGSTSettings.find(
-            (s) =>
-              s.setting_key ===
-              "enable_place_of_supply"
-          )?.setting_value
-        ) === 1;
+  const {
+    data: taxesGSTSettingsData,
+  } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
+
+  const enableGST =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key === "enable_gst"
+      )?.setting_value
+    ) === 1;
+
+  // const enableHSNSAC =
+  //   Number(
+  //     taxesGSTSettings.find(
+  //       (s) =>
+  //         s.setting_key === "enable_hsn_sac"
+  //     )?.setting_value
+  //   ) === 1;
+
+  const enablePlaceOfSupply =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_place_of_supply"
+      )?.setting_value
+    ) === 1;
+  const { data: transactionsSettingsData } = useGetAllTransactionsSettingsQuery();
+
+  const transactionsSettings = transactionsSettingsData?.settings || [];
+
+  const enableTransactionWiseDiscount =
+    Number(
+      transactionsSettings.find(
+        (s) =>
+          s.setting_key === "transaction_wise_discount"
+      )?.setting_value
+    ) === 1;
   const hasHistoricalMRP =
     purchase?.items?.some(
       (item) => item.hasHistoricalMRP === true
@@ -526,6 +538,7 @@ export default function PurchaseReturnAdd() {
     handleSubmit,
     setValue,
     watch,
+    getValues,
     reset,
     clearErrors,
     formState: { errors },
@@ -538,6 +551,8 @@ export default function PurchaseReturnAdd() {
       Bill_Date: "",
       Return_Date: new Date().toISOString().slice(0, 10),
       State_Of_Supply: "",
+      Transaction_Discount_Percentage: "",
+      Transaction_Discount_Amount: "",
       Total_Amount: "",
       Round_Off: "",
       Balance_Due: "",
@@ -561,7 +576,7 @@ export default function PurchaseReturnAdd() {
       ],
     },
   });
-  const { fields, append, remove,replace } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -621,28 +636,153 @@ export default function PurchaseReturnAdd() {
     };
   };
 
-  const getRawTotal = () => {
-    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
-  };
+  // const getRawTotal = () => {
+  //   return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  // };
+   const getRawTotal = () => {
+  const currentItems = getValues("items") || [];
 
+  return currentItems.reduce(
+    (sum, it) => sum + (Number(it.Amount) || 0),
+    0
+  );
+};
+
+  // const applyRoundOff = (roundOffValue) => {
+  //   const rawTotal = getRawTotal();
+  //   const totalReceived = Number(watch("Total_Received")) || 0;
+  //   const newTotal = rawTotal + roundOffValue;
+
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   setValue("Balance_Due", (newTotal - totalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  // };
   const applyRoundOff = (roundOffValue) => {
     const rawTotal = getRawTotal();
+
+    const discountAmount =
+      Number(watch("Transaction_Discount_Amount")) || 0;
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
     const totalReceived = Number(watch("Total_Received")) || 0;
-    const newTotal = rawTotal + roundOffValue;
+
+    const newTotal = afterDiscount + Number(roundOffValue || 0);
+
 
     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
     setValue("Balance_Due", (newTotal - totalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
   };
-  const syncTotalsAfterItemChange = () => {
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      applyRoundOff(currentRoundOff);
-    } else {
-      const rawTotal = getRawTotal();
-      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (rawTotal - Number(watch("Total_Received") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  
+  // const syncTotalsAfterItemChange = (
+  //   discountAmountOverride = null
+  // ) => {
+  //   const rawTotal = getRawTotal();
+
+  //   const discountAmount =
+  //     discountAmountOverride !== null
+  //       ? Number(discountAmountOverride) || 0
+  //       : Number(watch("Transaction_Discount_Amount")) || 0;
+
+  //   const afterDiscount = Math.max(
+  //     0,
+  //     rawTotal - discountAmount
+  //   );
+
+  //   const roundOff = isRoundOff
+  //     ? Number(watch("Round_Off")) || 0
+  //     : 0;
+
+  //   const finalTotal = afterDiscount + roundOff;
+
+  //   const totalReceived = Number(watch("Total_Received")) || 0;
+
+  //   setValue(
+  //     "Total_Amount",
+  //     finalTotal.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   setValue(
+  //     "Balance_Due",
+  //     (finalTotal - totalReceived).toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // };
+ const syncTotalsAfterItemChange = (rawTotalOverride = null) => {
+
+  const rawTotal =
+    rawTotalOverride !== null
+      ? Number(rawTotalOverride) || 0
+      : getRawTotal();
+
+  // Existing transaction discount percentage
+  const discountPercentage =
+    Number(watch("Transaction_Discount_Percentage")) || 0;
+
+  // Recalculate discount amount
+  const discountAmount =
+    discountPercentage > 0
+      ? (rawTotal * discountPercentage) / 100
+      : 0;
+
+  setValue(
+    "Transaction_Discount_Amount",
+    discountAmount > 0
+      ? discountAmount.toFixed(2)
+      : "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
     }
-  };
+  );
+
+  // Subtotal - Discount
+  const afterDiscount = Math.max(
+    0,
+    rawTotal - discountAmount
+  );
+
+  // Keep existing Round Off value if Round Off is enabled
+  const roundOff = isRoundOff
+    ? Number(watch("Round_Off")) || 0
+    : 0;
+
+  // After Discount + Round Off
+  const finalTotal = Math.max(
+    0,
+    afterDiscount + roundOff
+  );
+
+  const totalReceived =
+    Number(watch("Total_Received")) || 0;
+
+  setValue(
+    "Total_Amount",
+    finalTotal.toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Balance_Due",
+    (finalTotal - totalReceived).toFixed(2),
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+};
   const handleAddRow = () => {
     setRows((prev) => [
       ...prev.map((row) => ({
@@ -688,34 +828,62 @@ export default function PurchaseReturnAdd() {
 
   //const itemsValues = watch("items"); // watch all rows
 
-  const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
+  // const handleDeleteRow = (i) => {
+  //   // 1. get current items BEFORE removal
+  //   const currentItems = watch("items");
 
-    // 2. calculate new total excluding the deleted row
-    const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //   // 2. calculate new total excluding the deleted row
+  //   const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;
+  //     return sum + parseFloat(row.Amount || 0);
+  //   }, 0);
+
+  //   const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
+  //   //const newBalanceDue = newRawTotal - currentTotalReceived;
+
+  //   // 3. remove from UI state and form
+  //   setRows((prev) => prev.filter((_, idx) => idx !== i));
+  //   remove(i);
+
+  //   // 4. update totals
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     const newTotal = newRawTotal + currentRoundOff;
+  //     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   } else {
+  //     setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newRawTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+  // };
+
+
+
+
+const handleDeleteRow = (i) => {
+  // 1. Get current items BEFORE removal
+  const currentItems = watch("items") || [];
+
+  // 2. Calculate new raw total excluding deleted row
+  const newRawTotal = currentItems.reduce(
+    (sum, row, idx) => {
       if (idx === i) return sum;
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
 
-    const currentTotalReceived = parseFloat(watch("Total_Received") || 0);
-    //const newBalanceDue = newRawTotal - currentTotalReceived;
+      return sum + (Number(row.Amount) || 0);
+    },
+    0
+  );
 
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    remove(i);
+  // 3. Remove from UI state and form
+  setRows((prev) =>
+    prev.filter((_, idx) => idx !== i)
+  );
 
-    // 4. update totals
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      const newTotal = newRawTotal + currentRoundOff;
-      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newRawTotal - currentTotalReceived).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
-  };
+  remove(i);
+
+  // 4. Recalculate total using transaction discount
+  syncTotalsAfterItemChange(newRawTotal);
+};
   const formValues = watch();
 
 
@@ -762,37 +930,37 @@ export default function PurchaseReturnAdd() {
     isExistingItem: false,
   });
   const originalTaxTypesRef = useRef([]);
+  const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   useEffect(() => {
     if (purchase) {
-       originalTaxTypesRef.current = (purchase?.items || []).map(
+      originalTaxTypesRef.current = (purchase?.items || []).map(
         (item) => item?.Tax_Type || "None"
+      );
+      const savedDiscountAmount =
+        Number(
+          purchase?.billPurchaseDetails?.Transaction_Discount_Amount
+        ) || 0;
+
+      const savedDiscountPercentage =
+        Number(
+          purchase?.billPurchaseDetails?.Transaction_Discount_Percentage
+        ) || 0;
+
+      setShowTransactionDiscount(
+        enableTransactionWiseDiscount ||
+        savedDiscountAmount > 0 ||
+        savedDiscountPercentage > 0
       );
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name);
 
-     
+
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item, index) => {
 
           // Original purchase price saved in this purchase line
           const purchasePrice = Number(item.Purchase_Price) || 0;
 
-          // If this purchase was saved in secondary unit,
-          // convert its price back to PRIMARY price.
-          // const primaryUnit = item.Primary_Unit || "";
-          // const secondaryUnit = item.Secondary_Unit || "";
-          //       const primaryUnit =
-          //   item.Primary_Unit ||
-          //   availableUnits[0]?.Unit_Shorthand ||
-          //   "";
 
-          // const secondaryUnit =
-          //   item.Secondary_Unit ||
-          //   availableUnits.find(
-          //     (u) => u.Unit_Shorthand !== primaryUnit
-          //   )?.Unit_Shorthand ||
-          //   "";
-          //       const conversionRate = Number(item.Conversion_Rate) || 0;
-          //       const selectedUnit = item.Selected_Unit || primaryUnit;
           const conversionRate = Number(item.Conversion_Rate) || 0;
 
           const availableUnits = Array.isArray(item.Available_Units)
@@ -861,11 +1029,9 @@ export default function PurchaseReturnAdd() {
         MRP: item.MRP || "",
         Purchase_Price: item.Purchase_Price || "",
 
-        Discount_On_Purchase_Price:
-          item.Discount_On_Purchase_Price || "",
+        Discount_On_Purchase_Price:item.Discount_On_Purchase_Price || "",
 
-        Discount_Type_On_Purchase_Price:
-          item.Discount_Type_On_Purchase_Price || "Percentage",
+        Discount_Type_On_Purchase_Price:item.Discount_Type_On_Purchase_Price || "Percentage",
 
         Tax_Type: item.Tax_Type || "None",
         Tax_Amount: item.Tax_Amount || "",
@@ -888,6 +1054,15 @@ export default function PurchaseReturnAdd() {
         Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
         Total_Received: "",
         Balance_Due: purchase?.billPurchaseDetails?.Balance_Due,
+        Transaction_Discount_Amount:
+          Number(purchase?.billPurchaseDetails?.Transaction_Discount_Amount) > 0
+            ? purchase?.billPurchaseDetails?.Transaction_Discount_Amount
+            : "",
+
+        Transaction_Discount_Percentage:
+          Number(purchase?.billPurchaseDetails?.Transaction_Discount_Percentage) > 0
+            ? purchase?.billPurchaseDetails?.Transaction_Discount_Percentage
+            : "",
         // splits replaces Payment_Type / Bank_Account_Id / Reference_Number —
         // seed row 1 with the original purchase's payment info as a starting
         // suggestion; user can change it freely, it's just a convenience default
@@ -1421,180 +1596,54 @@ export default function PurchaseReturnAdd() {
     // CREATE UI ROWS
     // =====================================================
 
-    // const scannedUiRows = scannedItems.map(
-    //   (item) => ({
-    //     itemSearch:
-    //       item.Item_Name || "",
-
-    //     itemOpen: false,
-
-    //     isExistingItem: true,
-    //     isHSNLocked: false,
-    //     isUnitLocked: false,
-
-    //     CategoryOpen: false,
-    //     categorySearch:
-    //       item.Item_Category || "",
-
-    //     unitOpen: false,
-    //     unitSearch: "",
-
-    //     Item_Id:
-    //       item.Item_Id || "",
-
-    //     Item_Name:
-    //       item.Item_Name || "",
-
-    //     Item_Category:
-    //       item.Item_Category || "",
-
-    //     Item_HSN: item.Item_HSN || "",
-
-    //     // MRP: Number(item.MRP) > 0
-    //     //   ? Number(item.MRP)
-    //     //   : "",
-    //      MRP: showMRP && Number(item.MRP) > 0
-    //       ? Number(item.MRP)
-    //       : "",
-
-    //     Primary_Unit:item.Primary_Unit || null,
-
-    //     Secondary_Unit:item.Secondary_Unit || null,
-
-    //     Conversion_Rate:
-    //       item.Conversion_Rate || null,
-
-    //     Available_Units:
-    //       Array.isArray(item.Available_Units)
-    //         ? item.Available_Units
-    //         : [],
-
-    //     // ✅ PURCHASE PRICE
-    //     Purchase_Price:
-    //       Number(item.Purchase_Price) || 0,
-
-    //     // ✅ PURCHASE DISCOUNT
-    //     Discount_On_Purchase_Price:
-    //       item.Discount_On_Purchase_Price ?? "",
-
-    //     Discount_Type_On_Purchase_Price:
-    //       item.Discount_Type_On_Purchase_Price ||
-    //       "Percentage",
-
-    //     Tax_Type:
-    //       item.Tax_Type || "None",
-    //   })
-    // );
-
-    // =====================================================
-    // UPDATE UI ROWS
-    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
-    // =====================================================
-
-    // setRows((prev) => {
-    //   const updatedRows = [...prev];
-
-    //   let uiScanIndex = 0;
-
-    //   // ---------------------------------------------------
-    //   // Fill existing blank rows
-    //   // ---------------------------------------------------
-
-    //   for (
-    //     let i = 0;
-    //     i < updatedRows.length &&
-    //     uiScanIndex < scannedUiRows.length;
-    //     i++
-    //   ) {
-    //     const row = updatedRows[i];
-
-    //     const isBlankRow =
-    //       !row?.Item_Name ||
-    //       !row.Item_Name.trim();
-
-    //     if (isBlankRow) {
-    //       updatedRows[i] =
-    //         scannedUiRows[uiScanIndex];
-
-    //       uiScanIndex++;
-    //     }
-    //   }
-
-    //   // ---------------------------------------------------
-    //   // Remove remaining blank rows
-    //   // ---------------------------------------------------
-
-    //   const filledRows =
-    //     updatedRows.filter(
-    //       (row) =>
-    //         row?.Item_Name &&
-    //         row.Item_Name.trim()
-    //     );
-
-    //   // ---------------------------------------------------
-    //   // Append remaining scanned rows
-    //   // ---------------------------------------------------
-
-    //   if (
-    //     uiScanIndex <
-    //     scannedUiRows.length
-    //   ) {
-    //     filledRows.push(
-    //       ...scannedUiRows.slice(
-    //         uiScanIndex
-    //       )
-    //     );
-    //   }
-
-    //   return filledRows;
-    // });
+    
     setRows(() => {
-  return combinedItems.map((item) => ({
-    itemSearch: item.Item_Name || "",
+      return combinedItems.map((item) => ({
+        itemSearch: item.Item_Name || "",
 
-    itemOpen: false,
+        itemOpen: false,
 
-    isExistingItem: true,
-    isHSNLocked: false,
-    isUnitLocked: false,
+        isExistingItem: true,
+        isHSNLocked: false,
+        isUnitLocked: false,
 
-    CategoryOpen: false,
-    categorySearch: item.Item_Category || "",
+        CategoryOpen: false,
+        categorySearch: item.Item_Category || "",
 
-    unitOpen: false,
-    unitSearch: "",
+        unitOpen: false,
+        unitSearch: "",
 
-    Item_Id: item.Item_Id || "",
+        Item_Id: item.Item_Id || "",
 
-    Item_Name: item.Item_Name || "",
+        Item_Name: item.Item_Name || "",
 
-    Item_Category: item.Item_Category || "",
+        Item_Category: item.Item_Category || "",
 
-    Item_HSN: item.Item_HSN || "",
+        Item_HSN: item.Item_HSN || "",
 
-    MRP: showMRP && Number(item.MRP) > 0
-      ? Number(item.MRP)
-      : "",
+        MRP: showMRP && Number(item.MRP) > 0
+          ? Number(item.MRP)
+          : "",
 
-    Primary_Unit: item.Primary_Unit || null,
-    Secondary_Unit: item.Secondary_Unit || null,
-    Conversion_Rate: item.Conversion_Rate || null,
+        Primary_Unit: item.Primary_Unit || null,
+        Secondary_Unit: item.Secondary_Unit || null,
+        Conversion_Rate: item.Conversion_Rate || null,
 
-    Available_Units: Array.isArray(item.Available_Units)
-      ? item.Available_Units
-      : [],
+        Available_Units: Array.isArray(item.Available_Units)
+          ? item.Available_Units
+          : [],
 
-    Purchase_Price: Number(item.Purchase_Price) || 0,
+        Purchase_Price: Number(item.Purchase_Price) || 0,
 
-    Discount_On_Purchase_Price:
-      item.Discount_On_Purchase_Price ?? "",
+        Discount_On_Purchase_Price:
+          item.Discount_On_Purchase_Price ?? "",
 
-    Discount_Type_On_Purchase_Price:
-      item.Discount_Type_On_Purchase_Price || "Percentage",
+        Discount_Type_On_Purchase_Price:
+          item.Discount_Type_On_Purchase_Price || "Percentage",
 
-    Tax_Type: item.Tax_Type || "None",
-  }));
-});
+        Tax_Type: item.Tax_Type || "None",
+      }));
+    });
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1608,54 +1657,54 @@ export default function PurchaseReturnAdd() {
         0
       );
 
-    const roundOff = isRoundOff
-      ? Number(watch("Round_Off")) || 0
-      : 0;
+    // const roundOff = isRoundOff
+    //   ? Number(watch("Round_Off")) || 0
+    //   : 0;
 
-    const finalTotal =
-      rawTotal + roundOff;
+    // const finalTotal =
+    //   rawTotal + roundOff;
 
-    const totalReceived =
-      Number(watch("Total_Received")) || 0;
+    // const totalReceived =
+    //   Number(watch("Total_Received")) || 0;
 
-    const balanceDue =
-      finalTotal - totalReceived;
+    // const balanceDue =
+    //   finalTotal - totalReceived;
 
-    // =====================================================
-    // UPDATE TOTAL
-    // =====================================================
+    // // =====================================================
+    // // UPDATE TOTAL
+    // // =====================================================
 
-    setValue(
-      "Total_Amount",
-      finalTotal.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Total_Amount",
+    //   finalTotal.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
-    // =====================================================
-    // UPDATE BALANCE
-    // =====================================================
+    // // =====================================================
+    // // UPDATE BALANCE
+    // // =====================================================
 
-    setValue(
-      "Balance_Due",
-      balanceDue.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Balance_Due",
+    //   balanceDue.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
     // =====================================================
     // CLOSE MODAL
     // =====================================================
-
+      syncTotalsAfterItemChange(rawTotal);
     setShowScanCodeModal(false);
   };
   return (
     <>
-      
+
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -2083,9 +2132,9 @@ export default function PurchaseReturnAdd() {
                         {state}
                       </option>
                     ))}
-               
+
                   </select>
-                
+
                 </div>)}
               </div>
 
@@ -2105,7 +2154,7 @@ export default function PurchaseReturnAdd() {
                 <thead>
                   <tr>
 
-                     <th
+                    <th
                       className="cursor-pointer"
                       onClick={handleOpenScanModal}
                     >
@@ -2967,7 +3016,7 @@ export default function PurchaseReturnAdd() {
                                 setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
                                 setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
                                 //setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
-                                 if (showMRP) {
+                                if (showMRP) {
                                   setValue(
                                     `items.${i}.MRP`,
                                     Number(it.MRP) > 0 ? it.MRP : "",
@@ -2987,7 +3036,7 @@ export default function PurchaseReturnAdd() {
                                   );
                                 }
                                 setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                 setValue(
+                                setValue(
                                   `items.${i}.Quantity`,
                                   Number(itemsValues[i]?.Quantity) || 1,
                                   {
@@ -3831,9 +3880,8 @@ export default function PurchaseReturnAdd() {
 
                                                 const {
                                                   Tax_Amount,
-                                                  Amount,
-                                                  Total_Amount,
-                                                  Balance_Due,
+                                                  Amount
+
                                                 } = calculateRowAmount(
                                                   {
                                                     ...itemsValues[i],
@@ -4085,93 +4133,93 @@ export default function PurchaseReturnAdd() {
                         />
                       </td> */}
 
-                       {/* Tax Amount Entry */}
-                                            <td style={{ padding: "0px", width: "12%" }}>
-                                              <Controller
-                                                control={control}
-                                                name={`items.${i}.Tax_Type`}
-                                                render={({ field }) => {
-                                                  const originalTaxType =
-                                                    originalTaxTypesRef.current[i] || "None";
-                      
-                                                  return (
-                                                    <select
-                                                      {...field}
-                                                      className="form-select bg-gray-100 text-gray-700"
-                                                      onChange={(e) => {
-                                                        field.onChange(e);
-                      
-                                                        // Recalculate amounts on Tax_Type change
-                                                        const {
-                                                          Tax_Amount,
-                                                          Amount,
-                                                        } = calculateRowAmount(
-                                                          {
-                                                            ...itemsValues[i],
-                                                            Tax_Type: e.target.value,
-                                                          },
-                                                          i,
-                                                          itemsValues
-                                                        );
-                      
-                                                        setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
-                                                          shouldValidate: true,
-                                                        });
-                      
-                                                        setValue(`items.${i}.Amount`, Amount, {
-                                                          shouldValidate: true,
-                                                        });
-                      
-                                                        syncTotalsAfterItemChange();
-                                                      }}
-                                                    >
-                                                      {/* Always show None */}
-                                                      <option value="None">None</option>
-                      
-                                                      {enableGST ? (
-                                                        <>
-                                                          <option value="GST0">GST @0%</option>
-                                                          <option value="IGST0">IGST @0%</option>
-                      
-                                                          <option value="GST0.25">GST @0.25%</option>
-                                                          <option value="IGST0.25">IGST @0.25%</option>
-                      
-                                                          <option value="GST3">GST @3%</option>
-                                                          <option value="IGST3">IGST @3%</option>
-                      
-                                                          <option value="GST5">GST @5%</option>
-                                                          <option value="IGST5">IGST @5%</option>
-                      
-                                                          <option value="GST12">GST @12%</option>
-                                                          <option value="IGST12">IGST @12%</option>
-                      
-                                                          <option value="GST18">GST @18%</option>
-                                                          <option value="IGST18">IGST @18%</option>
-                      
-                                                          <option value="GST28">GST @28%</option>
-                                                          <option value="IGST28">IGST @28%</option>
-                      
-                                                          <option value="GST40">GST @40%</option>
-                                                          <option value="IGST40">IGST @40%</option>
-                                                        </>
-                                                      ) : (
-                                                        /* GST OFF:
-                                                           Show None + original saved tax type */
-                                                        originalTaxType !== "None" && (
-                                                          <option value={originalTaxType}>
-                                                            {originalTaxType.startsWith("GST")
-                                                              ? `GST @${originalTaxType.replace("GST", "")}%`
-                                                              : originalTaxType.startsWith("IGST")
-                                                                ? `IGST @${originalTaxType.replace("IGST", "")}%`
-                                                                : originalTaxType}
-                                                          </option>
-                                                        )
-                                                      )}
-                                                    </select>
-                                                  );
-                                                }}
-                                              />
-                                            </td>
+                      {/* Tax Amount Entry */}
+                      <td style={{ padding: "0px", width: "12%" }}>
+                        <Controller
+                          control={control}
+                          name={`items.${i}.Tax_Type`}
+                          render={({ field }) => {
+                            const originalTaxType =
+                              originalTaxTypesRef.current[i] || "None";
+
+                            return (
+                              <select
+                                {...field}
+                                className="form-select bg-gray-100 text-gray-700"
+                                onChange={(e) => {
+                                  field.onChange(e);
+
+                                  // Recalculate amounts on Tax_Type change
+                                  const {
+                                    Tax_Amount,
+                                    Amount,
+                                  } = calculateRowAmount(
+                                    {
+                                      ...itemsValues[i],
+                                      Tax_Type: e.target.value,
+                                    },
+                                    i,
+                                    itemsValues
+                                  );
+
+                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  setValue(`items.${i}.Amount`, Amount, {
+                                    shouldValidate: true,
+                                  });
+
+                                  syncTotalsAfterItemChange();
+                                }}
+                              >
+                                {/* Always show None */}
+                                <option value="None">None</option>
+
+                                {enableGST ? (
+                                  <>
+                                    <option value="GST0">GST @0%</option>
+                                    <option value="IGST0">IGST @0%</option>
+
+                                    <option value="GST0.25">GST @0.25%</option>
+                                    <option value="IGST0.25">IGST @0.25%</option>
+
+                                    <option value="GST3">GST @3%</option>
+                                    <option value="IGST3">IGST @3%</option>
+
+                                    <option value="GST5">GST @5%</option>
+                                    <option value="IGST5">IGST @5%</option>
+
+                                    <option value="GST12">GST @12%</option>
+                                    <option value="IGST12">IGST @12%</option>
+
+                                    <option value="GST18">GST @18%</option>
+                                    <option value="IGST18">IGST @18%</option>
+
+                                    <option value="GST28">GST @28%</option>
+                                    <option value="IGST28">IGST @28%</option>
+
+                                    <option value="GST40">GST @40%</option>
+                                    <option value="IGST40">IGST @40%</option>
+                                  </>
+                                ) : (
+                                  /* GST OFF:
+                                     Show None + original saved tax type */
+                                  originalTaxType !== "None" && (
+                                    <option value={originalTaxType}>
+                                      {originalTaxType.startsWith("GST")
+                                        ? `GST @${originalTaxType.replace("GST", "")}%`
+                                        : originalTaxType.startsWith("IGST")
+                                          ? `IGST @${originalTaxType.replace("IGST", "")}%`
+                                          : originalTaxType}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            );
+                          }}
+                        />
+                      </td>
 
                       {/* Tax Amount */}
                       <td style={{ width: "8%" }}>
@@ -4453,247 +4501,433 @@ export default function PurchaseReturnAdd() {
 
                   <div style={{ width: "100%" }}
                     className="flex justify-between items-start gap-6 w-full mr-4">
-                    {/* <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                    <div
+                      style={{ width: "100%" }}
+                      className="flex flex-col gap-4 mt-3 w-full"
+                    >
+                      {showTransactionDiscount && (
+                        <div
+                          style={{ width: "50%" }}
+                          className="flex items-center gap-2 justify-end ml-auto"
+                        >
+                          <span className="font-medium whitespace-nowrap">
+                            Discount
+                          </span>
 
-                          if (!totalAmount || isNaN(totalAmount)) return;
+                          {/* Discount Percentage */}
+                          <input
+                            type="text"
+                            placeholder="%"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Percentage")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                          if (isChecked) {
-                            setOriginalTotal(totalAmount);
+                              const parts = val.split(".");
 
-                            // Round off to nearest integer
-                            const rounded = Math.round(totalAmount);
+                              // Only one decimal point
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
 
-                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                              // Maximum 3 decimal places
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
 
-                          } else {
-                            if (originalTotal !== null) {
-                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+                              const numericValue = Number(val);
+
+                              //  Prevent ANY value greater than 100
+                              if (val !== "" && numericValue > 100) {
+                                toast.error("Discount percentage cannot be greater than 100%");
+
+                                // Restore previous valid value
+                                const previousValue =
+                                  watch("Transaction_Discount_Percentage") || "";
+
+                                e.target.value = previousValue;
+
+                                return;
+                              }
+
+                              e.target.value = val;
+
+                              const percentage = Number(val) || 0;
+                              const subtotal = getRawTotal();
+
+                              const discountAmount =
+                                (subtotal * percentage) / 100;
 
                               setValue(
-                                "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
-                                { shouldValidate: true }
+                                "Transaction_Discount_Percentage",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
                               );
+
+                              setValue(
+                                "Transaction_Discount_Amount",
+                                discountAmount > 0
+                                  ? discountAmount.toFixed(2)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+                              syncTotalsAfterItemChange();
+                              //syncTotalsAfterItemChange(discountAmount);
+                            }}
+                          />
+
+                          {/* Discount Amount */}
+                          <input
+                            type="text"
+                            placeholder="Amount"
+                            className="form-control"
+                            style={{
+                              marginBottom: "0px",
+                              height: "1.5rem",
+                              textAlign: "right",
+                            }}
+                            {...register("Transaction_Discount_Amount")}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                              const parts = val.split(".");
+                              if (parts.length > 2) {
+                                val =
+                                  parts[0] +
+                                  "." +
+                                  parts.slice(1).join("");
+                              }
+
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 3);
+                              }
+
+                              e.target.value = val;
+
+                              const amount = Number(val) || 0;
+                              const subtotal = getRawTotal();
+
+                              const percentage =
+                                subtotal > 0
+                                  ? (amount / subtotal) * 100
+                                  : 0;
+
+                              setValue(
+                                "Transaction_Discount_Amount",
+                                val,
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              setValue(
+                                "Transaction_Discount_Percentage",
+                                amount > 0
+                                  ? percentage.toFixed(3)
+                                  : "",
+                                {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                }
+                              );
+
+                              //syncTotalsAfterItemChange(amount);
+                              syncTotalsAfterItemChange();
+                            }}
+                          />
+                        </div>
+                      )}
+                      {/* <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="roundOffCheck"
+                          className="w-4 h-4 cursor-pointer"
+                          checked={isRoundOff}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            setIsRoundOff(isChecked);
+
+                            const rawTotal = getRawTotal();
+
+                            if (isChecked) {
+                              const rounded = Math.round(rawTotal);
+                              const diff = Number((rounded - rawTotal).toFixed(2));
+                              setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
+                              applyRoundOff(diff);
+                            } else {
+                              setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
+                              applyRoundOff(0);
                             }
-                          }
-                        }}
-                      />
+                          }}
+                        />
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                        <span className="font-medium whitespace-nowrap">Round Off</span>
 
+                        <input
+                          type="text"
+                          style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
+                          className="border border-gray-300 text-right text-sm"
+                          {...register("Round_Off")}
+                          disabled={!isRoundOff}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
+                            const numVal = parseFloat(val) || 0;
+                            applyRoundOff(numVal);
+                          }}
+                        />
+                      </div> */}
 
-                      <input
+                      <div style={{ width: "100%" }} 
+                      
+                        //"flex flex-col gap-4 mt-3 w-full"
+                        className="flex justify-between items-center gap-6 w-full mr-4"
+                        >
+                        {/* <div className="flex gap-3 items-center  w-full sm:w-auto">
 
-                        type="text"
+                          <div style={{ width: "100%" }} className="flex gap-2 ">
+                            <span className="font-medium whitespace-nowrap">Total Amount</span>
 
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="w-3  border border-gray-300  text-right text-sm"
-                        {...register("Round_Off")}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Received")) || 0;
+                            <input
+                              style={{ backgroundColor: "transparent", height: "1rem" }}
+                              type="text"
+                              className="form-control"
+                              {...register("Total_Amount")}
+                              readOnly
+                            />
+                          </div>
+                        </div> */}
+                         <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="roundOffCheck"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={isRoundOff}
+                            onChange={(e) => {
+                              const isChecked = e.target.checked;
+                              setIsRoundOff(isChecked);
 
-                          if (isNaN(totalAmount)) return;
+                              if (isChecked) {
+                                const rawTotal = getRawTotal();
 
-                          // New Total
-                          const newTotal = totalAmount + val;
+                                const discountAmount =
+                                  Number(watch("Transaction_Discount_Amount")) || 0;
 
-                          setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                        }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
-                      />
-                    </div> */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        checked={isRoundOff}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setIsRoundOff(isChecked);
+                                const totalBeforeRoundOff = Math.max(
+                                  0,
+                                  rawTotal - discountAmount
+                                );
 
-                          const rawTotal = getRawTotal();
+                                const rounded = Math.round(totalBeforeRoundOff);
 
-                          if (isChecked) {
-                            const rounded = Math.round(rawTotal);
-                            const diff = Number((rounded - rawTotal).toFixed(2));
-                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(diff);
-                          } else {
-                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(0);
-                          }
-                        }}
-                      />
+                                const diff = Number(
+                                  (rounded - totalBeforeRoundOff).toFixed(2)
+                                );
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                                setValue(
+                                  "Round_Off",
+                                  diff !== 0 ? diff.toFixed(2) : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
 
-                      <input
-                        type="text"
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="border border-gray-300 text-right text-sm"
-                        {...register("Round_Off")}
-                        disabled={!isRoundOff}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
-                          const numVal = parseFloat(val) || 0;
-                          applyRoundOff(numVal);
-                        }}
-                      />
-                    </div>
+                                applyRoundOff(diff);
+                              } else {
+                                setValue("Round_Off", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                      <div className="flex gap-3 items-center  w-full sm:w-auto">
+                                applyRoundOff(0);
+                              }
+                            }}
+                          />
 
-                        <div style={{ width: "100%" }} className="flex gap-2 ">
+                          <span className="font-medium whitespace-nowrap">
+                            Round Off
+                          </span>
+
+                          <input
+                            type="text"
+                            style={{
+                              marginTop: "10px",
+                              height: "1.5rem",
+                            }}
+                            className="border border-gray-300 text-right text-sm"
+                            {...register("Round_Off")}
+                            disabled={!isRoundOff}
+                            onChange={(e) => {
+                              const val = e.target.value;
+
+                              setValue("Round_Off", val, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              const numVal = parseFloat(val) || 0;
+
+                              applyRoundOff(numVal);
+                            }}
+                          />
+                        </div>
+                        {/* Total Amount */}
+                        
+
+                        <div style={{ width: "100%" }} className="flex items-center gap-2">
                           <span className="font-medium whitespace-nowrap">Total Amount</span>
 
                           <input
-                            style={{ backgroundColor: "transparent", height: "1rem" }}
+                            style={{ marginBottom: "0px", backgroundColor: "transparent", height: "1rem", width: "100%" }}
                             type="text"
                             className="form-control"
                             {...register("Total_Amount")}
                             readOnly
                           />
                         </div>
-                      </div>
+
+                             </div>
+
+                        <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+
+                          <div className="flex items-center gap-2 relative">
+
+                            <input
+                              type="checkbox"
 
 
+                              id="totalReceivedCheck"
+                              className="w-4 h-4 cursor-pointer"
+                              disabled={splitsWatch.length > 1}   // 🔹 add this
 
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
+                              onChange={(e) => {
 
-                        <div className="flex items-center gap-2 relative">
+                                const isChecked = e.target.checked;
+                                const totalAmount = parseFloat(watch("Total_Amount"));
+
+                                // 🧠 If no total amount entered, do nothing
+                                if (!totalAmount || isNaN(totalAmount)) {
+                                  // Optional: visually reset the checkbox
+
+
+                                  // Clear both fields to stay consistent
+                                  setValue("Total_Received", "");
+                                  setValue("Balance_Due", "");
+                                  if (splitsWatch.length === 1) {
+                                    setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                  }
+                                  return;
+                                }
+
+                                if (isChecked) {
+                                  // ✅ Set Total_Received = Total_Amount, Balance_Due = 0
+                                  setValue("Total_Received", totalAmount.toFixed(2));
+                                  setValue("Balance_Due", 0);
+                                } else {
+                                  // ✅ When unchecked, restore Balance_Due = Total_Amount
+                                  setValue("Total_Received", "");
+                                  setValue("Balance_Due", totalAmount.toFixed(2));
+                                }
+                                if (splitsWatch.length === 1) {
+                                  setValue(
+                                    "splits.0.Amount",
+                                    isChecked ? totalAmount.toFixed(2) : "",
+                                    { shouldValidate: true, shouldDirty: true }
+                                  );
+                                }
+                              }}
+                            />
+                            <span
+                              htmlFor="totalReceivedCheck"
+                              className="font-medium whitespace-nowrap"
+                            >
+                              Total Received
+                            </span>
+
+                          </div>
+
 
                           <input
-                            type="checkbox"
-
-
-                            id="totalReceivedCheck"
-                            className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
+                            type="text"
+                            {...register("Total_Received")}
+                            style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                            readOnly={splitsWatch.length > 1}
                             onChange={(e) => {
+                              if (splitsWatch.length > 1) return;
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                              const isChecked = e.target.checked;
-                              const totalAmount = parseFloat(watch("Total_Amount"));
+                              // Allow only one dot
+                              const parts = val.split(".");
+                              if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
 
-                              // 🧠 If no total amount entered, do nothing
-                              if (!totalAmount || isNaN(totalAmount)) {
-                                // Optional: visually reset the checkbox
-
-
-                                // Clear both fields to stay consistent
-                                setValue("Total_Received", "");
-                                setValue("Balance_Due", "");
-                                if (splitsWatch.length === 1) {
-                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
-                                }
-                                return;
+                              // Limit to 2 decimals
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
                               }
 
-                              if (isChecked) {
-                                // ✅ Set Total_Received = Total_Amount, Balance_Due = 0
-                                setValue("Total_Received", totalAmount.toFixed(2));
-                                setValue("Balance_Due", 0);
-                              } else {
-                                // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                setValue("Total_Received", "");
-                                setValue("Balance_Due", totalAmount.toFixed(2));
-                              }
+                              e.target.value = val;
+                              setValue("Total_Received", val);
+
+                              const totalReceived = parseFloat(val || 0);
+                              const totalAmount = parseFloat(watch("Total_Amount") || 0);
+                              setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
                               if (splitsWatch.length === 1) {
-                                setValue(
-                                  "splits.0.Amount",
-                                  isChecked ? totalAmount.toFixed(2) : "",
-                                  { shouldValidate: true, shouldDirty: true }
-                                );
+                                const val = e.target.value;
+                                setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
                               }
+                              clearErrors("splits.0.Amount"); // already there ✅
                             }}
+                            className="form-control"
                           />
-                          <span
-                            htmlFor="totalReceivedCheck"
-                            className="font-medium whitespace-nowrap"
-                          >
-                            Total Received
-                          </span>
-
                         </div>
 
 
-                        <input
-                          type="text"
-                          {...register("Total_Received")}
-                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
-                          onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
-                            let val = e.target.value.replace(/[^0-9.]/g, "");
 
-                            // Allow only one dot
-                            const parts = val.split(".");
-                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+                        <div style={{ width: "100%" }}
+                          className="flex  gap-2 items-center ">
 
-                            // Limit to 2 decimals
-                            if (val.includes(".")) {
-                              const [int, dec] = val.split(".");
-                              val = int + "." + dec.slice(0, 2);
-                            }
+                          <span className="font-medium whitespace-nowrap">Balance Due</span>
+                          <input
+                            style={{
+                              backgroundColor: "transparent", marginBottom: "0px",
+                              height: "1rem", width: "100%"
+                            }}
+                            type="text"
+                            className="form-control  "
+                            {...register("Balance_Due")}
 
-                            e.target.value = val;
-                            setValue("Total_Received", val);
-
-                            const totalReceived = parseFloat(val || 0);
-                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
-                            clearErrors("splits.0.Amount"); // already there ✅
-                          }}
-                          className="form-control"
-                        />
-                      </div>
-
-
-
-                      <div style={{ width: "100%" }}
-                        className="flex  gap-2 items-center ">
-
-                        <span className="font-medium whitespace-nowrap">Balance Due</span>
-                        <input
-                          style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
-                          }}
-                          type="text"
-                          className="form-control  "
-                          {...register("Balance_Due")}
-
-                          readOnly
-                        />
+                            readOnly
+                          />
+                        </div>
+                     
                       </div>
                     </div>
+
+
                   </div>
-
-
                 </div>
               </div>
-            </div>
-            <div className="flex justify-end gap-4 ">
-              {/* <button
+              <div className="flex justify-end gap-4 ">
+                {/* <button
                       type="button"
                          onClick={() => {
                                           // setShowModal(false)
@@ -4730,15 +4964,15 @@ export default function PurchaseReturnAdd() {
                     >
                       Cancel
                     </button> */}
-              <button
-                type="submit"
-                disabled={formValues.errorCount > 0 || isCreating}
-                className=" text-white font-bold py-2 px-4 rounded"
-                style={{ backgroundColor: "#4CA1AF" }}
-              >
-                {isCreating ? "Saving..." : "Save"}
-              </button>
-            </div>
+                <button
+                  type="submit"
+                  disabled={formValues.errorCount > 0 || isCreating}
+                  className=" text-white font-bold py-2 px-4 rounded"
+                  style={{ backgroundColor: "#4CA1AF" }}
+                >
+                  {isCreating ? "Saving..." : "Save"}
+                </button>
+              </div>
           </form>
 
         </div>

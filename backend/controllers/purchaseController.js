@@ -49,437 +49,6 @@ const normalizeNumber = (val) => {
 
 
 
-//only amount >0 needs to have an item name why please expalin ?
-
-// Because Amount is the one field that represents actual money at stake//
-// const addPurchase = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     await connection.beginTransaction();
-
-//     //console.log(req.body);
-
-//     const cleanData = sanitizeObject(req.body);
-//     const validation = purchaseSchema.safeParse(cleanData);
-//     if (!validation.success) {
-//       await connection.rollback();
-//       return res.status(400).json({ errors: validation.error.errors });
-//     }
-
-//     const {
-//       Party_Name,
-//       GSTIN,
-//       Bill_Number,
-//       Bill_Date,
-//       State_Of_Supply,
-//       Total_Amount,
-//       Total_Paid,
-//       Balance_Due,
-//       splits,   // 🔹 replaces single Payment_Type / Bank_Account_Id
-//       items,
-//       Terms_Conditions_Id,          // nullable int — null if user typed fresh or cleared
-//       Terms_Conditions_Description,
-//     } = validation.data;
-
-//     // 🔻 REMOVED: manual !Party_Name / !Bill_Number / !Bill_Date / items.length===0 check
-//     //    — Party_Name is enforced by the schema (min(1)); Bill_Number, Bill_Date presence-shape,
-//     //      and items being an empty array are all now legitimately allowed by the schema itself,
-//     //      so re-checking them here would just re-impose the old strict rules the schema
-//     //      was changed to relax. safeParse() above is the single source of truth now.
-
-
-
-//     let termsId = null;
-//     let termsDescription = null;
-
-
-
-//     if (
-//       Terms_Conditions_Id &&
-//       Terms_Conditions_Description?.trim()
-//     ) {
-//       // Template selected and untouched
-//       termsId = Number(Terms_Conditions_Id);
-//       termsDescription = Terms_Conditions_Description.trim();
-
-//     } else if (Terms_Conditions_Description?.trim()) {
-//       // Custom / edited description
-//       // UI has already cleared the template ID/title
-//       termsId = null;
-//       termsDescription = Terms_Conditions_Description.trim();
-//     }
-
-//     // Otherwise:
-//     // termsId = null
-//     // termsDescription = null
-//     if (termsId) {
-//       const [[selectedTerm]] = await connection.query(
-//         `SELECT id
-//      FROM terms_conditions
-//      WHERE id = ?
-//        AND Purchase_Bill = 1
-//      LIMIT 1`,
-//         [termsId]
-//       );
-
-//       if (!selectedTerm) {
-//         await connection.rollback();
-
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid Terms & Conditions for Purchase Bill.",
-//         });
-//       }
-//     }
-//     const normalizedSplits = (splits || []).map((s) => ({ ...s, Amount: Number(s.Amount) || 0 }));
-
-//     const firstValidIndex = normalizedSplits.findIndex((s) => {
-//       if (!s.Payment_Type) return false;
-//       if (s.Payment_Type === "Bank" && !s.Bank_Account_Id) return false;
-//       return true;
-//     });
-
-//     const validSplits = normalizedSplits.reduce((acc, s, index) => {
-//       if (!s.Payment_Type) return acc;
-//       if (s.Payment_Type === "Bank" && !s.Bank_Account_Id) return acc;
-//       if (s.Amount > 0) { acc.push(s); return acc; }
-//       if (index === firstValidIndex) acc.push({ ...s, Amount: 0 });
-//       return acc;
-//     }, []);
-
-//     const totalAmount = Number(Total_Amount) || 0;
-//     const totalPaid = validSplits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-//     const balanceDue = totalAmount - totalPaid;
-
-//     // 🔹 total paid cannot exceed total amount
-//     if (totalPaid > totalAmount) {
-//       await connection.rollback();
-//       return res.status(400).json({
-//         success: false,
-//         message: "Received amount should be less than or equal to Total Amount",
-//       });
-//     }
-//     if (totalPaid > 0) {
-//       try {
-//         validateSplits(validSplits, totalPaid);
-//       } catch (validationErr) {
-//         await connection.rollback();
-//         return res.status(400).json({ success: false, message: validationErr.message });
-//       }
-//     }
-
-
-
-//     // 🔻 REMOVED: per-item "Item name missing" loop check
-//     //    — Item_Name is now optional().default("") in the schema (blank rows are legitimately
-//     //      allowed to be submitted/skipped), so this loop was re-imposing a requirement the
-//     //      schema intentionally dropped. If you need to *skip* blank rows during insert rather
-//     //      than accept them, filter items below instead of validating/rejecting here:
-//     //      const itemsToInsert = items.filter((item) => item.Item_Name?.trim());
-
-//     // const [partyRows] = await connection.execute(
-//     //   "SELECT Party_Id, GSTIN FROM add_party WHERE Party_Name = ? LIMIT 1",
-//     //   [Party_Name]
-//     // );
-//     // if (partyRows.length === 0) {
-//     //   await connection.rollback();
-//     //   return res.status(404).json({ message: "Party not found." });
-//     // }
-//     // const Party_Id = partyRows[0].Party_Id;
-//     // =========================================================
-//     // 7. FIND PARTY / AUTO-CREATE NEW PARTY
-//     // =========================================================
-
-//     const [partyRows] = await connection.execute(
-//       `SELECT *
-//    FROM add_party
-//    WHERE TRIM(Party_Name) = TRIM(?)
-//    LIMIT 1`,
-//       [Party_Name]
-//     );
-
-//     let Party_Id;
-
-//     if (partyRows.length === 0) {
-//       // =======================================================
-//       // A. CREATE PARTY MASTER
-//       // =======================================================
-
-//       const [partyResult] = await connection.execute(
-//         `INSERT INTO add_party
-//      (
-//        Party_Name,
-
-
-//        created_at,
-//        updated_at
-//      )
-//      VALUES (?, NOW(), NOW())`,
-//         [
-//           Party_Name.trim(),
-
-
-//         ]
-//       );
-
-//       const partyIdNumber = partyResult.insertId;
-
-//       Party_Id =
-//         "PTY" +
-//         partyIdNumber
-//           .toString()
-//           .padStart(3, "0");
-
-//       await connection.execute(
-//         `UPDATE add_party
-//      SET Party_Id = ?
-//      WHERE id = ?`,
-//         [Party_Id, partyIdNumber]
-//       );
-
-//       // =======================================================
-//       // B. CREATE DEFAULT BILLING ADDRESS
-//       // =======================================================
-
-//       // Only create address row if user actually entered address
-//       // if (Billing_Address?.trim()) {
-//       //   await connection.execute(
-//       //     `INSERT INTO add_party_address
-//       //      (
-//       //        Party_Id,
-//       //        Billing_Address,
-//       //        Is_Default,
-//       //        created_at,
-//       //        updated_at
-//       //      )
-//       //      VALUES (?, ?, 1, NOW(), NOW())`,
-//       //     [
-//       //       Party_Id,
-//       //       Billing_Address.trim(),
-//       //     ]
-//       //   );
-//       // }
-//     }
-
-//     // =========================================================
-//     // EXISTING PARTY
-//     // =========================================================
-//     else {
-//       Party_Id = partyRows[0].Party_Id;
-
-//       // IMPORTANT:
-//       // Don't update party phone here.
-//       // Don't update default billing address here.
-//       //
-//       // Phone_Number and Billing_Address entered in this sale
-//       // belong to this invoice only.
-//     }
-
-//     const [fy] = await connection.query(
-//       `SELECT Financial_Year FROM financial_year WHERE Current_Financial_Year = 1 LIMIT 1`
-//     );
-//     if (fy.length === 0) {
-//       await connection.rollback();
-//       return res.status(400).json({ message: "No active financial year found. Please set one in settings." });
-//     }
-//     const activeFY = fy[0].Financial_Year;
-
-//     const [purchaseResult] = await connection.execute(
-//       `INSERT INTO add_purchase
-//    (
-//      Party_Id,
-//      Bill_Number,
-//      Bill_Date,
-//      financial_year,
-//      State_Of_Supply,
-//      Total_Amount,
-//      Total_Paid,
-//      Balance_Due,
-//      Terms_Conditions_Id,
-//      Terms_Conditions_Description,
-//      created_at,
-//      updated_at
-//    )
-//    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//       [
-//         Party_Id,
-//         Bill_Number,
-//         Bill_Date,
-//         activeFY,
-//         cleanValue(State_Of_Supply),
-
-//         totalAmount,
-//         totalPaid,
-//         balanceDue,
-
-//         // Terms
-//         termsId,
-//         termsDescription,
-//       ]
-//     );
-
-//     const purchaseIdNumber = purchaseResult.insertId;
-//     const newPurchaseId = "PUR" + purchaseIdNumber.toString().padStart(3, "0");
-
-//     await connection.execute(
-//       `UPDATE add_purchase SET Purchase_Id = ? WHERE id = ?`,
-//       [newPurchaseId, purchaseIdNumber]
-//     );
-//     if (validSplits.length > 0) {
-//       await insertPaymentSplits({
-//         connection,
-//         sourceType: "Purchase",
-//         sourceId: purchaseIdNumber,
-//         partyName: Party_Name,
-//         txnDate: Bill_Date,
-//         splits: validSplits,
-//       });
-//     }
-//     // 🔹 insert splits + fan out to bank/cash ledgers
-//     //     if (totalPaid > 0 && validSplits.length > 0) {
-//     //   await insertPaymentSplits({
-//     //     connection,
-//     //     sourceType: "Purchase",
-//     //     sourceId: purchaseIdNumber,
-//     //     partyName: Party_Name,
-//     //     txnDate: Bill_Date,
-//     //     splits: validSplits,   // 🔹 use the filtered array here
-//     //   });
-//     // }
-   
-
-//     await recordPartyLedger({
-//       connection,
-//       partyId: Party_Id,
-//       txnType: "Purchase",
-//       referenceId: purchaseIdNumber,
-//       amount: totalAmount,
-//       txnDate: Bill_Date,
-//       docNumber: Bill_Number,
-//       balanceDue: balanceDue,
-//     });
-
-//     // items loop — unchanged, now naturally handles an empty items array (no-op loop)
-//     for (const item of items) {
-//       if (!item.Item_Name?.trim()) {
-//         if ((normalizeNumber(item.Amount) ?? 0) > 0) {
-//           await connection.rollback();
-//           return res.status(400).json({ success: false, message: "Please enter an item name for the row." });
-//         }
-//         continue;
-//       }
-
-//       const {
-//         Item_Category,
-//         Item_Name,
-//         Item_HSN,
-//         Quantity,
-//         Item_Unit,
-//         Purchase_Price,
-//         Discount_On_Purchase_Price,
-//         Discount_Type_On_Purchase_Price,
-//         Tax_Type,
-//         Tax_Amount,
-//         Amount,
-//         Item_Image,
-//       } = item;
-
-//       const [itemRows] = await connection.execute(
-//         "SELECT * FROM add_item WHERE TRIM(Item_Name) = TRIM(?) LIMIT 1",
-//         [Item_Name]
-//       );
-
-//       let Item_Id;
-
-//       if (itemRows.length === 0) {
-//         const [itemResult] = await connection.execute(
-//           `INSERT INTO add_item
-//            (Item_Name, Item_HSN, Item_Unit, Item_Category, Stock_Quantity, created_at, updated_at)
-//            VALUES (?, ?, ?, ?, ?,  NOW(), NOW())`,
-//           [
-//             Item_Name,
-//             cleanValue(Item_HSN),
-//             Item_Unit || "",
-
-//             Item_Category || "",
-//             normalizeNumber(Quantity),
-//           ]
-//         );
-//         const itemIdNum = itemResult.insertId;
-//         Item_Id = "ITM" + itemIdNum.toString().padStart(3, "0");
-//         await connection.execute(
-//           `UPDATE add_item SET Item_Id = ? WHERE id = ?`,
-//           [Item_Id, itemIdNum]
-//         );
-//       } else {
-//         Item_Id = itemRows[0].Item_Id;
-//         await connection.execute(
-//           `UPDATE add_item
-//            SET Stock_Quantity = Stock_Quantity + ?,
-//                Item_HSN = ?,
-//                Item_Category = ?,
-//                updated_at = NOW()
-//            WHERE Item_Id = ?`,
-//           [normalizeNumber(Quantity), cleanValue(Item_HSN) || itemRows[0].Item_HSN, Item_Category || "", Item_Id]
-//         );
-//       }
-
-//       const [pitResult] = await connection.execute(
-//         `INSERT INTO add_purchase_items
-//          (Purchase_Id, Item_Id, Quantity, Purchase_Price,
-//           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
-//           Tax_Type, Tax_Amount, Amount, created_at, updated_at)
-//          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-//         [
-//           newPurchaseId,
-//           Item_Id,
-//           normalizeNumber(Quantity) ?? 0,
-//           normalizeNumber(Purchase_Price) ?? 0,
-//           cleanDiscount(Discount_On_Purchase_Price),
-//           cleanValue(Discount_Type_On_Purchase_Price),
-//           cleanValue(Tax_Type),
-//           normalizeNumber(Tax_Amount) ?? 0,
-//           normalizeNumber(Amount) ?? 0,
-//         ]
-//       );
-//       const pitId = pitResult.insertId;
-//       const newPurchaseItemId = "PIT" + pitId.toString().padStart(3, "0");
-//       await connection.execute(
-//         `UPDATE add_purchase_items SET Purchase_items_Id = ? WHERE id = ?`,
-//         [newPurchaseItemId, pitId]
-//       );
-//       await recordItemLedger({
-//         connection,
-//         itemId: Item_Id,
-//         txnType: "Purchase",
-//         referenceId: pitResult.insertId,   // purchase_item row's numeric id
-//         //formattedId: newPurchaseId,
-//          billId:      newPurchaseId,
-//           billNumber: Bill_Number,   // AEPL-22
-//         partyName: Party_Name,
-//         quantity: normalizeNumber(Quantity) ?? 0,
-//         rate: normalizeNumber(Purchase_Price) ?? null,
-//         txnDate: Bill_Date,
-
-//       });
-//     }
-
-//     await connection.commit();
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Purchase and items added successfully",
-//       purchaseId: newPurchaseId,
-//     });
-//   } catch (err) {
-//     if (connection) await connection.rollback();
-//     console.error("❌ Error adding purchase:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 
 //NEW
@@ -503,7 +72,7 @@ const addPurchase = async (req, res, next) => {
       Bill_Date,
       State_Of_Supply,
       Transaction_Discount_Percentage,
-Transaction_Discount_Amount,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       Total_Paid,
@@ -607,18 +176,44 @@ Transaction_Discount_Amount,
       return res.status(400).json({ message: "No active financial year found. Please set one in settings." });
     }
     const activeFY = fy[0].Financial_Year;
+    const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     // ── PURCHASE HEADER — unchanged ──
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase
-       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply, Transaction_Discount_Percentage,
+       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply, 
+       Transaction_Discount_Percentage,
      Transaction_Discount_Amount,
         Total_Amount, Round_Off,Total_Paid, Balance_Due, Terms_Conditions_Id, Terms_Conditions_Description,
         created_at, updated_at)
        VALUES (?, ?, ?, ?,?, ?,?,?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply), Transaction_Discount_Percentage,
-    Transaction_Discount_Amount,totalAmount,roundOffValue,totalPaid, balanceDue, termsId, termsDescription,
+        Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply), 
+        cleanTransactionDiscountPercentage,
+    cleanTransactionDiscountAmount,
+    totalAmount,roundOffValue,totalPaid, balanceDue, termsId, termsDescription,
       ]
     );
 
@@ -1233,134 +828,7 @@ const exportAllPurchasesReportToExcel = async (req, res, next) => {
 };
 
 
-// const getAllPurchases = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
 
-//     /* ---------- PAGINATION ---------- */
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-
-//     /* ---------- FILTERS ---------- */
-//     const search = req.query.search?.trim().toLowerCase() || "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     const whereClauses = [];
-//     const params = [];
-
-//     /* ---------- SEARCH ---------- */
-    
-//     if (search) {
-//       whereClauses.push(`(
-//       a.Party_Name          LIKE ? OR
-//         CAST(p.Total_Amount AS CHAR)  LIKE ? OR
-//         CAST(p.Balance_Due AS CHAR)   LIKE ? OR
-//         p.Bill_Number LIKE ?
-
-//       )`);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like);
-//     }
-
-//     /* ---------- DATE FILTER ---------- */
-//     if (fromDate && toDate) {
-//       whereClauses.push(`DATE(p.Bill_Date) BETWEEN ? AND ?`);
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(p.Bill_Date) >= ?`);
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(p.Bill_Date) <= ?`);
-//       params.push(toDate);
-//     }
-
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-//     /* ---------- MAIN QUERY ---------- */
-//      //ORDER BY p.created_at DESC
-//     const [rows] = await connection.query(
-//       `SELECT p.*, a.Party_Name
-//        FROM add_purchase p
-//        LEFT JOIN add_party a ON a.Party_Id = p.Party_Id
-//        ${whereSQL}
-//        ORDER BY p.Bill_Date DESC
-      
-//        LIMIT ? OFFSET ?`,
-//       [...params, limit, offset]
-//     );
-
-//     /* ---------- ATTACH SPLIT PAYMENT-TYPE LABELS PER ROW ---------- */
-//     const purchaseIds = rows.map((r) => r.id);
-
-//     if (purchaseIds.length > 0) {
-//       const placeholders = purchaseIds.map(() => "?").join(",");
-//       const [splits] = await connection.query(
-//         `SELECT ps.Source_Id, ps.Payment_Type, ba.Account_Display_Name
-//          FROM payment_splits ps
-//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//          WHERE ps.Source_Type = 'Purchase'
-//            AND ps.Source_Id IN (${placeholders})`,
-//         purchaseIds
-//       );
-
-//       const splitMap = {};
-//       for (const s of splits) {
-//         if (!splitMap[s.Source_Id]) splitMap[s.Source_Id] = [];
-//         splitMap[s.Source_Id].push(
-//           s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-//         );
-//       }
-
-//       for (const row of rows) {
-//         const labels = splitMap[row.id] || [];
-//         const counts = {};
-//         labels.forEach((l) => { counts[l] = (counts[l] || 0) + 1; });
-//         row.Payment_Type_Display = Object.entries(counts)
-//           .map(([l, c]) => (c > 1 ? `${l} (x${c})` : l))
-//           .join(" , ") || "—";
-//       }
-//     }
-
-//     /* ---------- COUNT QUERY ---------- */
-//     const [[{ total }]] = await connection.query(
-//       `SELECT COUNT(*) AS total
-//        FROM add_purchase p
-//        LEFT JOIN add_party a ON a.Party_Id = p.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     /* ---------- TOTALS QUERY ---------- */
-//     const [[totals]] = await connection.query(
-//       `SELECT
-//          COALESCE(SUM(p.Total_Amount), 0) AS totalAmount,
-//          COALESCE(SUM(p.Balance_Due),  0) AS totalUnpaid,
-//          COALESCE(SUM(p.Total_Paid),   0) AS totalPaid
-//        FROM add_purchase p
-//        LEFT JOIN add_party a ON a.Party_Id = p.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     /* ---------- RESPONSE ---------- */
-//     return res.status(200).json({
-//       success: true,
-//       currentPage: page,
-//       totalPages: Math.ceil(total / limit),
-//       totalPurchases: total,
-//       purchases: rows,
-//       totals,
-//     });
-//   } catch (err) {
-//     console.error("❌ Error fetching purchases:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const getAllPurchases = async (req, res, next) => {
   let connection;
 
@@ -1723,6 +1191,8 @@ const editPurchase = async (req, res, next) => {
       Bill_Number,
       Bill_Date,
       State_Of_Supply,
+      Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       Total_Paid,
@@ -1806,16 +1276,41 @@ const editPurchase = async (req, res, next) => {
       return res.status(404).json({ message: "Party not found." });
     }
     const Party_Id = partyRows[0].Party_Id;
+    const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     await connection.query(
       `UPDATE add_purchase SET
          Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
+         Transaction_Discount_Percentage = ?, Transaction_Discount_Amount = ?,
          Total_Amount = ?, Round_Off = ?, Total_Paid = ?, Balance_Due = ?,
          Terms_Conditions_Id = ?, Terms_Conditions_Description = ?,
          updated_at = NOW()
        WHERE Purchase_Id = ?`,
       [
         Party_Id, Bill_Number, Bill_Date, cleanValue(State_Of_Supply),
+         cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
         totalAmount,roundOffValue, totalPaid, balanceDue,
         termsId, termsDescription,
         purchaseId,
@@ -3113,6 +2608,9 @@ const getSinglePurchase = async (req, res, next) => {
 
         pu.Terms_Conditions_Id,
         pu.Terms_Conditions_Description,
+        pu.Transaction_Discount_Percentage,
+        pu.Transaction_Discount_Amount,
+     
 
          p.Party_Name,
     p.GSTIN,
@@ -3697,6 +3195,8 @@ availableUnits = unitCodes.map((unitCode) => {
         Terms_Conditions_Description: purchaseHeader.Terms_Conditions_Description,
 
         Terms_Conditions_Title: purchaseHeader.Terms_Conditions_Title,
+        Transaction_Discount_Percentage:purchaseHeader.Transaction_Discount_Percentage,
+        Transaction_Discount_Amount:purchaseHeader.Transaction_Discount_Amount
       },
 
       // =======================================================
