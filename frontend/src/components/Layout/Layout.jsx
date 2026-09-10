@@ -60,9 +60,14 @@ export default function Layout({ children }) {
       </aside>
 
       {/* RIGHT CONTENT */}
-      <main className="app-content">
+      {/* <main className="app-content">
         {children}
-      </main>
+      </main> */}
+      <main className="app-content">
+
+    {children}
+ 
+</main>
     </div>
   );
 }
