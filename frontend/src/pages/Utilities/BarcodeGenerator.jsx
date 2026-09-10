@@ -730,8 +730,16 @@ export default function BarcodeGenerator() {
     // };
     return (
         <>
-            <div className="flex flex-col bg-white" style={{ minHeight: "100%" }}>
-
+            {/* <div className="flex flex-col bg-white" style={{ minHeight: "100%" }}> */}
+            <div
+                className="flex flex-col bg-white"
+                style={{
+                    height: "100%",
+                    minHeight: 0,
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                }}
+            >
                 <div
                     className="inn-title flex items-start justify-between"
                     style={{
@@ -1174,7 +1182,7 @@ export default function BarcodeGenerator() {
 
                     <div className="table-responsive table-desi barcode-table-scroll" style={{
                         width: "100%",
-                        maxHeight: "300px",
+                        maxHeight: "200px",
                         overflowY: "auto",
                         overflowX: "auto",
                     }}>
