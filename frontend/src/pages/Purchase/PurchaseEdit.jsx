@@ -5037,7 +5037,55 @@ syncTotalsAfterItemChange(rawTotal);
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-4 p-4">
+            {/* <div className="flex justify-end gap-4 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  // setShowModal(false)
+                  if (from === "party-sales-purchases-details") {
+
+                    navigate({
+                      pathname: `/party/party-sales-purchases-details/${Party_Id}`,
+                      search: location.search,
+                    })
+                  }
+                  else if (from === "item-sales-purchases-details") {
+                    navigate({
+                      pathname: `/item/item-sales-purchases-details/${Item_Id}`,
+                      search: location.search,
+                    })
+                    // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else {
+                    navigate({
+                      pathname: "/purchase/all-purchases",
+                      search: location.search,
+                    })
+
+                    // navigate("/sale/all-sales");
+                  }
+                }}
+                // onClick={() => navigate({
+                //   pathname: "/purchase/all-purchases",
+                //   search: location.search,
+                // })}
+                // onClick={() => navigate("/purchase/all-purchases")}
+                className=" text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={formValues.errorCount > 0 || isEditingPurchase}
+                className=" text-white font-bold py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                {isEditingPurchase ? "Updating..." : "Update Purchase"}
+              </button>
+            </div> */}
+          </form >
+             <div className="flex justify-end gap-4 p-4">
               <button
                 type="button"
                 onClick={() => {
@@ -5084,7 +5132,6 @@ syncTotalsAfterItemChange(rawTotal);
                 {isEditingPurchase ? "Updating..." : "Update Purchase"}
               </button>
             </div>
-          </form >
          
 
         </div >
