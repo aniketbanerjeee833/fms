@@ -2359,7 +2359,12 @@ syncTotalsAfterItemChange(rawTotal);
 
 
 
-            <div className="table-responsive table-desi mt-4">
+            <div className="table-responsive table-desi mt-4"   
+            style={{
+    maxHeight: "400px",
+    overflowY: "auto",
+    overflowX: "auto",
+  }}>
 
               <table className="table table-hover">
                 <thead>
@@ -2388,7 +2393,9 @@ syncTotalsAfterItemChange(rawTotal);
                     <th>Amount</th>
                   </tr>
                 </thead>
-                <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
+                <tbody 
+                //style={{ maxHeight: "10rem", overflowY: "scroll" }}
+                >
                   {fields.map((field, i) => (
                     <tr key={field.id}>
                       {/* Action + Serial Number */}
@@ -5030,7 +5037,7 @@ syncTotalsAfterItemChange(rawTotal);
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-4 ">
+            <div className="flex justify-end gap-4 p-4">
               <button
                 type="button"
                 onClick={() => {
@@ -5078,6 +5085,7 @@ syncTotalsAfterItemChange(rawTotal);
               </button>
             </div>
           </form >
+         
 
         </div >
 
