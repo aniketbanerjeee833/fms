@@ -3,8 +3,20 @@ import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../uti
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { getExpenseItemUsageForPrint } from "../helpers/printReportHelpers.js";
 
-const PAGE_SIZE = 20;
+//const PAGE_SIZE = 20;
+const normalizeNumber = (val) => {
+  if (
+    val === undefined ||
+    val === null ||
+    String(val).trim() === ""
+  ) {
+    return null;
+  }
 
+  const num = Number(val);
+
+  return Number.isFinite(num) ? num : null;
+};
 /* ═══════════════════════════════════════
    CATEGORY CRUD
 ═══════════════════════════════════════ */
@@ -237,7 +249,7 @@ const getAllExpenseItemMastersCursor = async (req, res, next) => {
     // const limit = req.query.limit
     //   ? Math.min(parseInt(req.query.limit, 10), 100)
     //   : 10;
-     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
 
     const search = req.query.search?.trim() || "";
 
@@ -399,10 +411,12 @@ const createExpense = async (req, res, next) => {
 
       Party_Name,
       State_Of_Supply,
+      Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
 
       Total_Amount,
       Round_Off,
-      // Total_Paid, // ❌ don't trust frontend
+      // Total_Paid, //  don't trust frontend
 
       splits,
       items,
@@ -557,7 +571,7 @@ const createExpense = async (req, res, next) => {
         0
       );
 
-    const balanceDue =totalAmount - totalPaid;
+    const balanceDue = totalAmount - totalPaid;
     const roundOffValue = Number(Round_Off) || 0
 
     // =========================================================
@@ -606,7 +620,30 @@ const createExpense = async (req, res, next) => {
     //
     // Everything except Party can be blank/null.
     // =========================================================
+    const transactionDiscountPercentage =
+      normalizeNumber(Transaction_Discount_Percentage);
 
+    const transactionDiscountAmount =
+      normalizeNumber(Transaction_Discount_Amount);
+    if (
+      transactionDiscountPercentage !== null &&
+      transactionDiscountPercentage > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction discount percentage cannot be greater than 100%",
+      });
+    }
+
+    const cleanTransactionDiscountPercentage =
+      transactionDiscountPercentage > 0
+        ? transactionDiscountPercentage
+        : null;
+
+    const cleanTransactionDiscountAmount =
+      transactionDiscountAmount > 0
+        ? transactionDiscountAmount
+        : null;
     const [expenseResult] =
       await connection.query(
         `INSERT INTO expenses
@@ -618,6 +655,8 @@ const createExpense = async (req, res, next) => {
            Category_Id,
            Party_Id,
            State_Of_Supply,
+            Transaction_Discount_Percentage,
+           Transaction_Discount_Amount,
            Total_Amount,
            Round_Off,
            Total_Paid,
@@ -628,7 +667,7 @@ const createExpense = async (req, res, next) => {
          )
          VALUES (
            ?, ?, ?, ?, ?, ?,
-           ?, ?, ?, ?, ?, ?,
+           ?, ?, ?, ?, ?, ?,?,?,
            NOW(), NOW()
          )`,
         [
@@ -645,6 +684,8 @@ const createExpense = async (req, res, next) => {
           Party_Id,
 
           State_Of_Supply || null,
+          cleanTransactionDiscountPercentage,
+          cleanTransactionDiscountAmount,
 
           totalAmount,
           roundOffValue,
@@ -657,7 +698,7 @@ const createExpense = async (req, res, next) => {
         ]
       );
 
-    const expenseId =expenseResult.insertId;
+    const expenseId = expenseResult.insertId;
 
     // =========================================================
     // 10. TRANSACTION DATE
@@ -774,7 +815,7 @@ const createExpense = async (req, res, next) => {
 
           return res.status(400).json({
             success: false,
-            message:"Please enter an item name for the row.",
+            message: "Please enter an item name for the row.",
           });
         }
 
@@ -910,6 +951,8 @@ const editExpense = async (req, res, next) => {
 
       Party_Name,
       State_Of_Supply,
+        Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
 
       Total_Amount,
       Round_Off,
@@ -1058,7 +1101,7 @@ const editExpense = async (req, res, next) => {
     // Do NOT trust Total_Paid from frontend.
     // =========================================================
 
-    const totalAmount =Number(Total_Amount) || 0;
+    const totalAmount = Number(Total_Amount) || 0;
 
     const totalPaid =
       validSplits.reduce(
@@ -1067,7 +1110,7 @@ const editExpense = async (req, res, next) => {
         0
       );
 
-    const balanceDue =totalAmount - totalPaid;
+    const balanceDue = totalAmount - totalPaid;
     const roundOffValue = Number(Round_Off) || 0
 
     // =========================================================
@@ -1099,7 +1142,29 @@ const editExpense = async (req, res, next) => {
     // =========================================================
     // 10. UPDATE EXPENSE HEADER
     // =========================================================
+  const transactionDiscountPercentage =
+  normalizeNumber(Transaction_Discount_Percentage);
 
+const transactionDiscountAmount =
+  normalizeNumber(Transaction_Discount_Amount);
+if (
+  transactionDiscountPercentage !== null &&
+  transactionDiscountPercentage > 100
+) {
+  return res.status(400).json({
+    success: false,
+    message: "Transaction discount percentage cannot be greater than 100%",
+  });
+}
+const cleanTransactionDiscountPercentage =
+  transactionDiscountPercentage > 0
+    ? transactionDiscountPercentage
+    : null;
+
+const cleanTransactionDiscountAmount =
+  transactionDiscountAmount > 0
+    ? transactionDiscountAmount
+    : null;
     await connection.query(
       `UPDATE expenses
        SET
@@ -1110,6 +1175,8 @@ const editExpense = async (req, res, next) => {
          Category_Id = ?,
          Party_Id = ?,
          State_Of_Supply = ?,
+         Transaction_Discount_Percentage = ?, 
+         Transaction_Discount_Amount = ?,
          Total_Amount = ?,
          Round_Off = ?,
          Total_Paid = ?,
@@ -1126,6 +1193,8 @@ const editExpense = async (req, res, next) => {
         Party_Id,
 
         State_Of_Supply || null,
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
 
         totalAmount,
         roundOffValue,
@@ -1538,7 +1607,7 @@ const getExpensesByCategory = async (req, res, next) => {
       ? Number(req.query.cursor)
       : null;
 
-    const search =req.query.search?.trim().toLowerCase() || "";
+    const search = req.query.search?.trim().toLowerCase() || "";
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
     const date = req.query.date || "";
 
@@ -1613,7 +1682,7 @@ const getExpensesByCategory = async (req, res, next) => {
       LIMIT ?
       `,
       // [...params, PAGE_SIZE + 1]
-       [...params, limit + 1]
+      [...params, limit + 1]
     );
 
     // const hasMore =
@@ -1743,7 +1812,7 @@ const getExpenseItemUsage = async (req, res, next) => {
 
     const date = req.query.date || null;
     const search = req.query.search?.trim() || "";
-     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
     const whereClauses = [
       `ei.Expense_Item_Master_Id = ?`,
     ];
@@ -1787,7 +1856,7 @@ const getExpenseItemUsage = async (req, res, next) => {
         like  // Expense Date
       );
     }
-//ei.Amount AS Item_Amount,
+    //ei.Amount AS Item_Amount,
     // const [rows] = await connection.query(
     //   `
     //   SELECT
@@ -1836,8 +1905,8 @@ const getExpenseItemUsage = async (req, res, next) => {
     // const pageRows = hasMore
     //   ? rows.slice(0, PAGE_SIZE)
     //   : rows;
-const [rows] = await connection.query(
-  `
+    const [rows] = await connection.query(
+      `
   SELECT 
     ei.id,
     ei.Quantity,
@@ -1877,9 +1946,9 @@ const [rows] = await connection.query(
 
   LIMIT ?
   `,
-  [...params, limit + 1]
-);
-      const hasMore = rows.length > limit;
+      [...params, limit + 1]
+    );
+    const hasMore = rows.length > limit;
 
     const pageRows = hasMore
       ? rows.slice(0, limit)
@@ -1977,49 +2046,49 @@ const [rows] = await connection.query(
     }
   }
 };
-const getExpenseItemUsagePrintReport =async (req, res, next) => {
-    let connection;
+const getExpenseItemUsagePrintReport = async (req, res, next) => {
+  let connection;
 
-    try {
-      connection =await db.getConnection();
+  try {
+    connection = await db.getConnection();
 
-      const masterItemId =req.query.masterItemId? Number(
-              req.query.masterItemId
-            )
-          : null;
+    const masterItemId = req.query.masterItemId ? Number(
+      req.query.masterItemId
+    )
+      : null;
 
-      if (!masterItemId) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "masterItemId is required",
-        });
-      }
+    if (!masterItemId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "masterItemId is required",
+      });
+    }
 
-      const date =req.query.date || null;
+    const date = req.query.date || null;
 
-      const search =req.query.search?.trim() || "";
+    const search = req.query.search?.trim() || "";
 
-      const whereClauses = [
-        `WHERE ei.Expense_Item_Master_Id = ?`,
-      ];
+    const whereClauses = [
+      `WHERE ei.Expense_Item_Master_Id = ?`,
+    ];
 
-      const params = [masterItemId];
+    const params = [masterItemId];
 
-      // Date filter
-      if (date) {
-        whereClauses.push(
-          `AND DATE(e.Expense_Date) = ?`
-        );
+    // Date filter
+    if (date) {
+      whereClauses.push(
+        `AND DATE(e.Expense_Date) = ?`
+      );
 
-        params.push(date);
-      }
+      params.push(date);
+    }
 
-      // Search filter
-      if (search) {
-        const like = `%${search}%`;
+    // Search filter
+    if (search) {
+      const like = `%${search}%`;
 
-        whereClauses.push(`
+      whereClauses.push(`
           AND (
             e.Expense_Number LIKE ?
             OR a.Party_Name LIKE ?
@@ -2031,50 +2100,50 @@ const getExpenseItemUsagePrintReport =async (req, res, next) => {
           )
         `);
 
-        params.push(
-          like,
-          like,
-          like,
-          like
-        );
-      }
+      params.push(
+        like,
+        like,
+        like,
+        like
+      );
+    }
 
-      const whereClause =
-        whereClauses.join(" ");
+    const whereClause =
+      whereClauses.join(" ");
 
-      const {
-        expenseUsages,
-        summary,
-      } =
-        await getExpenseItemUsageForPrint(
-          connection,
-          whereClause,
-          params
-        );
-
-      return res.status(200).json({
-        success: true,
-
-        totalRecords:
-          expenseUsages.length,
-
-        expenseUsages,
-
-        summary,
-      });
-    } catch (err) {
-      console.error(
-        "Expense Item Usage Print Report Error:",
-        err
+    const {
+      expenseUsages,
+      summary,
+    } =
+      await getExpenseItemUsageForPrint(
+        connection,
+        whereClause,
+        params
       );
 
-      next(err);
-    } finally {
-      if (connection) {
-        connection.release();
-      }
+    return res.status(200).json({
+      success: true,
+
+      totalRecords:
+        expenseUsages.length,
+
+      expenseUsages,
+
+      summary,
+    });
+  } catch (err) {
+    console.error(
+      "Expense Item Usage Print Report Error:",
+      err
+    );
+
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
     }
-  };
+  }
+};
 
 export {
   getExpenseItemUsage,

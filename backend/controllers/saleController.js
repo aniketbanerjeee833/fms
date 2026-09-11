@@ -91,8 +91,8 @@ const addSale = async (req, res, next) => {
       Invoice_Number,
       Invoice_Date,
       State_Of_Supply,
-         Transaction_Discount_Percentage,
-Transaction_Discount_Amount,
+      Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
       Total_Received,
@@ -640,6 +640,151 @@ const cleanTransactionDiscountAmount =
   transactionDiscountAmount > 0
     ? transactionDiscountAmount
     : null;
+    // =========================================================
+// INVOICE NUMBER + TRANSACTION PREFIX SEQUENCE
+// =========================================================
+
+let invoiceNumber = String(Invoice_Number || "").trim();
+
+// ---------------------------------------------------------
+// SPECIAL CASE:
+// 000 / 00 / 0000 etc. means blank invoice number.
+// No error.
+// ---------------------------------------------------------
+
+if (/^0+$/.test(invoiceNumber)) {
+  invoiceNumber = "";
+}
+
+
+// ---------------------------------------------------------
+// Only process prefix sequence when invoice number exists
+// ---------------------------------------------------------
+
+if (invoiceNumber) {
+
+  // Extract trailing numeric part.
+  //
+  // SAL1000
+  //   prefix = SAL
+  //   number = 1000
+  //
+  // INV100
+  //   prefix = INV
+  //   number = 100
+  //
+  // AEPL-2627-0086
+  //   prefix = AEPL-2627-
+  //   number = 0086
+  //
+  // 1000
+  //   prefix = None
+  //   number = 1000
+
+  const invoiceMatch = invoiceNumber.match(/^(.*?)(\d+)$/);
+
+  if (!invoiceMatch) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid invoice number.",
+    });
+  }
+
+  const invoicePrefix = invoiceMatch[1] || "None";
+  const enteredInvoiceNumber = Number(invoiceMatch[2]);
+
+  if (
+    !Number.isInteger(enteredInvoiceNumber) ||
+    enteredInvoiceNumber < 1
+  ) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Invoice number must contain a valid positive number.",
+    });
+  }
+
+
+  // -------------------------------------------------------
+  // Find + LOCK the prefix row.
+  //
+  // Because addSale already started a transaction at the
+  // beginning of this controller, FOR UPDATE keeps this
+  // prefix row locked until commit/rollback.
+  // -------------------------------------------------------
+
+  const [prefixRows] = await connection.execute(
+    `
+    SELECT
+      id,
+      transaction_type,
+      prefix_name,
+      last_number,
+      is_active
+    FROM transactions_prefixes
+    WHERE transaction_type = 'sale'
+      AND prefix_name = ?
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [invoicePrefix]
+  );
+
+
+  // -------------------------------------------------------
+  // Prefix must exist.
+  // -------------------------------------------------------
+
+  if (prefixRows.length === 0) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: `Invoice prefix "${invoicePrefix}" does not exist.`,
+    });
+  }
+
+
+  const prefixRow = prefixRows[0];
+
+  const currentLastNumber =
+    Number(prefixRow.last_number) || 0;
+
+
+  // -------------------------------------------------------
+  // IMPORTANT:
+  //
+  // NEVER decrease last_number.
+  //
+  // Example:
+  //
+  // last_number = 1000
+  //
+  // SAL1  -> stays 1000
+  // SAL2  -> stays 1000
+  // SAL3  -> stays 1000
+  //
+  // SAL1001 -> becomes 1001
+  // -------------------------------------------------------
+
+  if (enteredInvoiceNumber > currentLastNumber) {
+
+    await connection.execute(
+      `
+      UPDATE transactions_prefixes
+      SET last_number = ?
+      WHERE id = ?
+      `,
+      [
+        enteredInvoiceNumber,
+        prefixRow.id,
+      ]
+    );
+  }
+}
     const [saleResult] = await connection.execute(
       `INSERT INTO add_sale
        (
@@ -668,7 +813,8 @@ const cleanTransactionDiscountAmount =
         cleanValue(Billing_Name),
         cleanValue(Phone_Number),
         cleanValue(Billing_Address),
-        Invoice_Number,
+        //Invoice_Number,
+        invoiceNumber,
         Invoice_Date,
         activeFY,
         cleanValue(State_Of_Supply),
@@ -730,7 +876,8 @@ const cleanTransactionDiscountAmount =
       referenceId: saleIdNumber,
       amount: totalAmount,
       txnDate: Invoice_Date,
-      docNumber: Invoice_Number,
+      //docNumber: Invoice_Number,
+      docNumber: invoiceNumber,
       balanceDue,
     });
 
@@ -1024,7 +1171,8 @@ const cleanTransactionDiscountAmount =
         txnType: "Sale",
         referenceId: saleItemIdNum,
         billId: newSaleId,
-        billNumber: Invoice_Number,
+        //billNumber: Invoice_Number,
+        billNumber: invoiceNumber,
         partyName: Party_Name,
         quantity: normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
         selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
@@ -3548,8 +3696,216 @@ const cleanTransactionDiscountAmount =
   transactionDiscountAmount > 0
     ? transactionDiscountAmount
     : null;
-    await connection.query(
-      `UPDATE add_sale
+    
+// ---------------------------------------------------------
+// Get OLD invoice number before updating the sale
+// ---------------------------------------------------------
+
+const [oldSaleRows] = await connection.execute(
+  `
+  SELECT Invoice_Number
+  FROM add_sale
+  WHERE Sale_Id = ?
+  LIMIT 1
+  FOR UPDATE
+  `,
+  [saleId]
+);
+
+const oldInvoiceNumber = String(
+  oldSaleRows[0]?.Invoice_Number || ""
+).trim();
+
+
+// ---------------------------------------------------------
+// Current invoice number
+// ---------------------------------------------------------
+
+let invoiceNumber = String(Invoice_Number || "").trim();
+
+
+// ---------------------------------------------------------
+// SPECIAL CASE:
+// 000 / 00 / 0000 etc. means blank invoice number.
+// ---------------------------------------------------------
+
+if (/^0+$/.test(invoiceNumber)) {
+  invoiceNumber = "";
+}
+
+
+// ---------------------------------------------------------
+// Handle invoice prefix sequence
+// ---------------------------------------------------------
+
+if (invoiceNumber) {
+
+  const invoiceMatch = invoiceNumber.match(/^(.*?)(\d+)$/);
+
+  if (!invoiceMatch) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid invoice number.",
+    });
+  }
+
+  const invoicePrefix = invoiceMatch[1] || "None";
+  const enteredInvoiceNumber = Number(invoiceMatch[2]);
+
+
+  if (
+    !Number.isInteger(enteredInvoiceNumber) ||
+    enteredInvoiceNumber < 1
+  ) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Invoice number must contain a valid positive number.",
+    });
+  }
+
+
+  // -------------------------------------------------------
+  // If prefix was changed while editing,
+  // release the old prefix number.
+  //
+  // Example:
+  // SAL3 -> INV2
+  //
+  // SAL last_number:
+  // 3 -> 2
+  // -------------------------------------------------------
+
+  if (oldInvoiceNumber && oldInvoiceNumber !== invoiceNumber) {
+
+    const oldMatch =
+      oldInvoiceNumber.match(/^(.*?)(\d+)$/);
+
+    if (oldMatch) {
+
+      const oldPrefix = oldMatch[1] || "None";
+      const oldNumber = Number(oldMatch[2]);
+
+
+      // Only when PREFIX changed
+      if (oldPrefix !== invoicePrefix) {
+
+        const [oldPrefixRows] = await connection.execute(
+          `
+          SELECT
+            id,
+            last_number
+          FROM transactions_prefixes
+          WHERE transaction_type = 'sale'
+            AND prefix_name = ?
+          LIMIT 1
+          FOR UPDATE
+          `,
+          [oldPrefix]
+        );
+
+
+        if (oldPrefixRows.length > 0) {
+
+          const oldPrefixRow = oldPrefixRows[0];
+
+          const oldLastNumber =
+            Number(oldPrefixRow.last_number) || 0;
+
+
+          // Old bill was the latest bill
+          if (oldNumber === oldLastNumber) {
+
+            await connection.execute(
+              `
+              UPDATE transactions_prefixes
+              SET last_number = ?
+              WHERE id = ?
+              `,
+              [
+                Math.max(0, oldLastNumber - 1),
+                oldPrefixRow.id,
+              ]
+            );
+          }
+        }
+      }
+    }
+  }
+
+
+  // -------------------------------------------------------
+  // Find + LOCK NEW prefix row
+  // -------------------------------------------------------
+
+  const [prefixRows] = await connection.execute(
+    `
+    SELECT
+      id,
+      transaction_type,
+      prefix_name,
+      last_number,
+      is_active
+    FROM transactions_prefixes
+    WHERE transaction_type = 'sale'
+      AND prefix_name = ?
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [invoicePrefix]
+  );
+
+
+  // -------------------------------------------------------
+  // Prefix must exist
+  // -------------------------------------------------------
+
+  if (prefixRows.length === 0) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: `Invoice prefix "${invoicePrefix}" does not exist.`,
+    });
+  }
+
+
+  const prefixRow = prefixRows[0];
+
+  const currentLastNumber =
+    Number(prefixRow.last_number) || 0;
+
+
+  // -------------------------------------------------------
+  // Update NEW prefix sequence if necessary
+  // -------------------------------------------------------
+
+  if (enteredInvoiceNumber > currentLastNumber) {
+
+    await connection.execute(
+      `
+      UPDATE transactions_prefixes
+      SET last_number = ?
+      WHERE id = ?
+      `,
+      [
+        enteredInvoiceNumber,
+        prefixRow.id,
+      ]
+    );
+  }
+}
+
+
+// ---------------------------------------------------------
+// UPDATE SALE
+// ---------------------------------------------------------
+
+await connection.query(
+  `UPDATE add_sale
    SET
       Party_Id = ?,
 
@@ -3560,45 +3916,50 @@ const cleanTransactionDiscountAmount =
       Invoice_Number = ?,
       Invoice_Date = ?,
       State_Of_Supply = ?,
-       Transaction_Discount_Percentage = ?, 
-       Transaction_Discount_Amount = ?,
+
+      Transaction_Discount_Percentage = ?,
+      Transaction_Discount_Amount = ?,
 
       Total_Amount = ?,
       Round_Off = ?,
       Total_Received = ?,
       Balance_Due = ?,
-        Terms_Conditions_Id = ?,
-     Terms_Conditions_Description = ?,
+
+      Terms_Conditions_Id = ?,
+      Terms_Conditions_Description = ?,
 
       updated_at = NOW()
 
    WHERE Sale_Id = ?`,
-      [
-        Party_Id,
+  [
+    Party_Id,
 
-        // Invoice-specific snapshots
-        cleanValue(Billing_Name),
-        cleanValue(Phone_Number),
-        cleanValue(Billing_Address),
+    // Invoice-specific snapshots
+    cleanValue(Billing_Name),
+    cleanValue(Phone_Number),
+    cleanValue(Billing_Address),
 
-        Invoice_Number,
-        Invoice_Date,
-        cleanValue(State_Of_Supply),
-         cleanTransactionDiscountPercentage,
-        cleanTransactionDiscountAmount,
+    // Invoice number
+    invoiceNumber,
 
-        totalAmount,
-        roundOffValue,
-        totalReceived,
-        balanceDue,
-        // Terms & Conditions
-        termsId,
-        termsDescription,
-        saleId,
-      ]
-    );
+    Invoice_Date,
+    cleanValue(State_Of_Supply),
 
+    cleanTransactionDiscountPercentage,
+    cleanTransactionDiscountAmount,
 
+    totalAmount,
+    roundOffValue,
+    totalReceived,
+    balanceDue,
+
+    // Terms & Conditions
+    termsId,
+    termsDescription,
+
+    saleId,
+  ]
+);
 
 
 
@@ -3611,7 +3972,8 @@ const cleanTransactionDiscountAmount =
       updated_at = NOW()
    WHERE Sale_Id = ?`,
       [
-        Invoice_Number,
+        invoiceNumber,
+        //Invoice_Number,
         Invoice_Date,
         saleId,
       ]
@@ -3676,7 +4038,8 @@ const cleanTransactionDiscountAmount =
 
       txnDate: Invoice_Date,
 
-      docNumber: Invoice_Number,
+      //docNumber: Invoice_Number,
+      docNumber:invoiceNumber,
 
       balanceDue: balanceDue,
     });
@@ -4721,7 +5084,8 @@ const cleanTransactionDiscountAmount =
         txnType: "Sale",
         referenceId: id,
         billId: saleId,
-        billNumber: Invoice_Number,
+        //billNumber: Invoice_Number,
+        billNumber:invoiceNumber,
         partyName: Party_Name,
         quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
         selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
@@ -5014,81 +5378,495 @@ const deleteSale = async (req, res, next) => {
 };
 
 ;
+// const getLatestInvoiceNumber = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+
+//     // 1️⃣ Fetch invoice prefix
+//     const [invoiceSettings] = await connection.query(
+//       `SELECT Invoice_Name FROM add_invoice LIMIT 1`
+//     );
+
+//     if (!invoiceSettings.length || !invoiceSettings[0].Invoice_Name) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invoice prefix not set ,please set it first.",
+//       });
+//     }
+
+//     const prefix = invoiceSettings[0].Invoice_Name.trim();
+
+//     // 2️⃣ Get ACTIVE financial year
+//     const [fy] = await connection.query(
+//       `SELECT Financial_Year 
+//        FROM financial_year 
+//        WHERE Current_Financial_Year = 1
+//        LIMIT 1`
+//     );
+
+//     if (!fy.length) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No active financial year found.",
+//       });
+//     }
+
+//     const activeFY = fy[0].Financial_Year;
+
+//     // 3️⃣ Fetch latest invoice **ONLY inside this financial year**
+//     const [rows] = await connection.query(
+//       `
+//       SELECT Invoice_Number 
+//       FROM add_sale
+//       WHERE Invoice_Number LIKE '${prefix}%'
+//       AND Financial_Year = ?
+//       ORDER BY 
+//         CAST(SUBSTRING(Invoice_Number, LENGTH(?) + 1) AS UNSIGNED) DESC
+//       LIMIT 1
+//       `,
+//       [activeFY, prefix]
+//     );
+
+//     // 4️⃣ default new invoice number
+//     let newInvoiceNumber = `${prefix}0001`;
+
+//     // If an invoice already exists in this FY → increment
+//     if (rows.length > 0) {
+//       const last = rows[0].Invoice_Number;
+//       const numPart = last.replace(prefix, "");
+//       const nextNum = parseInt(numPart) + 1;
+//       newInvoiceNumber = prefix + nextNum.toString().padStart(4, "0");
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       financialYear: activeFY,
+//       newInvoiceNumber,
+//     });
+//   } catch (err) {
+//     console.error("❌ Error:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
 const getLatestInvoiceNumber = async (req, res, next) => {
-  let connection;
-  try {
-    connection = await db.getConnection();
+    let connection;
 
-    // 1️⃣ Fetch invoice prefix
-    const [invoiceSettings] = await connection.query(
-      `SELECT Invoice_Name FROM add_invoice LIMIT 1`
-    );
+    try {
+        const { prefix: requestedPrefix } = req.query;
 
-    if (!invoiceSettings.length || !invoiceSettings[0].Invoice_Name) {
-      return res.status(400).json({
-        success: false,
-        message: "Invoice prefix not set ,please set it first.",
-      });
+        // =========================================================
+        // 1. VALIDATE PREFIX
+        // =========================================================
+
+        if (!requestedPrefix) {
+            return res.status(400).json({
+                success: false,
+                message: "Invoice prefix is required.",
+            });
+        }
+
+        const requestedPrefixName = String(requestedPrefix).trim();
+
+        connection = await db.getConnection();
+
+        // =========================================================
+        // 2. GET PREFIX + LAST NUMBER
+        // =========================================================
+
+        const [prefixRows] = await connection.query(
+            `
+            SELECT
+                id,
+                transaction_type,
+                prefix_name,
+                last_number,
+                is_active
+            FROM transactions_prefixes
+            WHERE transaction_type = 'sale'
+              AND prefix_name = ?
+            LIMIT 1
+            `,
+            [requestedPrefixName]
+        );
+
+        if (prefixRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid Sale invoice prefix.",
+            });
+        }
+
+        const prefixRow = prefixRows[0];
+
+        // =========================================================
+        // 3. GET LAST NUMBER
+        //
+        // Example:
+        //
+        // SAL -> 1000
+        // INV -> 50
+        // None -> 20
+        //
+        // If NULL, treat it as 0.
+        // =========================================================
+
+        const lastNumber = Number(prefixRow.last_number) || 0;
+
+        const nextNumber = lastNumber + 1;
+
+        // =========================================================
+        // 4. FORMAT NEXT NUMBER
+        // =========================================================
+
+        let newInvoiceNumber;
+
+        // ---------------------------------------------------------
+        // NONE PREFIX
+        //
+        // None:
+        // 1
+        // 2
+        // 3
+        // 1001
+        // ---------------------------------------------------------
+
+        if (
+            requestedPrefixName.toLowerCase() === "none"
+        ) {
+            newInvoiceNumber = String(nextNumber);
+        }
+
+        // ---------------------------------------------------------
+        // AEPL-2627-
+        //
+        // Old special format:
+        //
+        // 0086
+        // 0087
+        // 0088
+        // ---------------------------------------------------------
+
+        else if (
+            requestedPrefixName.toUpperCase() === "AEPL-2627-"
+        ) {
+            newInvoiceNumber = String(nextNumber).padStart(4, "0");
+        }
+
+        // ---------------------------------------------------------
+        // ALL OTHER PREFIXES
+        //
+        // SAL1
+        // SAL2
+        // SAL3
+        //
+        // API returns only:
+        // 1
+        // 2
+        // 3
+        //
+        // Frontend combines it with selected prefix.
+        // ---------------------------------------------------------
+
+        else {
+            newInvoiceNumber = String(nextNumber);
+        }
+
+        // =========================================================
+        // 5. GET CURRENT FINANCIAL YEAR
+        // =========================================================
+
+        const [fyRows] = await connection.query(
+            `
+            SELECT Financial_Year
+            FROM financial_year
+            WHERE Current_Financial_Year = 1
+            LIMIT 1
+            `
+        );
+
+        if (fyRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No active financial year found.",
+            });
+        }
+
+        const activeFY = fyRows[0].Financial_Year;
+
+        // =========================================================
+        // 6. RETURN NEXT NUMBER
+        // =========================================================
+
+        return res.status(200).json({
+            success: true,
+            prefix: requestedPrefixName,
+            financialYear: activeFY,
+            newInvoiceNumber,
+        });
+
+    } catch (err) {
+        console.error(
+            "❌ Error getting latest invoice number:",
+            err
+        );
+
+        next(err);
+
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
-
-    const prefix = invoiceSettings[0].Invoice_Name.trim();
-
-    // 2️⃣ Get ACTIVE financial year
-    const [fy] = await connection.query(
-      `SELECT Financial_Year 
-       FROM financial_year 
-       WHERE Current_Financial_Year = 1
-       LIMIT 1`
-    );
-
-    if (!fy.length) {
-      return res.status(400).json({
-        success: false,
-        message: "No active financial year found.",
-      });
-    }
-
-    const activeFY = fy[0].Financial_Year;
-
-    // 3️⃣ Fetch latest invoice **ONLY inside this financial year**
-    const [rows] = await connection.query(
-      `
-      SELECT Invoice_Number 
-      FROM add_sale
-      WHERE Invoice_Number LIKE '${prefix}%'
-      AND Financial_Year = ?
-      ORDER BY 
-        CAST(SUBSTRING(Invoice_Number, LENGTH(?) + 1) AS UNSIGNED) DESC
-      LIMIT 1
-      `,
-      [activeFY, prefix]
-    );
-
-    // 4️⃣ default new invoice number
-    let newInvoiceNumber = `${prefix}0001`;
-
-    // If an invoice already exists in this FY → increment
-    if (rows.length > 0) {
-      const last = rows[0].Invoice_Number;
-      const numPart = last.replace(prefix, "");
-      const nextNum = parseInt(numPart) + 1;
-      newInvoiceNumber = prefix + nextNum.toString().padStart(4, "0");
-    }
-
-    return res.status(200).json({
-      success: true,
-      financialYear: activeFY,
-      newInvoiceNumber,
-    });
-  } catch (err) {
-    console.error("❌ Error:", err);
-    next(err);
-  } finally {
-    if (connection) connection.release();
-  }
 };
+// const getLatestInvoiceNumber = async (req, res, next) => {
+//     let connection;
 
+//     try {
+//         const { prefix: requestedPrefix } = req.query;
 
+//         // =========================================================
+//         // 1. VALIDATE PREFIX
+//         // =========================================================
+
+//         if (!requestedPrefix) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Invoice prefix is required.",
+//             });
+//         }
+
+//         const requestedPrefixName = String(
+//             requestedPrefix
+//         ).trim();
+
+//         connection = await db.getConnection();
+
+//         // =========================================================
+//         // 2. VERIFY PREFIX EXISTS FOR SALE
+//         // =========================================================
+
+//         const [prefixRows] = await connection.query(
+//             `
+//             SELECT
+//                 id,
+//                 transaction_type,
+//                 prefix_name,
+//                 is_active
+//             FROM transactions_prefixes
+//             WHERE transaction_type = 'sale'
+//               AND prefix_name = ?
+//             LIMIT 1
+//             `,
+//             [requestedPrefixName]
+//         );
+
+//         if (prefixRows.length === 0) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Invalid Sale invoice prefix.",
+//             });
+//         }
+
+//         // =========================================================
+//         // 3. GET CURRENT FINANCIAL YEAR
+//         // =========================================================
+
+//         const [fyRows] = await connection.query(
+//             `
+//             SELECT Financial_Year
+//             FROM financial_year
+//             WHERE Current_Financial_Year = 1
+//             LIMIT 1
+//             `
+//         );
+
+//         if (fyRows.length === 0) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "No active financial year found.",
+//             });
+//         }
+
+//         const activeFY = fyRows[0].Financial_Year;
+
+//         // =========================================================
+//         // 4. NONE PREFIX
+//         //
+//         // None:
+//         //
+//         // 0001 -> 2
+//         // 0002 -> 3
+//         // 10   -> 11
+//         //
+//         // No invoice -> 1
+//         // =========================================================
+
+//         if (
+//             requestedPrefixName.toLowerCase() === "none"
+//         ) {
+//             const [rows] = await connection.query(
+//                 `
+//                 SELECT Invoice_Number
+//                 FROM add_sale
+//                 WHERE Financial_Year = ?
+//                   AND TRIM(Invoice_Number) REGEXP '^[0-9]+$'
+//                 ORDER BY
+//                     CAST(TRIM(Invoice_Number) AS UNSIGNED) DESC
+//                 LIMIT 1
+//                 `,
+//                 [activeFY]
+//             );
+
+//             let newInvoiceNumber = "1";
+
+//             if (rows.length > 0) {
+//                 const lastInvoiceNumber = String(
+//                     rows[0].Invoice_Number
+//                 ).trim();
+
+//                 const lastNumber = parseInt(
+//                     lastInvoiceNumber,
+//                     10
+//                 );
+
+//                 if (!Number.isNaN(lastNumber)) {
+//                     newInvoiceNumber = String(
+//                         lastNumber + 1
+//                     );
+//                 }
+//             }
+
+//             return res.status(200).json({
+//                 success: true,
+//                 prefix: requestedPrefixName,
+//                 financialYear: activeFY,
+//                 newInvoiceNumber,
+//             });
+//         }
+
+//         // =========================================================
+//         // 5. PREFIXED INVOICE
+//         //
+//         // Normally:
+//         //
+//         // SAL1  -> 2
+//         // SAL2  -> 3
+//         // ABC1  -> 2
+//         //
+//         // SPECIAL CASE:
+//         //
+//         // AEPL-2627-0086 -> 0087
+//         // AEPL-2627-0087 -> 0088
+//         //
+//         // Only AEPL-2627- uses 4 digit numbering.
+//         // =========================================================
+
+//         const prefix = requestedPrefixName;
+
+//         const [rows] = await connection.query(
+//             `
+//             SELECT Invoice_Number
+//             FROM add_sale
+//             WHERE Financial_Year = ?
+//               AND TRIM(Invoice_Number) LIKE CONCAT(?, '%')
+//               AND SUBSTRING(
+//                     TRIM(Invoice_Number),
+//                     CHAR_LENGTH(?) + 1
+//                   ) REGEXP '^[0-9]+$'
+//             ORDER BY
+//                 CAST(
+//                     SUBSTRING(
+//                         TRIM(Invoice_Number),
+//                         CHAR_LENGTH(?) + 1
+//                     ) AS UNSIGNED
+//                 ) DESC
+//             LIMIT 1
+//             `,
+//             [
+//                 activeFY,
+//                 prefix,
+//                 prefix,
+//                 prefix,
+//             ]
+//         );
+
+//         // =========================================================
+//         // 6. NEW PREFIX STARTS FROM 1
+//         // =========================================================
+
+//         let newInvoiceNumber = "1";
+
+//         if (rows.length > 0) {
+//             const lastInvoiceNumber = String(
+//                 rows[0].Invoice_Number
+//             ).trim();
+
+//             const numericPart = lastInvoiceNumber.substring(
+//                 prefix.length
+//             );
+
+//             const lastNumber = parseInt(
+//                 numericPart,
+//                 10
+//             );
+
+//             if (!Number.isNaN(lastNumber)) {
+//                 const nextNumber = lastNumber + 1;
+
+//                 // =================================================
+//                 // AEPL-2627- IS THE OLD SPECIAL FORMAT
+//                 // =================================================
+
+//                 if (
+//                     prefix.toUpperCase() === "AEPL-2627-"
+//                 ) {
+//                     newInvoiceNumber = String(
+//                         nextNumber
+//                     ).padStart(4, "0");
+//                 } else {
+//                     // =================================================
+//                     // ALL OTHER PREFIXES
+//                     //
+//                     // SAL1 -> 2
+//                     // SAL2 -> 3
+//                     // ABC1 -> 2
+//                     // =================================================
+
+//                     newInvoiceNumber = String(
+//                         nextNumber
+//                     );
+//                 }
+//             }
+//         }
+
+//         // =========================================================
+//         // 7. RETURN NUMBER ONLY
+//         // =========================================================
+
+//         return res.status(200).json({
+//             success: true,
+//             prefix: requestedPrefixName,
+//             financialYear: activeFY,
+//             newInvoiceNumber,
+//         });
+
+//     } catch (err) {
+//         console.error(
+//             "❌ Error getting latest invoice number:",
+//             err
+//         );
+
+//         next(err);
+
+//     } finally {
+//         if (connection) {
+//             connection.release();
+//         }
+//     }
+// };
 const getNewSaleLatestInvoiceNumber = async (req, res, next) => {
   let connection;
   try {

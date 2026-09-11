@@ -156,10 +156,19 @@ export const saleApi = createApi({
     // ------------------------------------
     // LATEST INVOICE NUMBER
     // ------------------------------------
+    // getLatestInvoiceNumber: builder.query({
+    //   query: () => `sale/get-latest-invoice-number`,
+    //   providesTags: [{ type: "Invoice", id: "LATEST" }],
+    // }),
     getLatestInvoiceNumber: builder.query({
-      query: () => `sale/get-latest-invoice-number`,
-      providesTags: [{ type: "Invoice", id: "LATEST" }],
-    }),
+  query: (prefix) => ({
+    url: `sale/get-latest-invoice-number`,
+    params: {
+      prefix,
+    },
+  }),
+  providesTags: [{ type: "Invoice", id: "LATEST" }],
+}),
 
     // ------------------------------------
     // SPECIFIC SALE

@@ -19,6 +19,8 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     Billing_Address,
     Phone_Number,
     State_Of_Supply,
+    Transaction_Discount_Percentage,
+    Transaction_Discount_Amount,
     Total_Amount,
     Round_Off,
     Total_Paid,
@@ -926,21 +928,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 )}
 
 
-                {/* {showTaxColumns && (
-                  <>
-                    <td className="invoice-item-right">
-                      {itemCgst > 0
-                        ? `₹ ${money(itemCgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                        : ""}
-                    </td>
-
-                    <td className="invoice-item-right">
-                      {itemSgst > 0
-                        ? `₹ ${money(itemSgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                        : ""}
-                    </td>
-                  </>
-                )} */}
+               
                 {/* =====================================================
     CGST
 ===================================================== */}
@@ -1306,16 +1294,23 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </td>
               </tr>
 
-              {/* ✅ Round Off row — only shown when it's non-zero */}
-              {/* {Math.abs(roundOff) >= 0.01 && (
+               {Number(Transaction_Discount_Amount || 0) > 0 && (
                 <tr>
-                  <td className="invoice-summary-cell">Round Off</td>
-                 
+                  <td className="invoice-summary-cell">
+                    Discount{" "}
+                    {Number(Transaction_Discount_Percentage || 0) > 0
+                      ? `(${Number(Transaction_Discount_Percentage).toFixed(2)}%)`
+                      : ""}
+                  </td>
+
                   <td className="invoice-summary-cell-right">
-                     ₹ {money(Math.abs(roundOff))}
+                     ₹ {money(Transaction_Discount_Amount)}
                   </td>
                 </tr>
-              )} */}
+              )}
+
+              {/* ✅ Round Off row — only shown when it's non-zero */}
+             
               {hasRoundOff && (
                 <tr>
                   <td className="invoice-summary-cell">

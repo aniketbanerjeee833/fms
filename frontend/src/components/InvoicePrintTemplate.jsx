@@ -25,6 +25,8 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     Billing_Address,
     Phone_Number,
     State_Of_Supply,
+    Transaction_Discount_Percentage,
+    Transaction_Discount_Amount,
     Total_Amount,
     Round_Off,
     Total_Paid,
@@ -478,9 +480,9 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const hasDiscountColumn = items.some(
     (item) => Number(item.Discount_Amount || 0) > 0
   );
-  const hasMRPColumn =items?.some(
-      (item) => item.hasHistoricalMRP === true
-    );
+  const hasMRPColumn = items?.some(
+    (item) => item.hasHistoricalMRP === true
+  );
   const hasItems = items.length > 0;
   //const MIN_ROWS = 10;
   //const emptyRows = Math.max(0, MIN_ROWS - items.length);
@@ -578,7 +580,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
         <thead>
           <tr>
-          
+
             <th className="invoice-section-header">
               {type === "sale" ? "Bill To" : "Bill From"}
             </th>
@@ -696,7 +698,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               HSN/ SAC
             </th>
 
-             {hasMRPColumn && (
+            {hasMRPColumn && (
               <th
                 className="invoice-table-header"
                 style={{ width: "9%" }}
@@ -741,7 +743,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               </th>
             )}
 
-           
+
             {showTaxableColumns && (
               <th
                 className="invoice-table-header"
@@ -872,11 +874,11 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   {safe(item.Item_HSN)}
                 </td>
 
-                  {hasMRPColumn && (
-                    <td className="invoice-item-right">
-                      {safe(item.MRP)}
-                    </td>
-                  )}
+                {hasMRPColumn && (
+                  <td className="invoice-item-right">
+                    {safe(item.MRP)}
+                  </td>
+                )}
 
                 {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
                 {/* <td className="invoice-item-right">
@@ -1216,111 +1218,111 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 </tr>
               </tbody>
             </table>)} */}
-        {showTaxColumns && taxGroupList.length > 0 && (
-  <table
-    className="invoice-summary-table"
-    style={{ width: "100%" }}
-  >
-    <thead>
-      <tr>
-        {/* EXACT SAME HEADING */}
-        <td className="invoice-summary-cell">
-          Tax Details
-        </td>
-
-        {taxGroupList.map((g) => {
-          // IGST 5% → 5%
-          // GST 12% → CGST 6% / SGST 6%
-          const displayRate = g.isIGST
-            ? g.rate
-            : g.rate / 2;
-
-          return (
-            <td
-              key={g.key}
-              className="invoice-summary-cell-right"
+          {showTaxColumns && taxGroupList.length > 0 && (
+            <table
+              className="invoice-summary-table"
+              style={{ width: "100%" }}
             >
-              {displayRate}%
-            </td>
-          );
-        })}
-      </tr>
-    </thead>
+              <thead>
+                <tr>
+                  {/* EXACT SAME HEADING */}
+                  <td className="invoice-summary-cell">
+                    Tax Details
+                  </td>
 
-    <tbody>
+                  {taxGroupList.map((g) => {
+                    // IGST 5% → 5%
+                    // GST 12% → CGST 6% / SGST 6%
+                    const displayRate = g.isIGST
+                      ? g.rate
+                      : g.rate / 2;
 
-      {/* =========================
+                    return (
+                      <td
+                        key={g.key}
+                        className="invoice-summary-cell-right"
+                      >
+                        {displayRate}%
+                      </td>
+                    );
+                  })}
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {/* =========================
           CGST
       ========================== */}
 
-      {hasNormalGst && (
-        <tr>
-          <td className="invoice-summary-cell">
-            CGST
-          </td>
+                {hasNormalGst && (
+                  <tr>
+                    <td className="invoice-summary-cell">
+                      CGST
+                    </td>
 
-          {taxGroupList.map((g) => (
-            <td
-              key={`cgst-${g.key}`}
-              className="invoice-summary-cell-right"
-            >
-              {g.cgst > 0
-                ? `₹ ${money(g.cgst)}`
-                : ""}
-            </td>
-          ))}
-        </tr>
-      )}
+                    {taxGroupList.map((g) => (
+                      <td
+                        key={`cgst-${g.key}`}
+                        className="invoice-summary-cell-right"
+                      >
+                        {g.cgst > 0
+                          ? `₹ ${money(g.cgst)}`
+                          : ""}
+                      </td>
+                    ))}
+                  </tr>
+                )}
 
-      {/* =========================
+                {/* =========================
           SGST
       ========================== */}
 
-      {hasNormalGst && (
-        <tr>
-          <td className="invoice-summary-cell">
-            SGST
-          </td>
+                {hasNormalGst && (
+                  <tr>
+                    <td className="invoice-summary-cell">
+                      SGST
+                    </td>
 
-          {taxGroupList.map((g) => (
-            <td
-              key={`sgst-${g.key}`}
-              className="invoice-summary-cell-right"
-            >
-              {g.sgst > 0
-                ? `₹ ${money(g.sgst)}`
-                : ""}
-            </td>
-          ))}
-        </tr>
-      )}
+                    {taxGroupList.map((g) => (
+                      <td
+                        key={`sgst-${g.key}`}
+                        className="invoice-summary-cell-right"
+                      >
+                        {g.sgst > 0
+                          ? `₹ ${money(g.sgst)}`
+                          : ""}
+                      </td>
+                    ))}
+                  </tr>
+                )}
 
-      {/* =========================
+                {/* =========================
           IGST
       ========================== */}
 
-      {hasIGST && (
-        <tr>
-          <td className="invoice-summary-cell">
-            IGST
-          </td>
+                {hasIGST && (
+                  <tr>
+                    <td className="invoice-summary-cell">
+                      IGST
+                    </td>
 
-          {taxGroupList.map((g) => (
-            <td
-              key={`igst-${g.key}`}
-              className="invoice-summary-cell-right"
-            >
-              {g.igst > 0
-                ? `₹ ${money(g.igst)}`
-                : ""}
-            </td>
-          ))}
-        </tr>
-      )}
+                    {taxGroupList.map((g) => (
+                      <td
+                        key={`igst-${g.key}`}
+                        className="invoice-summary-cell-right"
+                      >
+                        {g.igst > 0
+                          ? `₹ ${money(g.igst)}`
+                          : ""}
+                      </td>
+                    ))}
+                  </tr>
+                )}
 
-    </tbody>
-  </table>
-)}
+              </tbody>
+            </table>
+          )}
         </div>
 
 
@@ -1348,17 +1350,23 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   ₹ {money(itemsSum)}
                 </td>
               </tr>
-
-              {/* ✅ Round Off row — only shown when it's non-zero */}
-              {/* {Math.abs(roundOff) >= 0.01 && (
+              {Number(Transaction_Discount_Amount || 0) > 0 && (
                 <tr>
-                  <td className="invoice-summary-cell">Round Off</td>
-                
+                  <td className="invoice-summary-cell">
+                    Discount{" "}
+                    {Number(Transaction_Discount_Percentage || 0) > 0
+                      ? `(${Number(Transaction_Discount_Percentage).toFixed(2)}%)`
+                      : ""}
+                  </td>
+
                   <td className="invoice-summary-cell-right">
-                     ₹ {money(Math.abs(roundOff))}
+                     ₹ {money(Transaction_Discount_Amount)}
                   </td>
                 </tr>
-              )} */}
+              )}
+
+              {/* ✅ Round Off row — only shown when it's non-zero */}
+
               {hasRoundOff && (
                 <tr>
                   <td className="invoice-summary-cell">

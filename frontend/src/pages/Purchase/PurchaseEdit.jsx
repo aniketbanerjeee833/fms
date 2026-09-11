@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import {  useLocation, useNavigate, useParams } from "react-router-dom";
 import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1901,7 +1901,8 @@ export default function PurchaseEdit() {
         }}
       >
 
-        <div className="inn-title w-full px-2 py-2" style={{ marginTop: "2rem" }} >
+        <div className="inn-title w-full px-2 py-2"
+         style={{ marginTop: "2rem" }} >
 
           <div className="
     flex flex-col sm:flex-row 
@@ -4825,46 +4826,7 @@ export default function PurchaseEdit() {
                         <div style={{ width: "100%" }}
                           className="flex justify-between items-center gap-6 w-full mr-4"
                         >
-                          {/* <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="roundOffCheck"
-                            className="w-4 h-4 cursor-pointer"
-                            checked={isRoundOff}
-                            onChange={(e) => {
-                              const isChecked = e.target.checked;
-                              setIsRoundOff(isChecked);
-
-                              const rawTotal = getRawTotal();
-
-                              if (isChecked) {
-                                const rounded = Math.round(rawTotal);
-                                const diff = Number((rounded - rawTotal).toFixed(2));
-                                setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
-                                applyRoundOff(diff);
-                              } else {
-                                setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
-                                applyRoundOff(0);
-                              }
-                            }}
-                          />
-
-                          <span className="font-medium whitespace-nowrap">Round Off</span>
-
-                          <input
-                            type="text"
-                            style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                            className="border border-gray-300 text-right text-sm"
-                            {...register("Round_Off")}
-                            disabled={!isRoundOff}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
-                              const numVal = parseFloat(val) || 0;
-                              applyRoundOff(numVal);
-                            }}
-                          />
-                        </div> */}
+                 
                           <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
