@@ -90,6 +90,21 @@ export const saleEditFormSchema = z.object({
 
 
   Invoice_Number: z.string().optional().default(""),
+   Invoice_Number_Prefix: z
+        .string()
+        .optional()
+        .default("None"),
+      
+     Invoice_Number_Value: z
+        .union([z.string(), z.number(), z.null(), z.undefined()])
+        .transform((val) => String(val ?? "").trim())
+        .refine(
+          (val) => val === "" || /^\d+$/.test(val),
+          {
+            message: "invoice_Number_Value must contain only digits",
+          }
+        )
+        .transform((val) => (val === "" ? null : Number(val))),
 
   Invoice_Date: z
     .string()

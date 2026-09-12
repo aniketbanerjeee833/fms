@@ -289,9 +289,9 @@ deleteSale: builder.mutation({
     useGetAllSalesQuery,
     
 
-    useGetLatestInvoiceNumberQuery,
+    //useGetLatestInvoiceNumberQuery,
    
-    
+    useLazyGetLatestInvoiceNumberQuery,
     useGetSingleSaleQuery,
     usePrintSaleBillMutation,
 

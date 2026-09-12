@@ -12,7 +12,7 @@ import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsF
 import { toast } from "react-toastify";
 
 
-import { saleApi, useEditSaleMutation, useGetLatestInvoiceNumberQuery, useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { saleApi, useEditSaleMutation,  useGetSingleSaleQuery, useLazyGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
 
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -374,6 +374,8 @@ export default function SaleEdit() {
       Billing_Address: "",
       GSTIN: "",
       Invoice_Number: "",
+       Invoice_Number_Prefix:"None",
+      Invoice_Number_Value:"",
       Invoice_Date: "",
       State_Of_Supply: "",
       Transaction_Discount_Percentage: "",
@@ -540,42 +542,45 @@ export default function SaleEdit() {
     }
   }, [activeSalePrefix?.prefix_name]);
 
-  const {
-    data: latestInvoiceNumber,
-  } = useGetLatestInvoiceNumberQuery(
-    selectedSalePrefix,
-    {
-      skip: !selectedSalePrefix,
-    }
-  );
+  // const {
+  //   data: latestInvoiceNumber,
+  // } = useGetLatestInvoiceNumberQuery(
+  //   selectedSalePrefix,
+  //   {
+  //     skip: !selectedSalePrefix,
+  //   }
+  // );
+const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
+const [getLatestInvoiceNumber] =
+  useLazyGetLatestInvoiceNumberQuery();
 
-  useEffect(() => {
-    if (!isInvoicePrefixChanged) {
-      return;
-    }
+  // useEffect(() => {
+  //   if (!isInvoicePrefixChanged) {
+  //     return;
+  //   }
 
-    if (!latestInvoiceNumber?.newInvoiceNumber) {
-      return;
-    }
+  //   if (!latestInvoiceNumber?.newInvoiceNumber) {
+  //     return;
+  //   }
 
-    const nextNumber = latestInvoiceNumber.newInvoiceNumber;
+  //   const nextNumber = latestInvoiceNumber.newInvoiceNumber;
 
-    setInvoiceNumberPart(nextNumber);
+  //   setInvoiceNumberPart(nextNumber);
 
-    setValue(
-      "Invoice_Number",
-      `${selectedSalePrefix === "None" ? "" : selectedSalePrefix}${nextNumber}`,
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
-  }, [
-    latestInvoiceNumber,
-    selectedSalePrefix,
-    isInvoicePrefixChanged,
-    setValue,
-  ]);
+  //   setValue(
+  //     "Invoice_Number",
+  //     `${selectedSalePrefix === "None" ? "" : selectedSalePrefix}${nextNumber}`,
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // }, [
+  //   latestInvoiceNumber,
+  //   selectedSalePrefix,
+  //   isInvoicePrefixChanged,
+  //   setValue,
+  // ]);
 
   const { fields, append, remove, replace } = useFieldArray({
     control,
@@ -1250,32 +1255,55 @@ export default function SaleEdit() {
   const [originalInvoiceNumberPart, setOriginalInvoiceNumberPart] = useState("");
   useEffect(() => {
     if (sale) {
-      const savedInvoiceNumber =
-        sale?.invoicePartyDetails?.Invoice_Number || "";
+      // const savedInvoiceNumber =
+      //   sale?.invoicePartyDetails?.Invoice_Number || "";
 
-      const invoiceMatch =
-        String(savedInvoiceNumber).match(/^(.*?)(\d+)$/);
+      // const invoiceMatch =
+      //   String(savedInvoiceNumber).match(/^(.*?)(\d+)$/);
 
-      if (invoiceMatch) {
-        const prefix = invoiceMatch[1] || "None";
-        const number = invoiceMatch[2];
+      // if (invoiceMatch) {
+      //   const prefix = invoiceMatch[1] || "None";
+      //   const number = invoiceMatch[2];
 
-        setInvoicePrefix(prefix);
-        setInvoiceNumberPart(number);
-        setSelectedSalePrefix(prefix);
+      //   setInvoicePrefix(prefix);
+      //   setInvoiceNumberPart(number);
+      //   setSelectedSalePrefix(prefix);
 
-        // Remember original invoice
-        setOriginalSalePrefix(prefix);
-        setOriginalInvoiceNumberPart(number);
-      } else {
-        setInvoicePrefix("None");
-        setInvoiceNumberPart(savedInvoiceNumber);
-        setSelectedSalePrefix("None");
+      //   // Remember original invoice
+      //   setOriginalSalePrefix(prefix);
+      //   setOriginalInvoiceNumberPart(number);
+      // } else {
+      //   setInvoicePrefix("None");
+      //   setInvoiceNumberPart(savedInvoiceNumber);
+      //   setSelectedSalePrefix("None");
 
-        setOriginalSalePrefix("None");
-        setOriginalInvoiceNumberPart(savedInvoiceNumber);
-      }
-      setIsInvoicePrefixChanged(false);
+      //   setOriginalSalePrefix("None");
+      //   setOriginalInvoiceNumberPart(savedInvoiceNumber);
+      // }
+      // setIsInvoicePrefixChanged(false);
+       const savedInvoicePrefix =
+      String(
+        sale?.invoicePartyDetails?.Invoice_Number_Prefix ?? ""
+      ).trim() || "None";
+
+    const savedInvoiceValue =
+      sale?.invoicePartyDetails?.Invoice_Number_Value;
+
+    const savedInvoiceNumberPart =
+      savedInvoiceValue === null ||
+      savedInvoiceValue === undefined
+        ? ""
+        : String(savedInvoiceValue);
+
+    setInvoicePrefix(savedInvoicePrefix);
+    setInvoiceNumberPart(savedInvoiceNumberPart);
+    setSelectedSalePrefix(savedInvoicePrefix);
+
+    setOriginalSalePrefix(savedInvoicePrefix);
+    setOriginalInvoiceNumberPart(savedInvoiceNumberPart);
+
+    setLatestInvoiceNumber(null);
+    setIsInvoicePrefixChanged(false);
       originalTaxTypesRef.current = (sale?.items || []).map(
         (item) => item?.Tax_Type || "None"
       );
@@ -1416,6 +1444,8 @@ export default function SaleEdit() {
         Billing_Address: sale.invoicePartyDetails?.Billing_Address || "",
         GSTIN: sale.invoicePartyDetails?.GSTIN || "",
         Invoice_Number: sale.invoicePartyDetails?.Invoice_Number || "",
+        Invoice_Number_Prefix: sale.invoicePartyDetails?.Invoice_Number_Prefix || "None",
+        Invoice_Number_Value: sale.invoicePartyDetails?.Invoice_Number_Value || "",
 
         Invoice_Date: toLocalDateString(sale.invoicePartyDetails?.Invoice_Date),
         //  Invoice_Date: sale.invoicePartyDetails?.Invoice_Date,
@@ -2941,10 +2971,10 @@ export default function SaleEdit() {
                   />
                 </div> */}
                   {/* Invoice Number */}
-                  <div className="flex items-center w-full gap-3">
+                  {/* <div className="flex items-center w-full gap-3">
                       <span className="whitespace-nowrap">Invoice Number</span>
 
-                    {/* Prefix Dropdown */}
+                    
                     <div className="relative flex-shrink-0">
                       <select
                         value={selectedSalePrefix}
@@ -2999,7 +3029,6 @@ export default function SaleEdit() {
                       </select>
                     </div>
 
-                    {/* Invoice Number */}
                     <input
                       type="text"
                       value={invoiceNumberPart}
@@ -3016,7 +3045,186 @@ export default function SaleEdit() {
                   </div>
                   {errors?.Invoice_Number && (
                     <p className="text-red-500 text-xs pl-[162px]">{errors?.Invoice_Number?.message}</p>
-                  )}
+                  )} */}
+                  <div className="flex items-center w-full gap-3">
+  <span
+    className="whitespace-nowrap"
+    style={{
+      flexShrink: 0,
+    }}
+  >
+    Invoice Number
+  </span>
+
+  {/* Prefix Dropdown */}
+  <div className="relative flex-shrink-0">
+    <select
+      value={selectedSalePrefix}
+      onChange={async (e) => {
+        const prefix = e.target.value;
+
+        // Same prefix → don't do anything
+        if (prefix === selectedSalePrefix) {
+          return;
+        }
+
+        setSelectedSalePrefix(prefix);
+        setInvoicePrefix(prefix);
+        setIsInvoicePrefixChanged(true);
+
+        /*
+         * If switching back to the original prefix
+         * AND original number is meaningful,
+         * restore the original invoice number.
+         *
+         * 0 / 00 / empty = no meaningful number,
+         * so those should NOT be restored.
+         */
+        if (
+          prefix === originalSalePrefix &&
+          originalInvoiceNumberPart !== "" &&
+          Number(originalInvoiceNumberPart) !== 0
+        ) {
+          setInvoiceNumberPart(
+            originalInvoiceNumberPart
+          );
+
+          setValue(
+            "Invoice_Number_Prefix",
+            prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Invoice_Number_Value",
+            originalInvoiceNumberPart,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Invoice_Number",
+            `${
+              prefix === "None"
+                ? ""
+                : prefix
+            }${originalInvoiceNumberPart}`,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setIsInvoicePrefixChanged(false);
+
+          return;
+        }
+
+        /*
+         * Different prefix OR original number
+         * was 0 / 00 / empty.
+         *
+         * Fetch the next number for this prefix.
+         */
+        try {
+          setInvoiceNumberPart("");
+          setLatestInvoiceNumber(null);
+
+          const result =
+            await getLatestInvoiceNumber(
+              prefix,
+              false
+            ).unwrap();
+
+          setLatestInvoiceNumber(result);
+
+          const nextNumber =
+            result?.newInvoiceNumber || "";
+
+          setInvoiceNumberPart(nextNumber);
+
+          setValue(
+            "Invoice_Number_Prefix",
+            prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Invoice_Number_Value",
+            nextNumber,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Invoice_Number",
+            `${
+              prefix === "None"
+                ? ""
+                : prefix
+            }${nextNumber}`,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        } catch (error) {
+          console.error(
+            "Failed to get latest invoice number:",
+            error
+          );
+        }
+      }}
+      className="py-1 border-b-2 border-gray-300"
+      style={{
+        marginBottom: 0,
+        minWidth: "100px",
+        height: "32px",
+        border: "1px solid #ccc",
+      }}
+    >
+      {salePrefixes.map((prefix) => (
+        <option
+          key={prefix.id}
+          value={prefix.prefix_name}
+        >
+          {prefix.prefix_name}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {/* Invoice Number - NOT EDITABLE */}
+  <input
+    type="text"
+    value={invoiceNumberPart}
+    readOnly
+    placeholder="Invoice Number"
+    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+    style={{
+      marginBottom: 0,
+      height: "1rem",
+    }}
+  />
+</div>
+
+{errors?.Invoice_Number && (
+  <p className="text-red-500 text-xs pl-[162px]">
+    {errors?.Invoice_Number?.message}
+  </p>
+)}
+
+
 
                   {/* Invoice Date */}
                   <div className="grid grid-cols-[150px_1fr] items-center gap-3">

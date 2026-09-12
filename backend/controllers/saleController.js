@@ -50,7 +50,36 @@ const normalizeNumber = (val) =>
     : null;
 
 
+const buildLegacyInvoiceNumber = (
+  invoiceNumberPrefix,
+  invoiceNumberValue
+) => {
+  const prefix =
+    String(invoiceNumberPrefix ?? "").trim() || "None";
 
+  const valueString =
+    String(invoiceNumberValue ?? "").trim();
+
+  // No number
+  if (valueString === "") {
+    return null;
+  }
+
+  const number = Number(valueString);
+
+  // 0 / 00 / 000000 means no invoice number
+  if (number === 0) {
+    return null;
+  }
+
+  // None + 5000 -> "5000"
+  if (prefix === "None") {
+    return String(number);
+  }
+
+  // SAL + 5000 -> "SAL5000"
+  return `${prefix}${number}`;
+};
 //OLD
 
 
@@ -89,6 +118,8 @@ const addSale = async (req, res, next) => {
       Billing_Address,
       GSTIN,
       Invoice_Number,
+      Invoice_Number_Prefix,
+  Invoice_Number_Value,
       Invoice_Date,
       State_Of_Supply,
       Transaction_Discount_Percentage,
@@ -644,133 +675,231 @@ const cleanTransactionDiscountAmount =
 // INVOICE NUMBER + TRANSACTION PREFIX SEQUENCE
 // =========================================================
 
-let invoiceNumber = String(Invoice_Number || "").trim();
+// let invoiceNumber = String(Invoice_Number || "").trim();
+
+// // ---------------------------------------------------------
+// // SPECIAL CASE:
+// // 000 / 00 / 0000 etc. means blank invoice number.
+// // No error.
+// // ---------------------------------------------------------
+
+// if (/^0+$/.test(invoiceNumber)) {
+//   invoiceNumber = "";
+// }
+
+
+// // ---------------------------------------------------------
+// // Only process prefix sequence when invoice number exists
+// // ---------------------------------------------------------
+
+// if (invoiceNumber) {
+
+//   // Extract trailing numeric part.
+//   //
+//   // SAL1000
+//   //   prefix = SAL
+//   //   number = 1000
+//   //
+//   // INV100
+//   //   prefix = INV
+//   //   number = 100
+//   //
+//   // AEPL-2627-0086
+//   //   prefix = AEPL-2627-
+//   //   number = 0086
+//   //
+//   // 1000
+//   //   prefix = None
+//   //   number = 1000
+
+//   const invoiceMatch = invoiceNumber.match(/^(.*?)(\d+)$/);
+
+//   if (!invoiceMatch) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid invoice number.",
+//     });
+//   }
+
+//   const invoicePrefix = invoiceMatch[1] || "None";
+//   const enteredInvoiceNumber = Number(invoiceMatch[2]);
+
+//   if (
+//     !Number.isInteger(enteredInvoiceNumber) ||
+//     enteredInvoiceNumber < 1
+//   ) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invoice number must contain a valid positive number.",
+//     });
+//   }
+
+
+//   // -------------------------------------------------------
+//   // Find + LOCK the prefix row.
+//   //
+//   // Because addSale already started a transaction at the
+//   // beginning of this controller, FOR UPDATE keeps this
+//   // prefix row locked until commit/rollback.
+//   // -------------------------------------------------------
+
+//   const [prefixRows] = await connection.execute(
+//     `
+//     SELECT
+//       id,
+//       transaction_type,
+//       prefix_name,
+//       last_number,
+//       is_active
+//     FROM transactions_prefixes
+//     WHERE transaction_type = 'sale'
+//       AND prefix_name = ?
+//     LIMIT 1
+//     FOR UPDATE
+//     `,
+//     [invoicePrefix]
+//   );
+
+
+//   // -------------------------------------------------------
+//   // Prefix must exist.
+//   // -------------------------------------------------------
+
+//   if (prefixRows.length === 0) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: `Invoice prefix "${invoicePrefix}" does not exist.`,
+//     });
+//   }
+
+
+//   const prefixRow = prefixRows[0];
+
+//   const currentLastNumber =
+//     Number(prefixRow.last_number) || 0;
+
+
+//   // -------------------------------------------------------
+//   // IMPORTANT:
+//   //
+//   // NEVER decrease last_number.
+//   //
+//   // Example:
+//   //
+//   // last_number = 1000
+//   //
+//   // SAL1  -> stays 1000
+//   // SAL2  -> stays 1000
+//   // SAL3  -> stays 1000
+//   //
+//   // SAL1001 -> becomes 1001
+//   // -------------------------------------------------------
+
+//   if (enteredInvoiceNumber > currentLastNumber) {
+
+//     await connection.execute(
+//       `
+//       UPDATE transactions_prefixes
+//       SET last_number = ?
+//       WHERE id = ?
+//       `,
+//       [
+//         enteredInvoiceNumber,
+//         prefixRow.id,
+//       ]
+//     );
+//   }
+// }
+// =========================================================
+// INVOICE NUMBER + TRANSACTION PREFIX SEQUENCE
+// =========================================================
+
+const invoicePrefix =
+  String(
+    Invoice_Number_Prefix ?? ""
+  ).trim() || "None";
+
+const invoiceValueString =
+  String(
+    Invoice_Number_Value ?? ""
+  ).trim();
+
+let invoiceNumberValue = null;
 
 // ---------------------------------------------------------
-// SPECIAL CASE:
-// 000 / 00 / 0000 etc. means blank invoice number.
-// No error.
+// Validate numeric invoice value
 // ---------------------------------------------------------
 
-if (/^0+$/.test(invoiceNumber)) {
-  invoiceNumber = "";
+if (invoiceValueString !== "") {
+
+  if (!/^\d+$/.test(invoiceValueString)) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message:
+        "Invoice number must contain only digits.",
+    });
+  }
+
+  invoiceNumberValue =
+    Number(invoiceValueString);
 }
 
 
 // ---------------------------------------------------------
-// Only process prefix sequence when invoice number exists
+// Handle prefix sequence
 // ---------------------------------------------------------
 
-if (invoiceNumber) {
+if (invoiceNumberValue !== null) {
 
-  // Extract trailing numeric part.
-  //
-  // SAL1000
-  //   prefix = SAL
-  //   number = 1000
-  //
-  // INV100
-  //   prefix = INV
-  //   number = 100
-  //
-  // AEPL-2627-0086
-  //   prefix = AEPL-2627-
-  //   number = 0086
-  //
-  // 1000
-  //   prefix = None
-  //   number = 1000
-
-  const invoiceMatch = invoiceNumber.match(/^(.*?)(\d+)$/);
-
-  if (!invoiceMatch) {
-    await connection.rollback();
-
-    return res.status(400).json({
-      success: false,
-      message: "Invalid invoice number.",
-    });
-  }
-
-  const invoicePrefix = invoiceMatch[1] || "None";
-  const enteredInvoiceNumber = Number(invoiceMatch[2]);
-
-  if (
-    !Number.isInteger(enteredInvoiceNumber) ||
-    enteredInvoiceNumber < 1
-  ) {
-    await connection.rollback();
-
-    return res.status(400).json({
-      success: false,
-      message: "Invoice number must contain a valid positive number.",
-    });
-  }
-
-
-  // -------------------------------------------------------
-  // Find + LOCK the prefix row.
-  //
-  // Because addSale already started a transaction at the
-  // beginning of this controller, FOR UPDATE keeps this
-  // prefix row locked until commit/rollback.
-  // -------------------------------------------------------
-
-  const [prefixRows] = await connection.execute(
-    `
-    SELECT
-      id,
-      transaction_type,
-      prefix_name,
-      last_number,
-      is_active
-    FROM transactions_prefixes
-    WHERE transaction_type = 'sale'
-      AND prefix_name = ?
-    LIMIT 1
-    FOR UPDATE
-    `,
-    [invoicePrefix]
-  );
-
-
-  // -------------------------------------------------------
-  // Prefix must exist.
-  // -------------------------------------------------------
+  const [prefixRows] =
+    await connection.execute(
+      `
+      SELECT
+        id,
+        transaction_type,
+        prefix_name,
+        last_number,
+        is_active
+      FROM transactions_prefixes
+      WHERE transaction_type = 'sale'
+        AND prefix_name = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [invoicePrefix]
+    );
 
   if (prefixRows.length === 0) {
+
     await connection.rollback();
 
     return res.status(400).json({
       success: false,
-      message: `Invoice prefix "${invoicePrefix}" does not exist.`,
+      message:
+        `Invoice prefix "${invoicePrefix}" does not exist.`,
     });
   }
 
-
-  const prefixRow = prefixRows[0];
+  const prefixRow =
+    prefixRows[0];
 
   const currentLastNumber =
     Number(prefixRow.last_number) || 0;
 
-
-  // -------------------------------------------------------
-  // IMPORTANT:
-  //
-  // NEVER decrease last_number.
-  //
-  // Example:
-  //
-  // last_number = 1000
-  //
-  // SAL1  -> stays 1000
-  // SAL2  -> stays 1000
-  // SAL3  -> stays 1000
-  //
-  // SAL1001 -> becomes 1001
-  // -------------------------------------------------------
-
-  if (enteredInvoiceNumber > currentLastNumber) {
+  // 0 is meaningless, so never update
+  // the sequence to 0.
+  if (
+    invoiceNumberValue >
+    currentLastNumber
+  ) {
 
     await connection.execute(
       `
@@ -779,55 +908,100 @@ if (invoiceNumber) {
       WHERE id = ?
       `,
       [
-        enteredInvoiceNumber,
+        invoiceNumberValue,
         prefixRow.id,
       ]
     );
   }
 }
-    const [saleResult] = await connection.execute(
-      `INSERT INTO add_sale
-       (
-         Party_Id,
-         Billing_Name,
-         Phone_Number,
-         Billing_Address,
-         Invoice_Number,
-         Invoice_Date,
-         Financial_Year,
-         State_Of_Supply,
-         Transaction_Discount_Percentage,
-         Transaction_Discount_Amount,
-         Total_Amount,
-         Round_Off,
-         Total_Received,
-         Balance_Due,
-          Terms_Conditions_Id,
-     Terms_Conditions_Description,
-         created_at,
-         updated_at
-       )
-       VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?, NOW(), NOW())`,
-      [
-        Party_Id,
-        cleanValue(Billing_Name),
-        cleanValue(Phone_Number),
-        cleanValue(Billing_Address),
-        //Invoice_Number,
-        invoiceNumber,
-        Invoice_Date,
-        activeFY,
-        cleanValue(State_Of_Supply),
-        cleanTransactionDiscountPercentage,
-        cleanTransactionDiscountAmount,
-        totalAmount,
-        roundOffValue,
-        totalReceived,
-        balanceDue,
-        termsId,
-        termsDescription,
-      ]
+
+
+// =========================================================
+// BUILD LEGACY INVOICE NUMBER
+// =========================================================
+
+const invoiceNumber =
+  buildLegacyInvoiceNumber(
+    invoicePrefix,
+    invoiceNumberValue
+  );
+  // =========================================================
+// CHECK INVOICE NUMBER UNIQUENESS
+// =========================================================
+
+if (invoiceNumber !== null) {
+
+  const [duplicateRows] =
+    await connection.execute(
+      `
+      SELECT id
+      FROM add_sale
+      WHERE Invoice_Number = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [invoiceNumber]
     );
+
+  if (duplicateRows.length > 0) {
+
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message:
+        `Invoice number "${invoiceNumber}" already exists.`,
+    });
+  }
+}
+   const [saleResult] = await connection.execute(
+  `INSERT INTO add_sale
+   (
+      Party_Id,
+      Billing_Name,
+      Phone_Number,
+      Billing_Address,
+      Invoice_Number,
+      Invoice_Number_Prefix,
+      Invoice_Number_Value,
+      Invoice_Date,
+      Financial_Year,
+      State_Of_Supply,
+      Transaction_Discount_Percentage,
+      Transaction_Discount_Amount,
+      Total_Amount,
+      Round_Off,
+      Total_Received,
+      Balance_Due,
+      Terms_Conditions_Id,
+      Terms_Conditions_Description,
+      created_at,
+      updated_at
+   )
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+  [
+    Party_Id,
+    cleanValue(Billing_Name),
+    cleanValue(Phone_Number),
+    cleanValue(Billing_Address),
+
+    invoiceNumber,
+    invoicePrefix,
+    invoiceNumberValue,
+
+    Invoice_Date,
+    activeFY,
+    cleanValue(State_Of_Supply),
+    cleanTransactionDiscountPercentage,
+    cleanTransactionDiscountAmount,
+    totalAmount,
+    roundOffValue,
+    totalReceived,
+    balanceDue,
+    termsId,
+    termsDescription,
+  ]
+);
 
     const saleIdNumber = saleResult.insertId;
 
@@ -1302,117 +1476,7 @@ const getSingleInvoice = async (req, res, next) => {
   }
 };
 
-// const getAllSales = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
 
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-
-//     const search = req.query.search?.trim().toLowerCase() || "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     const whereClauses = [];
-//     const params = [];
-
-//     // if (search) {
-//     //   whereClauses.push(`(
-//     //     LOWER(a.Party_Name)      LIKE ? OR
-//     //     CAST(s.Total_Amount AS CHAR) LIKE ? OR
-//     //     CAST(s.Balance_Due  AS CHAR) LIKE ?
-//     //   )`);
-//     //   const like = `%${search}%`;
-//     //   params.push(like, like, like);
-//     // }
-//     if (search) {
-//       whereClauses.push(`(
-//         a.Party_Name      LIKE ? OR
-//         CAST(s.Total_Amount AS CHAR) LIKE ? OR
-//         CAST(s.Balance_Due  AS CHAR) LIKE ? OR
-//         s.Invoice_Number LIKE ?
-//       )`);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like);
-//     }
-//     if (fromDate && toDate) {
-//       whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
-//       params.push(`${fromDate} 00:00:00`, `${toDate} 23:59:59`);
-//     } else if (fromDate) {
-//       whereClauses.push(`s.Invoice_Date >= ?`);
-//       params.push(`${fromDate} 00:00:00`);
-//     } else if (toDate) {
-//       whereClauses.push(`s.Invoice_Date <= ?`);
-//       params.push(`${toDate} 23:59:59`);
-//     }
-
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-//     //ORDER BY s.created_at DESC
-//     const [rows] = await connection.query(
-//       `SELECT s.*, a.Party_Name
-//        FROM add_sale s
-//        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//        ${whereSQL}
-//        ORDER BY s.Invoice_Date DESC
-//        LIMIT ? OFFSET ?`,
-//       [...params, limit, offset]
-//     );
-
-//     // 🔹 attach Payment_Type_Display per row from splits
-//     for (const row of rows) {
-//       const [splits] = await connection.query(
-//         `SELECT ps.Payment_Type, ba.Account_Display_Name
-//          FROM payment_splits ps
-//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//          WHERE ps.Source_Type = 'Sale' AND ps.Source_Id = ?`,
-//         [row.id]
-//       );
-
-//       const labels = splits.map((s) =>
-//         s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-//       );
-//       const counts = {};
-//       labels.forEach((l) => (counts[l] = (counts[l] || 0) + 1));
-//       row.Payment_Type_Display = Object.entries(counts)
-//         .map(([label, count]) => (count > 1 ? `${label} (x${count})` : label))
-//         .join(" , ") || "—";
-//     }
-
-//     const [[{ total }]] = await connection.query(
-//       `SELECT COUNT(*) AS total
-//        FROM add_sale s
-//        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     const [[totals]] = await connection.query(
-//       `SELECT
-//          COALESCE(SUM(s.Total_Amount),   0) AS totalAmount,
-//          COALESCE(SUM(s.Balance_Due),    0) AS totalBalance,
-//          COALESCE(SUM(s.Total_Received), 0) AS totalReceived
-//        FROM add_sale s
-//        LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     return res.status(200).json({
-//       currentPage: page,
-//       totalPages: Math.ceil(total / limit),
-//       totalSales: total,
-//       sales: rows,
-//       totals,
-//     });
-//   } catch (err) {
-//     console.error("❌ Error fetching sales:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const getAllSales = async (req, res, next) => {
   let connection;
 
@@ -1971,115 +2035,7 @@ const exportAllSalesReportToExcel = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
-// const getAllNewSales = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
 
-//     const search = req.query.search ? req.query.search.trim().toLowerCase() : "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     console.log("🔍 Params =>", { page, search, fromDate, toDate });
-
-//     let whereClauses = [];
-//     let params = [];
-
-//     // 🔎 Search
-//     if (search) {
-//       whereClauses.push(`
-//         (LOWER(a.Party_Name) LIKE ? 
-//          OR LOWER(s.Payment_Type) LIKE ? 
-//          OR CAST(s.Balance_Due AS CHAR) LIKE ?
-//          OR LOWER(s.Total_Amount) LIKE ?)
-//       `);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like);
-//     }
-
-//     // 📅 Date Range
-//     // if (fromDate && toDate) {
-//     //   whereClauses.push("DATE(s.created_at) BETWEEN ? AND ?");
-//     //   params.push(fromDate, toDate);
-//     // } else if (fromDate) {
-//     //   whereClauses.push("DATE(s.created_at) >= ?");
-//     //   params.push(fromDate);
-//     // } else if (toDate) {
-//     //   whereClauses.push("DATE(s.created_at) <= ?");
-//     //   params.push(toDate);
-//     // }
-//     if (fromDate && toDate) {
-//       whereClauses.push(`s.Invoice_Date BETWEEN ? AND ?`);
-//       params.push(
-//         `${fromDate} 00:00:00`,
-//         `${toDate} 23:59:59`
-//       );
-//     } else if (fromDate) {
-//       whereClauses.push(`s.Invoice_Date >= ?`);
-//       params.push(`${fromDate} 00:00:00`);
-//     } else if (toDate) {
-//       whereClauses.push(`s.Invoice_Date <= ?`);
-//       params.push(`${toDate} 23:59:59`);
-//     }
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-
-//     // 🧠 Main Paginated Query
-//     const query = `
-//       SELECT s.*, a.Party_Name
-//       FROM add_new_sale s
-//       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//       ${whereSQL}
-//       ORDER BY GREATEST(s.updated_at, s.created_at) DESC 
-//       LIMIT ? OFFSET ?
-//     `;
-//     params.push(limit, offset);
-
-//     const [rows] = await db.query(query, params);
-
-//     //const [rows] = await db.query(query, params);
-
-
-//     // const [rows] = await db.query(
-//     //   `SELECT s.*, a.Party_Name 
-//     //    FROM add_sale s
-//     //    LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//     //    ORDER BY s.created_at DESC
-//     //    LIMIT ? OFFSET ?`,
-//     //   [limit, offset]
-//     // );
-//     const [count] = await db.query(
-//       `
-//       SELECT COUNT(*) AS total
-//       FROM add_new_sale s
-//       LEFT JOIN add_party a ON s.Party_Id = a.Party_Id
-//       ${whereSQL}
-//       `,
-//       params.slice(0, params.length - 2)
-//     );
-
-//     // const [count] = await db.query(
-//     //   `SELECT COUNT(*) AS total FROM add_sale`
-//     // )
-//     return res.status(200).json({
-//       currentPage: page,
-//       totalPages: Math.ceil(count[0].total / limit),
-//       totalSales: count[0].total,
-//       sales: rows,
-//     });
-
-//     //return res.status(200).json(rows);
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error fetching purchases:", err);
-//     next(err);
-//     // return res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 //     (
 //   SELECT pa.Address_Text
 //   FROM add_party_addresses pa
@@ -2124,6 +2080,8 @@ const getSingleSale = async (req, res, next) => {
      s.Billing_Name,
      s.Billing_Address,
      s.Invoice_Number,
+     s.Invoice_Number_Prefix,
+     s.Invoice_Number_Value,
      s.Invoice_Date,
      s.State_Of_Supply,
      s.Total_Amount,
@@ -2535,6 +2493,8 @@ const getSingleSale = async (req, res, next) => {
         //Reference_Number: saleHeader.Reference_Number,
         Payment_Type_Display,
         Invoice_Number: saleHeader.Invoice_Number,
+        Invoice_Number_Prefix: saleHeader.Invoice_Number_Prefix,
+        Invoice_Number_Value: saleHeader.Invoice_Number_Value,
         Invoice_Date: saleHeader.Invoice_Date,
         Total_Amount: saleHeader.Total_Amount,
         Round_Off: saleHeader.Round_Off,
@@ -3196,6 +3156,8 @@ const editSale = async (req, res, next) => {
       Party_Name,
       Billing_Name,
       Invoice_Number,
+      Invoice_Number_Prefix,
+  Invoice_Number_Value,
       Phone_Number,        // ← add
       Billing_Address,     // ← add
       Invoice_Date,
@@ -3697,13 +3659,220 @@ const cleanTransactionDiscountAmount =
     ? transactionDiscountAmount
     : null;
     
+// // ---------------------------------------------------------
+// // Get OLD invoice number before updating the sale
+// // ---------------------------------------------------------
+
+// const [oldSaleRows] = await connection.execute(
+//   `
+//   SELECT Invoice_Number
+//   FROM add_sale
+//   WHERE Sale_Id = ?
+//   LIMIT 1
+//   FOR UPDATE
+//   `,
+//   [saleId]
+// );
+
+// const oldInvoiceNumber = String(
+//   oldSaleRows[0]?.Invoice_Number || ""
+// ).trim();
+
+
+// // ---------------------------------------------------------
+// // Current invoice number
+// // ---------------------------------------------------------
+
+// let invoiceNumber = String(Invoice_Number || "").trim();
+
+
+// // ---------------------------------------------------------
+// // SPECIAL CASE:
+// // 000 / 00 / 0000 etc. means blank invoice number.
+// // ---------------------------------------------------------
+
+// if (/^0+$/.test(invoiceNumber)) {
+//   invoiceNumber = "";
+// }
+
+
+// // ---------------------------------------------------------
+// // Handle invoice prefix sequence
+// // ---------------------------------------------------------
+
+// if (invoiceNumber) {
+
+//   const invoiceMatch = invoiceNumber.match(/^(.*?)(\d+)$/);
+
+//   if (!invoiceMatch) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid invoice number.",
+//     });
+//   }
+
+//   const invoicePrefix = invoiceMatch[1] || "None";
+//   const enteredInvoiceNumber = Number(invoiceMatch[2]);
+
+
+//   if (
+//     !Number.isInteger(enteredInvoiceNumber) ||
+//     enteredInvoiceNumber < 1
+//   ) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invoice number must contain a valid positive number.",
+//     });
+//   }
+
+
+//   // -------------------------------------------------------
+//   // If prefix was changed while editing,
+//   // release the old prefix number.
+//   //
+//   // Example:
+//   // SAL3 -> INV2
+//   //
+//   // SAL last_number:
+//   // 3 -> 2
+//   // -------------------------------------------------------
+
+//   if (oldInvoiceNumber && oldInvoiceNumber !== invoiceNumber) {
+
+//     const oldMatch =
+//       oldInvoiceNumber.match(/^(.*?)(\d+)$/);
+
+//     if (oldMatch) {
+
+//       const oldPrefix = oldMatch[1] || "None";
+//       const oldNumber = Number(oldMatch[2]);
+
+
+//       // Only when PREFIX changed
+//       if (oldPrefix !== invoicePrefix) {
+
+//         const [oldPrefixRows] = await connection.execute(
+//           `
+//           SELECT
+//             id,
+//             last_number
+//           FROM transactions_prefixes
+//           WHERE transaction_type = 'sale'
+//             AND prefix_name = ?
+//           LIMIT 1
+//           FOR UPDATE
+//           `,
+//           [oldPrefix]
+//         );
+
+
+//         if (oldPrefixRows.length > 0) {
+
+//           const oldPrefixRow = oldPrefixRows[0];
+
+//           const oldLastNumber =
+//             Number(oldPrefixRow.last_number) || 0;
+
+
+//           // Old bill was the latest bill
+//           if (oldNumber === oldLastNumber) {
+
+//             await connection.execute(
+//               `
+//               UPDATE transactions_prefixes
+//               SET last_number = ?
+//               WHERE id = ?
+//               `,
+//               [
+//                 Math.max(0, oldLastNumber - 1),
+//                 oldPrefixRow.id,
+//               ]
+//             );
+//           }
+//         }
+//       }
+//     }
+//   }
+
+
+//   // -------------------------------------------------------
+//   // Find + LOCK NEW prefix row
+//   // -------------------------------------------------------
+
+//   const [prefixRows] = await connection.execute(
+//     `
+//     SELECT
+//       id,
+//       transaction_type,
+//       prefix_name,
+//       last_number,
+//       is_active
+//     FROM transactions_prefixes
+//     WHERE transaction_type = 'sale'
+//       AND prefix_name = ?
+//     LIMIT 1
+//     FOR UPDATE
+//     `,
+//     [invoicePrefix]
+//   );
+
+
+//   // -------------------------------------------------------
+//   // Prefix must exist
+//   // -------------------------------------------------------
+
+//   if (prefixRows.length === 0) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: `Invoice prefix "${invoicePrefix}" does not exist.`,
+//     });
+//   }
+
+
+//   const prefixRow = prefixRows[0];
+
+//   const currentLastNumber =
+//     Number(prefixRow.last_number) || 0;
+
+
+//   // -------------------------------------------------------
+//   // Update NEW prefix sequence if necessary
+//   // -------------------------------------------------------
+
+//   if (enteredInvoiceNumber > currentLastNumber) {
+
+//     await connection.execute(
+//       `
+//       UPDATE transactions_prefixes
+//       SET last_number = ?
+//       WHERE id = ?
+//       `,
+//       [
+//         enteredInvoiceNumber,
+//         prefixRow.id,
+//       ]
+//     );
+//   }
+// }
+
+
+
 // ---------------------------------------------------------
 // Get OLD invoice number before updating the sale
 // ---------------------------------------------------------
 
 const [oldSaleRows] = await connection.execute(
   `
-  SELECT Invoice_Number
+  SELECT
+    Invoice_Number,
+    Invoice_Number_Prefix,
+    Invoice_Number_Value
   FROM add_sale
   WHERE Sale_Id = ?
   LIMIT 1
@@ -3712,126 +3881,146 @@ const [oldSaleRows] = await connection.execute(
   [saleId]
 );
 
-const oldInvoiceNumber = String(
-  oldSaleRows[0]?.Invoice_Number || ""
-).trim();
+// const oldInvoiceNumber = String(
+//   oldSaleRows[0]?.Invoice_Number || ""
+// ).trim();
+
+const oldInvoicePrefix =
+  String(
+    oldSaleRows[0]?.Invoice_Number_Prefix ?? ""
+  ).trim() || "None";
+
+const oldInvoiceValue =
+  oldSaleRows[0]?.Invoice_Number_Value === null ||
+  oldSaleRows[0]?.Invoice_Number_Value === undefined
+    ? ""
+    : String(oldSaleRows[0].Invoice_Number_Value).trim();
 
 
 // ---------------------------------------------------------
-// Current invoice number
+// Current invoice prefix
 // ---------------------------------------------------------
 
-let invoiceNumber = String(Invoice_Number || "").trim();
+const invoicePrefix =
+  String(Invoice_Number_Prefix ?? "").trim() || "None";
 
 
 // ---------------------------------------------------------
-// SPECIAL CASE:
-// 000 / 00 / 0000 etc. means blank invoice number.
+// Current invoice number value
 // ---------------------------------------------------------
 
-if (/^0+$/.test(invoiceNumber)) {
-  invoiceNumber = "";
+const invoiceValueString =
+  String(Invoice_Number_Value ?? "").trim();
+
+
+// ---------------------------------------------------------
+// Validate invoice number value
+// ---------------------------------------------------------
+
+if (
+  invoiceValueString !== "" &&
+  !/^\d+$/.test(invoiceValueString)
+) {
+  await connection.rollback();
+
+  return res.status(400).json({
+    success: false,
+    message: "Invoice number must contain only digits.",
+  });
 }
+
+
+// ---------------------------------------------------------
+// Convert invoice value
+//
+// Empty = no invoice number
+// 0 / 00 = no invoice number
+// ---------------------------------------------------------
+
+const invoiceNumberValue =
+  invoiceValueString === ""
+    ? null
+    : Number(invoiceValueString);
+
+
+// ---------------------------------------------------------
+// Build legacy Invoice_Number
+//
+// None + 5000 -> "5000"
+// SAL + 5000  -> "SAL5000"
+// None + 0    -> NULL
+// SAL + 0     -> NULL
+// ---------------------------------------------------------
+
+const invoiceNumber = buildLegacyInvoiceNumber(
+  invoicePrefix,
+  invoiceNumberValue
+);
 
 
 // ---------------------------------------------------------
 // Handle invoice prefix sequence
 // ---------------------------------------------------------
 
-if (invoiceNumber) {
+if (invoiceNumberValue !== null) {
 
-  const invoiceMatch = invoiceNumber.match(/^(.*?)(\d+)$/);
+  // -------------------------------------------------------
+  // If old invoice used a different prefix/value,
+  // release old prefix sequence when old number was latest.
+  // -------------------------------------------------------
 
-  if (!invoiceMatch) {
-    await connection.rollback();
-
-    return res.status(400).json({
-      success: false,
-      message: "Invalid invoice number.",
-    });
-  }
-
-  const invoicePrefix = invoiceMatch[1] || "None";
-  const enteredInvoiceNumber = Number(invoiceMatch[2]);
+   const invoicePrefixChanged =
+    oldInvoicePrefix !== invoicePrefix;
 
 
   if (
-    !Number.isInteger(enteredInvoiceNumber) ||
-    enteredInvoiceNumber < 1
-  ) {
-    await connection.rollback();
+    invoicePrefixChanged &&
+    oldInvoiceValue !== "" &&
+    Number(oldInvoiceValue) !== 0
+  ){
 
-    return res.status(400).json({
-      success: false,
-      message: "Invoice number must contain a valid positive number.",
-    });
-  }
+    const oldNumber = Number(oldInvoiceValue);
 
-
-  // -------------------------------------------------------
-  // If prefix was changed while editing,
-  // release the old prefix number.
-  //
-  // Example:
-  // SAL3 -> INV2
-  //
-  // SAL last_number:
-  // 3 -> 2
-  // -------------------------------------------------------
-
-  if (oldInvoiceNumber && oldInvoiceNumber !== invoiceNumber) {
-
-    const oldMatch =
-      oldInvoiceNumber.match(/^(.*?)(\d+)$/);
-
-    if (oldMatch) {
-
-      const oldPrefix = oldMatch[1] || "None";
-      const oldNumber = Number(oldMatch[2]);
+    const [oldPrefixRows] = await connection.execute(
+      `
+      SELECT
+        id,
+        last_number
+      FROM transactions_prefixes
+      WHERE transaction_type = 'sale'
+        AND prefix_name = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [oldInvoicePrefix]
+    );
 
 
-      // Only when PREFIX changed
-      if (oldPrefix !== invoicePrefix) {
+    if (oldPrefixRows.length > 0) {
 
-        const [oldPrefixRows] = await connection.execute(
+      const oldPrefixRow = oldPrefixRows[0];
+
+      const oldLastNumber =
+        Number(oldPrefixRow.last_number) || 0;
+
+
+      // ---------------------------------------------------
+      // Only release if old invoice was the latest number
+      // ---------------------------------------------------
+
+      if (oldNumber === oldLastNumber) {
+
+        await connection.execute(
           `
-          SELECT
-            id,
-            last_number
-          FROM transactions_prefixes
-          WHERE transaction_type = 'sale'
-            AND prefix_name = ?
-          LIMIT 1
-          FOR UPDATE
+          UPDATE transactions_prefixes
+          SET last_number = ?
+          WHERE id = ?
           `,
-          [oldPrefix]
+          [
+            Math.max(0, oldLastNumber - 1),
+            oldPrefixRow.id,
+          ]
         );
-
-
-        if (oldPrefixRows.length > 0) {
-
-          const oldPrefixRow = oldPrefixRows[0];
-
-          const oldLastNumber =
-            Number(oldPrefixRow.last_number) || 0;
-
-
-          // Old bill was the latest bill
-          if (oldNumber === oldLastNumber) {
-
-            await connection.execute(
-              `
-              UPDATE transactions_prefixes
-              SET last_number = ?
-              WHERE id = ?
-              `,
-              [
-                Math.max(0, oldLastNumber - 1),
-                oldPrefixRow.id,
-              ]
-            );
-          }
-        }
       }
     }
   }
@@ -3883,7 +4072,7 @@ if (invoiceNumber) {
   // Update NEW prefix sequence if necessary
   // -------------------------------------------------------
 
-  if (enteredInvoiceNumber > currentLastNumber) {
+  if (invoiceNumberValue > currentLastNumber) {
 
     await connection.execute(
       `
@@ -3892,7 +4081,7 @@ if (invoiceNumber) {
       WHERE id = ?
       `,
       [
-        enteredInvoiceNumber,
+        invoiceNumberValue,
         prefixRow.id,
       ]
     );
@@ -3901,11 +4090,39 @@ if (invoiceNumber) {
 
 
 // ---------------------------------------------------------
-// UPDATE SALE
+// Check duplicate invoice number
 // ---------------------------------------------------------
 
+if (invoiceNumber !== null) {
+
+  const [duplicateRows] = await connection.execute(
+    `
+    SELECT Sale_Id
+    FROM add_sale
+    WHERE Invoice_Number = ?
+      AND Sale_Id <> ?
+    LIMIT 1
+    FOR UPDATE
+    `,
+    [
+      invoiceNumber,
+      saleId,
+    ]
+  );
+
+
+  if (duplicateRows.length > 0) {
+
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: `Invoice number "${invoiceNumber}" already exists.`,
+    });
+  }
+}
 await connection.query(
-  `UPDATE add_sale
+  `UPDATE add_sale 
    SET
       Party_Id = ?,
 
@@ -3914,6 +4131,9 @@ await connection.query(
       Billing_Address = ?,
 
       Invoice_Number = ?,
+      Invoice_Number_Prefix = ?,
+      Invoice_Number_Value = ?,
+
       Invoice_Date = ?,
       State_Of_Supply = ?,
 
@@ -3941,6 +4161,8 @@ await connection.query(
 
     // Invoice number
     invoiceNumber,
+    invoicePrefix,
+    invoiceNumberValue,
 
     Invoice_Date,
     cleanValue(State_Of_Supply),
@@ -3960,9 +4182,6 @@ await connection.query(
     saleId,
   ]
 );
-
-
-
 
     await connection.query(
       `UPDATE sale_return

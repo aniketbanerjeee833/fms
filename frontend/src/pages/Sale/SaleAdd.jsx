@@ -16,7 +16,7 @@ import { useEffect } from "react";
 import { toast } from "react-toastify";
 
 import { useDispatch } from "react-redux";
-import { saleApi, useAddSaleMutation, useGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
+import { saleApi, useAddSaleMutation,  useLazyGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
 import { saleFormSchema } from "../../schema/saleFormSchema";
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -388,6 +388,8 @@ export default function SaleAdd() {
       //Phone_Number: "",
       Billing_Address: "",
       Invoice_Number: "",
+      Invoice_Number_Prefix:"None",
+      Invoice_Number_Value:"",
       Invoice_Date: today,
       State_Of_Supply: "",
       Transaction_Discount_Percentage: "",
@@ -443,38 +445,41 @@ export default function SaleAdd() {
     }
   }, [activeSalePrefix?.prefix_name]);
   console.log(selectedSalePrefix, "selectedSalePrefix");
-  const {
-    data: latestInvoiceNumber,
-    //isFetching: isFetchingInvoiceNumber,
-    //refetch
-  } = useGetLatestInvoiceNumberQuery(
-    selectedSalePrefix,
-    {
-      skip: !selectedSalePrefix,
-    }
-  );
-  console.log(latestInvoiceNumber, "latestInvoiceNumber");
-  useEffect(() => {
-    if (!latestInvoiceNumber?.newInvoiceNumber) return;
+  // const {
+  //   data: latestInvoiceNumber,
+  //   //isFetching: isFetchingInvoiceNumber,
+  //   //refetch
+  // } = useGetLatestInvoiceNumberQuery(
+  //   selectedSalePrefix,
+  //   {
+  //     skip: !selectedSalePrefix,
+  //   }
+  // );
+  const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
+  const [getLatestInvoiceNumber] =
+  useLazyGetLatestInvoiceNumberQuery();
+  //console.log(latestInvoiceNumber, "latestInvoiceNumber");
+  // useEffect(() => {
+  //   if (!latestInvoiceNumber?.newInvoiceNumber) return;
 
-    const number = latestInvoiceNumber.newInvoiceNumber;
+  //   const number = latestInvoiceNumber.newInvoiceNumber;
 
-    setValue(
-      "Invoice_Number",
-      `${selectedSalePrefix === "None"
-        ? ""
-        : selectedSalePrefix
-      }${number}`,
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
-  }, [
-    latestInvoiceNumber,
-    selectedSalePrefix,
-    setValue,
-  ]);
+  //   setValue(
+  //     "Invoice_Number",
+  //     `${selectedSalePrefix === "None"
+  //       ? ""
+  //       : selectedSalePrefix
+  //     }${number}`,
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // }, [
+  //   latestInvoiceNumber,
+  //   selectedSalePrefix,
+  //   setValue,
+  // ]);
   const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
   // force refetch on component mount
   // useEffect(() => {
@@ -2601,7 +2606,7 @@ export default function SaleAdd() {
                     style={{ marginBottom: 0 }}
                   />
                 </div> */}
-                  <div className="flex items-center w-full gap-3">
+                  {/* <div className="flex items-center w-full gap-3">
                     <span
                     className="whitespace-nowrap"
                     style={{
@@ -2611,7 +2616,7 @@ export default function SaleAdd() {
                   >
                     Invoice Number
                   </span>
-                    {/* Prefix Dropdown */}
+                   
                     <div className="relative flex-shrink-0">
                       <select
                         value={selectedSalePrefix}
@@ -2651,7 +2656,7 @@ export default function SaleAdd() {
                      
                     </div>
 
-                    {/* Invoice Number */}
+                
                     <input
                       type="text"
                       id="Invoice_Number"
@@ -2672,7 +2677,135 @@ export default function SaleAdd() {
                     <p className="text-red-500 text-xs pl-[140px]">
                       {errors.Invoice_Number.message}
                     </p>
-                  )}
+                  )} */}
+                  <div className="flex items-center w-full gap-3">
+  <span
+    className="whitespace-nowrap"
+    style={{
+      flexShrink: 0,
+    }}
+  >
+    Invoice Number
+  </span>
+
+  {/* Prefix Dropdown */}
+  <div className="relative flex-shrink-0">
+    <select
+      value={selectedSalePrefix}
+      onChange={async (e) => {
+        const prefix = e.target.value;
+
+        setSelectedSalePrefix(prefix);
+
+        try {
+          // Fetch the next invoice number only when
+          // the prefix is changed.
+          const response =
+            await getLatestInvoiceNumber(
+              prefix,
+              false
+            ).unwrap();
+            setLatestInvoiceNumber(response);
+          const number =
+            response?.newInvoiceNumber;
+
+          if (
+            number === undefined ||
+            number === null
+          ) {
+            return;
+          }
+
+          const numberString =
+            String(number);
+
+          // ---------------------------------------------
+          // Store prefix separately
+          // ---------------------------------------------
+          setValue(
+            "Invoice_Number_Prefix",
+            prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          // ---------------------------------------------
+          // Store numeric value separately
+          // ---------------------------------------------
+          setValue(
+            "Invoice_Number_Value",
+            numberString,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          // ---------------------------------------------
+          // Store combined invoice number
+          // for existing/legacy backend logic
+          // ---------------------------------------------
+          setValue(
+            "Invoice_Number",
+            `${
+              prefix === "None"
+                ? ""
+                : prefix
+            }${numberString}`,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        } catch (error) {
+          console.error(
+            "Failed to get latest invoice number:",
+            error
+          );
+        }
+      }}
+      className="py-1 border-b-2 border-gray-300"
+      style={{
+        marginBottom: 0,
+        minWidth: "100px",
+        height: "32px",
+        border: "1px solid #ccc",
+      }}
+    >
+      {salePrefixes.map((prefix) => (
+        <option
+          key={prefix.id}
+          value={prefix.prefix_name}
+        >
+          {prefix.prefix_name}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {/* Invoice Number - NOT EDITABLE */}
+  <input
+    type="text"
+    id="Invoice_Number"
+    value={watch("Invoice_Number_Value") || ""}
+    placeholder="Invoice Number"
+    readOnly
+    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+    style={{
+      marginBottom: 0,
+      height: "1rem",
+      cursor: "default",
+    }}
+  />
+</div>
+
+{errors?.Invoice_Number && (
+  <p className="text-red-500 text-xs pl-[140px]">
+    {errors.Invoice_Number.message}
+  </p>
+)}
 
                   {/* Invoice Date */}
                   <div className="flex items-center w-full gap-3">

@@ -462,6 +462,9 @@ export default function SaleReturndEdit() {
     defaultValues: {
       Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
       Return_Number: "",
+      Return_Number_Prefix: "None",
+      Return_Number_Value: "",
+
       Party_Name: "",
       GSTIN: "",
       Invoice_Number: "",
@@ -1071,11 +1074,9 @@ const [getLatestSaleReturnNumber] =
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
-  const [originalReturnPrefix, setOriginalReturnPrefix] =
-  useState("None");
+  const [originalReturnPrefix, setOriginalReturnPrefix] =useState("None");
 
-const [originalReturnNumberPart, setOriginalReturnNumberPart] =
-  useState("");
+const [originalReturnNumberPart, setOriginalReturnNumberPart] =useState("");
 //   useEffect(() => {
 //     if (sale) {
 // //     const savedReturnNumber =
@@ -1345,74 +1346,122 @@ const [originalReturnNumberPart, setOriginalReturnNumberPart] =
     // Invalidate any previous prefix-number request
     ++returnPrefixRequestRef.current;
 
-    const savedReturnNumber = String(
-      sale?.saleReturn?.Return_Number || ""
-    ).trim();
+    // const savedReturnNumber = String(
+    //   sale?.saleReturn?.Return_Number || ""
+    // ).trim();
 
-    const returnMatch =
-      savedReturnNumber.match(/^(.*?)(\d+)$/);
+    // const returnMatch =
+    //   savedReturnNumber.match(/^(.*?)(\d+)$/);
 
-    if (returnMatch) {
-      // =====================================================
-      // NORMAL NUMBER
-      //
-      // SAL3 -> SAL | 3
-      // SAL100 -> SAL | 100
-      // =====================================================
+    // if (returnMatch) {
+    //   // =====================================================
+    //   // NORMAL NUMBER
+    //   //
+    //   // SAL3 -> SAL | 3
+    //   // SAL100 -> SAL | 100
+    //   // =====================================================
 
-      const prefix = returnMatch[1] || "None";
-      const number = returnMatch[2];
+    //   const prefix = returnMatch[1] || "None";
+    //   const number = returnMatch[2];
 
-      setReturnPrefix(prefix);
-      setReturnNumberPart(number);
-      setSelectedSaleReturnPrefix(prefix);
+    //   setReturnPrefix(prefix);
+    //   setReturnNumberPart(number);
+    //   setSelectedSaleReturnPrefix(prefix);
 
-      // Keep ref in sync
-      selectedReturnPrefixRef.current = prefix;
+    //   // Keep ref in sync
+    //   selectedReturnPrefixRef.current = prefix;
 
-      // Remember original return number
-      setOriginalReturnPrefix(prefix);
-      setOriginalReturnNumberPart(number);
+    //   // Remember original return number
+    //   setOriginalReturnPrefix(prefix);
+    //   setOriginalReturnNumberPart(number);
 
-    } else if (savedReturnNumber) {
+    // } else if (savedReturnNumber) {
 
-      // =====================================================
-      // PREFIX ONLY
-      //
-      // SAL -> SAL | empty
-      // INV -> INV | empty
-      //
-      // This means the bill previously had 00.
-      // =====================================================
+    //   // =====================================================
+    //   // PREFIX ONLY
+    //   //
+    //   // SAL -> SAL | empty
+    //   // INV -> INV | empty
+    //   //
+    //   // This means the bill previously had 00.
+    //   // =====================================================
 
-      setReturnPrefix(savedReturnNumber);
-      setReturnNumberPart("");
-      setSelectedSaleReturnPrefix(savedReturnNumber);
+    //   setReturnPrefix(savedReturnNumber);
+    //   setReturnNumberPart("");
+    //   setSelectedSaleReturnPrefix(savedReturnNumber);
 
-      // Keep ref in sync
-      selectedReturnPrefixRef.current = savedReturnNumber;
+    //   // Keep ref in sync
+    //   selectedReturnPrefixRef.current = savedReturnNumber;
 
-      // Remember original prefix-only value
-      setOriginalReturnPrefix(savedReturnNumber);
-      setOriginalReturnNumberPart("");
+    //   // Remember original prefix-only value
+    //   setOriginalReturnPrefix(savedReturnNumber);
+    //   setOriginalReturnNumberPart("");
 
-    } else {
+    // } else {
 
-      // =====================================================
-      // COMPLETELY EMPTY
-      // =====================================================
+    //   // =====================================================
+    //   // COMPLETELY EMPTY
+    //   // =====================================================
 
-      setReturnPrefix("None");
-      setReturnNumberPart("");
-      setSelectedSaleReturnPrefix("None");
+    //   setReturnPrefix("None");
+    //   setReturnNumberPart("");
+    //   setSelectedSaleReturnPrefix("None");
 
-      // Keep ref in sync
-      selectedReturnPrefixRef.current = "None";
+    //   // Keep ref in sync
+    //   selectedReturnPrefixRef.current = "None";
 
-      setOriginalReturnPrefix("None");
-      setOriginalReturnNumberPart("");
-    }
+    //   setOriginalReturnPrefix("None");
+    //   setOriginalReturnNumberPart("");
+    // }
+// ---------------------------------------------------------
+// LOAD SAVED RETURN NUMBER
+//
+// Prefix and numeric value are now stored separately.
+// Do NOT extract them from Return_Number.
+// ---------------------------------------------------------
 
+const savedReturnPrefix =
+  String(
+    sale?.saleReturn?.Return_Number_Prefix ?? ""
+  ).trim() || "None";
+
+const savedReturnValue =
+  sale?.saleReturn?.Return_Number_Value;
+
+const savedReturnNumberPart =
+  savedReturnValue === null ||
+  savedReturnValue === undefined
+    ? ""
+    : String(savedReturnValue);
+
+
+// ---------------------------------------------------------
+// SET RETURN NUMBER UI
+// ---------------------------------------------------------
+
+setReturnPrefix(savedReturnPrefix);
+
+setReturnNumberPart(savedReturnNumberPart);
+
+setSelectedSaleReturnPrefix(savedReturnPrefix);
+
+
+// Keep ref in sync
+selectedReturnPrefixRef.current =savedReturnPrefix;
+
+
+// ---------------------------------------------------------
+// REMEMBER ORIGINAL RETURN NUMBER
+//
+// Needed when user changes prefix and then changes
+// back to the original prefix.
+// ---------------------------------------------------------
+
+setOriginalReturnPrefix(savedReturnPrefix);
+
+setOriginalReturnNumberPart(
+  savedReturnNumberPart
+);
     // IMPORTANT:
     // Do NOT use setIsReturnPrefixChanged(false) anymore.
     // We are replacing that logic with the request ref.
@@ -1574,11 +1623,12 @@ const [originalReturnNumberPart, setOriginalReturnNumberPart] =
         ) ||
         new Date().toISOString().slice(0, 10),
 
-      Return_Number:
-        sale.saleReturn?.Return_Number || "",
+      Return_Number:sale.saleReturn?.Return_Number || "",
+       Return_Number_Prefix:sale.saleReturn?.Return_Number_Prefix || "None",
 
-      Party_Name:
-        sale.saleReturn?.Party_Name || "",
+  Return_Number_Value:sale.saleReturn?.Return_Number_Value ?? "",
+
+      Party_Name:sale.saleReturn?.Party_Name || "",
 
       GSTIN:
         sale.saleReturn?.GSTIN || "",
@@ -2931,13 +2981,13 @@ onChange={(e) => {
     </p>
   )}
 </div> */}
-<div className="flex items-center w-full gap-3">
+{/* <div className="flex items-center w-full gap-3">
   <span className="whitespace-nowrap">
     Return Number
-    {/* <span className="text-red-500">*</span> */}
+   
   </span>
 
-  {/* Prefix Dropdown */}
+
   <div className="relative flex-shrink-0">
     <select
       value={selectedSaleReturnPrefix}
@@ -3114,7 +3164,7 @@ onChange={(e) => {
     </select>
   </div>
 
-  {/* Editable Return Number */}
+
   <input
     type="text"
     value={returnNumberPart}
@@ -3154,6 +3204,271 @@ onChange={(e) => {
   {errors?.Return_Number && (
     <p className="text-red-500 text-xs mt-1">
       {errors?.Return_Number?.message}
+    </p>
+  )}
+</div> */}
+
+<div className="flex items-center w-full gap-3">
+  <span className="whitespace-nowrap">
+    Return Number
+    {/* <span className="text-red-500">*</span> */}
+  </span>
+
+  {/* Prefix Dropdown */}
+  <div className="relative flex-shrink-0">
+    <select
+      value={selectedSaleReturnPrefix}
+      onChange={async (e) => {
+        const prefix = e.target.value;
+
+        // -------------------------------------------------
+        // Every new selection gets a new request ID.
+        // This prevents an older API response from
+        // overwriting the latest selected prefix.
+        // -------------------------------------------------
+        const requestId =
+          ++returnPrefixRequestRef.current;
+
+        // Keep ref immediately in sync
+        selectedReturnPrefixRef.current = prefix;
+
+        setSelectedSaleReturnPrefix(prefix);
+        setReturnPrefix(prefix);
+
+        // -------------------------------------------------
+        // Switching back to original prefix
+        // -------------------------------------------------
+        // -------------------------------------------------
+// Switching back to original prefix
+// -------------------------------------------------
+if (prefix === originalReturnPrefix) {
+
+  // Restore original numeric value ONLY if it
+  // is a meaningful non-zero number.
+  if (
+    originalReturnNumberPart !== "" &&
+    Number(originalReturnNumberPart) !== 0
+  ) {
+    setReturnNumberPart(
+      originalReturnNumberPart
+    );
+
+    setValue(
+      "Return_Number_Prefix",
+      prefix,
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    setValue(
+      "Return_Number_Value",
+      originalReturnNumberPart,
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    return;
+  }
+
+  // Original value was empty or 0.
+  // Do NOT restore 0.
+  // Continue below and fetch the latest
+  // number for this prefix.
+
+  setReturnNumberPart("");
+
+  setValue(
+    "Return_Number_Prefix",
+    prefix,
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+
+  setValue(
+    "Return_Number_Value",
+    "",
+    {
+      shouldValidate: true,
+      shouldDirty: true,
+    }
+  );
+} else {
+          // -------------------------------------------------
+          // Different prefix
+          // Clear current number while fetching
+          // the latest number for the new prefix.
+          // -------------------------------------------------
+          setReturnNumberPart("");
+
+          setValue(
+            "Return_Number_Prefix",
+            prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Return_Number_Value",
+            "",
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        }
+
+        // -------------------------------------------------
+        // Fetch latest number for selected prefix
+        // -------------------------------------------------
+        try {
+          const response =
+            await getLatestSaleReturnNumber(
+              prefix,
+              false
+            ).unwrap();
+
+          // -------------------------------------------------
+          // Ignore stale response
+          // -------------------------------------------------
+          if (
+            requestId !==
+            returnPrefixRequestRef.current
+          ) {
+            return;
+          }
+
+          if (
+            selectedReturnPrefixRef.current !==
+            prefix
+          ) {
+            return;
+          }
+
+          const nextNumber =
+            response?.newReturnNumber;
+
+          if (
+            nextNumber === undefined ||
+            nextNumber === null
+          ) {
+            return;
+          }
+
+          const nextNumberString =
+            String(nextNumber);
+
+          setReturnNumberPart(
+            nextNumberString
+          );
+
+          setValue(
+            "Return_Number_Prefix",
+            prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Return_Number_Value",
+            nextNumberString,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        } catch (error) {
+          // Ignore stale request errors
+          if (
+            requestId !==
+            returnPrefixRequestRef.current
+          ) {
+            return;
+          }
+
+          console.error(
+            "Failed to get latest sale return number:",
+            error
+          );
+        }
+      }}
+      className="py-1 border-b-2 border-gray-300"
+      style={{
+        marginBottom: 0,
+        minWidth: "100px",
+        height: "32px",
+        border: "1px solid #ccc",
+      }}
+    >
+      {saleReturnPrefixes.map((prefix) => (
+        <option
+          key={prefix.id}
+          value={prefix.prefix_name}
+        >
+          {prefix.prefix_name}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {/* Editable Return Number Value */}
+  <input
+    type="text"
+    value={returnNumberPart}
+    placeholder="Return Number"
+    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+    style={{
+      marginBottom: 0,
+      height: "1.5rem",
+    }}
+    onChange={(e) => {
+      // -------------------------------------------------
+      // Manual editing invalidates any pending API request.
+      // -------------------------------------------------
+      ++returnPrefixRequestRef.current;
+
+      const number =
+        e.target.value.replace(/\D/g, "");
+
+      setReturnNumberPart(number);
+
+      // -------------------------------------------------
+      // NEW:
+      // Store prefix and numeric value separately.
+      // Do NOT build Return_Number here.
+      // -------------------------------------------------
+      setValue(
+        "Return_Number_Prefix",
+        selectedSaleReturnPrefix || "None",
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setValue(
+        "Return_Number_Value",
+        number,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+    }}
+  />
+
+  {errors?.Return_Number_Value && (
+    <p className="text-red-500 text-xs mt-1">
+      {errors?.Return_Number_Value?.message}
     </p>
   )}
 </div>

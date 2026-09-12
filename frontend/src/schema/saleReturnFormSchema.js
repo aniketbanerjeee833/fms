@@ -70,7 +70,22 @@ export const saleReturnFormSchema = z.object({
   ),
 
   /* ── Return-specific fields — both optional now ── */
-  Return_Number: z.string().optional().default(""),
+  //Return_Number: z.string().optional().default(""),
+  Return_Number_Prefix: z
+  .string()
+  .optional()
+  .default("None"),
+
+Return_Number_Value: z
+  .union([z.string(), z.number(), z.null(), z.undefined()])
+  .transform((val) => String(val ?? "").trim())
+  .refine(
+    (val) => val === "" || /^\d+$/.test(val),
+    {
+      message: "Return_Number_Value must contain only digits",
+    }
+  )
+  .transform((val) => (val === "" ? null : Number(val))),
 
   Return_Date: z
     .string()

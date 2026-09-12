@@ -12,7 +12,7 @@ import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsF
 import { toast } from "react-toastify";
 
 
-import {  useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { useGetSingleSaleQuery } from "../../redux/api/saleApi";
 
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -20,7 +20,7 @@ import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 
-import { saleReturnApi, useCreateSaleReturnMutation,  useLazyGetLatestSaleReturnNumberQuery } from "../../redux/api/saleReturnApi";
+import { saleReturnApi, useCreateSaleReturnMutation, useLazyGetLatestSaleReturnNumberQuery } from "../../redux/api/saleReturnApi";
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
@@ -389,6 +389,8 @@ export default function SaleReturnAdd() {
     defaultValues: {
       Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
       Return_Number: "",
+      Return_Number_Prefix: "None",
+      Return_Number_Value: "",
       Party_Name: "",
       GSTIN: "",
       Invoice_Number: "",
@@ -456,8 +458,8 @@ export default function SaleReturnAdd() {
   //   }
   // );
   // console.log(latestSaleReturnNumber, "latestSaleReturnNumber");
-const [triggerLatestSaleReturnNumber] =
-  useLazyGetLatestSaleReturnNumberQuery();
+  const [triggerLatestSaleReturnNumber] =
+    useLazyGetLatestSaleReturnNumberQuery();
   const [returnNumberPart, setReturnNumberPart] = useState("");
   // useEffect(() => {
   //   if (!latestSaleReturnNumber?.newReturnNumber) return;
@@ -1413,12 +1415,12 @@ const [triggerLatestSaleReturnNumber] =
       //     "SaleReturn",
       //   ])
       // );
-     dispatch(
-  saleReturnApi.util.invalidateTags([
-    "SaleReturn",
-    { type: "SaleReturn", id: "LATEST_RETURN" },
-  ])
-);
+      dispatch(
+        saleReturnApi.util.invalidateTags([
+          "SaleReturn",
+          { type: "SaleReturn", id: "LATEST_RETURN" },
+        ])
+      );
 
 
       dispatch(
@@ -2132,7 +2134,7 @@ const [triggerLatestSaleReturnNumber] =
                     </p>
                   )}
                 </div> */}
-                 {/* Return Number */}
+                  {/* Return Number */}
                   {/* <div className="flex items-center w-full gap-3 justify-end">
                     <span className="whitespace-nowrap">
                       Return Number
@@ -2199,129 +2201,234 @@ const [triggerLatestSaleReturnNumber] =
                       </p>
                     )}
                   </div> */}
+                  {/* <div className="flex items-center w-full gap-3 justify-end">
+                    <span className="whitespace-nowrap">
+                      Return Number
+                     
+                    </span>
+
+                   
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={selectedSaleReturnPrefix}
+                        onChange={async (e) => {
+                          const prefix = e.target.value;
+
+                          setSelectedSaleReturnPrefix(prefix);
+
+                          try {
+                            // Call latest number API for the selected prefix
+                            const response =
+                              await triggerLatestSaleReturnNumber(prefix).unwrap();
+
+                            const number =
+                              response?.newReturnNumber || "";
+
+                            // Show only numeric part in input
+                            setReturnNumberPart(String(number));
+
+                            // Store complete value in form
+                            setValue(
+                              "Return_Number",
+                              `${prefix === "None"
+                                ? ""
+                                : prefix
+                              }${number}`,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                          } catch (error) {
+                            console.error(
+                              "Failed to get latest sale return number:",
+                              error
+                            );
+
+                            setReturnNumberPart("");
+
+                            setValue(
+                              "Return_Number",
+                              prefix === "None" ? "" : prefix,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                          }
+                        }}
+                        className="py-1 border-b-2 border-gray-300"
+                        style={{
+                          marginBottom: 0,
+                          minWidth: "100px",
+                          height: "32px",
+                          border: "1px solid #ccc",
+                        }}
+                      >
+                        {saleReturnPrefixes.map((prefix) => (
+                          <option
+                            key={prefix.id}
+                            value={prefix.prefix_name}
+                          >
+                            {prefix.prefix_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    
+                    <input
+                      type="text"
+                      id="Return_Number"
+                      value={returnNumberPart}
+                      placeholder="Return Number"
+                      onChange={(e) => {
+                        // Only allow numbers
+                        const number = e.target.value.replace(/\D/g, "");
+
+                        setReturnNumberPart(number);
+
+                        // Build complete return number
+                        const fullReturnNumber =
+                          selectedSaleReturnPrefix === "None"
+                            ? number
+                            : `${selectedSaleReturnPrefix}${number}`;
+
+                        setValue(
+                          "Return_Number",
+                          fullReturnNumber,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+                      }}
+                      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+                      style={{
+                        marginBottom: 0,
+                        height: "1rem",
+                      }}
+                    />
+
+                    {errors?.Return_Number && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Return_Number?.message}
+                      </p>
+                    )}
+                  </div> */}
                   <div className="flex items-center w-full gap-3 justify-end">
-  <span className="whitespace-nowrap">
-    Return Number
-    {/* <span className="text-red-500">*</span> */}
-  </span>
+                    <span className="whitespace-nowrap">
+                      Return Number
+                      {/* <span className="text-red-500">*</span> */}
+                    </span>
 
-  {/* Prefix Dropdown */}
-  <div className="relative flex-shrink-0">
-    <select
-      value={selectedSaleReturnPrefix}
-      onChange={async (e) => {
-        const prefix = e.target.value;
+                    {/* Prefix Dropdown */}
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={selectedSaleReturnPrefix}
+                        onChange={async (e) => {
+                          const prefix = e.target.value;
 
-        setSelectedSaleReturnPrefix(prefix);
+                          setSelectedSaleReturnPrefix(prefix);
 
-        try {
-          // Call latest number API for the selected prefix
-          const response =
-            await triggerLatestSaleReturnNumber(prefix).unwrap();
+                          try {
+                            // Get latest number for the selected prefix
+                            const response = await triggerLatestSaleReturnNumber(prefix).unwrap();
 
-          const number =
-            response?.newReturnNumber || "";
+                            const number = response?.newReturnNumber ?? "";
 
-          // Show only numeric part in input
-          setReturnNumberPart(String(number));
+                            // Show only numeric part in the input
+                            setReturnNumberPart(String(number));
 
-          // Store complete value in form
-          setValue(
-            "Return_Number",
-            `${
-              prefix === "None"
-                ? ""
-                : prefix
-            }${number}`,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        } catch (error) {
-          console.error(
-            "Failed to get latest sale return number:",
-            error
-          );
+                            // Store prefix separately
+                            setValue("Return_Number_Prefix", prefix, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
-          setReturnNumberPart("");
+                            // Store numeric value separately
+                            setValue("Return_Number_Value", String(number), {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          } catch (error) {
+                            console.error(
+                              "Failed to get latest sale return number:",
+                              error
+                            );
 
-          setValue(
-            "Return_Number",
-            prefix === "None" ? "" : prefix,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        }
-      }}
-      className="py-1 border-b-2 border-gray-300"
-      style={{
-        marginBottom: 0,
-        minWidth: "100px",
-        height: "32px",
-        border: "1px solid #ccc",
-      }}
-    >
-      {saleReturnPrefixes.map((prefix) => (
-        <option
-          key={prefix.id}
-          value={prefix.prefix_name}
-        >
-          {prefix.prefix_name}
-        </option>
-      ))}
-    </select>
-  </div>
+                            setReturnNumberPart("");
 
-  {/* Return Number - Editable */}
-  <input
-    type="text"
-    id="Return_Number"
-    value={returnNumberPart}
-    placeholder="Return Number"
-    onChange={(e) => {
-      // Only allow numbers
-      const number = e.target.value.replace(/\D/g, "");
+                            // Still store the selected prefix
+                            setValue("Return_Number_Prefix", prefix, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
-      setReturnNumberPart(number);
+                            // Clear numeric value if API fails
+                            setValue("Return_Number_Value", "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }
+                        }}
+                        className="py-1 border-b-2 border-gray-300"
+                        style={{
+                          marginBottom: 0,
+                          minWidth: "100px",
+                          height: "32px",
+                          border: "1px solid #ccc",
+                        }}
+                      >
+                        {saleReturnPrefixes.map((prefix) => (
+                          <option
+                            key={prefix.id}
+                            value={prefix.prefix_name}
+                          >
+                            {prefix.prefix_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-      // Build complete return number
-      const fullReturnNumber =
-        selectedSaleReturnPrefix === "None"
-          ? number
-          : `${selectedSaleReturnPrefix}${number}`;
+                    {/* Return Number - Editable Numeric Part */}
+                    <input
+                      type="text"
+                      id="Return_Number_Value"
+                      value={returnNumberPart}
+                      placeholder="Return Number"
+                      onChange={(e) => {
+                        // Only allow numbers
+                        const number = e.target.value.replace(/\D/g, "");
 
-      setValue(
-        "Return_Number",
-        fullReturnNumber,
-        {
-          shouldValidate: true,
-          shouldDirty: true,
-        }
-      );
-    }}
-    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
-    style={{
-      marginBottom: 0,
-      height: "1rem",
-    }}
-  />
+                        setReturnNumberPart(number);
 
-  {errors?.Return_Number && (
-    <p className="text-red-500 text-xs mt-1">
-      {errors?.Return_Number?.message}
-    </p>
-  )}
-</div>
+                        // Store ONLY numeric value
+                        setValue("Return_Number_Value", number, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }}
+                      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+                      style={{
+                        marginBottom: 0,
+                        height: "1rem",
+                      }}
+                    />
+
+                    {errors?.Return_Number_Value && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Return_Number_Value?.message}
+                      </p>
+                    )}
+                  </div>
                   <div className="flex items-center w-full gap-3  justify-end">
                     {/* <div className="row  "> */}
 
                     {/* Invoice Number */}
                     {/* <div className="input-field col s6 mt-4"> */}
                     <span className="whitespace-nowrap ">
-                      Invoice Number 
+                      Invoice Number
                       {/* <span className="text-red-500">*</span> */}
                     </span>
 
