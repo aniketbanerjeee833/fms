@@ -327,7 +327,7 @@ export default function AllPurchaseList() {
         }}
       > */}
         <div
-        className="flex flex-col bg-white"
+        className="all-purchase-page flex flex-col bg-white"
         style={{
           height: "100%",
           minHeight: 0,
