@@ -14,7 +14,7 @@ import {
 const TRANSACTION_PREFIX_TYPES = {
   sale: "Sale",
   //credit_note: "Credit Note",
-  //debit_note: "Debit Note",
+  sale_return: "Credit Note",
 };
 
 // =========================================================

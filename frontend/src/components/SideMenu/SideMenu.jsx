@@ -306,7 +306,7 @@ if (
          
                {renderMenu("Sales", <IndianRupee size={20} />, [
             { to: "/sale/all-sales", text: "  Sale Invoices" },
-           {to: "/sale/invoice", text: " Invoice" },
+          //  {to: "/sale/invoice", text: " Invoice" },
             //{ to: "/sale/add", text: "Add Sale" },
               { to: "/sale/return", text: "Sale Return" },
              { to: "/sale/payment-in", text: "Payment In" },

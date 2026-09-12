@@ -167,14 +167,24 @@
 @media screen and (max-width: 481px) {}
 
 @media (max-width: 767px) {
-    .app-content {
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
+    /* Break the fixed-height flex chain — let the whole page scroll naturally */
+    .app-layout {
+        position: relative !important; /* was fixed — stop pinning to viewport */
+        height: auto !important;
+        min-height: 100vh !important;
+        display: block !important; /* was grid with sidebar column — stack instead */
     }
 
-    .all-purchase-page {
-        height: auto !important;
-        min-height: 100% !important;
-        overflow: visible !important;
+    .app-sidebar {
+        display: none !important; /* assuming mobile uses a different nav, e.g. bottom tab bar */
     }
+
+    .app-content {
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important; /* was hidden — let content flow naturally */
+        display: block !important; /* was flex column with overflow:hidden */
+    }
+
+   
 }

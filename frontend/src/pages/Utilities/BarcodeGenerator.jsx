@@ -466,6 +466,7 @@ export default function BarcodeGenerator() {
 
                 // Existing item found
                 setSelectedItem(matchedItem);
+                setBarcodeValue(matchedItem.Item_Code);
                 setItemSearch(matchedItem.Item_Name || "");
                 setItemDropdownOpen(false);
 
@@ -721,13 +722,7 @@ export default function BarcodeGenerator() {
             printTriggerRef.current();
         }
     };
-    //     const handleGenerate = () => {
-    //     if (barcodeItems.length === 0) return;
-
-    //     setTimeout(() => {
-    //         window.print();
-    //     }, 100);
-    // };
+   console.log(selectedItem,"selectedItem");
     return (
         <>
             {/* <div className="flex flex-col bg-white" style={{ minHeight: "100%" }}> */}

@@ -108,6 +108,14 @@ export const saleReturnApi = createApi({
       providesTags: (_r, _e, id) => [{ type: "SaleReturn", id }],
     }),
 
+    getLatestSaleReturnNumber: builder.query({
+    query: (prefix) => ({
+        url: `/sale-return/get-latest-return-number`,
+        params: { prefix },
+    }),
+    providesTags: [{ type: "SaleReturn", id: "LATEST_RETURN" }],
+}),
+
     /* CREATE */
     createSaleReturn: builder.mutation({
       query: ({ Sale_Id, ...body }) => ({
@@ -161,5 +169,6 @@ export const {
   useCreateSaleReturnMutation,
   useUpdateSaleReturnMutation,
   useDeleteSaleReturnMutation,
-  useLazyGetSaleReturnPrintReportQuery
+  useLazyGetSaleReturnPrintReportQuery,
+  useLazyGetLatestSaleReturnNumberQuery
 } = saleReturnApi;

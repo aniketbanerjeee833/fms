@@ -486,6 +486,7 @@ export default function SaleReturn() {
                 <div
                   style={{
                     display: "grid",
+                    //gridTemplateColumns: "0.7fr 1.3fr 1.2fr 2.5fr 1.5fr 1.2fr 1.2fr 0.5fr",
                     gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     width: "100%",
                     //minWidth: "1062px",
@@ -502,7 +503,9 @@ export default function SaleReturn() {
                   }}
                 >
                   <div>Sl.No</div>
-                  <div>Invoice Date</div>
+                  {/* <div>Invoice Date</div> */}
+                  <div>Ref No</div>
+                   {/* <div>Return Date</div> */}
                   <div>Party Name</div>
                   <div>Payment Type</div>
                   <div>Amount</div>
@@ -587,6 +590,7 @@ export default function SaleReturn() {
                           }}
                           style={{
                             display: "grid",
+                            //gridTemplateColumns: "0.7fr 1.3fr 1.2fr 2.5fr 1.5fr 1.2fr 1.2fr 0.5fr",
                             gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
                             //gridTemplateColumns:"70px 120px minmax(180px, 1fr) 160px 120px 120px 120px 50px",
                             alignItems: "center",
@@ -607,9 +611,9 @@ export default function SaleReturn() {
                             {idx + 1}.
                           </div>
 
-                          {/* INVOICE DATE */}
+                          {/* RETURN DATE */}
 
-                          <div>
+                          {/* <div>
                             {saleReturn?.Invoice_Date
                               ? new Date(
                                 saleReturn.Invoice_Date
@@ -622,7 +626,26 @@ export default function SaleReturn() {
                                 }
                               )
                               : "N/A"}
+                          </div> */}
+                          <div className="table-desi-cell">
+                          
+                            {saleReturn?.Return_Number ??
+                              ""}
                           </div>
+                            {/* <div>
+                            {saleReturn?.Return_Date
+                              ? new Date(
+                                saleReturn.Return_Date
+                              ).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "numeric",
+                                  month: "numeric",
+                                  year: "numeric",
+                                }
+                              )
+                              : "N/A"}
+                          </div> */}
 
                           {/* PARTY */}
 

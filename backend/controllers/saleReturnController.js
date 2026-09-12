@@ -1077,6 +1077,373 @@ const createSaleReturn = async (req, res, next) => {
       transactionDiscountAmount > 0
         ? transactionDiscountAmount
         : null;
+        // =========================================================
+// RETURN NUMBER PREFIX SEQUENCE
+// =========================================================
+
+// let returnNumber = String(Return_Number || "").trim();
+
+// // ---------------------------------------------------------
+// // SPECIAL CASE:
+// // 000 / 00 / 0000 etc. means blank return number.
+// // No error.
+// // ---------------------------------------------------------
+
+// if (/^0+$/.test(returnNumber)) {
+//   returnNumber = "";
+// }
+
+
+// // ---------------------------------------------------------
+// // Only process prefix sequence when return number exists
+// // ---------------------------------------------------------
+
+// if (returnNumber) {
+
+//   // Extract trailing numeric part.
+//   //
+//   // CN1000
+//   //   prefix = CN
+//   //   number = 1000
+//   //
+//   // CRN100
+//   //   prefix = CRN
+//   //   number = 100
+//   //
+//   // AEPL-2627-0086
+//   //   prefix = AEPL-2627-
+//   //   number = 0086
+//   //
+//   // 1000
+//   //   prefix = None
+//   //   number = 1000
+
+//   const returnMatch = returnNumber.match(/^(.*?)(\d+)$/);
+
+//   if (!returnMatch) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid return number.",
+//     });
+//   }
+
+//   const returnPrefix = returnMatch[1] || "None";
+//   const enteredReturnNumber = Number(returnMatch[2]);
+
+//   if (
+//     !Number.isInteger(enteredReturnNumber) ||
+//     enteredReturnNumber < 1
+//   ) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Return number must contain a valid positive number.",
+//     });
+//   }
+
+
+//   // -------------------------------------------------------
+//   // Find + LOCK the return prefix row.
+//   //
+//   // createSaleReturn already started a transaction at the
+//   // beginning of this controller.
+//   //
+//   // FOR UPDATE keeps this prefix row locked until
+//   // commit/rollback.
+//   // -------------------------------------------------------
+
+//   const [prefixRows] = await connection.execute(
+//     `
+//     SELECT
+//       id,
+//       transaction_type,
+//       prefix_name,
+//       last_number,
+//       is_active
+//     FROM transactions_prefixes
+//     WHERE transaction_type = 'sale_return'
+//       AND prefix_name = ?
+//     LIMIT 1
+//     FOR UPDATE
+//     `,
+//     [returnPrefix]
+//   );
+
+
+//   // -------------------------------------------------------
+//   // Prefix must exist.
+//   // -------------------------------------------------------
+
+//   if (prefixRows.length === 0) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: `Return prefix "${returnPrefix}" does not exist.`,
+//     });
+//   }
+
+
+//   const prefixRow = prefixRows[0];
+
+//   const currentLastNumber =
+//     Number(prefixRow.last_number) || 0;
+
+
+//   // -------------------------------------------------------
+//   // IMPORTANT:
+//   //
+//   // NEVER decrease last_number.
+//   //
+//   // Example:
+//   //
+//   // last_number = 1000
+//   //
+//   // CN1    -> stays 1000
+//   // CN2    -> stays 1000
+//   // CN3    -> stays 1000
+//   //
+//   // CN1001 -> becomes 1001
+//   // -------------------------------------------------------
+
+//   if (enteredReturnNumber > currentLastNumber) {
+
+//     await connection.execute(
+//       `
+//       UPDATE transactions_prefixes
+//       SET last_number = ?
+//       WHERE id = ?
+//       `,
+//       [
+//         enteredReturnNumber,
+//         prefixRow.id,
+//       ]
+//     );
+//   }
+// }
+// =========================================================
+// RETURN NUMBER PREFIX SEQUENCE
+// =========================================================
+
+let returnNumber = String(Return_Number || "").trim();
+
+// ---------------------------------------------------------
+// Extract prefix + numeric part
+//
+// Examples:
+//
+// 00        -> prefix = None, number = 0
+// SAL0      -> prefix = SAL,  number = 0
+// SAL00     -> prefix = SAL,  number = 0
+// SAL000    -> prefix = SAL,  number = 0
+// SAL5      -> prefix = SAL,  number = 5
+// SAL100    -> prefix = SAL, number = 100
+// AEPL-2627-0086
+//           -> prefix = AEPL-2627-
+//           -> number = 86
+// ---------------------------------------------------------
+
+if (returnNumber) {
+
+  const returnMatch =
+    returnNumber.match(/^(.*?)(\d+)$/);
+
+  // -------------------------------------------------------
+  // Invalid return number
+  // -------------------------------------------------------
+
+  if (!returnMatch) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid return number.",
+    });
+  }
+
+  const returnPrefix =
+    returnMatch[1] || "None";
+
+  const numericPart = returnMatch[2];
+
+  const enteredReturnNumber =
+    Number(numericPart) || 0;
+
+  // -------------------------------------------------------
+  // SPECIAL CASE:
+  //
+  // SAL0
+  // SAL00
+  // SAL000
+  //
+  // means:
+  //
+  // SAL | empty
+  //
+  // Store only the prefix.
+  //
+  // 00 / 000 without a prefix means completely empty.
+  // -------------------------------------------------------
+
+  if (/^0+$/.test(numericPart)) {
+
+    if (returnPrefix === "None") {
+      // 00 / 000 / 0000
+      returnNumber = "";
+    } else {
+
+      // SAL0 / SAL00 / SAL000
+      //
+      // Store only SAL.
+      returnNumber = returnPrefix;
+    }
+
+  } else {
+
+    // -----------------------------------------------------
+    // NORMAL NUMBER
+    //
+    // SAL5
+    // SAL100
+    // INV25
+    // -----------------------------------------------------
+
+    if (
+      !Number.isInteger(enteredReturnNumber) ||
+      enteredReturnNumber < 1
+    ) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Return number must contain a valid positive number.",
+      });
+    }
+
+    // -----------------------------------------------------
+    // Find + LOCK the return prefix row.
+    // -----------------------------------------------------
+
+    const [prefixRows] =
+      await connection.execute(
+        `
+        SELECT
+          id,
+          transaction_type,
+          prefix_name,
+          last_number,
+          is_active
+        FROM transactions_prefixes
+        WHERE transaction_type = 'sale_return'
+          AND prefix_name = ?
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [returnPrefix]
+      );
+
+    // -----------------------------------------------------
+    // Prefix must exist.
+    // -----------------------------------------------------
+
+    if (prefixRows.length === 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Return prefix "${returnPrefix}" does not exist.`,
+      });
+    }
+
+    const prefixRow = prefixRows[0];
+
+    const currentLastNumber =
+      Number(prefixRow.last_number) || 0;
+
+    // -----------------------------------------------------
+    // NEVER decrease last_number.
+    //
+    // Only increase it when the newly entered number
+    // is greater than the current last number.
+    //
+    // SAL5  -> last_number becomes 5 if currently < 5
+    // SAL10 -> last_number becomes 10 if currently < 10
+    // SAL3  -> stays whatever current value is if >= 3
+    // -----------------------------------------------------
+
+    if (
+      enteredReturnNumber >
+      currentLastNumber
+    ) {
+      await connection.execute(
+        `
+        UPDATE transactions_prefixes
+        SET last_number = ?
+        WHERE id = ?
+        `,
+        [
+          enteredReturnNumber,
+          prefixRow.id,
+        ]
+      );
+    }
+  }
+
+  // -------------------------------------------------------
+  // PREFIX-ONLY VALUE
+  //
+  // Example:
+  //
+  // SAL0 -> SAL
+  // SAL00 -> SAL
+  // SAL000 -> SAL
+  //
+  // We must make sure the prefix actually exists.
+  //
+  // Do NOT update last_number.
+  // -------------------------------------------------------
+
+  if (
+    returnNumber &&
+    !/\d+$/.test(returnNumber)
+  ) {
+
+    const [prefixRows] =
+      await connection.execute(
+        `
+        SELECT
+          id,
+          transaction_type,
+          prefix_name,
+          last_number,
+          is_active
+        FROM transactions_prefixes
+        WHERE transaction_type = 'sale_return'
+          AND prefix_name = ?
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [returnNumber]
+      );
+
+    if (prefixRows.length === 0) {
+      await connection.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message:
+          `Return prefix "${returnNumber}" does not exist.`,
+      });
+    }
+  }
+}
+console.log("Return_Number received:", Return_Number);
+console.log("Return_Number final before INSERT:", returnNumber);
     const [headerResult] = await connection.query(
       `INSERT INTO sale_return
        (
@@ -1099,7 +1466,8 @@ const createSaleReturn = async (req, res, next) => {
       [
         Sale_Id,
         party.Party_Id,
-        Return_Number || null,
+        //Return_Number || null,
+         returnNumber || null, 
         Invoice_Number || null,
         Invoice_Date || null,
         activeFY,
@@ -1140,7 +1508,8 @@ const createSaleReturn = async (req, res, next) => {
       referenceId: id,
       amount: totalAmount,
       txnDate: Return_Date,
-      docNumber: Return_Number,
+      //docNumber: Return_Number,
+      docNumber: returnNumber,
       balanceDue,
     });
 
@@ -1437,8 +1806,8 @@ const createSaleReturn = async (req, res, next) => {
         referenceId: srItemId,
 
         billId: id,                     // sale_return.id
-        billNumber: Return_Number || null,
-
+        //billNumber: Return_Number || null,
+        billNumber:returnNumber || null,
         partyName: Party_Name,
 
         // User-entered quantity
@@ -1622,6 +1991,598 @@ const cleanTransactionDiscountAmount =
   transactionDiscountAmount > 0
     ? transactionDiscountAmount
     : null;
+//     // ---------------------------------------------------------
+// // Get OLD return number before updating the sale return
+// // ---------------------------------------------------------
+
+// const [oldReturnRows] = await connection.execute(
+//   `
+//   SELECT Return_Number
+//   FROM sale_return
+//   WHERE id = ?
+//   LIMIT 1
+//   FOR UPDATE
+//   `,
+//   [Sale_Return_Id]
+// );
+
+// const oldReturnNumber = String(
+//   oldReturnRows[0]?.Return_Number || ""
+// ).trim();
+
+
+// // ---------------------------------------------------------
+// // Current return number
+// // ---------------------------------------------------------
+
+// let returnNumber = String(Return_Number || "").trim();
+
+
+// // ---------------------------------------------------------
+// // SPECIAL CASE:
+// // 000 / 00 / 0000 etc. means blank return number.
+// // ---------------------------------------------------------
+
+// if (/^0+$/.test(returnNumber)) {
+//   returnNumber = "";
+// }
+
+
+// // ---------------------------------------------------------
+// // Handle return number prefix sequence
+// // ---------------------------------------------------------
+
+// if (returnNumber) {
+
+//   const returnMatch =
+//     returnNumber.match(/^(.*?)(\d+)$/);
+
+//   if (!returnMatch) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid return number.",
+//     });
+//   }
+
+//   const returnPrefix =
+//     returnMatch[1] || "None";
+
+//   const enteredReturnNumber =
+//     Number(returnMatch[2]);
+
+
+//   if (
+//     !Number.isInteger(enteredReturnNumber) ||
+//     enteredReturnNumber < 1
+//   ) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         "Return number must contain a valid positive number.",
+//     });
+//   }
+
+
+//   // -------------------------------------------------------
+//   // If prefix was changed while editing,
+//   // release the old prefix number.
+//   //
+//   // Example:
+//   // CN3 -> SR2
+//   //
+//   // CN last_number:
+//   // 3 -> 2
+//   // -------------------------------------------------------
+
+//   if (
+//     oldReturnNumber &&
+//     oldReturnNumber !== returnNumber
+//   ) {
+
+//     const oldMatch =
+//       oldReturnNumber.match(/^(.*?)(\d+)$/);
+
+//     if (oldMatch) {
+
+//       const oldPrefix =
+//         oldMatch[1] || "None";
+
+//       const oldNumber =
+//         Number(oldMatch[2]);
+
+
+//       // Only when PREFIX changed
+//       if (oldPrefix !== returnPrefix) {
+
+//         const [oldPrefixRows] =
+//           await connection.execute(
+//             `
+//             SELECT
+//               id,
+//               last_number
+//             FROM transactions_prefixes
+//             WHERE transaction_type = 'sale_return'
+//               AND prefix_name = ?
+//             LIMIT 1
+//             FOR UPDATE
+//             `,
+//             [oldPrefix]
+//           );
+
+
+//         if (oldPrefixRows.length > 0) {
+
+//           const oldPrefixRow =
+//             oldPrefixRows[0];
+
+//           const oldLastNumber =
+//             Number(oldPrefixRow.last_number) || 0;
+
+
+//           // Old return was the latest return
+//           if (oldNumber === oldLastNumber) {
+
+//             await connection.execute(
+//               `
+//               UPDATE transactions_prefixes
+//               SET last_number = ?
+//               WHERE id = ?
+//               `,
+//               [
+//                 Math.max(
+//                   0,
+//                   oldLastNumber - 1
+//                 ),
+//                 oldPrefixRow.id,
+//               ]
+//             );
+//           }
+//         }
+//       }
+//     }
+//   }
+
+
+//   // -------------------------------------------------------
+//   // Find + LOCK NEW prefix row
+//   // -------------------------------------------------------
+
+//   const [prefixRows] =
+//     await connection.execute(
+//       `
+//       SELECT
+//         id,
+//         transaction_type,
+//         prefix_name,
+//         last_number,
+//         is_active
+//       FROM transactions_prefixes
+//       WHERE transaction_type = 'sale_return'
+//         AND prefix_name = ?
+//       LIMIT 1
+//       FOR UPDATE
+//       `,
+//       [returnPrefix]
+//     );
+
+
+//   // -------------------------------------------------------
+//   // Prefix must exist
+//   // -------------------------------------------------------
+
+//   if (prefixRows.length === 0) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         `Return prefix "${returnPrefix}" does not exist.`,
+//     });
+//   }
+
+
+//   const prefixRow = prefixRows[0];
+
+//   const currentLastNumber =Number(prefixRow.last_number) || 0;
+
+
+//   // -------------------------------------------------------
+//   // Update NEW prefix sequence if necessary
+//   // -------------------------------------------------------
+
+//   if (
+//     enteredReturnNumber >
+//     currentLastNumber
+//   ) {
+
+//     await connection.execute(
+//       `
+//       UPDATE transactions_prefixes
+//       SET last_number = ?
+//       WHERE id = ?
+//       `,
+//       [
+//         enteredReturnNumber,
+//         prefixRow.id,
+//       ]
+//     );
+//   }
+// }
+    // =========================================================
+    // =========================================================
+// 8. GET OLD RETURN NUMBER
+// =========================================================
+
+const [oldReturnRows] = await connection.execute(
+  `
+  SELECT Return_Number
+  FROM sale_return
+  WHERE id = ?
+  LIMIT 1
+  FOR UPDATE
+  `,
+  [Sale_Return_Id]
+);
+
+const oldReturnNumber = String(
+  oldReturnRows[0]?.Return_Number || ""
+).trim();
+
+
+// =========================================================
+// 9. CURRENT RETURN NUMBER
+// =========================================================
+
+let returnNumber = String(
+  Return_Number || ""
+).trim();
+
+
+// =========================================================
+// 10. SPECIAL CASE
+//
+// SAL0  -> SAL
+// SAL00 -> SAL
+// INV0  -> INV
+// INV00 -> INV
+//
+// 0     -> ""
+// 00    -> ""
+// 000   -> ""
+//
+// IMPORTANT:
+// "None" is the UI prefix name, but it is NOT stored in DB.
+//
+// So:
+//
+// None + 0  -> ""
+// None + 00 -> ""
+//
+// If old number was latest:
+//
+// SAL1000 -> SAL
+// SAL last_number: 1000 -> 999
+// =========================================================
+
+// =========================================================
+// 10. SPECIAL ZERO NUMBER
+//
+// DN0   -> DN
+// DN00  -> DN
+// DN000 -> DN
+//
+// 0     -> ""
+// 00    -> ""
+//
+// IMPORTANT:
+// DN1300 must remain DN1300.
+// We only treat the number as "zero" when the ENTIRE
+// numeric portion is zero.
+// =========================================================
+
+const returnMatchForZeroCheck =
+  returnNumber.match(/^(.*?)(\d+)$/);
+
+if (returnMatchForZeroCheck) {
+  const zeroPrefix = returnMatchForZeroCheck[1] || "";
+  const numericPart = returnMatchForZeroCheck[2] || "";
+
+  // Only special-case when the ENTIRE number is zero.
+  // Examples:
+  // 0     -> true
+  // 00    -> true
+  // 000   -> true
+  // 1300  -> false
+  // 100   -> false
+  // 10    -> false
+
+  if (/^0+$/.test(numericPart)) {
+
+    // -------------------------------------------------------
+    // Get old return number
+    // -------------------------------------------------------
+
+    const oldMatch =
+      oldReturnNumber.match(/^(.*?)(\d+)$/);
+
+    if (oldMatch) {
+      const oldPrefix =
+        oldMatch[1] || "";
+
+      const oldNumber =
+        Number(oldMatch[2]);
+
+      // Only decrement when the old prefix is the same
+      if (oldPrefix === zeroPrefix) {
+
+        const [oldPrefixRows] =
+          await connection.execute(
+            `
+            SELECT
+              id,
+              last_number
+            FROM transactions_prefixes
+            WHERE transaction_type = 'sale_return'
+              AND prefix_name = ?
+            LIMIT 1
+            FOR UPDATE
+            `,
+            [oldPrefix]
+          );
+
+        if (oldPrefixRows.length > 0) {
+
+          const oldPrefixRow =
+            oldPrefixRows[0];
+
+          const oldLastNumber =
+            Number(oldPrefixRow.last_number) || 0;
+
+          // Only decrement if old return was latest
+          if (oldNumber === oldLastNumber) {
+
+            await connection.execute(
+              `
+              UPDATE transactions_prefixes
+              SET last_number = ?
+              WHERE id = ?
+              `,
+              [
+                Math.max(
+                  0,
+                  oldLastNumber - 1
+                ),
+                oldPrefixRow.id,
+              ]
+            );
+          }
+        }
+      }
+    }
+
+    // -------------------------------------------------------
+    // Store prefix only
+    //
+    // DN0  -> DN
+    // DN00 -> DN
+    //
+    // 0 / 00 / 000 -> ""
+    // -------------------------------------------------------
+
+    returnNumber = zeroPrefix;
+  }
+}
+
+// =========================================================
+// 11. HANDLE NORMAL RETURN NUMBER PREFIX SEQUENCE
+// =========================================================
+//
+// This block runs only for:
+//
+// SAL5
+// SAL1000
+// INV5
+// 5
+// 100
+//
+// It does NOT run for:
+//
+// SAL0
+// SAL00
+// INV0
+// INV00
+// 0
+// 00
+// =========================================================
+
+if (
+  returnNumber &&
+  /\d+$/.test(returnNumber)
+) {
+  const returnMatch =
+    returnNumber.match(/^(.*?)(\d+)$/);
+
+  // -------------------------------------------------------
+  // Invalid return number
+  // -------------------------------------------------------
+
+  if (!returnMatch) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid return number.",
+    });
+  }
+
+  const returnPrefix =
+    returnMatch[1] || "";
+
+  const enteredReturnNumber =
+    Number(returnMatch[2]);
+
+  // -------------------------------------------------------
+  // Validate positive number
+  // -------------------------------------------------------
+
+  if (
+    !Number.isInteger(enteredReturnNumber) ||
+    enteredReturnNumber < 1
+  ) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message:
+        "Return number must contain a valid positive number.",
+    });
+  }
+
+  // -------------------------------------------------------
+  // If prefix changed while editing,
+  // release old prefix number.
+  //
+  // Example:
+  //
+  // SAL3 -> INV2
+  //
+  // SAL last_number:
+  // 3 -> 2
+  // -------------------------------------------------------
+
+  if (
+    oldReturnNumber &&
+    oldReturnNumber !== returnNumber
+  ) {
+    const oldMatch =
+      oldReturnNumber.match(/^(.*?)(\d+)$/);
+
+    if (oldMatch) {
+      const oldPrefix =
+        oldMatch[1] || "";
+
+      const oldNumber =
+        Number(oldMatch[2]);
+
+      // ---------------------------------------------------
+      // Only when PREFIX changed
+      // ---------------------------------------------------
+
+      if (oldPrefix !== returnPrefix) {
+        const [oldPrefixRows] =
+          await connection.execute(
+            `
+            SELECT
+              id,
+              last_number
+            FROM transactions_prefixes
+            WHERE transaction_type = 'sale_return'
+              AND prefix_name = ?
+            LIMIT 1
+            FOR UPDATE
+            `,
+            [oldPrefix]
+          );
+
+        if (oldPrefixRows.length > 0) {
+          const oldPrefixRow =
+            oldPrefixRows[0];
+
+          const oldLastNumber =
+            Number(oldPrefixRow.last_number) || 0;
+
+          // Old return was latest
+          if (
+            oldNumber === oldLastNumber
+          ) {
+            await connection.execute(
+              `
+              UPDATE transactions_prefixes
+              SET last_number = ?
+              WHERE id = ?
+              `,
+              [
+                Math.max(
+                  0,
+                  oldLastNumber - 1
+                ),
+                oldPrefixRow.id,
+              ]
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------
+  // Find + LOCK NEW prefix row
+  // -------------------------------------------------------
+
+  const [prefixRows] =
+    await connection.execute(
+      `
+      SELECT
+        id,
+        transaction_type,
+        prefix_name,
+        last_number,
+        is_active
+      FROM transactions_prefixes
+      WHERE transaction_type = 'sale_return'
+        AND prefix_name = ?
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [returnPrefix]
+    );
+
+  // -------------------------------------------------------
+  // Prefix must exist
+  // -------------------------------------------------------
+
+  if (prefixRows.length === 0) {
+    await connection.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message:
+        `Return prefix "${returnPrefix}" does not exist.`,
+    });
+  }
+
+  const prefixRow =
+    prefixRows[0];
+
+  const currentLastNumber =
+    Number(prefixRow.last_number) || 0;
+
+  // -------------------------------------------------------
+  // Update NEW prefix sequence if necessary
+  // -------------------------------------------------------
+
+  if (
+    enteredReturnNumber >
+    currentLastNumber
+  ) {
+    await connection.execute(
+      `
+      UPDATE transactions_prefixes
+      SET last_number = ?
+      WHERE id = ?
+      `,
+      [
+        enteredReturnNumber,
+        prefixRow.id,
+      ]
+    );
+  }
+}
+
     await connection.query(
       `UPDATE sale_return
        SET
@@ -1641,7 +2602,8 @@ const cleanTransactionDiscountAmount =
        WHERE id = ?`,
       [
         party.Party_Id,
-        Return_Number || null,
+        returnNumber || null,
+        //Return_Number || null,
         Invoice_Number || null,
         Invoice_Date || null,
         Return_Date,
@@ -1688,7 +2650,8 @@ const cleanTransactionDiscountAmount =
       referenceId: Number(Sale_Return_Id),
       amount: totalAmount,
       txnDate: Return_Date,
-      docNumber: Return_Number,
+      docNumber: returnNumber,
+      //docNumber: Return_Number,
       balanceDue,
     });
 
@@ -2023,12 +2986,7 @@ const cleanTransactionDiscountAmount =
         oldBaseQty
       );
     }
-    // for (const old of oldItems) {
-    //   oldQtyByItem.set(
-    //     old.Item_Id,
-    //     (oldQtyByItem.get(old.Item_Id) || 0) + (Number(old.Quantity) || 0)
-    //   );
-    // }
+    
 
     // =========================================================
     // 19. STOCK DIFFERENCE — Sale Return ADDS stock
@@ -2181,7 +3139,8 @@ const cleanTransactionDiscountAmount =
         referenceId: saleReturnItemId,
 
         billId: existing.id,                     // sale_return.id
-        billNumber: Return_Number || null,
+        //billNumber: Return_Number || null,
+        billNumber: returnNumber || null,
 
         partyName: Party_Name,
 
@@ -2469,6 +3428,146 @@ const deleteSaleReturn = async (req, res, next) => {
       connection.release();
     }
   }
+};
+
+const getLatestSaleReturnNumber = async (req, res, next) => {
+    let connection;
+
+    try {
+        const { prefix: requestedPrefix } = req.query;
+
+        // =========================================================
+        // 1. VALIDATE PREFIX
+        // =========================================================
+
+        if (!requestedPrefix) {
+            return res.status(400).json({
+                success: false,
+                message: "Return prefix is required.",
+            });
+        }
+
+        const requestedPrefixName = String(requestedPrefix).trim();
+
+        connection = await db.getConnection();
+
+        // =========================================================
+        // 2. GET PREFIX + LAST NUMBER
+        // =========================================================
+
+        const [prefixRows] = await connection.query(
+            `
+            SELECT
+                id,
+                transaction_type,
+                prefix_name,
+                last_number,
+                is_active
+            FROM transactions_prefixes
+            WHERE transaction_type = 'sale_return'
+              AND prefix_name = ?
+            LIMIT 1
+            `,
+            [requestedPrefixName]
+        );
+
+        if (prefixRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid Sale Return prefix.",
+            });
+        }
+
+        const prefixRow = prefixRows[0];
+
+        // =========================================================
+        // 3. GET LAST NUMBER
+        // =========================================================
+
+        const lastNumber = Number(prefixRow.last_number) || 0;
+
+        const nextNumber = lastNumber + 1;
+
+        // =========================================================
+        // 4. FORMAT NEXT NUMBER
+        // =========================================================
+
+        let newReturnNumber;
+
+        // ---------------------------------------------------------
+        // NONE PREFIX
+        // ---------------------------------------------------------
+
+        if (
+            requestedPrefixName.toLowerCase() === "none"
+        ) {
+            newReturnNumber = String(nextNumber);
+        }
+
+        // ---------------------------------------------------------
+        // AEPL-2627-
+        // ---------------------------------------------------------
+
+        else if (
+            requestedPrefixName.toUpperCase() === "AEPL-2627-"
+        ) {
+            newReturnNumber = String(nextNumber).padStart(4, "0");
+        }
+
+        // ---------------------------------------------------------
+        // ALL OTHER PREFIXES
+        // ---------------------------------------------------------
+
+        else {
+            newReturnNumber = String(nextNumber);
+        }
+
+        // =========================================================
+        // 5. GET CURRENT FINANCIAL YEAR
+        // =========================================================
+
+        const [fyRows] = await connection.query(
+            `
+            SELECT Financial_Year
+            FROM financial_year
+            WHERE Current_Financial_Year = 1
+            LIMIT 1
+            `
+        );
+
+        if (fyRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No active financial year found.",
+            });
+        }
+
+        const activeFY = fyRows[0].Financial_Year;
+
+        // =========================================================
+        // 6. RETURN NEXT NUMBER
+        // =========================================================
+
+        return res.status(200).json({
+            success: true,
+            prefix: requestedPrefixName,
+            financialYear: activeFY,
+            newReturnNumber,
+        });
+
+    } catch (err) {
+        console.error(
+            "❌ Error getting latest sale return number:",
+            err
+        );
+
+        next(err);
+
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
 };
 const exportSaleReturnReportToExcel = async (req, res, next) => {
   let connection;
@@ -3197,6 +4296,7 @@ export {
   createSaleReturn,
   editSaleReturn,
   deleteSaleReturn,
+  getLatestSaleReturnNumber,
   exportSaleReturnReportToExcel,
   getSaleReturnPrintReport
 };

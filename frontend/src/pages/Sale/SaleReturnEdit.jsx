@@ -20,7 +20,7 @@ import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 
-import { saleReturnApi, useUpdateSaleReturnMutation, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
+import { saleReturnApi, useUpdateSaleReturnMutation, useGetSaleReturnByIdQuery, useLazyGetLatestSaleReturnNumberQuery } from "../../redux/api/saleReturnApi";
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
@@ -35,7 +35,7 @@ import { useCallback } from "react";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
-import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
+import { useGetAllTransactionsSettingsQuery, useGetTransactionPrefixesByTypeQuery } from "../../redux/api/Settings/transactionsSettingApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -497,6 +497,158 @@ export default function SaleReturndEdit() {
     }
 
   })
+  const {
+  data: saleReturnPrefixesData,
+} = useGetTransactionPrefixesByTypeQuery("sale_return");
+
+const saleReturnPrefixes =
+  saleReturnPrefixesData?.prefixes || [];
+
+const activeSaleReturnPrefix =
+  saleReturnPrefixes.find(
+    (prefix) => Number(prefix.is_active) === 1
+  );
+
+const [selectedSaleReturnPrefix, setSelectedSaleReturnPrefix] =
+  useState("");
+
+const [returnPrefix, setReturnPrefix] =
+  useState("None");
+
+const [returnNumberPart, setReturnNumberPart] =
+  useState("");
+// Keeps the latest selected prefix immediately available
+const selectedReturnPrefixRef = useRef("");
+
+// Identifies the latest prefix request.
+// Older API responses will be ignored.
+const returnPrefixRequestRef = useRef(0);
+//const [isReturnPrefixChanged, setIsReturnPrefixChanged] =useState(false);
+
+// ---------------------------------------------------------
+// ORIGINAL RETURN NUMBER
+// Used when editing and user changes back to original prefix
+// ---------------------------------------------------------
+
+
+// ---------------------------------------------------------
+// Active prefix
+// ---------------------------------------------------------
+
+// useEffect(() => {
+//   if (activeSaleReturnPrefix?.prefix_name) {
+//     setSelectedSaleReturnPrefix(
+//       activeSaleReturnPrefix.prefix_name
+//     );
+//   }
+// }, [activeSaleReturnPrefix?.prefix_name]);
+useEffect(() => {
+  if (!sale && activeSaleReturnPrefix?.prefix_name) {
+    setSelectedSaleReturnPrefix(
+      activeSaleReturnPrefix.prefix_name
+    );
+  }
+}, [
+  sale,
+  activeSaleReturnPrefix?.prefix_name,
+]);
+// ---------------------------------------------------------
+// Get latest return number when prefix changes
+// ---------------------------------------------------------
+
+// const {
+//   data: latestSaleReturnNumber,
+// } = useGetLatestSaleReturnNumberQuery(
+//   selectedSaleReturnPrefix,
+//   {
+//     skip: !selectedSaleReturnPrefix,
+//   }
+// );
+// const {
+//   data: latestSaleReturnNumber,
+// } =
+//   useGetLatestSaleReturnNumberQuery(
+//     selectedSaleReturnPrefix,
+//     {
+//       skip:
+//         !selectedSaleReturnPrefix ||
+//         !isReturnPrefixChanged,
+//     }
+//   );
+const [getLatestSaleReturnNumber] =
+  useLazyGetLatestSaleReturnNumberQuery();
+//console.log(latestSaleReturnNumber, "latestSaleReturnNumber");
+// ---------------------------------------------------------
+// Apply latest number ONLY after prefix is changed
+// ---------------------------------------------------------
+
+// useEffect(() => {
+//   if (!isReturnPrefixChanged) {
+//     return;
+//   }
+
+//   if (!latestSaleReturnNumber?.newReturnNumber) {
+//     return;
+//   }
+
+//   const nextNumber =
+//     latestSaleReturnNumber.newReturnNumber;
+
+//   setReturnNumberPart(nextNumber);
+
+//   setValue(
+//     "Return_Number",
+//     `${
+//       selectedSaleReturnPrefix === "None"
+//         ? ""
+//         : selectedSaleReturnPrefix
+//     }${nextNumber}`,
+//     {
+//       shouldValidate: true,
+//       shouldDirty: true,
+//     }
+//   );
+// }, [
+//   latestSaleReturnNumber,
+//   selectedSaleReturnPrefix,
+//   isReturnPrefixChanged,
+//   setValue,
+// ]);
+// useEffect(() => {
+//   if (!isReturnPrefixChanged) {
+//     return;
+//   }
+
+//   if (!latestSaleReturnNumber?.newReturnNumber) {
+//     return;
+//   }
+
+//   const nextNumber =
+//     latestSaleReturnNumber.newReturnNumber;
+
+//   setReturnNumberPart(nextNumber);
+
+//   setValue(
+//     "Return_Number",
+//     `${
+//       selectedSaleReturnPrefix === "None"
+//         ? ""
+//         : selectedSaleReturnPrefix
+//     }${nextNumber}`,
+//     {
+//       shouldValidate: true,
+//       shouldDirty: true,
+//     }
+//   );
+
+//   // Number fetched successfully
+//   setIsReturnPrefixChanged(false);
+// }, [
+//   latestSaleReturnNumber,
+//   selectedSaleReturnPrefix,
+//   isReturnPrefixChanged,
+//   setValue,
+// ]);
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
@@ -919,170 +1071,575 @@ export default function SaleReturndEdit() {
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
-  useEffect(() => {
-    if (sale) {
-      originalTaxTypesRef.current = (sale?.saleReturn?.items || []).map(
-        (item) => item?.Tax_Type || "None"
-      );
-      const savedDiscountAmount =
-        Number(
-          sale?.saleReturn?.Transaction_Discount_Amount
-        ) || 0;
+  const [originalReturnPrefix, setOriginalReturnPrefix] =
+  useState("None");
 
-      const savedDiscountPercentage =
-        Number(
-          sale?.saleReturn?.Transaction_Discount_Percentage
-        ) || 0;
+const [originalReturnNumberPart, setOriginalReturnNumberPart] =
+  useState("");
+//   useEffect(() => {
+//     if (sale) {
+// //     const savedReturnNumber =
+// //   sale?.saleReturn?.Return_Number || "";
 
-      setShowTransactionDiscount(
-        enableTransactionWiseDiscount ||
-        savedDiscountAmount > 0 ||
-        savedDiscountPercentage > 0
-      );
-      setPartySearch(sale.saleReturn.Party_Name);
+// // const returnMatch =
+// //   String(savedReturnNumber).match(/^(.*?)(\d+)$/);
+
+// // if (returnMatch) {
+// //   const prefix = returnMatch[1] || "None";
+// //   const number = returnMatch[2];
+
+// //   setReturnPrefix(prefix);
+// //   setReturnNumberPart(number);
+// //   setSelectedSaleReturnPrefix(prefix);
+
+// //   // Remember original return number
+// //   setOriginalReturnPrefix(prefix);
+// //   setOriginalReturnNumberPart(number);
+// // } else {
+// //   setReturnPrefix("None");
+// //   setReturnNumberPart(savedReturnNumber);
+// //   setSelectedSaleReturnPrefix("None");
+
+// //   setOriginalReturnPrefix("None");
+// //   setOriginalReturnNumberPart(savedReturnNumber);
+// // }
+
+// // setIsReturnPrefixChanged(false);
+// const savedReturnNumber = String(
+//   sale?.saleReturn?.Return_Number || ""
+// ).trim();
+
+// const returnMatch =
+//   savedReturnNumber.match(/^(.*?)(\d+)$/);
+
+// if (returnMatch) {
+//   // =====================================================
+//   // NORMAL NUMBER
+//   //
+//   // SAL3 -> SAL | 3
+//   // SAL100 -> SAL | 100
+//   // =====================================================
+
+//   const prefix =returnMatch[1] || "None";
+
+//   const number =returnMatch[2];
+
+//   setReturnPrefix(prefix);
+//   setReturnNumberPart(number);
+//   setSelectedSaleReturnPrefix(prefix);
+
+//   setOriginalReturnPrefix(prefix);
+//   setOriginalReturnNumberPart(number);
+
+// } else if (savedReturnNumber) {
+
+//   // =====================================================
+//   // PREFIX ONLY
+//   //
+//   // SAL -> SAL | empty
+//   // INV -> INV | empty
+//   //
+//   // This means the bill previously had 00.
+//   // =====================================================
+
+//   setReturnPrefix(savedReturnNumber);
+//   setReturnNumberPart("");
+//   setSelectedSaleReturnPrefix(savedReturnNumber);
+
+//   setOriginalReturnPrefix(savedReturnNumber);
+//   setOriginalReturnNumberPart("");
+
+// } else {
+
+//   // =====================================================
+//   // COMPLETELY EMPTY
+//   // =====================================================
+
+//   setReturnPrefix("None");
+//   setReturnNumberPart("");
+//   setSelectedSaleReturnPrefix("None");
+
+//   setOriginalReturnPrefix("None");
+//   setOriginalReturnNumberPart("");
+// }
+
+// setIsReturnPrefixChanged(false);
+//       originalTaxTypesRef.current = (sale?.saleReturn?.items || []).map(
+//         (item) => item?.Tax_Type || "None"
+//       );
+//       const savedDiscountAmount =
+//         Number(
+//           sale?.saleReturn?.Transaction_Discount_Amount
+//         ) || 0;
+
+//       const savedDiscountPercentage =
+//         Number(
+//           sale?.saleReturn?.Transaction_Discount_Percentage
+//         ) || 0;
+
+//       setShowTransactionDiscount(
+//         enableTransactionWiseDiscount ||
+//         savedDiscountAmount > 0 ||
+//         savedDiscountPercentage > 0
+//       );
+//       setPartySearch(sale.saleReturn.Party_Name);
 
 
 
-      const prefilledRows = sale?.saleReturn?.items?.length > 0
+//       const prefilledRows = sale?.saleReturn?.items?.length > 0
+//         ? sale.saleReturn.items.map((item, index) => {
+
+//           // Original purchase price saved in this purchase line
+//           const salePrice = Number(item.Sale_Price) || 0;
+//           const historicalMRPDiscount =
+//             Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
+//               ? Number(item.Discount_On_MRP_For_Sale_Percentage)
+//               : 0;
+
+//           const currentMasterMRPDiscount =
+//             Number(item.Current_MRP_Discount) > 0
+//               ? Number(item.Current_MRP_Discount)
+//               : 0;
+
+//           masterMrpDiscountRef.current[index] =
+//             historicalMRPDiscount > 0
+//               ? historicalMRPDiscount
+//               : currentMasterMRPDiscount;
+
+//           const conversionRate = Number(item.Conversion_Rate) || 0;
+
+//           const availableUnits = Array.isArray(item.Available_Units)
+//             ? item.Available_Units
+//             : [];
+
+//           // Historical snapshot may have Secondary_Unit = null.
+//           // In that case use CURRENT available units.
+//           const primaryUnit =
+//             item.Primary_Unit ||
+//             availableUnits[0]?.Unit_Shorthand ||
+//             "";
+
+//           const secondaryUnit =
+//             item.Secondary_Unit ||
+//             availableUnits.find(
+//               (u) => u.Unit_Shorthand !== primaryUnit
+//             )?.Unit_Shorthand ||
+//             "";
+
+//           const selectedUnit = item.Selected_Unit || primaryUnit;
+
+//           let baseSalePrice = salePrice;
+
+//           if (
+//             selectedUnit === secondaryUnit &&
+//             conversionRate > 0
+//           ) {
+//             baseSalePrice = salePrice * conversionRate;
+//           }
+
+//           // Store original/base price separately
+//           baseSalePriceRef.current[index] = baseSalePrice;
+//           baseSaleUnitRef.current[index] = primaryUnit;
+//           return {
+//             ...item,
+
+//             Item_Unit: selectedUnit,
+
+//             itemSearch: item.Item_Name,
+//             itemOpen: false,
+//             CategoryOpen: false,
+//             unitOpen: false,
+//             unitSearch: "",
+
+//             isHSNLocked: false,
+//             isUnitLocked: false,
+//             isExistingItem: true,
+
+//             Primary_Unit: primaryUnit,
+//             Secondary_Unit: secondaryUnit,
+//             Conversion_Rate: conversionRate,
+
+//             Available_Units: availableUnits,
+//           };
+//         })
+//         : [emptyRow()];
+//       const formItems = prefilledRows.map((item) => ({
+//         Item_Id: item.Item_Id,
+//         Item_Name: item.Item_Name || "",
+//         Item_Category: item.Item_Category || "",
+//         Item_HSN: item.Item_HSN || "",
+//         MRP: item.MRP || "",
+//         Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
+//         Quantity: item.Quantity || "",
+//         Item_Unit: item.Item_Unit || "",
+//         Sale_Price: item.Sale_Price || "",
+
+//         Discount_On_Sale_Price:
+//           item.Discount_On_Sale_Price || "",
+
+//         Discount_Type_On_Sale_Price:
+//           item.Discount_Type_On_Sale_Price || "Percentage",
+
+//         Tax_Type: item.Tax_Type || "None",
+//         Tax_Amount: item.Tax_Amount || "",
+//         Amount: item.Amount || "",
+//       }));
+//       setRows(prefilledRows)
+//       const roundOffFromDb = Number(sale.saleReturn?.Round_Off) || 0;
+
+//       //  checkbox reflects whether a real round-off was applied
+//       setIsRoundOff(roundOffFromDb !== 0);
+
+//       reset({
+//         Return_Date: toLocalDateString(sale.saleReturn?.Return_Date) || new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
+//         Return_Number: sale.saleReturn?.Return_Number || "",
+//         Party_Name: sale.saleReturn?.Party_Name || "",
+//         GSTIN: sale.saleReturn?.GSTIN || "",
+//         Invoice_Number: sale.saleReturn?.Invoice_Number || "",
+
+//         Invoice_Date: toLocalDateString(sale.saleReturn?.Invoice_Date),
+//         //  Invoice_Date: sale.saleReturn?.Invoice_Date,
+//         State_Of_Supply: sale.saleReturn?.State_Of_Supply || "",
+//         Total_Amount: sale.saleReturn?.Total_Amount || "",
+//         Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
+//         Total_Paid: sale.saleReturn?.Total_Paid || "",
+//         Balance_Due: sale.saleReturn?.Balance_Due || "",
+//         Transaction_Discount_Amount:
+//           Number(sale.saleReturn?.Transaction_Discount_Amount) > 0
+//             ? sale.saleReturn?.Transaction_Discount_Amount
+//             : "",
+
+//         Transaction_Discount_Percentage:
+//           Number(sale.saleReturn?.Transaction_Discount_Percentage) > 0
+//             ? sale.saleReturn?.Transaction_Discount_Percentage
+//             : "",
+//         //Balance_Due: sale.saleReturn?.Balance_Due || "",
+//         // Payment_Type: sale.saleReturn?.Payment_Type || "",
+//         // Bank_Account_Id: sale.saleReturn?.Bank_Account_Id, // ✅ Add this
+//         // Reference_Number: sale.saleReturn?.Reference_Number || "",
+//         splits:
+//           sale?.saleReturn?.splits?.length > 0
+//             ? sale?.saleReturn?.splits.map((split) => ({
+//               Payment_Type: split.Payment_Type,
+//               Bank_Account_Id: split.Bank_Account_Id,
+//               Reference_Number: split.Reference_Number || "",
+//               Amount: split.Amount, // or split.Amount if you want to prefill the original amount
+//             }))
+//             : [
+//               {
+//                 Payment_Type: "Cash",
+//                 Bank_Account_Id: null,
+//                 Reference_Number: "",
+//                 Amount: "",
+//               },
+//             ],
+
+//         //items: prefilledRows,
+//         items: formItems
+//       })
+//       setShowSplitBox((sale?.saleReturn?.splits?.length || 0) > 1);
+//     }
+//   }, [sale]);
+ useEffect(() => {
+  if (sale) {
+    // Invalidate any previous prefix-number request
+    ++returnPrefixRequestRef.current;
+
+    const savedReturnNumber = String(
+      sale?.saleReturn?.Return_Number || ""
+    ).trim();
+
+    const returnMatch =
+      savedReturnNumber.match(/^(.*?)(\d+)$/);
+
+    if (returnMatch) {
+      // =====================================================
+      // NORMAL NUMBER
+      //
+      // SAL3 -> SAL | 3
+      // SAL100 -> SAL | 100
+      // =====================================================
+
+      const prefix = returnMatch[1] || "None";
+      const number = returnMatch[2];
+
+      setReturnPrefix(prefix);
+      setReturnNumberPart(number);
+      setSelectedSaleReturnPrefix(prefix);
+
+      // Keep ref in sync
+      selectedReturnPrefixRef.current = prefix;
+
+      // Remember original return number
+      setOriginalReturnPrefix(prefix);
+      setOriginalReturnNumberPart(number);
+
+    } else if (savedReturnNumber) {
+
+      // =====================================================
+      // PREFIX ONLY
+      //
+      // SAL -> SAL | empty
+      // INV -> INV | empty
+      //
+      // This means the bill previously had 00.
+      // =====================================================
+
+      setReturnPrefix(savedReturnNumber);
+      setReturnNumberPart("");
+      setSelectedSaleReturnPrefix(savedReturnNumber);
+
+      // Keep ref in sync
+      selectedReturnPrefixRef.current = savedReturnNumber;
+
+      // Remember original prefix-only value
+      setOriginalReturnPrefix(savedReturnNumber);
+      setOriginalReturnNumberPart("");
+
+    } else {
+
+      // =====================================================
+      // COMPLETELY EMPTY
+      // =====================================================
+
+      setReturnPrefix("None");
+      setReturnNumberPart("");
+      setSelectedSaleReturnPrefix("None");
+
+      // Keep ref in sync
+      selectedReturnPrefixRef.current = "None";
+
+      setOriginalReturnPrefix("None");
+      setOriginalReturnNumberPart("");
+    }
+
+    // IMPORTANT:
+    // Do NOT use setIsReturnPrefixChanged(false) anymore.
+    // We are replacing that logic with the request ref.
+
+    originalTaxTypesRef.current = (
+      sale?.saleReturn?.items || []
+    ).map(
+      (item) => item?.Tax_Type || "None"
+    );
+
+    const savedDiscountAmount =
+      Number(
+        sale?.saleReturn?.Transaction_Discount_Amount
+      ) || 0;
+
+    const savedDiscountPercentage =
+      Number(
+        sale?.saleReturn?.Transaction_Discount_Percentage
+      ) || 0;
+
+    setShowTransactionDiscount(
+      enableTransactionWiseDiscount ||
+      savedDiscountAmount > 0 ||
+      savedDiscountPercentage > 0
+    );
+
+    setPartySearch(sale.saleReturn.Party_Name);
+
+    const prefilledRows =
+      sale?.saleReturn?.items?.length > 0
         ? sale.saleReturn.items.map((item, index) => {
 
-          // Original purchase price saved in this purchase line
-          const salePrice = Number(item.Sale_Price) || 0;
-          const historicalMRPDiscount =
-            Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
-              ? Number(item.Discount_On_MRP_For_Sale_Percentage)
-              : 0;
+            // Original purchase price saved in this purchase line
+            const salePrice =
+              Number(item.Sale_Price) || 0;
 
-          const currentMasterMRPDiscount =
-            Number(item.Current_MRP_Discount) > 0
-              ? Number(item.Current_MRP_Discount)
-              : 0;
+            const historicalMRPDiscount =
+              Number(
+                item.Discount_On_MRP_For_Sale_Percentage
+              ) > 0
+                ? Number(
+                    item.Discount_On_MRP_For_Sale_Percentage
+                  )
+                : 0;
 
-          masterMrpDiscountRef.current[index] =
-            historicalMRPDiscount > 0
-              ? historicalMRPDiscount
-              : currentMasterMRPDiscount;
+            const currentMasterMRPDiscount =
+              Number(item.Current_MRP_Discount) > 0
+                ? Number(item.Current_MRP_Discount)
+                : 0;
 
-          const conversionRate = Number(item.Conversion_Rate) || 0;
+            masterMrpDiscountRef.current[index] =
+              historicalMRPDiscount > 0
+                ? historicalMRPDiscount
+                : currentMasterMRPDiscount;
 
-          const availableUnits = Array.isArray(item.Available_Units)
-            ? item.Available_Units
-            : [];
+            const conversionRate =
+              Number(item.Conversion_Rate) || 0;
 
-          // Historical snapshot may have Secondary_Unit = null.
-          // In that case use CURRENT available units.
-          const primaryUnit =
-            item.Primary_Unit ||
-            availableUnits[0]?.Unit_Shorthand ||
-            "";
+            const availableUnits =
+              Array.isArray(item.Available_Units)
+                ? item.Available_Units
+                : [];
 
-          const secondaryUnit =
-            item.Secondary_Unit ||
-            availableUnits.find(
-              (u) => u.Unit_Shorthand !== primaryUnit
-            )?.Unit_Shorthand ||
-            "";
+            // Historical snapshot may have Secondary_Unit = null.
+            // In that case use CURRENT available units.
+            const primaryUnit =
+              item.Primary_Unit ||
+              availableUnits[0]?.Unit_Shorthand ||
+              "";
 
-          const selectedUnit = item.Selected_Unit || primaryUnit;
+            const secondaryUnit =
+              item.Secondary_Unit ||
+              availableUnits.find(
+                (u) =>
+                  u.Unit_Shorthand !== primaryUnit
+              )?.Unit_Shorthand ||
+              "";
 
-          let baseSalePrice = salePrice;
+            const selectedUnit =
+              item.Selected_Unit || primaryUnit;
 
-          if (
-            selectedUnit === secondaryUnit &&
-            conversionRate > 0
-          ) {
-            baseSalePrice = salePrice * conversionRate;
-          }
+            let baseSalePrice = salePrice;
 
-          // Store original/base price separately
-          baseSalePriceRef.current[index] = baseSalePrice;
-          baseSaleUnitRef.current[index] = primaryUnit;
-          return {
-            ...item,
+            if (
+              selectedUnit === secondaryUnit &&
+              conversionRate > 0
+            ) {
+              baseSalePrice =
+                salePrice * conversionRate;
+            }
 
-            Item_Unit: selectedUnit,
+            // Store original/base price separately
+            baseSalePriceRef.current[index] =
+              baseSalePrice;
 
-            itemSearch: item.Item_Name,
-            itemOpen: false,
-            CategoryOpen: false,
-            unitOpen: false,
-            unitSearch: "",
+            baseSaleUnitRef.current[index] =
+              primaryUnit;
 
-            isHSNLocked: false,
-            isUnitLocked: false,
-            isExistingItem: true,
+            return {
+              ...item,
 
-            Primary_Unit: primaryUnit,
-            Secondary_Unit: secondaryUnit,
-            Conversion_Rate: conversionRate,
+              Item_Unit: selectedUnit,
 
-            Available_Units: availableUnits,
-          };
-        })
+              itemSearch: item.Item_Name,
+              itemOpen: false,
+              CategoryOpen: false,
+              unitOpen: false,
+              unitSearch: "",
+
+              isHSNLocked: false,
+              isUnitLocked: false,
+              isExistingItem: true,
+
+              Primary_Unit: primaryUnit,
+              Secondary_Unit: secondaryUnit,
+              Conversion_Rate: conversionRate,
+
+              Available_Units: availableUnits,
+            };
+          })
         : [emptyRow()];
-      const formItems = prefilledRows.map((item) => ({
-        Item_Id: item.Item_Id,
-        Item_Name: item.Item_Name || "",
-        Item_Category: item.Item_Category || "",
-        Item_HSN: item.Item_HSN || "",
-        MRP: item.MRP || "",
-        Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
-        Quantity: item.Quantity || "",
-        Item_Unit: item.Item_Unit || "",
-        Sale_Price: item.Sale_Price || "",
 
-        Discount_On_Sale_Price:
-          item.Discount_On_Sale_Price || "",
+    const formItems = prefilledRows.map((item) => ({
+      Item_Id: item.Item_Id,
+      Item_Name: item.Item_Name || "",
+      Item_Category: item.Item_Category || "",
+      Item_HSN: item.Item_HSN || "",
+      MRP: item.MRP || "",
+      Discount_On_MRP_For_Sale_Percentage:
+        item.Discount_On_MRP_For_Sale_Percentage || "",
+      Quantity: item.Quantity || "",
+      Item_Unit: item.Item_Unit || "",
+      Sale_Price: item.Sale_Price || "",
 
-        Discount_Type_On_Sale_Price:
-          item.Discount_Type_On_Sale_Price || "Percentage",
+      Discount_On_Sale_Price:
+        item.Discount_On_Sale_Price || "",
 
-        Tax_Type: item.Tax_Type || "None",
-        Tax_Amount: item.Tax_Amount || "",
-        Amount: item.Amount || "",
-      }));
-      setRows(prefilledRows)
-      const roundOffFromDb = Number(sale.saleReturn?.Round_Off) || 0;
+      Discount_Type_On_Sale_Price:
+        item.Discount_Type_On_Sale_Price ||
+        "Percentage",
 
-      //  checkbox reflects whether a real round-off was applied
-      setIsRoundOff(roundOffFromDb !== 0);
+      Tax_Type: item.Tax_Type || "None",
+      Tax_Amount: item.Tax_Amount || "",
+      Amount: item.Amount || "",
+    }));
 
-      reset({
-        Return_Date: toLocalDateString(sale.saleReturn?.Return_Date) || new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
-        Return_Number: sale.saleReturn?.Return_Number || "",
-        Party_Name: sale.saleReturn?.Party_Name || "",
-        GSTIN: sale.saleReturn?.GSTIN || "",
-        Invoice_Number: sale.saleReturn?.Invoice_Number || "",
+    setRows(prefilledRows);
 
-        Invoice_Date: toLocalDateString(sale.saleReturn?.Invoice_Date),
-        //  Invoice_Date: sale.saleReturn?.Invoice_Date,
-        State_Of_Supply: sale.saleReturn?.State_Of_Supply || "",
-        Total_Amount: sale.saleReturn?.Total_Amount || "",
-        Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
-        Total_Paid: sale.saleReturn?.Total_Paid || "",
-        Balance_Due: sale.saleReturn?.Balance_Due || "",
-        Transaction_Discount_Amount:
-          Number(sale.saleReturn?.Transaction_Discount_Amount) > 0
-            ? sale.saleReturn?.Transaction_Discount_Amount
-            : "",
+    const roundOffFromDb =
+      Number(sale.saleReturn?.Round_Off) || 0;
 
-        Transaction_Discount_Percentage:
-          Number(sale.saleReturn?.Transaction_Discount_Percentage) > 0
-            ? sale.saleReturn?.Transaction_Discount_Percentage
-            : "",
-        //Balance_Due: sale.saleReturn?.Balance_Due || "",
-        // Payment_Type: sale.saleReturn?.Payment_Type || "",
-        // Bank_Account_Id: sale.saleReturn?.Bank_Account_Id, // ✅ Add this
-        // Reference_Number: sale.saleReturn?.Reference_Number || "",
-        splits:
-          sale?.saleReturn?.splits?.length > 0
-            ? sale?.saleReturn?.splits.map((split) => ({
-              Payment_Type: split.Payment_Type,
-              Bank_Account_Id: split.Bank_Account_Id,
-              Reference_Number: split.Reference_Number || "",
-              Amount: split.Amount, // or split.Amount if you want to prefill the original amount
+    // Checkbox reflects whether a real round-off was applied
+    setIsRoundOff(roundOffFromDb !== 0);
+
+    reset({
+      Return_Date:
+        toLocalDateString(
+          sale.saleReturn?.Return_Date
+        ) ||
+        new Date().toISOString().slice(0, 10),
+
+      Return_Number:
+        sale.saleReturn?.Return_Number || "",
+
+      Party_Name:
+        sale.saleReturn?.Party_Name || "",
+
+      GSTIN:
+        sale.saleReturn?.GSTIN || "",
+
+      Invoice_Number:
+        sale.saleReturn?.Invoice_Number || "",
+
+      Invoice_Date:
+        toLocalDateString(
+          sale.saleReturn?.Invoice_Date
+        ),
+
+      State_Of_Supply:
+        sale.saleReturn?.State_Of_Supply || "",
+
+      Total_Amount:
+        sale.saleReturn?.Total_Amount || "",
+
+      Round_Off:
+        roundOffFromDb !== 0
+          ? roundOffFromDb.toFixed(2)
+          : "",
+
+      Total_Paid:
+        sale.saleReturn?.Total_Paid || "",
+
+      Balance_Due:
+        sale.saleReturn?.Balance_Due || "",
+
+      Transaction_Discount_Amount:
+        Number(
+          sale.saleReturn?.Transaction_Discount_Amount
+        ) > 0
+          ? sale.saleReturn
+              ?.Transaction_Discount_Amount
+          : "",
+
+      Transaction_Discount_Percentage:
+        Number(
+          sale.saleReturn
+            ?.Transaction_Discount_Percentage
+        ) > 0
+          ? sale.saleReturn
+              ?.Transaction_Discount_Percentage
+          : "",
+
+      splits:
+        sale?.saleReturn?.splits?.length > 0
+          ? sale?.saleReturn?.splits.map((split) => ({
+              Payment_Type:
+                split.Payment_Type,
+
+              Bank_Account_Id:
+                split.Bank_Account_Id,
+
+              Reference_Number:
+                split.Reference_Number || "",
+
+              Amount: split.Amount,
             }))
-            : [
+          : [
               {
                 Payment_Type: "Cash",
                 Bank_Account_Id: null,
@@ -1091,15 +1648,14 @@ export default function SaleReturndEdit() {
               },
             ],
 
-        //items: prefilledRows,
-        items: formItems
-      })
-      setShowSplitBox((sale?.saleReturn?.splits?.length || 0) > 1);
-    }
-  }, [sale]);
-  //const Invoice_Number=sale.saleReturn?.Invoice_Number 
-  //const Invoice_Date=sale?.saleReturn?.Invoice_Date
-  //console.log(sale)
+      items: formItems,
+    });
+
+    setShowSplitBox(
+      (sale?.saleReturn?.splits?.length || 0) > 1
+    );
+  }
+}, [sale]);
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
   const paymentType = watch("splits.0.Payment_Type");
@@ -2148,7 +2704,7 @@ export default function SaleReturndEdit() {
 
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
-                <div className="flex items-center w-full gap-3  justify-end">
+                {/* <div className="flex items-center w-full gap-3  justify-end">
                   <span className="whitespace-nowrap ">
                     Return Number
                     <span className="text-red-500">*</span>
@@ -2167,14 +2723,448 @@ export default function SaleReturndEdit() {
                       {errors?.Return_Number?.message}
                     </p>
                   )}
-                </div>
+                </div> */}
+
+                  {/* Return Number */}
+                {/* <div className="flex items-center w-full gap-3">
+  <span className="whitespace-nowrap">
+    Return Number
+   
+  </span>
+
+ 
+  <div className="relative flex-shrink-0">
+    <select
+      value={selectedSaleReturnPrefix}
+      onChange={(e) => {
+        const prefix = e.target.value;
+
+        // Same prefix → don't change anything
+        if (prefix === selectedSaleReturnPrefix) {
+          return;
+        }
+
+        setSelectedSaleReturnPrefix(prefix);
+        setReturnPrefix(prefix);
+
+        // If switching back to the original prefix,
+        // restore the original return number.
+        if (prefix === originalReturnPrefix) {
+          setReturnNumberPart(originalReturnNumberPart);
+
+          setValue(
+            "Return_Number",
+            `${
+              prefix === "None" ? "" : prefix
+            }${originalReturnNumberPart}`,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setIsReturnPrefixChanged(false);
+          return;
+        }
+
+        // New/different prefix → get next number
+        setIsReturnPrefixChanged(true);
+      }}
+      className="py-1 border-b-2 border-gray-300"
+      style={{
+        marginBottom: 0,
+        minWidth: "100px",
+        height: "32px",
+        border: "1px solid #ccc",
+      }}
+    >
+      {saleReturnPrefixes.map((prefix) => (
+        <option
+          key={prefix.id}
+          value={prefix.prefix_name}
+        >
+          {prefix.prefix_name}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  
+  <input
+    type="text"
+    value={returnNumberPart}
+    readOnly
+    placeholder="Return Number"
+    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+    style={{
+      marginBottom: 0,
+      height: "1rem",
+    }}
+  />
+
+  {errors?.Return_Number && (
+    <p className="text-red-500 text-xs mt-1">
+      {errors?.Return_Number?.message}
+    </p>
+  )}
+</div> */}
+{/* <div className="flex items-center w-full gap-3">
+  <span className="whitespace-nowrap">
+    Return Number
+
+  </span>
+
+ 
+  <div className="relative flex-shrink-0">
+    <select
+      value={selectedSaleReturnPrefix}
+onChange={(e) => {
+  const prefix = e.target.value;
+
+  // Same prefix selected again
+  if (prefix === selectedSaleReturnPrefix) {
+    if (
+      prefix === originalReturnPrefix &&
+      originalReturnNumberPart === ""
+    ) {
+      setIsReturnPrefixChanged(true);
+    }
+
+    return;
+  }
+
+  setSelectedSaleReturnPrefix(prefix);
+  setReturnPrefix(prefix);
+
+  // Switching back to original prefix
+  if (prefix === originalReturnPrefix) {
+    // Original had a number → restore it
+    if (originalReturnNumberPart) {
+      setReturnNumberPart(originalReturnNumberPart);
+
+      setValue(
+        "Return_Number",
+        `${prefix === "None" ? "" : prefix}${originalReturnNumberPart}`,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setIsReturnPrefixChanged(false);
+      return;
+    }
+
+    // Original was prefix-only, e.g. DN
+    // Fetch the next DN number.
+    setReturnNumberPart("");
+
+    setValue(
+      "Return_Number",
+      prefix === "None" ? "" : prefix,
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    setIsReturnPrefixChanged(true);
+    return;
+  }
+
+  // Different prefix → fetch next number
+  setIsReturnPrefixChanged(true);
+}}
+      className="py-1 border-b-2 border-gray-300"
+      style={{
+        marginBottom: 0,
+        minWidth: "100px",
+        height: "32px",
+        border: "1px solid #ccc",
+      }}
+    >
+      {saleReturnPrefixes.map((prefix) => (
+        <option
+          key={prefix.id}
+          value={prefix.prefix_name}
+        >
+          {prefix.prefix_name}
+        </option>
+      ))}
+    </select>
+  </div>
+
+ 
+  <input
+    type="text"
+    value={returnNumberPart}
+    placeholder="Return Number"
+    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+    style={{
+      marginBottom: 0,
+      height: "1.5rem",
+    }}
+    onChange={(e) => {
+      // Only allow numbers
+      const number = e.target.value.replace(/\D/g, "");
+
+      setReturnNumberPart(number);
+
+      const fullReturnNumber =
+        selectedSaleReturnPrefix === "None"
+          ? number
+          : `${selectedSaleReturnPrefix}${number}`;
+
+      setValue("Return_Number", fullReturnNumber, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+
+      // Manual editing means prefix/number is now changed
+      setIsReturnPrefixChanged(false);
+    }}
+  />
+
+  {errors?.Return_Number && (
+    <p className="text-red-500 text-xs mt-1">
+      {errors?.Return_Number?.message}
+    </p>
+  )}
+</div> */}
+<div className="flex items-center w-full gap-3">
+  <span className="whitespace-nowrap">
+    Return Number
+    {/* <span className="text-red-500">*</span> */}
+  </span>
+
+  {/* Prefix Dropdown */}
+  <div className="relative flex-shrink-0">
+    <select
+      value={selectedSaleReturnPrefix}
+      onChange={async (e) => {
+        const prefix = e.target.value;
+
+        // -------------------------------------------------
+        // Every new selection gets a new request ID.
+        // This prevents an older API response from
+        // overwriting the latest selected prefix.
+        // -------------------------------------------------
+        const requestId =
+          ++returnPrefixRequestRef.current;
+
+        // Keep ref immediately in sync
+        selectedReturnPrefixRef.current = prefix;
+
+        setSelectedSaleReturnPrefix(prefix);
+        setReturnPrefix(prefix);
+
+        // -------------------------------------------------
+        // Switching back to original prefix
+        // -------------------------------------------------
+        if (prefix === originalReturnPrefix) {
+          // Original had a number
+          //
+          // Example:
+          // SAL3 -> SAL | 3
+          // SAL -> another prefix -> SAL
+          //                    -> restore 3
+          if (originalReturnNumberPart) {
+            setReturnNumberPart(
+              originalReturnNumberPart
+            );
+
+            setValue(
+              "Return_Number",
+              `${
+                prefix === "None" ? "" : prefix
+              }${originalReturnNumberPart}`,
+              {
+                shouldValidate: true,
+                shouldDirty: true,
+              }
+            );
+
+            return;
+          }
+
+          // -------------------------------------------------
+          // Original was prefix-only
+          //
+          // Example:
+          // DB = DN
+          //
+          // UI:
+          // DN | empty
+          //
+          // Switching away and then back to DN should
+          // fetch the latest DN number.
+          // -------------------------------------------------
+          setReturnNumberPart("");
+
+          setValue(
+            "Return_Number",
+            prefix === "None" ? "" : prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        } else {
+          // -------------------------------------------------
+          // Different prefix
+          //
+          // Example:
+          // DN -> SAL
+          //
+          // Clear current number while fetching SAL number.
+          // -------------------------------------------------
+          setReturnNumberPart("");
+
+          setValue(
+            "Return_Number",
+            prefix === "None" ? "" : prefix,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        }
+
+        // -------------------------------------------------
+        // Fetch latest number for selected prefix
+        // -------------------------------------------------
+        try {
+          const response =
+            await getLatestSaleReturnNumber(
+              prefix,
+              false
+            ).unwrap();
+
+          // -------------------------------------------------
+          // IMPORTANT:
+          // Ignore response if another prefix was selected
+          // while this request was running.
+          // -------------------------------------------------
+          if (
+            requestId !==
+            returnPrefixRequestRef.current
+          ) {
+            return;
+          }
+
+          if (
+            selectedReturnPrefixRef.current !==
+            prefix
+          ) {
+            return;
+          }
+
+          const nextNumber =
+            response?.newReturnNumber;
+
+          if (!nextNumber) {
+            return;
+          }
+
+          setReturnNumberPart(
+            String(nextNumber)
+          );
+
+          setValue(
+            "Return_Number",
+            `${
+              prefix === "None" ? "" : prefix
+            }${nextNumber}`,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+        } catch (error) {
+          // Ignore stale request errors
+          if (
+            requestId !==
+            returnPrefixRequestRef.current
+          ) {
+            return;
+          }
+
+          console.error(
+            "Failed to get latest sale return number:",
+            error
+          );
+        }
+      }}
+      className="py-1 border-b-2 border-gray-300"
+      style={{
+        marginBottom: 0,
+        minWidth: "100px",
+        height: "32px",
+        border: "1px solid #ccc",
+      }}
+    >
+      {saleReturnPrefixes.map((prefix) => (
+        <option
+          key={prefix.id}
+          value={prefix.prefix_name}
+        >
+          {prefix.prefix_name}
+        </option>
+      ))}
+    </select>
+  </div>
+
+  {/* Editable Return Number */}
+  <input
+    type="text"
+    value={returnNumberPart}
+    placeholder="Return Number"
+    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+    style={{
+      marginBottom: 0,
+      height: "1.5rem",
+    }}
+    onChange={(e) => {
+      // -------------------------------------------------
+      // Manual editing invalidates any pending API request.
+      // -------------------------------------------------
+      ++returnPrefixRequestRef.current;
+
+      const number =
+        e.target.value.replace(/\D/g, "");
+
+      setReturnNumberPart(number);
+
+      const fullReturnNumber =
+        selectedSaleReturnPrefix === "None"
+          ? number
+          : `${selectedSaleReturnPrefix}${number}`;
+
+      setValue(
+        "Return_Number",
+        fullReturnNumber,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+    }}
+  />
+
+  {errors?.Return_Number && (
+    <p className="text-red-500 text-xs mt-1">
+      {errors?.Return_Number?.message}
+    </p>
+  )}
+</div>
                 <div className="flex items-center w-full gap-3  justify-end">
-                  {/* <div className="row  "> */}
+                 
 
                   {/* Invoice Number */}
                   {/* <div className="input-field col s6 mt-4"> */}
                   <span className="whitespace-nowrap ">
-                    Invoice Number <span className="text-red-500">*</span>
+                    Invoice Number 
+                    {/* <span className="text-red-500">*</span> */}
                   </span>
 
                   <input

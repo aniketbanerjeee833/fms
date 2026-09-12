@@ -523,7 +523,8 @@ export default function PurchaseReturn() {
                   }}
                 >
                   <div>Sl.No</div>
-                  <div>Bill Date</div>
+                  {/* <div>Bill Date</div> */}
+                    <div>Return Date</div>
                   <div>Party Name</div>
                   <div>Payment Type</div>
                   <div>Amount</div>
@@ -630,11 +631,26 @@ export default function PurchaseReturn() {
                             {idx + 1}.
                           </div>
 
-                          {/* BILL DATE */}
-                          <div>
+                          {/* RETURN DATE */}
+                          {/* <div>
                             {purchaseReturn?.Bill_Date
                               ? new Date(
                                 purchaseReturn.Bill_Date
+                              ).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "numeric",
+                                  month: "numeric",
+                                  year: "numeric",
+                                }
+                              )
+                              : "N/A"}
+                          </div> */}
+
+                          <div>
+                            {purchaseReturn?.Return_Date
+                              ? new Date(
+                                purchaseReturn.Return_Date
                               ).toLocaleDateString(
                                 "en-IN",
                                 {

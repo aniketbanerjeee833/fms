@@ -549,10 +549,6 @@ export default function SaleEdit() {
     }
   );
 
-  console.log(
-    latestInvoiceNumber,
-    "latestInvoiceNumber"
-  );
   useEffect(() => {
     if (!isInvoicePrefixChanged) {
       return;
@@ -1778,14 +1774,15 @@ export default function SaleEdit() {
       // 8. INVALIDATE CACHE
       // =======================================================
 
-      dispatch(
-        saleApi.util.invalidateTags([
-          { type: "Invoice", id: "LATEST" },
-        ])
-      )
-      dispatch(
-        saleApi.util.invalidateTags(["Sale"])
-      );
+     dispatch(
+  saleApi.util.invalidateTags([
+    { type: "Invoice", id: "LATEST" },
+    "Sale",
+  ])
+);
+      // dispatch(
+      //   saleApi.util.invalidateTags(["Sale"])
+      // );
 
 
       dispatch(
