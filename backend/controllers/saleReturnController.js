@@ -2236,7 +2236,8 @@ const oldReturnNumber = String(
 // =========================================================
 // 9. CURRENT RETURN NUMBER
 // =========================================================
-
+const normalizeReturnPrefix = (prefix) =>
+  String(prefix || "").trim() || "None";
 let returnNumber = String(
   Return_Number || ""
 ).trim();
@@ -2288,7 +2289,10 @@ const returnMatchForZeroCheck =
   returnNumber.match(/^(.*?)(\d+)$/);
 
 if (returnMatchForZeroCheck) {
-  const zeroPrefix = returnMatchForZeroCheck[1] || "";
+  const zeroPrefix = normalizeReturnPrefix(
+  returnMatchForZeroCheck[1]
+);
+  //const zeroPrefix = returnMatchForZeroCheck[1] || "";
   const numericPart = returnMatchForZeroCheck[2] || "";
 
   // Only special-case when the ENTIRE number is zero.
@@ -2310,9 +2314,8 @@ if (returnMatchForZeroCheck) {
       oldReturnNumber.match(/^(.*?)(\d+)$/);
 
     if (oldMatch) {
-      const oldPrefix =
-        oldMatch[1] || "";
-
+      //const oldPrefix =oldMatch[1] || "";
+      const oldPrefix = normalizeReturnPrefix(oldMatch[1]);
       const oldNumber =
         Number(oldMatch[2]);
 
@@ -2419,8 +2422,8 @@ if (
     });
   }
 
-  const returnPrefix =
-    returnMatch[1] || "";
+  //const returnPrefix =returnMatch[1] || "";
+  const returnPrefix = normalizeReturnPrefix(returnMatch[1]);
 
   const enteredReturnNumber =
     Number(returnMatch[2]);
