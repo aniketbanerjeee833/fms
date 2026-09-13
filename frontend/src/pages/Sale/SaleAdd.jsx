@@ -458,28 +458,65 @@ export default function SaleAdd() {
   const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
   const [getLatestInvoiceNumber] =
   useLazyGetLatestInvoiceNumberQuery();
+  useEffect(() => {
+  if (!activeSalePrefix?.prefix_name) {
+    return;
+  }
+
+  const prefix = activeSalePrefix.prefix_name;
+
+  setSelectedSalePrefix(prefix);
+
+  getLatestInvoiceNumber(prefix)
+    .unwrap()
+    .then((result) => {
+      setLatestInvoiceNumber(result);
+
+      const nextNumber =
+        result?.newInvoiceNumber || "";
+
+      //setInvoiceNumberPart(nextNumber);
+
+      setValue(
+        "Invoice_Number_Prefix",
+        prefix,
+        {
+          shouldValidate: true,
+        }
+      );
+
+      setValue(
+        "Invoice_Number_Value",
+        nextNumber,
+        {
+          shouldValidate: true,
+        }
+      );
+
+      setValue(
+        "Invoice_Number",
+        `${
+          prefix === "None" ? "" : prefix
+        }${nextNumber}`,
+        {
+          shouldValidate: true,
+        }
+      );
+    })
+    .catch((error) => {
+      console.error(
+        "Failed to get latest invoice number:",
+        error
+      );
+      toast.error( "Failed to get latest invoice number");
+    });
+}, [
+  activeSalePrefix?.prefix_name,
+  getLatestInvoiceNumber,
+  setValue,
+]);
   //console.log(latestInvoiceNumber, "latestInvoiceNumber");
-  // useEffect(() => {
-  //   if (!latestInvoiceNumber?.newInvoiceNumber) return;
 
-  //   const number = latestInvoiceNumber.newInvoiceNumber;
-
-  //   setValue(
-  //     "Invoice_Number",
-  //     `${selectedSalePrefix === "None"
-  //       ? ""
-  //       : selectedSalePrefix
-  //     }${number}`,
-  //     {
-  //       shouldValidate: true,
-  //       shouldDirty: true,
-  //     }
-  //   );
-  // }, [
-  //   latestInvoiceNumber,
-  //   selectedSalePrefix,
-  //   setValue,
-  // ]);
   const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
   // force refetch on component mount
   // useEffect(() => {

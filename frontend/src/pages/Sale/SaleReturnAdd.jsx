@@ -448,6 +448,72 @@ export default function SaleReturnAdd() {
       );
     }
   }, [activeSaleReturnPrefix?.prefix_name]);
+    const [triggerLatestSaleReturnNumber] =
+    useLazyGetLatestSaleReturnNumberQuery();
+  const [returnNumberPart, setReturnNumberPart] = useState("");
+  useEffect(() => {
+  if (!activeSaleReturnPrefix?.prefix_name) {
+    return;
+  }
+
+  const prefix =
+    activeSaleReturnPrefix.prefix_name;
+
+  setSelectedSaleReturnPrefix(prefix);
+
+  // Automatically fetch the next return number
+  // for the active/default prefix.
+  triggerLatestSaleReturnNumber(prefix)
+    .unwrap()
+    .then((result) => {
+      //setLatestSaleReturnNumber(result);
+
+      const nextNumber =
+        result?.newReturnNumber || "";
+
+      setReturnNumberPart(nextNumber);
+
+      setValue(
+        "Return_Number_Prefix",
+        prefix,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setValue(
+        "Return_Number_Value",
+        nextNumber,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+
+      setValue(
+        "Return_Number",
+        `${
+          prefix === "None" ? "" : prefix
+        }${nextNumber}`,
+        {
+          shouldValidate: true,
+          shouldDirty: true,
+        }
+      );
+    })
+    .catch((error) => {
+      console.error(
+        "Failed to get latest sale return number:",
+        error
+      );
+      toast.error("Failed to get latest sale return number");
+    });
+}, [
+  activeSaleReturnPrefix?.prefix_name,
+  triggerLatestSaleReturnNumber,
+  setValue,
+]);
   console.log(selectedSaleReturnPrefix, "selectedSaleReturnPrefix");
   // const {
   //   data: latestSaleReturnNumber,
@@ -458,31 +524,8 @@ export default function SaleReturnAdd() {
   //   }
   // );
   // console.log(latestSaleReturnNumber, "latestSaleReturnNumber");
-  const [triggerLatestSaleReturnNumber] =
-    useLazyGetLatestSaleReturnNumberQuery();
-  const [returnNumberPart, setReturnNumberPart] = useState("");
-  // useEffect(() => {
-  //   if (!latestSaleReturnNumber?.newReturnNumber) return;
 
-  //   const number =
-  //     latestSaleReturnNumber.newReturnNumber;
 
-  //   setValue(
-  //     "Return_Number",
-  //     `${selectedSaleReturnPrefix === "None"
-  //       ? ""
-  //       : selectedSaleReturnPrefix
-  //     }${number}`,
-  //     {
-  //       shouldValidate: true,
-  //       shouldDirty: true,
-  //     }
-  //   );
-  // }, [
-  //   latestSaleReturnNumber,
-  //   selectedSaleReturnPrefix,
-  //   setValue,
-  // ]);
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",

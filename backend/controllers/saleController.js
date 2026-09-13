@@ -5768,11 +5768,11 @@ const getLatestInvoiceNumber = async (req, res, next) => {
         // 0088
         // ---------------------------------------------------------
 
-        else if (
-            requestedPrefixName.toUpperCase() === "AEPL-2627-"
-        ) {
-            newInvoiceNumber = String(nextNumber).padStart(4, "0");
-        }
+        // else if (
+        //     requestedPrefixName.toUpperCase() === "AEPL-2627-"
+        // ) {
+        //     newInvoiceNumber = String(nextNumber).padStart(4, "0");
+        // }
 
         // ---------------------------------------------------------
         // ALL OTHER PREFIXES
