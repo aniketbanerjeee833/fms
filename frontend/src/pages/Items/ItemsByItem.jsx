@@ -1047,13 +1047,24 @@ export default function ItemsByItem() {
                             //overflowY: "hidden",
                         }}
                     > */}
+                      {/* <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowX: "auto",
+                  overflowY: "hidden",   // fine to keep — this hides the OUTER wrapper's own vertical scrollbar
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              > */}
                     <div
                         className="w-full lg:w-[70%] p-1 flex-none lg:flex-1 h-auto"
                         style={{
                             minHeight: 0,
+                            minWidth: 762,
                             display: "flex",
                             flexDirection: "column",
-                            minWidth: 0,
+                           
                         }}
                     >
                         {(liveItem || selectedItemMeta) && (
@@ -1341,21 +1352,21 @@ export default function ItemsByItem() {
                                         >
                                             {/* SL NO */}
                                             <div className="table-desi-cell"
-                                                style={{ padding: "0 5px" }}
+                                                //style={{ padding: "0 5px" }}
                                             >
                                                 {idx + 1}.
                                             </div>
 
                                             {/* DATE */}
                                             <div className="table-desi-cell"
-                                                style={{ padding: "0 5px" }}
+                                                //style={{ padding: "0 5px" }}
                                             >
                                                 {fmtDate(txn.Txn_Date)}
                                             </div>
 
                                             {/* BILL NO */}
                                             <div className="table-desi-cell"
-                                                style={{ padding: "0 5px" }}
+                                                //style={{ padding: "0 5px" }}
                                             >
                                                 {txn.Number || "—"}
                                             </div>
@@ -1365,10 +1376,10 @@ export default function ItemsByItem() {
                                                 style={{
                                                     overflowWrap: "break-word",
                                                     wordBreak: "break-word",
-                                                    padding: "0 5px"
+                                                    // padding: "0 5px"
 
                                                 }}
-                                                title={txn.Party_Name || ""}
+                                                // title={txn.Party_Name || ""}
                                             >
                                                 {txn.Party_Name || "—"}
                                             </div>
@@ -1376,7 +1387,7 @@ export default function ItemsByItem() {
                                             {/* TYPE */}
                                             <div className="table-desi-cell"
                                                 style={{
-                                                    padding: "0 5px",
+                                                    //padding: "0 5px",
                                                     //whiteSpace: "nowrap",
                                                     color:
                                                         txn.Direction === "In"
@@ -1389,10 +1400,10 @@ export default function ItemsByItem() {
 
                                             {/* QTY */}
                                             <div className="table-desi-cell"
-                                                style={{
-                                                    padding: "0 5px",
-                                                    whiteSpace: "nowrap",
-                                                }}
+                                                // style={{
+                                                //     //padding: "0 5px",
+                                                //     whiteSpace: "nowrap",
+                                                // }}
                                             >
                                                 {fmt(txn.Quantity)}
                                                 {txn.Selected_Unit
@@ -1402,10 +1413,10 @@ export default function ItemsByItem() {
 
                                             {/* PRICE */}
                                             <div
-                                                style={{
-                                                    padding: "0 5px",
-                                                    whiteSpace: "nowrap",
-                                                }}
+                                                // style={{
+                                                //     //padding: "0 5px",
+                                                //     whiteSpace: "nowrap",
+                                                // }}
                                             >
                                                 {txn.Rate !== null
                                                     ? `₹ ${fmt(txn.Rate)}`
@@ -1610,6 +1621,7 @@ export default function ItemsByItem() {
                             />
                         </div>
                     </div>
+                    {/* </div> */}
 
                 </div>
             </div>
