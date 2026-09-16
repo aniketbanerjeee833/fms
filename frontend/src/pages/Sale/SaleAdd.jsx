@@ -16,7 +16,7 @@ import { useEffect } from "react";
 import { toast } from "react-toastify";
 
 import { useDispatch } from "react-redux";
-import { saleApi, useAddSaleMutation,  useLazyGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
+import { saleApi, useAddSaleMutation, useLazyGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
 import { saleFormSchema } from "../../schema/saleFormSchema";
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -388,8 +388,8 @@ export default function SaleAdd() {
       //Phone_Number: "",
       Billing_Address: "",
       Invoice_Number: "",
-      Invoice_Number_Prefix:"None",
-      Invoice_Number_Value:"",
+      Invoice_Number_Prefix: "None",
+      Invoice_Number_Value: "",
       Invoice_Date: today,
       State_Of_Supply: "",
       Transaction_Discount_Percentage: "",
@@ -411,6 +411,7 @@ export default function SaleAdd() {
         Item_Category: "",
         Item_Name: "",
         Quantity: "",
+        Free_Quantity: "",
         Item_Unit: "",
         MRP: "",
         Discount_On_MRP_For_Sale_Percentage: "",
@@ -457,64 +458,63 @@ export default function SaleAdd() {
   // );
   const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
   const [getLatestInvoiceNumber] =
-  useLazyGetLatestInvoiceNumberQuery();
+    useLazyGetLatestInvoiceNumberQuery();
   useEffect(() => {
-  if (!activeSalePrefix?.prefix_name) {
-    return;
-  }
+    if (!activeSalePrefix?.prefix_name) {
+      return;
+    }
 
-  const prefix = activeSalePrefix.prefix_name;
+    const prefix = activeSalePrefix.prefix_name;
 
-  setSelectedSalePrefix(prefix);
+    setSelectedSalePrefix(prefix);
 
-  getLatestInvoiceNumber(prefix)
-    .unwrap()
-    .then((result) => {
-      setLatestInvoiceNumber(result);
+    getLatestInvoiceNumber(prefix)
+      .unwrap()
+      .then((result) => {
+        setLatestInvoiceNumber(result);
 
-      const nextNumber =
-        result?.newInvoiceNumber || "";
+        const nextNumber =
+          result?.newInvoiceNumber || "";
 
-      //setInvoiceNumberPart(nextNumber);
+        //setInvoiceNumberPart(nextNumber);
 
-      setValue(
-        "Invoice_Number_Prefix",
-        prefix,
-        {
-          shouldValidate: true,
-        }
-      );
+        setValue(
+          "Invoice_Number_Prefix",
+          prefix,
+          {
+            shouldValidate: true,
+          }
+        );
 
-      setValue(
-        "Invoice_Number_Value",
-        nextNumber,
-        {
-          shouldValidate: true,
-        }
-      );
+        setValue(
+          "Invoice_Number_Value",
+          nextNumber,
+          {
+            shouldValidate: true,
+          }
+        );
 
-      setValue(
-        "Invoice_Number",
-        `${
-          prefix === "None" ? "" : prefix
-        }${nextNumber}`,
-        {
-          shouldValidate: true,
-        }
-      );
-    })
-    .catch((error) => {
-      console.error(
-        "Failed to get latest invoice number:",
-        error
-      );
-      toast.error( "Failed to get latest invoice number");
-    });
-}, [
-  activeSalePrefix?.prefix_name,
-  getLatestInvoiceNumber,
-  setValue,
-]);
+        setValue(
+          "Invoice_Number",
+          `${prefix === "None" ? "" : prefix
+          }${nextNumber}`,
+          {
+            shouldValidate: true,
+          }
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "Failed to get latest invoice number:",
+          error
+        );
+        toast.error("Failed to get latest invoice number");
+      });
+  }, [
+    activeSalePrefix?.prefix_name,
+    getLatestInvoiceNumber,
+    setValue,
+  ]);
   //console.log(latestInvoiceNumber, "latestInvoiceNumber");
 
   const { data: termsTemplates } = useGetAllTermsQuery("Sale_Invoice");
@@ -537,13 +537,17 @@ export default function SaleAdd() {
   const [addSale, { isLoading: isAddingSale }] = useAddSaleMutation();
   const { data: settingsData } = useGetAllSettingsQuery();
   const settings = settingsData?.settings || [];
-
+  console.log(settings);
   const showMRP =
     Number(
       settings.find(
         (s) => s.setting_key === "show_mrp"
       )?.setting_value
     ) === 1;
+
+
+
+
 
   const calculateSalePriceFromMRP =
     Number(
@@ -614,7 +618,15 @@ export default function SaleAdd() {
           s.setting_key === "transaction_wise_discount"
       )?.setting_value
     ) === 1;
-  console.log(settings, "settings")
+
+  const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+
+
   // useEffect(() => {
   //   setValue("Invoice_Number", latestInvoiceNumber?.newInvoiceNumber);
   // }, [latestInvoiceNumber]);
@@ -963,6 +975,7 @@ export default function SaleAdd() {
       Item_Name: "",
       Item_HSN: "",
       Quantity: "",
+      Free_Quantity: "",
       Item_Unit: "",
       MRP: "",
       Discount_On_MRP_For_Sale_Percentage: "",
@@ -1546,6 +1559,7 @@ export default function SaleAdd() {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+        const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Sale_Price) || 0;
 
         const subtotal = qty * price;
@@ -1559,6 +1573,7 @@ export default function SaleAdd() {
             : discountRaw * qty;
 
         acc.totalQty += qty;
+        acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -1567,6 +1582,7 @@ export default function SaleAdd() {
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1574,6 +1590,7 @@ export default function SaleAdd() {
     );
   };
   const totals = calculateTotals(itemsValues || []);
+  console.log(totals)
   const showSalePayment = totalAmountWatch > 0;
   //console.log(currentPartyDetails)
 
@@ -2716,133 +2733,132 @@ export default function SaleAdd() {
                     </p>
                   )} */}
                   <div className="flex items-center w-full gap-3">
-  <span
-    className="whitespace-nowrap"
-    style={{
-      flexShrink: 0,
-    }}
-  >
-    Invoice Number
-  </span>
+                    <span
+                      className="whitespace-nowrap"
+                      style={{
+                        flexShrink: 0,
+                      }}
+                    >
+                      Invoice Number
+                    </span>
 
-  {/* Prefix Dropdown */}
-  <div className="relative flex-shrink-0">
-    <select
-      value={selectedSalePrefix}
-      onChange={async (e) => {
-        const prefix = e.target.value;
+                    {/* Prefix Dropdown */}
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={selectedSalePrefix}
+                        onChange={async (e) => {
+                          const prefix = e.target.value;
 
-        setSelectedSalePrefix(prefix);
+                          setSelectedSalePrefix(prefix);
 
-        try {
-          // Fetch the next invoice number only when
-          // the prefix is changed.
-          const response =
-            await getLatestInvoiceNumber(
-              prefix,
-              false
-            ).unwrap();
-            setLatestInvoiceNumber(response);
-          const number =
-            response?.newInvoiceNumber;
+                          try {
+                            // Fetch the next invoice number only when
+                            // the prefix is changed.
+                            const response =
+                              await getLatestInvoiceNumber(
+                                prefix,
+                                false
+                              ).unwrap();
+                            setLatestInvoiceNumber(response);
+                            const number =
+                              response?.newInvoiceNumber;
 
-          if (
-            number === undefined ||
-            number === null
-          ) {
-            return;
-          }
+                            if (
+                              number === undefined ||
+                              number === null
+                            ) {
+                              return;
+                            }
 
-          const numberString =
-            String(number);
+                            const numberString =
+                              String(number);
 
-          // ---------------------------------------------
-          // Store prefix separately
-          // ---------------------------------------------
-          setValue(
-            "Invoice_Number_Prefix",
-            prefix,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            // ---------------------------------------------
+                            // Store prefix separately
+                            // ---------------------------------------------
+                            setValue(
+                              "Invoice_Number_Prefix",
+                              prefix,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          // ---------------------------------------------
-          // Store numeric value separately
-          // ---------------------------------------------
-          setValue(
-            "Invoice_Number_Value",
-            numberString,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            // ---------------------------------------------
+                            // Store numeric value separately
+                            // ---------------------------------------------
+                            setValue(
+                              "Invoice_Number_Value",
+                              numberString,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          // ---------------------------------------------
-          // Store combined invoice number
-          // for existing/legacy backend logic
-          // ---------------------------------------------
-          setValue(
-            "Invoice_Number",
-            `${
-              prefix === "None"
-                ? ""
-                : prefix
-            }${numberString}`,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        } catch (error) {
-          console.error(
-            "Failed to get latest invoice number:",
-            error
-          );
-        }
-      }}
-      className="py-1 border-b-2 border-gray-300"
-      style={{
-        marginBottom: 0,
-        minWidth: "100px",
-        height: "32px",
-        border: "1px solid #ccc",
-      }}
-    >
-      {salePrefixes.map((prefix) => (
-        <option
-          key={prefix.id}
-          value={prefix.prefix_name}
-        >
-          {prefix.prefix_name}
-        </option>
-      ))}
-    </select>
-  </div>
+                            // ---------------------------------------------
+                            // Store combined invoice number
+                            // for existing/legacy backend logic
+                            // ---------------------------------------------
+                            setValue(
+                              "Invoice_Number",
+                              `${prefix === "None"
+                                ? ""
+                                : prefix
+                              }${numberString}`,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                          } catch (error) {
+                            console.error(
+                              "Failed to get latest invoice number:",
+                              error
+                            );
+                          }
+                        }}
+                        className="py-1 border-b-2 border-gray-300"
+                        style={{
+                          marginBottom: 0,
+                          minWidth: "100px",
+                          height: "32px",
+                          border: "1px solid #ccc",
+                        }}
+                      >
+                        {salePrefixes.map((prefix) => (
+                          <option
+                            key={prefix.id}
+                            value={prefix.prefix_name}
+                          >
+                            {prefix.prefix_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-  {/* Invoice Number - NOT EDITABLE */}
-  <input
-    type="text"
-    id="Invoice_Number"
-    value={watch("Invoice_Number_Value") || ""}
-    placeholder="Invoice Number"
-    readOnly
-    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
-    style={{
-      marginBottom: 0,
-      height: "1rem",
-      cursor: "default",
-    }}
-  />
-</div>
+                    {/* Invoice Number - NOT EDITABLE */}
+                    <input
+                      type="text"
+                      id="Invoice_Number"
+                      value={watch("Invoice_Number_Value") || ""}
+                      placeholder="Invoice Number"
+                      readOnly
+                      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+                      style={{
+                        marginBottom: 0,
+                        height: "1rem",
+                        cursor: "default",
+                      }}
+                    />
+                  </div>
 
-{errors?.Invoice_Number && (
-  <p className="text-red-500 text-xs pl-[140px]">
-    {errors.Invoice_Number.message}
-  </p>
-)}
+                  {errors?.Invoice_Number && (
+                    <p className="text-red-500 text-xs pl-[140px]">
+                      {errors.Invoice_Number.message}
+                    </p>
+                  )}
 
                   {/* Invoice Date */}
                   <div className="flex items-center w-full gap-3">
@@ -2861,7 +2877,7 @@ export default function SaleAdd() {
                       id="Invoice_Date"
                       {...register("Invoice_Date")}
                       className="invoice-date-class w-full outline-none text-gray-900 border-b-2"
-                      style={{ marginBottom: 0,height:"1rem" }}
+                      style={{ marginBottom: 0, height: "1rem" }}
                       min={
                         latestInvoiceNumber?.latestInvoiceInfo?.createdAt
                           ? new Date(
@@ -2948,6 +2964,7 @@ export default function SaleAdd() {
                         <th>Discount On MRP (%)</th>
                       )}
                       <th>Qty</th>
+                      {showFreeQuantity && <th>Free Qty</th>}
                       <th>Unit</th>
                       <th>Price/Unit</th>
                       <th>Discount</th>
@@ -3065,7 +3082,14 @@ export default function SaleAdd() {
 
 
 
-                        <td style={{ padding: "0px", width: "18%", position: "relative" }}>
+                        <td
+                          style={{
+                            padding: "0px",
+                              width: showFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                        // style={{ padding: "0px", width: "18%", position: "relative" }}
+                        >
                           <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                             <input
                               type="text"
@@ -4838,11 +4862,43 @@ export default function SaleAdd() {
                             </p>
                           )}
                         </td>
+                        {showFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
+
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
+
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
+
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
+                        )}
 
 
                         {/* Unit */}
 
-                        <td style={{ padding: "0px", width: "10%" }}>
+                        <td style={{ padding: "0px", width: "6%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Item_Unit`}
@@ -5478,7 +5534,7 @@ export default function SaleAdd() {
                         />
                       </td> */}
                         {/* Tax Amount Entry*/}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        <td style={{ padding: "0px",   width: showFreeQuantity ? "8%" : "10%" }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -5486,6 +5542,10 @@ export default function SaleAdd() {
                               <select
                                 {...field}
                                 className="form-select"
+                                 style={{
+    fontSize: showFreeQuantity ? "10px" : "12px",
+    padding: "2px 4px",
+  }}
                                 onChange={(e) => {
                                   field.onChange(e);
 
@@ -5596,6 +5656,9 @@ export default function SaleAdd() {
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
+                      {showFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
 
                       <td></td>
                       <td></td>

@@ -15,7 +15,7 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
-   const optionalDigitsOnly = (fieldName) =>
+const optionalDigitsOnly = (fieldName) =>
   z.union([z.string(), z.number(), z.null(), z.undefined()])
     .transform((val) => String(val ?? "").trim())
     .refine(
@@ -91,12 +91,12 @@ export const saleFormSchema = z.object({
 
 
   Invoice_Number: z.string().optional().default(""),
-    Invoice_Number_Prefix: z
+  Invoice_Number_Prefix: z
     .string()
     .optional()
     .default("None"),
-  
- Invoice_Number_Value: z
+
+  Invoice_Number_Value: z
     .union([z.string(), z.number(), z.null(), z.undefined()])
     .transform((val) => String(val ?? "").trim())
     .refine(
@@ -116,12 +116,12 @@ export const saleFormSchema = z.object({
   // State_Of_Supply: z.string().min(1, "State_Of_Supply is required"),
   State_Of_Supply: z.string().nullable().optional(),
   Transaction_Discount_Percentage: optionalDigitsOnly(
-  "Transaction_Discount_Percentage"
-),
+    "Transaction_Discount_Percentage"
+  ),
 
-Transaction_Discount_Amount: optionalDigitsOnly(
-  "Transaction_Discount_Amount"
-),
+  Transaction_Discount_Amount: optionalDigitsOnly(
+    "Transaction_Discount_Amount"
+  ),
   // 🔹 Auto-calculated but cannot be empty
   Total_Amount: digitsOnly("Total_Amount", false).default(0),
   Round_Off: z
@@ -181,39 +181,39 @@ Transaction_Discount_Amount: optionalDigitsOnly(
           .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
             message: "HSN Code must be 4-8 digits if provided",
           }),
-      MRP: z
-  .union([z.string(), z.number(), z.null(), z.undefined()])
-  .optional()
-  .transform((val) => String(val ?? "").trim())
-  .refine(
-    (s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s),
-    {
-      message: "MRP must be a valid number with up to 2 decimals",
-    }
-  )
-  .transform((s) => (s === "" ? "" : Number(s)))
-  .refine(
-    (val) => val === "" || val >= 0,
-    {
-      message: "MRP cannot be negative",
-    }
-  ),
+        MRP: z
+          .union([z.string(), z.number(), z.null(), z.undefined()])
+          .optional()
+          .transform((val) => String(val ?? "").trim())
+          .refine(
+            (s) => s === "" || /^\d+(\.\d{0,2})?$/.test(s),
+            {
+              message: "MRP must be a valid number with up to 2 decimals",
+            }
+          )
+          .transform((s) => (s === "" ? "" : Number(s)))
+          .refine(
+            (val) => val === "" || val >= 0,
+            {
+              message: "MRP cannot be negative",
+            }
+          ),
         Discount_On_MRP_For_Sale_Percentage: z
-  .union([z.string(), z.number(), z.null(), z.undefined()])
-  .optional()
-  .transform((val) => {
-    if (
-      val === "" ||
-      val === undefined ||
-      val === null
-    ) {
-      return "";
-    }
+          .union([z.string(), z.number(), z.null(), z.undefined()])
+          .optional()
+          .transform((val) => {
+            if (
+              val === "" ||
+              val === undefined ||
+              val === null
+            ) {
+              return "";
+            }
 
-    const n = Number(val);
+            const n = Number(val);
 
-    return n === 0 ? "" : n;
-  }),
+            return n === 0 ? "" : n;
+          }),
         Quantity: z.preprocess(
           (val) => {
             if (val === "" || val === undefined || val === null) return 0;
@@ -222,6 +222,39 @@ Transaction_Discount_Amount: optionalDigitsOnly(
           },
           z.number().min(0, "Quantity cannot be negative")
         ),
+        Free_Quantity: z
+          .union([z.string(), z.number(), z.null(), z.undefined()])
+          .transform((val) => {
+            if (val === "" || val === null || val === undefined) {
+              return null;
+            }
+
+            return String(val).trim();
+          })
+          .refine(
+            (val) =>
+              val === null || /^\d+(\.\d{1,2})?$/.test(val),
+            {
+              message:
+                "Free Quantity must be a valid number with up to 2 decimals",
+            }
+          )
+          .transform((val) => {
+            if (val === null) {
+              return null;
+            }
+
+            const num = Number(val);
+
+            // 0 => null
+            return num > 0 ? num : null;
+          })
+          .refine(
+            (val) => val === null || val >= 0,
+            {
+              message: "Free Quantity cannot be negative",
+            }
+          ),
         Item_Unit: z.string().optional().default(""),
         Sale_Price: z
           .union([z.string(), z.number()])

@@ -475,6 +475,17 @@ export default function PurchaseReturnAdd() {
       (item) => item.hasHistoricalMRP === true
     );
 
+       const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+const hasHistoricaFreeQuantity=purchase?.items?.some(
+  (item) => item.hasHistoricalFreeQuantity === true
+)
+const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
+
   const shouldShowMRP = showMRP || hasHistoricalMRP;
 
   // helper to update a field in a specific row
@@ -563,6 +574,7 @@ export default function PurchaseReturnAdd() {
           Item_Category: "",
           Item_Name: "",
           Quantity: "",
+          Free_Quantity: "",
           Item_Unit: "",
           MRP: "",
           Purchase_Price: "",
@@ -914,6 +926,7 @@ const handleDeleteRow = (i) => {
     Item_HSN: "",
     MRP: "",
     Quantity: "",
+    Free_Quantity: "",
     Item_Unit: "",
     Purchase_Price: "",
     Discount_On_Purchase_Price: "",
@@ -1025,6 +1038,7 @@ const handleDeleteRow = (i) => {
         Item_Category: item.Item_Category || "",
         Item_HSN: item.Item_HSN || "",
         Quantity: item.Quantity || "",
+         Free_Quantity:item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
         MRP: item.MRP || "",
         Purchase_Price: item.Purchase_Price || "",
@@ -1108,6 +1122,7 @@ const handleDeleteRow = (i) => {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+         const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Purchase_Price) || 0;
 
         const subtotal = qty * price;
@@ -1121,6 +1136,7 @@ const handleDeleteRow = (i) => {
             : discountRaw * qty;
 
         acc.totalQty += qty;
+         acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -1129,6 +1145,7 @@ const handleDeleteRow = (i) => {
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1412,6 +1429,7 @@ const handleDeleteRow = (i) => {
           { type: "Item", id: "LIST" },
           { type: "ItemsByCategory", id: "LIST" },
           { type: "ItemLedger", id: "LIST" },
+           { type: "Item", id: "DROPDOWN" },
         ])
       );;
 
@@ -2212,6 +2230,7 @@ const handleDeleteRow = (i) => {
                     <th>Item_HSN</th>
                     {shouldShowMRP && <th>MRP</th>}
                     <th>Qty</th>
+                    {shouldShowFreeQuantity && <th>Free Qty</th>}
                     <th>Unit</th>
                     <th>Price/Unit</th>
                     <th>Discount</th>
@@ -2460,7 +2479,15 @@ const handleDeleteRow = (i) => {
                         )}
                       </td>
                       {/* Item Dropdown */}
-                      <td style={{ padding: "0px", width: "18%", position: "relative" }}>
+                      <td 
+                      style={{
+                            padding: "0px",
+                              width: shouldShowFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                      //style={{ padding: "0px", width: "18%", position: "relative" }}
+                      
+                      >
                         <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                           <input
                             type="text"
@@ -3439,6 +3466,38 @@ const handleDeleteRow = (i) => {
                           </p>
                         )}
                       </td>
+                       {shouldShowFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
+
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
+
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
+
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
+                        )}
 
 
 
@@ -4179,7 +4238,12 @@ const handleDeleteRow = (i) => {
                       </td> */}
 
                       {/* Tax Amount Entry */}
-                      <td style={{ padding: "0px", width: "12%" }}>
+                      <td 
+                       style={{ padding: "0px", 
+                          width: shouldShowFreeQuantity ? "8%" : "10%" 
+                          }}
+                      //style={{ padding: "0px", width: "12%" }}
+                      >
                         <Controller
                           control={control}
                           name={`items.${i}.Tax_Type`}
@@ -4300,6 +4364,9 @@ const handleDeleteRow = (i) => {
                     <td className="text-right">
                       {totals.totalQty}
                     </td>
+                    {shouldShowFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
 
                     <td></td>
                     <td></td>

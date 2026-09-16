@@ -155,6 +155,7 @@ getItemByName: builder.query({
         { type: "Item", id: "LIST" },
         { type: "ItemsByCategory", id: "LIST" },
         { type: "ItemLedger", id: "LIST" },
+         { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
 
@@ -169,6 +170,7 @@ getItemByName: builder.query({
         { type: "Item", id: "LIST" },
         { type: "ItemsByCategory", id: "LIST" },
         { type: "ItemLedger", id: "LIST" },
+         { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
 
@@ -182,6 +184,7 @@ getItemByName: builder.query({
         { type: "Item", id: "LIST" },
         { type: "ItemsByCategory", id: "LIST" },
         { type: "ItemLedger", id: "LIST" },
+         { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
 
@@ -283,7 +286,8 @@ moveItemsToCategory: builder.mutation({
   }),
     invalidatesTags: [
     { type: "Item", id: "LIST" },
-    { type: "ItemsByCategory", id: "LIST" }
+    { type: "ItemsByCategory", id: "LIST" },
+     { type: "Item", id: "DROPDOWN" },   // ← add
   ],
 }),
     getItemsByCategory: builder.query({
@@ -432,6 +436,7 @@ getItemsByCode: builder.query({
         { type: "ItemsByCategory", id: "LIST" },
         { type: "ItemLedger", id: "LIST" },
         { type: "ItemLedger", id: arg.Item_Id },
+         { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
 
@@ -446,6 +451,7 @@ getItemsByCode: builder.query({
         { type: "ItemsByCategory", id: "LIST" },
         { type: "ItemLedger", id: "LIST" },
         { type: "ItemLedger", id: arg.Item_Id },
+         { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
 
@@ -459,6 +465,7 @@ getItemsByCode: builder.query({
         { type: "ItemsByCategory", id: "LIST" },
         { type: "ItemLedger", id: "LIST" },
         { type: "ItemLedger", id: payload.Item_Id },
+         { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
     addItemUnit: builder.mutation({
@@ -487,46 +494,8 @@ getAllItemUnits: builder.query({
   },
   providesTags: ["Unit"],
 }),
-// getAllItemUnitsCursor: builder.query({
-//   query: ({
-//     cursor = null,
-//     search = "",
-//     limit = 10,
-//   }) => {
-//     const params = new URLSearchParams();
 
-//     if (cursor) params.set("cursor", cursor);
-//     if (search) params.set("search", search);
-//     params.set("limit", limit);
 
-//     return `/unit/get-all-units/cursor?${params.toString()}`;
-//   },
-
-//   serializeQueryArgs: ({ queryArgs }) => {
-//     const { search } = queryArgs;
-//     return { search };
-//   },
-
-//   merge: (currentCache, newData, { arg }) => {
-//     if (!arg.cursor) {
-//       return newData;
-//     }
-
-//     currentCache.units.push(...newData.units);
-//     currentCache.nextCursor = newData.nextCursor;
-//     currentCache.hasMore = newData.hasMore;
-//     currentCache.totalUnits = newData.totalUnits;
-//   },
-
-//   forceRefetch: ({
-//     currentArg,
-//     previousArg,
-//   }) =>
-//     currentArg?.cursor !== previousArg?.cursor ||
-//     currentArg?.search !== previousArg?.search,
-
-//   providesTags: ["Unit"],
-// }),
 getAllItemUnitsCursor: builder.query({
   query: ({ cursor = null, search = "", limit = 10, resetKey = 0 }) => {
     const params = new URLSearchParams();

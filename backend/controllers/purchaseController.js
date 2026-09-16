@@ -263,6 +263,7 @@ const cleanTransactionDiscountAmount =
         Item_HSN,
         MRP,
         Quantity,
+        Free_Quantity,
         Item_Unit,
 
         Purchase_Price,
@@ -273,7 +274,7 @@ const cleanTransactionDiscountAmount =
         Amount,
         Item_Image,
       } = item;
-
+      const cleanFreeQuantity = Number(Free_Quantity) > 0 ? Number(Free_Quantity) : null;
       // UI currently calls the selected billing unit "Item_Unit".
       // Backend internally calls it Selected_Unit.
       const Selected_Unit = Item_Unit || null;
@@ -364,7 +365,11 @@ normalizeNumber(MRP)|| null,
   normalizeNumber(Purchase_Price) ?? null,
 
   // Initial stock
-  normalizeNumber(Quantity) ?? 0,
+  // normalizeNumber(Quantity) ?? 0,
+    (
+              (normalizeNumber(Quantity) ?? 0) +
+              (cleanFreeQuantity ?? 0)
+            )
 ]
         );
 
@@ -384,7 +389,10 @@ normalizeNumber(MRP)|| null,
         // Stock was already inserted above.
         // This variable is needed for consistency,
         // but DON'T add it to stock again here.
-        stockDelta =normalizeNumber(Quantity) ?? 0;
+         stockDelta =
+          (normalizeNumber(Quantity) ?? 0) +
+          (cleanFreeQuantity ?? 0);
+        //stockDelta =normalizeNumber(Quantity) ?? 0;
 
         // Bill snapshot
         snapshot = {
@@ -471,13 +479,14 @@ try {
   const result = resolveUnitAndStockDelta({
     dbItemRow,
     Selected_Unit,
-    Quantity,
+    // Quantity,
+      Quantity:(normalizeNumber(Quantity) ?? 0) +
+              (cleanFreeQuantity ?? 0),
   });
 
   stockDelta = result.stockDelta;
   snapshot = result.snapshot;
-  resolvedSelectedUnit =
-    result.resolvedSelectedUnit;
+  resolvedSelectedUnit =result.resolvedSelectedUnit;
 
  
 
@@ -522,16 +531,17 @@ try {
 
       const [pitResult] = await connection.execute(
         `INSERT INTO add_purchase_items
-         (Purchase_Id, Item_Id, Quantity, MRP, Purchase_Price,
+         (Purchase_Id, Item_Id, Quantity,Free_Quantity, MRP, Purchase_Price,
           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
           Tax_Type, Tax_Amount, Amount,
           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
           created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, ?,?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           newPurchaseId,
           Item_Id,
           normalizeNumber(Quantity) ?? 0,
+          cleanFreeQuantity,
           normalizeNumber(MRP) || null,
           normalizeNumber(Purchase_Price) ?? 0,
           cleanDiscount(Discount_On_Purchase_Price),
@@ -581,7 +591,8 @@ await syncUnitIdsForPurchaseItem(connection, {
   billId:       newPurchaseId,
   billNumber:   Bill_Number,
   partyName:    Party_Name,
-  quantity:     normalizeNumber(Quantity) ?? 0,    // user-entered: e.g. 500
+  quantity:     normalizeNumber(Quantity) ?? 0,
+  freeQuantity: cleanFreeQuantity,    // user-entered: e.g. 500
   selectedUnit: resolvedSelectedUnit,               // 🔹 e.g. "Gm"
   baseQty:      stockDelta,                         // 🔹 normalized: e.g. 0.5
   rate:         normalizeNumber(Purchase_Price) ?? null,
@@ -1369,6 +1380,7 @@ for (const item of items) {
     Item_Unit,
 
     Quantity,
+    Free_Quantity,
     Purchase_Price, // ✅ ADD
 
     // These may come from frontend for a brand-new item
@@ -1399,7 +1411,9 @@ for (const item of items) {
   // =====================================================
 
   const Selected_Unit = Item_Unit || null;
-
+ const cleanFreeQuantity =Number(Free_Quantity) > 0
+    ? Number(Free_Quantity)
+    : null;
   let Item_Id = item.Item_Id || null;
   let dbItemRow = null;
 
@@ -1623,17 +1637,13 @@ for (const item of items) {
 
       Item_HSN: cleanValue(Item_HSN),
 
-      Item_Category:
-        Item_Category || "",
+      Item_Category:Item_Category || "",
 
-      Primary_Unit:
-        primaryUnit,
+      Primary_Unit:primaryUnit,
 
-      Secondary_Unit:
-        secondaryUnit,
+      Secondary_Unit:secondaryUnit,
 
-      Conversion_Rate:
-        conversionRate,
+      Conversion_Rate:conversionRate,
     };
 
     // ===================================================
@@ -1670,9 +1680,10 @@ for (const item of items) {
     // NORMALIZE STOCK INTO PRIMARY UNIT
     // ===================================================
 
-    const qty =
-      normalizeNumber(Quantity) ?? 0;
-
+    //const qty =normalizeNumber(Quantity) ?? 0;
+const qty =
+  (normalizeNumber(Quantity) ?? 0) +
+  (cleanFreeQuantity ?? 0);
     /*
       Convention:
 
@@ -1819,8 +1830,10 @@ for (const item of items) {
 
     resolvedSelectedUnit = Selected_Unit;
 
-    const qty =normalizeNumber(Quantity) ?? 0;
-
+    //const qty =normalizeNumber(Quantity) ?? 0;
+    const qty =
+  (normalizeNumber(Quantity) ?? 0) +
+  (cleanFreeQuantity ?? 0);
     // User selected primary KG
     if (Selected_Unit === oldPrimary) {
       quantityInBaseUnit = qty;
@@ -1886,7 +1899,10 @@ for (const item of items) {
       resolveUnitAndStockDelta({
         dbItemRow,
         Selected_Unit,
-        Quantity,
+        //Quantity,
+          Quantity:
+      (normalizeNumber(Quantity) ?? 0) +
+      (cleanFreeQuantity ?? 0),
       });
 
     snapshot =result.snapshot;
@@ -1963,6 +1979,7 @@ params.push(normalizeNumber(MRP) || null);
     ...item,
 
     Item_Id,
+     Free_Quantity: cleanFreeQuantity,
 
     snapshot,
 
@@ -2087,10 +2104,20 @@ for (const old of oldItems) {
   // =======================================================
 
   else {
-    const rawQty =
-      Number(old.Quantity) || 0;
+    // const rawQty =
+    //   Number(old.Quantity) || 0;
 
-    baseQty = rawQty;
+    // baseQty = rawQty;
+    const oldFreeQty =
+  Number(old.Free_Quantity) > 0
+    ? Number(old.Free_Quantity)
+    : 0;
+
+const rawQty =
+  (Number(old.Quantity) || 0) +
+  oldFreeQty;
+
+baseQty = rawQty;
 
     // If the old transaction was entered using
     // the historical secondary unit, convert it
@@ -2209,16 +2236,18 @@ for (const itemId of allItemIds) {
     for (const line of resolvedLines) {
       const [insertRes] = await connection.execute(
         `INSERT INTO add_purchase_items
-         (Purchase_Id, Item_Id, Quantity,MRP, Purchase_Price,
+         (Purchase_Id, Item_Id, Quantity,Free_Quantity,MRP, Purchase_Price,
           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
           Tax_Type, Tax_Amount, Amount,
           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit,
           created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?,?, ?,?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [
           purchaseId,
           line.Item_Id,
           normalizeNumber(line.Quantity) ?? 0,
+          line.Free_Quantity ?? null,
+          //line.Free_Quantity > 0? Number(line.Free_Quantity): null,
           normalizeNumber(line.MRP) || null,
           normalizeNumber(line.Purchase_Price) ?? 0,
           cleanDiscount(line.Discount_On_Purchase_Price),
@@ -2273,7 +2302,9 @@ await syncUnitIdsForPurchaseItem(connection, {
  billId: purchaseId,
   billNumber:   Bill_Number,
   partyName:    Party_Name,
-  quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
+  quantity: normalizeNumber(line.Quantity) ?? 0,
+  freeQuantity: line.Free_Quantity ?? null,
+  //freeQuantity:line.Free_Quantity > 0? Number(line.Free_Quantity): null,    // user-entered: e.g. 500
   selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
   baseQty:     line.quantityInBaseUnit,                         // 🔹 normalized: e.g. 0.5
    rate: normalizeNumber(line.Purchase_Price) ?? null,
@@ -2435,11 +2466,12 @@ if (purchaseReturn) {
 
       if (ledgerRow) {
 
-        const baseQty =
-          Number(
-            ledgerRow.Base_Qty ??
-            ledgerRow.Quantity
-          ) || 0;
+        // const baseQty =
+        //   Number(
+        //     ledgerRow.Base_Qty ??
+        //     ledgerRow.Quantity
+        //   ) || 0;
+        const baseQty = Number(ledgerRow.Base_Qty) || 0;
 
         // Purchase is an IN transaction.
         // Deleting it means stock must decrease.
@@ -2737,6 +2769,7 @@ const [items] = await connection.query(
     i.Conversion_Rate,
 
     pi.Quantity,
+     pi.Free_Quantity,
 
     -- SNAPSHOT IDS
     pi.Primary_Unit_Snapshot_Id,
@@ -2947,6 +2980,7 @@ const currentPrimary =it.Current_Primary_Unit || null;
 
 const currentSecondary =it.Current_Secondary_Unit || null;
  const hasHistoricalMRP =it.MRP !== null && Number(it.MRP) > 0;
+  const hasHistoricalFreeQuantity = it.Free_Quantity !== null && Number(it.Free_Quantity) > 0;
 const price = Number(it.Purchase_Price || 0);
 let discountAmount = 0;
 
@@ -3062,6 +3096,8 @@ availableUnits = unitCodes.map((unitCode) => {
         Item_Category:it.Item_Category,
 
         Quantity:it.Quantity,
+        Free_Quantity: it.Free_Quantity,
+        hasHistoricalFreeQuantity,
 
         // =====================================================
         // UNIT DATA
@@ -3083,7 +3119,7 @@ availableUnits = unitCodes.map((unitCode) => {
         // PRICE / TAX
         // =====================================================
         MRP:it.MRP,
-         hasHistoricalMRP,
+        hasHistoricalMRP,
         Purchase_Price:it.Purchase_Price,
 
         Discount_On_Purchase_Price:

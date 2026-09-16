@@ -5,7 +5,7 @@ import {
 
     Search,
     MoreVertical,
-    
+
     Package,
     Eye,
     SquarePen,
@@ -805,14 +805,14 @@ export default function ItemsByItem() {
                 style={{ height: "100vh", overflow: "hidden" }}
            
             > */}
-               <div
-  className="flex flex-col bg-white"
-  style={{
-    height: "100%",
-    minHeight: 0,
-    overflow: "hidden",
-  }}
->
+            <div
+                className="flex flex-col bg-white"
+                style={{
+                    height: "100%",
+                    minHeight: 0,
+                    overflow: "hidden",
+                }}
+            >
                 <div className="flex" style={{ borderBottom: "1px solid #f1f5f9" }}>
                     {["Product", "Service"].map((type) => (
                         <button
@@ -1047,7 +1047,7 @@ export default function ItemsByItem() {
                             //overflowY: "hidden",
                         }}
                     > */}
-                      {/* <div
+                    {/* <div
                 style={{
                   flex: 1,
                   minHeight: 0,
@@ -1064,7 +1064,7 @@ export default function ItemsByItem() {
                             minWidth: 762,
                             display: "flex",
                             flexDirection: "column",
-                           
+
                         }}
                     >
                         {(liveItem || selectedItemMeta) && (
@@ -1285,6 +1285,7 @@ export default function ItemsByItem() {
                                     rowMenuOpen === txn.Ledger_Id
                                 }
                                 renderRow={(txn, idx) => {
+                                    console.log(txn);
                                     // const isHighlighted =
                                     //     String(highlightTxnId) ===
                                     //     String(txn.Ledger_Id)
@@ -1352,21 +1353,21 @@ export default function ItemsByItem() {
                                         >
                                             {/* SL NO */}
                                             <div className="table-desi-cell"
-                                                //style={{ padding: "0 5px" }}
+                                            //style={{ padding: "0 5px" }}
                                             >
                                                 {idx + 1}.
                                             </div>
 
                                             {/* DATE */}
                                             <div className="table-desi-cell"
-                                                //style={{ padding: "0 5px" }}
+                                            //style={{ padding: "0 5px" }}
                                             >
                                                 {fmtDate(txn.Txn_Date)}
                                             </div>
 
                                             {/* BILL NO */}
                                             <div className="table-desi-cell"
-                                                //style={{ padding: "0 5px" }}
+                                            //style={{ padding: "0 5px" }}
                                             >
                                                 {txn.Number || "—"}
                                             </div>
@@ -1379,7 +1380,7 @@ export default function ItemsByItem() {
                                                     // padding: "0 5px"
 
                                                 }}
-                                                // title={txn.Party_Name || ""}
+                                            // title={txn.Party_Name || ""}
                                             >
                                                 {txn.Party_Name || "—"}
                                             </div>
@@ -1399,7 +1400,7 @@ export default function ItemsByItem() {
                                             </div>
 
                                             {/* QTY */}
-                                            <div className="table-desi-cell"
+                                            {/* <div className="table-desi-cell"
                                                 // style={{
                                                 //     //padding: "0 5px",
                                                 //     whiteSpace: "nowrap",
@@ -1409,14 +1410,30 @@ export default function ItemsByItem() {
                                                 {txn.Selected_Unit
                                                     ? ` (${txn.Selected_Unit})`
                                                     : ""}
+                                            </div> */}
+                                            <div className="table-desi-cell">
+                                                {fmt(txn.Quantity)}
+
+
+                                                {txn.Free_Quantity !== null &&
+                                                    Number(txn.Free_Quantity) > 0 && (
+                                                        <>
+                                                            {" + "}
+                                                            {fmt(txn.Free_Quantity)}
+                                                        </>
+                                                    )}
+                                                
+                                                {txn.Selected_Unit
+                                                    ? ` ${txn.Selected_Unit}`
+                                                    : ""}
                                             </div>
 
                                             {/* PRICE */}
                                             <div
-                                                // style={{
-                                                //     //padding: "0 5px",
-                                                //     whiteSpace: "nowrap",
-                                                // }}
+                                            // style={{
+                                            //     //padding: "0 5px",
+                                            //     whiteSpace: "nowrap",
+                                            // }}
                                             >
                                                 {txn.Rate !== null
                                                     ? `₹ ${fmt(txn.Rate)}`
@@ -1483,7 +1500,7 @@ export default function ItemsByItem() {
                                                             />
                                                         </button>
 
-                                                       
+
                                                         {rowMenuOpen ===
                                                             txn.Ledger_Id && (
                                                                 <div

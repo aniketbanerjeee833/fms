@@ -565,6 +565,7 @@ const getPurchaseReturnById = async (req, res, next) => {
     i.Conversion_Rate,
 
     pri.Quantity,
+    pri.Free_Quantity,
 
     -- HISTORICAL SNAPSHOT UNITS FROM IDS
     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
@@ -638,8 +639,7 @@ const getPurchaseReturnById = async (req, res, next) => {
       const oldSecondary =
         it.Secondary_Unit_Snapshot || null;
 
-      const oldSelected =
-        it.Selected_Unit || null;
+      const oldSelected = it.Selected_Unit || null;
 
       // =======================================================
       // CURRENT MASTER
@@ -649,6 +649,7 @@ const getPurchaseReturnById = async (req, res, next) => {
 
       const currentSecondary = it.Current_Secondary_Unit || null;
       const hasHistoricalMRP = it.MRP !== null && Number(it.MRP) > 0;
+      const hasHistoricalFreeQuantity = it.Free_Quantity !== null && Number(it.Free_Quantity) > 0;
       const price = Number(it.Purchase_Price || 0);
       let discountAmount = 0;
 
@@ -747,6 +748,9 @@ const getPurchaseReturnById = async (req, res, next) => {
         Item_Category: it.Item_Category,
 
         Quantity: it.Quantity,
+
+        Free_Quantity: it.Free_Quantity,
+        hasHistoricalFreeQuantity,
 
         // Snapshot
         Primary_Unit: oldPrimary,
@@ -1250,6 +1254,7 @@ const createPurchaseReturn = async (req, res, next) => {
         MRP,
         Item_Unit,
         Quantity,
+        Free_Quantity,
         Purchase_Price,
         Discount_On_Purchase_Price,
         Discount_Type_On_Purchase_Price,
@@ -1258,7 +1263,7 @@ const createPurchaseReturn = async (req, res, next) => {
         Amount,
       } = item;
       const Selected_Unit = Item_Unit || null;
-
+      const cleanFreeQuantity = Number(Free_Quantity) > 0 ? Number(Free_Quantity) : null;
       // =======================================================
       // 12. FIND EXISTING ITEM
       //
@@ -1424,7 +1429,9 @@ VALUES
       } = resolveUnitAndStockDelta({
         dbItemRow,
         Selected_Unit,
-        Quantity,
+        //Quantity,
+        Quantity: (normalizeNumber(Quantity) ?? 0) +
+          (cleanFreeQuantity ?? 0),
       });
 
       // =======================================================
@@ -1443,6 +1450,7 @@ VALUES
     Selected_Unit,
 
     Quantity,
+    Free_Quantity,
      MRP,
     Purchase_Price,
     Discount_On_Purchase_Price,
@@ -1453,7 +1461,7 @@ VALUES
 )
 VALUES
 (
-    ?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?,?, ?,?, ?, ?, ?, ?, ?
 )
          
          `,
@@ -1467,6 +1475,7 @@ VALUES
           resolvedSelectedUnit,
 
           Number(Quantity) || 0,
+          cleanFreeQuantity,
           normalizeNumber(MRP) || null,
           Number(Purchase_Price) || 0,
           Number(Discount_On_Purchase_Price) || 0,
@@ -1547,6 +1556,7 @@ VALUES
 
         // User-entered quantity
         quantity: normalizeNumber(Quantity) ?? 0,
+        freeQuantity: cleanFreeQuantity,
 
         // Unit used in this transaction
         selectedUnit: resolvedSelectedUnit,
@@ -1580,7 +1590,7 @@ VALUES
     }
 
     console.error(
-      "❌ createPurchaseReturn:",
+      " createPurchaseReturn:",
       err
     );
 
@@ -1636,7 +1646,7 @@ const editPurchaseReturn = async (req, res, next) => {
       Bill_Date,
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
-       Transaction_Discount_Percentage,
+      Transaction_Discount_Percentage,
       Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
@@ -1715,29 +1725,29 @@ const editPurchaseReturn = async (req, res, next) => {
     // =========================================================
     // 6. UPDATE HEADER
     // =========================================================
-       const transactionDiscountPercentage =
-  normalizeNumber(Transaction_Discount_Percentage);
+    const transactionDiscountPercentage =
+      normalizeNumber(Transaction_Discount_Percentage);
 
-const transactionDiscountAmount =
-  normalizeNumber(Transaction_Discount_Amount);
-if (
-  transactionDiscountPercentage !== null &&
-  transactionDiscountPercentage > 100
-) {
-  return res.status(400).json({
-    success: false,
-    message: "Transaction discount percentage cannot be greater than 100%",
-  });
-}
-const cleanTransactionDiscountPercentage =
-  transactionDiscountPercentage > 0
-    ? transactionDiscountPercentage
-    : null;
+    const transactionDiscountAmount =
+      normalizeNumber(Transaction_Discount_Amount);
+    if (
+      transactionDiscountPercentage !== null &&
+      transactionDiscountPercentage > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction discount percentage cannot be greater than 100%",
+      });
+    }
+    const cleanTransactionDiscountPercentage =
+      transactionDiscountPercentage > 0
+        ? transactionDiscountPercentage
+        : null;
 
-const cleanTransactionDiscountAmount =
-  transactionDiscountAmount > 0
-    ? transactionDiscountAmount
-    : null;
+    const cleanTransactionDiscountAmount =
+      transactionDiscountAmount > 0
+        ? transactionDiscountAmount
+        : null;
     await connection.query(
       `UPDATE purchase_return
        SET
@@ -1843,6 +1853,7 @@ const cleanTransactionDiscountAmount =
         Item_HSN,
         Item_Unit,          // 🔹 Selected_Unit from frontend
         Quantity,
+        Free_Quantity,
         MRP,
         Purchase_Price,
         Discount_On_Purchase_Price,
@@ -1854,7 +1865,7 @@ const cleanTransactionDiscountAmount =
 
       let Item_Id = item.Item_Id || null;
       let dbItemRow = null;
-
+      const cleanFreeQuantity = Number(Free_Quantity) > 0 ? Number(Free_Quantity) : null;
       // =======================================================
       // 11. FIND ITEM
       // =======================================================
@@ -1983,7 +1994,10 @@ const cleanTransactionDiscountAmount =
       } = resolveUnitAndStockDelta({
         dbItemRow,
         Selected_Unit: Item_Unit,
-        Quantity: Number(Quantity) || 0,
+        Quantity:
+          (Number(Quantity) || 0) +
+          (cleanFreeQuantity ?? 0),
+        //Quantity: Number(Quantity) || 0,
       });
 
       // =======================================================
@@ -1994,6 +2008,7 @@ const cleanTransactionDiscountAmount =
         ...item,
         Item_Id,
         dbItemRow,
+        Free_Quantity: cleanFreeQuantity,
 
         // unit snapshots for the DB row
         Primary_Unit_Snapshot: snapshot.Primary_Unit_Snapshot,
@@ -2061,13 +2076,20 @@ const cleanTransactionDiscountAmount =
       } else {
 
         // Fallback for old records where ledger is missing
+        // const rawQty =
+        //   Number(old.Quantity) || 0;
+        const oldFreeQty =
+          Number(old.Free_Quantity) > 0
+            ? Number(old.Free_Quantity)
+            : 0;
+
         const rawQty =
-          Number(old.Quantity) || 0;
+          (Number(old.Quantity) || 0) +
+          oldFreeQty;
 
         oldBaseQty = rawQty;
 
-        const oldPrimary =
-          old.Primary_Unit_Snapshot || null;
+        const oldPrimary = old.Primary_Unit_Snapshot || null;
 
         const oldSecondary =
           old.Secondary_Unit_Snapshot || null;
@@ -2165,15 +2187,16 @@ const cleanTransactionDiscountAmount =
     for (const line of resolvedLines) {
       const [insertResult] = await connection.query(
         `INSERT INTO purchase_return_items
-         (Purchase_Return_Id, Item_Id, Quantity, MRP,Purchase_Price,
+         (Purchase_Return_Id, Item_Id, Quantity,Free_Quantity, MRP,Purchase_Price,
           Discount_On_Purchase_Price, Discount_Type_On_Purchase_Price,
           Tax_Type, Tax_Amount, Amount,
           Primary_Unit_Snapshot, Secondary_Unit_Snapshot, Selected_Unit)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Purchase_Return_Id,
           line.Item_Id,
           line.Quantity,
+          line.Free_Quantity,
           normalizeNumber(line.MRP) || null,
           line.Purchase_Price,
           line.Discount_On_Purchase_Price,
@@ -2199,7 +2222,8 @@ const cleanTransactionDiscountAmount =
   WHERE Item_Id = ?
   `,
         [
-          line.resolvedSelectedUnit || null,
+          line.Selected_Unit || null,
+          //line.resolvedSelectedUnit || null,
           line.Primary_Unit_Snapshot || null,
           line.Secondary_Unit_Snapshot || null,
           line.Item_Id,
@@ -2234,7 +2258,7 @@ const cleanTransactionDiscountAmount =
         partyName: Party_Name,
 
         quantity: normalizeNumber(line.Quantity) ?? 0,
-
+        freeQuantity: line.Free_Quantity ?? null,
         //selectedUnit: line.resolvedSelectedUnit,
         selectedUnit: line.Selected_Unit,
 
@@ -2380,11 +2404,12 @@ const deletePurchaseReturn = async (req, res, next) => {
         continue;
       }
 
-      const baseQty =
-        Number(
-          ledgerRow.Base_Qty ??
-          ledgerRow.Quantity
-        ) || 0;
+      // const baseQty =
+      //   Number(
+      //     ledgerRow.Base_Qty ??
+      //     ledgerRow.Quantity
+      //   ) || 0;
+      const baseQty = Number(ledgerRow.Base_Qty) || 0;
 
       // -------------------------------------------------------
       // Purchase Return was OUT.

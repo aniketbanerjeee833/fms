@@ -32,6 +32,7 @@ export const recordItemLedger = async ({
   billNumber = null,
   partyName,
   quantity,        // user-entered display quantity (e.g. 500 for 500 Gm)
+   freeQuantity,   
   selectedUnit = null,  // 🔹 unit selected in this transaction (e.g. "Gm")
   baseQty,         // 🔹 normalized stock qty from resolveUnitAndStockDelta (e.g. 0.5)
   rate,
@@ -63,6 +64,7 @@ export const recordItemLedger = async ({
       `UPDATE item_ledger
        SET
          Quantity      = ?,
+         Free_Quantity = ?,
          Selected_Unit = ?,
          Base_Qty      = ?,
          Rate          = ?,
@@ -73,6 +75,7 @@ export const recordItemLedger = async ({
        WHERE id = ?`,
       [
         quantity,
+        freeQuantity??null,
         selectedUnit ?? null,
         newBaseQty,
         rate ?? null,
@@ -133,13 +136,14 @@ await syncUnitIdForLedgerRow(connection, {
   Party_Name,
   Direction,
   Quantity,
+  Free_Quantity,
   Selected_Unit,
   Base_Qty,
   Running_Stock,
   Rate,
   Txn_Date
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?, ?)
      
      `,
     [
@@ -149,6 +153,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       partyName  || null,
       direction,
       quantity,          // display quantity — what user typed
+      freeQuantity ?? null,
       selectedUnit ?? null,
       base,              // normalized stock quantity
       newStock,

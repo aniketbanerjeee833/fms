@@ -125,38 +125,7 @@ Transaction_Discount_Amount: optionalDigitsOnly(
         }
       });
     }),
-  //  splits: z
-  //       .array(paymentSplitSchema)
-  //       .min(1, "At least one payment split is required")
-  //       .superRefine((splits, ctx) => {
-  //         let cashSeen = false;
-  //         const seenBankAccounts = new Set();
 
-  //         splits.forEach((split, index) => {
-  //           if (split.Payment_Type === "Cash") {
-  //             if (cashSeen) {
-  //               ctx.addIssue({
-  //                 code: z.ZodIssueCode.custom,
-  //                 message: "Only one Cash split is allowed.",
-  //                 path: [index, "Payment_Type"],
-  //               });
-  //             }
-  //             cashSeen = true;
-  //           }
-
-  //           if (split.Payment_Type === "Bank" && split.Bank_Account_Id) {
-  //             if (seenBankAccounts.has(split.Bank_Account_Id)) {
-  //               ctx.addIssue({
-  //                 code: z.ZodIssueCode.custom,
-  //                 message:
-  //                   "Each bank account can only be used once. Edit the existing split instead of adding a duplicate.",
-  //                 path: [index, "Bank_Account_Id"],
-  //               });
-  //             }
-  //             seenBankAccounts.add(split.Bank_Account_Id);
-  //           }
-  //         });
-  //       }),
 
   // 🔹 items — allowed to be empty array entirely (Vyapar's 2 blank rows never get submitted as "items")
   items: z
@@ -191,6 +160,39 @@ Transaction_Discount_Amount: optionalDigitsOnly(
           },
           z.number().min(0, "Quantity cannot be negative")
         ),
+               Free_Quantity: z
+                  .union([z.string(), z.number(), z.null(), z.undefined()])
+                  .transform((val) => {
+                    if (val === "" || val === null || val === undefined) {
+                      return null;
+                    }
+                
+                    return String(val).trim();
+                  })
+                  .refine(
+                    (val) =>
+                      val === null || /^\d+(\.\d{1,2})?$/.test(val),
+                    {
+                      message:
+                        "Free Quantity must be a valid number with up to 2 decimals",
+                    }
+                  )
+                 .transform((val) => {
+            if (val === null) {
+              return null;
+            }
+        
+            const num = Number(val);
+        
+            // 0 => null
+            return num > 0 ? num : null;
+          })
+                  .refine(
+                    (val) => val === null || val >= 0,
+                    {
+                      message: "Free  Quantity cannot be negative",
+                    }
+                  ),
         Item_Unit: z.string().optional().default(""),
         Purchase_Price: z
           .union([z.string(), z.number()])

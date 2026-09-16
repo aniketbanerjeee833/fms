@@ -219,6 +219,40 @@ Transaction_Discount_Amount: optionalDigitsOnly(
           },
           z.number().min(0, "Quantity cannot be negative")
         ),
+        Free_Quantity: z
+                  .union([z.string(), z.number(), z.null(), z.undefined()])
+                  .transform((val) => {
+                    if (val === "" || val === null || val === undefined) {
+                      return null;
+                    }
+        
+                    return String(val).trim();
+                  })
+                  .refine(
+                    (val) =>
+                      val === null || /^\d+(\.\d{1,2})?$/.test(val),
+                    {
+                      message:
+                        "Free Quantity must be a valid number with up to 2 decimals",
+                    }
+                  )
+                  .transform((val) => {
+                    if (val === null) {
+                      return null;
+                    }
+        
+                    const num = Number(val);
+        
+                    // 0 => null
+                    return num > 0 ? num : null;
+                  })
+                  .refine(
+                    (val) => val === null || val >= 0,
+                    {
+                      message: "Free  Quantity cannot be negative",
+                    }
+                  ),
+        
 
         Item_Unit: z.string().optional().default(""),
 

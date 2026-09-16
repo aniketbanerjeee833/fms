@@ -23,7 +23,7 @@ const TRANSACTION_PREFIX_TYPES = {
 
 function SettingRow({ setting, isUpdating, onToggle }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 rounded-md border border-slate-200 min-h-[64px] mt-2">
+    <div className="flex items-center justify-between px-3 py-2 rounded-md border border-slate-200 min-h-[64px] mt-2">
       <div>
         <p className="text-sm font-semibold text-gray-900">
           {setting.setting_label}
@@ -351,7 +351,16 @@ export default function Transactions() {
   };
 
   return (
-    <>
+    // <>
+      <div
+                className="flex flex-col bg-white"
+                style={{
+                    height: "100%",
+                    minHeight: 0,
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                }}
+            >
       <div className="inn-title">
         <h4 className="text-2xl font-bold mb-2">Transactions Settings</h4>
         <p className="text-gray-500">
@@ -441,7 +450,8 @@ export default function Transactions() {
           transform: translateX(20px);
         }
       `}</style>
-    </>
+    {/* </> */}
+    </div>
   );
 }
 // import React, { useEffect, useState, useRef, memo } from "react";

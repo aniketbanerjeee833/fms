@@ -460,6 +460,17 @@ export default function PurchaseEdit() {
           s.setting_key === "transaction_wise_discount"
       )?.setting_value
     ) === 1;
+
+    const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+const hasHistoricaFreeQuantity=purchase?.items?.some(
+  (item) => item.hasHistoricalFreeQuantity === true
+)
+const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
   const shouldShowMRP = showMRP || hasHistoricalMRP;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -551,6 +562,7 @@ export default function PurchaseEdit() {
         Item_Category: "",
         Item_Name: "",
         Quantity: "",
+        Free_Quantity: "",
         Item_Unit: "",
         Purchase_Price: "",
         MRP: "",
@@ -803,6 +815,7 @@ export default function PurchaseEdit() {
       Item_HSN: "",
       MRP: "",
       Quantity: "",
+      Free_Quantity: "",
       Item_Unit: "",
 
       Purchase_Price: "",
@@ -985,6 +998,7 @@ export default function PurchaseEdit() {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+        const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Purchase_Price) || 0;
 
         const subtotal = qty * price;
@@ -998,6 +1012,7 @@ export default function PurchaseEdit() {
             : discountRaw * qty;
 
         acc.totalQty += qty;
+        acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -1006,6 +1021,7 @@ export default function PurchaseEdit() {
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1019,6 +1035,7 @@ export default function PurchaseEdit() {
     Item_HSN: "",
     MRP: "",
     Quantity: "",
+    Free_Quantity: "",
     Item_Unit: "",
 
     Purchase_Price: "",
@@ -1136,7 +1153,7 @@ export default function PurchaseEdit() {
           ? item.MRP
           : "",
         Quantity: item.Quantity || "",
-
+        Free_Quantity:item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
 
         Purchase_Price: item.Purchase_Price || "",
@@ -2430,6 +2447,7 @@ export default function PurchaseEdit() {
                       <th>Item_HSN</th>
                       {shouldShowMRP && <th>MRP</th>}
                       <th>Qty</th>
+                      {shouldShowFreeQuantity && <th>Free Qty</th>}
                       <th>Unit</th>
                       <th>Price/Unit</th>
                       <th>Discount</th>
@@ -2546,7 +2564,14 @@ export default function PurchaseEdit() {
                           )}
                         </td>
                         {/* Item Dropdown */}
-                        <td style={{ padding: "0px", width: "18%", position: "relative" }}>
+                        <td 
+                        style={{
+                            padding: "0px",
+                              width: shouldShowFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                        //style={{ padding: "0px", width: "18%", position: "relative" }}
+                        >
                           <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                             <input
                               type="text"
@@ -3551,231 +3576,42 @@ export default function PurchaseEdit() {
                           )}
                         </td>
 
+                          {shouldShowFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
 
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
 
-                        {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => {
-                            const row = rows[i];
-                            const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-                            console.log(row, "row")
-                            return (
-                              <select
-                                {...field}
-                                value={field.value || ""}
-                                className="form-select"
-                                style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                //disabled={row?.isUnitLocked}
-                                onChange={(e) => {
-                                  const newUnit = e.target.value;
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
 
-                                  if (newUnit === "__ADD_UNIT__") {
-                                    setActiveUnitRow(i);
-                                    setShowAddUnitModal(true);
-                                    return;
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
                                   }
-
-                                  const previousUnit = field.value;
-                                  field.onChange(newUnit);
-                                  handleRowChange(i, "Item_Unit", newUnit);
-                                  setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
-                                  //const quantity = Number(itemsValues[i]?.Quantity);
-
-                                  // if (!Number.isFinite(quantity) || quantity <= 0) {
-                                  //   return;
-                                  // }
-                                  // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
-                                  // const primaryUnit = row?.Primary_Unit;
-                                  // const secondaryUnit = row?.Secondary_Unit;
-                                  // const conversionRate = Number(row?.Conversion_Rate) || 0;
-                                  // const currentItem = itemsValues[i];
-
-                                  // const primaryUnit =
-                                  //   currentItem?.Primary_Unit ||
-                                  //   availableUnits?.[0]?.Unit_Shorthand ||
-                                  //   "";
-
-                                  // const secondaryUnit =
-                                  //   currentItem?.Secondary_Unit ||
-                                  //   availableUnits?.find(
-                                  //     (u) => u.Unit_Shorthand !== primaryUnit
-                                  //   )?.Unit_Shorthand ||
-                                  //   "";
-
-                                  // const conversionRate =
-                                  //   Number(currentItem?.Conversion_Rate) || 0;
-                                  // const row = rows[i];
-
-                                  // const availableUnits = Array.isArray(row?.Available_Units)
-                                  //   ? row.Available_Units
-                                  //   : [];
-
-                                  const primaryUnit =
-                                    row?.Primary_Unit ||
-                                    availableUnits?.[0]?.Unit_Shorthand ||
-                                    "";
-
-                                  const secondaryUnit =
-                                    row?.Secondary_Unit ||
-                                    availableUnits?.find(
-                                      (u) => u.Unit_Shorthand !== primaryUnit
-                                    )?.Unit_Shorthand ||
-                                    "";
-
-                                  const conversionRate =
-                                    Number(row?.Conversion_Rate) || 0;
-
-                                  if (
-                                    previousUnit &&
-                                    newUnit &&
-                                    previousUnit !== newUnit &&
-                                    primaryUnit &&
-                                    secondaryUnit &&
-                                    conversionRate > 0
-                                  ) {
-                                    //const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
-
-                                    //let newPrice = currentPrice;
-
-                                    // switching FROM primary TO secondary — price per unit gets smaller
-                                    // if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
-                                    //   newPrice = currentPrice / conversionRate;
-                                    // }
-                                    // // switching FROM secondary TO primary — price per unit gets bigger
-                                    // else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
-                                    //   newPrice = currentPrice * conversionRate;
-                                    // }
-
-                                    //const roundedPrice = newPrice.toFixed(2);
-                                    const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
-
-                                    // if (basePrice <= 0) {
-                                    //   return;
-                                    // }
-
-                                    // let newPrice = basePrice;
-
-                                    // =====================================================
-                                    // PRIMARY → SECONDARY
-                                    // Example:
-                                    // ₹45 / Kg
-                                    // 1 Kg = 1000 Gm
-                                    // ₹45 / 1000 = ₹0.045
-                                    // UI allows only 2 decimals → ₹0.05
-                                    // =====================================================
-
-                                    // if (
-                                    //   previousUnit === primaryUnit &&
-                                    //   newUnit === secondaryUnit
-                                    // ) {
-                                    //   newPrice = basePrice / conversionRate;
-                                    // }
-
-                                    // =====================================================
-                                    // SECONDARY → PRIMARY
-                                    // IMPORTANT:
-                                    // Do NOT use current displayed price.
-                                    // Restore original base price.
-                                    // =====================================================
-
-                                    // else if (
-                                    //   previousUnit === secondaryUnit &&
-                                    //   newUnit === primaryUnit
-                                    // ) {
-                                    //   newPrice = basePrice;
-
-                                    // }
-
-                                    // else {
-                                    //   return;
-                                    // }
-
-                                    //const roundedPrice = newPrice.toFixed(2);
-                                    const baseUnit =
-                                      basePurchaseUnitRef.current[i];
-
-                                    if (basePrice <= 0 || !baseUnit) {
-                                      return;
-                                    }
-
-                                    let newPrice;
-
-                                    if (newUnit === baseUnit) {
-                                      // Back to the unit in which the price was entered
-                                      newPrice = basePrice;
-                                    }
-
-                                    else if (
-                                      baseUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      // Primary → Secondary
-                                      newPrice = basePrice / conversionRate;
-                                    }
-
-                                    else if (
-                                      baseUnit === secondaryUnit &&
-                                      newUnit === primaryUnit
-                                    ) {
-                                      // Secondary → Primary
-                                      newPrice = basePrice * conversionRate;
-                                    }
-
-                                    else {
-                                      return;
-                                    }
-
-                                    const roundedPrice = newPrice.toFixed(2);
-
-
-
-
-
-                                    setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
-
-                                    // recompute Amount/Tax/Total with the new price
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Purchase_Price: roundedPrice },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                  }
-                                }}
-                              >
-                                {availableUnits.length > 0 ? (
-                                  availableUnits.map((unit) => (
-                                    <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                    </option>
-                                  ))
-                                ) : (
-                                  <>
-                                    <option value="">NONE</option>
-                                    {Array.isArray(itemUnits) &&
-                                      itemUnits.map((unit) => (
-                                        <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                        </option>
-                                      ))}
-                                    <option value="__ADD_UNIT__">➕ Add Unit</option>
-                                  </>
-                                )}
-                              </select>
-                            );
-                          }}
-                        />
-
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
                         )}
-                      </td> */}
+
+
+
+                     
                         <td style={{ padding: "0px", width: "10%" }}>
                           <Controller
                             control={control}
@@ -4293,7 +4129,10 @@ export default function PurchaseEdit() {
                         />
                       </td> */}
                         {/* Tax Amount Entry */}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        <td style={{ padding: "0px",
+                        width: shouldShowFreeQuantity ? "8%" : "10%"  
+                          //width: "12%" 
+                          }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -4414,6 +4253,10 @@ export default function PurchaseEdit() {
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
+
+                      {shouldShowFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
 
                       <td></td>
                       <td></td>

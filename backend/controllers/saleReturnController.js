@@ -650,6 +650,7 @@ const getSaleReturnById = async (req, res, next) => {
     i.Conversion_Rate,
 
     sri.Quantity,
+    sri.Free_Quantity,
 
     -- HISTORICAL SNAPSHOT UNITS FROM IDS
     pu1.Unit_Shorthand AS Primary_Unit_Snapshot,
@@ -732,6 +733,7 @@ const getSaleReturnById = async (req, res, next) => {
 
       const currentSecondary = it.Current_Secondary_Unit || null;
       const hasHistoricalMRP = it.MRP !== null && Number(it.MRP) > 0;
+      const hasHistoricalFreeQuantity = it.Free_Quantity !== null && Number(it.Free_Quantity) > 0;
       const price = Number(it.Sale_Price || 0);
       let discountAmount = 0;
 
@@ -830,6 +832,8 @@ const getSaleReturnById = async (req, res, next) => {
         Item_Category: it.Item_Category,
 
         Quantity: it.Quantity,
+        Free_Quantity: it.Free_Quantity,
+        hasHistoricalFreeQuantity,
 
         // Snapshot
         Primary_Unit: oldPrimary,
@@ -1646,17 +1650,27 @@ returnNumber = buildLegacyReturnNumber(
   returnNumberValue
 );
 if (returnNumber !== null) {
+  // const [duplicateRows] = await connection.execute(
+  //   `
+  //   SELECT id
+  //   FROM sale_return
+  //   WHERE Return_Number = ?
+  //     AND id <> ?
+  //   LIMIT 1
+  //   FOR UPDATE
+  //   `,
+  //   [returnNumber,id]
+  // );
   const [duplicateRows] = await connection.execute(
-    `
-    SELECT id
-    FROM sale_return
-    WHERE Return_Number = ?
-      AND id <> ?
-    LIMIT 1
-    FOR UPDATE
-    `,
-    [returnNumber, Sale_Return_Id]
-  );
+  `
+  SELECT id
+  FROM sale_return
+  WHERE Return_Number = ?
+  LIMIT 1
+  FOR UPDATE
+  `,
+  [returnNumber]
+);
 
   if (duplicateRows.length > 0) {
     await connection.rollback();
@@ -1778,6 +1792,7 @@ if (returnNumber !== null) {
         MRP,
         Discount_On_MRP_For_Sale_Percentage,
         Quantity,
+        Free_Quantity,
         Sale_Price,
         Discount_On_Sale_Price,
         Discount_Type_On_Sale_Price,
@@ -1788,7 +1803,7 @@ if (returnNumber !== null) {
 
       // ── UNIT ARCHITECTURE (ported from createPurchaseReturn) ──
       const Selected_Unit = Item_Unit || null;   // step 1
-
+      const cleanFreeQuantity = Number(Free_Quantity) > 0 ? Number(Free_Quantity) : null;
       // =========================================================
       // 12. FIND EXISTING ITEM
       // =========================================================
@@ -1917,7 +1932,9 @@ if (returnNumber !== null) {
       } = resolveUnitAndStockDelta({
         dbItemRow,
         Selected_Unit,
-        Quantity,
+        //Quantity,
+         Quantity: (normalizeNumber(Quantity) ?? 0) +
+          (cleanFreeQuantity ?? 0)
       });
 
       // =========================================================
@@ -1934,6 +1951,7 @@ if (returnNumber !== null) {
            Secondary_Unit_Snapshot,
            Selected_Unit,
            Quantity,
+           Free_Quantity,
            MRP,
            Discount_On_MRP_For_Sale_Percentage,
            Sale_Price,
@@ -1943,7 +1961,7 @@ if (returnNumber !== null) {
            Tax_Amount,
            Amount
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           Item_Id,
@@ -1951,6 +1969,7 @@ if (returnNumber !== null) {
           snapshot.Secondary_Unit_Snapshot,  // step 6
           resolvedSelectedUnit,              // step 6
           Number(Quantity) || 0,
+          cleanFreeQuantity,
           normalizeNumber(MRP) || null,
           normalizeNumber(Discount_On_MRP_For_Sale_Percentage) || null,
           Number(Sale_Price) || 0,
@@ -2044,7 +2063,7 @@ if (returnNumber !== null) {
 
         // User-entered quantity
         quantity: normalizeNumber(Quantity) ?? 0,
-
+        freeQuantity: cleanFreeQuantity,
         // Unit used in this transaction
         selectedUnit: resolvedSelectedUnit,
 
@@ -2989,6 +3008,7 @@ if (returnNumber !== null) {
         MRP,
         Discount_On_MRP_For_Sale_Percentage,
         Quantity,
+         Free_Quantity,
         Sale_Price,
         Discount_On_Sale_Price,
         Discount_Type_On_Sale_Price,
@@ -3001,6 +3021,7 @@ if (returnNumber !== null) {
 
       let Item_Id = item.Item_Id || null;
       let dbItemRow = null;
+      const cleanFreeQuantity = Number(Free_Quantity) > 0 ? Number(Free_Quantity) : null
 
       // =======================================================
       // 12. FIND ITEM
@@ -3125,7 +3146,10 @@ if (returnNumber !== null) {
       } = resolveUnitAndStockDelta({
         dbItemRow,
         Selected_Unit: Selected_Unit,
-        Quantity: Number(Quantity) || 0,
+         Quantity:
+          (Number(Quantity) || 0) +
+          (cleanFreeQuantity ?? 0),
+        //Quantity: Number(Quantity) || 0,
       });
 
       // =======================================================
@@ -3136,6 +3160,7 @@ if (returnNumber !== null) {
         ...item,
         Item_Id,
         dbItemRow,
+         Free_Quantity: cleanFreeQuantity,
 
         Primary_Unit_Snapshot: snapshot.Primary_Unit_Snapshot,
         Secondary_Unit_Snapshot: snapshot.Secondary_Unit_Snapshot,
@@ -3208,8 +3233,18 @@ if (returnNumber !== null) {
       } else {
 
         // Fallback for old records where ledger is missing
+        // const rawQty =
+        //   Number(old.Quantity) || 0;
+
+        // oldBaseQty = rawQty;
+         const oldFreeQty =
+          Number(old.Free_Quantity) > 0
+            ? Number(old.Free_Quantity)
+            : 0;
+
         const rawQty =
-          Number(old.Quantity) || 0;
+          (Number(old.Quantity) || 0) +
+          oldFreeQty;
 
         oldBaseQty = rawQty;
 
@@ -3359,6 +3394,7 @@ if (returnNumber !== null) {
            Sale_Return_Id,
            Item_Id,
            Quantity,
+           Free_Quantity,
            MRP,
            Discount_On_MRP_For_Sale_Percentage,
            Sale_Price,
@@ -3371,11 +3407,12 @@ if (returnNumber !== null) {
            Secondary_Unit_Snapshot,
            Selected_Unit
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Sale_Return_Id,
           line.Item_Id,
           line.Quantity,
+          line.Free_Quantity,
           normalizeNumber(line.MRP) || null,
           normalizeNumber(line.Discount_On_MRP_For_Sale_Percentage) || null,
           line.Sale_Price,
@@ -3403,7 +3440,8 @@ if (returnNumber !== null) {
   WHERE Item_Id = ?
   `,
         [
-          line.resolvedSelectedUnit || null,
+          line.Selected_Unit || null,
+          ///line.resolvedSelectedUnit || null,
           line.Primary_Unit_Snapshot || null,
           line.Secondary_Unit_Snapshot || null,
           line.Item_Id,
@@ -3443,7 +3481,7 @@ if (returnNumber !== null) {
 
         // User-entered quantity
         quantity: normalizeNumber(line.Quantity) ?? 0,
-
+        freeQuantity: line.Free_Quantity ?? null,
         // Unit used in this transaction
         selectedUnit: line.Selected_Unit,
 

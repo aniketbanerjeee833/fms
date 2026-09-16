@@ -13,7 +13,7 @@ const digitsOnly = (fieldName, required = true) =>
       { message: `${fieldName} must be a valid number` }
     )
     .transform((val) => (val === "" ? 0 : Number(val)));
-  const optionalDigitsOnly = (fieldName) =>
+const optionalDigitsOnly = (fieldName) =>
   z.union([z.string(), z.number(), z.null(), z.undefined()])
     .transform((val) => String(val ?? "").trim())
     .refine(
@@ -90,16 +90,16 @@ export const purchaseReturnFormSchema = z.object({
   ),
 
   Transaction_Discount_Percentage: optionalDigitsOnly(
-  "Transaction_Discount_Percentage"
-),
+    "Transaction_Discount_Percentage"
+  ),
 
-Transaction_Discount_Amount: optionalDigitsOnly(
-  "Transaction_Discount_Amount"
-),
+  Transaction_Discount_Amount: optionalDigitsOnly(
+    "Transaction_Discount_Amount"
+  ),
 
   /* ── Amounts — can legitimately be 0 for an empty return ── */
   Total_Amount: digitsOnly("Total_Amount", false).default(0),
-    Round_Off: z
+  Round_Off: z
     .union([z.string(), z.number()])
     .optional()
     .transform((val) => {
@@ -157,7 +157,7 @@ Transaction_Discount_Amount: optionalDigitsOnly(
           .refine((val) => val === "" || /^\d{4,8}$/.test(val), {
             message: "HSN Code must be 4-8 digits if provided",
           }),
-           MRP: z
+        MRP: z
           .union([z.string(), z.number()])
           .optional()
           .transform((val) => String(val ?? "").trim())
@@ -177,6 +177,39 @@ Transaction_Discount_Amount: optionalDigitsOnly(
           },
           z.number().min(0, "Quantity cannot be negative")
         ),
+        Free_Quantity: z
+          .union([z.string(), z.number(), z.null(), z.undefined()])
+          .transform((val) => {
+            if (val === "" || val === null || val === undefined) {
+              return null;
+            }
+
+            return String(val).trim();
+          })
+          .refine(
+            (val) =>
+              val === null || /^\d+(\.\d{1,2})?$/.test(val),
+            {
+              message:
+                "Free Quantity must be a valid number with up to 2 decimals",
+            }
+          )
+          .transform((val) => {
+            if (val === null) {
+              return null;
+            }
+
+            const num = Number(val);
+
+            // 0 => null
+            return num > 0 ? num : null;
+          })
+          .refine(
+            (val) => val === null || val >= 0,
+            {
+              message: "Free  Quantity cannot be negative",
+            }
+          ),
 
         Item_Unit: z.string().optional().default(""),
 

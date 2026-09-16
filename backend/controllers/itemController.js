@@ -5377,6 +5377,7 @@ const getItemBills = async (req, res, next) => {
     il.Bill_Number,
     il.Party_Name,
     il.Quantity,
+    il.Free_Quantity,
 
     u.Unit_Shorthand AS Selected_Unit,
 
@@ -5608,6 +5609,8 @@ const getItemBills = async (req, res, next) => {
           Party_Name: row.Party_Name,
 
           Quantity: Number(row.Quantity || 0),
+          
+Free_Quantity:Number(row.Free_Quantity) > 0? Number(row.Free_Quantity): null,
 
           Rate:
             row.Rate !== null

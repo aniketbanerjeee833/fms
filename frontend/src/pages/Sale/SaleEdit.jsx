@@ -396,6 +396,7 @@ export default function SaleEdit() {
         Item_Category: "",
         Item_Name: "",
         Quantity: "",
+        Free_Quantity: "",
         Item_Unit: "",
         MRP: "",
         Discount_On_MRP_For_Sale_Percentage: "",
@@ -515,6 +516,18 @@ export default function SaleEdit() {
       )?.setting_value
     ) === 1;
 
+    
+
+    const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+const hasHistoricaFreeQuantity=sale?.items?.some(
+  (item) => item.hasHistoricalFreeQuantity === true
+)
+const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
   const hasHistoricalMRP =
     sale?.items?.some(
       (item) => item.hasHistoricalMRP === true
@@ -926,6 +939,7 @@ const [getLatestInvoiceNumber] =
       Item_Name: "",
       Item_HSN: "",
       Quantity: "",
+      Free_Quantity: "",
       Item_Unit: "",
       MRP: "",
       Discount_On_MRP_For_Sale_Percentage: "",
@@ -1235,6 +1249,7 @@ const [getLatestInvoiceNumber] =
     MRP: "",
     Discount_On_MRP_For_Sale_Percentage: "",
     Quantity: "",
+    Free_Quantity: "",
     Sale_Price: "",
     Discount_On_Sale_Price: "",
     Discount_Type_On_Sale_Price: "Percentage",
@@ -1255,32 +1270,7 @@ const [getLatestInvoiceNumber] =
   const [originalInvoiceNumberPart, setOriginalInvoiceNumberPart] = useState("");
   useEffect(() => {
     if (sale) {
-      // const savedInvoiceNumber =
-      //   sale?.invoicePartyDetails?.Invoice_Number || "";
-
-      // const invoiceMatch =
-      //   String(savedInvoiceNumber).match(/^(.*?)(\d+)$/);
-
-      // if (invoiceMatch) {
-      //   const prefix = invoiceMatch[1] || "None";
-      //   const number = invoiceMatch[2];
-
-      //   setInvoicePrefix(prefix);
-      //   setInvoiceNumberPart(number);
-      //   setSelectedSalePrefix(prefix);
-
-      //   // Remember original invoice
-      //   setOriginalSalePrefix(prefix);
-      //   setOriginalInvoiceNumberPart(number);
-      // } else {
-      //   setInvoicePrefix("None");
-      //   setInvoiceNumberPart(savedInvoiceNumber);
-      //   setSelectedSalePrefix("None");
-
-      //   setOriginalSalePrefix("None");
-      //   setOriginalInvoiceNumberPart(savedInvoiceNumber);
-      // }
-      // setIsInvoicePrefixChanged(false);
+     
        const savedInvoicePrefix =
       String(
         sale?.invoicePartyDetails?.Invoice_Number_Prefix ?? ""
@@ -1417,14 +1407,13 @@ const [getLatestInvoiceNumber] =
         MRP: item.MRP || "",
         Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
         Quantity: item.Quantity || "",
+        Free_Quantity:item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
         Sale_Price: item.Sale_Price || "",
 
-        Discount_On_Sale_Price:
-          item.Discount_On_Sale_Price || "",
+        Discount_On_Sale_Price:item.Discount_On_Sale_Price || "",
 
-        Discount_Type_On_Sale_Price:
-          item.Discount_Type_On_Sale_Price || "Percentage",
+        Discount_Type_On_Sale_Price:item.Discount_Type_On_Sale_Price || "Percentage",
 
         Tax_Type: item.Tax_Type || "None",
         Tax_Amount: item.Tax_Amount || "",
@@ -1530,6 +1519,7 @@ const [getLatestInvoiceNumber] =
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+        const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Sale_Price) || 0;
 
         const subtotal = qty * price;
@@ -1543,6 +1533,7 @@ const [getLatestInvoiceNumber] =
             : discountRaw * qty;
 
         acc.totalQty += qty;
+        acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -1551,6 +1542,7 @@ const [getLatestInvoiceNumber] =
       },
       {
         totalQty: 0,
+         freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1558,6 +1550,7 @@ const [getLatestInvoiceNumber] =
     );
   };
   const totals = calculateTotals(itemsValues || []);
+  console.log(totals)
   const sanitizeAmount = (value) => {
     let val = value.replace(/[^0-9.]/g, "");
     const parts = val.split(".");
@@ -3313,6 +3306,7 @@ const [getLatestInvoiceNumber] =
                         <th>Discount On MRP (%)</th>
                       )}
                       <th>Qty</th>
+                      {shouldShowFreeQuantity && <th>Free Qty</th>}
                       <th>Unit</th>
                       <th>Price/Unit</th>
                       <th>Discount</th>
@@ -3565,7 +3559,14 @@ const [getLatestInvoiceNumber] =
                         </td>
 
                         {/* Item Dropdown */}
-                        <td style={{ padding: "0px", width: "20%", position: "relative" }}>
+                        <td 
+                        style={{
+                            padding: "0px",
+                              width: shouldShowFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                        //style={{ padding: "0px", width: "20%", position: "relative" }}
+                        >
                           <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                             <input
                               type="text"
@@ -4749,200 +4750,7 @@ const [getLatestInvoiceNumber] =
                           )}
                         </td>
                         {/*MRP */}
-                        {/* <td style={{ padding: "0px", width: "6%" }}>
-                        <div className="d-flex align-items-center">
-                          <input
-                            type="text"
-                            className="form-control"
-                            style={{ width: "100%", marginBottom: "0px" }}
-                            {...register(`items.${i}.MRP`)}
-                            onChange={(e) => {
-                              let val = e.target.value;
-
-                              // allow digits and one dot
-                              val = val.replace(/[^0-9.]/g, "");
-
-                              // keep only first dot
-                              const parts = val.split(".");
-                              if (parts.length > 2) {
-                                val = parts[0] + "." + parts.slice(1).join("");
-                              }
-
-                              // max 2 decimals
-                              if (val.includes(".")) {
-                                const [int, dec] = val.split(".");
-                                val = int + "." + dec.slice(0, 2);
-                              }
-                              if (val === "") {
-                                setValue(`items.${i}.MRP`, "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
-
-                                setValue(
-                                  `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
-                                  "",
-                                  {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  }
-                                );
-
-                                return;
-                              }
-
-                              setValue(`items.${i}.MRP`, val, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                              });
-
-                              // ==========================================
-                              // RECALCULATE SALE PRICE FROM MRP + MASTER DISCOUNT
-                              // ==========================================
-
-                              const mrpNum = Number(val) || 0;
-
-                              // const discountNum =
-                              //   Number(
-                              //     itemsValues[i]?.Discount_On_MRP_For_Sale_Percentage
-                              //   ) || 0;
-                              const discountNum =
-                                Number(masterMrpDiscountRef.current[i]) > 0
-                                  ? Number(masterMrpDiscountRef.current[i])
-                                  : 0;
-                              if (mrpNum > 0 && discountNum > 0) {
-                                setValue(
-                                  `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
-                                  discountNum,
-                                  {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  }
-                                );
-                              }
-
-                              if (mrpNum > 0) {
-                                const calculatedSalePrice =
-                                  mrpNum - (mrpNum * discountNum) / 100;
-
-                                setValue(
-                                  `items.${i}.Sale_Price`,
-                                  calculatedSalePrice.toFixed(2),
-                                  {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  }
-                                );
-                                const { Tax_Amount, Amount } = calculateRowAmount(
-                                  {
-                                    ...itemsValues[i],
-
-                                    Sale_Price: calculatedSalePrice.toFixed(2),
-                                  },
-                                  i,
-                                  itemsValues
-                                );
-
-                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
-
-                                setValue(`items.${i}.Amount`, Amount, {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
-
-                                syncTotalsAfterItemChange();
-                              }
-                            }}
-                            onBlur={(e) => {
-                              if (Number(e.target.value) === 0) {
-                                e.target.value = "";
-
-                                setValue(`items.${i}.MRP`, "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
-                                setValue(
-                                  `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
-                                  "",
-                                  {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
-                              }
-                            }}
-
-                            placeholder="MRP"
-                          />
-
-
-
-                        </div>
-                        {errors?.items?.[i]?.MRP && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].MRP.message}
-                          </p>
-                        )}
-                      </td>
-                      <td style={{ padding: "0px", width: "6%" }}>
-                        <div className="d-flex align-items-center">
-                          <input
-                            type="text"
-                            className="form-control"
-                            readOnly
-                            style={{ width: "100%", marginBottom: "0px" }}
-                            {...register(`items.${i}.Discount_On_MRP_For_Sale_Percentage`)}
-                          // onChange={(e) => {
-                          //   let val = e.target.value;
-
-                          //   // ✅ allow digits and one dot
-                          //   val = val.replace(/[^0-9.]/g, "");
-
-                          //   // ✅ if more than one dot, keep only the first
-                          //   const parts = val.split(".");
-                          //   if (parts.length > 2) {
-                          //     val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                          //   }
-
-                          //   // ✅ limit to 2 decimal places
-                          //   if (val.includes(".")) {
-                          //     const [int, dec] = val.split(".");
-                          //     val = int + "." + dec.slice(0, 2);
-                          //   }
-
-                          //   //const displayValue = Number(val) === 0 ? "" : val;
-
-                          //   //e.target.value = displayValue;
-                          //   setValue(`items.${i}.MRP`, val,
-                          //     { shouldValidate: true, shouldDirty: true });
-
-
-                          // }}
-                          // onBlur={(e) => {
-                          //   if (Number(e.target.value) === 0) {
-                          //     e.target.value = "";
-
-                          //     setValue(`items.${i}.MRP`, "", {
-                          //       shouldValidate: true,
-                          //       shouldDirty: true,
-                          //     });
-                          //   }
-                          // }}
-
-                          //placeholder="MRP"
-                          />
-
-
-
-                        </div>
-                        {/* {errors?.items?.[i]?.MRP && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors.items[i].MRP.message}
-                            </p>
-                          )} 
-                      </td> */}
+                    
                         {shouldShowMRP && (
                           <td style={{ padding: "0px", width: "6%" }}>
                             <div className="d-flex align-items-center">
@@ -5160,6 +4968,39 @@ const [getLatestInvoiceNumber] =
                             </p>
                           )}
                         </td>
+
+                         {shouldShowFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
+
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
+
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
+
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
+                        )}
 
 
 
@@ -5997,7 +5838,11 @@ const [getLatestInvoiceNumber] =
                         />
                       </td> */}
                         {/* Tax Amount Entry */}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        <td 
+                        style={{ padding: "0px", 
+                          width: shouldShowFreeQuantity ? "8%" : "10%" 
+                          }}
+                          >
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -6124,6 +5969,9 @@ const [getLatestInvoiceNumber] =
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
+                       {shouldShowFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
 
                       <td></td>
                       <td></td>

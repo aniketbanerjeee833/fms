@@ -412,6 +412,7 @@ export default function SaleReturnAdd() {
         Item_Category: "",
         Item_Name: "",
         Quantity: "",
+        Free_Quantity: "",
         Item_Unit: "",
         MRP: "",
         Discount_On_MRP_For_Sale_Percentage: "",
@@ -649,6 +650,16 @@ export default function SaleReturnAdd() {
     sale?.items?.some(
       (item) => item.hasHistoricalMRP === true
     );
+  const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+const hasHistoricaFreeQuantity=sale?.items?.some(
+  (item) => item.hasHistoricalFreeQuantity === true
+)
+const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
 
   const shouldShowMRP = showMRP || hasHistoricalMRP;
 
@@ -899,6 +910,7 @@ export default function SaleReturnAdd() {
       Item_Name: "",
       Item_HSN: "",
       Quantity: "",
+      Free_Quantity:"",
       Item_Unit: "",
       MRP: "",
       Discount_On_MRP_For_Sale_Percentage: "",
@@ -1006,6 +1018,7 @@ export default function SaleReturnAdd() {
     MRP: "",
     Discount_On_MRP_For_Sale_Percentage: "",
     Quantity: "",
+    Free_Quantity:"",
     Sale_Price: "",
     Discount_On_Sale_Price: "",
     Discount_Type_On_Sale_Price: "Percentage",
@@ -1148,6 +1161,7 @@ export default function SaleReturnAdd() {
         MRP: item.MRP || "",
         Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
         Quantity: item.Quantity || "",
+        Free_Quantity:item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
         Sale_Price: item.Sale_Price || "",
 
@@ -1233,6 +1247,7 @@ export default function SaleReturnAdd() {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+         const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Sale_Price) || 0;
 
         const subtotal = qty * price;
@@ -1246,6 +1261,7 @@ export default function SaleReturnAdd() {
             : discountRaw * qty;
 
         acc.totalQty += qty;
+         acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -1254,6 +1270,7 @@ export default function SaleReturnAdd() {
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1471,6 +1488,7 @@ export default function SaleReturnAdd() {
           { type: "Item", id: "LIST" },
           { type: "ItemsByCategory", id: "LIST" },
           { type: "ItemLedger", id: "LIST" },
+           { type: "Item", id: "DROPDOWN" },
         ])
       );;
 
@@ -2612,6 +2630,7 @@ export default function SaleReturnAdd() {
                         <th>Discount On MRP (%)</th>
                       )}
                       <th>Qty</th>
+                      {shouldShowFreeQuantity && <th>Free Qty</th>}
                       <th>Unit</th>
                       <th>Price/Unit</th>
                       <th>Discount</th>
@@ -2861,7 +2880,14 @@ export default function SaleReturnAdd() {
 
 
                         {/* Item Dropdown */}
-                        <td style={{ padding: "0px", width: "20%", position: "relative" }}>
+                        <td 
+                        style={{
+                            padding: "0px",
+                              width: shouldShowFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                        //style={{ padding: "0px", width: "20%", position: "relative" }}
+                        >
                           <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                             <input
                               type="text"
@@ -4447,6 +4473,38 @@ export default function SaleReturnAdd() {
                             </p>
                           )}
                         </td>
+                        {shouldShowFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
+
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
+
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
+
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
+                        )}
 
 
 
@@ -5302,7 +5360,13 @@ export default function SaleReturnAdd() {
                       </td> */}
 
                         {/* Tax Amount Entry */}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        <td 
+                         style={{ padding: "0px", 
+                          width: shouldShowFreeQuantity ? "8%" : "10%" 
+                          }}
+                        //style={{ padding: "0px", width: "12%" }}
+                        
+                        >
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -5427,6 +5491,9 @@ export default function SaleReturnAdd() {
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
+                       {shouldShowFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
 
                       <td></td>
                       <td></td>

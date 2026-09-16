@@ -182,7 +182,7 @@ const SettingRow = memo(function SettingRow({
 }) {
   return (
     <div
-      className="flex items-center justify-between px-4 py-3 rounded-md border setting-row"
+      className="flex items-center justify-between px-3 py-2 rounded-md border setting-row"
       style={{
         borderColor: "#e2e8f0",
         opacity: disabled ? 0.55 : 1,

@@ -1961,6 +1961,7 @@ setOriginalReturnNumberPart(
           { type: "Item", id: "LIST" },
           { type: "ItemsByCategory", id: "LIST" },
           { type: "ItemLedger", id: "LIST" },
+           { type: "Item", id: "DROPDOWN" },
         ])
       );;
 
