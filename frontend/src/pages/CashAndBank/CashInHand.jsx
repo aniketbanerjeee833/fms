@@ -772,7 +772,7 @@ export default function CashInHand() {
                                                         // );
                                                     }}
                                                     onDoubleClick={() => {
-                                                        setClickHighlightId(null);
+                                                        //setClickHighlightId(null);
                                                         const params =
                                                             new URLSearchParams(
                                                                 searchParams

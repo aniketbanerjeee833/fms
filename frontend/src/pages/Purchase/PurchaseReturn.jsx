@@ -593,7 +593,7 @@ export default function PurchaseReturn() {
                             // });
                           }}
                           onDoubleClick={() => {
-                            setClickHighlightId(null);
+                            //setClickHighlightId(null);
                             const params = new URLSearchParams(searchParams);
 
                             params.set(

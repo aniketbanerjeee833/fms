@@ -571,7 +571,7 @@ export default function SaleReturn() {
                             // });
                           }}
                           onDoubleClick={() => {
-                            setClickHighlightId(null);
+                            //setClickHighlightId(null);
                             const params = new URLSearchParams(searchParams);
 
                             params.set(

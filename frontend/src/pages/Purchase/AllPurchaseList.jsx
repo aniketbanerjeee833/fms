@@ -711,7 +711,7 @@ export default function AllPurchaseList() {
                               // setSearchParams(params, { replace: true });
                             }}
                             onDoubleClick={() => {
-                              setClickHighlightId(null);
+                              //setClickHighlightId(null);
                               const params = new URLSearchParams(searchParams);
 
                               params.set(
