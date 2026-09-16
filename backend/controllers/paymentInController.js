@@ -565,29 +565,29 @@ const updatePaymentIn = async (req, res, next) => {
       });
     }
 
-    // =====================================================
-    // 6. CHECK PAYMENT EXISTS
-    // =====================================================
+   // =====================================================
+// 6. START TRANSACTION + LOCK PAYMENT IN ROW
+// =====================================================
 
-    const [[existing]] = await connection.query(
-      `SELECT Id,financial_year
-       FROM payment_in
-       WHERE Id = ?`,
-      [id]
-    );
+await connection.beginTransaction();
 
-    if (!existing) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment In not found",
-      });
-    }
+const [[existing]] = await connection.query(
+  `SELECT Id, financial_year
+   FROM payment_in
+   WHERE Id = ?
+   LIMIT 1
+   FOR UPDATE`,
+  [id]
+);
 
-    // =====================================================
-    // 7. START TRANSACTION
-    // =====================================================
+if (!existing) {
+  await connection.rollback();
 
-    await connection.beginTransaction();
+  return res.status(404).json({
+    success: false,
+    message: "Payment In not found",
+  });
+}
 
     // =====================================================
     // 8. UPDATE PAYMENT HEADER

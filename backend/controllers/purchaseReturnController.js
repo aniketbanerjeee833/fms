@@ -1616,15 +1616,16 @@ const editPurchaseReturn = async (req, res, next) => {
     // 1. CHECK PURCHASE RETURN EXISTS
     // =========================================================
 
-    const [[existing]] = await connection.query(
-      `
+ const [[existing]] = await connection.query(
+  `
   SELECT id, financial_year
   FROM purchase_return
   WHERE id = ?
   LIMIT 1
+  FOR UPDATE
   `,
-      [Purchase_Return_Id]
-    );
+  [Purchase_Return_Id]
+);
 
     if (!existing) {
       await connection.rollback();

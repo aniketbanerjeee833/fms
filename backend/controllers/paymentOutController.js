@@ -1319,28 +1319,30 @@ const updatePaymentOut = async (req, res, next) => {
     }
 
     // =====================================================
-    // 6. CHECK PAYMENT OUT EXISTS
-    // =====================================================
-
-    const [[existing]] = await connection.query(
-      `SELECT id,financial_year
-       FROM payment_out
-       WHERE id = ?`,
-      [id]
-    );
-
-    if (!existing) {
-      return res.status(404).json({
-        success: false,
-        message: "Payment Out not found",
-      });
-    }
-
-    // =====================================================
-    // 7. START TRANSACTION
-    // =====================================================
+// 6. START TRANSACTION + LOCK PAYMENT OUT
+// =====================================================
 
     await connection.beginTransaction();
+  
+    const [[existing]] = await connection.query(
+  `SELECT id, financial_year
+   FROM payment_out
+   WHERE id = ?
+   LIMIT 1
+   FOR UPDATE`,
+  [id]
+);
+
+   if (!existing) {
+  await connection.rollback();
+
+  return res.status(404).json({
+    success: false,
+    message: "Payment Out not found",
+  });
+}
+
+   
 
     // =====================================================
     // 8. UPDATE HEADER

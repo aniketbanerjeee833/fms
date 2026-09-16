@@ -2118,9 +2118,15 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
 
     const [[existing]] = await connection.query(
-      `SELECT id,financial_year FROM sale_return WHERE id = ?`,
-      [Sale_Return_Id]
-    );
+  `
+  SELECT id, financial_year
+  FROM sale_return
+  WHERE id = ?
+  LIMIT 1
+  FOR UPDATE
+  `,
+  [Sale_Return_Id]
+);
 
     if (!existing) {
       await connection.rollback();

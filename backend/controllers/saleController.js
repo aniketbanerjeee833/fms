@@ -2456,9 +2456,9 @@ const getSingleSale = async (req, res, next) => {
           discountAmount.toFixed(2)
         ),
 
-        Tax_Amount:it.Tax_Amount,
+        Tax_Amount: it.Tax_Amount,
 
-        Tax_Type:it.Tax_Type || "None",
+        Tax_Type: it.Tax_Type || "None",
 
         Amount:
           it.Amount,
@@ -3137,7 +3137,11 @@ const editSale = async (req, res, next) => {
     const { Sale_Id: saleId } = req.params;
 
     const [existingSale] = await connection.query(
-      "SELECT * FROM add_sale WHERE Sale_Id = ?",
+      `SELECT *
+   FROM add_sale
+   WHERE Sale_Id = ?
+   LIMIT 1
+   FOR UPDATE`,
       [saleId]
     );
     if (existingSale.length === 0) {
@@ -4322,12 +4326,12 @@ const editSale = async (req, res, next) => {
       // add_item.Item_Unit is legacy and remains ""
       // =======================================================
 
-      const Selected_Unit =item.Item_Unit?.trim() || null;
-      const cleanFreeQuantity =Number(item.Free_Quantity) > 0
-    ? Number(item.Free_Quantity)
-    : null;
+      const Selected_Unit = item.Item_Unit?.trim() || null;
+      const cleanFreeQuantity = Number(item.Free_Quantity) > 0
+        ? Number(item.Free_Quantity)
+        : null;
 
-      let Item_Id =item.Item_Id || null;
+      let Item_Id = item.Item_Id || null;
 
       let dbItemRow = null;
 
@@ -4364,14 +4368,14 @@ const editSale = async (req, res, next) => {
 
         dbItemRow = rows[0] || null;
 
-        Item_Id =dbItemRow?.Item_Id || null;
+        Item_Id = dbItemRow?.Item_Id || null;
       }
 
 
       // These are what THIS sale row will save
       let stockDelta = 0;
 
-      const normalQuantity =normalizeNumber(item.Quantity) ?? 0;
+      const normalQuantity = normalizeNumber(item.Quantity) ?? 0;
 
       //const freeQuantity =normalizeNumber(item.Free_Quantity) ?? 0;
       const freeQuantity = cleanFreeQuantity ?? 0;
@@ -5196,8 +5200,8 @@ const editSale = async (req, res, next) => {
             normalizeNumber(
               line.Quantity
             ) ?? 0,
-            
-             line.Free_Quantity > 0? Number(line.Free_Quantity): null,
+
+            line.Free_Quantity > 0 ? Number(line.Free_Quantity) : null,
             //normalizeNumber(line.Free_Quantity) ?? null,
             line.snapshot.Primary_Unit_Snapshot,
             line.snapshot.Secondary_Unit_Snapshot,
@@ -5301,7 +5305,7 @@ const editSale = async (req, res, next) => {
         billNumber: invoiceNumber,
         partyName: Party_Name,
         quantity: normalizeNumber(line.Quantity) ?? 0,    // user-entered: e.g. 500
-        freeQuantity:line.Free_Quantity > 0? Number(line.Free_Quantity): null,
+        freeQuantity: line.Free_Quantity > 0 ? Number(line.Free_Quantity) : null,
         //freeQuantity: normalizeNumber(line.Free_Quantity) ?? null,
         selectedUnit: line.resolvedSelectedUnit,               // 🔹 e.g. "Gm"
         baseQty: line.Stock_Delta,                         // 🔹 normalized: e.g. 0.5

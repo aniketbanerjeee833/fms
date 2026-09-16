@@ -1180,10 +1180,14 @@ const editPurchase = async (req, res, next) => {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    const [existingPurchase] = await connection.query(
-      "SELECT * FROM add_purchase WHERE Purchase_Id = ?",
-      [purchaseId]
-    );
+ const [existingPurchase] = await connection.query(
+  `SELECT *
+   FROM add_purchase
+   WHERE Purchase_Id = ?
+   LIMIT 1
+   FOR UPDATE`,
+  [purchaseId]
+);
     if (existingPurchase.length === 0) {
       return res.status(404).json({ message: "No such Purchase found." });
     }
