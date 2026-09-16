@@ -1160,6 +1160,7 @@ const handleDeleteRow = (i) => {
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
