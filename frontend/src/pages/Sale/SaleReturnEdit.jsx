@@ -458,7 +458,7 @@ export default function SaleReturndEdit() {
         (s) => s.setting_key === "free_item_quantity"
       )?.setting_value
     ) === 1;
-const hasHistoricaFreeQuantity=sale?.saleReturn?.items?.items?.some(
+const hasHistoricaFreeQuantity=sale?.saleReturn?.items?.some(
   (item) => item.hasHistoricalFreeQuantity === true
 )
 const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
