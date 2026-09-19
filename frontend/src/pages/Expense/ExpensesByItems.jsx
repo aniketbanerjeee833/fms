@@ -844,6 +844,7 @@ export default function ExpensesByItems() {
                           <p
                             className="font-semibold text-gray-800 truncate text-sm"
                             style={{ margin: 0 }}
+                            title={item.name}
                           >
                             {item.name}
                           </p>

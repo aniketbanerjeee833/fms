@@ -997,7 +997,10 @@ useEffect(() => {
                                                     <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-semibold text-black truncate text-sm" style={{ margin: 0 }}>
+                                                    <p className="font-semibold text-black truncate text-sm" 
+                                                    style={{ margin: 0 }}
+                                                    title={item.Item_Name }
+                                                    >
                                                         {item.Item_Name}
                                                     </p>
                                                     {item.Item_Category?.trim() && (
