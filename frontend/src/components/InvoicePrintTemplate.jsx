@@ -322,9 +322,26 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   // QUANTITY
   // =========================================================
 
+  // const totalQuantity = items.reduce(
+  //   (sum, item) => sum + Number(item?.Quantity || 0),
+  //   0
+  // );
+
   const totalQuantity = items.reduce(
-    (sum, item) => sum + Number(item?.Quantity || 0),
-    0
+    (sum, item) => {
+      // Don't include Service items
+      if (
+        String(item?.Item_Type || "").toLowerCase() === "service"
+      ) {
+        return sum;
+      }
+
+      sum.quantity += Number(item?.Quantity || 0);
+      sum.freeQuantity += Number(item?.Free_Quantity || 0);
+
+      return sum;
+    },
+    { quantity: 0, freeQuantity: 0 }
   );
 
   const itemsSum = items.reduce(
@@ -881,13 +898,22 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 )}
 
                 {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
+             
                 {/* <td className="invoice-item-right">
-                  {money(item.Quantity)}
-                  {item.Selected_Unit ? ` ${item.Selected_Unit}` : item.Item_Unit ? ` ${item.Item_Unit}` : ""}
+                  {item.Quantity}
+                 
                 </td> */}
                 <td className="invoice-item-right">
-                  {item.Quantity}
-                  {/* {item.Selected_Unit ? ` ${item.Selected_Unit}` : ""} */}
+                  {Number(item.Quantity || 0)}
+
+                  {item.Free_Quantity !== null &&
+                    item.Free_Quantity !== undefined &&
+                    Number(item.Free_Quantity) > 0 && (
+                      <>
+                        {" + "}
+                        {Number(item.Free_Quantity)}
+                      </>
+                    )}
                 </td>
 
                 {showUnitColumn && (<td className="invoice-item-right">
@@ -1055,28 +1081,27 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             {hasMRPColumn && (
               <td className="invoice-total-cell"></td>
             )}
-            <td className="invoice-total-cell">
-              {hasItems ? money(totalQuantity) : ""}
-            </td>
+
             {/* <td className="invoice-total-cell">
-              {money(totalQuantity)}
+              {hasItems ? totalQuantity : ""}
             </td> */}
+            <td className="invoice-total-cell">
+  {hasItems &&
+  (totalQuantity.quantity > 0 || totalQuantity.freeQuantity > 0)
+    ? `${totalQuantity.quantity}${
+        totalQuantity.freeQuantity > 0
+          ? ` + ${totalQuantity.freeQuantity}`
+          : ""
+      }`
+    : ""}
+</td>
+
             {showUnitColumn && (
               <td className="invoice-total-cell"></td>
             )}
             {/* Price/Unit */}
             <td className="invoice-total-cell"></td>
-            {/* {hasDiscountColumn && (
-              <td className="invoice-total-cell">
-                ₹ {money(
-                  items.reduce(
-                    (sum, item) =>
-                      sum + Number(item.Discount_Amount || 0),
-                    0
-                  )
-                )}
-              </td>
-            )} */}
+
             {hasDiscountColumn && (
               <td className="invoice-total-cell">
                 ₹{" "}
@@ -1360,7 +1385,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   </td>
 
                   <td className="invoice-summary-cell-right">
-                     ₹ {money(Transaction_Discount_Amount)}
+                    ₹ {money(Transaction_Discount_Amount)}
                   </td>
                 </tr>
               )}

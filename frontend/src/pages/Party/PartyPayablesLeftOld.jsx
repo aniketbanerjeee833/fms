@@ -542,7 +542,7 @@ useEffect(() => {
     virtualListRef.current?.scrollToIndex(
       targetIndex,
       {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       }
     );

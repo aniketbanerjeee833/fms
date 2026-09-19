@@ -161,8 +161,8 @@ export default function AllPurchaseList() {
     }
 
     const timer = setTimeout(() => {
-      virtualListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
-      mobileListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
+      virtualListRef.current?.scrollToIndex(targetIndex, { align: "auto", behavior: "auto" });
+      mobileListRef.current?.scrollToIndex(targetIndex, { align: "auto", behavior: "auto" });
       hasScrolledToHighlightRef.current = true;
     }, 100);
 

@@ -2208,6 +2208,7 @@ const getSingleSale = async (req, res, next) => {
     i.Item_Name,
     i.Item_HSN,
     i.Item_Category,
+    i.Item_Type,
     i.Discount_On_MRP_For_Sale AS Current_MRP_Discount,
 
     -- CURRENT ITEM MASTER UNITS FROM IDs
@@ -2405,6 +2406,7 @@ const getSingleSale = async (req, res, next) => {
         Item_Name: it.Item_Name,
 
         Item_HSN: it.Item_HSN,
+        Item_Type:it.Item_Type,
 
         // Legacy field
         Item_Unit: it.Item_Unit,

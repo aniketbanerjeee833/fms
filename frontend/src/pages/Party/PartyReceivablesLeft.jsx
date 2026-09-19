@@ -549,7 +549,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       virtualListRef.current?.scrollToIndex(
         targetIndex,
         {
-          align: "center",
+          align: "auto",
           behavior: "auto",
         }
       );
@@ -1539,7 +1539,8 @@ export default function PartyReceivablesLeft() {
     useGetAllReceivablePartiesQuery({
       cursor: leftCursor,
       search: leftSearch,
-      limit: leftCursor ? 10 : initialLeftLimit.current
+      limit: leftCursor ? 10 : initialLeftLimit.current,
+      //  scope: "parties-receivables-page-list",
     });
   const parties = partiesData?.parties || [];
   const totalParties = partiesData?.totalParties || 0;
@@ -1701,7 +1702,7 @@ export default function PartyReceivablesLeft() {
 
     const timer = setTimeout(() => {
       virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       });
 
@@ -2084,117 +2085,3 @@ export default function PartyReceivablesLeft() {
 
 
 
-// <div
-//                     key={party.Party_Id}
-//                     ref={isSelected ? selectedItemRowRef : null}
-//                     onClick={() => handleSelectParty(party.Party_Id)}
-//                     onDoubleClick={() => {
-//                       if (party.Party_Name === "Cash Sale") return;
-//                       handleSelectParty(party.Party_Id);
-//                       handleEdit(party);
-//                       setOpenMenuId(null);
-//                     }}
-//                     className="flex items-center justify-between px-4 py-3 cursor-pointer transition-colors relative"
-//                     style={{
-//                       backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-//                       borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-//                       borderBottom: "1px solid #f1f5f9",
-//                     }}
-//                   >
-//                     <div className="flex items-center gap-3 flex-1 min-w-0">
-//                       <div
-//                         className="flex items-center justify-center rounded-lg flex-shrink-0"
-//                         style={{
-//                           width: 36,
-//                           height: 36,
-//                           backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
-//                         }}
-//                       >
-//                         <Users size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
-//                       </div>
-//                       {/* <div className="min-w-0">
-//                         <p className="font-semibold text-gray-800 truncate text-sm" style={{ margin: 0 }}>
-//                           {party.Party_Name}
-//                         </p>
-//                         <p className="text-xs truncate text-gray-400">
-//                           {party.GSTIN || party.State || "—"}
-//                         </p>
-//                       </div> */}
-//                       <div className="min-w-0">
-//                         <p
-//                           className="font-semibold text-gray-800 truncate text-sm"
-//                           style={{ margin: 0 }}
-//                         >
-//                           {party.Party_Name}
-//                         </p>
-
-//                         <p
-//                           className="text-xs truncate font-medium"
-//                           style={{
-//                             color:
-//                               Number(party.Current_Balance) < 0
-//                                 ? "#dc2626" // red
-//                                 : "#16a34a", // green
-//                           }}
-//                         >
-//                           ₹ {Math.abs(Number(party.Current_Balance || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       </div>
-//                     </div>
-
-//                     {/* 3-dot menu */}
-
-//                     {party.Party_Name !== "Cash Sale" && (
-//                       <div ref={openMenuId === party.Party_Id ? menuRef : null}
-//                         className="flex items-center ml-2 flex-shrink-0 relative">
-
-//                         <button
-//                           type="button"
-//                           onClick={(e) => {
-//                             e.stopPropagation();
-
-//                             // Select this party
-//                             handleSelectParty(party.Party_Id);
-
-//                             // Open/close menu
-//                             setOpenMenuId(
-//                               openMenuId === party.Party_Id ? null : party.Party_Id
-//                             );
-//                           }}
-//                           className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-//                           style={{ backgroundColor: "transparent" }}
-//                         >
-//                           <MoreVertical size={16} style={{ color: "#374151" }} />
-//                         </button>
-
-//                         {openMenuId === party.Party_Id && (
-//                           <div
-//                             className="absolute right-0 top-8 bg-white rounded-md shadow-lg z-10"
-//                             style={{ border: "1px solid #e2e8f0", minWidth: 120 }}
-//                             onClick={(e) => e.stopPropagation()}
-//                           >
-//                             <button
-//                               type="button"
-//                               //onClick={handleEdit}
-//                               onClick={() => handleEdit(party)}
-//                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-//                               style={{ backgroundColor: "transparent" }}
-//                             >
-//                               <SquarePen size={14} style={{ color: "#4CA1AF" }} /> Edit
-//                             </button>
-//                             <button
-//                               type="button"
-//                               onClick={() => {
-//                                 setOpenMenuId(null);
-//                               }}
-//                               className="flex items-center gap-2 px-3 py-2 w-full text-left text-sm hover:bg-gray-50"
-//                               style={{ backgroundColor: "transparent" }}
-//                             >
-//                               <Trash2 size={14} style={{ color: "#dc2626" }} /> Delete
-//                             </button>
-//                           </div>
-//                         )}
-//                       </div>
-//                     )}
-
-//                   </div>

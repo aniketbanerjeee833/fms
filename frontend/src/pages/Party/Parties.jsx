@@ -535,7 +535,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       virtualListRef.current?.scrollToIndex(
         targetIndex,
         {
-          align: "center",
+          align: "auto",
           behavior: "auto",
         }
       );
@@ -1648,8 +1648,9 @@ export default function Parties() {
   } = useGetAllPartiesCursorQuery({
     cursor: leftCursor,
     search: leftSearch,
-    //limit: 10,
-    limit: leftCursor ? 10 : initialLeftLimit.current
+    
+    limit: leftCursor ? 10 : initialLeftLimit.current,
+     scope: "parties-page-list",
   },
   );
 
@@ -1845,7 +1846,7 @@ export default function Parties() {
 
     const timer = setTimeout(() => {
       virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       });
 

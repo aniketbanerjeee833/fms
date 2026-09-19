@@ -1,6 +1,6 @@
 
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -8,6 +8,8 @@ import PaymentTypeSelect from "../PaymentTypeSelect";
 import { bankAccountApi } from "../../redux/api/bankAccountApi";
 import BankAccountModal from "./BankAccountModal";
 import { useDispatch } from "react-redux";
+import { useGetAllPartiesCursorQuery } from "../../redux/api/partyAPi";
+import VirtualPartyScrollList from "../VirtualPartyScrollList";
 
 /**
  * PaymentOutModal
@@ -29,7 +31,7 @@ import { useDispatch } from "react-redux";
 export default function PaymentOutModal({
   mode = "add",              // "add" | "edit" | "view"
   initialData = null,        // existing payment-out record for edit/view
-  parties = [],               // array of { Party_Id, Party_Name, Phone_Number, GSTIN } (or { parties: [...] })
+  //parties = [],               // array of { Party_Id, Party_Name, Phone_Number, GSTIN } (or { parties: [...] })
   onClose,
   onSave,
   banks,
@@ -39,7 +41,7 @@ export default function PaymentOutModal({
   const isView = mode === "view";
   const dispatch = useDispatch();
   // Normalize parties prop - accepts either an array or { parties: [...] }
-  const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
+  //const partyList = Array.isArray(parties) ? parties : parties?.parties || [];
 
   const formatDateForInput = (date) => {
     if (!date) return "";
@@ -85,6 +87,31 @@ export default function PaymentOutModal({
   const { fields, append, remove } = useFieldArray({ control, name: "splits" });
   const [open, setOpen] = useState(false);
   const [partySearch, setPartySearch] = useState(initialData?.Party_Name || "");
+  const [partyCursor, setPartyCursor] = useState(null);
+const partyScrollRef = useRef(null);
+  const {
+  data: partiesData,
+  isFetching: isPartiesFetching,
+} = useGetAllPartiesCursorQuery({
+  cursor: partyCursor,
+  search: partySearch,
+  limit: 20,
+  scope: "payment-out-party-dropdown",
+});
+
+const parties = partiesData?.parties || [];
+const partiesHasMore = partiesData?.hasMore ?? false;
+const partiesNextCursor = partiesData?.nextCursor ?? null;
+
+const handlePartyLoadMore = useCallback(() => {
+  if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
+
+  setPartyCursor(partiesNextCursor);
+}, [
+  partiesHasMore,
+  partiesNextCursor,
+  isPartiesFetching,
+]);
   const [showSplitBox, setShowSplitBox] = useState(
     isView ? (initialData?.splits?.length > 0) : (initialData?.splits?.length > 1)
   );
@@ -127,42 +154,7 @@ export default function PaymentOutModal({
     );
   };
 
-  // splits.0 already holds whatever was picked in single mode — just add a blank row
-  // const handleAddPaymentType = () => {
-  //   append({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" });
-  //   setShowSplitBox(true);
-  // };
-  // const handleAddPaymentType = () => {
-  //   const newIndex = fields.length;
 
-  //   const availableOptions = getAvailableOptions(newIndex);
-
-  //   if (availableOptions.length === 0) {
-  //     toast.info("No more payment types are available.");
-  //     return;
-  //   }
-
-  //   const firstOption = availableOptions[0];
-  //   console.log(firstOption);
-
-  //   if (firstOption.value.startsWith("bank_")) {
-  //     append({
-  //       Payment_Type: "Bank",
-  //       Bank_Account_Id: Number(firstOption.value.replace("bank_", "")),
-  //       Reference_Number: "",
-  //       Amount: "",
-  //     });
-  //   } else {
-  //     append({
-  //       Payment_Type: firstOption.value,
-  //       Bank_Account_Id: null,
-  //       Reference_Number: "",
-  //       Amount: "",
-  //     });
-  //   }
-
-  //   setShowSplitBox(true);
-  // };
   const handleAddPaymentType = () => {
     const newIndex = fields.length;
     const availableOptions = getAvailableOptions(newIndex);
@@ -192,11 +184,11 @@ export default function PaymentOutModal({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredParties = partyList.filter(
-    (p) =>
-      p?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-      p?.Phone_Number?.includes(partySearch)
-  );
+  // const filteredParties = partyList.filter(
+  //   (p) =>
+  //     p?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+  //     p?.Phone_Number?.includes(partySearch)
+  // );
 
   const selectParty = (party) => {
     setPartySearch(party.Party_Name);
@@ -301,7 +293,7 @@ export default function PaymentOutModal({
           {/* Fields — 2 column grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Party (searchable combobox) */}
-            <div
+            {/* <div
               ref={wrapperRef}
               className="flex flex-col relative mt-2 gap-2 party-class"
               style={{ marginBottom: "0px", marginTop: "0px" }}
@@ -311,7 +303,7 @@ export default function PaymentOutModal({
                 <span className="text-red-500">&nbsp;*</span>
               </span>
 
-              {/* Hidden field registered so RHF validates Party_Id */}
+           
               <input
                 type="hidden"
                 {...register("Party_Id", { required: "Party is required" })}
@@ -362,15 +354,7 @@ export default function PaymentOutModal({
                       + Add Party
                     </span>
 
-                    {/* {filteredParties.map((party, i) => (
-                      <div
-                        key={party.Party_Id ?? i}
-                        onClick={() => selectParty(party)}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                      >
-                        {party.Party_Name} {party.Phone_Number ? `(${party.Phone_Number})` : ""}
-                      </div>
-                    ))} */}
+                  
                     {filteredParties.map((party, i) => {
                       const bal = Number(party.Current_Balance ?? 0);
                       const balColor = bal < 0 ? "#ef4444" : "#16a34a";
@@ -382,7 +366,7 @@ export default function PaymentOutModal({
                           className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
                           style={{ borderBottom: "1px solid #f3f4f6" }}
                         >
-                          {/* Left — name + phone */}
+                         
                           <div className="flex flex-col min-w-0">
                             <span className="text-sm text-gray-800 font-medium truncate">
                               {party.Party_Name}
@@ -392,7 +376,7 @@ export default function PaymentOutModal({
                             </span>
                           </div>
 
-                          {/* Right — balance */}
+                         
                           <div className="flex flex-col items-end flex-shrink-0">
                             <span className="text-xs text-gray-400">Balance</span>
                             <span
@@ -417,7 +401,7 @@ export default function PaymentOutModal({
                 )}
               </div>
 
-              {/* Add Party Modal - only rendered if a component was passed in */}
+          
               {showPartyModal && PartyAddModal && (
                 <PartyAddModal
                   onClose={() => setShowPartyModal(false)}
@@ -428,7 +412,108 @@ export default function PaymentOutModal({
               {errors?.Party_Id && (
                 <p className="text-red-500 text-xs mt-1">{errors.Party_Id.message}</p>
               )}
-            </div>
+            </div> */}
+                   <div
+                  ref={wrapperRef}
+                  className="flex flex-col relative mt-2 gap-2 party-class"
+                  style={{ marginBottom: "0px", marginTop: "0px" }}
+                >
+                  <span className="whitespace-nowrap active">
+                    Party
+                    <span className="text-red-500">&nbsp;*</span>
+                  </span>
+            
+                  <input
+                    type="hidden"
+                    {...register("Party_Id", { required: "Party is required" })}
+                  />
+            
+                  <div className="relative w-full">
+                    <div
+                      className="flex flex-row border rounded-md bg-white cursor-pointer"
+                      onClick={() => !isView && setOpen((prev) => !prev)}
+                    >
+                      <input
+                        type="text"
+                        id="Party_Name"
+                        value={partySearch}
+                        disabled={isView}
+                        onChange={(e) => {
+                          setPartyCursor(null);   // reset cursor on new search
+                          const value = e.target.value;
+                          setPartySearch(value);
+                          setValue("Party_Id", "", { shouldValidate: false });
+                          setValue("Party_Name", value, { shouldValidate: false });
+                          setOpen(true);
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!isView) setOpen(true);
+                        }}
+                        placeholder="Search By Name/Phone"
+                        className="w-full outline-none py-1 px-2 text-gray-900"
+                        style={{
+                          marginBottom: 0,
+                          marginTop: "4px",
+                          border: "none",
+                          borderBottom: "none",
+                          height: "2rem",
+                        }}
+                      />
+                      <div className="w-10" />
+                      {!isView && <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>}
+                    </div>
+            
+                    {open && !isView && (
+                      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                        <span
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setShowPartyModal(true);
+                          }}
+                          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                          style={{ borderBottom: "1px solid #f3f4f6" }}
+                        >
+                          + Add Party
+                        </span>
+            
+                        <VirtualPartyScrollList
+                          parties={parties}
+                          isFetching={isPartiesFetching}
+                          hasMore={partiesHasMore}
+                          onLoadMore={handlePartyLoadMore}
+                          scrollRef={partyScrollRef}
+                         
+                           onSelectParty={(party) => {
+                setPartyCursor(null);
+            
+                setPartySearch(party.Party_Name);
+            
+                setValue("Party_Id", party.Party_Id, {
+                  shouldValidate: true,
+                });
+            
+                setValue("Party_Name", party.Party_Name, {
+                  shouldValidate: true,
+                });
+            
+                setOpen(false);
+              }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                    {showPartyModal && PartyAddModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={handleAddPartyResult}
+                    />
+                  )}
+            
+                  {errors?.Party_Id && (
+                    <p className="text-red-500 text-xs mt-1">{errors.Party_Id.message}</p>
+                  )}
+                </div>
 
             {/* Receipt No */}
             <div className="flex flex-col">

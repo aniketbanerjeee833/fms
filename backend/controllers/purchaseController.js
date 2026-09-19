@@ -2766,6 +2766,7 @@ const [items] = await connection.query(
     i.Item_Name,
     i.Item_HSN,
     i.Item_Category,
+    i.Item_Type,
 
     -- CURRENT ITEM UNIT FROM ID
     iu.Unit_Shorthand AS Item_Unit,
@@ -3086,13 +3087,12 @@ availableUnits = unitCodes.map((unitCode) => {
         Purchase_Items_Id:
           it.Purchase_Items_Id,
 
-        Item_Id:
-          it.Item_Id,
+        Item_Id:it.Item_Id,
 
-        Item_Name:
-          it.Item_Name,
+        Item_Name:it.Item_Name,
 
         Item_HSN:it.Item_HSN,
+        Item_Type:it.Item_Type,
 
         // Keep legacy column for old application data
         Item_Unit:it.Item_Unit,

@@ -48,44 +48,82 @@ export const partyApi = createApi({
   providesTags: ["Party"],
 }),
 
-getAllPartiesCursor: builder.query({
-      query: ({ cursor = null, search = "", limit = 10 } = {}) => {
-        const params = new URLSearchParams();
-        if (cursor)        params.append("cursor", cursor);
-        if (search?.trim()) params.append("search", search.trim());
-        params.append("limit", limit);
-        return `party/cursor?${params.toString()}`;  // adjust route to match yours
-      },
+// getAllPartiesCursor: builder.query({
+//       query: ({ cursor = null, search = "", limit = 10 } = {}) => {
+//         const params = new URLSearchParams();
+//         if (cursor)        params.append("cursor", cursor);
+//         if (search?.trim()) params.append("search", search.trim());
+//         params.append("limit", limit);
+//         return `party/cursor?${params.toString()}`;  // adjust route to match yours
+//       },
  
-      // Cache key = search term only — different cursors for the SAME search
-      // merge into the same cache entry
-      serializeQueryArgs: ({ queryArgs }) => ({
-        search: queryArgs.search ?? "",
-      }),
+//       // Cache key = search term only — different cursors for the SAME search
+//       // merge into the same cache entry
+//       serializeQueryArgs: ({ queryArgs }) => ({
+//         search: queryArgs.search ?? "",
+//       }),
  
-      // Merge incoming page into existing cache
-      merge: (currentCache, newData, { arg }) => {
-        if (!arg.cursor) {
-          // First page (no cursor) — replace entirely
-          return newData;
-        }
-        // Subsequent pages — append
-        currentCache.parties.push(...newData.parties);
-        currentCache.hasMore    = newData.hasMore;
-        currentCache.nextCursor = newData.nextCursor;
-      },
+//       // Merge incoming page into existing cache
+//       merge: (currentCache, newData, { arg }) => {
+//         if (!arg.cursor) {
+//           // First page (no cursor) — replace entirely
+//           return newData;
+//         }
+//         // Subsequent pages — append
+//         currentCache.parties.push(...newData.parties);
+//         currentCache.hasMore    = newData.hasMore;
+//         currentCache.nextCursor = newData.nextCursor;
+//       },
  
-      // Re-fetch when cursor or search changes
-      forceRefetch: ({ currentArg, previousArg }) =>
-        currentArg?.cursor !== previousArg?.cursor ||
-        currentArg?.search !== previousArg?.search ||
-        currentArg?.limit !== previousArg?.limit, 
+//       // Re-fetch when cursor or search changes
+//       forceRefetch: ({ currentArg, previousArg }) =>
+//         currentArg?.cursor !== previousArg?.cursor ||
+//         currentArg?.search !== previousArg?.search ||
+//         currentArg?.limit !== previousArg?.limit, 
  
-      providesTags: ["Party"],
-    }),
+//       providesTags: ["Party"],
+//     }),
  
 
     // ✅ Add a party
+    getAllPartiesCursor: builder.query({
+  query: ({ cursor = null, search = "", limit = 10, scope = "default" } = {}) => {
+    const params = new URLSearchParams();
+    if (cursor) params.append("cursor", cursor);
+    if (search?.trim()) params.append("search", search.trim());
+    params.append("limit", limit);
+    return `party/cursor?${params.toString()}`;
+  },
+
+  // Cache key now includes `scope` — page-list and dropdown usages
+  // never share the same accumulated cache entry, even with identical search text
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: (queryArgs.search ?? "").trim(),
+    scope: queryArgs.scope ?? "default",
+  }),
+
+
+  merge: (currentCache, newData, { arg }) => {
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    const existingIds = new Set(currentCache.parties.map((p) => p.Party_Id));
+    const uniqueNew = newData.parties.filter((p) => !existingIds.has(p.Party_Id));
+
+    currentCache.parties.push(...uniqueNew);
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+  },
+
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    (currentArg?.search ?? "").trim() !== (previousArg?.search ?? "").trim() ||
+    currentArg?.limit !== previousArg?.limit ||
+    currentArg?.scope !== previousArg?.scope,
+
+  providesTags: ["Party"],
+}),
     addParty: builder.mutation({
       query: ({ body }) => ({
         url: `party/add-party`,

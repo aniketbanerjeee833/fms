@@ -224,7 +224,7 @@ export default function SaleReturn() {
     // Wait until VirtualScrollList has rendered the new data
     const timer = setTimeout(() => {
       virtualListRef.current?.scrollToIndex(targetIndex, {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       });
 

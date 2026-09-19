@@ -442,8 +442,8 @@ function BankDetailPanel({ bankId }) {
       return;
     }
 
-    //virtualListRef.current?.scrollToIndex(targetIndex, { align: "center" });
-    virtualListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
+    //virtualListRef.current?.scrollToIndex(targetIndex, { align: "auto" });
+    virtualListRef.current?.scrollToIndex(targetIndex, { align: "auto", behavior: "auto" });
     hasScrolledToHighlightRef.current = true;
   }, [ledger, isLoading, isFetching, hasMore, searchParams, handleLoadMore]);
 

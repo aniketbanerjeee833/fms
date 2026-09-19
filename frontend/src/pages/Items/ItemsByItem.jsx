@@ -729,7 +729,7 @@ export default function ItemsByItem() {
             return;
         }
 
-        virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
+        virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "auto", behavior: "auto" });
         hasScrolledToSelectedRef.current = true;
     }, [items, isLoading, isItemsFetching, selectedItemId, itemsHasMore, itemsNextCursor]);
 
@@ -751,48 +751,81 @@ export default function ItemsByItem() {
     useEffect(() => {
         hasScrolledToHighlightRef.current = false;
     }, [selectedItemId, highlightTxnId, txnSearch]);
+useEffect(() => {
+    if (hasScrolledToHighlightRef.current) return;
+    if (!highlightTxnId) return;
+    if (isBillsLoading || isBillsFetching) return;
+    if (!transactions.length) return;
 
-    useEffect(() => {
-        // if (skipHighlightScrollRef.current) {
-        //     skipHighlightScrollRef.current = false;
-        //     return;
-        // }
-        if (hasScrolledToHighlightRef.current) return;
-        if (!highlightTxnId) return;
-        if (isBillsLoading || isBillsFetching) return;
-        if (!transactions.length) return;
+    const targetIndex = transactions.findIndex(
+        (txn) => String(txn.Ledger_Id) === String(highlightTxnId)
+    );
 
-        const targetIndex = transactions.findIndex(
-            (txn) =>
-                String(txn.Ledger_Id) ===
-                String(highlightTxnId)
-        );
-
-        if (targetIndex === -1) {
-            if (hasMore && nextCursor && !isBillsFetching) {
-                setCursor(nextCursor);
-            }
-
-            return;
+    if (targetIndex === -1) {
+        if (hasMore && nextCursor && !isBillsFetching) {
+            setCursor(nextCursor);
         }
+        return;
+    }
 
-        virtualRightListRef.current?.scrollToIndex(
-            targetIndex,
-            {
-                align: "center",
-                behavior: "auto",
-            }
-        );
-
+    // give the DOM a moment to actually render the rows before scrolling
+    const timer = setTimeout(() => {
+        virtualRightListRef.current?.scrollToIndex(targetIndex, {
+            align: "auto",
+            behavior: "auto",
+        });
         hasScrolledToHighlightRef.current = true;
-    }, [
-        transactions,
-        highlightTxnId,
-        isBillsLoading,
-        isBillsFetching,
-        hasMore,
-        nextCursor,
-    ]);
+    }, 100);
+
+    return () => clearTimeout(timer);
+}, [
+    transactions,
+    highlightTxnId,
+    isBillsLoading,
+    isBillsFetching,
+    hasMore,
+    nextCursor,
+]);
+
+    // useEffect(() => {
+        
+    //     if (hasScrolledToHighlightRef.current) return;
+    //     if (!highlightTxnId) return;
+    //     if (isBillsLoading || isBillsFetching) return;
+    //     if (!transactions.length) return;
+
+    //     const targetIndex = transactions.findIndex(
+    //         (txn) =>
+    //             String(txn.Ledger_Id) ===
+    //             String(highlightTxnId)
+    //     );
+
+    //     if (targetIndex === -1) {
+    //         if (hasMore && nextCursor && !isBillsFetching) {
+    //             setCursor(nextCursor);
+    //         }
+
+    //         return;
+    //     }
+
+    //     virtualRightListRef.current?.scrollToIndex(
+    //         targetIndex,
+    //         {
+    //             //align: "auto",
+    //              align: "auto",
+    //             behavior: "auto",
+    //         }
+    //     );
+
+    //     hasScrolledToHighlightRef.current = true;
+    // }, [
+    //     transactions,
+    //     highlightTxnId,
+    //     isBillsLoading,
+    //     isBillsFetching,
+    //     hasMore,
+    //     nextCursor,
+    // ]);
     useEffect(() => {
         sessionStorage.setItem(
             "itemsByItem:rightCount",
@@ -1400,18 +1433,8 @@ export default function ItemsByItem() {
                                             </div>
 
                                             {/* QTY */}
-                                            {/* <div className="table-desi-cell"
-                                                // style={{
-                                                //     //padding: "0 5px",
-                                                //     whiteSpace: "nowrap",
-                                                // }}
-                                            >
-                                                {fmt(txn.Quantity)}
-                                                {txn.Selected_Unit
-                                                    ? ` (${txn.Selected_Unit})`
-                                                    : ""}
-                                            </div> */}
-                                            <div className="table-desi-cell">
+                                           
+                                            {/* <div className="table-desi-cell">
                                                 {fmt(txn.Quantity)}
 
 
@@ -1426,7 +1449,22 @@ export default function ItemsByItem() {
                                                 {txn.Selected_Unit
                                                     ? ` ${txn.Selected_Unit}`
                                                     : ""}
-                                            </div>
+                                            </div> */}
+                                            <div className="table-desi-cell">
+  {Number(txn.Quantity || 0)}
+
+  {txn.Free_Quantity !== null &&
+    Number(txn.Free_Quantity) > 0 && (
+      <>
+        {" + "}
+        {Number(txn.Free_Quantity)}
+      </>
+    )}
+
+  {txn.Selected_Unit
+    ? ` ${txn.Selected_Unit}`
+    : ""}
+</div>
 
                                             {/* PRICE */}
                                             <div

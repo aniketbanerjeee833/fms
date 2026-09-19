@@ -3,64 +3,7 @@
 import { forwardRef } from "react";
 import "./SalePurchaseBulkReportPrintTemplate.css";
 
-// const TYPE_CONFIG = {
-//     sale: {
-//         title: "Sale Report",
-//         docLabel: "Invoice No.",
-//         dateLabel: "Invoice Date",
-//         docNumberKey: "Invoice_Number",
-//         dateKey: "Invoice_Date",
-//         amountKey: "Total_Amount",
-//         paidKey: "Total_Received",
-//         paidLabel: "Received",
-//         priceKey: "Sale_Price",
-//         discountKey: "Discount_On_Sale_Price",
-//         discountTypeKey: "Discount_Type_On_Sale_Price",
-//         showTerms: true,
-//     },
-//     purchase: {
-//         title: "Purchase Report",
-//         docLabel: "Bill No.",
-//         dateLabel: "Bill Date",
-//         docNumberKey: "Bill_Number",
-//         dateKey: "Bill_Date",
-//         amountKey: "Total_Amount",
-//         paidKey: "Total_Paid",
-//         paidLabel: "Paid",
-//         priceKey: "Purchase_Price",
-//         discountKey: "Discount_On_Purchase_Price",
-//         discountTypeKey: "Discount_Type_On_Purchase_Price",
-//         showTerms: true,
-//     },
-//     credit: {
-//         title: "Credit Note Report",
-//         docLabel: "Return No.",
-//         dateLabel: "Return Date",
-//         docNumberKey: "Return_Number",
-//         dateKey: "Return_Date",
-//         amountKey: "Total_Amount",
-//         paidKey: "Total_Paid",
-//         paidLabel: "Received",
-//         priceKey: "Sale_Price",
-//         discountKey: "Discount_On_Sale_Price",
-//         discountTypeKey: "Discount_Type_On_Sale_Price",
-//         showTerms: false,
-//     },
-//     debit: {
-//         title: "Debit Note Report",
-//         docLabel: "Return No.",
-//         dateLabel: "Return Date",
-//         docNumberKey: "Return_Number",
-//         dateKey: "Return_Date",
-//         amountKey: "Total_Amount",
-//         paidKey: "Total_Received",
-//         paidLabel: "Paid",
-//         priceKey: "Purchase_Price",
-//         discountKey: "Discount_On_Purchase_Price",
-//         discountTypeKey: "Discount_Type_On_Purchase_Price",
-//         showTerms: false,
-//     },
-// };
+
 const TYPE_CONFIG = {
     sale: {
         title: "Sale Report",
@@ -302,7 +245,19 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                                                 : "-"}
                                                         </td>
                                                     )}
-                                                    <td className="bulk-right">{money(item.Quantity)}</td>
+                                                    <td className="bulk-right">
+                                                        {Number(item.Quantity || 0)}
+
+                                                        {item.Free_Quantity !== null &&
+                                                            item.Free_Quantity !== undefined &&
+                                                            Number(item.Free_Quantity) > 0 && (
+                                                                <>
+                                                                    {" + "}
+                                                                    {Number(item.Free_Quantity)}
+                                                                </>
+                                                            )}
+                                                    </td>
+                                                    {/* <td className="bulk-right">{money(item.Quantity)}</td> */}
                                                     <td className="bulk-center">
                                                         {item.Selected_Unit || item.Item_Unit || "-"}
                                                     </td>
@@ -355,10 +310,43 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                             <td />
                                             <td className="bulk-bold">Total</td>
                                             <td />
-                                             {hasMRPColumn && <td />}
+                                            {hasMRPColumn && <td />}
                                             {/* <td colSpan={3} className="bulk-right bulk-bold">Total</td> */}
-                                            <td className="bulk-right bulk-bold">
+                                            {/* <td className="bulk-right bulk-bold">
                                                 {money(items.reduce((s, i) => s + Number(i.Quantity || 0), 0))}
+                                            </td> */}
+                                            <td className="bulk-right bulk-bold">
+                                                {(() => {
+                                                    const quantityTotal = items.reduce(
+                                                        (sum, item) => {
+                                                            // Don't include Service items
+                                                            if (
+                                                                String(item?.Item_Type || "").toLowerCase() ===
+                                                                "service"
+                                                            ) {
+                                                                return sum;
+                                                            }
+
+                                                            sum.quantity += Number(item?.Quantity || 0);
+                                                            sum.freeQuantity += Number(item?.Free_Quantity || 0);
+
+                                                            return sum;
+                                                        },
+                                                        { quantity: 0, freeQuantity: 0 }
+                                                    );
+
+                                                    if (
+                                                        quantityTotal.quantity === 0 &&
+                                                        quantityTotal.freeQuantity === 0
+                                                    ) {
+                                                        return "";
+                                                    }
+
+                                                    return `${quantityTotal.quantity}${quantityTotal.freeQuantity > 0
+                                                            ? ` + ${quantityTotal.freeQuantity}`
+                                                            : ""
+                                                        }`;
+                                                })()}
                                             </td>
                                             <td />
                                             <td />

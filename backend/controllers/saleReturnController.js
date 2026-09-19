@@ -52,121 +52,7 @@ const buildLegacyReturnNumber = (
   return `${prefix}${number}`;
 };
 /* ── GET ALL ──────────────────────────────────────────────── */
-// const getAllSaleReturns = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
 
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = 10;
-//     const offset = (page - 1) * limit;
-//     const search = req.query.search?.trim().toLowerCase() || "";
-//     const fromDate = req.query.fromDate || null;
-//     const toDate = req.query.toDate || null;
-
-//     const whereClauses = [];
-//     const params = [];
-
-//     // if (search) {
-//     //   whereClauses.push(`(
-//     //     LOWER(p.Party_Name)      LIKE ? OR
-//     //     LOWER(sr.Return_Number)  LIKE ? OR
-//     //     LOWER(sr.Invoice_Number) LIKE ? OR
-//     //     CAST(sr.Total_Amount AS CHAR) LIKE ? OR
-//     //     CAST(sr.Balance_Due AS CHAR) LIKE ? OR
-//     //     CAST(sr.Total_Paid AS CHAR) LIKE ?
-//     //   )`);
-//     //   const like = `%${search}%`;
-//     //   params.push(like, like, like, like, like, like);
-//     // }
-
-//     if (search) {
-//       whereClauses.push(`(
-//         p.Party_Name     LIKE ? OR
-//         sr.Return_Number  LIKE ? OR
-//         sr.Invoice_Number LIKE ? OR
-//         CAST(sr.Total_Amount AS CHAR) LIKE ? OR
-//         CAST(sr.Balance_Due AS CHAR) LIKE ? OR
-//         CAST(sr.Total_Paid AS CHAR) LIKE ?
-//       )`);
-//       const like = `%${search}%`;
-//       params.push(like, like, like, like, like, like);
-//     }
-
-//     if (fromDate && toDate) {
-//       whereClauses.push(`DATE(sr.Return_Date) BETWEEN ? AND ?`);
-//       params.push(fromDate, toDate);
-//     } else if (fromDate) {
-//       whereClauses.push(`DATE(sr.Return_Date) >= ?`);
-//       params.push(fromDate);
-//     } else if (toDate) {
-//       whereClauses.push(`DATE(sr.Return_Date) <= ?`);
-//       params.push(toDate);
-//     }
-
-//     const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
-//     //ORDER BY sr.created_at DESC
-//     const [rows] = await connection.query(
-//       `SELECT sr.*, p.Party_Name
-//        FROM sale_return sr
-//        LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
-//        ${whereSQL}
-//        ORDER BY sr.Invoice_Date DESC
-//        LIMIT ? OFFSET ?`,
-//       [...params, limit, offset]
-//     );
-
-//     // 🔹 attach Payment_Type_Display per row from splits
-//     for (const row of rows) {
-//       const [splits] = await connection.query(
-//         `SELECT ps.Payment_Type, ba.Account_Display_Name
-//          FROM payment_splits ps
-//          LEFT JOIN bank_accounts ba ON ba.id = ps.Bank_Account_Id
-//          WHERE ps.Source_Type = 'Sale_Return' AND ps.Source_Id = ?`,
-//         [row.id]
-//       );
-//       const labels = splits.map((s) =>
-//         s.Payment_Type === "Bank" ? s.Account_Display_Name : s.Payment_Type
-//       );
-//       const counts = {};
-//       labels.forEach((l) => (counts[l] = (counts[l] || 0) + 1));
-//       row.Payment_Type_Display = Object.entries(counts)
-//         .map(([label, count]) => (count > 1 ? `${label} (x${count})` : label))
-//         .join(",") || "—";
-//     }
-
-//     const [[{ total }]] = await connection.query(
-//       `SELECT COUNT(*) AS total
-//        FROM sale_return sr
-//        LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     const [[totals]] = await connection.query(
-//       `SELECT
-//          COALESCE(SUM(sr.Total_Amount), 0) AS totalAmount,
-//          COALESCE(SUM(sr.Total_Paid),   0) AS totalPaid,
-//          COALESCE(SUM(sr.Balance_Due),  0) AS totalBalance
-//        FROM sale_return sr
-//        LEFT JOIN add_party p ON p.Party_Id = sr.Party_Id
-//        ${whereSQL}`,
-//       params
-//     );
-
-//     return res.status(200).json({
-//       success: true,
-//       currentPage: page,
-//       totalPages: Math.ceil(total / limit),
-//       totalReturns: total,
-//       saleReturns: rows,
-//       totals,
-//     });
-//   } catch (err) {
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
 // };
 const getAllSaleReturns = async (req, res, next) => {
   let connection;
@@ -640,6 +526,7 @@ const getSaleReturnById = async (req, res, next) => {
     i.Item_Name,
     i.Item_HSN,
     i.Item_Category,
+    i.Item_Type,
     i.Discount_On_MRP_For_Sale AS Current_MRP_Discount,
 
     -- CURRENT MASTER UNITS FROM IDs
@@ -830,6 +717,7 @@ const getSaleReturnById = async (req, res, next) => {
         Item_Unit: it.Item_Unit,
 
         Item_Category: it.Item_Category,
+        Item_Type:it.Item_Type,
 
         Quantity: it.Quantity,
         Free_Quantity: it.Free_Quantity,

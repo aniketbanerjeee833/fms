@@ -246,7 +246,7 @@ useEffect(() => {
 
     // const timer = setTimeout(() => {
     //     virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-    //         align: "center",
+    //         align: "auto",
     //         behavior: "auto",
     //     });
 
@@ -254,7 +254,7 @@ useEffect(() => {
     // }, 100);
 
     // return () => clearTimeout(timer);
-     virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
+     virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "auto", behavior: "auto" });
         hasScrolledToSelectedCategoryRef.current = true;
 }, [
     categories,
@@ -296,7 +296,7 @@ useEffect(() => {
 
   const timer = setTimeout(() => {
     virtualRightListRef.current?.scrollToIndex(targetIndex, {
-      align: "center",
+      align: "auto",
       behavior: "auto",
     });
 

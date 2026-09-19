@@ -441,7 +441,7 @@ useEffect(() => {
   if (targetIndex === -1) return;
 
   virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-    align: "center",
+    align: "auto",
     behavior: "auto",
   });
 
@@ -493,7 +493,7 @@ useEffect(() => {
     virtualRightListRef.current?.scrollToIndex(
       targetIndex,
       {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       }
     );

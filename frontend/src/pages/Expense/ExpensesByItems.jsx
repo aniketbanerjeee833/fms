@@ -566,7 +566,7 @@ export default function ExpensesByItems() {
     virtualLeftListRef.current?.scrollToIndex(
       targetIndex,
       {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       }
     );
@@ -635,7 +635,7 @@ export default function ExpensesByItems() {
     virtualRightListRef.current?.scrollToIndex(
       targetIndex,
       {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       }
     );

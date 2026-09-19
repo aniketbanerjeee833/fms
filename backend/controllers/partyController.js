@@ -986,16 +986,29 @@ const getAllPartiesCursor = async (req, res, next) => {
     const conditions = [];
     const params = [];
 
+    // if (search) {
+    //   conditions.push(`(
+    //     p.Party_Name   LIKE ? OR
+    //     p.GSTIN        LIKE ? OR
+    //     p.Phone_Number LIKE ? OR
+    //     CAST(ABS(p.Current_Balance) AS CHAR) LIKE ?
+    //   )`);
+    //   const like = `%${search}%`;
+    //   params.push(like, like, like, like);
+    // }
     if (search) {
-      conditions.push(`(
-        p.Party_Name   LIKE ? OR
-        p.GSTIN        LIKE ? OR
-        p.Phone_Number LIKE ? OR
-        CAST(ABS(p.Current_Balance) AS CHAR) LIKE ?
-      )`);
-      const like = `%${search}%`;
-      params.push(like, like, like, like);
-    }
+  conditions.push(`(
+    p.Party_Name LIKE ? OR
+    p.GSTIN LIKE ? OR
+    p.Phone_Number LIKE ? OR
+    CAST(ABS(p.Current_Balance) AS CHAR) LIKE ?
+  )`);
+
+  const like = `%${search}%`;
+  const phoneLike = `${search}%`;
+
+  params.push(like, like, phoneLike, like);
+}
 
     /* cursor: fetch rows whose internal id < cursor (desc order) */
     if (cursor) {
@@ -1023,7 +1036,10 @@ const getAllPartiesCursor = async (req, res, next) => {
   )`);
 
       const like = `%${search}%`;
-      countParams.push(like, like, like, like);
+       const phoneLike = `${search}%`;   // ← fixed: was `like` before, now matches main query
+
+      countParams.push(like, like, phoneLike, like);
+      // countParams.push(like, like, like, like);
     }
 
     const countWhereSQL =

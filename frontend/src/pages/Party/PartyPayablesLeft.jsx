@@ -548,7 +548,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       virtualListRef.current?.scrollToIndex(
         targetIndex,
         {
-          align: "center",
+          align: "auto",
           behavior: "auto",
         }
       );
@@ -1549,7 +1549,9 @@ export default function PartyPayablesLeft() {
     useGetAllPayablePartiesQuery({
       cursor: leftCursor,
       search: leftSearch,
-      limit: leftCursor ? 10 : initialLeftLimit.current
+      limit: leftCursor ? 10 : initialLeftLimit.current,
+      // scope: "parties-payables-page-list",
+
     });
   const parties = partiesData?.parties || [];
   const totalParties = partiesData?.totalParties || 0;
@@ -1711,7 +1713,7 @@ export default function PartyPayablesLeft() {
 
     const timer = setTimeout(() => {
       virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-        align: "center",
+        align: "auto",
         behavior: "auto",
       });
 

@@ -69,6 +69,7 @@ export const getPurchasesForPrint = async (
       i.Item_HSN,
       i.Item_Unit,
       i.Item_Category,
+      i.Item_Type,
 
       i.Primary_Unit,
       i.Secondary_Unit,
@@ -309,6 +310,7 @@ export const getSalesForPrint = async (
         i.Item_HSN,
         i.Item_Unit,
         i.Item_Category,
+        i.Item_Type,
 
         i.Primary_Unit,
         i.Secondary_Unit,
@@ -603,6 +605,7 @@ export const getPurchaseReturnsForPrint = async (
         i.Item_HSN,
         i.Item_Unit,
         i.Item_Category,
+        i.Item_Type,
 
         i.Primary_Unit,
         i.Secondary_Unit,
@@ -875,6 +878,7 @@ if (!returns.length) {
         i.Item_HSN,
         i.Item_Unit,
         i.Item_Category,
+        i.Item_Type,
 
         i.Primary_Unit,
         i.Secondary_Unit,

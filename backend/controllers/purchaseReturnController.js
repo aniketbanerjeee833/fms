@@ -556,6 +556,7 @@ const getPurchaseReturnById = async (req, res, next) => {
     i.Item_Name,
     i.Item_HSN,
     i.Item_Category,
+    i.Item_Type,
 
     -- CURRENT MASTER UNITS FROM IDs
     iu.Unit_Shorthand AS Item_Unit,
@@ -742,6 +743,7 @@ const getPurchaseReturnById = async (req, res, next) => {
         Item_Name: it.Item_Name,
 
         Item_HSN: it.Item_HSN,
+        Item_Type: it.Item_Type,
 
         Item_Unit: it.Item_Unit,
 
