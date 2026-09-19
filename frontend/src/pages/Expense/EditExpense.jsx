@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { NavLink, useNavigate, useLocation, useParams } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,7 +18,7 @@ import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 // import AddUnitModal from "../../components/Modal/AddUnitModal";
 
 
-import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { useGetAllPartiesCursorQuery } from "../../redux/api/partyAPi";
 import { useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
 
 import {
@@ -29,6 +29,7 @@ import {
 } from "../../redux/api/expenseApi";
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
+import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
 
 
 
@@ -166,7 +167,7 @@ export default function EditExpense() {
     // TODO: const { data: categories } = useGetAllExpenseCategoriesQuery();
     const {
         data: categoryResponse,
-        isLoading: isCategoryLoading,
+        //isLoading: isCategoryLoading,
     } = useGetAllExpenseCategoriesQuery();
 
     const categories = categoryResponse?.categories || [];
@@ -177,7 +178,7 @@ export default function EditExpense() {
 
     const {
         data: itemResponse,
-        isLoading: isItemLoading,
+        //isLoading: isItemLoading,
     } = useGetAllExpenseItemMastersQuery();
 
     const items = itemResponse?.items || [];
@@ -186,16 +187,53 @@ export default function EditExpense() {
     // console.log("Items:", items);
 
 
+    // const {
+    //     data: partiesResponse,
+    //     isLoading: isPartyLoading,
+    // } = useGetAllPartiesQuery();
+
+    const [partyOpen, setPartyOpen] = useState(false);
+    const [partySearch, setPartySearch] = useState("");
+    const partyRef = useRef(null);
+
+    const [partyCursor, setPartyCursor] = useState(null);
+    const partyScrollRef = useRef(null);
+
     const {
-        data: partiesResponse,
-        isLoading: isPartyLoading,
-    } = useGetAllPartiesQuery();
+        data: partiesData,
+        isFetching: isPartiesFetching,
+    } = useGetAllPartiesCursorQuery({
+        cursor: partyCursor,
+        search: partySearch,
+        limit: 20,
+        scope: "expense-edit-party-dropdown",
+    });
+
+    const parties = partiesData?.parties || [];
+    const partiesHasMore = partiesData?.hasMore ?? false;
+    const partiesNextCursor = partiesData?.nextCursor ?? null;
+
+    const handlePartyLoadMore = useCallback(() => {
+        if (
+            !partiesHasMore ||
+            !partiesNextCursor ||
+            isPartiesFetching
+        ) {
+            return;
+        }
+
+        setPartyCursor(partiesNextCursor);
+    }, [
+        partiesHasMore,
+        partiesNextCursor,
+        isPartiesFetching,
+    ]);
     // console.log("Parties:", partiesResponse);
 
     // TODO: const { data: banks = [] } = useGetAllBankAccountsQuery();
     const {
         data: banks = [],
-        isLoading: isBankLoading,
+        //isLoading: isBankLoading,
     } = useGetAllBankAccountsQuery();
     // console.log("Banks:", banks);
 
@@ -216,7 +254,7 @@ export default function EditExpense() {
 
     const {
         data: expenseResponse,
-        isLoading: isExpenseLoading,
+        //isLoading: isExpenseLoading,
     } = useGetExpenseByIdQuery(id);
 
 
@@ -238,10 +276,6 @@ export default function EditExpense() {
     const [itemOpen, setItemOpen] = useState(null);
     const [itemSearch, setItemSearch] = useState({});
     const itemRefs = useRef({});
-
-    const [partyOpen, setPartyOpen] = useState(false);
-    const [partySearch, setPartySearch] = useState("");
-    const partyRef = useRef(null);
 
     // const [showAddUnitModal, setShowAddUnitModal] = useState(false);
     // const [activeUnitRow, setActiveUnitRow] = useState(null);
@@ -320,7 +354,7 @@ export default function EditExpense() {
         append: appendSplit,
         remove: removeSplit,
     } = useFieldArray({ control, name: "splits" });
- const {
+    const {
         data: taxesGSTSettingsData,
     } = useGetAllTaxesAndGSTSettingsQuery();
 
@@ -353,8 +387,8 @@ export default function EditExpense() {
                     s.setting_key === "transaction_wise_discount"
             )?.setting_value
         ) === 1;
-          const originalTaxTypesRef = useRef([]);
-          const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
+    const originalTaxTypesRef = useRef([]);
+    const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
     // useEffect(() => {
     //     if (!expenseResponse?.expense) return;
 
@@ -466,170 +500,170 @@ export default function EditExpense() {
     //     );
 
     // }, [expenseResponse, reset]);
-useEffect(() => {
-    if (!expenseResponse?.expense) return;
+    useEffect(() => {
+        if (!expenseResponse?.expense) return;
 
-    const expense = expenseResponse.expense;
+        const expense = expenseResponse.expense;
 
-    console.log("Expense ID:", expense.id);
-    console.log("Expense:", expense);
-    console.log("Items:", expense.items);
-    console.log("Splits:", expense.splits);
-    console.log("Items Length:", expense.items?.length);
-    console.log("Splits Length:", expense.splits?.length);
-     originalTaxTypesRef.current = (expense?.items || []).map(
-        (item) => item?.Tax_Type || "None"
-    );
-
-    // -----------------------------------------
-    // Restore transaction-wise discount
-    // -----------------------------------------
-    const savedDiscountAmount =
-        Number(expense?.Transaction_Discount_Amount) || 0;
-
-    const savedDiscountPercentage =
-        Number(expense?.Transaction_Discount_Percentage) || 0;
-
-    setShowTransactionDiscount(
-        enableTransactionWiseDiscount ||
-        savedDiscountAmount > 0 ||
-        savedDiscountPercentage > 0
-    );
-
-    reset({
-        Category_Name: expense.Category_Name || "",
-        Category_Type: expense.Category_Type || "Indirect",
-
-        Party_Id: expense.Party_Id || "",
-        Party_Name: expense.Party_Name || "",
-
-        Expense_Number: expense.Expense_Number || "",
-
-        Expense_Date: expense.Expense_Date
-            ? new Date(expense.Expense_Date).toLocaleDateString("en-CA")
-            : "",
-
-        Bill_Date: expense.Bill_Date
-            ? new Date(expense.Bill_Date).toLocaleDateString("en-CA")
-            : "",
-
-        With_GST: Boolean(expense.With_GST),
-
-        State_Of_Supply: expense.State_Of_Supply || "",
-
-        Total_Amount: expense.Total_Amount || "0.00",
-
-        Round_Off:
-            expense.Round_Off !== null &&
-            expense.Round_Off !== undefined
-                ? String(expense.Round_Off)
-                : "",
-
-        Total_Paid: expense.Total_Paid || "0.00",
-        Balance_Due: expense.Balance_Due || "0.00",
+        console.log("Expense ID:", expense.id);
+        console.log("Expense:", expense);
+        console.log("Items:", expense.items);
+        console.log("Splits:", expense.splits);
+        console.log("Items Length:", expense.items?.length);
+        console.log("Splits Length:", expense.splits?.length);
+        originalTaxTypesRef.current = (expense?.items || []).map(
+            (item) => item?.Tax_Type || "None"
+        );
 
         // -----------------------------------------
-        // Transaction-wise discount
+        // Restore transaction-wise discount
         // -----------------------------------------
-        Transaction_Discount_Amount:
-            savedDiscountAmount > 0
-                ? String(expense.Transaction_Discount_Amount)
-                : "",
+        const savedDiscountAmount =
+            Number(expense?.Transaction_Discount_Amount) || 0;
 
-        Transaction_Discount_Percentage:
+        const savedDiscountPercentage =
+            Number(expense?.Transaction_Discount_Percentage) || 0;
+
+        setShowTransactionDiscount(
+            enableTransactionWiseDiscount ||
+            savedDiscountAmount > 0 ||
             savedDiscountPercentage > 0
-                ? String(expense.Transaction_Discount_Percentage)
+        );
+
+        reset({
+            Category_Name: expense.Category_Name || "",
+            Category_Type: expense.Category_Type || "Indirect",
+
+            Party_Id: expense.Party_Id || "",
+            Party_Name: expense.Party_Name || "",
+
+            Expense_Number: expense.Expense_Number || "",
+
+            Expense_Date: expense.Expense_Date
+                ? new Date(expense.Expense_Date).toLocaleDateString("en-CA")
                 : "",
 
-        items: (() => {
-            console.log("Items going into reset:", expense.items);
+            Bill_Date: expense.Bill_Date
+                ? new Date(expense.Bill_Date).toLocaleDateString("en-CA")
+                : "",
 
-            return (
-                expense.items?.map((item) => ({
-                    Item_Name: item.Item_Name || "",
-                    Item_HSN: item.Item_HSN || "",
-                    Quantity: item.Quantity || "",
-                    Price: item.Price || "",
-                    Discount_On_Price: item.Discount_On_Price || "",
-                    Discount_Type_On_Price:
-                        item.Discount_Type_On_Price || "Percentage",
+            With_GST: Boolean(expense.With_GST),
 
-                    Tax_Type: item.Tax_Type || "None",
+            State_Of_Supply: expense.State_Of_Supply || "",
 
-                    Tax_Amount: item.Tax_Amount || "",
+            Total_Amount: expense.Total_Amount || "0.00",
 
-                    Amount: item.Amount || "",
-                })) || [emptyRow()]
-            );
-        })(),
+            Round_Off:
+                expense.Round_Off !== null &&
+                    expense.Round_Off !== undefined
+                    ? String(expense.Round_Off)
+                    : "",
 
-        splits:
-            expense.splits?.length > 0
-                ? expense.splits.map((split) => ({
-                    Payment_Type: split.Payment_Type || "Cash",
-                    Bank_Account_Id: split.Bank_Account_Id || null,
-                    Reference_Number: split.Reference_Number || "",
-                    Amount: split.Amount || "",
-                }))
-                : [
-                    {
-                        Payment_Type: "Cash",
-                        Bank_Account_Id: null,
-                        Reference_Number: "",
-                        Amount: "",
-                    },
-                ],
-    });
+            Total_Paid: expense.Total_Paid || "0.00",
+            Balance_Due: expense.Balance_Due || "0.00",
 
-    // -----------------------------------------
-    // Restore Round Off state
-    // -----------------------------------------
-    const savedRoundOff = Number(expense.Round_Off) || 0;
+            // -----------------------------------------
+            // Transaction-wise discount
+            // -----------------------------------------
+            Transaction_Discount_Amount:
+                savedDiscountAmount > 0
+                    ? String(expense.Transaction_Discount_Amount)
+                    : "",
 
-    setIsRoundOff(savedRoundOff !== 0);
+            Transaction_Discount_Percentage:
+                savedDiscountPercentage > 0
+                    ? String(expense.Transaction_Discount_Percentage)
+                    : "",
 
-    // -----------------------------------------
-    // Calculate original item total
-    // -----------------------------------------
-    const rawTotal = (expense.items || []).reduce(
-        (sum, item) => sum + (Number(item.Amount) || 0),
-        0
-    );
+            items: (() => {
+                console.log("Items going into reset:", expense.items);
 
-    setOriginalTotal(rawTotal);
+                return (
+                    expense.items?.map((item) => ({
+                        Item_Name: item.Item_Name || "",
+                        Item_HSN: item.Item_HSN || "",
+                        Quantity: item.Quantity || "",
+                        Price: item.Price || "",
+                        Discount_On_Price: item.Discount_On_Price || "",
+                        Discount_Type_On_Price:
+                            item.Discount_Type_On_Price || "Percentage",
 
-    // -----------------------------------------
-    // Controlled search states
-    // -----------------------------------------
-    setCategorySearch(expense.Category_Name || "");
-    setPartySearch(expense.Party_Name || "");
+                        Tax_Type: item.Tax_Type || "None",
 
-    const searchValues = {};
+                        Tax_Amount: item.Tax_Amount || "",
 
-    expense.items?.forEach((item, index) => {
-        searchValues[index] = item.Item_Name || "";
-    });
+                        Amount: item.Amount || "",
+                    })) || [emptyRow()]
+                );
+            })(),
 
-    setItemSearch(searchValues);
+            splits:
+                expense.splits?.length > 0
+                    ? expense.splits.map((split) => ({
+                        Payment_Type: split.Payment_Type || "Cash",
+                        Bank_Account_Id: split.Bank_Account_Id || null,
+                        Reference_Number: split.Reference_Number || "",
+                        Amount: split.Amount || "",
+                    }))
+                    : [
+                        {
+                            Payment_Type: "Cash",
+                            Bank_Account_Id: null,
+                            Reference_Number: "",
+                            Amount: "",
+                        },
+                    ],
+        });
 
-    // -----------------------------------------
-    // Split box
-    // -----------------------------------------
-    setShowSplitBox(
-        expense.splits && expense.splits.length > 1
-    );
+        // -----------------------------------------
+        // Restore Round Off state
+        // -----------------------------------------
+        const savedRoundOff = Number(expense.Round_Off) || 0;
 
-}, [
-    expenseResponse,
-    reset,
-    enableTransactionWiseDiscount,
-]);
+        setIsRoundOff(savedRoundOff !== 0);
+
+        // -----------------------------------------
+        // Calculate original item total
+        // -----------------------------------------
+        const rawTotal = (expense.items || []).reduce(
+            (sum, item) => sum + (Number(item.Amount) || 0),
+            0
+        );
+
+        setOriginalTotal(rawTotal);
+
+        // -----------------------------------------
+        // Controlled search states
+        // -----------------------------------------
+        setCategorySearch(expense.Category_Name || "");
+        setPartySearch(expense.Party_Name || "");
+
+        const searchValues = {};
+
+        expense.items?.forEach((item, index) => {
+            searchValues[index] = item.Item_Name || "";
+        });
+
+        setItemSearch(searchValues);
+
+        // -----------------------------------------
+        // Split box
+        // -----------------------------------------
+        setShowSplitBox(
+            expense.splits && expense.splits.length > 1
+        );
+
+    }, [
+        expenseResponse,
+        reset,
+        enableTransactionWiseDiscount,
+    ]);
     const itemsValues = watch("items");
     const splitsValues = watch("splits") || [];
     const totalAmountWatch = watch("Total_Amount");
 
     /* ───────────────────────── ITEM TABLE TOTALS ───────────────────────── */
-   
+
     const calculateTotals = (items = []) => {
         return items.reduce(
             (acc, row) => {
@@ -1021,17 +1055,17 @@ useEffect(() => {
         );
     };
 
-    const filteredParties = useMemo(() => {
-        const list = partiesResponse?.parties || [];
+    // const filteredParties = useMemo(() => {
+    //     const list = partiesResponse?.parties || [];
 
-        return list.filter(
-            (p) =>
-                p.Party_Name?.toLowerCase().includes(
-                    partySearch.toLowerCase()
-                ) ||
-                p.Phone_Number?.includes(partySearch)
-        );
-    }, [partiesResponse, partySearch]);
+    //     return list.filter(
+    //         (p) =>
+    //             p.Party_Name?.toLowerCase().includes(
+    //                 partySearch.toLowerCase()
+    //             ) ||
+    //             p.Phone_Number?.includes(partySearch)
+    //     );
+    // }, [partiesResponse, partySearch]);
 
     // console.log(partiesResponse);
 
@@ -1238,10 +1272,10 @@ useEffect(() => {
                             <div className="flex flex-col sm:flex-row justify-between gap-6 w-full px-2 heading-wrapper">
                                 {/* LEFT — Category (+ Party if GST) */}
                                 <div className="flex flex-col gap-4 w-full sm:w-1/2 lg:w-1/3">
-                                    {gstEnabled && (
+                                    {/* {gstEnabled && (
                                         <div ref={partyRef} className="flex flex-col relative gap-2 party-class">
                                             <span className="whitespace-nowrap active">
-                                                {/* Search by Name/Phone */}
+                                                
                                                 Party
                                                 <span className="text-red-500">&nbsp;*</span>
                                             </span>
@@ -1302,14 +1336,14 @@ useEffect(() => {
                                                                     className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
                                                                     style={{ borderBottom: "1px solid #f3f4f6" }}
                                                                 >
-                                                                    {/* Party Name */}
+                                                                    
                                                                     <div className="flex flex-col min-w-0">
                                                                         <span className="text-sm text-gray-800 font-medium truncate">
                                                                             {party.Party_Name}
                                                                         </span>
                                                                     </div>
 
-                                                                    {/* Balance */}
+                                                                    
                                                                     <div className="flex flex-col items-end flex-shrink-0">
                                                                         <span className="text-xs text-gray-400">
                                                                             Balance
@@ -1351,6 +1385,141 @@ useEffect(() => {
                                                 <p className="text-red-500 text-xs mt-1">{errors.Party_Name.message}</p>
                                             )}
 
+                                        </div>
+                                    )} */}
+                                    {gstEnabled && (
+                                        <div
+                                            ref={partyRef}
+                                            className="flex flex-col relative gap-2 party-class"
+                                        >
+                                            <span className="whitespace-nowrap active">
+                                                Party
+                                                <span className="text-red-500">&nbsp;*</span>
+                                            </span>
+
+                                            <div className="relative w-full">
+                                                <div
+                                                    className="flex flex-row border rounded-md bg-white cursor-pointer"
+                                                    onClick={() => setPartyOpen((prev) => !prev)}
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        value={partySearch}
+                                                        onChange={(e) => {
+                                                            setPartyCursor(null);
+
+                                                            const value = e.target.value;
+
+                                                            setPartySearch(value);
+
+                                                            setValue("Party_Id", "", {
+                                                                shouldValidate: false,
+                                                            });
+
+                                                            setValue("Party_Name", value, {
+                                                                shouldValidate: true,
+                                                            });
+
+                                                            setPartyOpen(true);
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setPartyOpen(true);
+                                                        }}
+                                                        placeholder="Search by Name/Phone"
+                                                        className="w-full outline-none py-1 px-2 text-gray-900"
+                                                        style={{
+                                                            marginBottom: 0,
+                                                            border: "none",
+                                                            height: "2rem",
+                                                        }}
+                                                    />
+
+                                                    <span className="absolute right-2 top-2 text-gray-700">
+                                                        <ChevronDown size={16} />
+                                                    </span>
+                                                </div>
+
+                                                {partyOpen && (
+                                                    <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+
+                                                        {/* Add Party */}
+                                                        <span
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                setShowPartyModal(true);
+                                                            }}
+                                                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                                                            style={{
+                                                                borderBottom: "1px solid #f3f4f6",
+                                                            }}
+                                                        >
+                                                            + Add Party
+                                                        </span>
+
+                                                        {/* Virtual Party List */}
+                                                        <VirtualPartyScrollList
+                                                            parties={parties}
+                                                            isFetching={isPartiesFetching}
+                                                            hasMore={partiesHasMore}
+                                                            onLoadMore={handlePartyLoadMore}
+                                                            scrollRef={partyScrollRef}
+                                                            onSelectParty={(party) => {
+                                                                setPartyCursor(null);
+
+                                                                setPartySearch(party.Party_Name);
+
+                                                                setValue(
+                                                                    "Party_Id",
+                                                                    party.Party_Id,
+                                                                    {
+                                                                        shouldValidate: true,
+                                                                    }
+                                                                );
+
+                                                                setValue(
+                                                                    "Party_Name",
+                                                                    party.Party_Name,
+                                                                    {
+                                                                        shouldValidate: true,
+                                                                    }
+                                                                );
+
+                                                                setPartyOpen(false);
+                                                            }}
+                                                        />
+
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Add Party Modal */}
+                                            {showPartyModal && (
+                                                <PartyAddModal
+                                                    onClose={() => setShowPartyModal(false)}
+                                                    onSave={(newParty) => {
+                                                        setPartyCursor(null);
+
+                                                        setPartySearch(newParty);
+
+                                                        setValue(
+                                                            "Party_Name",
+                                                            newParty,
+                                                            {
+                                                                shouldValidate: true,
+                                                            }
+                                                        );
+
+                                                        setShowPartyModal(false);
+                                                    }}
+                                                />
+                                            )}
+
+                                            {errors?.Party_Name && (
+                                                <p className="text-red-500 text-xs mt-1">
+                                                    {errors.Party_Name.message}
+                                                </p>
+                                            )}
                                         </div>
                                     )}
 
@@ -1874,61 +2043,61 @@ useEffect(() => {
                                                     </select>
                                                 </td> */}
                                                 <td>
-    <select
-        value={itemsValues[i]?.Tax_Type ?? "None"}
-        onChange={(e) =>
-            recalcRow(i, { Tax_Type: e.target.value })
-        }
-        style={{ fontSize: 12, width: "100%" }}
-    >
-        {/* Always show None */}
-        <option value="None">NONE</option>
+                                                    <select
+                                                        value={itemsValues[i]?.Tax_Type ?? "None"}
+                                                        onChange={(e) =>
+                                                            recalcRow(i, { Tax_Type: e.target.value })
+                                                        }
+                                                        style={{ fontSize: 12, width: "100%" }}
+                                                    >
+                                                        {/* Always show None */}
+                                                        <option value="None">NONE</option>
 
-        {enableGST ? (
-            <>
-                <option value="IGST0">IGST@0%</option>
-                <option value="GST0">GST@0%</option>
+                                                        {enableGST ? (
+                                                            <>
+                                                                <option value="IGST0">IGST@0%</option>
+                                                                <option value="GST0">GST@0%</option>
 
-                <option value="IGST0.25">IGST@0.25%</option>
-                <option value="GST0.25">GST@0.25%</option>
+                                                                <option value="IGST0.25">IGST@0.25%</option>
+                                                                <option value="GST0.25">GST@0.25%</option>
 
-                <option value="IGST3">IGST@3%</option>
-                <option value="GST3">GST@3%</option>
+                                                                <option value="IGST3">IGST@3%</option>
+                                                                <option value="GST3">GST@3%</option>
 
-                <option value="IGST5">IGST@5%</option>
-                <option value="GST5">GST@5%</option>
+                                                                <option value="IGST5">IGST@5%</option>
+                                                                <option value="GST5">GST@5%</option>
 
-                <option value="IGST12">IGST@12%</option>
-                <option value="GST12">GST@12%</option>
+                                                                <option value="IGST12">IGST@12%</option>
+                                                                <option value="GST12">GST@12%</option>
 
-                <option value="IGST18">IGST@18%</option>
-                <option value="GST18">GST@18%</option>
+                                                                <option value="IGST18">IGST@18%</option>
+                                                                <option value="GST18">GST@18%</option>
 
-                <option value="IGST28">IGST@28%</option>
-                <option value="GST28">GST@28%</option>
-            </>
-        ) : (
-            /* GST OFF:
-               Show None + original saved tax type */
-            originalTaxTypesRef.current[i] &&
-            originalTaxTypesRef.current[i] !== "None" && (
-                <option value={originalTaxTypesRef.current[i]}>
-                    {originalTaxTypesRef.current[i].startsWith("GST")
-                        ? `GST@${originalTaxTypesRef.current[i].replace(
-                            "GST",
-                            ""
-                        )}%`
-                        : originalTaxTypesRef.current[i].startsWith("IGST")
-                            ? `IGST@${originalTaxTypesRef.current[i].replace(
-                                "IGST",
-                                ""
-                            )}%`
-                            : originalTaxTypesRef.current[i]}
-                </option>
-            )
-        )}
-    </select>
-</td>
+                                                                <option value="IGST28">IGST@28%</option>
+                                                                <option value="GST28">GST@28%</option>
+                                                            </>
+                                                        ) : (
+                                                            /* GST OFF:
+                                                               Show None + original saved tax type */
+                                                            originalTaxTypesRef.current[i] &&
+                                                            originalTaxTypesRef.current[i] !== "None" && (
+                                                                <option value={originalTaxTypesRef.current[i]}>
+                                                                    {originalTaxTypesRef.current[i].startsWith("GST")
+                                                                        ? `GST@${originalTaxTypesRef.current[i].replace(
+                                                                            "GST",
+                                                                            ""
+                                                                        )}%`
+                                                                        : originalTaxTypesRef.current[i].startsWith("IGST")
+                                                                            ? `IGST@${originalTaxTypesRef.current[i].replace(
+                                                                                "IGST",
+                                                                                ""
+                                                                            )}%`
+                                                                            : originalTaxTypesRef.current[i]}
+                                                                </option>
+                                                            )
+                                                        )}
+                                                    </select>
+                                                </td>
 
                                                 {/* FIX: Tax Amount input now always renders (matching Add Expense) */}
                                                 <td>
