@@ -1590,9 +1590,9 @@ export default function PartyPayablesLeft() {
     setLeftCursor(partiesNextCursor);
   }, [partiesHasMore, partiesNextCursor, isPartiesFetching])
   /* reset left cursor when item search changes */
-  // useEffect(() => {
-  //   setLeftCursor(null);
-  // }, [leftSearch]);
+  useEffect(() => {
+    setLeftCursor(null);
+  }, [leftSearch]);
 
   // const handleLeftObserver = useCallback(
   //   (entries) => {

@@ -306,6 +306,74 @@ forceRefetch: ({
 
 //     providesTags: ["Party"],
 // }),
+// getAllPayableParties: builder.query({
+//   query: ({
+//     cursor = null,
+//     search = "",
+//     limit = 10,
+//   } = {}) => {
+//     const params = new URLSearchParams();
+
+//     if (cursor) {
+//       params.append("cursor", cursor);
+//     }
+
+//     if (search?.trim()) {
+//       params.append(
+//         "search",
+//         search.trim()
+//       );
+//     }
+
+//     params.append("limit", limit);
+
+//     return `party/payables?${params.toString()}`;
+//   },
+
+//   serializeQueryArgs: ({
+//     queryArgs,
+//   }) => ({
+//     search: queryArgs.search ?? "",
+//   }),
+
+//   merge: (
+//     currentCache,
+//     newData,
+//     { arg }
+//   ) => {
+//     if (!arg.cursor) {
+//       return newData;
+//     }
+
+//     currentCache.parties.push(
+//       ...newData.parties
+//     );
+
+//     currentCache.hasMore =
+//       newData.hasMore;
+
+//     currentCache.nextCursor =
+//       newData.nextCursor;
+
+//     currentCache.totalParties =
+//       newData.totalParties;
+//   },
+
+//   forceRefetch: ({
+//     currentArg,
+//     previousArg,
+//   }) =>
+//     currentArg?.cursor !==previousArg?.cursor ||
+//     currentArg?.search !==previousArg?.search ||
+//     currentArg?.limit !== previousArg?.limit,
+//   providesTags: ["Party"],
+//   // providesTags: [
+//   //   {
+//   //     type: "Party",
+//   //     id: "PAYABLE_LIST",
+//   //   },
+//   // ],
+// }),
 getAllPayableParties: builder.query({
   query: ({
     cursor = null,
@@ -319,10 +387,7 @@ getAllPayableParties: builder.query({
     }
 
     if (search?.trim()) {
-      params.append(
-        "search",
-        search.trim()
-      );
+      params.append("search", search.trim());
     }
 
     params.append("limit", limit);
@@ -330,49 +395,36 @@ getAllPayableParties: builder.query({
     return `party/payables?${params.toString()}`;
   },
 
-  serializeQueryArgs: ({
-    queryArgs,
-  }) => ({
-    search: queryArgs.search ?? "",
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: (queryArgs.search ?? "").trim(),
   }),
 
-  merge: (
-    currentCache,
-    newData,
-    { arg }
-  ) => {
+  merge: (currentCache, newData, { arg }) => {
     if (!arg.cursor) {
       return newData;
     }
 
-    currentCache.parties.push(
-      ...newData.parties
+    const existingIds = new Set(
+      currentCache.parties.map((p) => p.Party_Id)
     );
 
-    currentCache.hasMore =
-      newData.hasMore;
+    const uniqueNew = newData.parties.filter(
+      (p) => !existingIds.has(p.Party_Id)
+    );
 
-    currentCache.nextCursor =
-      newData.nextCursor;
-
-    currentCache.totalParties =
-      newData.totalParties;
+    currentCache.parties.push(...uniqueNew);
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+    currentCache.totalParties = newData.totalParties;
   },
 
-  forceRefetch: ({
-    currentArg,
-    previousArg,
-  }) =>
-    currentArg?.cursor !==previousArg?.cursor ||
-    currentArg?.search !==previousArg?.search ||
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    (currentArg?.search ?? "").trim() !==
+      (previousArg?.search ?? "").trim() ||
     currentArg?.limit !== previousArg?.limit,
+
   providesTags: ["Party"],
-  // providesTags: [
-  //   {
-  //     type: "Party",
-  //     id: "PAYABLE_LIST",
-  //   },
-  // ],
 }),
 getAllReceivableParties: builder.query({
   query: ({
@@ -387,10 +439,7 @@ getAllReceivableParties: builder.query({
     }
 
     if (search?.trim()) {
-      params.append(
-        "search",
-        search.trim()
-      );
+      params.append("search", search.trim());
     }
 
     params.append("limit", limit);
@@ -398,45 +447,101 @@ getAllReceivableParties: builder.query({
     return `party/receivables?${params.toString()}`;
   },
 
-  serializeQueryArgs: ({
-    queryArgs,
-  }) => ({
-    search: queryArgs.search ?? "",
+  serializeQueryArgs: ({ queryArgs }) => ({
+    search: (queryArgs.search ?? "").trim(),
   }),
 
-  merge: (
-    currentCache,
-    newData,
-    { arg }
-  ) => {
+  merge: (currentCache, newData, { arg }) => {
     if (!arg.cursor) {
       return newData;
     }
 
-    currentCache.parties.push(
-      ...newData.parties
+    const existingIds = new Set(
+      currentCache.parties.map((p) => p.Party_Id)
     );
 
-    currentCache.hasMore =
-      newData.hasMore;
+    const uniqueNew = newData.parties.filter(
+      (p) => !existingIds.has(p.Party_Id)
+    );
 
-    currentCache.nextCursor =
-      newData.nextCursor;
+    currentCache.parties.push(...uniqueNew);
 
-    currentCache.totalParties =
-      newData.totalParties;
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+    currentCache.totalParties = newData.totalParties;
   },
 
-  forceRefetch: ({
-    currentArg,
-    previousArg,
-  }) =>
-    currentArg?.cursor !==previousArg?.cursor ||
-    currentArg?.search !==previousArg?.search ||
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.cursor !== previousArg?.cursor ||
+    (currentArg?.search ?? "").trim() !==
+      (previousArg?.search ?? "").trim() ||
     currentArg?.limit !== previousArg?.limit,
 
   providesTags: ["Party"],
 }),
+// getAllReceivableParties: builder.query({
+//   query: ({
+//     cursor = null,
+//     search = "",
+//     limit = 10,
+//   } = {}) => {
+//     const params = new URLSearchParams();
+
+//     if (cursor) {
+//       params.append("cursor", cursor);
+//     }
+
+//     if (search?.trim()) {
+//       params.append(
+//         "search",
+//         search.trim()
+//       );
+//     }
+
+//     params.append("limit", limit);
+
+//     return `party/receivables?${params.toString()}`;
+//   },
+
+//   serializeQueryArgs: ({
+//     queryArgs,
+//   }) => ({
+//     search: queryArgs.search ?? "",
+//   }),
+
+//   merge: (
+//     currentCache,
+//     newData,
+//     { arg }
+//   ) => {
+//     if (!arg.cursor) {
+//       return newData;
+//     }
+
+//     currentCache.parties.push(
+//       ...newData.parties
+//     );
+
+//     currentCache.hasMore =
+//       newData.hasMore;
+
+//     currentCache.nextCursor =
+//       newData.nextCursor;
+
+//     currentCache.totalParties =
+//       newData.totalParties;
+//   },
+
+//   forceRefetch: ({
+//     currentArg,
+//     previousArg,
+//   }) =>
+//     currentArg?.cursor !==previousArg?.cursor ||
+//     currentArg?.search !==previousArg?.search ||
+//     currentArg?.limit !== previousArg?.limit,
+
+//   providesTags: ["Party"],
+// }),
   getPartyPrintReport: builder.query({
   query: ({
     Party_Id,
