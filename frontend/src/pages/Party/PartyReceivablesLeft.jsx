@@ -1915,6 +1915,7 @@ export default function PartyReceivablesLeft() {
                             <p
                               className="font-semibold text-gray-800 truncate text-sm"
                               style={{ margin: 0 }}
+                              title={party.Party_Name}
                             >
                               {party.Party_Name}
                             </p>

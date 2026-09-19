@@ -108,10 +108,12 @@ function VirtualPartyScrollList({
                 }}
               >
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm text-gray-800 font-medium truncate">
+                  <span
+                    className="text-sm text-gray-800 font-medium truncate"
+                    title={party.Party_Name}
+                  >
                     {party.Party_Name}
                   </span>
-
                   <span className="text-xs text-gray-400">
                     {party.Phone_Number || "—"}
                   </span>
@@ -145,16 +147,16 @@ function VirtualPartyScrollList({
       )}
 
       {isFetching && (
-  <div className="text-center text-xs text-gray-400 py-2">
-    Loading more...
-  </div>
-)}
+        <div className="text-center text-xs text-gray-400 py-2">
+          Loading more...
+        </div>
+      )}
 
-{!isFetching && !hasMore && parties.length > 0 && (
-  <div className="text-center text-xs text-gray-400 py-2">
-    — End of parties —
-  </div>
-)}
+      {!isFetching && !hasMore && parties.length > 0 && (
+        <div className="text-center text-xs text-gray-400 py-2">
+          — End of parties —
+        </div>
+      )}
     </div>
   );
 }

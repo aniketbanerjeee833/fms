@@ -1648,9 +1648,9 @@ export default function Parties() {
   } = useGetAllPartiesCursorQuery({
     cursor: leftCursor,
     search: leftSearch,
-    
+
     limit: leftCursor ? 10 : initialLeftLimit.current,
-     scope: "parties-page-list",
+    scope: "parties-page-list",
   },
   );
 
@@ -2065,6 +2065,7 @@ export default function Parties() {
                           <p
                             className="font-semibold text-gray-800 truncate text-sm"
                             style={{ margin: 0 }}
+                            title={party.Party_Name}
                           >
                             {party.Party_Name}
                           </p>
