@@ -12,6 +12,7 @@ import BarcodeLabelSheet from "../../components/Barcode/BarcodeLabelSheet"
 import BarcodeSettingsDrawer from "../../components/Barcode/BarcodeSettingsDrawer";
 import { useGetBarcodeSettingsQuery, useSelectBarcodeSettingMutation } from "../../redux/api/Settings/barcodeSettingsApi";
 import { toast } from "react-toastify";
+import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 // =========================================================
 // FIELD OPTIONS for Header/Line1-4 dropdowns
 // =========================================================
@@ -21,7 +22,7 @@ const LABEL_FIELD_OPTIONS = [
     { value: "Item_Name", label: "Item Name" },
     { value: "Sale_Price", label: "Sale Price" },
     { value: "Discount", label: "Discount" },
-    { value: "MRP", label: "MRP" },
+    //{ value: "MRP", label: "MRP" },
 ];
 
 // =========================================================
@@ -245,16 +246,29 @@ function LabelFieldDropdown({
     labelDropdownOpen,
     setLabelDropdownOpen,
     labelDropdownRefs,
+    showMRP
 }) {
     const isOpen = labelDropdownOpen === fieldKey;
 
     const searchText = value?.value || "";
+    const fieldOptions = [
+    ...LABEL_FIELD_OPTIONS,
+    ...(showMRP
+        ? [{ value: "MRP", label: "MRP" }]
+        : []),
+];
 
-    const filteredOptions = LABEL_FIELD_OPTIONS.filter((option) =>
-        option.label
-            .toLowerCase()
-            .includes(searchText.trim().toLowerCase())
-    );
+const filteredOptions = fieldOptions.filter((option) =>
+    option.label
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase())
+);
+
+    // const filteredOptions = LABEL_FIELD_OPTIONS.filter((option) =>
+    //     option.label
+    //         .toLowerCase()
+    //         .includes(searchText.trim().toLowerCase())
+    // );
 
     const handleChange = (e) => {
         onValueChange(fieldKey, e.target.value);
@@ -346,7 +360,16 @@ export default function BarcodeGenerator() {
     const [showBarcodeSettings, setShowBarcodeSettings] = useState(false);
 
     const [selectedBarcodeSizeId, setSelectedBarcodeSizeId] = useState(null);
+const { data: settingsData } = useGetAllSettingsQuery();
 
+const settings = settingsData?.settings || [];
+
+const showMRP =
+    Number(
+        settings.find(
+            (s) => s.setting_key === "show_mrp"
+        )?.setting_value
+    ) === 1;
     const [getItemByName] = useLazyGetItemByNameQuery();
     const [editItem] = useEditItemMutation()
     const {
@@ -404,14 +427,66 @@ export default function BarcodeGenerator() {
     // ITEM SELECTION
     // =========================================================
 
-    const handleSelectItem = (it) => {
-        console.log("Selected item:", it);
+    // const handleSelectItem = (it) => {
+    //     console.log("Selected item:", it);
 
-        setSelectedItem(it);
-        setItemSearch(it?.Item_Name || "");
-        setItemDropdownOpen(false);
-        setBarcodeValue(it?.Item_Code || "");
+    //     setSelectedItem(it);
+    //     setItemSearch(it?.Item_Name || "");
+    //     setItemDropdownOpen(false);
+    //     setBarcodeValue(it?.Item_Code || "");
+    // };
+ const handleSelectItem = (it) => {
+    console.log("Selected item:", it);
+
+    setSelectedItem(it);
+    setItemSearch(it?.Item_Name || "");
+    setItemDropdownOpen(false);
+    setBarcodeValue(it?.Item_Code || "");
+
+    setLabelConfig((prev) => {
+    const getValue = (field, defaultValue = "") => {
+        const finalField = field || defaultValue;
+
+        return {
+            field: finalField,
+            value: finalField
+                ? resolveFieldValue(
+                    finalField,
+                    it,
+                    "Anco Innovation"
+                )
+                : "",
+        };
     };
+
+    return {
+        header: prev.header?.field
+            ? getValue(prev.header.field)
+            : getValue("Company_Name"),
+
+        line1: prev.line1?.field
+            ? getValue(prev.line1.field)
+            : getValue("Discount"),
+
+        line2: prev.line2?.field
+            ? getValue(prev.line2.field)
+            : getValue("Sale_Price"),
+
+        line3: prev.line3?.field
+            ? getValue(prev.line3.field)
+            : showMRP
+                ? getValue("MRP")
+                : {
+                    field: "",
+                    value: "",
+                },
+
+        line4: prev.line4?.field
+            ? getValue(prev.line4.field)
+            : getValue("Item_Name"),
+    };
+});
+};
 
     const canEditItemCode = !!selectedItem && !selectedItem.Item_Code;
 
@@ -421,12 +496,43 @@ export default function BarcodeGenerator() {
 
         // Once the user changes the text after selecting an item,
         // the previous item is no longer considered selected.
+         // If item name is cleared, clear all label lines
+    if (!val.trim()) {
+        setSelectedItem(null);
+         setBarcodeValue("");
+
+        setLabelConfig({
+            header: {
+                field: "",
+                value: "",
+            },
+            line1: {
+                field: "",
+                value: "",
+            },
+            line2: {
+                field: "",
+                value: "",
+            },
+            line3: {
+                field: "",
+                value: "",
+            },
+            line4: {
+                field: "",
+                value: "",
+            },
+        });
+
+        return;
+    }
         if (
             selectedItem &&
             val.trim().toLowerCase() !==
             (selectedItem.Item_Name || "").trim().toLowerCase()
         ) {
             setSelectedItem(null);
+             setBarcodeValue("");
         }
     };
     const handleItemNameBlur = () => {
@@ -598,35 +704,68 @@ export default function BarcodeGenerator() {
         [barcodeItems]
     );
 
+    // const handleLabelFieldSelect = (fieldKey, selectedField) => {
+    //     let initialValue = "";
+
+    //     if (selectedField === "Company_Name") {
+    //         initialValue = "Anco Innovation";
+    //     } else if (selectedItem) {
+    //         initialValue = resolveFieldValue(
+    //             selectedField,
+    //             selectedItem,
+
+    //         );
+    //     } else {
+    //         const selectedOption = LABEL_FIELD_OPTIONS.find(
+    //             (option) => option.value === selectedField
+    //         );
+
+    //         initialValue = selectedOption?.label || "";
+    //     }
+
+    //     setLabelConfig((prev) => ({
+    //         ...prev,
+    //         [fieldKey]: {
+    //             field: selectedField,
+    //             value: initialValue,
+    //         },
+    //     }));
+
+    //     setLabelDropdownOpen(null);
+    // };
     const handleLabelFieldSelect = (fieldKey, selectedField) => {
-        let initialValue = "";
+    let initialValue = "";
 
-        if (selectedField === "Company_Name") {
-            initialValue = "Anco Innovation";
-        } else if (selectedItem) {
-            initialValue = resolveFieldValue(
-                selectedField,
-                selectedItem,
+    if (selectedField === "Company_Name") {
+        initialValue = "Anco Innovation";
+    } else if (selectedItem) {
+        initialValue = resolveFieldValue(
+            selectedField,
+            selectedItem
+        );
+    } else {
+        const selectedOption = [
+            ...LABEL_FIELD_OPTIONS,
+            ...(showMRP
+                ? [{ value: "MRP", label: "MRP" }]
+                : []),
+        ].find(
+            (option) => option.value === selectedField
+        );
 
-            );
-        } else {
-            const selectedOption = LABEL_FIELD_OPTIONS.find(
-                (option) => option.value === selectedField
-            );
+        initialValue = selectedOption?.label || "";
+    }
 
-            initialValue = selectedOption?.label || "";
-        }
+    setLabelConfig((prev) => ({
+        ...prev,
+        [fieldKey]: {
+            field: selectedField,
+            value: initialValue,
+        },
+    }));
 
-        setLabelConfig((prev) => ({
-            ...prev,
-            [fieldKey]: {
-                field: selectedField,
-                value: initialValue,
-            },
-        }));
-
-        setLabelDropdownOpen(null);
-    };
+    setLabelDropdownOpen(null);
+};
 
 
     // free typing — always allowed, always reflected in preview
@@ -681,41 +820,41 @@ export default function BarcodeGenerator() {
             document.removeEventListener("mousedown", handleOutsideClick);
         };
     }, [labelDropdownOpen]);
-    useEffect(() => {
-        if (!selectedItem) return;
+    // useEffect(() => {
+    //     if (!selectedItem) return;
 
-        setLabelConfig({
-            header: {
-                field: "Company_Name",
-                value: "Anco Innovation",
-            },
-            line1: {
-                field: "Discount",
-                value: resolveFieldValue(
-                    "Discount",
-                    selectedItem
-                ),
-            },
-            line2: {
-                field: "Sale_Price",
-                value: resolveFieldValue(
-                    "Sale_Price",
-                    selectedItem
-                ),
-            },
-            line3: {
-                field: "MRP",
-                value: resolveFieldValue(
-                    "MRP",
-                    selectedItem
-                ),
-            },
-            line4: {
-                field: "",
-                value: "",
-            },
-        });
-    }, [selectedItem]);
+    //     setLabelConfig({
+    //         header: {
+    //             field: "Company_Name",
+    //             value: "Anco Innovation",
+    //         },
+    //         line1: {
+    //             field: "Discount",
+    //             value: resolveFieldValue(
+    //                 "Discount",
+    //                 selectedItem
+    //             ),
+    //         },
+    //         line2: {
+    //             field: "Sale_Price",
+    //             value: resolveFieldValue(
+    //                 "Sale_Price",
+    //                 selectedItem
+    //             ),
+    //         },
+    //         line3: {
+    //             field: "MRP",
+    //             value: resolveFieldValue(
+    //                 "MRP",
+    //                 selectedItem
+    //             ),
+    //         },
+    //         line4: {
+    //             field: "",
+    //             value: "",
+    //         },
+    //     });
+    // }, [selectedItem]);
     const printTriggerRef = useRef(null);
     const handleGenerate = () => {
         if (printTriggerRef.current) {
@@ -884,34 +1023,7 @@ export default function BarcodeGenerator() {
 
                         </div>
 
-                        {/* <div className="flex gap-4 mt-6">
-                            <div className="input-field col s6" style={{ width: "33%", marginTop: "0px" }}>
-                                <span className="active">Header</span>
-                                <LabelFieldDropdown
-                                    fieldKey="header"
-                                    value={labelConfig.header}
-                                    onChange={(val) => setLabelConfig((prev) => ({ ...prev, header: val }))}
-                                />
-                            </div>
-
-                            <div className="input-field col s6" style={{ width: "33%", marginTop: "0px" }}>
-                                <span className="active">Line 1</span>
-                                <LabelFieldDropdown
-                                    fieldKey="line1"
-                                    value={labelConfig.line1}
-                                    onChange={(val) => setLabelConfig((prev) => ({ ...prev, line1: val }))}
-                                />
-                            </div>
-
-                            <div className="input-field col s6" style={{ width: "33%", marginTop: "0px" }}>
-                                <span className="active">Line 2</span>
-                                <LabelFieldDropdown
-                                    fieldKey="line2"
-                                    value={labelConfig.line2}
-                                    onChange={(val) => setLabelConfig((prev) => ({ ...prev, line2: val }))}
-                                />
-                            </div>
-                        </div> */}
+                       
                         <div className="flex gap-4 mt-6">
 
                             <div
@@ -935,6 +1047,8 @@ export default function BarcodeGenerator() {
                                     labelDropdownOpen={labelDropdownOpen}
                                     setLabelDropdownOpen={setLabelDropdownOpen}
                                     labelDropdownRefs={labelDropdownRefs}
+                                    showMRP={showMRP}
+
                                 />
                             </div>
 
@@ -952,6 +1066,8 @@ export default function BarcodeGenerator() {
                                     labelDropdownOpen={labelDropdownOpen}
                                     setLabelDropdownOpen={setLabelDropdownOpen}
                                     labelDropdownRefs={labelDropdownRefs}
+                                    showMRP={showMRP}
+
                                 />
                             </div>
 
@@ -969,6 +1085,8 @@ export default function BarcodeGenerator() {
                                     labelDropdownOpen={labelDropdownOpen}
                                     setLabelDropdownOpen={setLabelDropdownOpen}
                                     labelDropdownRefs={labelDropdownRefs}
+                                    showMRP={showMRP}
+
                                 />
                             </div>
 
@@ -990,6 +1108,8 @@ export default function BarcodeGenerator() {
                                     labelDropdownOpen={labelDropdownOpen}
                                     setLabelDropdownOpen={setLabelDropdownOpen}
                                     labelDropdownRefs={labelDropdownRefs}
+                                    showMRP={showMRP}
+
                                 />
                             </div>
 
@@ -1008,6 +1128,8 @@ export default function BarcodeGenerator() {
                                     labelDropdownOpen={labelDropdownOpen}
                                     setLabelDropdownOpen={setLabelDropdownOpen}
                                     labelDropdownRefs={labelDropdownRefs}
+                                    showMRP={showMRP}
+
                                 />
                             </div>
 
