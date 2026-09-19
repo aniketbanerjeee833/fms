@@ -1578,9 +1578,9 @@ export default function PartyReceivablesLeft() {
 
     setLeftCursor(partiesNextCursor);
   }, [partiesHasMore, partiesNextCursor, isPartiesFetching])
-  // useEffect(() => {
-  //   setLeftCursor(null);
-  // }, [leftSearch]);
+  useEffect(() => {
+    setLeftCursor(null);
+  }, [leftSearch]);
 
   // const handleLeftObserver = useCallback(
   //   (entries) => {
