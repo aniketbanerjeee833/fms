@@ -269,8 +269,8 @@ const handleRightLoadMore = useCallback(() => {
           id: e.id,
           date: e.Expense_Date,
           expNo: e.Expense_Number,
-          party: e.Party_Name || "—",
-          paymentType: e.Payment_Type_Display || "—",
+          party: e.Party_Name || "",
+          paymentType: e.Payment_Type_Display || "",
           amount: e.Total_Amount,
           balance: e.Balance_Due,
         })),
@@ -1113,7 +1113,7 @@ useEffect(() => {
     onLoadMore={handleRightLoadMore}
     isFetching={isExpensesFetching}
     hasMore={expensesHasMore}
-    dynamicHeight={true}
+    //dynamicHeight={true}
     getItemKey={(txn) => txn.id}
     emptyMessage="No transactions to show"
     endMessage="— End of transactions —"
@@ -1134,16 +1134,7 @@ useEffect(() => {
         key={txn.id}
         onClick={() => {
           setClickHighlightId(txn.id);
-          // const params = new URLSearchParams(searchParams);
-
-          // params.set(
-          //   "highlightTxn",
-          //   String(txn.id)
-          // );
-
-          // setSearchParams(params, {
-          //   replace: true,
-          // });
+          
         }}
         onDoubleClick={() => {
           setClickHighlightId(null);
@@ -1203,17 +1194,18 @@ useEffect(() => {
         </div>
 
         <div className="table-desi-cell">
-          {txn.expNo || "—"}
+          {txn.expNo || ""}
         </div>
 
-        <div className="table-desi-cell"
-         style={{
-            overflowWrap: "break-word",
-            wordBreak: "break-word",
-             padding: "0 5px"
-  }}
+        <div className="table-desi-cell truncate"
+  //        style={{
+  //           overflowWrap: "break-word",
+  //           wordBreak: "break-word",
+  //            padding: "0 5px"
+  // }}
+  title={txn.party || ""}
         >
-          {txn.party || "—"}
+          {txn.party || ""}
         </div>
 
         <div lassName="table-desi-cell"
@@ -1223,7 +1215,7 @@ useEffect(() => {
               padding: "0 5px"
           }}
         >
-          {txn.paymentType || "—"}
+          {txn.paymentType || ""}
         </div>
 
         <div lassName="table-desi-cell"

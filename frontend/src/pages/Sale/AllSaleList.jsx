@@ -667,7 +667,7 @@ export default function AllSaleList() {
                                     year: "numeric",
                                   }
                                 )
-                                : "N/A"}
+                                : ""}
                             </div>
 
                             {/* INVOICE NO */}
@@ -683,7 +683,7 @@ export default function AllSaleList() {
                                 wordBreak: "break-word",
                               }}
                             >
-                              {sale?.Party_Name || "N/A"}
+                              {sale?.Party_Name || ""}
                             </div>
 
                             {/* PAYMENT TYPE */}
@@ -696,12 +696,12 @@ export default function AllSaleList() {
 
                             {/* AMOUNT */}
                             <div className="table-desi-cell">
-                              ₹{sale?.Total_Amount || "N/A"}
+                              ₹{sale?.Total_Amount || ""}
                             </div>
 
                             {/* BALANCE */}
                             <div className="table-desi-cell">
-                              ₹{sale?.Balance_Due || "N/A"}
+                              ₹{sale?.Balance_Due || ""}
                             </div>
 
                             {/* THREE DOT MENU */}

@@ -694,7 +694,7 @@ export default function PaymentOut() {
                                                                     year: "numeric",
                                                                 }
                                                             )
-                                                            : "N/A"}
+                                                            : ""}
                                                     </div>
 
                                                     {/* PARTY */}
@@ -709,7 +709,7 @@ export default function PaymentOut() {
                                                         }}
                                                     >
                                                         {paymentOut?.Party_Name ||
-                                                            "N/A"}
+                                                            ""}
                                                     </div>
 
                                                     {/* PAYMENT TYPE */}
@@ -717,7 +717,7 @@ export default function PaymentOut() {
                                                     <div className="table-desi-cell">
                                                         {paymentOut
                                                             ?.Payment_Type_Display ||
-                                                            "N/A"}
+                                                            ""}
                                                     </div>
 
                                                     {/* PAID */}
@@ -725,7 +725,7 @@ export default function PaymentOut() {
                                                     <div className="table-desi-cell">
                                                         ₹
                                                         {paymentOut?.Paid ??
-                                                            "N/A"}
+                                                            ""}
                                                     </div>
 
                                                     {/* MENU */}

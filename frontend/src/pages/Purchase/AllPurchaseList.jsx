@@ -765,7 +765,7 @@ export default function AllPurchaseList() {
                             <div className="table-desi-cell">
                               {purchase?.Bill_Number
                                 ? purchase.Bill_Number.split("T")[0]
-                                : "N/A"}
+                                : ""}
                             </div>
 
                             {/* PARTY */}
@@ -776,22 +776,22 @@ export default function AllPurchaseList() {
                                 wordBreak: "break-word",
                               }}
                             >
-                              {purchase?.Party_Name || "N/A"}
+                              {purchase?.Party_Name || ""}
                             </div>
 
                             {/* PAYMENT TYPE */}
                             <div className="table-desi-cell">
-                              {purchase?.Payment_Type_Display || "N/A"}
+                              {purchase?.Payment_Type_Display || ""}
                             </div>
 
                             {/* AMOUNT */}
                             <div className="table-desi-cell">
-                              ₹ {purchase?.Total_Amount || "N/A"}
+                              ₹ {purchase?.Total_Amount || ""}
                             </div>
 
                             {/* BALANCE */}
                             <div className="table-desi-cell">
-                              ₹ {purchase?.Balance_Due || "N/A"}
+                              ₹ {purchase?.Balance_Due || ""}
                             </div>
 
                             {/* THREE DOT MENU */}

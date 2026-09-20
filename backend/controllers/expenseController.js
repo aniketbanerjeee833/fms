@@ -1758,7 +1758,7 @@ const getExpensesByCategory = async (req, res, next) => {
                 ? `${label} (x${count})`
                 : label
             )
-            .join(" , ") || "—";
+            .join(" , ") || "";
       }
     }
 
@@ -2019,7 +2019,7 @@ const getExpenseItemUsage = async (req, res, next) => {
                 ? `${label} (x${count})`
                 : label
             )
-            .join(" , ") || "—";
+            .join(" , ") || "";
       }
     }
 

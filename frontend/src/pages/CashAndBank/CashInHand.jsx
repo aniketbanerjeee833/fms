@@ -821,7 +821,7 @@ export default function CashInHand() {
 
                                                     <div className="table-desi-cell">
                                                         {row?.Txn_Type ||
-                                                            "N/A"}
+                                                            ""}
                                                     </div>
 
                                                     {/* NAME */}
@@ -836,7 +836,7 @@ export default function CashInHand() {
                                                         }}
                                                     >
                                                         {row?.Party_Name ||
-                                                            "N/A"}
+                                                            ""}
                                                     </div>
 
                                                     {/* DATE */}
@@ -853,7 +853,7 @@ export default function CashInHand() {
                                                                     year: "numeric",
                                                                 }
                                                             )
-                                                            : "N/A"}
+                                                            : ""}
                                                     </div>
 
                                                     {/* AMOUNT */}
@@ -867,7 +867,7 @@ export default function CashInHand() {
                                                     >
                                                         ₹{" "}
                                                         {row?.Amount ??
-                                                            "N/A"}
+                                                            ""}
                                                     </div>
 
                                                     {/* MENU */}

@@ -669,35 +669,35 @@ export default function PurchaseReturn() {
                               wordBreak: "break-word",
                             }}>
                             {purchaseReturn?.Party_Name ||
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* PAYMENT TYPE */}
                           <div className="table-desi-cell">
                             {purchaseReturn
                               ?.Payment_Type_Display ||
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* AMOUNT */}
                           <div className="table-desi-cell">
                             ₹
                             {purchaseReturn?.Total_Amount ??
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* RECEIVED */}
                           <div className="table-desi-cell">
                             ₹
                             {purchaseReturn?.Total_Received ??
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* BALANCE */}
                           <div className="table-desi-cell">
                             ₹
                             {purchaseReturn?.Balance_Due ??
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* MENU */}

@@ -848,7 +848,7 @@ function BankDetailPanel({ bankId }) {
                 rowHeight={52}
                 height="100%"
                 onLoadMore={handleLoadMore}
-                dynamicHeight={true}    // 👈 opt in
+                //dynamicHeight={true}    // 👈 opt in
                 isFetching={isFetching}
                 hasMore={hasMore}
                 getItemKey={(row) => row.id}
@@ -897,8 +897,11 @@ function BankDetailPanel({ bankId }) {
                       {/* SL.NO */}
                       <div className="table-desi-cell" style={{ padding: "0 5px" }}>{idx + 1}.</div>
                       <div className="table-desi-cell" style={{ padding: "0 5px" }}>{meta.label}</div>
-                      <div className="table-desi-cell" style={{ padding: "0 5px", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                        {row.Party_Name || "N/A"}
+                      <div className="table-desi-cell truncate"
+                      title={row.Party_Name}
+                      //style={{ padding: "0 5px",overflowWrap: "break-word", wordBreak: "break-word" }}
+                        >
+                        {row.Party_Name || ""}
                       </div>
 
                       {/* DATE */}
@@ -909,7 +912,7 @@ function BankDetailPanel({ bankId }) {
                             month: "numeric",
                             year: "numeric",
                           })
-                          : "N/A"}
+                          : ""}
                       </div>
 
                       {/* AMOUNT */}

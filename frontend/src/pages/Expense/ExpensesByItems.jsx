@@ -457,8 +457,8 @@ export default function ExpensesByItems() {
           expenseId: u.Expense_Id,
           date: u.Expense_Date,
           expNo: u.Expense_Number,
-          party: u.Party_Name || "—",
-          paymentType: u.Payment_Type_Display || "—",
+          party: u.Party_Name || "",
+          paymentType: u.Payment_Type_Display || "",
           amount: u.Amount,
           balance: u.Balance_Due,
         })),
@@ -484,8 +484,8 @@ export default function ExpensesByItems() {
           expenseId: u.Expense_Id,
           date: u.Expense_Date,
           expNo: u.Expense_Number,
-          party: u.Party_Name || "—",
-          paymentType: u.Payment_Type_Display || "—",
+          party: u.Party_Name || "",
+          paymentType: u.Payment_Type_Display || "",
           amount: u.Amount,
           balance: u.Balance_Due,
         })),
@@ -1225,7 +1225,7 @@ export default function ExpensesByItems() {
                 onLoadMore={handleRightLoadMore}
                 isFetching={isUsageFetching}
                 hasMore={usageHasMore}
-                dynamicHeight={true}
+                //dynamicHeight={true}
                 getItemKey={(txn) => txn.id}
                 emptyMessage="No transactions to show"
                 endMessage="— End of transactions —"
@@ -1315,24 +1315,25 @@ export default function ExpensesByItems() {
 
                       {/* Exp No. */}
                       <div className="table-desi-cell">
-                        {txn.expNo || "—"}
+                        {txn.expNo || ""}
                       </div>
 
                       {/* Party */}
-                      <div className="table-desi-cell"
-                        style={{
-                          overflowWrap: "break-word",
-                          wordBreak: "break-word",
-                          padding: "0 5px"
+                      <div className="table-desi-cell truncate"
+                        // style={{
+                        //   overflowWrap: "break-word",
+                        //   wordBreak: "break-word",
+                        //   padding: "0 5px"
 
-                        }}
+                        // }}
+                        title={txn.party}
                       >
-                        {txn.party || "—"}
+                        {txn.party || ""}
                       </div>
 
                       {/* Payment Type */}
                       <div className="table-desi-cell" style={{ minWidth: 0 }}>
-                        {txn.paymentType || "—"}
+                        {txn.paymentType || ""}
                       </div>
 
                       {/* Amount */}

@@ -657,7 +657,7 @@ export default function SaleReturn() {
                             }}
                           >
                             {saleReturn?.Party_Name ||
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* PAYMENT TYPE */}
@@ -665,7 +665,7 @@ export default function SaleReturn() {
                           <div className="table-desi-cell">
                             {saleReturn
                               ?.Payment_Type_Display ||
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* AMOUNT */}
@@ -673,7 +673,7 @@ export default function SaleReturn() {
                           <div className="table-desi-cell">
                             ₹
                             {saleReturn?.Total_Amount ??
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* PAID */}
@@ -681,7 +681,7 @@ export default function SaleReturn() {
                           <div className="table-desi-cell">
                             ₹
                             {saleReturn?.Total_Paid ??
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* BALANCE */}
@@ -689,7 +689,7 @@ export default function SaleReturn() {
                           <div className="table-desi-cell">
                             ₹
                             {saleReturn?.Balance_Due ??
-                              "N/A"}
+                              ""}
                           </div>
 
                           {/* MENU */}
