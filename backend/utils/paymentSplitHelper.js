@@ -53,41 +53,7 @@ export const validateSplits = (splits, expectedTotal=null) => {
   const seenBankAccounts = new Set();
   let sum = 0;
 
-  // for (const split of splits) {
-  //   const { Payment_Type, Bank_Account_Id, Reference_Number, Amount } = split;
 
-  //   if (!Payment_Type) throw new Error("Payment Type is required for every split.");
-  //   if (isNaN(Amount) || Number(Amount) < 0) {
-  //     throw new Error(" Payment Type amount must be greater than 0.");
-  //   }
-
-  // //    const splitAmount = Number(Amount) || 0;
-
-  // // // Don't allow negative payment
-  // // if (splitAmount < 0) {
-  // //   throw new Error("Payment amount cannot be negative.");
-  // // }
-
-
-  //   if (Payment_Type === "Cash") {
-  //     if (cashSeen) throw new Error("Only one Cash split is allowed.");
-  //     cashSeen = true;
-  //   }
-
-  //   if (Payment_Type === "Bank") {
-  //     if (!Bank_Account_Id) throw new Error("Bank account is required for a Bank split.");
-  //     if (seenBankAccounts.has(Bank_Account_Id)) {
-  //       throw new Error("Each bank account can only be used once. Edit the existing split instead of adding a duplicate.");
-  //     }
-  //     seenBankAccounts.add(Bank_Account_Id);
-  //   }
-
-  //   // if ((Payment_Type === "Cheque" || Payment_Type === "Neft") && !Reference_Number?.trim()) {
-  //   //   throw new Error(`Reference number is required for ${Payment_Type} splits.`);
-  //   // }
-
-  //   sum += Number(Amount);
-  // }
 for (const split of splits) {
   const {
     Payment_Type,
