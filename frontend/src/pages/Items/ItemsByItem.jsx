@@ -920,11 +920,12 @@ useEffect(() => {
                         }}
                     > */}
                     <div
-                        className="w-full lg:w-[30%] flex flex-col flex-none  h-[50vh] lg:h-auto"
+                        className="w-full lg:w-[30%] flex flex-col flex-none  h-[50vh] lg:h-auto sm:w-[100%]"
                         style={{
                             borderRight: "1px solid #e2e8f0",
                             minHeight: 0,
-                            boxSizing: "border-box",
+                            boxSizing: "border-box"
+                          
                         }}
                     >
                         {/* search — stays fixed, outside the scrolling list */}
