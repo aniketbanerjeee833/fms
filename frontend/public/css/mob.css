@@ -184,6 +184,7 @@
         min-height: 100vh !important;
         overflow: visible !important; /* was hidden — let content flow naturally */
         display: block !important; /* was flex column with overflow:hidden */
+        margin-top: 2rem;
     }
 
    

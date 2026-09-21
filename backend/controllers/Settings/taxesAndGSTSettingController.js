@@ -9,6 +9,7 @@ const TAX_GST_SETTING_RULES = {
     onDisable: [
       "enable_hsn_sac",
       "enable_place_of_supply",
+      "enable_hsn_code"
     ],
   },
 
@@ -17,6 +18,10 @@ const TAX_GST_SETTING_RULES = {
   },
 
   enable_place_of_supply: {
+    requiresEnabled: ["enable_gst"],
+  },
+
+  enable_hsn_code: {
     requiresEnabled: ["enable_gst"],
   },
 };

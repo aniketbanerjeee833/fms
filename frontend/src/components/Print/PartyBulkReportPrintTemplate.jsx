@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import "./PartyBulkReportPrintTemplate.css";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 
 /* ── which top-level `type` labels carry an items table ── */
 // const ITEM_TXN_TYPES = ["Sale", "Purchase", "Sale Return", "Purchase Return"];
@@ -120,6 +121,19 @@ const buildSplitSummary = (splits = []) =>
         : "";
 
 const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
+    const { data: taxesGSTSettingsData } =
+        useGetAllTaxesAndGSTSettingsQuery();
+
+    const taxesGSTSettings =
+        taxesGSTSettingsData?.settings || [];
+
+    const enableHSNCode =
+        Number(
+            taxesGSTSettings.find(
+                (s) => s.setting_key === "enable_hsn_sac"
+            )?.setting_value
+        ) === 1;
+
     const party = data?.partyDetails || {};
     const transactions = data?.transactions || [];
     console.log(transactions);
@@ -279,7 +293,10 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                 <tr>
                                                     <th className="bulk-center" style={{ width: "4%" }}>#</th>
                                                     <th style={{ width: "22%" }}>Item name</th>
-                                                    <th style={{ width: "9%" }}>HSN</th>
+                                                    {/* <th style={{ width: "9%" }}>HSN</th> */}
+                                                    {enableHSNCode && (
+                                                        <th style={{ width: "9%" }}>HSN</th>
+                                                    )}
                                                     {hasMRPColumn && (
                                                         <th className="bulk-right" style={{ width: "8%" }}>
                                                             MRP
@@ -312,27 +329,30 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                     return (
                                                         <tr key={item.id || i}>
                                                             <td className="bulk-center">{i + 1}</td>
-                                                            <td>{item.Item_Name || "-"}</td>
-                                                            <td>{item.Item_HSN || "-"}</td>
+                                                            <td>{item.Item_Name || ""}</td>
+                                                            {enableHSNCode && (
+                                                                <td>{item.Item_HSN || ""}</td>
+                                                            )}
+                                                            {/* <td>{item.Item_HSN || ""}</td> */}
                                                             {hasMRPColumn && (
                                                                 <td className="bulk-right">
                                                                     {Number(item[cfg.mrpKey] || 0) > 0
                                                                         ? money(item[cfg.mrpKey])
-                                                                        : "-"}
+                                                                        : ""}
                                                                 </td>
                                                             )}
-                                                                                         <td className="bulk-right">
-                                                        {Number(item.Quantity || 0)}
+                                                            <td className="bulk-right">
+                                                                {Number(item.Quantity || 0)}
 
-                                                        {item.Free_Quantity !== null &&
-                                                            item.Free_Quantity !== undefined &&
-                                                            Number(item.Free_Quantity) > 0 && (
-                                                                <>
-                                                                    {" + "}
-                                                                    {Number(item.Free_Quantity)}
-                                                                </>
-                                                            )}
-                                                    </td>
+                                                                {item.Free_Quantity !== null &&
+                                                                    item.Free_Quantity !== undefined &&
+                                                                    Number(item.Free_Quantity) > 0 && (
+                                                                        <>
+                                                                            {" + "}
+                                                                            {Number(item.Free_Quantity)}
+                                                                        </>
+                                                                    )}
+                                                            </td>
                                                             {/* <td className="bulk-right">{money(item.Quantity)}</td> */}
                                                             <td className="bulk-center">
                                                                 {item.Selected_Unit || item.Item_Unit || "-"}
@@ -345,7 +365,7 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                                         ? item[cfg.discountTypeKey] === "Percentage"
                                                                             ? `${item[cfg.discountKey]}% (₹${money(item.Discount_Amount || 0)})`
                                                                             : `₹${money(item.Discount_Amount || 0)}`
-                                                                        : "-"}
+                                                                        : ""}
                                                                 </td>
                                                             )}
 
@@ -354,12 +374,12 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                                     <td className="bulk-right">
                                                                         {itemCgst > 0
                                                                             ? `₹ ${money(itemCgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                                                                            : "-"}
+                                                                            : ""}
                                                                     </td>
                                                                     <td className="bulk-right">
                                                                         {itemSgst > 0
                                                                             ? `₹ ${money(itemSgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                                                                            : "-"}
+                                                                            : ""}
                                                                     </td>
                                                                 </>
                                                             )}
@@ -373,44 +393,43 @@ const PartyBulkReportPrintTemplate = forwardRef(({ data }, ref) => {
                                                 <tr>
                                                     <td />
                                                     <td className="bulk-bold">Total</td>
-                                                    <td />
+                                                    {/* <td /> */}
+                                                    {enableHSNCode && <td />}
                                                     {hasMRPColumn && <td />}
-                                                    {/* <td className="bulk-right bulk-bold">
-                                                        {money(items.reduce((s, i) => s + Number(i.Quantity || 0), 0))}
-                                                    </td> */}
+                                               
                                                     <td className="bulk-right bulk-bold">
-                                                {(() => {
-                                                    const quantityTotal = items.reduce(
-                                                        (sum, item) => {
-                                                            // Don't include Service items
+                                                        {(() => {
+                                                            const quantityTotal = items.reduce(
+                                                                (sum, item) => {
+                                                                    // Don't include Service items
+                                                                    if (
+                                                                        String(item?.Item_Type || "").toLowerCase() ===
+                                                                        "service"
+                                                                    ) {
+                                                                        return sum;
+                                                                    }
+
+                                                                    sum.quantity += Number(item?.Quantity || 0);
+                                                                    sum.freeQuantity += Number(item?.Free_Quantity || 0);
+
+                                                                    return sum;
+                                                                },
+                                                                { quantity: 0, freeQuantity: 0 }
+                                                            );
+
                                                             if (
-                                                                String(item?.Item_Type || "").toLowerCase() ===
-                                                                "service"
+                                                                quantityTotal.quantity === 0 &&
+                                                                quantityTotal.freeQuantity === 0
                                                             ) {
-                                                                return sum;
+                                                                return "";
                                                             }
 
-                                                            sum.quantity += Number(item?.Quantity || 0);
-                                                            sum.freeQuantity += Number(item?.Free_Quantity || 0);
-
-                                                            return sum;
-                                                        },
-                                                        { quantity: 0, freeQuantity: 0 }
-                                                    );
-
-                                                    if (
-                                                        quantityTotal.quantity === 0 &&
-                                                        quantityTotal.freeQuantity === 0
-                                                    ) {
-                                                        return "";
-                                                    }
-
-                                                    return `${quantityTotal.quantity}${quantityTotal.freeQuantity > 0
-                                                            ? ` + ${quantityTotal.freeQuantity}`
-                                                            : ""
-                                                        }`;
-                                                })()}
-                                            </td>
+                                                            return `${quantityTotal.quantity}${quantityTotal.freeQuantity > 0
+                                                                ? ` + ${quantityTotal.freeQuantity}`
+                                                                : ""
+                                                                }`;
+                                                        })()}
+                                                    </td>
                                                     <td />
                                                     <td />
                                                     {hasDiscountColumn && (

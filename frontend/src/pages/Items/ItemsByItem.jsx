@@ -729,7 +729,7 @@ export default function ItemsByItem() {
             return;
         }
 
-        virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "auto", behavior: "auto" });
+        virtualLeftListRef.current?.scrollToIndex(targetIndex, { align: "center", behavior: "auto" });
         hasScrolledToSelectedRef.current = true;
     }, [items, isLoading, isItemsFetching, selectedItemId, itemsHasMore, itemsNextCursor]);
 
@@ -773,6 +773,7 @@ useEffect(() => {
         virtualRightListRef.current?.scrollToIndex(targetIndex, {
             align: "auto",
             behavior: "auto",
+             //behavior: "smooth", 
         });
         hasScrolledToHighlightRef.current = true;
     }, 100);

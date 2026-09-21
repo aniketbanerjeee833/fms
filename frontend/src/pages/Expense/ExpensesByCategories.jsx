@@ -558,9 +558,11 @@ useEffect(() => {
         {/* ── SPLIT LAYOUT ── */}
         <div
           className="flex flex-col lg:flex-row gap-0"
-          style={{ flex: 1,  minHeight: 0, 
+          style={{ flex: 1, 
+             minHeight: 0, 
             overflowY: "auto",
-             borderTop: "1px solid #e2e8f0" }}
+             borderTop: "1px solid #e2e8f0" 
+            }}
         >
 
           {/* ══ LEFT — 30% — category list (client-side filtered) ══ */}
@@ -891,9 +893,10 @@ useEffect(() => {
             <div className="w-full lg:w-[70%] p-1 flex-none lg:flex-1 h-auto"
                         style={{
                             minHeight: 0,
+                            minWidth: 762,
                             display: "flex",
                             flexDirection: "column",
-                            minWidth: 0,
+                            //minWidth: 0,
                             
                         }}
                     >

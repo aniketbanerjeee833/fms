@@ -1,5 +1,5 @@
 import { useState } from "react";
-import {  useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -222,13 +222,13 @@ export default function PurchaseEdit() {
   const [partyCursor, setPartyCursor] = useState(null);
   //const virtualPartyListRef = useRef(null);
   const partyScrollRef = useRef(null);
-   const [partySearch, setPartySearch] = useState("");
-    const [newCategory, setNewCategory] = useState("");
-  
-    const [showPartyModal, setShowPartyModal] = useState(false);
-    const [showSplitBox, setShowSplitBox] = useState(false);
-    const [showGSTIN, setShowGSTIN] = useState("");
-    const {
+  const [partySearch, setPartySearch] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showSplitBox, setShowSplitBox] = useState(false);
+  const [showGSTIN, setShowGSTIN] = useState("");
+  const {
     data: partiesData,
     isFetching: isPartiesFetching,
   } = useGetAllPartiesCursorQuery({
@@ -237,16 +237,16 @@ export default function PurchaseEdit() {
     limit: 20,
     scope: "purchase-edit-party-dropdown",
   });
-  
+
   const parties = partiesData?.parties || [];
   const partiesHasMore = partiesData?.hasMore ?? false;
   const partiesNextCursor = partiesData?.nextCursor ?? null;
-  
 
-const handlePartyLoadMore = useCallback(() => {
-  if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
-  setPartyCursor(partiesNextCursor);
-}, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
+
+  const handlePartyLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
+    setPartyCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
   // reset cursor whenever the search text changes — starts a fresh page-1 fetch
   // useEffect(() => {
   //   setPartyCursor(null);
@@ -335,7 +335,7 @@ const handlePartyLoadMore = useCallback(() => {
   //const[categoryOpen,setCategoryOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   //const[selected,setSelected] = useState([]);
-  
+
   //const [originalTotal, setOriginalTotal] = useState(null);
   const [addCategory] = useAddCategoryMutation();
 
@@ -460,14 +460,14 @@ const handlePartyLoadMore = useCallback(() => {
       )?.setting_value
     ) === 1;
 
-  // const enableHSNSAC =
-  //   Number(
-  //     taxesGSTSettings.find(
-  //       (s) =>
-  //         s.setting_key === "enable_hsn_sac"
-  //     )?.setting_value
-  //   ) === 1;
-
+const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
   const enablePlaceOfSupply =
     Number(
       taxesGSTSettings.find(
@@ -488,16 +488,16 @@ const handlePartyLoadMore = useCallback(() => {
       )?.setting_value
     ) === 1;
 
-    const showFreeQuantity =
+  const showFreeQuantity =
     Number(
       transactionsSettings.find(
         (s) => s.setting_key === "free_item_quantity"
       )?.setting_value
     ) === 1;
-const hasHistoricaFreeQuantity=purchase?.items?.some(
-  (item) => item.hasHistoricalFreeQuantity === true
-)
-const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
+  const hasHistoricaFreeQuantity = purchase?.items?.some(
+    (item) => item.hasHistoricalFreeQuantity === true
+  )
+  const shouldShowFreeQuantity = showFreeQuantity || hasHistoricaFreeQuantity
   const shouldShowMRP = showMRP || hasHistoricalMRP;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
@@ -1180,7 +1180,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
           ? item.MRP
           : "",
         Quantity: item.Quantity || "",
-        Free_Quantity:item.Free_Quantity || "",
+        Free_Quantity: item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
 
         Purchase_Price: item.Purchase_Price || "",
@@ -1940,13 +1940,13 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
           minHeight: 0,
           overflow: "hidden",
           padding: "20px",
-           boxSizing: "border-box",
+          boxSizing: "border-box",
           //  marginTop: "2rem"
         }}
       >
 
         <div className="inn-title w-full px-2 py-2"
-         style={{ marginTop: "2rem" }} >
+          style={{ marginTop: "2rem" }} >
 
           <div className="
     flex flex-col sm:flex-row 
@@ -2098,35 +2098,35 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
 
           </div>
         </div>
-        <div 
-         style={{
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
-    overflow: "hidden",
-    padding: "0px",
-    backgroundColor: "#f1f1f19d",
-  }}
-        //style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} 
-        //className="tab-inn"
-        className="tab-inn flex flex-col"
-        >
-          <form onSubmit={handleSubmit(onSubmit)} 
-          className="flex flex-col"
+        <div
           style={{
             flex: 1,
             minHeight: 0,
             minWidth: 0,
             overflow: "hidden",
-           
+            padding: "0px",
+            backgroundColor: "#f1f1f19d",
           }}
+          //style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} 
+          //className="tab-inn"
+          className="tab-inn flex flex-col"
+        >
+          <form onSubmit={handleSubmit(onSubmit)}
+            className="flex flex-col"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              overflow: "hidden",
+
+            }}
           >
             {/* SCROLLABLE FORM CONTENT */}
             <div
               style={{
                 flex: 1,
                 minHeight: 0,
-               
+
                 minWidth: 0,
                 overflowY: "auto",
                 overflowX: "hidden",
@@ -2299,114 +2299,114 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                       <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
                     )}
                   </div> */}
-   
-<div className="flex flex-col gap-2 relative party-class">
-  <span className="whitespace-nowrap active">
-    Party
-    <span className="text-red-500">*</span>
-  </span>
 
-  <div className="relative w-full">
-    <div
-      className="flex flex-row border rounded-md bg-white cursor-pointer"
-      onClick={() => setOpen((prev) => !prev)}
-    >
-      <input
-        type="text"
-        id="Party_Name"
-        value={partySearch}
-        onChange={(e) => {
-          setPartyCursor(null);   // ← ADDED
-          const value = e.target.value;
-          setPartySearch(value);
-          setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
-          setOpen(true);
+                  <div className="flex flex-col gap-2 relative party-class">
+                    <span className="whitespace-nowrap active">
+                      Party
+                      <span className="text-red-500">*</span>
+                    </span>
 
-          const matchedParty = parties.find(
-            (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
-          );
+                    <div className="relative w-full">
+                      <div
+                        className="flex flex-row border rounded-md bg-white cursor-pointer"
+                        onClick={() => setOpen((prev) => !prev)}
+                      >
+                        <input
+                          type="text"
+                          id="Party_Name"
+                          value={partySearch}
+                          onChange={(e) => {
+                            setPartyCursor(null);   // ← ADDED
+                            const value = e.target.value;
+                            setPartySearch(value);
+                            setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                            setOpen(true);
 
-          if (matchedParty) {
-            setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-          } else {
-            setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-          }
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-        onBlur={() => {
-          setTimeout(() => {
-            const typedValue = partySearch?.trim()?.toLowerCase();
-            const matchedParty = parties.find(
-              (p) => p.Party_Name.toLowerCase() === typedValue
-            );
+                            const matchedParty = parties.find(
+                              (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
+                            );
 
-            if (matchedParty) {
-              setPartyCursor(null);   // ← ADDED
-              setPartySearch(matchedParty.Party_Name);
-              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-            }
+                            if (matchedParty) {
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                            } else {
+                              setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const typedValue = partySearch?.trim()?.toLowerCase();
+                              const matchedParty = parties.find(
+                                (p) => p.Party_Name.toLowerCase() === typedValue
+                              );
 
-            setOpen(false);
-          }, 150);
-        }}
-        placeholder="Search By Name/Phone"
-        className="w-full outline-none py-1 px-2 text-gray-900"
-        style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-      />
-      <div className="w-10"></div>
-      <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
-    </div>
+                              if (matchedParty) {
+                                setPartyCursor(null);   // ← ADDED
+                                setPartySearch(matchedParty.Party_Name);
+                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              }
 
-    {open && (
-      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                              setOpen(false);
+                            }, 150);
+                          }}
+                          placeholder="Search By Name/Phone"
+                          className="w-full outline-none py-1 px-2 text-gray-900"
+                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                        />
+                        <div className="w-10"></div>
+                        <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                      </div>
 
-        <span
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setShowPartyModal(true);
-          }}
-          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
-          style={{ borderBottom: "1px solid #f3f4f6" }}
-        >
-          + Add Party
-        </span>
+                      {open && (
+                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
 
-        <VirtualPartyScrollList
-          parties={parties}
-          isFetching={isPartiesFetching}
-          hasMore={partiesHasMore}
-          onLoadMore={handlePartyLoadMore}
-          scrollRef={partyScrollRef}
-          onSelectParty={(party) => {
-            setPartyCursor(null);   // ← ADDED
-            setPartySearch(party.Party_Name);
-            setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-            setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-            setOpen(false);
-          }}
-        />
+                          <span
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setShowPartyModal(true);
+                            }}
+                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                            style={{ borderBottom: "1px solid #f3f4f6" }}
+                          >
+                            + Add Party
+                          </span>
 
-      </div>
-    )}
-  </div>
+                          <VirtualPartyScrollList
+                            parties={parties}
+                            isFetching={isPartiesFetching}
+                            hasMore={partiesHasMore}
+                            onLoadMore={handlePartyLoadMore}
+                            scrollRef={partyScrollRef}
+                            onSelectParty={(party) => {
+                              setPartyCursor(null);   // ← ADDED
+                              setPartySearch(party.Party_Name);
+                              setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                              setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              setOpen(false);
+                            }}
+                          />
 
-  {showPartyModal && (
-    <PartyAddModal
-      onClose={() => setShowPartyModal(false)}
-      onSave={(newParty) => {
-        setPartyCursor(null);   // ← ADDED
-        setPartySearch(newParty.Party_Name);
-        setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-        setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-        setShowPartyModal(false);
-      }}
-    />
-  )}
-</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartyCursor(null);   // ← ADDED
+                          setPartySearch(newParty.Party_Name);
+                          setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                          setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )}
+                  </div>
                   <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
                     <span className=" whitespace-nowrap active ">
@@ -2531,7 +2531,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
               //   // overflowY: "auto",
               //   overflowX: "auto",
               // }}
-              
+
               >
 
                 <table className="table table-hover">
@@ -2550,7 +2550,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      <th>Item_HSN</th>
+                      {enableHSNCode &&<th>Item_HSN</th>}
                       {shouldShowMRP && <th>MRP</th>}
                       <th>Qty</th>
                       {shouldShowFreeQuantity && <th>Free Qty</th>}
@@ -2670,10 +2670,10 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                           )}
                         </td>
                         {/* Item Dropdown */}
-                        <td 
-                        style={{
+                        <td
+                          style={{
                             padding: "0px",
-                              width: shouldShowFreeQuantity ? "18%" : "22%",
+                            width: shouldShowFreeQuantity ? "18%" : "22%",
                             position: "relative",
                           }}
                         //style={{ padding: "0px", width: "18%", position: "relative" }}
@@ -3524,16 +3524,13 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                         </td>
 
                         {/*HSN Code */}
-                        <td style={{ padding: "0px", width: "8%" }}>
+                        {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
                           <input
                             type="text"
                             maxLength={8}
                             value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
                             onChange={(e) => {
-                              // if (!rows[i]?.isHSNLocked) {
-                              //   handleRowChange(i, "Item_HSN", e.target.value);
-                              //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                              // }
+                              
                               e.target.value = e.target.value.replace(/[^0-9]/g, "");
                               handleRowChange(i, "Item_HSN", e.target.value);
                               setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
@@ -3547,7 +3544,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                               {errors.items[i].Item_HSN.message}
                             </p>
                           )}
-                        </td>
+                        </td>)}
                         {/*MRP */}
                         {shouldShowMRP && (<td style={{ padding: "0px", width: "6%" }}>
                           <div className="d-flex align-items-center">
@@ -3682,7 +3679,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                           )}
                         </td>
 
-                          {shouldShowFreeQuantity && (
+                        {shouldShowFreeQuantity && (
                           <td style={{ padding: "0px", width: "4%" }}>
                             <input
                               type="text"
@@ -3717,7 +3714,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
 
 
 
-                     
+
                         <td style={{ padding: "0px", width: "10%" }}>
                           <Controller
                             control={control}
@@ -4235,10 +4232,11 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                         />
                       </td> */}
                         {/* Tax Amount Entry */}
-                        <td style={{ padding: "0px",
-                        width: shouldShowFreeQuantity ? "8%" : "10%"  
+                        <td style={{
+                          padding: "0px",
+                          width: shouldShowFreeQuantity ? "8%" : "10%"
                           //width: "12%" 
-                          }}>
+                        }}>
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -4337,7 +4335,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                         </td>
 
                         {/* Amount */}
-                        <td style={{ width: "8%" }}>
+                        <td style={{ width: "16%" }}>
                           <input
                             type="text"
                             className="form-control"
@@ -4353,7 +4351,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                      <td></td>
+                      {enableHSNCode &&<td></td>}
                       {shouldShowMRP && <td></td>}
 
                       <td className="text-right">
@@ -4775,7 +4773,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                         <div style={{ width: "100%" }}
                           className="flex justify-between items-center gap-6 w-full mr-4"
                         >
-                 
+
                           <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -4994,12 +4992,12 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
               </div>
             </div>
             <div className="flex justify-end gap-4"
-                style={{
+              style={{
                 //flexShrink: 0,
                 background: "#fff",
                 borderTop: "1px solid #e2e8f0",
                 padding: "8px",
-            }}
+              }}
             >
               <button
                 type="button"

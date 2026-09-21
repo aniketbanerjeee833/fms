@@ -17,6 +17,7 @@ import SelectUnitModal from "./SelectUnitModal";
 import { purchaseApi } from "../../redux/api/purchaseApi";
 import { saleApi } from "../../redux/api/saleApi";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 
 export default function AddItemModal({ onClose, onSave, defaultItemType = "Product" }) {
     const dispatch = useDispatch();
@@ -55,6 +56,20 @@ const calculateSalePriceFromMRP =
         "calculate_sale_price_from_mrp_disc"
     )?.setting_value
   ) === 1;
+    const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
+  
+    const taxesGSTSettings =taxesGSTSettingsData?.settings || [];
+
+    
+    const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
+  
 
     const { data: categories } = useGetAllCategoriesQuery();
 
@@ -455,7 +470,7 @@ useEffect(() => {
                                 )}
                             </div>
 
-                            <div className="input-field col s6" style={{ width: "50%" }}>
+                            {enableHSNCode &&(<div className="input-field col s6" style={{ width: "50%" }}>
                                 <span className="active">{fieldLabel("HSN Code")}</span>
                                 <input
                                     type="text"
@@ -470,7 +485,7 @@ useEffect(() => {
                                 {errors?.Item_HSN && (
                                     <p className="text-red-500 text-xs mt-1">{errors?.Item_HSN?.message}</p>
                                 )}
-                            </div>
+                            </div>)}
 
                             <div className="input-field col s6" style={{ width: "50%" }}>
                                 <span className="active">{fieldLabel("Unit")}</span>

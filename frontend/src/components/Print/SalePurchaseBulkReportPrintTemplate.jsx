@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import "./SalePurchaseBulkReportPrintTemplate.css";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 
 
 const TYPE_CONFIG = {
@@ -87,6 +88,19 @@ const formatRate = (rate) =>
 
 const SalePurchaseBulkReportPrintTemplate = forwardRef(
     ({ type = "sale", data, fromDate, toDate }, ref) => {
+        // ✅ HOOKS FIRST
+        const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
+
+        const taxesGSTSettings =
+            taxesGSTSettingsData?.settings || [];
+
+        const enableHSNCode =
+            Number(
+                taxesGSTSettings.find(
+                    (s) => s.setting_key === "enable_hsn_sac"
+                )?.setting_value
+            ) === 1;
+
         const records = Array.isArray(data)
             ? data
             : data?.invoices || data?.purchases || data?.saleReturns || data?.purchaseReturns || [];
@@ -202,7 +216,10 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                         <tr>
                                             <th className="bulk-center" style={{ width: "4%" }}>#</th>
                                             <th style={{ width: "22%" }}>Item name</th>
-                                            <th style={{ width: "9%" }}>HSN</th>
+                                            {/* <th style={{ width: "9%" }}>HSN</th> */}
+                                            {enableHSNCode && (
+                                                <th style={{ width: "9%" }}>HSN</th>
+                                            )}
                                             {hasMRPColumn && (
                                                 <th className="bulk-right" style={{ width: "8%" }}>
                                                     MRP
@@ -236,13 +253,16 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                             return (
                                                 <tr key={item.id || i}>
                                                     <td className="bulk-center">{i + 1}</td>
-                                                    <td>{item.Item_Name || "-"}</td>
-                                                    <td>{item.Item_HSN || "-"}</td>
+                                                    <td>{item.Item_Name || ""}</td>
+                                                    {enableHSNCode && (
+                                                        <td>{item.Item_HSN || ""}</td>
+                                                    )}
+                                                    {/* <td>{item.Item_HSN || "-"}</td> */}
                                                     {hasMRPColumn && (
                                                         <td className="bulk-right">
                                                             {Number(item[cfg.mrpKey] || 0) > 0
                                                                 ? money(item[cfg.mrpKey])
-                                                                : "-"}
+                                                                : ""}
                                                         </td>
                                                     )}
                                                     <td className="bulk-right">
@@ -259,7 +279,7 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                                     </td>
                                                     {/* <td className="bulk-right">{money(item.Quantity)}</td> */}
                                                     <td className="bulk-center">
-                                                        {item.Selected_Unit || item.Item_Unit || "-"}
+                                                        {item.Selected_Unit || item.Item_Unit || ""}
                                                     </td>
                                                     <td className="bulk-right">₹ {money(item[cfg.priceKey])}</td>
 
@@ -278,12 +298,12 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                                             <td className="bulk-right">
                                                                 {itemCgst > 0
                                                                     ? `₹ ${money(itemCgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                                                                    : "-"}
+                                                                    : ""}
                                                             </td>
                                                             <td className="bulk-right">
                                                                 {itemSgst > 0
                                                                     ? `₹ ${money(itemSgst)}${isTaxable ? ` (${formatRate(halfRate)})` : ""}`
-                                                                    : "-"}
+                                                                    : ""}
                                                             </td>
                                                         </>
                                                     )}
@@ -309,7 +329,8 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                         <tr>
                                             <td />
                                             <td className="bulk-bold">Total</td>
-                                            <td />
+                                            {/* <td /> */}
+                                            {enableHSNCode && <td />}
                                             {hasMRPColumn && <td />}
                                             {/* <td colSpan={3} className="bulk-right bulk-bold">Total</td> */}
                                             {/* <td className="bulk-right bulk-bold">
@@ -343,8 +364,8 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                                     }
 
                                                     return `${quantityTotal.quantity}${quantityTotal.freeQuantity > 0
-                                                            ? ` + ${quantityTotal.freeQuantity}`
-                                                            : ""
+                                                        ? ` + ${quantityTotal.freeQuantity}`
+                                                        : ""
                                                         }`;
                                                 })()}
                                             </td>

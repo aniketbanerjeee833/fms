@@ -436,14 +436,14 @@ const [partyCursor, setPartyCursor] = useState(null);
       )?.setting_value
     ) === 1;
 
-  // const enableHSNSAC =
-  //   Number(
-  //     taxesGSTSettings.find(
-  //       (s) =>
-  //         s.setting_key === "enable_hsn_sac"
-  //     )?.setting_value
-  //   ) === 1;
-
+     const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
   const enablePlaceOfSupply =
     Number(
       taxesGSTSettings.find(
@@ -3737,7 +3737,7 @@ if (prefix === originalReturnPrefix) {
                     </th>
                     <th>Category</th>
                     <th>Item</th>
-                    <th>Item_HSN</th>
+                    {enableHSNCode &&<th>Item_HSN</th>}
                     {shouldShowMRP && <th>MRP</th>}
 
                     {showMRP && calculateSalePriceFromMRP && (
@@ -4775,7 +4775,7 @@ if (prefix === originalReturnPrefix) {
                       </td>
 
                       {/*HSN Code */}
-                      <td style={{ padding: "0px", width: "8%" }}>
+                      {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
 
@@ -4798,7 +4798,7 @@ if (prefix === originalReturnPrefix) {
                             {errors.items[i].Item_HSN.message}
                           </p>
                         )}
-                      </td>
+                      </td>)}
                       {/*MRP */}
                       {shouldShowMRP && (
                         <td style={{ padding: "0px", width: "6%" }}>
@@ -5792,7 +5792,7 @@ if (prefix === originalReturnPrefix) {
                       </td>
 
                       {/* Amount */}
-                      <td style={{ width: "8%" }}>
+                      <td style={{ width: "16%" }}>
                         <input
                           type="text"
                           className="form-control"
@@ -5808,7 +5808,7 @@ if (prefix === originalReturnPrefix) {
                   <tr>
                     <td colSpan={2}></td>
                     <td>Total</td>
-                    <td></td>
+                     {enableHSNCode &&<td></td>}
                     {shouldShowMRP && <td></td>}
 
                     {/* MRP Discount column */}

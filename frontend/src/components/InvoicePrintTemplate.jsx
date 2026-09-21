@@ -4,12 +4,24 @@
 
 import { forwardRef } from "react";
 import "./InvoicePrintTemplate.css";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../redux/api/Settings/taxesAndGSTSettingsApi";
 
 // const InvoicePrintTemplate = forwardRef(({ purchase }, ref) => 
 const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
+  
+   const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings =taxesGSTSettingsData?.settings || [];
+  const enableHSNCode =
+  Number(
+    taxesGSTSettings.find(
+      (s) => s.setting_key === "enable_hsn_sac"
+    )?.setting_value
+  ) === 1;
   if (!invoice) return null;
+
 
   const {
     Purchase_Id,
@@ -532,6 +544,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       ? (price * qty * discount) / 100
       : discount * qty;
   };
+ 
   return (
     <div
       ref={ref}
@@ -708,12 +721,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               Item name
             </th>
 
-            <th
-              className="invoice-table-header"
-              style={{ width: "10%" }}
-            >
-              HSN/ SAC
-            </th>
+            
+            {enableHSNCode && (
+  <th
+    className="invoice-table-header"
+    style={{ width: "10%" }}
+  >
+    HSN/ SAC
+  </th>
+)}
 
             {hasMRPColumn && (
               <th
@@ -887,9 +903,14 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   {safe(item.Item_Name)}
                 </td>
 
-                <td className="invoice-item-cell">
+                {/* <td className="invoice-item-cell">
                   {safe(item.Item_HSN)}
-                </td>
+                </td> */}
+                {enableHSNCode && (
+  <td className="invoice-item-cell">
+    {safe(item.Item_HSN)}
+  </td>
+)}
 
                 {hasMRPColumn && (
                   <td className="invoice-item-right">
@@ -1077,7 +1098,10 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             </td>
 
             {/* HSN column */}
-            <td className="invoice-total-cell"></td>
+            {/* <td className="invoice-total-cell"></td> */}
+            {enableHSNCode && (
+  <td className="invoice-total-cell"></td>
+)}
             {hasMRPColumn && (
               <td className="invoice-total-cell"></td>
             )}

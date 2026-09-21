@@ -1003,7 +1003,7 @@ export default function ExpensesByItems() {
               minHeight: 0,
               display: "flex",
               flexDirection: "column",
-              minWidth: 0,
+              minWidth: 762,
             }}
           //style={{ maxHeight: "calc(100vh - 180px)" }}
           >

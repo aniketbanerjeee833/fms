@@ -645,14 +645,14 @@ export default function SaleReturnAdd() {
       )?.setting_value
     ) === 1;
 
-  // const enableHSNSAC =
-  //   Number(
-  //     taxesGSTSettings.find(
-  //       (s) =>
-  //         s.setting_key === "enable_hsn_sac"
-  //     )?.setting_value
-  //   ) === 1;
-
+   const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
   const enablePlaceOfSupply =
     Number(
       taxesGSTSettings.find(
@@ -2725,7 +2725,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      <th>Item_HSN</th>
+                     {enableHSNCode &&<th>Item_HSN</th>}
                       {/* <th>MRP</th>
                     <th>Discount On MRP (%)</th> */}
                       {shouldShowMRP && <th>MRP</th>}
@@ -4333,7 +4333,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                         </td>
 
                         {/*HSN Code */}
-                        <td style={{ padding: "0px", width: "8%" }}>
+                        {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
                           <input
                             type="text"
                             //readOnly
@@ -4356,7 +4356,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                               {errors.items[i].Item_HSN.message}
                             </p>
                           )}
-                        </td>
+                        </td>)}
                         {/*MRP */}
                         {shouldShowMRP && (
                           <td style={{ padding: "0px", width: "6%" }}>
@@ -5570,7 +5570,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                         </td>
 
                         {/* Amount */}
-                        <td style={{ width: "8%" }}>
+                        <td style={{ width: "16%" }}>
                           <input
                             type="text"
                             className="form-control"
@@ -5586,7 +5586,7 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                      <td></td>
+                      {enableHSNCode &&<td></td>}
                       {shouldShowMRP && <td></td>}
 
                       {/* MRP Discount column */}

@@ -416,8 +416,7 @@ const handlePartyLoadMore = useCallback(() => {
     ) === 1;
   const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
 
-  const taxesGSTSettings =
-    taxesGSTSettingsData?.settings || [];
+  const taxesGSTSettings =taxesGSTSettingsData?.settings || [];
 
   const enableGST =
     Number(
@@ -432,6 +431,15 @@ const handlePartyLoadMore = useCallback(() => {
         (s) =>
           s.setting_key ===
           "enable_place_of_supply"
+      )?.setting_value
+    ) === 1;
+
+    const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
       )?.setting_value
     ) === 1;
 
@@ -2359,7 +2367,7 @@ const handlePartyLoadMore = useCallback(() => {
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      <th>Item_HSN</th>
+                      {enableHSNCode &&<th>Item_HSN</th>}
                       {showMRP && <th>MRP</th>}
                       <th>Qty</th>
                       {showFreeQuantity && <th>Free Qty</th>}
@@ -3373,19 +3381,14 @@ const handlePartyLoadMore = useCallback(() => {
                           </td>
 
                           {/*HSN Code */}
-                          <td style={{ padding: "0px", width: "8%" }}>
+                          {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
                             <input
                               type="text"
                               value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
                               maxLength={8}              // limit to 8 digits
 
                               onChange={(e) => {
-                                // if (!rows[i]?.isHSNLocked) {
-                                //   e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                                //   handleRowChange(i, "Item_HSN", e.target.value);
-                                //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                                //   // setValue(`items.${i}.Item_HSN`, e.target.value);
-                                // }
+                               
 
                                 e.target.value = e.target.value.replace(/[^0-9]/g, "");
                                 handleRowChange(i, "Item_HSN", e.target.value);
@@ -3402,7 +3405,7 @@ const handlePartyLoadMore = useCallback(() => {
                                 {errors.items[i].Item_HSN.message}
                               </p>
                             )}
-                          </td>
+                          </td>)}
                           {/*MRP */}
                           {showMRP && (<td style={{ padding: "0px", width: "6%" }}>
                             <div className="d-flex align-items-center">
@@ -4217,7 +4220,7 @@ const handlePartyLoadMore = useCallback(() => {
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                      <td></td>
+                      {enableHSNCode &&<td></td>}
                       {showMRP && <td></td>}
                       <td className="text-right">
                         {totals.totalQty}

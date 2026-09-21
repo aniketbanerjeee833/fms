@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { partyApi, useGetAllPartiesCursorQuery, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesCursorQuery } from "../../redux/api/partyAPi";
 import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsForDropdownQuery, useLazyGetItemByNameQuery } from "../../redux/api/itemApi";
 
 
@@ -545,14 +545,14 @@ const handlePartyLoadMore = useCallback(() => {
       )?.setting_value
     ) === 1;
 
-  // const enableHSNSAC =
-  //   Number(
-  //     taxesGSTSettings.find(
-  //       (s) =>
-  //         s.setting_key === "enable_hsn_sac"
-  //     )?.setting_value
-  //   ) === 1;
-
+  const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
   const enablePlaceOfSupply =
     Number(
       taxesGSTSettings.find(
@@ -2775,7 +2775,7 @@ syncTotalsAfterItemChange(rawTotal)
                     </th>
                     <th>Category</th>
                     <th>Item</th>
-                    <th>Item_HSN</th>
+                    {enableHSNCode &&<th>Item_HSN</th>}
                     {shouldShowMRP && <th>MRP</th>}
                     
                     <th>Qty</th>
@@ -3567,7 +3567,7 @@ syncTotalsAfterItemChange(rawTotal)
                       </td>
 
                       {/*HSN Code */}
-                      <td style={{ padding: "0px", width: "8%" }}>
+                       {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
                         <input
                           type="text"
                           //readOnly
@@ -3596,7 +3596,7 @@ syncTotalsAfterItemChange(rawTotal)
                             {errors.items[i].Item_HSN.message}
                           </p>
                         )}
-                      </td>
+                      </td>)}
                       {/*MRP */}
                       {shouldShowMRP && (<td style={{ padding: "0px", width: "6%" }}>
                         <div className="d-flex align-items-center">
@@ -4648,7 +4648,7 @@ syncTotalsAfterItemChange(rawTotal)
                       </td>
 
                       {/* Amount */}
-                      <td style={{ width: "8%" }}>
+                      <td style={{ width: "16%" }}>
                         <input
                           type="text"
                           className="form-control"
@@ -4664,7 +4664,7 @@ syncTotalsAfterItemChange(rawTotal)
                   <tr>
                     <td colSpan={2}></td>
                     <td>Total</td>
-                    <td></td>
+                    {enableHSNCode &&<td></td>}
                     {shouldShowMRP && <td></td>}
 
                       {shouldShowFreeQuantity && (<td className="text-right">

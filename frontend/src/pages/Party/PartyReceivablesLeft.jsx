@@ -986,7 +986,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {row.Doc_Number || "—"}
+                    {row.Doc_Number || ""}
                   </div>
 
                   {/* DATE */}
@@ -1700,16 +1700,16 @@ export default function PartyReceivablesLeft() {
       return;
     }
 
-    const timer = setTimeout(() => {
+    //const timer = setTimeout(() => {
       virtualLeftListRef.current?.scrollToIndex(targetIndex, {
         align: "auto",
         behavior: "auto",
       });
 
       hasScrolledToSelectedRef.current = true;
-    }, 100);
+    //}, 100);
 
-    return () => clearTimeout(timer);
+    //return () => clearTimeout(timer);
   }, [
     parties,
     isLoading,
