@@ -460,7 +460,7 @@ export default function PurchaseEdit() {
       )?.setting_value
     ) === 1;
 
-const enableHSNCode =
+  const enableHSNCode =
     Number(
       taxesGSTSettings.find(
         (s) =>
@@ -569,6 +569,7 @@ const enableHSNCode =
       Party_Name: "",
 
       Bill_Number: "",
+      Phone_Number: "",
       Bill_Date: "",
       State_Of_Supply: "",
       Transaction_Discount_Percentage: "",
@@ -1203,6 +1204,7 @@ const enableHSNCode =
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
         GSTIN: purchase?.billPurchaseDetails?.GSTIN,
         Bill_Number: purchase?.billPurchaseDetails?.Bill_Number,
+        Phone_Number: purchase?.billPurchaseDetails?.Phone_Number || "",
         Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
         State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
         Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
@@ -1919,7 +1921,7 @@ const enableHSNCode =
 
     setShowScanCodeModal(false);
   };
-
+  //const partyWasEditedRef = useRef(false);
   return (
     <>
 
@@ -2134,10 +2136,12 @@ const enableHSNCode =
             >
               <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
 
-
-                <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-
-                  {/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
+                <div className="flex flex-col gap-4 w-full lg:w-2/3">
+                  <div
+                    //className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
+                    className="grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4"
+                  >
+                    {/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
                     style={{ marginBottom: "0px", marginTop: "0px" }}>
                     <span className="whitespace-nowrap active ">
                       Party
@@ -2300,114 +2304,249 @@ const enableHSNCode =
                     )}
                   </div> */}
 
-                  <div className="flex flex-col gap-2 relative party-class">
-                    <span className="whitespace-nowrap active">
-                      Party
-                      <span className="text-red-500">*</span>
-                    </span>
+                    <div className="flex flex-col gap-2 relative party-class">
+                      <span className="whitespace-nowrap active">
+                        Party
+                        <span className="text-red-500">*</span>
+                      </span>
 
-                    <div className="relative w-full">
-                      <div
-                        className="flex flex-row border rounded-md bg-white cursor-pointer"
-                        onClick={() => setOpen((prev) => !prev)}
-                      >
-                        <input
-                          type="text"
-                          id="Party_Name"
-                          value={partySearch}
-                          onChange={(e) => {
-                            setPartyCursor(null);   // ← ADDED
-                            const value = e.target.value;
-                            setPartySearch(value);
-                            setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
-                            setOpen(true);
+                      <div className="relative w-full">
+                        <div
+                          className="flex flex-row border rounded-md bg-white cursor-pointer"
+                          onClick={() => setOpen((prev) => !prev)}
+                        >
+                          <input
+                            type="text"
+                            id="Party_Name"
+                            value={partySearch}
+                            // onChange={(e) => {
+                            //   setPartyCursor(null);   // ← ADDED
+                            //   const value = e.target.value;
+                            //   setPartySearch(value);
+                            //   setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                            //   setOpen(true);
 
-                            const matchedParty = parties.find(
-                              (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
-                            );
+                            //   const matchedParty = parties.find(
+                            //     (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
+                            //   );
 
-                            if (matchedParty) {
-                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                            } else {
-                              setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-                            }
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpen(true);
-                          }}
-                          onBlur={() => {
-                            setTimeout(() => {
-                              const typedValue = partySearch?.trim()?.toLowerCase();
+                            //   if (matchedParty) {
+                            //     setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                            //     setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                            //       shouldValidate: true,
+                            //       shouldDirty: true,
+                            //     });
+                            //   } else {
+                            //     setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
+                            //     setValue("Phone_Number", "", {
+                            //       shouldValidate: true,
+                            //       shouldDirty: true,
+                            //     });
+
+                            //   }
+                            // }}
+                            onChange={(e) => {
+                              setPartyCursor(null);
+
+                              const value = e.target.value;
+
+                              setPartySearch(value);
+
+                              setValue("Party_Name", value, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setOpen(true);
+
                               const matchedParty = parties.find(
-                                (p) => p.Party_Name.toLowerCase() === typedValue
+                                (p) =>
+                                  p.Party_Name?.toLowerCase() ===
+                                  value.trim().toLowerCase()
                               );
 
                               if (matchedParty) {
-                                setPartyCursor(null);   // ← ADDED
-                                setPartySearch(matchedParty.Party_Name);
-                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                              }
+                                setValue("GSTIN", matchedParty.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-                              setOpen(false);
-                            }, 150);
-                          }}
-                          placeholder="Search By Name/Phone"
-                          className="w-full outline-none py-1 px-2 text-gray-900"
-                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-                        />
-                        <div className="w-10"></div>
-                        <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                                // Exact match → keep existing bill phone
+                              } else {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                // Not an exact match → clear phone
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(true);
+                            }}
+                            // onBlur={() => {
+                            //   setTimeout(() => {
+                            //     const typedValue = partySearch?.trim()?.toLowerCase();
+                            //     const matchedParty = parties.find(
+                            //       (p) => p.Party_Name.toLowerCase() === typedValue
+                            //     );
+
+                            //     if (matchedParty) {
+                            //       setPartyCursor(null);   // ← ADDED
+                            //       setPartySearch(matchedParty.Party_Name);
+                            //       setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                            //       // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                            //       //   shouldValidate: true,
+                            //       //   shouldDirty: true,
+                            //       // });
+
+                            //       setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                            //     }
+
+                            //     setOpen(false);
+                            //   }, 150);
+                            // }}
+
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue =
+                                  partySearch?.trim()?.toLowerCase();
+
+                                const matchedParty = parties.find(
+                                  (p) =>
+                                    p.Party_Name?.toLowerCase() === typedValue
+                                );
+
+                                if (matchedParty) {
+                                  setPartyCursor(null);
+
+                                  setPartySearch(matchedParty.Party_Name);
+
+                                  setValue("Party_Name", matchedParty.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setValue("GSTIN", matchedParty.GSTIN || "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  // If bill phone is empty, restore master phone
+                                  const currentBillPhone = watch("Phone_Number");
+
+                                  if (!currentBillPhone?.trim()) {
+                                    setValue(
+                                      "Phone_Number",
+                                      matchedParty.Phone_Number || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
+                                } else {
+                                  // No exact Party match → phone must remain cleared
+                                  setValue("Phone_Number", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }
+
+                                setOpen(false);
+                              }, 150);
+                            }}
+                            placeholder="Search By Name/Phone"
+                            className="w-full outline-none py-1 px-2 text-gray-900"
+                            style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                          />
+                          <div className="w-10"></div>
+                          <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                        </div>
+
+                        {open && (
+                          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+
+                            <span
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setShowPartyModal(true);
+                              }}
+                              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                              style={{ borderBottom: "1px solid #f3f4f6" }}
+                            >
+                              + Add Party
+                            </span>
+
+                            <VirtualPartyScrollList
+                              parties={parties}
+                              isFetching={isPartiesFetching}
+                              hasMore={partiesHasMore}
+                              onLoadMore={handlePartyLoadMore}
+                              scrollRef={partyScrollRef}
+                              onSelectParty={(party) => {
+                                setPartyCursor(null);   // ← ADDED
+                                setPartySearch(party.Party_Name);
+                                setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                setValue("Phone_Number", party.Phone_Number || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setOpen(false);
+                              }}
+                            />
+
+                          </div>
+                        )}
                       </div>
 
-                      {open && (
-                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
-
-                          <span
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setShowPartyModal(true);
-                            }}
-                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
-                            style={{ borderBottom: "1px solid #f3f4f6" }}
-                          >
-                            + Add Party
-                          </span>
-
-                          <VirtualPartyScrollList
-                            parties={parties}
-                            isFetching={isPartiesFetching}
-                            hasMore={partiesHasMore}
-                            onLoadMore={handlePartyLoadMore}
-                            scrollRef={partyScrollRef}
-                            onSelectParty={(party) => {
-                              setPartyCursor(null);   // ← ADDED
-                              setPartySearch(party.Party_Name);
-                              setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                              setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                              setOpen(false);
-                            }}
-                          />
-
-                        </div>
+                      {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);   // ← ADDED
+                            setPartySearch(newParty.Party_Name);
+                            setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                            setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                            setShowPartyModal(false);
+                          }}
+                        />
                       )}
                     </div>
+                    {/* Phone Number — compact inline label+input */}
 
-                    {showPartyModal && (
-                      <PartyAddModal
-                        onClose={() => setShowPartyModal(false)}
-                        onSave={(newParty) => {
-                          setPartyCursor(null);   // ← ADDED
-                          setPartySearch(newParty.Party_Name);
-                          setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                          setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                          setShowPartyModal(false);
+                    <div className="flex flex-col gap-2">
+
+                      <span className="whitespace-nowrap active">Phone Number</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        id="Phone_Number"
+                        {...register("Phone_Number")}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
+
+                          setValue("Phone_Number", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
                         }}
+                        placeholder="Phone Number"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
                       />
-                    )}
-                  </div>
-                  <div className="input-field  flex gap-4
+
+                      {errors?.Phone_Number && (
+                        <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
+                      )}
+                    </div>
+                    {/* <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
                     <span className=" whitespace-nowrap active ">
                       GSTIN
@@ -2429,8 +2568,9 @@ const enableHSNCode =
                         {errors?.GSTIN?.message}
                       </p>
                     )}
-                  </div>
+                  </div> */}
 
+                  </div>
                 </div>
                 <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
@@ -2550,7 +2690,7 @@ const enableHSNCode =
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      {enableHSNCode &&<th>Item_HSN</th>}
+                      {enableHSNCode && <th>Item_HSN</th>}
                       {shouldShowMRP && <th>MRP</th>}
                       <th>Qty</th>
                       {shouldShowFreeQuantity && <th>Free Qty</th>}
@@ -3530,7 +3670,7 @@ const enableHSNCode =
                             maxLength={8}
                             value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
                             onChange={(e) => {
-                              
+
                               e.target.value = e.target.value.replace(/[^0-9]/g, "");
                               handleRowChange(i, "Item_HSN", e.target.value);
                               setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
@@ -4351,7 +4491,7 @@ const enableHSNCode =
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                      {enableHSNCode &&<td></td>}
+                      {enableHSNCode && <td></td>}
                       {shouldShowMRP && <td></td>}
 
                       <td className="text-right">
@@ -4999,7 +5139,7 @@ const enableHSNCode =
                 padding: "8px",
               }}
             >
-              <button
+              {/* <button
                 type="button"
                 onClick={() => {
                   // setShowModal(false)
@@ -5035,14 +5175,14 @@ const enableHSNCode =
                 style={{ backgroundColor: "#4CA1AF" }}
               >
                 Cancel
-              </button>
+              </button> */}
               <button
                 type="submit"
                 disabled={formValues.errorCount > 0 || isEditingPurchase}
                 className=" text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                {isEditingPurchase ? "Updating..." : "Update Purchase"}
+                {isEditingPurchase ? "Saving..." : "Save"}
               </button>
             </div>
 

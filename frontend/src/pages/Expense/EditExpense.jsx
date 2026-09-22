@@ -2532,7 +2532,7 @@ export default function EditExpense() {
                                 padding: "8px",
                             }}>
 
-                            <button
+                            {/* <button
                                 type="button"
                                 onClick={() => {
                                     const dest = getBackDestination();
@@ -2544,7 +2544,7 @@ export default function EditExpense() {
                                 style={{ backgroundColor: "#94a3b8" }}
                             >
                                 Cancel
-                            </button>
+                            </button> */}
 
                             <button
                                 type="submit"
@@ -2552,7 +2552,7 @@ export default function EditExpense() {
                                 className="text-white font-bold py-2 px-4 rounded"
                                 style={{ backgroundColor: "#4CA1AF" }}
                             >
-                                {isUpdatingExpense ? "Updating..." : "Update"}
+                                {isUpdatingExpense ? "Saving..." : "Save"}
                             </button>
 
                         </div>

@@ -443,13 +443,14 @@ const getPurchaseReturnById = async (req, res, next) => {
     // =========================================================
     // 1. FETCH HEADER
     // =========================================================
-
+ //a.Phone_Number,
     const [[header]] = await connection.query(
       `SELECT
          pr.id,
          
          pr.Return_Number,
          pr.Bill_Number,
+         pr.Phone_Number,
          pr.Bill_Date,
          pr.Return_Date,
          pr.State_Of_Supply,
@@ -464,7 +465,8 @@ const getPurchaseReturnById = async (req, res, next) => {
          a.Party_Name,
      a.GSTIN,
          a.State,
-          a.Phone_Number,
+         a.Phone_Number AS Party_Phone_Number,
+         
     
           (
   SELECT pa.Address_Text
@@ -854,6 +856,10 @@ const getPurchaseReturnById = async (req, res, next) => {
       success: true,
       purchaseReturn: {
         ...header,
+        Phone_Number:
+      header.Phone_Number ||
+      header.Party_Phone_Number ||
+      "",
         items: formattedItems,
         splits,
       },
@@ -883,6 +889,7 @@ const createPurchaseReturn = async (req, res, next) => {
       Party_Name,
       Return_Number,
       Bill_Number,
+      Phone_Number,
       Bill_Date,
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
@@ -1072,22 +1079,121 @@ const createPurchaseReturn = async (req, res, next) => {
     // 7. FIND PARTY
     // =========================================================
 
-    const [[party]] = await connection.query(
-      `SELECT Party_Id
-       FROM add_party
-       WHERE Party_Name = ?
-       LIMIT 1`,
-      [Party_Name]
+    // const [[party]] = await connection.query(
+    //   `SELECT Party_Id
+    //    FROM add_party
+    //    WHERE Party_Name = ?
+    //    LIMIT 1`,
+    //   [Party_Name]
+    // );
+
+    // if (!party) {
+    //   await connection.rollback();
+
+    //   return res.status(404).json({
+    //     success: false,
+    //     message: "Party not found",
+    //   });
+    // }
+
+// =========================================================
+// 7. FIND OR CREATE PARTY
+// =========================================================
+const cleanPartyName = Party_Name?.trim();
+
+const [[existingParty]] = await connection.query(
+  `
+  SELECT
+    Party_Id,
+    Party_Name,
+    Phone_Number
+  FROM add_party
+  WHERE Party_Name = ?
+  LIMIT 1
+  `,
+  [cleanPartyName]
+);
+
+let party;
+
+if (!existingParty) {
+  // =======================================================
+  // PARTY DOES NOT EXIST → CREATE NEW PARTY
+  // =======================================================
+
+  const [partyResult] = await connection.execute(
+    `
+    INSERT INTO add_party
+      (
+        Party_Name,
+        Phone_Number,
+        created_at,
+        updated_at
+      )
+    VALUES (?, ?, NOW(), NOW())
+    `,
+    [
+      cleanPartyName,
+      cleanValue(Phone_Number),
+    ]
+  );
+
+  // Generate Party_Id exactly like add_item
+  const partyIdNumber = partyResult.insertId;
+
+  const Party_Id =
+    "PTY" + partyIdNumber.toString().padStart(3, "0");
+
+  // Save generated Party_Id
+  await connection.execute(
+    `
+    UPDATE add_party
+    SET Party_Id = ?
+    WHERE id = ?
+    `,
+    [
+      Party_Id,
+      partyIdNumber,
+    ]
+  );
+
+  // Use the newly generated party
+  party = {
+    Party_Id,
+    Party_Name: cleanPartyName,
+    Phone_Number: cleanValue(Phone_Number),
+  };
+
+} else {
+  // =======================================================
+  // PARTY ALREADY EXISTS
+  // =======================================================
+
+  party = existingParty;
+
+  // If master party has no phone,
+  // save the phone entered in this bill.
+  if (
+    !existingParty.Phone_Number?.trim() &&
+    Phone_Number?.trim()
+  ) {
+    await connection.execute(
+      `
+      UPDATE add_party
+      SET
+        Phone_Number = ?,
+        updated_at = NOW()
+      WHERE Party_Id = ?
+      `,
+      [
+        cleanValue(Phone_Number),
+        existingParty.Party_Id,
+      ]
     );
 
-    if (!party) {
-      await connection.rollback();
-
-      return res.status(404).json({
-        success: false,
-        message: "Party not found",
-      });
-    }
+    party.Phone_Number = Phone_Number.trim();
+  }
+}
 
     // =========================================================
     // 8. INSERT PURCHASE RETURN HEADER
@@ -1123,6 +1229,7 @@ const createPurchaseReturn = async (req, res, next) => {
          Party_Id,
          Return_Number,
          Bill_Number,
+         Phone_Number,
          Bill_Date,
          financial_year,
          Return_Date,
@@ -1134,12 +1241,13 @@ const createPurchaseReturn = async (req, res, next) => {
          Total_Received,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?, ?,?,?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?,?, ?,?,?, ?, ?, ?, ?, ?, ?)`,
       [
         Purchase_Id,
         party.Party_Id,
         Return_Number || null,
         Bill_Number || null,
+        cleanValue(Phone_Number),
         Bill_Date || null,
         activeFY,
         Return_Date,
@@ -1646,6 +1754,7 @@ const editPurchaseReturn = async (req, res, next) => {
       Party_Name,
       Return_Number,
       Bill_Number,
+      Phone_Number,
       Bill_Date,
       Return_Date = new Date().toISOString().slice(0, 10),
       State_Of_Supply,
@@ -1715,15 +1824,118 @@ const editPurchaseReturn = async (req, res, next) => {
     // 5. FIND PARTY
     // =========================================================
 
-    const [[party]] = await connection.query(
-      `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
-      [Party_Name]
+    // const [[party]] = await connection.query(
+    //   `SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1`,
+    //   [Party_Name]
+    // );
+
+    // if (!party) {
+    //   await connection.rollback();
+    //   return res.status(404).json({ success: false, message: "Party not found" });
+    // }
+    // =========================================================
+// 5. FIND OR CREATE PARTY
+// =========================================================
+
+// =========================================================
+// 5. FIND OR CREATE PARTY
+// =========================================================
+
+const cleanPartyName = Party_Name?.trim();
+
+const [[existingParty]] = await connection.query(
+  `
+  SELECT
+    Party_Id,
+    Party_Name,
+    Phone_Number
+  FROM add_party
+  WHERE Party_Name = ?
+  LIMIT 1
+  `,
+  [cleanPartyName]
+);
+
+let party;
+
+if (!existingParty) {
+  // =======================================================
+  // PARTY DOES NOT EXIST → CREATE NEW PARTY
+  // =======================================================
+
+  const [partyResult] = await connection.execute(
+    `
+    INSERT INTO add_party
+      (
+        Party_Name,
+        Phone_Number,
+        created_at,
+        updated_at
+      )
+    VALUES (?, ?, NOW(), NOW())
+    `,
+    [
+      cleanPartyName,
+      cleanValue(Phone_Number),
+    ]
+  );
+
+  // Generate Party_Id
+  const partyIdNumber = partyResult.insertId;
+
+  const Party_Id =
+    "PTY" + partyIdNumber.toString().padStart(3, "0");
+
+  // Save generated Party_Id
+  await connection.execute(
+    `
+    UPDATE add_party
+    SET Party_Id = ?
+    WHERE id = ?
+    `,
+    [
+      Party_Id,
+      partyIdNumber,
+    ]
+  );
+
+  // Use newly created party
+  party = {
+    Party_Id,
+    Party_Name: cleanPartyName,
+    Phone_Number: cleanValue(Phone_Number),
+  };
+
+} else {
+  // =======================================================
+  // PARTY ALREADY EXISTS
+  // =======================================================
+
+  party = existingParty;
+
+  // If master phone is empty but bill has phone,
+  // save the phone into Party master.
+  if (
+    !existingParty.Phone_Number?.trim() &&
+    Phone_Number?.trim()
+  ) {
+    await connection.execute(
+      `
+      UPDATE add_party
+      SET
+        Phone_Number = ?,
+        updated_at = NOW()
+      WHERE Party_Id = ?
+      `,
+      [
+        cleanValue(Phone_Number),
+        existingParty.Party_Id,
+      ]
     );
 
-    if (!party) {
-      await connection.rollback();
-      return res.status(404).json({ success: false, message: "Party not found" });
-    }
+    party.Phone_Number = Phone_Number.trim();
+  }
+}
 
     // =========================================================
     // 6. UPDATE HEADER
@@ -1757,6 +1969,7 @@ const editPurchaseReturn = async (req, res, next) => {
          Party_Id        = ?,
          Return_Number   = ?,
          Bill_Number     = ?,
+         Phone_Number    = ?,
          Bill_Date       = ?,
          Return_Date     = ?,
          State_Of_Supply = ?,
@@ -1772,6 +1985,7 @@ const editPurchaseReturn = async (req, res, next) => {
         party.Party_Id,
         Return_Number || null,
         Bill_Number || null,
+        cleanValue(Phone_Number),
         Bill_Date || null,
         Return_Date,
         State_Of_Supply || null,

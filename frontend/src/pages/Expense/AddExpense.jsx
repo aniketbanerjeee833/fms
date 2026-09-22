@@ -1956,14 +1956,14 @@ const handlePartyLoadMore = useCallback(() => {
                                 padding: "8px",
                             }}
                         >
-                            <button
+                            {/* <button
                                 type="button"
                                 onClick={() => navigate("/expense/all-expenses")}
                                 className="text-white font-bold py-2 px-4 rounded"
                                 style={{ backgroundColor: "#94a3b8" }}
                             >
                                 Cancel
-                            </button>
+                            </button> */}
                             <button
                                 type="submit"
                                 disabled={isAddingExpense}

@@ -10,6 +10,7 @@ export const getPurchasesForPrint = async (
       p.id,
       p.Purchase_Id,
       p.Bill_Number,
+      p.Phone_Number,
       p.Bill_Date,
       p.Total_Amount,
       p.Round_Off,
@@ -22,6 +23,7 @@ export const getPurchasesForPrint = async (
 
       party.Party_Name,
       party.GSTIN,
+      party.Phone_Number AS Party_Phone_Number,
 
       tc.Title AS Terms_Conditions_Title
 
@@ -174,6 +176,10 @@ export const getPurchasesForPrint = async (
     Purchase_Id: purchase.Purchase_Id,
     Party_Name: purchase.Party_Name,
     GSTIN: purchase.GSTIN,
+     Phone_Number:
+      purchase.Phone_Number ||
+      purchase.Party_Phone_Number ||
+      "",
 
     Bill_Number: purchase.Bill_Number,
     Bill_Date: purchase.Bill_Date,
@@ -264,6 +270,7 @@ export const getSalesForPrint = async (
 
         p.Party_Name,
         p.GSTIN,
+        p.Phone_Number AS Party_Phone_Number,
      
 
         tc.Title AS Terms_Conditions_Title
@@ -460,7 +467,7 @@ export const getSalesForPrint = async (
           Sale_Id: sale.Sale_Id,
           Party_Name: sale.Party_Name,
           Billing_Name: sale.Billing_Name,
-          Phone_Number: sale.Phone_Number,
+          Phone_Number: sale.Phone_Number || sale.Party_Phone_Number ||"",
           Billing_Address:
             sale.Billing_Address,
           GSTIN: sale.GSTIN,
@@ -548,6 +555,7 @@ export const getPurchaseReturnsForPrint = async (
         pr.id,
         pr.Return_Number,
         pr.Bill_Number,
+        pr.Phone_Number,
         pr.Bill_Date,
         pr.Return_Date,
         pr.State_Of_Supply,
@@ -556,9 +564,11 @@ export const getPurchaseReturnsForPrint = async (
         pr.Total_Received,
         pr.Balance_Due,
         pr.Party_Id,
+        
 
         p.Party_Name,
-        p.GSTIN
+        p.GSTIN,
+        p.Phone_Number AS Party_Phone_Number
        
 
       FROM purchase_return pr
@@ -750,13 +760,15 @@ export const getPurchaseReturnsForPrint = async (
             Purchase_Return_Id:
               row.id,
 
-            Party_Name:
-              row.Party_Name,
+            Party_Name:row.Party_Name,
+              Phone_Number:
+    row.Phone_Number ||
+    row.Party_Phone_Number ||
+    "",
 
             GSTIN: row.GSTIN,
 
-            Return_Number:
-              row.Return_Number,
+            Return_Number:row.Return_Number,
 
             Bill_Number:
               row.Bill_Number,
@@ -822,6 +834,7 @@ export const getPurchaseReturnsForPrint = async (
         sr.id,
         sr.Return_Number,
         sr.Invoice_Number,
+        sr.Phone_Number,
         sr.Invoice_Date,
         sr.Return_Date,
         sr.State_Of_Supply,
@@ -832,7 +845,8 @@ export const getPurchaseReturnsForPrint = async (
         sr.Party_Id,
 
         p.Party_Name,
-        p.GSTIN
+        p.GSTIN,
+        p.Phone_Number AS Party_Phone_Number
         
 
       FROM sale_return sr
@@ -1015,6 +1029,11 @@ if (!returns.length) {
           Sale_Return_Id: row.id,
 
           Party_Name: row.Party_Name,
+            Phone_Number:
+    row.Phone_Number ||
+    row.Party_Phone_Number ||
+    "",
+
           GSTIN: row.GSTIN,
 
           Return_Number: row.Return_Number,
@@ -1076,7 +1095,8 @@ if (!returns.length) {
         pi.*,
 
         a.Party_Name,
-        a.GSTIN
+        a.GSTIN,
+        a.Phone_Number
 
       FROM payment_in pi
 
@@ -1211,7 +1231,8 @@ export const getPaymentOutsForPrint = async (
         po.*,
 
         a.Party_Name,
-        a.GSTIN
+        a.GSTIN,
+        a.Phone_Number
 
       FROM payment_out po
 

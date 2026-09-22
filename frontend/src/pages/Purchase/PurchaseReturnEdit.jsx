@@ -432,6 +432,7 @@ const handlePartyLoadMore = useCallback(() => {
       Party_Name: "",
       Return_Number: "",
       Bill_Number: "",
+      Phone_Number: "",
       Bill_Date: "",
       Return_Date: new Date().toISOString().slice(0, 10),
       State_Of_Supply: "",
@@ -1108,7 +1109,7 @@ const handleDeleteRow = (i) => {
         Party_Name: purchase.purchaseReturn?.Party_Name || "",
         GSTIN: purchase.purchaseReturn?.GSTIN || "",
         Bill_Number: purchase.purchaseReturn?.Bill_Number || "",
-
+        Phone_Number: purchase?.purchaseReturn?.Phone_Number || "",
         Bill_Date: toLocalDateString(purchase.purchaseReturn?.Bill_Date),
         //  Invoice_Date: purchase.purchaseReturn?.Invoice_Date,
         State_Of_Supply: purchase.purchaseReturn?.State_Of_Supply || "",
@@ -2001,478 +2002,14 @@ syncTotalsAfterItemChange(rawTotal)
           >
             <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
               {/* <div className="row"> */}
-              <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-                {/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
-                  style={{ marginBottom: "0px", marginTop: "0px" }}>
-                  
+              <div className="flex flex-col gap-4 w-full lg:w-2/3">
+              <div
+              className="grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4"
+              //className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "
+              >
+               
 
-                  <span className="active">
-                    Party
-                    <span className="text-red-500">*</span>
-                  </span>
-
-
-                  <div className="relative w-full">
-                    <div
-                      className="flex flex-row border rounded-md bg-white cursor-pointer"
-                      onClick={() => setOpen((prev) => !prev)}
-                    >
-                      <input
-                        type="text"
-                        id="Party_Name"
-                        value={partySearch}
-                        // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPartySearch(value);
-                          setValue("Party_Name", value, { shouldValidate: true });
-                          setOpen(true);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpen(true);
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            const typedValue = partySearch?.trim()?.toLowerCase();
-                            const matchedParty = parties?.parties?.find(
-                              (p) => p.Party_Name.toLowerCase() === typedValue
-                            );
-
-                            if (matchedParty) {
-                              setPartySearch(matchedParty.Party_Name);
-                              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
-                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
-                            }
-
-                            setOpen(false);
-                          }, 150);
-                        }}
-                        placeholder="Search By Name/Phone"
-                        className="w-full outline-none py-1 px-2 text-gray-900"
-                        style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-                      />
-                      <div className="w-10 "></div>
-                      <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
-                    </div>
-
-                    {open && (
-                      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        <span
-                          onClick={() => setShowPartyModal(true)}
-                          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                        >
-                          + Add Party
-                        </span>
-
-                  
-                        {parties?.parties
-                          ?.filter(
-                            (party) =>
-                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                              party?.Phone_Number?.includes(partySearch)
-                          )
-                          .map((party, i) => {
-                            const bal = Number(party.Current_Balance ?? 0);
-                            const balColor = bal < 0 ? "#ef4444" : "#16a34a";
-
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => {
-                                  setPartySearch(party.Party_Name);
-                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                                  //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
-
-                                  setOpen(false);
-                                }}
-                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
-                                style={{ borderBottom: "1px solid #f3f4f6" }}
-                              >
-                               
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm text-gray-800 font-medium truncate">
-                                    {party.Party_Name}
-                                  </span>
-                                  <span className="text-xs text-gray-400">
-                                    {party.Phone_Number || "—"}
-                                  </span>
-                                </div>
-
-                                
-                                <div className="flex flex-col items-end flex-shrink-0">
-                                  <span className="text-xs text-gray-400">Balance</span>
-                                  <span className="text-xs font-semibold" style={{ color: balColor }}>
-                                    ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                        {parties?.parties?.filter((party) =>
-                          party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
-                        ).length === 0 && (
-                            <p className="px-3 py-2 text-gray-500">No Party found</p>
-                          )}
-                      </div>
-                    )}
-                  </div>
-                 
-                  {showPartyModal && (
-                    <PartyAddModal
-                      onClose={() => setShowPartyModal(false)}
-                      onSave={(newParty) => {
-                        setPartySearch(newParty.Party_Name);
-
-                        setValue(
-                          "Party_Name",
-                          newParty.Party_Name,
-                          {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          }
-                        );
-
-                        setValue(
-                          "GSTIN",
-                          newParty.GSTIN || "",
-                          {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          }
-                        );
-
-                        setValue(
-                          "Billing_Name",
-                          newParty.Billing_Name || "",
-                          {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          }
-                        );
-
-                        //setCurrentPartyDetails(newParty);
-
-                        setShowPartyModal(false);
-                      }}
-                    />
-                  )}
-
-                </div> */}
-                  {/* <div
-    className="flex flex-col relative mt-2 gap-2 party-class"
-    style={{
-      marginBottom: "0px",
-      marginTop: "0px",
-    }}
-  >
-    <span className="active">
-      Party
-      <span className="text-red-500">*</span>
-    </span>
-
-    <div className="relative w-full">
-     
-      <div
-        className="flex flex-row border rounded-md bg-white cursor-pointer"
-        onClick={() =>
-          setOpen((prev) => !prev)
-        }
-      >
-        <input
-          type="text"
-          id="Party_Name"
-          value={partySearch}
-          onChange={(e) => {
-            const value = e.target.value;
-
-            setPartySearch(value);
-
-            setValue(
-              "Party_Name",
-              value,
-              {
-                shouldValidate: true,
-                shouldDirty: true,
-              }
-            );
-
-            setOpen(true);
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            setOpen(true);
-          }}
-          onBlur={() => {
-            setTimeout(() => {
-              const typedValue =
-                partySearch
-                  ?.trim()
-                  ?.toLowerCase();
-
-              const matchedParty =
-                parties?.parties?.find(
-                  (p) =>
-                    p.Party_Name
-                      ?.toLowerCase() ===
-                    typedValue
-                );
-
-              if (matchedParty) {
-                setPartySearch(
-                  matchedParty.Party_Name
-                );
-
-                setValue(
-                  "Party_Name",
-                  matchedParty.Party_Name,
-                  {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  }
-                );
-
-                setValue(
-                  "GSTIN",
-                  matchedParty.GSTIN || "",
-                  {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  }
-                );
-
-                setValue(
-                  "Billing_Name",
-                  matchedParty.Billing_Name || "",
-                  {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  }
-                );
-              }
-
-              setOpen(false);
-            }, 150);
-          }}
-          placeholder="Search By Name/Phone"
-          className="w-full outline-none py-1 px-2 text-gray-900"
-          style={{
-            marginBottom: 0,
-            marginTop: "4px",
-            border: "none",
-            borderBottom: "none",
-            height: "2rem",
-          }}
-        />
-
-        <div className="w-10"></div>
-
-        <span className="absolute right-0 px-2 top-1/3 text-gray-700">
-          ▼
-        </span>
-      </div>
-
-     
-    {open && (
-  <div
-    className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg"
-    style={{
-      height: Math.min(
-        44 + parties.length * 56 + (partiesHasMore ? 30 : 0), // "+ Add Party" row + rows + loading/end indicator
-        260 // cap at the same max as before
-      ),
-      minHeight: 44 + 56, // always room for "+ Add Party" + at least one row/empty message
-    }}
-  >
-          
-          <span
-            onMouseDown={(e) =>
-              e.preventDefault()
-            }
-            onClick={() =>
-              setShowPartyModal(true)
-            }
-            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
-            style={{
-              borderBottom:
-                "1px solid #f3f4f6",
-            }}
-          >
-            + Add Party
-          </span>
-
-          
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-            }}
-          >
-            <VirtualScrollList
-              ref={virtualPartyListRef}
-              items={parties}
-              rowHeight={56}
-              height="100%"
-              onLoadMore={
-                handlePartyLoadMore
-              }
-              isFetching={
-                isPartiesFetching
-              }
-              hasMore={partiesHasMore}
-              getItemKey={(party) =>
-                party.Party_Id
-              }
-              emptyMessage="No Party found"
-              endMessage="— End of parties —"
-              renderRow={(party) => {
-                const bal = Number(
-                  party.Current_Balance ?? 0
-                );
-
-                const balColor =
-                  bal < 0
-                    ? "#ef4444"
-                    : "#16a34a";
-
-                return (
-                  <div
-                    key={party.Party_Id}
-                    onMouseDown={(e) =>
-                      e.preventDefault()
-                    }
-                    onClick={() => {
-                      setPartySearch(
-                        party.Party_Name
-                      );
-
-                      setValue(
-                        "Party_Name",
-                        party.Party_Name,
-                        {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        }
-                      );
-
-                      setValue(
-                        "GSTIN",
-                        party.GSTIN || "",
-                        {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        }
-                      );
-
-                      setValue(
-                        "Billing_Name",
-                        party.Billing_Name || "",
-                        {
-                          shouldValidate: true,
-                          shouldDirty: true,
-                        }
-                      );
-
-                      setOpen(false);
-                    }}
-                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
-                    style={{
-                      borderBottom:
-                        "1px solid #f3f4f6",
-                      minHeight: 56,
-                      boxSizing:
-                        "border-box",
-                    }}
-                  >
-                    
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm text-gray-800 font-medium truncate">
-                        {party.Party_Name}
-                      </span>
-
-                      <span className="text-xs text-gray-400">
-                        {party.Phone_Number ||
-                          "—"}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col items-end flex-shrink-0">
-                      <span className="text-xs text-gray-400">
-                        Balance
-                      </span>
-
-                      <span
-                        className="text-xs font-semibold"
-                        style={{
-                          color: balColor,
-                        }}
-                      >
-                        ₹
-                        {bal.toLocaleString(
-                          "en-IN",
-                          {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          }
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                );
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-
-   
-    {showPartyModal && (
-      <PartyAddModal
-        onClose={() =>
-          setShowPartyModal(false)
-        }
-        onSave={(newParty) => {
-          setPartySearch(
-            newParty.Party_Name
-          );
-
-          setValue(
-            "Party_Name",
-            newParty.Party_Name,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-
-          setValue(
-            "GSTIN",
-            newParty.GSTIN || "",
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-
-          setValue(
-            "Billing_Name",
-            newParty.Billing_Name || "",
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-
-          setShowPartyModal(false);
-        }}
-      />
-    )}
-  </div> */}
-
-  <div className="flex flex-col gap-2 relative party-class">
+  {/* <div className="flex flex-col gap-2 relative party-class">
     <span className="whitespace-nowrap active">
       Party
       <span className="text-red-500">*</span>
@@ -2578,10 +2115,294 @@ syncTotalsAfterItemChange(rawTotal)
         }}
       />
     )}
+  </div> */}
+  <div className="flex flex-col gap-2 relative party-class">
+  <span className="whitespace-nowrap active">
+    Party
+    <span className="text-red-500">*</span>
+  </span>
+
+  <div className="relative w-full">
+    <div
+      className="flex flex-row border rounded-md bg-white cursor-pointer"
+      onClick={() => setOpen((prev) => !prev)}
+    >
+      <input
+        type="text"
+        id="Party_Name"
+        value={partySearch}
+        onChange={(e) => {
+          setPartyCursor(null);
+
+          const value = e.target.value;
+
+          setPartySearch(value);
+
+          setValue("Party_Name", value, {
+            shouldValidate: true,
+            shouldDirty: true,
+          });
+
+          setOpen(true);
+
+          // Find exact Party match
+          const matchedParty = parties.find(
+            (p) =>
+              p.Party_Name?.toLowerCase() ===
+              value.trim().toLowerCase()
+          );
+
+          if (matchedParty) {
+            // =================================================
+            // EXACT PARTY MATCH
+            // =================================================
+
+            setValue("GSTIN", matchedParty.GSTIN || "", {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+
+            /*
+             * DO NOT change Phone_Number here.
+             *
+             * Example:
+             * Existing bill:
+             * Party = Sangita
+             * Phone = 9876543210
+             *
+             * User types:
+             * Sangita
+             *
+             * Existing bill phone remains.
+             */
+          } else {
+            // =================================================
+            // PARTY DOES NOT MATCH
+            // =================================================
+
+            setValue("GSTIN", "", {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+
+            // Clear phone immediately because the
+            // typed Party does not exist in the list.
+            setValue("Phone_Number", "", {
+              shouldValidate: true,
+              shouldDirty: true,
+            });
+          }
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        onBlur={() => {
+          setTimeout(() => {
+            const typedValue =
+              partySearch?.trim()?.toLowerCase();
+
+            const matchedParty = parties.find(
+              (p) =>
+                p.Party_Name?.toLowerCase() === typedValue
+            );
+
+            if (matchedParty) {
+              // ===============================================
+              // EXACT PARTY MATCH
+              // ===============================================
+
+              setPartyCursor(null);
+
+              setPartySearch(matchedParty.Party_Name);
+
+              setValue(
+                "Party_Name",
+                matchedParty.Party_Name,
+                {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                }
+              );
+
+              setValue(
+                "GSTIN",
+                matchedParty.GSTIN || "",
+                {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                }
+              );
+
+              /*
+               * If bill already has a phone,
+               * KEEP the bill phone.
+               *
+               * If bill phone is empty,
+               * use the master Party phone.
+               */
+              const currentBillPhone =
+                watch("Phone_Number");
+
+              if (!currentBillPhone?.trim()) {
+                setValue(
+                  "Phone_Number",
+                  matchedParty.Phone_Number || "",
+                  {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  }
+                );
+              }
+            } else {
+              // ===============================================
+              // NO PARTY MATCH
+              // ===============================================
+
+              setValue("Phone_Number", "", {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+
+              setValue("GSTIN", "", {
+                shouldValidate: true,
+                shouldDirty: true,
+              });
+            }
+
+            setOpen(false);
+          }, 150);
+        }}
+        placeholder="Search By Name/Phone"
+        className="w-full outline-none py-1 px-2 text-gray-900"
+        style={{
+          marginBottom: 0,
+          marginTop: "4px",
+          border: "none",
+          borderBottom: "none",
+          height: "2rem",
+        }}
+      />
+
+      <div className="w-10"></div>
+
+      <span className="absolute right-0 px-2 top-1/3 text-gray-700">
+        ▼
+      </span>
+    </div>
+
+    {open && (
+      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+
+        {/* ADD PARTY */}
+        <span
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setShowPartyModal(true);
+          }}
+          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+          style={{
+            borderBottom: "1px solid #f3f4f6",
+          }}
+        >
+          + Add Party
+        </span>
+
+        {/* PARTY LIST */}
+        <VirtualPartyScrollList
+          parties={parties}
+          isFetching={isPartiesFetching}
+          hasMore={partiesHasMore}
+          onLoadMore={handlePartyLoadMore}
+          scrollRef={partyScrollRef}
+          onSelectParty={(party) => {
+            setPartyCursor(null);
+
+            setPartySearch(party.Party_Name);
+
+            setValue(
+              "Party_Name",
+              party.Party_Name,
+              {
+                shouldValidate: true,
+                shouldDirty: true,
+              }
+            );
+
+            setValue(
+              "GSTIN",
+              party.GSTIN || "",
+              {
+                shouldValidate: true,
+                shouldDirty: true,
+              }
+            );
+
+            // ===============================================
+            // DROPDOWN SELECTION
+            // ===============================================
+            // Always use master Party phone
+            setValue(
+              "Phone_Number",
+              party.Phone_Number || "",
+              {
+                shouldValidate: true,
+                shouldDirty: true,
+              }
+            );
+
+            setOpen(false);
+          }}
+        />
+      </div>
+    )}
   </div>
-                <div className="input-field  flex gap-4
+
+  {/* ADD PARTY MODAL */}
+  {showPartyModal && (
+    <PartyAddModal
+      onClose={() => setShowPartyModal(false)}
+      onSave={(newParty) => {
+        setPartyCursor(null);
+
+        setPartySearch(newParty.Party_Name);
+
+        setValue(
+          "Party_Name",
+          newParty.Party_Name,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+
+        setValue(
+          "GSTIN",
+          newParty.GSTIN || "",
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+
+        // New Party → use its phone
+        setValue(
+          "Phone_Number",
+          newParty.Phone_Number || "",
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+
+        setShowPartyModal(false);
+      }}
+    />
+  )}
+</div>
+                {/* <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
-                  {/* <div className="input-field col s6 mt-4"> */}
+                  {/* <div className="input-field col s6 mt-4"> 
                   <span className="whitespace-nowrap active">
                     GSTIN
 
@@ -2602,7 +2423,35 @@ syncTotalsAfterItemChange(rawTotal)
                       {errors?.GSTIN?.message}
                     </p>
                   )}
-                </div>
+                </div> */}
+                 {/* Phone Number — compact inline label+input */}
+
+                    <div className="flex flex-col gap-2">
+
+                      <span className="whitespace-nowrap active">Phone Number</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        id="Phone_Number"
+                        {...register("Phone_Number")}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
+
+                          setValue("Phone_Number", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
+                        placeholder="Phone Number"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+
+                      {errors?.Phone_Number && (
+                        <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
+                      )}
+                    </div>
+              </div>
               </div>
 
               <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
@@ -5575,3 +5424,472 @@ syncTotalsAfterItemChange(rawTotal)
     </>
   );
 }
+ {/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
+                  style={{ marginBottom: "0px", marginTop: "0px" }}>
+                  
+
+                  <span className="active">
+                    Party
+                    <span className="text-red-500">*</span>
+                  </span>
+
+
+                  <div className="relative w-full">
+                    <div
+                      className="flex flex-row border rounded-md bg-white cursor-pointer"
+                      onClick={() => setOpen((prev) => !prev)}
+                    >
+                      <input
+                        type="text"
+                        id="Party_Name"
+                        value={partySearch}
+                        // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPartySearch(value);
+                          setValue("Party_Name", value, { shouldValidate: true });
+                          setOpen(true);
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(true);
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            const typedValue = partySearch?.trim()?.toLowerCase();
+                            const matchedParty = parties?.parties?.find(
+                              (p) => p.Party_Name.toLowerCase() === typedValue
+                            );
+
+                            if (matchedParty) {
+                              setPartySearch(matchedParty.Party_Name);
+                              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
+                            }
+
+                            setOpen(false);
+                          }, 150);
+                        }}
+                        placeholder="Search By Name/Phone"
+                        className="w-full outline-none py-1 px-2 text-gray-900"
+                        style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                      />
+                      <div className="w-10 "></div>
+                      <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
+                    </div>
+
+                    {open && (
+                      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        <span
+                          onClick={() => setShowPartyModal(true)}
+                          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                        >
+                          + Add Party
+                        </span>
+
+                  
+                        {parties?.parties
+                          ?.filter(
+                            (party) =>
+                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                              party?.Phone_Number?.includes(partySearch)
+                          )
+                          .map((party, i) => {
+                            const bal = Number(party.Current_Balance ?? 0);
+                            const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                            return (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  setPartySearch(party.Party_Name);
+                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                  //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+
+                                  setOpen(false);
+                                }}
+                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                style={{ borderBottom: "1px solid #f3f4f6" }}
+                              >
+                               
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm text-gray-800 font-medium truncate">
+                                    {party.Party_Name}
+                                  </span>
+                                  <span className="text-xs text-gray-400">
+                                    {party.Phone_Number || "—"}
+                                  </span>
+                                </div>
+
+                                
+                                <div className="flex flex-col items-end flex-shrink-0">
+                                  <span className="text-xs text-gray-400">Balance</span>
+                                  <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                    ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {parties?.parties?.filter((party) =>
+                          party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+                        ).length === 0 && (
+                            <p className="px-3 py-2 text-gray-500">No Party found</p>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                 
+                  {showPartyModal && (
+                    <PartyAddModal
+                      onClose={() => setShowPartyModal(false)}
+                      onSave={(newParty) => {
+                        setPartySearch(newParty.Party_Name);
+
+                        setValue(
+                          "Party_Name",
+                          newParty.Party_Name,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "GSTIN",
+                          newParty.GSTIN || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        setValue(
+                          "Billing_Name",
+                          newParty.Billing_Name || "",
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+
+                        //setCurrentPartyDetails(newParty);
+
+                        setShowPartyModal(false);
+                      }}
+                    />
+                  )}
+
+                </div> */}
+                  {/* <div
+    className="flex flex-col relative mt-2 gap-2 party-class"
+    style={{
+      marginBottom: "0px",
+      marginTop: "0px",
+    }}
+  >
+    <span className="active">
+      Party
+      <span className="text-red-500">*</span>
+    </span>
+
+    <div className="relative w-full">
+     
+      <div
+        className="flex flex-row border rounded-md bg-white cursor-pointer"
+        onClick={() =>
+          setOpen((prev) => !prev)
+        }
+      >
+        <input
+          type="text"
+          id="Party_Name"
+          value={partySearch}
+          onChange={(e) => {
+            const value = e.target.value;
+
+            setPartySearch(value);
+
+            setValue(
+              "Party_Name",
+              value,
+              {
+                shouldValidate: true,
+                shouldDirty: true,
+              }
+            );
+
+            setOpen(true);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(true);
+          }}
+          onBlur={() => {
+            setTimeout(() => {
+              const typedValue =
+                partySearch
+                  ?.trim()
+                  ?.toLowerCase();
+
+              const matchedParty =
+                parties?.parties?.find(
+                  (p) =>
+                    p.Party_Name
+                      ?.toLowerCase() ===
+                    typedValue
+                );
+
+              if (matchedParty) {
+                setPartySearch(
+                  matchedParty.Party_Name
+                );
+
+                setValue(
+                  "Party_Name",
+                  matchedParty.Party_Name,
+                  {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  }
+                );
+
+                setValue(
+                  "GSTIN",
+                  matchedParty.GSTIN || "",
+                  {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  }
+                );
+
+                setValue(
+                  "Billing_Name",
+                  matchedParty.Billing_Name || "",
+                  {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  }
+                );
+              }
+
+              setOpen(false);
+            }, 150);
+          }}
+          placeholder="Search By Name/Phone"
+          className="w-full outline-none py-1 px-2 text-gray-900"
+          style={{
+            marginBottom: 0,
+            marginTop: "4px",
+            border: "none",
+            borderBottom: "none",
+            height: "2rem",
+          }}
+        />
+
+        <div className="w-10"></div>
+
+        <span className="absolute right-0 px-2 top-1/3 text-gray-700">
+          ▼
+        </span>
+      </div>
+
+     
+    {open && (
+  <div
+    className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg"
+    style={{
+      height: Math.min(
+        44 + parties.length * 56 + (partiesHasMore ? 30 : 0), // "+ Add Party" row + rows + loading/end indicator
+        260 // cap at the same max as before
+      ),
+      minHeight: 44 + 56, // always room for "+ Add Party" + at least one row/empty message
+    }}
+  >
+          
+          <span
+            onMouseDown={(e) =>
+              e.preventDefault()
+            }
+            onClick={() =>
+              setShowPartyModal(true)
+            }
+            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+            style={{
+              borderBottom:
+                "1px solid #f3f4f6",
+            }}
+          >
+            + Add Party
+          </span>
+
+          
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            <VirtualScrollList
+              ref={virtualPartyListRef}
+              items={parties}
+              rowHeight={56}
+              height="100%"
+              onLoadMore={
+                handlePartyLoadMore
+              }
+              isFetching={
+                isPartiesFetching
+              }
+              hasMore={partiesHasMore}
+              getItemKey={(party) =>
+                party.Party_Id
+              }
+              emptyMessage="No Party found"
+              endMessage="— End of parties —"
+              renderRow={(party) => {
+                const bal = Number(
+                  party.Current_Balance ?? 0
+                );
+
+                const balColor =
+                  bal < 0
+                    ? "#ef4444"
+                    : "#16a34a";
+
+                return (
+                  <div
+                    key={party.Party_Id}
+                    onMouseDown={(e) =>
+                      e.preventDefault()
+                    }
+                    onClick={() => {
+                      setPartySearch(
+                        party.Party_Name
+                      );
+
+                      setValue(
+                        "Party_Name",
+                        party.Party_Name,
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        }
+                      );
+
+                      setValue(
+                        "GSTIN",
+                        party.GSTIN || "",
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        }
+                      );
+
+                      setValue(
+                        "Billing_Name",
+                        party.Billing_Name || "",
+                        {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        }
+                      );
+
+                      setOpen(false);
+                    }}
+                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                    style={{
+                      borderBottom:
+                        "1px solid #f3f4f6",
+                      minHeight: 56,
+                      boxSizing:
+                        "border-box",
+                    }}
+                  >
+                    
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm text-gray-800 font-medium truncate">
+                        {party.Party_Name}
+                      </span>
+
+                      <span className="text-xs text-gray-400">
+                        {party.Phone_Number ||
+                          "—"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-end flex-shrink-0">
+                      <span className="text-xs text-gray-400">
+                        Balance
+                      </span>
+
+                      <span
+                        className="text-xs font-semibold"
+                        style={{
+                          color: balColor,
+                        }}
+                      >
+                        ₹
+                        {bal.toLocaleString(
+                          "en-IN",
+                          {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+
+   
+    {showPartyModal && (
+      <PartyAddModal
+        onClose={() =>
+          setShowPartyModal(false)
+        }
+        onSave={(newParty) => {
+          setPartySearch(
+            newParty.Party_Name
+          );
+
+          setValue(
+            "Party_Name",
+            newParty.Party_Name,
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "GSTIN",
+            newParty.GSTIN || "",
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setValue(
+            "Billing_Name",
+            newParty.Billing_Name || "",
+            {
+              shouldValidate: true,
+              shouldDirty: true,
+            }
+          );
+
+          setShowPartyModal(false);
+        }}
+      />
+    )}
+  </div> */}

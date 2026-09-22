@@ -191,7 +191,7 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                 className="bulk-invoice-block"
                             >
                                 {/* HEADER */}
-                                <div className="bulk-invoice-header">
+                                {/* <div className="bulk-invoice-header">
                                     <div>
                                         <span className="bulk-label">Party: </span>
                                         <span className="bulk-bold">{doc.Party_Name || "-"}</span>
@@ -204,9 +204,50 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                         <span className="bulk-label">GSTIN: </span>
                                         {doc.GSTIN || "-"}
                                     </div>
+               
                                     <div>
                                         <span className="bulk-label">{cfg.dateLabel}: </span>
                                         {formatDate(doc[cfg.dateKey])}
+                                    </div>
+                                </div> */}
+                                <div className="bulk-invoice-header">
+                                    {/* LEFT */}
+                                    <div>
+                                        <div>
+                                            <span className="bulk-label">Party: </span>
+                                            <span className="bulk-bold">
+                                                {doc.Party_Name || "-"}
+                                            </span>
+                                        </div>
+
+                                        {doc.GSTIN && (
+                                            <div>
+                                                <span className="bulk-label">GSTIN: </span>
+                                                {doc.GSTIN}
+                                            </div>
+                                        )}
+
+                                        {doc.Phone_Number && (
+                                            <div>
+                                                <span className="bulk-label">Phone: </span>
+                                                {doc.Phone_Number}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* RIGHT */}
+                                    <div style={{ textAlign: "right" }}>
+                                        <div>
+                                            <span className="bulk-label">{cfg.docLabel} </span>
+                                            <span className="bulk-bold">
+                                                {doc[cfg.docNumberKey] || "-"}
+                                            </span>
+                                        </div>
+
+                                        <div>
+                                            <span className="bulk-label">{cfg.dateLabel}: </span>
+                                            {formatDate(doc[cfg.dateKey])}
+                                        </div>
                                     </div>
                                 </div>
 

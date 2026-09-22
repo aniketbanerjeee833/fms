@@ -56,7 +56,16 @@ const paymentSplitSchema = z
 
 export const purchaseFormSchema = z.object({
   Party_Name: z.string().min(1, "Party_Name is required"), // 🔹 only real requirement
-
+ Phone_Number: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || /^\d{10}$/.test(value),
+      {
+        message: "Phone number must be exactly 10 digits",
+      }
+    )
+    .optional(),
 
   GSTIN: z.preprocess(
     (val) => (val === null || val === undefined ? "" : String(val)),

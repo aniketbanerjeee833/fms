@@ -218,37 +218,37 @@ export default function PurchaseAdd() {
   const navigate = useNavigate();
   // const { data: parties } = useGetAllPartiesQuery();
   // ── cursor pagination for the party dropdown ──
-const [partyCursor, setPartyCursor] = useState(null);
-// const virtualPartyListRef = useRef(null);
- const partyScrollRef = useRef(null);
- const [partySearch, setPartySearch] = useState("");
+  const [partyCursor, setPartyCursor] = useState(null);
+  // const virtualPartyListRef = useRef(null);
+  const partyScrollRef = useRef(null);
+  const [partySearch, setPartySearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
 
   const [showPartyModal, setShowPartyModal] = useState(false);
   const [showSplitBox, setShowSplitBox] = useState(false);
   const [showGSTIN, setShowGSTIN] = useState("");
- const {
-  data: partiesData,
-  isFetching: isPartiesFetching,
-} = useGetAllPartiesCursorQuery({
-  cursor: partyCursor,
-  search: partySearch,
-  limit: 20,
-  scope: "purchase-add-party-dropdown",   // distinct scope
-});
+  const {
+    data: partiesData,
+    isFetching: isPartiesFetching,
+  } = useGetAllPartiesCursorQuery({
+    cursor: partyCursor,
+    search: partySearch,
+    limit: 20,
+    scope: "purchase-add-party-dropdown",   // distinct scope
+  });
 
-const parties = partiesData?.parties || [];
-const partiesHasMore = partiesData?.hasMore ?? false;
-const partiesNextCursor = partiesData?.nextCursor ?? null;
+  const parties = partiesData?.parties || [];
+  const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
 
-const handlePartyLoadMore = useCallback(() => {
-  if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
-  setPartyCursor(partiesNextCursor);
-}, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
-// reset cursor whenever the search text changes — starts a fresh page-1 fetch
-// useEffect(() => {
-//   setPartyCursor(null);
-// }, [partySearch]);
+  const handlePartyLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
+    setPartyCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
+  // reset cursor whenever the search text changes — starts a fresh page-1 fetch
+  // useEffect(() => {
+  //   setPartyCursor(null);
+  // }, [partySearch]);
   const [showItemAddModal, setShowItemAddModal] = useState(false);
   // const { data: itemsOld } = useGetAllItemsQuery();
   const [rows, setRows] = useState([
@@ -350,7 +350,7 @@ const handlePartyLoadMore = useCallback(() => {
   //const [showTermsConditionsModal, setShowTermsConditionsModal] = useState(false);
   //const [showTermsConditionsModal, setShowTermsConditionsModal]    = useState({ open: false, mode: "add", data: null });
   //const [isSaving, setIsSaving] = useState(false);
- 
+
   //const [originalTotal, setOriginalTotal] = useState(null);
   // const[chequeNumber,setChequeNumber]=useState(false);
   // const[neftNumber,setNeftNumber]=useState(false);
@@ -416,7 +416,7 @@ const handlePartyLoadMore = useCallback(() => {
     ) === 1;
   const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
 
-  const taxesGSTSettings =taxesGSTSettingsData?.settings || [];
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
 
   const enableGST =
     Number(
@@ -434,7 +434,7 @@ const handlePartyLoadMore = useCallback(() => {
       )?.setting_value
     ) === 1;
 
-    const enableHSNCode =
+  const enableHSNCode =
     Number(
       taxesGSTSettings.find(
         (s) =>
@@ -2098,113 +2098,129 @@ const handlePartyLoadMore = useCallback(() => {
                       )}
 
                     </div> */}
-<div className="flex flex-col gap-2 relative party-class">
-  <span className="whitespace-nowrap active">
-    Party
-    <span className="text-red-500">*</span>
-  </span>
+                    <div className="flex flex-col gap-2 relative party-class">
+                      <span className="whitespace-nowrap active">
+                        Party
+                        <span className="text-red-500">*</span>
+                      </span>
 
-  <div className="relative w-full">
-    <div
-      className="flex flex-row border rounded-md bg-white cursor-pointer"
-      onClick={() => setOpen((prev) => !prev)}
-    >
-      <input
-        type="text"
-        id="Party_Name"
-        value={partySearch}
-        onChange={(e) => {
-          setPartyCursor(null);   // ← ADDED
-          const value = e.target.value;
-          setPartySearch(value);
-          setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
-          setOpen(true);
+                      <div className="relative w-full">
+                        <div
+                          className="flex flex-row border rounded-md bg-white cursor-pointer"
+                          onClick={() => setOpen((prev) => !prev)}
+                        >
+                          <input
+                            type="text"
+                            id="Party_Name"
+                            value={partySearch}
+                            onChange={(e) => {
+                              setPartyCursor(null);   // ← ADDED
+                              const value = e.target.value;
+                              setPartySearch(value);
+                              setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                              setOpen(true);
 
-          const matchedParty = parties.find(
-            (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
-          );
+                              const matchedParty = parties.find(
+                                (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
+                              );
 
-          if (matchedParty) {
-            setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-          } else {
-            setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
-          }
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-        onBlur={() => {
-          setTimeout(() => {
-            const typedValue = partySearch?.trim()?.toLowerCase();
-            const matchedParty = parties.find(
-              (p) => p.Party_Name.toLowerCase() === typedValue
-            );
+                              if (matchedParty) {
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                              } else {
+                                setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
+                                 setValue("Phone_Number","",{
+                                   shouldValidate: true,
+                                  shouldDirty: true,
+                                })
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(true);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue = partySearch?.trim()?.toLowerCase();
+                                const matchedParty = parties.find(
+                                  (p) => p.Party_Name.toLowerCase() === typedValue
+                                );
 
-            if (matchedParty) {
-              setPartyCursor(null);   // ← ADDED
-              setPartySearch(matchedParty.Party_Name);
-              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-            }
+                                if (matchedParty) {
+                                  setPartyCursor(null);   // ← ADDED
+                                  setPartySearch(matchedParty.Party_Name);
+                                  setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                  setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }
 
-            setOpen(false);
-          }, 150);
-        }}
-        placeholder="Search By Name/Phone"
-        className="w-full outline-none py-1 px-2 text-gray-900"
-        style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-      />
-      <div className="w-10"></div>
-      <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
-    </div>
+                                setOpen(false);
+                              }, 150);
+                            }}
+                            placeholder="Search By Name/Phone"
+                            className="w-full outline-none py-1 px-2 text-gray-900"
+                            style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                          />
+                          <div className="w-10"></div>
+                          <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                        </div>
 
-    {open && (
-      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                        {open && (
+                          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
 
-        <span
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setShowPartyModal(true);
-          }}
-          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
-          style={{ borderBottom: "1px solid #f3f4f6" }}
-        >
-          + Add Party
-        </span>
+                            <span
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setShowPartyModal(true);
+                              }}
+                              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                              style={{ borderBottom: "1px solid #f3f4f6" }}
+                            >
+                              + Add Party
+                            </span>
 
-        <VirtualPartyScrollList
-          parties={parties}
-          isFetching={isPartiesFetching}
-          hasMore={partiesHasMore}
-          onLoadMore={handlePartyLoadMore}
-          scrollRef={partyScrollRef}
-          onSelectParty={(party) => {
-            setPartyCursor(null);   // ← ADDED
-            setPartySearch(party.Party_Name);
-            setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-            setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-            setOpen(false);
-          }}
-        />
+                            <VirtualPartyScrollList
+                              parties={parties}
+                              isFetching={isPartiesFetching}
+                              hasMore={partiesHasMore}
+                              onLoadMore={handlePartyLoadMore}
+                              scrollRef={partyScrollRef}
+                              onSelectParty={(party) => {
+                                setPartyCursor(null);   // ← ADDED
+                                setPartySearch(party.Party_Name);
+                                setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                setValue("Phone_Number", party.Phone_Number || "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                setOpen(false);
+                              }}
+                            />
 
-      </div>
-    )}
-  </div>
+                          </div>
+                        )}
+                      </div>
 
-  {showPartyModal && (
-    <PartyAddModal
-      onClose={() => setShowPartyModal(false)}
-      onSave={(newParty) => {
-        setPartyCursor(null);   // ← ADDED
-        setPartySearch(newParty.Party_Name);
-        setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-        setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-        setShowPartyModal(false);
-      }}
-    />
-  )}
-</div>
+                      {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);   // ← ADDED
+                            setPartySearch(newParty.Party_Name);
+                            setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                            setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                            setShowPartyModal(false);
+                          }}
+                        />
+                      )}
+                    </div>
 
                     {/* Billing Name — only rendered when applicable, sits beside Party */}
                     {/* {showBillingName && (
@@ -2225,15 +2241,42 @@ const handlePartyLoadMore = useCallback(() => {
         )}
       </div>
     )} */}
+
+                    <div className="flex flex-col gap-2">
+                      <span className="whitespace-nowrap active">
+                        Phone Number
+                        {/* {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name"} */}
+                      </span>
+                      <input
+                        type="text"
+                        id="Phone_Number"
+                        maxLength={10}
+                        {...register("Phone_Number")}
+                                               onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, "");
+
+    setValue("Phone_Number", value, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+  }}
+                        placeholder="Phone Number"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+                      {errors?.Phone_Number && (
+                        <p className="text-red-500 text-xs">{errors?.Phone_Number?.message}</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* ROW 2: Phone Number + GSTIN */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                  {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4"> */}
 
 
 
-                    {/* GSTIN — readonly */}
-                    <div className="flex flex-col gap-2">
+                  {/* GSTIN — readonly */}
+                  {/* <div className="flex flex-col gap-2">
                       <span className="whitespace-nowrap active">GSTIN</span>
                       <input
                         type="text"
@@ -2247,9 +2290,9 @@ const handlePartyLoadMore = useCallback(() => {
                       {errors?.GSTIN && (
                         <p className="text-red-500 text-xs mt-1">{errors?.GSTIN?.message}</p>
                       )}
-                    </div>
+                    </div> */}
 
-                  </div>
+                  {/* </div> */}
 
                 </div>
                 {/* <div className="row  "> */}
@@ -2367,7 +2410,7 @@ const handlePartyLoadMore = useCallback(() => {
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      {enableHSNCode &&<th>Item_HSN</th>}
+                      {enableHSNCode && <th>Item_HSN</th>}
                       {showMRP && <th>MRP</th>}
                       <th>Qty</th>
                       {showFreeQuantity && <th>Free Qty</th>}
@@ -3388,7 +3431,7 @@ const handlePartyLoadMore = useCallback(() => {
                               maxLength={8}              // limit to 8 digits
 
                               onChange={(e) => {
-                               
+
 
                                 e.target.value = e.target.value.replace(/[^0-9]/g, "");
                                 handleRowChange(i, "Item_HSN", e.target.value);
@@ -4220,12 +4263,12 @@ const handlePartyLoadMore = useCallback(() => {
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                      {enableHSNCode &&<td></td>}
+                      {enableHSNCode && <td></td>}
                       {showMRP && <td></td>}
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
-                       {showFreeQuantity && (<td className="text-right">
+                      {showFreeQuantity && (<td className="text-right">
                         {totals.freeQuantity}
                       </td>)}
 
@@ -4954,7 +4997,7 @@ const handlePartyLoadMore = useCallback(() => {
                 padding: "8px",
               }}
             >
-              <button
+              {/* <button
                 type="button"
 
                 onClick={() => navigate("/purchase/all-purchases")}
@@ -4962,7 +5005,7 @@ const handlePartyLoadMore = useCallback(() => {
                 style={{ backgroundColor: "#4CA1AF" }}
               >
                 Cancel
-              </button>
+              </button> */}
               <button
                 type="submit"
                 disabled={formValues.errorCount > 0 || isAddingPurchase}

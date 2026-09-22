@@ -69,6 +69,7 @@ const addPurchase = async (req, res, next) => {
       Party_Name,
       GSTIN,
       Bill_Number,
+      Phone_Number,
       Bill_Date,
       State_Of_Supply,
       Transaction_Discount_Percentage,
@@ -157,14 +158,41 @@ const addPurchase = async (req, res, next) => {
 
     if (partyRows.length === 0) {
       const [partyResult] = await connection.execute(
-        `INSERT INTO add_party (Party_Name, created_at, updated_at) VALUES (?, NOW(), NOW())`,
-        [Party_Name.trim()]
+        `INSERT INTO add_party (Party_Name,Phone_Number, created_at, updated_at) VALUES (?,?, NOW(), NOW())`,
+        [Party_Name.trim(),cleanValue(Phone_Number)]
       );
       const partyIdNumber = partyResult.insertId;
       Party_Id = "PTY" + partyIdNumber.toString().padStart(3, "0");
       await connection.execute(`UPDATE add_party SET Party_Id = ? WHERE id = ?`, [Party_Id, partyIdNumber]);
     } else {
+      const existingParty = partyRows[0];
       Party_Id = partyRows[0].Party_Id;
+
+      // =====================================================
+  // PHONE NUMBER
+  //
+  // Initialize master only if currently blank.
+  // =====================================================
+
+  if (
+    !existingParty.Phone_Number?.trim() &&
+    Phone_Number?.trim()
+  ) {
+    await connection.execute(
+      `
+      UPDATE add_party
+      SET
+        Phone_Number = ?,
+        updated_at = NOW()
+      WHERE Party_Id = ?
+      `,
+      [
+        cleanValue(Phone_Number),
+        Party_Id,
+      ]
+    );
+  }
+
     }
 
     // ── FINANCIAL YEAR — unchanged ──
@@ -203,14 +231,14 @@ const cleanTransactionDiscountAmount =
     // ── PURCHASE HEADER — unchanged ──
     const [purchaseResult] = await connection.execute(
       `INSERT INTO add_purchase
-       (Party_Id, Bill_Number, Bill_Date, financial_year, State_Of_Supply, 
+       (Party_Id, Bill_Number,Phone_Number, Bill_Date, financial_year, State_Of_Supply, 
        Transaction_Discount_Percentage,
      Transaction_Discount_Amount,
         Total_Amount, Round_Off,Total_Paid, Balance_Due, Terms_Conditions_Id, Terms_Conditions_Description,
         created_at, updated_at)
-       VALUES (?, ?, ?, ?,?, ?,?,?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?,?, ?,?,?,?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
-        Party_Id, Bill_Number, Bill_Date, activeFY, cleanValue(State_Of_Supply), 
+        Party_Id, Bill_Number,cleanValue(Phone_Number), Bill_Date, activeFY, cleanValue(State_Of_Supply), 
         cleanTransactionDiscountPercentage,
     cleanTransactionDiscountAmount,
     totalAmount,roundOffValue,totalPaid, balanceDue, termsId, termsDescription,
@@ -1204,6 +1232,7 @@ const editPurchase = async (req, res, next) => {
       Party_Name,
       GSTIN,
       Bill_Number,
+      Phone_Number,
       Bill_Date,
       State_Of_Supply,
       Transaction_Discount_Percentage,
@@ -1283,14 +1312,39 @@ const editPurchase = async (req, res, next) => {
     }
 
     const [partyRows] = await connection.query(
-      "SELECT Party_Id FROM add_party WHERE Party_Name = ? LIMIT 1",
+      "SELECT Party_Id, Phone_Number FROM add_party WHERE Party_Name = ? LIMIT 1",
       [Party_Name]
     );
     if (partyRows.length === 0) {
       await connection.rollback();
       return res.status(404).json({ message: "Party not found." });
     }
+    const existingParty = partyRows[0];
     const Party_Id = partyRows[0].Party_Id;
+    // =====================================================
+// PHONE NUMBER
+//
+// Initialize master only if currently blank.
+// =====================================================
+
+if (
+  !existingParty.Phone_Number?.trim() &&
+  Phone_Number?.trim()
+) {
+  await connection.query(
+    `
+    UPDATE add_party
+    SET
+      Phone_Number = ?,
+      updated_at = NOW()
+    WHERE Party_Id = ?
+    `,
+    [
+      cleanValue(Phone_Number),
+      Party_Id,
+    ]
+  );
+  }
     const transactionDiscountPercentage =
   normalizeNumber(Transaction_Discount_Percentage);
 
@@ -1316,14 +1370,14 @@ const cleanTransactionDiscountAmount =
     : null;
     await connection.query(
       `UPDATE add_purchase SET
-         Party_Id = ?, Bill_Number = ?, Bill_Date = ?, State_Of_Supply = ?,
+         Party_Id = ?, Bill_Number = ?, Phone_Number=?, Bill_Date = ?, State_Of_Supply = ?,
          Transaction_Discount_Percentage = ?, Transaction_Discount_Amount = ?,
          Total_Amount = ?, Round_Off = ?, Total_Paid = ?, Balance_Due = ?,
          Terms_Conditions_Id = ?, Terms_Conditions_Description = ?,
          updated_at = NOW()
        WHERE Purchase_Id = ?`,
       [
-        Party_Id, Bill_Number, Bill_Date, cleanValue(State_Of_Supply),
+        Party_Id, Bill_Number, cleanValue(Phone_Number), Bill_Date, cleanValue(State_Of_Supply),
          cleanTransactionDiscountPercentage,
         cleanTransactionDiscountAmount,
         totalAmount,roundOffValue, totalPaid, balanceDue,
@@ -2627,13 +2681,14 @@ const getSinglePurchase = async (req, res, next) => {
     // =========================================================
     // 2. FETCH PURCHASE HEADER
     // =========================================================
-
+//p.Phone_Number,
     const [purchaseData] = await connection.query(
       `
       SELECT
         pu.id,
         pu.Purchase_Id,
         pu.Bill_Number,
+        pu.Phone_Number,
         pu.Bill_Date,
         pu.State_Of_Supply,
         pu.Total_Amount,
@@ -2651,7 +2706,8 @@ const getSinglePurchase = async (req, res, next) => {
          p.Party_Name,
     p.GSTIN,
     p.State,
-    p.Phone_Number,
+    p.Phone_Number AS Party_Phone_Number,
+    
      
            (
   SELECT pa.Address_Text
@@ -3204,16 +3260,19 @@ availableUnits = unitCodes.map((unitCode) => {
         Purchase_Id:
           purchaseHeader.Purchase_Id,
 
-        Party_Name:
-          purchaseHeader.Party_Name,
+        Party_Name:purchaseHeader.Party_Name,
 
-        GSTIN:
-          purchaseHeader.GSTIN,
+        GSTIN:purchaseHeader.GSTIN,
 
         State_Of_Supply:purchaseHeader.State_Of_Supply,
           State:purchaseHeader.State,
 
         Bill_Number:purchaseHeader.Bill_Number,
+        Phone_Number:
+  purchaseHeader.Phone_Number ||
+  purchaseHeader.Party_Phone_Number ||
+  "",
+        //Phone_Number:purchaseHeader.Phone_Number,
 
         Bill_Date:purchaseHeader.Bill_Date,
 

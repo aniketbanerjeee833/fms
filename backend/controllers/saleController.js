@@ -2104,11 +2104,12 @@ const getSingleSale = async (req, res, next) => {
      s.Transaction_Discount_Percentage,
         s.Transaction_Discount_Amount,
 
-     -- Party master
+     -- Party master   p.Phone_Number
          p.Party_Name,
     p.GSTIN,
     p.State,
-    p.Phone_Number,
+    p.Phone_Number AS Party_Phone_Number,
+  
     
      COALESCE(
        NULLIF(s.Billing_Address, ''),
@@ -2499,7 +2500,7 @@ const getSingleSale = async (req, res, next) => {
         Sale_Id: saleHeader.Sale_Id,
         Party_Name: saleHeader.Party_Name,
         Billing_Name: saleHeader.Billing_Name,
-        Phone_Number: saleHeader.Phone_Number,
+        Phone_Number: saleHeader.Phone_Number || saleHeader.Party_Phone_Number||"",
         Billing_Address: saleHeader.Billing_Address,
         GSTIN: saleHeader.GSTIN,
         State_Of_Supply: saleHeader.State_Of_Supply,
@@ -3578,7 +3579,8 @@ const editSale = async (req, res, next) => {
            updated_at = NOW()
          WHERE Party_Id = ?`,
             [
-              Phone_Number.trim(),
+              //Phone_Number.trim(),
+              cleanValue(Phone_Number),
               Party_Id,
             ]
           );

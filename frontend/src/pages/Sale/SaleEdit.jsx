@@ -12,7 +12,7 @@ import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsF
 import { toast } from "react-toastify";
 
 
-import { saleApi, useEditSaleMutation,  useGetSingleSaleQuery, useLazyGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
+import { saleApi, useEditSaleMutation, useGetSingleSaleQuery, useLazyGetLatestInvoiceNumberQuery } from "../../redux/api/saleApi";
 
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -282,41 +282,41 @@ export default function SaleEdit() {
     = useGetSingleSaleQuery(Sale_Id, {
       skip: Sale_Id === undefined,
     });
-    const [partyCursor, setPartyCursor] = useState(null);
-    //const virtualPartyListRef = useRef(null);
-     const partyScrollRef = useRef(null);
+  const [partyCursor, setPartyCursor] = useState(null);
+  //const virtualPartyListRef = useRef(null);
+  const partyScrollRef = useRef(null);
 
-    const [partySearch, setPartySearch] = useState("");
-      const [newCategory, setNewCategory] = useState("");
-    
-      const [showPartyModal, setShowPartyModal] = useState(false);
-      const [showSplitBox, setShowSplitBox] = useState(false);
-      const [showGSTIN, setShowGSTIN] = useState("");
-      const {
-      data: partiesData,
-      isFetching: isPartiesFetching,
-    } = useGetAllPartiesCursorQuery({
-      cursor: partyCursor,
-      search: partySearch,
-      limit: 20,
-      scope: "sale-form-dropdown",
-    });
- 
+  const [partySearch, setPartySearch] = useState("");
+  const [newCategory, setNewCategory] = useState("");
 
-//console.log("DEBUG:", { partySearch, partyCursor, partiesData, isPartiesFetching });
-    const parties = partiesData?.parties || [];
-    const partiesHasMore = partiesData?.hasMore ?? false;
-    const partiesNextCursor = partiesData?.nextCursor ?? null;
-    
-    const handlePartyLoadMore = useCallback(() => {
-      if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
-      setPartyCursor(partiesNextCursor);
-    }, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
-    
-    // reset cursor whenever the search text changes — starts a fresh page-1 fetch
-    // useEffect(() => {
-    //   setPartyCursor(null);
-    // }, [partySearch]);
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showSplitBox, setShowSplitBox] = useState(false);
+  const [showGSTIN, setShowGSTIN] = useState("");
+  const {
+    data: partiesData,
+    isFetching: isPartiesFetching,
+  } = useGetAllPartiesCursorQuery({
+    cursor: partyCursor,
+    search: partySearch,
+    limit: 20,
+    scope: "sale-form-dropdown",
+  });
+
+
+  //console.log("DEBUG:", { partySearch, partyCursor, partiesData, isPartiesFetching });
+  const parties = partiesData?.parties || [];
+  const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
+
+  const handlePartyLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
+    setPartyCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
+
+  // reset cursor whenever the search text changes — starts a fresh page-1 fetch
+  // useEffect(() => {
+  //   setPartyCursor(null);
+  // }, [partySearch]);
   //const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
   //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
@@ -411,8 +411,8 @@ export default function SaleEdit() {
       Billing_Address: "",
       GSTIN: "",
       Invoice_Number: "",
-       Invoice_Number_Prefix:"None",
-      Invoice_Number_Value:"",
+      Invoice_Number_Prefix: "None",
+      Invoice_Number_Value: "",
       Invoice_Date: "",
       State_Of_Supply: "",
       Transaction_Discount_Percentage: "",
@@ -468,7 +468,7 @@ export default function SaleEdit() {
     item: null,
     rowIndex: null
   });
-  
+
   const [addCategory] = useAddCategoryMutation();
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
@@ -523,7 +523,7 @@ export default function SaleEdit() {
       )?.setting_value
     ) === 1;
 
-    const enableHSNCode =
+  const enableHSNCode =
     Number(
       taxesGSTSettings.find(
         (s) =>
@@ -552,18 +552,18 @@ export default function SaleEdit() {
       )?.setting_value
     ) === 1;
 
-    
 
-    const showFreeQuantity =
+
+  const showFreeQuantity =
     Number(
       transactionsSettings.find(
         (s) => s.setting_key === "free_item_quantity"
       )?.setting_value
     ) === 1;
-const hasHistoricaFreeQuantity=sale?.items?.some(
-  (item) => item.hasHistoricalFreeQuantity === true
-)
-const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
+  const hasHistoricaFreeQuantity = sale?.items?.some(
+    (item) => item.hasHistoricalFreeQuantity === true
+  )
+  const shouldShowFreeQuantity = showFreeQuantity || hasHistoricaFreeQuantity
   const hasHistoricalMRP =
     sale?.items?.some(
       (item) => item.hasHistoricalMRP === true
@@ -599,9 +599,9 @@ const shouldShowFreeQuantity=showFreeQuantity||hasHistoricaFreeQuantity
   //     skip: !selectedSalePrefix,
   //   }
   // );
-const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
-const [getLatestInvoiceNumber] =
-  useLazyGetLatestInvoiceNumberQuery();
+  const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
+  const [getLatestInvoiceNumber] =
+    useLazyGetLatestInvoiceNumberQuery();
 
   // useEffect(() => {
   //   if (!isInvoicePrefixChanged) {
@@ -1306,30 +1306,30 @@ const [getLatestInvoiceNumber] =
   const [originalInvoiceNumberPart, setOriginalInvoiceNumberPart] = useState("");
   useEffect(() => {
     if (sale) {
-     
-       const savedInvoicePrefix =
-      String(
-        sale?.invoicePartyDetails?.Invoice_Number_Prefix ?? ""
-      ).trim() || "None";
 
-    const savedInvoiceValue =
-      sale?.invoicePartyDetails?.Invoice_Number_Value;
+      const savedInvoicePrefix =
+        String(
+          sale?.invoicePartyDetails?.Invoice_Number_Prefix ?? ""
+        ).trim() || "None";
 
-    const savedInvoiceNumberPart =
-      savedInvoiceValue === null ||
-      savedInvoiceValue === undefined
-        ? ""
-        : String(savedInvoiceValue);
+      const savedInvoiceValue =
+        sale?.invoicePartyDetails?.Invoice_Number_Value;
 
-    setInvoicePrefix(savedInvoicePrefix);
-    setInvoiceNumberPart(savedInvoiceNumberPart);
-    setSelectedSalePrefix(savedInvoicePrefix);
+      const savedInvoiceNumberPart =
+        savedInvoiceValue === null ||
+          savedInvoiceValue === undefined
+          ? ""
+          : String(savedInvoiceValue);
 
-    setOriginalSalePrefix(savedInvoicePrefix);
-    setOriginalInvoiceNumberPart(savedInvoiceNumberPart);
+      setInvoicePrefix(savedInvoicePrefix);
+      setInvoiceNumberPart(savedInvoiceNumberPart);
+      setSelectedSalePrefix(savedInvoicePrefix);
 
-    setLatestInvoiceNumber(null);
-    setIsInvoicePrefixChanged(false);
+      setOriginalSalePrefix(savedInvoicePrefix);
+      setOriginalInvoiceNumberPart(savedInvoiceNumberPart);
+
+      setLatestInvoiceNumber(null);
+      setIsInvoicePrefixChanged(false);
       originalTaxTypesRef.current = (sale?.items || []).map(
         (item) => item?.Tax_Type || "None"
       );
@@ -1443,13 +1443,13 @@ const [getLatestInvoiceNumber] =
         MRP: item.MRP || "",
         Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
         Quantity: item.Quantity || "",
-        Free_Quantity:item.Free_Quantity || "",
+        Free_Quantity: item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
         Sale_Price: item.Sale_Price || "",
 
-        Discount_On_Sale_Price:item.Discount_On_Sale_Price || "",
+        Discount_On_Sale_Price: item.Discount_On_Sale_Price || "",
 
-        Discount_Type_On_Sale_Price:item.Discount_Type_On_Sale_Price || "Percentage",
+        Discount_Type_On_Sale_Price: item.Discount_Type_On_Sale_Price || "Percentage",
 
         Tax_Type: item.Tax_Type || "None",
         Tax_Amount: item.Tax_Amount || "",
@@ -1578,7 +1578,7 @@ const [getLatestInvoiceNumber] =
       },
       {
         totalQty: 0,
-         freeQuantity: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1833,12 +1833,12 @@ const [getLatestInvoiceNumber] =
       // 8. INVALIDATE CACHE
       // =======================================================
 
-     dispatch(
-  saleApi.util.invalidateTags([
-    { type: "Invoice", id: "LATEST" },
-    "Sale",
-  ])
-);
+      dispatch(
+        saleApi.util.invalidateTags([
+          { type: "Invoice", id: "LATEST" },
+          "Sale",
+        ])
+      );
       // dispatch(
       //   saleApi.util.invalidateTags(["Sale"])
       // );
@@ -2270,40 +2270,40 @@ const [getLatestInvoiceNumber] =
 
     setShowScanCodeModal(false);
   };
-//const containerRef = useRef(null);
+  //const containerRef = useRef(null);
 
-// useEffect(() => {
-//   if (!open) return;
+  // useEffect(() => {
+  //   if (!open) return;
 
-//   function handleClickOutside(e) {
-//     if (containerRef.current && !containerRef.current.contains(e.target)) {
-//       setOpen(false);
+  //   function handleClickOutside(e) {
+  //     if (containerRef.current && !containerRef.current.contains(e.target)) {
+  //       setOpen(false);
 
-//       // run the "did they type an exact match" check here instead of onBlur
-//       const typedValue = partySearch?.trim()?.toLowerCase();
-//       const matchedParty = parties.find(
-//         (p) => p.Party_Name.toLowerCase() === typedValue
-//       );
+  //       // run the "did they type an exact match" check here instead of onBlur
+  //       const typedValue = partySearch?.trim()?.toLowerCase();
+  //       const matchedParty = parties.find(
+  //         (p) => p.Party_Name.toLowerCase() === typedValue
+  //       );
 
-//       if (matchedParty) {
-//         setPartySearch(matchedParty.Party_Name);
-//         setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-//         setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-//         const defaultBilling = matchedParty.addresses?.find(
-//           (a) => a.Address_Type === "Billing" && a.Is_Default
-//         );
-//         setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
-//         setCurrentPartyDetails(matchedParty);
-//         setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
-//       } else {
-//         setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
-//       }
-//     }
-//   }
+  //       if (matchedParty) {
+  //         setPartySearch(matchedParty.Party_Name);
+  //         setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+  //         setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+  //         const defaultBilling = matchedParty.addresses?.find(
+  //           (a) => a.Address_Type === "Billing" && a.Is_Default
+  //         );
+  //         setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldValidate: true, shouldDirty: true });
+  //         setCurrentPartyDetails(matchedParty);
+  //         setValue("Billing_Name", matchedParty.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+  //       } else {
+  //         setValue("Billing_Name", "", { shouldValidate: true, shouldDirty: true });
+  //       }
+  //     }
+  //   }
 
-//   document.addEventListener("mousedown", handleClickOutside);
-//   return () => document.removeEventListener("mousedown", handleClickOutside);
-// }, [open, partySearch, parties]);
+  //   document.addEventListener("mousedown", handleClickOutside);
+  //   return () => document.removeEventListener("mousedown", handleClickOutside);
+  // }, [open, partySearch, parties]);
   return (
     <>
 
@@ -2523,7 +2523,7 @@ const [getLatestInvoiceNumber] =
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
 
-                   
+
                     {/* <div className="flex flex-col gap-2 relative party-class">
                      
                       <span className="whitespace-nowrap active">
@@ -2969,273 +2969,389 @@ const [getLatestInvoiceNumber] =
   )}
 
 </div> */}
-<div className="flex flex-col gap-2 relative party-class">
+                    <div className="flex flex-col gap-2 relative party-class">
 
-  <span className="whitespace-nowrap active">
-    Party
-    <span className="text-red-500">*</span>
-  </span>
+                      <span className="whitespace-nowrap active">
+                        Party
+                        <span className="text-red-500">*</span>
+                      </span>
 
-  <div className="relative w-full">
+                      <div className="relative w-full">
 
-    <div
-      className="flex flex-row border rounded-md bg-white cursor-pointer"
-      onClick={() => setOpen((prev) => !prev)}
-    >
+                        <div
+                          className="flex flex-row border rounded-md bg-white cursor-pointer"
+                          onClick={() => setOpen((prev) => !prev)}
+                        >
 
-      <input
-        type="text"
-        id="Party_Name"
-        value={partySearch}
-        onChange={(e) => {
-          setPartyCursor(null);   // ← ADDED
-          const value = e.target.value;
+                          <input
+                            type="text"
+                            id="Party_Name"
+                            value={partySearch}
+                            onChange={(e) => {
+                              setPartyCursor(null);
 
-          setPartySearch(value);
+                              const value = e.target.value;
 
-          setValue("Party_Name", value, {
-            shouldValidate: true,
-            shouldDirty: true,
-          });
+                              setPartySearch(value);
 
-          setOpen(true);
+                              setValue("Party_Name", value, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
 
-          // CLEAR SEARCH
-          if (!value.trim()) {
-            setPartyCursor(null);
+                              setOpen(true);
 
-            setValue("GSTIN", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                              // =====================================================
+                              // FIND EXACT PARTY MATCH
+                              // =====================================================
 
-            setValue("Billing_Address", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                              const matchedParty = parties.find(
+                                (p) =>
+                                  p.Party_Name?.toLowerCase() ===
+                                  value.trim().toLowerCase()
+                              );
 
-            setValue("Billing_Name", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                              if (!value.trim()) {
+                                // ===================================================
+                                // PARTY COMPLETELY CLEARED
+                                // ===================================================
 
-            setCurrentPartyDetails(null);
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            return;
-          }
+                                setValue("Billing_Address", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-          const matchedParty = parties.find(
-            (p) =>
-              p.Party_Name?.toLowerCase() ===
-              value.trim().toLowerCase()
-          );
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-          if (matchedParty) {
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            setValue("GSTIN", matchedParty.GSTIN || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                setCurrentPartyDetails(null);
 
-            const defaultBilling = matchedParty.addresses?.find(
-              (a) => a.Address_Type === "Billing" && a.Is_Default
-            );
+                                return;
+                              }
 
-            setValue("Billing_Address", defaultBilling?.Address_Text || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                              if (matchedParty) {
+                                // ===================================================
+                                // EXACT PARTY MATCH
+                                // ===================================================
 
-            setCurrentPartyDetails(matchedParty);
+                                setValue("GSTIN", matchedParty.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            setValue("Billing_Name", matchedParty.Billing_Name || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                const defaultBilling = matchedParty.addresses?.find(
+                                  (a) =>
+                                    a.Address_Type === "Billing" &&
+                                    a.Is_Default
+                                );
 
-          } else {
+                                setValue(
+                                  "Billing_Address",
+                                  defaultBilling?.Address_Text || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
 
-            setValue("GSTIN", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                setCurrentPartyDetails(matchedParty);
 
-            setValue("Billing_Address", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                setValue(
+                                  "Billing_Name",
+                                  matchedParty.Billing_Name || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
 
-            setValue("Billing_Name", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                // DO NOT change Phone_Number here.
+                                // Existing bill phone remains for an exact match.
 
-            setCurrentPartyDetails(null);
-          }
-        }}
+                              } else {
+                                // ===================================================
+                                // PARTY DOES NOT MATCH
+                                // ===================================================
 
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-        onBlur={() => {
-          setTimeout(() => {
-            const typedValue = partySearch?.trim()?.toLowerCase();
+                                setValue("Billing_Address", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            const matchedParty = parties.find(
-              (p) => p.Party_Name?.toLowerCase() === typedValue
-            );
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            if (matchedParty) {
-              setPartyCursor(null);   // ← ADDED
-              setPartySearch(matchedParty.Party_Name);
+                                // Non-matching Party → clear phone
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-              setValue("Party_Name", matchedParty.Party_Name, {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
+                                setCurrentPartyDetails(null);
+                              }
+                            }}
 
-              setValue("GSTIN", matchedParty.GSTIN || "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(true);
+                            }}
 
-              const defaultBilling = matchedParty.addresses?.find(
-                (a) => a.Address_Type === "Billing" && a.Is_Default
-              );
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue =
+                                  partySearch?.trim()?.toLowerCase();
 
-              setValue("Billing_Address", defaultBilling?.Address_Text || "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
+                                const matchedParty = parties.find(
+                                  (p) =>
+                                    p.Party_Name?.toLowerCase() === typedValue
+                                );
 
-              setValue("Billing_Name", matchedParty.Billing_Name || "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
+                                if (matchedParty) {
+                                  setPartyCursor(null);
 
-              setCurrentPartyDetails(matchedParty);
-            } else {
-              setValue("Billing_Name", "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
-            }
+                                  setPartySearch(matchedParty.Party_Name);
 
-            setOpen(false);
-          }, 150);
-        }}
+                                  setValue("Party_Name", matchedParty.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-        placeholder="Search By Name/Phone"
+                                  setValue("GSTIN", matchedParty.GSTIN || "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-        className="w-full outline-none py-1 px-2 text-gray-900"
+                                  const defaultBilling = matchedParty.addresses?.find(
+                                    (a) =>
+                                      a.Address_Type === "Billing" &&
+                                      a.Is_Default
+                                  );
 
-        style={{
-          marginBottom: 0,
-          marginTop: "4px",
-          border: "none",
-          borderBottom: "none",
-          height: "2rem",
-        }}
-      />
+                                  setValue(
+                                    "Billing_Address",
+                                    defaultBilling?.Address_Text || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
 
-      <div className="w-10"></div>
+                                  setValue(
+                                    "Billing_Name",
+                                    matchedParty.Billing_Name || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
 
-      <span className="absolute right-0 px-2 top-1/3 text-gray-700">
-        ▼
-      </span>
+                                  // =================================================
+                                  // PHONE
+                                  // =================================================
+                                  // If bill phone is empty → use master phone.
+                                  // If bill phone already exists → keep it.
 
-    </div>
+                                  const currentBillPhone =
+                                    watch("Phone_Number");
 
-    {open && (
-      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                                  if (!currentBillPhone?.trim()) {
+                                    setValue(
+                                      "Phone_Number",
+                                      matchedParty.Phone_Number || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
 
-        <span
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setShowPartyModal(true);
-          }}
-          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
-          style={{ borderBottom: "1px solid #f3f4f6" }}
-        >
-          + Add Party
-        </span>
+                                  setCurrentPartyDetails(matchedParty);
+                                } else {
+                                  // =================================================
+                                  // NO EXACT PARTY MATCH
+                                  // =================================================
 
-        <VirtualPartyScrollList
-          parties={parties}
-          isFetching={isPartiesFetching}
-          hasMore={partiesHasMore}
-          onLoadMore={handlePartyLoadMore}
-          scrollRef={partyScrollRef}
-          onSelectParty={(party) => {
-            setPartyCursor(null);   // ← ADDED
-            setPartySearch(party.Party_Name);
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-            setValue("Party_Name", party.Party_Name, {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                  // Keep phone cleared for non-matching Party
+                                  setValue("Phone_Number", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-            setValue("GSTIN", party.GSTIN || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                  setCurrentPartyDetails(null);
+                                }
 
-            const defaultBilling = party.addresses?.find(
-              (a) => a.Address_Type === "Billing" && a.Is_Default
-            );
+                                setOpen(false);
+                              }, 150);
+                            }}
 
-            setValue("Billing_Address", defaultBilling?.Address_Text || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                            placeholder="Search By Name/Phone"
 
-            setValue("Billing_Name", party.Billing_Name || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                            className="w-full outline-none py-1 px-2 text-gray-900"
 
-            setCurrentPartyDetails(party);
+                            style={{
+                              marginBottom: 0,
+                              marginTop: "4px",
+                              border: "none",
+                              borderBottom: "none",
+                              height: "2rem",
+                            }}
+                          />
 
-            setOpen(false);
-          }}
-        />
+                          <div className="w-10"></div>
 
-      </div>
-    )}
-  </div>
+                          <span className="absolute right-0 px-2 top-1/3 text-gray-700">
+                            ▼
+                          </span>
 
-  {showPartyModal && (
-    <PartyAddModal
-      onClose={() => setShowPartyModal(false)}
-      onSave={(newParty) => {
-        setPartyCursor(null);   // ← ADDED
-        setPartySearch(newParty.Party_Name);
+                        </div>
 
-        setValue("Party_Name", newParty.Party_Name, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
+                        {open && (
+                          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
 
-        setValue("GSTIN", newParty.GSTIN || "", {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
+                            <span
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setShowPartyModal(true);
+                              }}
+                              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                              style={{ borderBottom: "1px solid #f3f4f6" }}
+                            >
+                              + Add Party
+                            </span>
 
-        setValue("Billing_Name", newParty.Billing_Name || "", {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
+                            <VirtualPartyScrollList
+                              parties={parties}
+                              isFetching={isPartiesFetching}
+                              hasMore={partiesHasMore}
+                              onLoadMore={handlePartyLoadMore}
+                              scrollRef={partyScrollRef}
+                              onSelectParty={(party) => {
+                                setPartyCursor(null);   // ← ADDED
+                                setPartySearch(party.Party_Name);
 
-        setCurrentPartyDetails(newParty);
+                                setValue("Party_Name", party.Party_Name, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-        setShowPartyModal(false);
-      }}
-    />
-  )}
+                                setValue("GSTIN", party.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-</div>
+                                const defaultBilling = party.addresses?.find(
+                                  (a) => a.Address_Type === "Billing" && a.Is_Default
+                                );
+
+                                setValue("Billing_Address", defaultBilling?.Address_Text || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Billing_Name", party.Billing_Name || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setValue("Phone_Number", party.Phone_Number || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setCurrentPartyDetails(party);
+
+                                setOpen(false);
+                              }}
+                            />
+
+                          </div>
+                        )}
+                      </div>
+
+                      {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);   // ← ADDED
+                            setPartySearch(newParty.Party_Name);
+
+                            setValue("Party_Name", newParty.Party_Name, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            setValue("GSTIN", newParty.GSTIN || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            setValue("Billing_Name", newParty.Billing_Name || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            setCurrentPartyDetails(newParty);
+
+                            setShowPartyModal(false);
+                          }}
+                        />
+                      )}
+
+                    </div>
+
+
+                    {/* Phone Number — compact inline label+input */}
+
+                    <div className="flex flex-col gap-2">
+
+                      <span className="whitespace-nowrap active">Phone Number</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        id="Phone_Number"
+                        {...register("Phone_Number")}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
+
+                          setValue("Phone_Number", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
+                        placeholder="Phone Number"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+
+                      {errors?.Phone_Number && (
+                        <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
 
                     {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2">
@@ -3254,30 +3370,9 @@ const [getLatestInvoiceNumber] =
                         <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
                       )}
                     </div>)}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                    {/* Phone Number — compact inline label+input */}
-
-                    {/* <div className="flex flex-col gap-2">
-
-                    <span className="whitespace-nowrap active">Phone Number</span>
-                    <input
-                      type="tel"
-                      maxLength={10}
-                      id="Phone_Number"
-                      {...register("Phone_Number")}
-                      placeholder="Phone Number"
-                      className="w-full outline-none border-b-2 text-gray-900"
-                      style={{ marginBottom: 0 }}
-                    />
-
-                    {errors?.Phone_Number && (
-                      <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
-                    )}
-                  </div> */}
 
                     {/* GSTIN — compact inline label+input, pinned to top */}
-                    {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
+                    {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
 
                       <span className="whitespace-nowrap active">GSTIN</span>
                       <input
@@ -3290,7 +3385,7 @@ const [getLatestInvoiceNumber] =
                         style={{ marginBottom: 0 }}
                         readOnly
                       />
-                    </div>)}
+                    </div>)} */}
 
                     {/* ── ROW 2: Billing Address + GSTIN ── */}
                     {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
@@ -3582,182 +3677,180 @@ const [getLatestInvoiceNumber] =
                     <p className="text-red-500 text-xs pl-[162px]">{errors?.Invoice_Number?.message}</p>
                   )} */}
                   <div className="flex items-center w-full gap-3">
-  <span
-    className="whitespace-nowrap"
-    style={{
-      flexShrink: 0,
-    }}
-  >
-    Invoice Number
-  </span>
+                    <span
+                      className="whitespace-nowrap"
+                      style={{
+                        flexShrink: 0,
+                      }}
+                    >
+                      Invoice Number
+                    </span>
 
-  {/* Prefix Dropdown */}
-  <div className="relative flex-shrink-0">
-    <select
-      value={selectedSalePrefix}
-      onChange={async (e) => {
-        const prefix = e.target.value;
+                    {/* Prefix Dropdown */}
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={selectedSalePrefix}
+                        onChange={async (e) => {
+                          const prefix = e.target.value;
 
-        // Same prefix → don't do anything
-        if (prefix === selectedSalePrefix) {
-          return;
-        }
+                          // Same prefix → don't do anything
+                          if (prefix === selectedSalePrefix) {
+                            return;
+                          }
 
-        setSelectedSalePrefix(prefix);
-        setInvoicePrefix(prefix);
-        setIsInvoicePrefixChanged(true);
+                          setSelectedSalePrefix(prefix);
+                          setInvoicePrefix(prefix);
+                          setIsInvoicePrefixChanged(true);
 
-        /*
-         * If switching back to the original prefix
-         * AND original number is meaningful,
-         * restore the original invoice number.
-         *
-         * 0 / 00 / empty = no meaningful number,
-         * so those should NOT be restored.
-         */
-        if (
-          prefix === originalSalePrefix &&
-          originalInvoiceNumberPart !== "" &&
-          Number(originalInvoiceNumberPart) !== 0
-        ) {
-          setInvoiceNumberPart(
-            originalInvoiceNumberPart
-          );
+                          /*
+                           * If switching back to the original prefix
+                           * AND original number is meaningful,
+                           * restore the original invoice number.
+                           *
+                           * 0 / 00 / empty = no meaningful number,
+                           * so those should NOT be restored.
+                           */
+                          if (
+                            prefix === originalSalePrefix &&
+                            originalInvoiceNumberPart !== "" &&
+                            Number(originalInvoiceNumberPart) !== 0
+                          ) {
+                            setInvoiceNumberPart(
+                              originalInvoiceNumberPart
+                            );
 
-          setValue(
-            "Invoice_Number_Prefix",
-            prefix,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            setValue(
+                              "Invoice_Number_Prefix",
+                              prefix,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          setValue(
-            "Invoice_Number_Value",
-            originalInvoiceNumberPart,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            setValue(
+                              "Invoice_Number_Value",
+                              originalInvoiceNumberPart,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          setValue(
-            "Invoice_Number",
-            `${
-              prefix === "None"
-                ? ""
-                : prefix
-            }${originalInvoiceNumberPart}`,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            setValue(
+                              "Invoice_Number",
+                              `${prefix === "None"
+                                ? ""
+                                : prefix
+                              }${originalInvoiceNumberPart}`,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          setIsInvoicePrefixChanged(false);
+                            setIsInvoicePrefixChanged(false);
 
-          return;
-        }
+                            return;
+                          }
 
-        /*
-         * Different prefix OR original number
-         * was 0 / 00 / empty.
-         *
-         * Fetch the next number for this prefix.
-         */
-        try {
-          setInvoiceNumberPart("");
-          setLatestInvoiceNumber(null);
+                          /*
+                           * Different prefix OR original number
+                           * was 0 / 00 / empty.
+                           *
+                           * Fetch the next number for this prefix.
+                           */
+                          try {
+                            setInvoiceNumberPart("");
+                            setLatestInvoiceNumber(null);
 
-          const result =
-            await getLatestInvoiceNumber(
-              prefix,
-              false
-            ).unwrap();
+                            const result =
+                              await getLatestInvoiceNumber(
+                                prefix,
+                                false
+                              ).unwrap();
 
-          setLatestInvoiceNumber(result);
+                            setLatestInvoiceNumber(result);
 
-          const nextNumber =
-            result?.newInvoiceNumber || "";
+                            const nextNumber =
+                              result?.newInvoiceNumber || "";
 
-          setInvoiceNumberPart(nextNumber);
+                            setInvoiceNumberPart(nextNumber);
 
-          setValue(
-            "Invoice_Number_Prefix",
-            prefix,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            setValue(
+                              "Invoice_Number_Prefix",
+                              prefix,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          setValue(
-            "Invoice_Number_Value",
-            nextNumber,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
+                            setValue(
+                              "Invoice_Number_Value",
+                              nextNumber,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-          setValue(
-            "Invoice_Number",
-            `${
-              prefix === "None"
-                ? ""
-                : prefix
-            }${nextNumber}`,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        } catch (error) {
-          console.error(
-            "Failed to get latest invoice number:",
-            error
-          );
-        }
-      }}
-      className="py-1 border-b-2 border-gray-300"
-      style={{
-        marginBottom: 0,
-        minWidth: "100px",
-        height: "32px",
-        border: "1px solid #ccc",
-      }}
-    >
-      {salePrefixes.map((prefix) => (
-        <option
-          key={prefix.id}
-          value={prefix.prefix_name}
-        >
-          {prefix.prefix_name}
-        </option>
-      ))}
-    </select>
-  </div>
+                            setValue(
+                              "Invoice_Number",
+                              `${prefix === "None"
+                                ? ""
+                                : prefix
+                              }${nextNumber}`,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                          } catch (error) {
+                            console.error(
+                              "Failed to get latest invoice number:",
+                              error
+                            );
+                          }
+                        }}
+                        className="py-1 border-b-2 border-gray-300"
+                        style={{
+                          marginBottom: 0,
+                          minWidth: "100px",
+                          height: "32px",
+                          border: "1px solid #ccc",
+                        }}
+                      >
+                        {salePrefixes.map((prefix) => (
+                          <option
+                            key={prefix.id}
+                            value={prefix.prefix_name}
+                          >
+                            {prefix.prefix_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-  {/* Invoice Number - NOT EDITABLE */}
-  <input
-    type="text"
-    value={invoiceNumberPart}
-    readOnly
-    placeholder="Invoice Number"
-    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
-    style={{
-      marginBottom: 0,
-      height: "1rem",
-    }}
-  />
-</div>
+                    {/* Invoice Number - NOT EDITABLE */}
+                    <input
+                      type="text"
+                      value={invoiceNumberPart}
+                      readOnly
+                      placeholder="Invoice Number"
+                      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+                      style={{
+                        marginBottom: 0,
+                        height: "1rem",
+                      }}
+                    />
+                  </div>
 
-{errors?.Invoice_Number && (
-  <p className="text-red-500 text-xs pl-[162px]">
-    {errors?.Invoice_Number?.message}
-  </p>
-)}
+                  {errors?.Invoice_Number && (
+                    <p className="text-red-500 text-xs pl-[162px]">
+                      {errors?.Invoice_Number?.message}
+                    </p>
+                  )}
 
 
 
@@ -3769,7 +3862,7 @@ const [getLatestInvoiceNumber] =
                       id="Invoice_Date"
                       {...register("Invoice_Date")}
                       className="invoice-date-class w-full outline-none text-gray-900 border-b-2"
-                      style={{ marginBottom: 0 , height:"1rem"}}
+                      style={{ marginBottom: 0, height: "1rem" }}
                     />
                   </div>
                   {errors?.Invoice_Date && (
@@ -3839,7 +3932,7 @@ const [getLatestInvoiceNumber] =
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      {enableHSNCode &&<th>Item_HSN</th>}
+                      {enableHSNCode && <th>Item_HSN</th>}
                       {/* <th>MRP</th>
                     <th>Discount On MRP (%)</th> */}
                       {shouldShowMRP && <th>MRP</th>}
@@ -4101,10 +4194,10 @@ const [getLatestInvoiceNumber] =
                         </td>
 
                         {/* Item Dropdown */}
-                        <td 
-                        style={{
+                        <td
+                          style={{
                             padding: "0px",
-                              width: shouldShowFreeQuantity ? "18%" : "22%",
+                            width: shouldShowFreeQuantity ? "18%" : "22%",
                             position: "relative",
                           }}
                         //style={{ padding: "0px", width: "20%", position: "relative" }}
@@ -5292,7 +5385,7 @@ const [getLatestInvoiceNumber] =
                           )}
                         </td>)}
                         {/*MRP */}
-                    
+
                         {shouldShowMRP && (
                           <td style={{ padding: "0px", width: "6%" }}>
                             <div className="d-flex align-items-center">
@@ -5511,7 +5604,7 @@ const [getLatestInvoiceNumber] =
                           )}
                         </td>
 
-                         {shouldShowFreeQuantity && (
+                        {shouldShowFreeQuantity && (
                           <td style={{ padding: "0px", width: "4%" }}>
                             <input
                               type="text"
@@ -6380,11 +6473,12 @@ const [getLatestInvoiceNumber] =
                         />
                       </td> */}
                         {/* Tax Amount Entry */}
-                        <td 
-                        style={{ padding: "0px", 
-                          width: shouldShowFreeQuantity ? "8%" : "10%" 
+                        <td
+                          style={{
+                            padding: "0px",
+                            width: shouldShowFreeQuantity ? "8%" : "10%"
                           }}
-                          >
+                        >
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -6484,7 +6578,7 @@ const [getLatestInvoiceNumber] =
                         </td>
 
                         {/* Amount */}
-                        <td style={{ width: "8%" }}>
+                        <td style={{ width: "16%" }}>
                           <input
                             type="text"
                             className="form-control"
@@ -6500,7 +6594,7 @@ const [getLatestInvoiceNumber] =
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                       {enableHSNCode &&<td></td>}
+                      {enableHSNCode && <td></td>}
                       {shouldShowMRP && <td></td>}
 
                       {/* MRP Discount column */}
@@ -6511,7 +6605,7 @@ const [getLatestInvoiceNumber] =
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
-                       {shouldShowFreeQuantity && (<td className="text-right">
+                      {shouldShowFreeQuantity && (<td className="text-right">
                         {totals.freeQuantity}
                       </td>)}
 
@@ -7238,7 +7332,7 @@ const [getLatestInvoiceNumber] =
                 padding: "8px",
               }}
             >
-              <button
+              {/* <button
                 type="button"
 
                 onClick={() => {
@@ -7271,14 +7365,14 @@ const [getLatestInvoiceNumber] =
                 style={{ backgroundColor: "#4CA1AF" }}
               >
                 Cancel
-              </button>
+              </button> */}
               <button
                 type="submit"
                 disabled={formValues.errorCount > 0 || isEditingSale}
                 className=" text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                {isEditingSale ? "Updating..." : "Update Sale"}
+                {isEditingSale ? "Saving..." : "Save"}
               </button>
             </div>
           </form>
