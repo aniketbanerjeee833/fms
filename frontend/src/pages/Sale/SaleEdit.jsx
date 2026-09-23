@@ -560,6 +560,16 @@ export default function SaleEdit() {
         (s) => s.setting_key === "free_item_quantity"
       )?.setting_value
     ) === 1;
+      const enableBillingNameOfParties =
+        Number(
+          transactionsSettings.find(
+            (s) => s.setting_key === "billing_name_of_parties"
+          )?.setting_value
+        ) === 1
+      //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
+      const showBillingName =
+  enableBillingNameOfParties ||
+  !!currentPartyDetails?.Billing_Name?.trim();
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -2921,22 +2931,24 @@ export default function SaleEdit() {
 
 
                     {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && ( */}
-                    <div className="flex flex-col gap-2">
-                      <span className="whitespace-nowrap active">
-                        {currentPartyDetails?.Party_Name === "Cash Sale" ? "Billing Name (Optional)" : "Billing Name (Optional)"}
-                      </span>
-                      <input
-                        type="text"
-                        id="Billing_Name"
-                        {...register("Billing_Name")}
-                        placeholder="Billing Name"
-                        className="w-full outline-none border-b-2 text-gray-900"
-                        style={{ marginBottom: 0 }}
-                      />
-                      {errors?.Billing_Name && (
-                        <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
-                      )}
-                    </div>
+                    {showBillingName && (
+  <div className="flex flex-col gap-2">
+    <span className="whitespace-nowrap active">
+      Billing Name (Optional)
+    </span>
+
+    <input
+      type="text"
+      id="Billing_Name"
+      {...register("Billing_Name")}
+      placeholder="Billing Name"
+      className="w-full outline-none border-b-2 text-gray-900"
+      style={{ marginBottom: 0 }}
+    />
+
+    
+  </div>
+)}
                     {/* //)} */}
 
                     {/* GSTIN — compact inline label+input, pinned to top */}

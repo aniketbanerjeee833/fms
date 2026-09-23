@@ -460,6 +460,11 @@ export default function SaleAdd() {
     }
 
   })
+  const saleMode = watch("Sale_Mode");
+
+
+  const itemsValues = watch("items");   // watch all item rows
+  const totalReceived = watch("Total_Received"); // watch Total_Received
   // const { data: latestInvoiceNumber, refetch } = useGetLatestInvoiceNumberQuery();
   const {
     data: salePrefixesData,
@@ -490,8 +495,7 @@ export default function SaleAdd() {
   //   }
   // );
   const [latestInvoiceNumber, setLatestInvoiceNumber] = useState(null);
-  const [getLatestInvoiceNumber] =
-    useLazyGetLatestInvoiceNumberQuery();
+  const [getLatestInvoiceNumber] = useLazyGetLatestInvoiceNumberQuery();
   useEffect(() => {
     if (!activeSalePrefix?.prefix_name) {
       return;
@@ -642,8 +646,7 @@ export default function SaleAdd() {
     ) === 1;
   const { data: transactionsSettingsData } = useGetAllTransactionsSettingsQuery();
 
-  const transactionsSettings =
-    transactionsSettingsData?.settings || [];
+  const transactionsSettings = transactionsSettingsData?.settings || [];
 
   const enableTransactionWiseDiscount =
     Number(
@@ -660,7 +663,31 @@ export default function SaleAdd() {
       )?.setting_value
     ) === 1;
 
+  const enableBillingNameOfParties =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "billing_name_of_parties"
+      )?.setting_value
+    ) === 1
+  const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
+  //const [partyMatched, //setPartyMatched] = useState(false);
 
+  const showBillingName =
+    enableBillingNameOfParties ||
+    saleMode === "Cash" ||
+    (saleMode === "Credit" && billingNameManuallyEntered);
+  // const showBillingName =
+  //   saleMode === "Cash" ||
+  //   enableBillingNameOfParties ||
+  //   !!currentPartyDetails?.Billing_Name?.trim() ||
+  //   billingNameManuallyEntered;
+  // console.log("BILLING DEBUG", {
+  //   saleMode,
+  //   billingName: watch("Billing_Name"),
+  //   partyName: watch("Party_Name"),
+  //   billingNameManuallyEntered,
+  //   showBillingName,
+  // });
   // useEffect(() => {
   //   setValue("Invoice_Number", latestInvoiceNumber?.newInvoiceNumber);
   // }, [latestInvoiceNumber]);
@@ -777,11 +804,7 @@ export default function SaleAdd() {
     name: "splits",
   });
 
-  const saleMode = watch("Sale_Mode");
 
-
-  const itemsValues = watch("items");   // watch all item rows
-  const totalReceived = watch("Total_Received"); // watch Total_Received
 
 
   const num = (v) => (v === undefined || v === null || v === "" ? 0 : Number(v));
@@ -1624,9 +1647,9 @@ export default function SaleAdd() {
     );
   };
   const totals = calculateTotals(itemsValues || []);
-  console.log(totals)
+  //console.log(totals)
   const showSalePayment = totalAmountWatch > 0;
-  //console.log(currentPartyDetails)
+
 
   const handleOpenScanModal = () => {
     setShowScanCodeModal(true);
@@ -1911,6 +1934,7 @@ export default function SaleAdd() {
     }
   }, [directBarcodeScanEnabled]);
   console.log(saleMode)
+  console.log(currentPartyDetails, "currentPartyDetails")
   return (
     <>
 
@@ -1954,19 +1978,59 @@ export default function SaleAdd() {
               <div className="flex  gap-3 mb-4">
                 <h4 className="text-xl sm:text-2xl font-bold  sm:mb-2 mt-2">Add New Sale</h4>
                 {/* <span className="text-sm font-medium text-gray-700">Sale Mode:</span> */}
-            
+
                 <div
                   className="flex items-center gap-3 cursor-pointer select-none whitespace-nowrap"
-                  onClick={() => {
-                    // const nextMode =
-                    //   saleMode === "Credit" ? "Cash" : "Credit";
-                    const currentMode = watch("Sale_Mode");
+                  // onClick={() => {
+                  //   // const nextMode =
+                  //   //   saleMode === "Credit" ? "Cash" : "Credit";
+                  //   const currentMode = watch("Sale_Mode");
 
-                    const nextMode =currentMode === "Credit" ? "Cash" : "Credit";
+                  //   const nextMode = currentMode === "Credit" ? "Cash" : "Credit";
+
+                  //   setValue("Sale_Mode", nextMode, {
+                  //     shouldDirty: true,
+                  //     shouldValidate: true
+                  //   });
+                  // }}
+                  onClick={() => {
+                    const currentMode = getValues("Sale_Mode");
+                    const nextMode =
+                      currentMode === "Credit" ? "Cash" : "Credit";
+
+                    console.log("TOGGLE START", {
+                      currentMode,
+                      nextMode,
+                      billingName: getValues("Billing_Name"),
+                      partyName: getValues("Party_Name"),
+                    });
+
+                    if (nextMode === "Cash") {
+                      const currentBillingName = getValues("Billing_Name");
+                      const partyName = getValues("Party_Name");
+
+                      console.log("CASH CONDITION", {
+                        currentBillingName,
+                        partyName,
+                        shouldFill:
+                          !currentBillingName?.trim() && partyName?.trim(),
+                      });
+
+                      if (!currentBillingName?.trim() && partyName?.trim()) {
+                        console.log("SETTING BILLING NAME TO:", partyName);
+
+                        setValue("Billing_Name", partyName.trim(), {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+
+                        setBillingNameManuallyEntered(true);
+                      }
+                    }
 
                     setValue("Sale_Mode", nextMode, {
                       shouldDirty: true,
-                      shouldValidate: true
+                      shouldValidate: true,
                     });
                   }}
                 >
@@ -2136,6 +2200,8 @@ export default function SaleAdd() {
                               // =========================
                               if (!value.trim()) {
                                 setPartyCursor(null);
+                                ////setPartyMatched(false);
+                                setBillingNameManuallyEntered(false);
 
                                 setValue("GSTIN", "", {
                                   shouldValidate: true,
@@ -2167,6 +2233,11 @@ export default function SaleAdd() {
                               );
 
                               if (matchedParty) {
+                                ////setPartyMatched(true);
+
+                                setBillingNameManuallyEntered(
+                                  !!matchedParty.Billing_Name?.trim()
+                                );
                                 setValue("GSTIN", matchedParty.GSTIN || "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
@@ -2198,7 +2269,7 @@ export default function SaleAdd() {
                                 );
 
                                 setCurrentPartyDetails(matchedParty);
-                                 setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
@@ -2212,13 +2283,14 @@ export default function SaleAdd() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
-
+                                //setPartyMatched(false);
+                                setBillingNameManuallyEntered(false);
                                 setValue("Billing_Name", "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
-                                setValue("Phone_Number","",{
-                                   shouldValidate: true,
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
                                   shouldDirty: true,
                                 })
 
@@ -2285,18 +2357,36 @@ export default function SaleAdd() {
                                       shouldDirty: true,
                                     }
                                   );
+                                  if (!getValues("Billing_Name")?.trim()) {
+                                    setBillingNameManuallyEntered(
+                                      !!matchedParty.Billing_Name?.trim()
+                                    );
+                                    //setBillingNameManuallyEntered(false);
 
-                                  setValue(
-                                    "Billing_Name",
-                                    matchedParty.Billing_Name || "",
-                                    {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    }
-                                  );
+                                    setValue(
+                                      "Billing_Name",
+                                      matchedParty.Billing_Name || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
+                                  // setBillingNameManuallyEntered(false);
+                                  // setValue(
+                                  //   "Billing_Name",
+                                  //   matchedParty.Billing_Name || "",
+                                  //   {
+                                  //     shouldValidate: true,
+                                  //     shouldDirty: true,
+                                  //   }
+                                  // );
 
                                   setCurrentPartyDetails(matchedParty);
                                 } else {
+                                  //setPartyMatched(false);
+                                  setBillingNameManuallyEntered(false);
+
                                   setValue("Billing_Name", "", {
                                     shouldValidate: true,
                                     shouldDirty: true,
@@ -2360,6 +2450,12 @@ export default function SaleAdd() {
                               onLoadMore={handlePartyLoadMore}
                               scrollRef={partyScrollRef}
                               onSelectParty={(party) => {
+                                //setBillingNameManuallyEntered(false);
+                                //setPartyMatched(true);
+
+                                setBillingNameManuallyEntered(
+                                  !!party.Billing_Name?.trim()
+                                );
                                 //setSelectedParty(party);
                                 setPartyCursor(null);   // ← add this
                                 setPartySearch(party.Party_Name);
@@ -2373,9 +2469,9 @@ export default function SaleAdd() {
                                   }
                                 );
                                 setValue("Phone_Number", party.Phone_Number || "", {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
                                 setValue(
                                   "GSTIN",
@@ -2446,7 +2542,12 @@ export default function SaleAdd() {
                                 shouldDirty: true,
                               }
                             );
+                            //setBillingNameManuallyEntered(false);
+                            //setPartyMatched(true);
 
+                            setBillingNameManuallyEntered(
+                              !!newParty.Billing_Name?.trim()
+                            );
                             setValue(
                               "Billing_Name",
                               newParty.Billing_Name || "",
@@ -2473,7 +2574,7 @@ export default function SaleAdd() {
                       )}
                     </div>
 
-                      <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2">
                       <span className="whitespace-nowrap active">
                         Phone Number
                         {/* {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name"} */}
@@ -2481,16 +2582,16 @@ export default function SaleAdd() {
                       <input
                         type="text"
                         id="Phone_Number"
-                         maxLength={10}
+                        maxLength={10}
                         {...register("Phone_Number")}
-                         onChange={(e) => {
-    const value = e.target.value.replace(/\D/g, "");
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
 
-    setValue("Phone_Number", value, {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
-  }}
+                          setValue("Phone_Number", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
                         placeholder="Phone Number"
                         className="w-full outline-none border-b-2 text-gray-900"
                         style={{ marginBottom: 0 }}
@@ -2501,7 +2602,7 @@ export default function SaleAdd() {
                     </div>
 
 
-                   
+
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
@@ -2523,24 +2624,33 @@ export default function SaleAdd() {
                         readOnly
                       />
                     </div>)} */}
-                     {/* {currentPartyDetails?.Party_Name !== "Cash Sale" && ( */}
+                    {/* {currentPartyDetails?.Party_Name !== "Cash Sale" && ( */}
+                    {showBillingName && (
                       <div className="flex flex-col gap-2">
-                      <span className="whitespace-nowrap active">
-                        {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name (Optional)"}
-                      </span>
-                      <input
-                        type="text"
-                        id="Billing_Name"
-                        {...register("Billing_Name")}
-                        placeholder="Billing Name"
-                        className="w-full outline-none border-b-2 text-gray-900"
-                        style={{ marginBottom: 0 }}
-                      />
-                      {errors?.Billing_Name && (
-                        <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
-                      )}
-                    </div>
-                  {/* )} */}
+                        <span className="whitespace-nowrap active">
+                          Billing Name
+                        </span>
+
+                        <input
+                          type="text"
+                          id="Billing_Name"
+                          {...register("Billing_Name")}
+                          placeholder="Billing Name"
+                          onChange={(e) => {
+                            setValue("Billing_Name", e.target.value, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+
+                            setBillingNameManuallyEntered(true);
+                          }}
+                          className="w-full outline-none border-b-2 text-gray-900"
+                          style={{ marginBottom: 0 }}
+                        />
+
+                       
+                      </div>
+                    )}
                     {/* {errors?.GSTIN && (
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}
@@ -6958,8 +7068,8 @@ export default function SaleAdd() {
 
 
 
-                      
-                    {/* <div className="flex flex-col gap-2 relative party-class">
+
+{/* <div className="flex flex-col gap-2 relative party-class">
                      
                       <span className="whitespace-nowrap active">
                         {saleMode === "Cash" ? "Party (Optional)" : "Party"}
@@ -7166,7 +7276,7 @@ export default function SaleAdd() {
                         <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
                       )}
                     </div> */}
-                    {/* <div className="flex flex-col gap-2 relative party-class">
+{/* <div className="flex flex-col gap-2 relative party-class">
     <span className="whitespace-nowrap active">
       {saleMode === "Cash" ? "Party (Optional)" : "Party"}
       {saleMode === "Credit" && <span className="text-red-500">*</span>}

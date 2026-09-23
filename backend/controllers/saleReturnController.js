@@ -1138,28 +1138,67 @@ else {
   // 1. PHONE NUMBER
   // =====================================================
 
-  if (
-    !existingParty.Phone_Number?.trim() &&
-    Phone_Number?.trim()
-  ) {
-    await connection.execute(
-      `
-      UPDATE add_party
-      SET
-        Phone_Number = ?,
-        Billing_Name = ?,
-        updated_at = NOW()
-      WHERE Party_Id = ?
-      `,
-      [
-        cleanValue(Phone_Number),
-        cleanValue(Billing_Name),
-        existingParty.Party_Id,
-      ]
-    );
+  // if (
+  //   !existingParty.Phone_Number?.trim() &&
+  //   Phone_Number?.trim()
+  // ) {
+  //   await connection.execute(
+  //     `
+  //     UPDATE add_party
+  //     SET
+  //       Phone_Number = ?,
+  //       Billing_Name = ?,
+  //       updated_at = NOW()
+  //     WHERE Party_Id = ?
+  //     `,
+  //     [
+  //       cleanValue(Phone_Number),
+  //       cleanValue(Billing_Name),
+  //       existingParty.Party_Id,
+  //     ]
+  //   );
 
-    party.Phone_Number = Phone_Number.trim();
-  }
+  //   party.Phone_Number = Phone_Number.trim();
+  // }
+  // =====================================================
+// UPDATE PARTY MASTER ONLY WITH NON-EMPTY VALUES
+// =====================================================
+
+const partyUpdates = [];
+const partyParams = [];
+
+// Phone: update only if master phone is empty
+// and new phone has a value
+if (
+  !existingParty.Phone_Number?.trim() &&
+  Phone_Number?.trim()
+) {
+  partyUpdates.push("Phone_Number = ?");
+  partyParams.push(cleanValue(Phone_Number));
+
+  party.Phone_Number = Phone_Number.trim();
+}
+
+// Billing Name: update only if new Billing Name has a value
+if (Billing_Name?.trim()) {
+  partyUpdates.push("Billing_Name = ?");
+  partyParams.push(cleanValue(Billing_Name));
+}
+
+if (partyUpdates.length > 0) {
+  partyUpdates.push("updated_at = NOW()");
+  partyParams.push(existingParty.Party_Id);
+
+  await connection.execute(
+    `
+    UPDATE add_party
+    SET
+      ${partyUpdates.join(", ")}
+    WHERE Party_Id = ?
+    `,
+    partyParams
+  );
+}
 
 
   // =====================================================
@@ -2101,28 +2140,67 @@ if (!existingParty) {
   // UPDATE PARTY PHONE/BILLING NAME ONLY IF PHONE IS EMPTY
   // =======================================================
 
-  if (
-    !existingParty.Phone_Number?.trim() &&
-    Phone_Number?.trim()
-  ) {
-    await connection.execute(
-      `
-      UPDATE add_party
-      SET
-        Phone_Number = ?,
-        Billing_Name = ?,
-        updated_at = NOW()
-      WHERE Party_Id = ?
-      `,
-      [
-        cleanValue(Phone_Number),
-        cleanValue(Billing_Name),
-        existingParty.Party_Id,
-      ]
-    );
+  // if (
+  //   !existingParty.Phone_Number?.trim() &&
+  //   Phone_Number?.trim()
+  // ) {
+  //   await connection.execute(
+  //     `
+  //     UPDATE add_party
+  //     SET
+  //       Phone_Number = ?,
+  //       Billing_Name = ?,
+  //       updated_at = NOW()
+  //     WHERE Party_Id = ?
+  //     `,
+  //     [
+  //       cleanValue(Phone_Number),
+  //       cleanValue(Billing_Name),
+  //       existingParty.Party_Id,
+  //     ]
+  //   );
 
-    party.Phone_Number = Phone_Number.trim();
-  }
+  //   party.Phone_Number = Phone_Number.trim();
+  // }
+  // =======================================================
+// UPDATE PARTY MASTER ONLY WITH NON-EMPTY VALUES
+// =======================================================
+
+const partyUpdates = [];
+const partyParams = [];
+
+// Update phone ONLY if master phone is empty
+// and the new phone has a value
+if (
+  !existingParty.Phone_Number?.trim() &&
+  Phone_Number?.trim()
+) {
+  partyUpdates.push("Phone_Number = ?");
+  partyParams.push(cleanValue(Phone_Number));
+
+  party.Phone_Number = Phone_Number.trim();
+}
+
+// Update Billing Name ONLY if a value is provided
+if (Billing_Name?.trim()) {
+  partyUpdates.push("Billing_Name = ?");
+  partyParams.push(cleanValue(Billing_Name));
+}
+
+if (partyUpdates.length > 0) {
+  partyUpdates.push("updated_at = NOW()");
+  partyParams.push(existingParty.Party_Id);
+
+  await connection.execute(
+    `
+    UPDATE add_party
+    SET
+      ${partyUpdates.join(", ")}
+    WHERE Party_Id = ?
+    `,
+    partyParams
+  );
+}
 
   // =======================================================
   // SAVE BILLING ADDRESS INTO PARTY MASTER

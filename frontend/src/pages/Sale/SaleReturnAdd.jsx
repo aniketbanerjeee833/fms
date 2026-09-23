@@ -480,8 +480,7 @@ export default function SaleReturnAdd() {
       );
     }
   }, [activeSaleReturnPrefix?.prefix_name]);
-  const [triggerLatestSaleReturnNumber] =
-    useLazyGetLatestSaleReturnNumberQuery();
+  const [triggerLatestSaleReturnNumber] = useLazyGetLatestSaleReturnNumberQuery();
   const [returnNumberPart, setReturnNumberPart] = useState("");
   useEffect(() => {
     if (!activeSaleReturnPrefix?.prefix_name) {
@@ -686,6 +685,16 @@ export default function SaleReturnAdd() {
         (s) => s.setting_key === "free_item_quantity"
       )?.setting_value
     ) === 1;
+  const enableBillingNameOfParties =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "billing_name_of_parties"
+      )?.setting_value
+    ) === 1
+  //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
+  const showBillingName =
+    enableBillingNameOfParties ||
+    !!currentPartyDetails?.Billing_Name?.trim();
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -1065,7 +1074,7 @@ export default function SaleReturnAdd() {
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
-   const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
+  const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
   useEffect(() => {
     if (sale) {
       originalTaxTypesRef.current = (sale?.items || []).map(
@@ -1087,12 +1096,12 @@ export default function SaleReturnAdd() {
         savedDiscountPercentage > 0
       );
       setPartySearch(sale.invoicePartyDetails.Party_Name);
-            setCurrentPartyDetails({
-  ...sale.invoicePartyDetails,
-});
-          setHasSavedBillingAddress(
-  !!sale.invoicePartyDetails?.Billing_Address?.trim()
-);
+      setCurrentPartyDetails({
+        ...sale.invoicePartyDetails,
+      });
+      setHasSavedBillingAddress(
+        !!sale.invoicePartyDetails?.Billing_Address?.trim()
+      );
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item, index) => {
 
@@ -2142,7 +2151,7 @@ export default function SaleReturnAdd() {
 
                                 if (matchedParty) {
                                   setPartyCursor(null);
-                                   setHasSavedBillingAddress(
+                                  setHasSavedBillingAddress(
                                     !!matchedParty.addresses?.some(
                                       (a) => a.Address_Type === "Billing"
                                     )
@@ -2434,22 +2443,24 @@ export default function SaleReturnAdd() {
 
 
                     {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && ( */}
-                    <div className="flex flex-col gap-2">
-                      <span className="whitespace-nowrap active">
-                        {currentPartyDetails?.Party_Name === "Cash Sale" ? "Billing Name (Optional)" : "Billing Name (Optional)"}
-                      </span>
-                      <input
-                        type="text"
-                        id="Billing_Name"
-                        {...register("Billing_Name")}
-                        placeholder="Billing Name"
-                        className="w-full outline-none border-b-2 text-gray-900"
-                        style={{ marginBottom: 0 }}
-                      />
-                      {errors?.Billing_Name && (
-                        <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
-                      )}
-                    </div>
+                    {showBillingName && (
+                      <div className="flex flex-col gap-2">
+                        <span className="whitespace-nowrap active">
+                          Billing Name (Optional)
+                        </span>
+
+                        <input
+                          type="text"
+                          id="Billing_Name"
+                          {...register("Billing_Name")}
+                          placeholder="Billing Name"
+                          className="w-full outline-none border-b-2 text-gray-900"
+                          style={{ marginBottom: 0 }}
+                        />
+
+                       
+                      </div>
+                    )}
                     {/* //)} */}
 
                     {/* GSTIN — compact inline label+input, pinned to top */}
@@ -2512,7 +2523,7 @@ export default function SaleReturnAdd() {
                           })()}
 
                           {/* Address has content — show Remove / Change (only when party HAS a saved address) */}
-                           {hasSavedBillingAddress && watch("Billing_Address") && (
+                          {hasSavedBillingAddress && watch("Billing_Address") && (
                             // currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && 
                             // (
                             <div className="flex justify-end gap-3 mt-1">
