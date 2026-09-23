@@ -2523,9 +2523,10 @@ export default function SaleAdd() {
                         readOnly
                       />
                     </div>)} */}
-                     {currentPartyDetails?.Party_Name !== "Cash Sale" && (<div className="flex flex-col gap-2">
+                     {/* {currentPartyDetails?.Party_Name !== "Cash Sale" && ( */}
+                      <div className="flex flex-col gap-2">
                       <span className="whitespace-nowrap active">
-                        {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name"}
+                        {saleMode === "Cash" ? "Billing Name (Optional)" : "Billing Name (Optional)"}
                       </span>
                       <input
                         type="text"
@@ -2538,7 +2539,8 @@ export default function SaleAdd() {
                       {errors?.Billing_Name && (
                         <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
                       )}
-                    </div>)}
+                    </div>
+                  {/* )} */}
                     {/* {errors?.GSTIN && (
                     <p className="text-red-500 text-xs sm:pl-[142px]">{errors?.GSTIN?.message}</p>
                   )} */}

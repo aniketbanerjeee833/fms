@@ -32,11 +32,24 @@ const TAX_TYPES = {
   IGST28: "IGST 28%",
   IGST40: "IGST 40%"
 }
+// const cleanValue = (value) => {
+//   if (value === undefined || value === null || value === "" || value === " ") {
+//     return null; // store as NULL in DB
+//   }
+//   return value;  // ✅ returns the original value for valid data
+// };
 const cleanValue = (value) => {
-  if (value === undefined || value === null || value === "" || value === " ") {
-    return null; // store as NULL in DB
+  if (value === undefined || value === null) {
+    return null;
   }
-  return value;  // ✅ returns the original value for valid data
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    return trimmedValue === "" ? null : trimmedValue;
+  }
+
+  return value;
 };
 const cleanDiscount = (value) => {
   if (value === undefined || value === null || value === "" || value === " ") {
@@ -540,7 +553,8 @@ const addSale = async (req, res, next) => {
            updated_at = NOW()
          WHERE Party_Id = ?`,
             [
-              Billing_Name.trim(),
+              //Billing_Name.trim(),
+              cleanValue(Billing_Name),
               Party_Id,
             ]
           );
@@ -2502,6 +2516,15 @@ const getSingleSale = async (req, res, next) => {
         Billing_Name: saleHeader.Billing_Name,
         Phone_Number: saleHeader.Phone_Number || saleHeader.Party_Phone_Number||"",
         Billing_Address: saleHeader.Billing_Address,
+          addresses: saleHeader.Billing_Address
+    ? [
+        {
+          Address_Type: "Billing",
+          Address_Text: saleHeader.Billing_Address,
+          Is_Default: true,
+        },
+      ]
+    : [],
         GSTIN: saleHeader.GSTIN,
         State_Of_Supply: saleHeader.State_Of_Supply,
         State: saleHeader.State,
@@ -3493,7 +3516,7 @@ const editSale = async (req, res, next) => {
          VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
             [
               Party_Id,
-              Billing_Address.trim(),
+              cleanValue(Billing_Address),
             ]
           );
         }
@@ -3554,7 +3577,7 @@ const editSale = async (req, res, next) => {
            updated_at = NOW()
          WHERE Party_Id = ?`,
             [
-              Billing_Name.trim(),
+              cleanValue(Billing_Name),
               Party_Id,
             ]
           );
@@ -3619,7 +3642,8 @@ const editSale = async (req, res, next) => {
            VALUES (?, 'Billing', ?, 1, NOW(), NOW())`,
               [
                 Party_Id,
-                Billing_Address.trim(),
+                //Billing_Address.trim(),
+                cleanValue(Billing_Address)
               ]
             );
           }

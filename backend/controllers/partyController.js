@@ -6,13 +6,25 @@ import { sanitizeObject } from "../utils/sanitizeInput.js";
 import partySchema from "../validators/partySchema.js";
 import ExcelJS from "exceljs";
 import PdfPrinter from "pdfmake";
+// const cleanValue = (value) => {
+//   if (value === undefined || value === null || value === "" || value === " ") {
+//     return null; // store as NULL in DB
+//   }
+//   return value;  // ✅ returns the original value for valid data
+// };
 const cleanValue = (value) => {
-  if (value === undefined || value === null || value === "" || value === " ") {
-    return null; // store as NULL in DB
+  if (value === undefined || value === null) {
+    return null;
   }
-  return value;  // ✅ returns the original value for valid data
-};
 
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    return trimmedValue === "" ? null : trimmedValue;
+  }
+
+  return value;
+};
 
 const addParty = async (req, res, next) => {
   let connection;

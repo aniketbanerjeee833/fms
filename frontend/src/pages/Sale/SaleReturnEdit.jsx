@@ -506,6 +506,9 @@ export default function SaleReturndEdit() {
       Return_Number_Value: "",
 
       Party_Name: "",
+
+      Billing_Name: "",
+      Billing_Address: "",
       GSTIN: "",
       Invoice_Number: "",
       Phone_Number: "",
@@ -694,6 +697,9 @@ export default function SaleReturndEdit() {
   //   isReturnPrefixChanged,
   //   setValue,
   // ]);
+  const [showEditPartyModal, setShowEditPartyModal] = useState(false);
+  const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
+
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
@@ -1385,6 +1391,8 @@ export default function SaleReturndEdit() {
   //       setShowSplitBox((sale?.saleReturn?.splits?.length || 0) > 1);
   //     }
   //   }, [sale]);
+  const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
+
   useEffect(() => {
     if (sale) {
       // Invalidate any previous prefix-number request
@@ -1533,6 +1541,12 @@ export default function SaleReturndEdit() {
       );
 
       setPartySearch(sale.saleReturn.Party_Name);
+      setCurrentPartyDetails({
+        ...sale.saleReturn,
+      });
+      setHasSavedBillingAddress(
+        !!sale.saleReturn?.Billing_Address?.trim()
+      );
 
       const prefilledRows =
         sale?.saleReturn?.items?.length > 0
@@ -1674,7 +1688,8 @@ export default function SaleReturndEdit() {
         Return_Number_Value: sale.saleReturn?.Return_Number_Value ?? "",
 
         Party_Name: sale.saleReturn?.Party_Name || "",
-
+        Billing_Name: sale.saleReturn?.Billing_Name || "",
+        Billing_Address: sale.saleReturn?.Billing_Address || "",
         GSTIN: sale.saleReturn?.GSTIN || "",
 
         Invoice_Number: sale.saleReturn?.Invoice_Number || "",
@@ -2585,13 +2600,13 @@ export default function SaleReturndEdit() {
             >
               <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
                 {/* <div className="row"> */}
-                 <div className="flex flex-col gap-4 w-full lg:w-2/3">
-                <div 
-                className="grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4"
-                //className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "
-                >
+                <div className="flex flex-col gap-4 w-full lg:w-2/3">
+                  <div
+                    className="grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4"
+                  //className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "
+                  >
 
-                  {/* <div className="flex flex-col gap-2 relative party-class">
+                    {/* <div className="flex flex-col gap-2 relative party-class">
                     <span className="whitespace-nowrap active">
                       Party
                       <span className="text-red-500">*</span>
@@ -2698,269 +2713,380 @@ export default function SaleReturndEdit() {
                       />
                     )}
                   </div> */}
-                  <div className="flex flex-col gap-2 relative party-class">
-  <span className="whitespace-nowrap active">
-    Party
-    <span className="text-red-500">*</span>
-  </span>
+                    <div className="flex flex-col gap-2 relative party-class">
+                      <span className="whitespace-nowrap active">
+                        Party
+                        <span className="text-red-500">*</span>
+                      </span>
 
-  <div className="relative w-full">
-    <div
-      className="flex flex-row border rounded-md bg-white cursor-pointer"
-      onClick={() => setOpen((prev) => !prev)}
-    >
-      <input
-        type="text"
-        id="Party_Name"
-        value={partySearch}
-        onChange={(e) => {
-          setPartyCursor(null);
+                      <div className="relative w-full">
+                        <div
+                          className="flex flex-row border rounded-md bg-white cursor-pointer"
+                          onClick={() => setOpen((prev) => !prev)}
+                        >
+                          <input
+                            type="text"
+                            id="Party_Name"
+                            value={partySearch}
+                            onChange={(e) => {
+                              setPartyCursor(null);
 
-          const value = e.target.value;
+                              const value = e.target.value;
 
-          setPartySearch(value);
+                              setPartySearch(value);
 
-          setValue("Party_Name", value, {
-            shouldValidate: true,
-            shouldDirty: true,
-          });
+                              setValue("Party_Name", value, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
 
-          setOpen(true);
+                              setOpen(true);
 
-          const matchedParty = parties.find(
-            (p) =>
-              p.Party_Name?.toLowerCase() ===
-              value.trim().toLowerCase()
-          );
+                              const matchedParty = parties.find(
+                                (p) =>
+                                  p.Party_Name?.toLowerCase() ===
+                                  value.trim().toLowerCase()
+                              );
 
-          // Party completely cleared
-          if (!value.trim()) {
-            setValue("GSTIN", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                              // Party completely cleared
+                              if (!value.trim()) {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            setValue("Phone_Number", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setValue("Billing_Address", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            return;
-          }
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setCurrentPartyDetails(null);
+                                return;
+                              }
 
-          // Exact existing Party
-          if (matchedParty) {
-            setValue("GSTIN", matchedParty.GSTIN || "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                              // Exact existing Party
+                              if (matchedParty) {
+                                setValue("GSTIN", matchedParty.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-            // Do NOT change Phone_Number here.
-            // Existing bill phone should remain.
-          }
+                                const defaultBilling = matchedParty.addresses?.find(
+                                  (a) =>
+                                    a.Address_Type === "Billing" &&
+                                    a.Is_Default
+                                );
 
-          // Party does not exactly match
-          else {
-            setValue("GSTIN", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
+                                setValue(
+                                  "Billing_Address",
+                                  defaultBilling?.Address_Text || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
 
-            setValue("Phone_Number", "", {
-              shouldValidate: true,
-              shouldDirty: true,
-            });
-          }
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-        onBlur={() => {
-          setTimeout(() => {
-            const typedValue =
-              partySearch?.trim()?.toLowerCase();
+                                setCurrentPartyDetails(matchedParty);
 
-            const matchedParty = parties.find(
-              (p) =>
-                p.Party_Name?.toLowerCase() === typedValue
-            );
+                                setValue(
+                                  "Billing_Name",
+                                  matchedParty.Billing_Name || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
 
-            if (matchedParty) {
-              setPartyCursor(null);
+                                // Do NOT change Phone_Number here.
+                                // Existing bill phone should remain.
+                              }
 
-              setPartySearch(matchedParty.Party_Name);
+                              // Party does not exactly match
+                              else {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-              setValue(
-                "Party_Name",
-                matchedParty.Party_Name,
-                {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                }
-              );
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setValue("Billing_Address", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
 
-              setValue(
-                "GSTIN",
-                matchedParty.GSTIN || "",
-                {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                }
-              );
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setCurrentPartyDetails(null);
 
-              // If bill phone is empty,
-              // populate it from master Party.
-              const currentBillPhone =
-                watch("Phone_Number");
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(true);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue =
+                                  partySearch?.trim()?.toLowerCase();
 
-              if (!currentBillPhone?.trim()) {
-                setValue(
-                  "Phone_Number",
-                  matchedParty.Phone_Number || "",
-                  {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  }
-                );
-              }
-            } else {
-              setValue("GSTIN", "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
+                                const matchedParty = parties.find(
+                                  (p) =>
+                                    p.Party_Name?.toLowerCase() === typedValue
+                                );
 
-              setValue("Phone_Number", "", {
-                shouldValidate: true,
-                shouldDirty: true,
-              });
-            }
+                                if (matchedParty) {
+                                  setPartyCursor(null);
+                                  setHasSavedBillingAddress(
+                                    !!matchedParty.addresses?.some(
+                                      (a) => a.Address_Type === "Billing"
+                                    )
+                                  );
 
-            setOpen(false);
-          }, 150);
-        }}
-        placeholder="Search By Name/Phone"
-        className="w-full outline-none py-1 px-2 text-gray-900"
-        style={{
-          marginBottom: 0,
-          marginTop: "4px",
-          border: "none",
-          borderBottom: "none",
-          height: "2rem",
-        }}
-      />
+                                  setPartySearch(matchedParty.Party_Name);
 
-      <div className="w-10"></div>
+                                  setValue(
+                                    "Party_Name",
+                                    matchedParty.Party_Name,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
 
-      <span className="absolute right-0 px-2 top-1/3 text-gray-700">
-        ▼
-      </span>
-    </div>
+                                  setValue(
+                                    "GSTIN",
+                                    matchedParty.GSTIN || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                  const defaultBilling = matchedParty.addresses?.find(
+                                    (a) =>
+                                      a.Address_Type === "Billing" &&
+                                      a.Is_Default
+                                  );
+                                  const currentBillingAddress =
+                                    watch("Billing_Address");
 
-    {open && (
-      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                                  if (!currentBillingAddress?.trim()) {
+                                    setValue(
+                                      "Billing_Address",
+                                      defaultBilling?.Address_Text || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
 
-        <span
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setShowPartyModal(true);
-          }}
-          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
-          style={{
-            borderBottom: "1px solid #f3f4f6",
-          }}
-        >
-          + Add Party
-        </span>
+                                  setValue(
+                                    "Billing_Name",
+                                    matchedParty.Billing_Name || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
 
-        <VirtualPartyScrollList
-          parties={parties}
-          isFetching={isPartiesFetching}
-          hasMore={partiesHasMore}
-          onLoadMore={handlePartyLoadMore}
-          scrollRef={partyScrollRef}
-          onSelectParty={(party) => {
-            setPartyCursor(null);
+                                  // If bill phone is empty,
+                                  // populate it from master Party.
+                                  const currentBillPhone =
+                                    watch("Phone_Number");
 
-            setPartySearch(party.Party_Name);
+                                  if (!currentBillPhone?.trim()) {
+                                    setValue(
+                                      "Phone_Number",
+                                      matchedParty.Phone_Number || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
+                                  setCurrentPartyDetails(matchedParty);
+                                } else {
+                                  setHasSavedBillingAddress(false);
+                                  setValue("GSTIN", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-            setValue(
-              "Party_Name",
-              party.Party_Name,
-              {
-                shouldValidate: true,
-                shouldDirty: true,
-              }
-            );
 
-            setValue(
-              "GSTIN",
-              party.GSTIN || "",
-              {
-                shouldValidate: true,
-                shouldDirty: true,
-              }
-            );
+                                  setValue("Phone_Number", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                  setCurrentPartyDetails(null);
+                                }
 
-            // Dropdown selection → always use master phone
-            setValue(
-              "Phone_Number",
-              party.Phone_Number || "",
-              {
-                shouldValidate: true,
-                shouldDirty: true,
-              }
-            );
+                                setOpen(false);
+                              }, 150);
+                            }}
+                            placeholder="Search By Name/Phone"
+                            className="w-full outline-none py-1 px-2 text-gray-900"
+                            style={{
+                              marginBottom: 0,
+                              marginTop: "4px",
+                              border: "none",
+                              borderBottom: "none",
+                              height: "2rem",
+                            }}
+                          />
 
-            setOpen(false);
-          }}
-        />
-      </div>
-    )}
-  </div>
+                          <div className="w-10"></div>
 
-  {showPartyModal && (
-    <PartyAddModal
-      onClose={() => setShowPartyModal(false)}
-      onSave={(newParty) => {
-        setPartyCursor(null);
+                          <span className="absolute right-0 px-2 top-1/3 text-gray-700">
+                            ▼
+                          </span>
+                        </div>
 
-        setPartySearch(newParty.Party_Name);
+                        {open && (
+                          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
 
-        setValue(
-          "Party_Name",
-          newParty.Party_Name,
-          {
-            shouldValidate: true,
-            shouldDirty: true,
-          }
-        );
+                            <span
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setShowPartyModal(true);
+                              }}
+                              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                              style={{
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              + Add Party
+                            </span>
 
-        setValue(
-          "GSTIN",
-          newParty.GSTIN || "",
-          {
-            shouldValidate: true,
-            shouldDirty: true,
-          }
-        );
+                            <VirtualPartyScrollList
+                              parties={parties}
+                              isFetching={isPartiesFetching}
+                              hasMore={partiesHasMore}
+                              onLoadMore={handlePartyLoadMore}
+                              scrollRef={partyScrollRef}
+                              onSelectParty={(party) => {
+                                setPartyCursor(null);
+                                setHasSavedBillingAddress(
+                                  !!party.addresses?.some(
+                                    (a) => a.Address_Type === "Billing"
+                                  )
+                                );
 
-        // New Party → use new Party phone
-        setValue(
-          "Phone_Number",
-          newParty.Phone_Number || "",
-          {
-            shouldValidate: true,
-            shouldDirty: true,
-          }
-        );
+                                setPartySearch(party.Party_Name);
 
-        setShowPartyModal(false);
-      }}
-    />
-  )}
-</div>
-                  {/* <div className="input-field  flex gap-4
+                                setValue(
+                                  "Party_Name",
+                                  party.Party_Name,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  "GSTIN",
+                                  party.GSTIN || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                const defaultBilling = party.addresses?.find(
+                                  (a) => a.Address_Type === "Billing" && a.Is_Default
+                                );
+
+                                setValue("Billing_Address", defaultBilling?.Address_Text || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Billing_Name", party.Billing_Name || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                // Dropdown selection → always use master phone
+                                setValue(
+                                  "Phone_Number",
+                                  party.Phone_Number || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                setCurrentPartyDetails(party);
+
+                                setOpen(false);
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);
+
+                            setPartySearch(newParty.Party_Name);
+
+                            setValue(
+                              "Party_Name",
+                              newParty.Party_Name,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+
+                            setValue(
+                              "GSTIN",
+                              newParty.GSTIN || "",
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+
+                            // New Party → use new Party phone
+                            setValue(
+                              "Phone_Number",
+                              newParty.Phone_Number || "",
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                            setValue("Billing_Name", newParty.Billing_Name || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            setCurrentPartyDetails(newParty);
+
+
+                            setShowPartyModal(false);
+                          }}
+                        />
+                      )}
+                    </div>
+                    {/* <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
                  
                     <span className="whitespace-nowrap active">
@@ -3012,6 +3138,170 @@ export default function SaleReturndEdit() {
                       )}
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+
+                    {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && ( */}
+                    <div className="flex flex-col gap-2">
+                      <span className="whitespace-nowrap active">
+                        {currentPartyDetails?.Party_Name === "Cash Sale" ? "Billing Name (Optional)" : "Billing Name (Optional)"}
+                      </span>
+                      <input
+                        type="text"
+                        id="Billing_Name"
+                        {...register("Billing_Name")}
+                        placeholder="Billing Name"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+                      {errors?.Billing_Name && (
+                        <p className="text-red-500 text-xs">{errors?.Billing_Name?.message}</p>
+                      )}
+                    </div>
+                    {/* //)} */}
+
+                    {/* GSTIN — compact inline label+input, pinned to top */}
+                    {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
+                  
+                                        <span className="whitespace-nowrap active">GSTIN</span>
+                                        <input
+                                          type="text"
+                                          id="GSTIN"
+                                          value={showGSTIN || ""}
+                                          {...register("GSTIN")}
+                                          placeholder="GSTIN"
+                                          className="w-full outline-none border-b-2 text-gray-900"
+                                          style={{ marginBottom: 0 }}
+                                          readOnly
+                                        />
+                                      </div>)} */}
+
+                    {/* ── ROW 2: Billing Address + GSTIN ── */}
+
+                    {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
+                      //currentPartyDetails?.Party_Name.trim().toLowerCase() !== "cash sale" && (
+                      <div>
+                        {/* Billing Address */}
+                        <div className="flex flex-col gap-2">
+                          <span className="active">Billing Address</span>
+
+                          {(() => {
+                            // 🔹 check if party has ANY billing address saved
+                            // const hasPartyBillingAddress = currentPartyDetails?.addresses?.some(
+                            //   (addr) => addr.Address_Type === "Billing"
+                            // );
+
+
+                            return (
+                              <textarea
+                                {...register("Billing_Address")}
+                                rows={5}
+                                placeholder="Billing Address"
+                                readOnly={hasSavedBillingAddress}
+                                //readOnly={hasPartyBillingAddress}   // 🔹 readonly if party has a saved address
+                                // onClick={() => {
+                                //   if (hasPartyBillingAddress) {
+                                //     setShowEditPartyModal(true);   // clicking a readonly field opens the modal too
+                                //   }
+                                // }}
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none"
+                                style={{
+                                  minHeight: "80px",
+                                  backgroundColor: hasSavedBillingAddress ? "#f9fafb" : "white",
+                                  cursor: hasSavedBillingAddress ? "pointer" : "text",
+                                  //backgroundColor: hasPartyBillingAddress ? "#f9fafb" : "white",
+                                  //cursor: hasPartyBillingAddress ? "pointer" : "text",
+                                }}
+                              />
+                            );
+                          })()}
+
+                          {/* Address has content — show Remove / Change (only when party HAS a saved address) */}
+                          {hasSavedBillingAddress && watch("Billing_Address") && (
+                            // currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && 
+                            // (
+                            <div className="flex justify-end gap-3 mt-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setValue("Billing_Address", "", {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  })
+                                }
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#ef4444",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                }}
+                              >
+                                Remove
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setShowEditPartyModal(true)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#4CA1AF",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Change
+                              </button>
+                            </div>
+                            //)
+                          )}
+
+                          {/* Address was just removed OR party has a saved address but field is empty
+                                              — offer to pick one from the party */}
+                          {hasSavedBillingAddress && !watch("Billing_Address") &&
+                            currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && (
+                              <div className="flex justify-end mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEditPartyModal(true)}
+                                  style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "#4CA1AF",
+                                    cursor: "pointer",
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  Select Billing Address
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+
+
+                  {showEditPartyModal && (
+                    <PartyAddModal
+                      editingParty={true}
+                      partyDetails={currentPartyDetails}
+                      restrictedMode={true}
+                      onClose={() => setShowEditPartyModal(false)}
+                      onSave={(updatedParty) => {
+                        const defaultBilling = updatedParty.addresses?.find(
+                          (a) => a.Address_Type === "Billing" && a.Is_Default
+                        );
+                        setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldDirty: true, shouldValidate: true });
+                        setShowEditPartyModal(false);
+                        setCurrentPartyDetails(updatedParty);
+                      }}
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 

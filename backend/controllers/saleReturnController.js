@@ -8,11 +8,24 @@ import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelpe
 import { validateSplits, insertPaymentSplits, deletePaymentSplits } from "../utils/paymentSplitHelper.js";
 import { resolveUnitAndStockDelta } from "../utils/resolveUnitAndStockDelta.js";
 import ExcelJS from "exceljs";
+// const cleanValue = (value) => {
+//   if (value === undefined || value === null || value === "" || value === " ") {
+//     return null; // store as NULL in DB
+//   }
+//   return value;  // ✅ returns the original value for valid data
+// };
 const cleanValue = (value) => {
-  if (value === undefined || value === null || value === "" || value === " ") {
-    return null; // store as NULL in DB
+  if (value === undefined || value === null) {
+    return null;
   }
-  return value;  // ✅ returns the original value for valid data
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+
+    return trimmedValue === "" ? null : trimmedValue;
+  }
+
+  return value;
 };
 const normalizeNumber = (val) =>
   val !== undefined &&
@@ -415,9 +428,18 @@ const getSaleReturnById = async (req, res, next) => {
     // 1. FETCH HEADER
     // =========================================================
   //a.Phone_Number,
+//       (
+//   SELECT pa.Address_Text
+//   FROM add_party_addresses pa
+//   WHERE pa.Party_Id = sr.Party_Id
+//     AND pa.Address_Type = 'Billing'
+//     AND pa.Is_Default = 1
+// ) AS Billing_Address
     const [[header]] = await connection.query(
       `SELECT
      sr.id,
+     sr.Billing_Name,
+     sr.Billing_Address,
      sr.Return_Number,
      sr.Return_Number_Prefix,
      sr.Return_Number_Value,
@@ -439,13 +461,18 @@ const getSaleReturnById = async (req, res, next) => {
          a.Phone_Number AS Party_Phone_Number,
         
     
-          (
-  SELECT pa.Address_Text
-  FROM add_party_addresses pa
-  WHERE pa.Party_Id = sr.Party_Id
-    AND pa.Address_Type = 'Billing'
-    AND pa.Is_Default = 1
-) AS Billing_Address
+         COALESCE(
+       NULLIF(sr.Billing_Address, ''),
+       (
+         SELECT pa.Address_Text
+         FROM add_party_addresses pa
+         WHERE pa.Party_Id = sr.Party_Id
+           AND pa.Address_Type = 'Billing'
+           AND pa.Is_Default = 1
+         ORDER BY pa.id ASC
+         LIMIT 1
+       )
+     ) AS Billing_Address
          
    FROM sale_return sr
    LEFT JOIN add_party a
@@ -460,6 +487,24 @@ const getSaleReturnById = async (req, res, next) => {
         message: "Sale Return not found.",
       });
     }
+    // =========================================================
+// FETCH ALL PARTY ADDRESSES
+// =========================================================
+const [partyAddresses] = await connection.query(
+  `
+  SELECT
+    id,
+    Address_Type,
+    Address_Text,
+    Is_Default
+  FROM add_party_addresses
+  WHERE Party_Id = ?
+  ORDER BY
+    Is_Default DESC,
+    id ASC
+  `,
+  [header.Party_Id]
+);
 
     // =========================================================
     // 2. FETCH ITEMS
@@ -827,6 +872,7 @@ const getSaleReturnById = async (req, res, next) => {
       success: true,
       saleReturn: {
         ...header,
+          addresses: partyAddresses,
         Phone_Number:
       header.Phone_Number ||
       header.Party_Phone_Number ||
@@ -859,6 +905,8 @@ const createSaleReturn = async (req, res, next) => {
 
     const {
       Party_Name,
+      Billing_Name, 
+      Billing_Address,
       Return_Number,
         Return_Number_Prefix,
   Return_Number_Value,
@@ -1013,16 +1061,18 @@ if (!existingParty) {
   const [partyResult] = await connection.execute(
     `
     INSERT INTO add_party
-      (
-        Party_Name,
-        Phone_Number,
-        created_at,
-        updated_at
-      )
-    VALUES (?, ?, NOW(), NOW())
+    (
+      Party_Name,
+      Billing_Name,
+      Phone_Number,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, NOW(), NOW())
     `,
     [
       cleanPartyName,
+      cleanValue(Billing_Name),
       cleanValue(Phone_Number),
     ]
   );
@@ -1050,14 +1100,44 @@ if (!existingParty) {
     Phone_Number: cleanValue(Phone_Number),
   };
 
-} else {
+
+  // =====================================================
+  // FIRST BILLING ADDRESS -> DEFAULT ADDRESS
+  // =====================================================
+
+  if (Billing_Address?.trim()) {
+    await connection.execute(
+      `
+      INSERT INTO add_party_addresses
+      (
+        Party_Id,
+        Address_Type,
+        Address_Text,
+        Is_Default,
+        created_at,
+        updated_at
+      )
+      VALUES (?, 'Billing', ?, 1, NOW(), NOW())
+      `,
+      [
+        Party_Id,
+        Billing_Address.trim(),
+      ]
+    );
+  }
+}
+else {
   // =======================================================
   // EXISTING PARTY
   // =======================================================
 
   party = existingParty;
 
-  // Master phone is blank → save bill phone into master
+
+  // =====================================================
+  // 1. PHONE NUMBER
+  // =====================================================
+
   if (
     !existingParty.Phone_Number?.trim() &&
     Phone_Number?.trim()
@@ -1067,19 +1147,60 @@ if (!existingParty) {
       UPDATE add_party
       SET
         Phone_Number = ?,
+        Billing_Name = ?,
         updated_at = NOW()
       WHERE Party_Id = ?
       `,
       [
         cleanValue(Phone_Number),
+        cleanValue(Billing_Name),
         existingParty.Party_Id,
       ]
     );
 
     party.Phone_Number = Phone_Number.trim();
   }
-}
 
+
+  // =====================================================
+  // 2. BILLING ADDRESS
+  //    Initialize only if NO billing address exists
+  // =====================================================
+
+  if (Billing_Address?.trim()) {
+    const [[{ addrCount }]] =
+      await connection.query(
+        `
+        SELECT COUNT(*) AS addrCount
+        FROM add_party_addresses
+        WHERE Party_Id = ?
+          AND Address_Type = 'Billing'
+        `,
+        [existingParty.Party_Id]
+      );
+
+    if (Number(addrCount) === 0) {
+      await connection.execute(
+        `
+        INSERT INTO add_party_addresses
+        (
+          Party_Id,
+          Address_Type,
+          Address_Text,
+          Is_Default,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'Billing', ?, 1, NOW(), NOW())
+        `,
+        [
+          existingParty.Party_Id,
+          Billing_Address.trim(),
+        ]
+      );
+    }
+  }
+}
     // =========================================================
     // 8. INSERT SALE RETURN HEADER
     // =========================================================
@@ -1110,370 +1231,6 @@ if (!existingParty) {
         // =========================================================
 // RETURN NUMBER PREFIX SEQUENCE
 // =========================================================
-
-// let returnNumber = String(Return_Number || "").trim();
-
-// // ---------------------------------------------------------
-// // SPECIAL CASE:
-// // 000 / 00 / 0000 etc. means blank return number.
-// // No error.
-// // ---------------------------------------------------------
-
-// if (/^0+$/.test(returnNumber)) {
-//   returnNumber = "";
-// }
-
-
-// // ---------------------------------------------------------
-// // Only process prefix sequence when return number exists
-// // ---------------------------------------------------------
-
-// if (returnNumber) {
-
-//   // Extract trailing numeric part.
-//   //
-//   // CN1000
-//   //   prefix = CN
-//   //   number = 1000
-//   //
-//   // CRN100
-//   //   prefix = CRN
-//   //   number = 100
-//   //
-//   // AEPL-2627-0086
-//   //   prefix = AEPL-2627-
-//   //   number = 0086
-//   //
-//   // 1000
-//   //   prefix = None
-//   //   number = 1000
-
-//   const returnMatch = returnNumber.match(/^(.*?)(\d+)$/);
-
-//   if (!returnMatch) {
-//     await connection.rollback();
-
-//     return res.status(400).json({
-//       success: false,
-//       message: "Invalid return number.",
-//     });
-//   }
-
-//   const returnPrefix = returnMatch[1] || "None";
-//   const enteredReturnNumber = Number(returnMatch[2]);
-
-//   if (
-//     !Number.isInteger(enteredReturnNumber) ||
-//     enteredReturnNumber < 1
-//   ) {
-//     await connection.rollback();
-
-//     return res.status(400).json({
-//       success: false,
-//       message: "Return number must contain a valid positive number.",
-//     });
-//   }
-
-
-//   // -------------------------------------------------------
-//   // Find + LOCK the return prefix row.
-//   //
-//   // createSaleReturn already started a transaction at the
-//   // beginning of this controller.
-//   //
-//   // FOR UPDATE keeps this prefix row locked until
-//   // commit/rollback.
-//   // -------------------------------------------------------
-
-//   const [prefixRows] = await connection.execute(
-//     `
-//     SELECT
-//       id,
-//       transaction_type,
-//       prefix_name,
-//       last_number,
-//       is_active
-//     FROM transactions_prefixes
-//     WHERE transaction_type = 'sale_return'
-//       AND prefix_name = ?
-//     LIMIT 1
-//     FOR UPDATE
-//     `,
-//     [returnPrefix]
-//   );
-
-
-//   // -------------------------------------------------------
-//   // Prefix must exist.
-//   // -------------------------------------------------------
-
-//   if (prefixRows.length === 0) {
-//     await connection.rollback();
-
-//     return res.status(400).json({
-//       success: false,
-//       message: `Return prefix "${returnPrefix}" does not exist.`,
-//     });
-//   }
-
-
-//   const prefixRow = prefixRows[0];
-
-//   const currentLastNumber =
-//     Number(prefixRow.last_number) || 0;
-
-
-//   // -------------------------------------------------------
-//   // IMPORTANT:
-//   //
-//   // NEVER decrease last_number.
-//   //
-//   // Example:
-//   //
-//   // last_number = 1000
-//   //
-//   // CN1    -> stays 1000
-//   // CN2    -> stays 1000
-//   // CN3    -> stays 1000
-//   //
-//   // CN1001 -> becomes 1001
-//   // -------------------------------------------------------
-
-//   if (enteredReturnNumber > currentLastNumber) {
-
-//     await connection.execute(
-//       `
-//       UPDATE transactions_prefixes
-//       SET last_number = ?
-//       WHERE id = ?
-//       `,
-//       [
-//         enteredReturnNumber,
-//         prefixRow.id,
-//       ]
-//     );
-//   }
-// }
-// =========================================================
-// RETURN NUMBER PREFIX SEQUENCE
-// =========================================================
-
-// let returnNumber = String(Return_Number || "").trim();
-
-// // ---------------------------------------------------------
-// // Extract prefix + numeric part
-// //
-// // Examples:
-// //
-// // 00        -> prefix = None, number = 0
-// // SAL0      -> prefix = SAL,  number = 0
-// // SAL00     -> prefix = SAL,  number = 0
-// // SAL000    -> prefix = SAL,  number = 0
-// // SAL5      -> prefix = SAL,  number = 5
-// // SAL100    -> prefix = SAL, number = 100
-// // AEPL-2627-0086
-// //           -> prefix = AEPL-2627-
-// //           -> number = 86
-// // ---------------------------------------------------------
-
-// if (returnNumber) {
-
-//   const returnMatch =
-//     returnNumber.match(/^(.*?)(\d+)$/);
-
-//   // -------------------------------------------------------
-//   // Invalid return number
-//   // -------------------------------------------------------
-
-//   if (!returnMatch) {
-//     await connection.rollback();
-
-//     return res.status(400).json({
-//       success: false,
-//       message: "Invalid return number.",
-//     });
-//   }
-
-//   const returnPrefix =
-//     returnMatch[1] || "None";
-
-//   const numericPart = returnMatch[2];
-
-//   const enteredReturnNumber =
-//     Number(numericPart) || 0;
-
-//   // -------------------------------------------------------
-//   // SPECIAL CASE:
-//   //
-//   // SAL0
-//   // SAL00
-//   // SAL000
-//   //
-//   // means:
-//   //
-//   // SAL | empty
-//   //
-//   // Store only the prefix.
-//   //
-//   // 00 / 000 without a prefix means completely empty.
-//   // -------------------------------------------------------
-
-//   if (/^0+$/.test(numericPart)) {
-
-//     if (returnPrefix === "None") {
-//       // 00 / 000 / 0000
-//       returnNumber = "";
-//     } else {
-
-//       // SAL0 / SAL00 / SAL000
-//       //
-//       // Store only SAL.
-//       returnNumber = returnPrefix;
-//     }
-
-//   } else {
-
-//     // -----------------------------------------------------
-//     // NORMAL NUMBER
-//     //
-//     // SAL5
-//     // SAL100
-//     // INV25
-//     // -----------------------------------------------------
-
-//     if (
-//       !Number.isInteger(enteredReturnNumber) ||
-//       enteredReturnNumber < 1
-//     ) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Return number must contain a valid positive number.",
-//       });
-//     }
-
-//     // -----------------------------------------------------
-//     // Find + LOCK the return prefix row.
-//     // -----------------------------------------------------
-
-//     const [prefixRows] =
-//       await connection.execute(
-//         `
-//         SELECT
-//           id,
-//           transaction_type,
-//           prefix_name,
-//           last_number,
-//           is_active
-//         FROM transactions_prefixes
-//         WHERE transaction_type = 'sale_return'
-//           AND prefix_name = ?
-//         LIMIT 1
-//         FOR UPDATE
-//         `,
-//         [returnPrefix]
-//       );
-
-//     // -----------------------------------------------------
-//     // Prefix must exist.
-//     // -----------------------------------------------------
-
-//     if (prefixRows.length === 0) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           `Return prefix "${returnPrefix}" does not exist.`,
-//       });
-//     }
-
-//     const prefixRow = prefixRows[0];
-
-//     const currentLastNumber =
-//       Number(prefixRow.last_number) || 0;
-
-//     // -----------------------------------------------------
-//     // NEVER decrease last_number.
-//     //
-//     // Only increase it when the newly entered number
-//     // is greater than the current last number.
-//     //
-//     // SAL5  -> last_number becomes 5 if currently < 5
-//     // SAL10 -> last_number becomes 10 if currently < 10
-//     // SAL3  -> stays whatever current value is if >= 3
-//     // -----------------------------------------------------
-
-//     if (
-//       enteredReturnNumber >
-//       currentLastNumber
-//     ) {
-//       await connection.execute(
-//         `
-//         UPDATE transactions_prefixes
-//         SET last_number = ?
-//         WHERE id = ?
-//         `,
-//         [
-//           enteredReturnNumber,
-//           prefixRow.id,
-//         ]
-//       );
-//     }
-//   }
-
-//   // -------------------------------------------------------
-//   // PREFIX-ONLY VALUE
-//   //
-//   // Example:
-//   //
-//   // SAL0 -> SAL
-//   // SAL00 -> SAL
-//   // SAL000 -> SAL
-//   //
-//   // We must make sure the prefix actually exists.
-//   //
-//   // Do NOT update last_number.
-//   // -------------------------------------------------------
-
-//   if (
-//     returnNumber &&
-//     !/\d+$/.test(returnNumber)
-//   ) {
-
-//     const [prefixRows] =
-//       await connection.execute(
-//         `
-//         SELECT
-//           id,
-//           transaction_type,
-//           prefix_name,
-//           last_number,
-//           is_active
-//         FROM transactions_prefixes
-//         WHERE transaction_type = 'sale_return'
-//           AND prefix_name = ?
-//         LIMIT 1
-//         FOR UPDATE
-//         `,
-//         [returnNumber]
-//       );
-
-//     if (prefixRows.length === 0) {
-//       await connection.rollback();
-
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           `Return prefix "${returnNumber}" does not exist.`,
-//       });
-//     }
-//   }
-// }
-// console.log("Return_Number received:", Return_Number);
-// console.log("Return_Number final before INSERT:", returnNumber);
 
 // =========================================================
 // RETURN NUMBER PREFIX SEQUENCE
@@ -1677,7 +1434,9 @@ if (returnNumber !== null) {
   `INSERT INTO sale_return 
    (
      Sale_Id, 
-     Party_Id, 
+     Party_Id,
+     Billing_Name,
+      Billing_Address, 
      Return_Number, 
      Return_Number_Prefix, 
      Return_Number_Value, 
@@ -1694,10 +1453,12 @@ if (returnNumber !== null) {
      Total_Paid, 
      Balance_Due 
    ) 
-   VALUES (?, ?, ?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+   VALUES (?, ?, ?,?,?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   [
     Sale_Id,
     party.Party_Id,
+    cleanValue(Billing_Name),
+     cleanValue(Billing_Address),
 
     // Combined number — keep for Item Ledger / backward compatibility
     returnNumber || null,
@@ -2124,6 +1885,22 @@ const editSaleReturn = async (req, res, next) => {
         message: "Sale Return not found",
       });
     }
+    // =========================================================
+// GET OLD PARTY ID
+// =========================================================
+
+const [[oldSaleReturn]] = await connection.query(
+  `
+  SELECT Party_Id
+  FROM sale_return
+  WHERE id = ?
+  LIMIT 1
+  FOR UPDATE
+  `,
+  [Sale_Return_Id]
+);
+
+const oldPartyId = oldSaleReturn?.Party_Id || null;
 
     // =========================================================
     // 2. BODY
@@ -2131,6 +1908,8 @@ const editSaleReturn = async (req, res, next) => {
 
     const {
       Party_Name,
+      Billing_Name,
+      Billing_Address, 
       Return_Number,
         Return_Number_Prefix,
   Return_Number_Value,
@@ -2218,6 +1997,10 @@ const editSaleReturn = async (req, res, next) => {
 // 6. FIND OR CREATE PARTY
 // =========================================================
 
+// =========================================================
+// 6. FIND OR CREATE PARTY
+// =========================================================
+
 const cleanPartyName = Party_Name?.trim();
 
 const [[existingParty]] = await connection.query(
@@ -2243,16 +2026,18 @@ if (!existingParty) {
   const [partyResult] = await connection.execute(
     `
     INSERT INTO add_party
-      (
-        Party_Name,
-        Phone_Number,
-        created_at,
-        updated_at
-      )
-    VALUES (?, ?, NOW(), NOW())
+    (
+      Party_Name,
+      Billing_Name,
+      Phone_Number,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, NOW(), NOW())
     `,
     [
       cleanPartyName,
+      cleanValue(Billing_Name),
       cleanValue(Phone_Number),
     ]
   );
@@ -2274,6 +2059,31 @@ if (!existingParty) {
     ]
   );
 
+  // =======================================================
+  // SAVE BILLING ADDRESS INTO PARTY MASTER
+  // =======================================================
+
+  if (Billing_Address?.trim()) {
+    await connection.execute(
+      `
+      INSERT INTO add_party_addresses
+      (
+        Party_Id,
+        Address_Type,
+        Address_Text,
+        Is_Default,
+        created_at,
+        updated_at
+      )
+      VALUES (?, 'Billing', ?, 1, NOW(), NOW())
+      `,
+      [
+        Party_Id,
+        cleanValue(Billing_Address),
+      ]
+    );
+  }
+
   party = {
     Party_Id,
     Party_Name: cleanPartyName,
@@ -2287,8 +2097,10 @@ if (!existingParty) {
 
   party = existingParty;
 
-  // Only fill master phone if it is currently empty.
-  // Never overwrite an existing master phone.
+  // =======================================================
+  // UPDATE PARTY PHONE/BILLING NAME ONLY IF PHONE IS EMPTY
+  // =======================================================
+
   if (
     !existingParty.Phone_Number?.trim() &&
     Phone_Number?.trim()
@@ -2298,16 +2110,56 @@ if (!existingParty) {
       UPDATE add_party
       SET
         Phone_Number = ?,
+        Billing_Name = ?,
         updated_at = NOW()
       WHERE Party_Id = ?
       `,
       [
         cleanValue(Phone_Number),
+        cleanValue(Billing_Name),
         existingParty.Party_Id,
       ]
     );
 
     party.Phone_Number = Phone_Number.trim();
+  }
+
+  // =======================================================
+  // SAVE BILLING ADDRESS INTO PARTY MASTER
+  // ONLY IF PARTY DOES NOT ALREADY HAVE ONE
+  // =======================================================
+
+  if (Billing_Address?.trim()) {
+    const [[{ addrCount }]] = await connection.query(
+      `
+      SELECT COUNT(*) AS addrCount
+      FROM add_party_addresses
+      WHERE Party_Id = ?
+        AND Address_Type = 'Billing'
+      `,
+      [existingParty.Party_Id]
+    );
+
+    if (Number(addrCount) === 0) {
+      await connection.execute(
+        `
+        INSERT INTO add_party_addresses
+        (
+          Party_Id,
+          Address_Type,
+          Address_Text,
+          Is_Default,
+          created_at,
+          updated_at
+        )
+        VALUES (?, 'Billing', ?, 1, NOW(), NOW())
+        `,
+        [
+          existingParty.Party_Id,
+          cleanValue(Billing_Address),
+        ]
+      );
+    }
   }
 }
 
@@ -2993,6 +2845,8 @@ if (returnNumber !== null) {
   `UPDATE sale_return
    SET
      Party_Id = ?,
+       Billing_Name = ?,
+     Billing_Address = ?,
      Return_Number = ?,
      Return_Number_Prefix = ?,
      Return_Number_Value = ?,
@@ -3011,6 +2865,8 @@ if (returnNumber !== null) {
    WHERE id = ?`,
   [
     party.Party_Id,
+    cleanValue(Billing_Name),
+    cleanValue(Billing_Address),
     returnNumber,
     returnPrefix,
     returnNumberValue,
@@ -3054,17 +2910,70 @@ if (returnNumber !== null) {
     // 9. PARTY LEDGER — unchanged
     // =========================================================
 
-    await recordPartyLedger({
-      connection,
-      partyId: party.Party_Id,
-      txnType: "Sale_Return",
-      referenceId: Number(Sale_Return_Id),
-      amount: totalAmount,
-      txnDate: Return_Date,
-      docNumber: returnNumber,
-      //docNumber: Return_Number,
-      balanceDue,
-    });
+    // await recordPartyLedger({
+    //   connection,
+    //   partyId: party.Party_Id,
+    //   txnType: "Sale_Return",
+    //   referenceId: Number(Sale_Return_Id),
+    //   amount: totalAmount,
+    //   txnDate: Return_Date,
+    //   docNumber: returnNumber,
+    //   //docNumber: Return_Number,
+    //   balanceDue,
+    // });
+    // =========================================================
+// 9. PARTY LEDGER
+// =========================================================
+
+// Check whether Party has changed
+const partyChanged =
+  oldPartyId &&
+  party.Party_Id &&
+  oldPartyId !== party.Party_Id;
+
+
+// =========================================================
+// 9A. REMOVE SALE RETURN FROM OLD PARTY
+// =========================================================
+
+if (partyChanged) {
+  await reversePartyLedger({
+    connection,
+
+    // OLD PARTY
+    partyId: oldPartyId,
+
+    // SAME TRANSACTION TYPE
+    txnType: "Sale_Return",
+
+    // SAME SALE RETURN ID
+    referenceId: Number(Sale_Return_Id),
+  });
+}
+
+
+// =========================================================
+// 9B. ADD / UPDATE SALE RETURN FOR CURRENT PARTY
+// =========================================================
+
+await recordPartyLedger({
+  connection,
+
+  // CURRENT PARTY
+  partyId: party.Party_Id,
+
+  txnType: "Sale_Return",
+
+  referenceId: Number(Sale_Return_Id),
+
+  amount: totalAmount,
+
+  txnDate: Return_Date,
+
+  docNumber: returnNumber,
+
+  balanceDue,
+});
 
     // =========================================================
     // 10. OLD ITEMS — unchanged
@@ -4734,3 +4643,375 @@ export {
   exportSaleReturnReportToExcel,
   getSaleReturnPrintReport
 };
+
+
+
+
+
+
+
+
+
+// let returnNumber = String(Return_Number || "").trim();
+
+// // ---------------------------------------------------------
+// // SPECIAL CASE:
+// // 000 / 00 / 0000 etc. means blank return number.
+// // No error.
+// // ---------------------------------------------------------
+
+// if (/^0+$/.test(returnNumber)) {
+//   returnNumber = "";
+// }
+
+
+// // ---------------------------------------------------------
+// // Only process prefix sequence when return number exists
+// // ---------------------------------------------------------
+
+// if (returnNumber) {
+
+//   // Extract trailing numeric part.
+//   //
+//   // CN1000
+//   //   prefix = CN
+//   //   number = 1000
+//   //
+//   // CRN100
+//   //   prefix = CRN
+//   //   number = 100
+//   //
+//   // AEPL-2627-0086
+//   //   prefix = AEPL-2627-
+//   //   number = 0086
+//   //
+//   // 1000
+//   //   prefix = None
+//   //   number = 1000
+
+//   const returnMatch = returnNumber.match(/^(.*?)(\d+)$/);
+
+//   if (!returnMatch) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid return number.",
+//     });
+//   }
+
+//   const returnPrefix = returnMatch[1] || "None";
+//   const enteredReturnNumber = Number(returnMatch[2]);
+
+//   if (
+//     !Number.isInteger(enteredReturnNumber) ||
+//     enteredReturnNumber < 1
+//   ) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Return number must contain a valid positive number.",
+//     });
+//   }
+
+
+//   // -------------------------------------------------------
+//   // Find + LOCK the return prefix row.
+//   //
+//   // createSaleReturn already started a transaction at the
+//   // beginning of this controller.
+//   //
+//   // FOR UPDATE keeps this prefix row locked until
+//   // commit/rollback.
+//   // -------------------------------------------------------
+
+//   const [prefixRows] = await connection.execute(
+//     `
+//     SELECT
+//       id,
+//       transaction_type,
+//       prefix_name,
+//       last_number,
+//       is_active
+//     FROM transactions_prefixes
+//     WHERE transaction_type = 'sale_return'
+//       AND prefix_name = ?
+//     LIMIT 1
+//     FOR UPDATE
+//     `,
+//     [returnPrefix]
+//   );
+
+
+//   // -------------------------------------------------------
+//   // Prefix must exist.
+//   // -------------------------------------------------------
+
+//   if (prefixRows.length === 0) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: `Return prefix "${returnPrefix}" does not exist.`,
+//     });
+//   }
+
+
+//   const prefixRow = prefixRows[0];
+
+//   const currentLastNumber =
+//     Number(prefixRow.last_number) || 0;
+
+
+//   // -------------------------------------------------------
+//   // IMPORTANT:
+//   //
+//   // NEVER decrease last_number.
+//   //
+//   // Example:
+//   //
+//   // last_number = 1000
+//   //
+//   // CN1    -> stays 1000
+//   // CN2    -> stays 1000
+//   // CN3    -> stays 1000
+//   //
+//   // CN1001 -> becomes 1001
+//   // -------------------------------------------------------
+
+//   if (enteredReturnNumber > currentLastNumber) {
+
+//     await connection.execute(
+//       `
+//       UPDATE transactions_prefixes
+//       SET last_number = ?
+//       WHERE id = ?
+//       `,
+//       [
+//         enteredReturnNumber,
+//         prefixRow.id,
+//       ]
+//     );
+//   }
+// }
+// =========================================================
+// RETURN NUMBER PREFIX SEQUENCE
+// =========================================================
+
+// let returnNumber = String(Return_Number || "").trim();
+
+// // ---------------------------------------------------------
+// // Extract prefix + numeric part
+// //
+// // Examples:
+// //
+// // 00        -> prefix = None, number = 0
+// // SAL0      -> prefix = SAL,  number = 0
+// // SAL00     -> prefix = SAL,  number = 0
+// // SAL000    -> prefix = SAL,  number = 0
+// // SAL5      -> prefix = SAL,  number = 5
+// // SAL100    -> prefix = SAL, number = 100
+// // AEPL-2627-0086
+// //           -> prefix = AEPL-2627-
+// //           -> number = 86
+// // ---------------------------------------------------------
+
+// if (returnNumber) {
+
+//   const returnMatch =
+//     returnNumber.match(/^(.*?)(\d+)$/);
+
+//   // -------------------------------------------------------
+//   // Invalid return number
+//   // -------------------------------------------------------
+
+//   if (!returnMatch) {
+//     await connection.rollback();
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid return number.",
+//     });
+//   }
+
+//   const returnPrefix =
+//     returnMatch[1] || "None";
+
+//   const numericPart = returnMatch[2];
+
+//   const enteredReturnNumber =
+//     Number(numericPart) || 0;
+
+//   // -------------------------------------------------------
+//   // SPECIAL CASE:
+//   //
+//   // SAL0
+//   // SAL00
+//   // SAL000
+//   //
+//   // means:
+//   //
+//   // SAL | empty
+//   //
+//   // Store only the prefix.
+//   //
+//   // 00 / 000 without a prefix means completely empty.
+//   // -------------------------------------------------------
+
+//   if (/^0+$/.test(numericPart)) {
+
+//     if (returnPrefix === "None") {
+//       // 00 / 000 / 0000
+//       returnNumber = "";
+//     } else {
+
+//       // SAL0 / SAL00 / SAL000
+//       //
+//       // Store only SAL.
+//       returnNumber = returnPrefix;
+//     }
+
+//   } else {
+
+//     // -----------------------------------------------------
+//     // NORMAL NUMBER
+//     //
+//     // SAL5
+//     // SAL100
+//     // INV25
+//     // -----------------------------------------------------
+
+//     if (
+//       !Number.isInteger(enteredReturnNumber) ||
+//       enteredReturnNumber < 1
+//     ) {
+//       await connection.rollback();
+
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Return number must contain a valid positive number.",
+//       });
+//     }
+
+//     // -----------------------------------------------------
+//     // Find + LOCK the return prefix row.
+//     // -----------------------------------------------------
+
+//     const [prefixRows] =
+//       await connection.execute(
+//         `
+//         SELECT
+//           id,
+//           transaction_type,
+//           prefix_name,
+//           last_number,
+//           is_active
+//         FROM transactions_prefixes
+//         WHERE transaction_type = 'sale_return'
+//           AND prefix_name = ?
+//         LIMIT 1
+//         FOR UPDATE
+//         `,
+//         [returnPrefix]
+//       );
+
+//     // -----------------------------------------------------
+//     // Prefix must exist.
+//     // -----------------------------------------------------
+
+//     if (prefixRows.length === 0) {
+//       await connection.rollback();
+
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           `Return prefix "${returnPrefix}" does not exist.`,
+//       });
+//     }
+
+//     const prefixRow = prefixRows[0];
+
+//     const currentLastNumber =
+//       Number(prefixRow.last_number) || 0;
+
+//     // -----------------------------------------------------
+//     // NEVER decrease last_number.
+//     //
+//     // Only increase it when the newly entered number
+//     // is greater than the current last number.
+//     //
+//     // SAL5  -> last_number becomes 5 if currently < 5
+//     // SAL10 -> last_number becomes 10 if currently < 10
+//     // SAL3  -> stays whatever current value is if >= 3
+//     // -----------------------------------------------------
+
+//     if (
+//       enteredReturnNumber >
+//       currentLastNumber
+//     ) {
+//       await connection.execute(
+//         `
+//         UPDATE transactions_prefixes
+//         SET last_number = ?
+//         WHERE id = ?
+//         `,
+//         [
+//           enteredReturnNumber,
+//           prefixRow.id,
+//         ]
+//       );
+//     }
+//   }
+
+//   // -------------------------------------------------------
+//   // PREFIX-ONLY VALUE
+//   //
+//   // Example:
+//   //
+//   // SAL0 -> SAL
+//   // SAL00 -> SAL
+//   // SAL000 -> SAL
+//   //
+//   // We must make sure the prefix actually exists.
+//   //
+//   // Do NOT update last_number.
+//   // -------------------------------------------------------
+
+//   if (
+//     returnNumber &&
+//     !/\d+$/.test(returnNumber)
+//   ) {
+
+//     const [prefixRows] =
+//       await connection.execute(
+//         `
+//         SELECT
+//           id,
+//           transaction_type,
+//           prefix_name,
+//           last_number,
+//           is_active
+//         FROM transactions_prefixes
+//         WHERE transaction_type = 'sale_return'
+//           AND prefix_name = ?
+//         LIMIT 1
+//         FOR UPDATE
+//         `,
+//         [returnNumber]
+//       );
+
+//     if (prefixRows.length === 0) {
+//       await connection.rollback();
+
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           `Return prefix "${returnNumber}" does not exist.`,
+//       });
+//     }
+//   }
+// }
+// console.log("Return_Number received:", Return_Number);
+// console.log("Return_Number final before INSERT:", returnNumber);

@@ -326,7 +326,7 @@ export default function AllPurchaseList() {
           overflow: "hidden",
         }}
       > */}
-        <div
+      <div
         className=" flex flex-col bg-white "
         style={{
           height: "100%",
@@ -634,7 +634,8 @@ export default function AllPurchaseList() {
                     style={{
                       display: "grid",
                       gridTemplateColumns:
-                        "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                        //"0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                        "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.8fr",
                       width: "100%",
                       //minWidth: "1062px",
                       boxSizing: "border-box",
@@ -656,13 +657,14 @@ export default function AllPurchaseList() {
                     <div>Payment Type</div>
                     <div>Amount</div>
                     <div>Balance</div>
-                    <div
+                    {/* <div
                       style={{
                         position: "sticky",
                         right: 0,
                         //backgroundColor: "#fff",
                       }}
-                    />
+                    /> */}
+                    <div>Action</div>
                   </div>
                   {/* </div> */}
                   <div style={{
@@ -730,7 +732,8 @@ export default function AllPurchaseList() {
                             }}
                             style={{
                               display: "grid",
-                              gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                              gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.8fr",
+                              //gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
                               alignItems: "center",
                               minHeight: "52px",
                               columnGap: "10px",
@@ -795,7 +798,7 @@ export default function AllPurchaseList() {
                             </div>
 
                             {/* THREE DOT MENU */}
-                            <div
+                            {/* <div
                               className="py-2 px-2 table-desi-cell"
                               style={{
                                 position: "sticky",   // 👈 was "relative", now sticky
@@ -849,7 +852,7 @@ export default function AllPurchaseList() {
                                 />
                               </button>
 
-                              {/* THREE DOT MENU */}
+                              
                               {rowMenuOpen === purchase?.Purchase_Id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
@@ -863,7 +866,7 @@ export default function AllPurchaseList() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {/* ── VIEW / EDIT ── */}
+                                  
                                   <NavLink
                                     to={{
                                       pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
@@ -898,7 +901,7 @@ export default function AllPurchaseList() {
                                   </NavLink>
 
 
-                                  {/* ── PRINT ── */}
+                                
                                   <button
                                     type="button"
                                     className="row-menu-item"
@@ -920,7 +923,7 @@ export default function AllPurchaseList() {
                                   </button>
 
 
-                                  {/* ── RETURN ── */}
+                               
                                   <NavLink
                                     to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
                                     state={{
@@ -940,7 +943,188 @@ export default function AllPurchaseList() {
                                   </NavLink>
 
 
-                                  {/* ── DELETE ── */}
+                            
+                                  <button
+                                    type="button"
+                                    className="row-menu-item delete-item"
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setDeleteTarget({
+                                        Purchase_Id:
+                                          purchase?.Purchase_Id,
+                                      });
+                                    }}
+                                  >
+                                    <Trash2
+                                      size={13}
+                                      style={{ color: "#dc2626" }}
+                                    />
+
+                                    <span>
+                                      Delete
+                                    </span>
+                                  </button>
+                                </div>
+                              )}
+                            </div> */}
+                            {/* ACTION */}
+                            <div
+                              className="py-2 px-2 table-desi-cell"
+                              style={{
+                                position: "sticky",
+                                right: 0,
+                                width: 80,
+                                textAlign: "center",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "2px",
+                              }}
+                            >
+                              {/* PRINT BUTTON */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  setClickHighlightId(purchase?.Purchase_Id);
+                                  setPrintPurchaseId(purchase?.Purchase_Id);
+                                }}
+                                className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                style={{
+                                  backgroundColor: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                                title="Print"
+                              >
+                                <Printer
+                                  size={16}
+                                  className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
+                                />
+                              </button>
+
+                              {/* THREE DOT BUTTON */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  setClickHighlightId(purchase?.Purchase_Id);
+
+                                  setRowMenuOpen(
+                                    rowMenuOpen === purchase?.Purchase_Id
+                                      ? null
+                                      : purchase?.Purchase_Id
+                                  );
+                                }}
+                                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                style={{
+                                  backgroundColor: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                                title="More"
+                              >
+                                <MoreVertical
+                                  size={16}
+                                  style={{
+                                    color: "#374151",
+                                  }}
+                                />
+                              </button>
+
+                              {/* THREE DOT MENU */}
+                              {rowMenuOpen === purchase?.Purchase_Id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute bg-white shadow-lg rounded-md"
+                                  style={{
+                                    right: 0,
+                                    top: "100%",
+                                    width: 150,
+                                    zIndex: 100,
+                                    border: "1px solid #e2e8f0",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {/* VIEW / EDIT */}
+                                  <NavLink
+                                    to={{
+                                      pathname: `/purchase/edit/${purchase?.Purchase_Id}`,
+                                      search: (() => {
+                                        const params = new URLSearchParams(searchParams);
+
+                                        params.set(
+                                          "highlightTxn",
+                                          purchase?.Purchase_Id
+                                        );
+
+                                        return params.toString();
+                                      })(),
+                                    }}
+                                    state={{
+                                      from: "all-purchase-list",
+                                    }}
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setClickHighlightId(null);
+                                      setRowMenuOpen(null);
+                                    }}
+                                  >
+                                    <Eye
+                                      size={13}
+                                      style={{ color: "#4CA1AF" }}
+                                    />
+
+                                    <span>
+                                      View / Edit
+                                    </span>
+                                  </NavLink>
+
+                                  {/* PRINT */}
+                                  <button
+                                    type="button"
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setPrintPurchaseId(
+                                        purchase.Purchase_Id
+                                      );
+                                    }}
+                                  >
+                                    <Printer
+                                      size={13}
+                                      style={{ color: "#4CA1AF" }}
+                                    />
+
+                                    <span>
+                                      Print
+                                    </span>
+                                  </button>
+
+                                  {/* RETURN */}
+                                  <NavLink
+                                    to={`/purchase/return/add/${purchase?.Purchase_Id}${location.search}`}
+                                    state={{
+                                      from: "purchase-return-list",
+                                    }}
+                                    className="row-menu-item"
+                                    onClick={() => setRowMenuOpen(null)}
+                                  >
+                                    <Undo2
+                                      size={13}
+                                      style={{ color: "#4CA1AF" }}
+                                    />
+
+                                    <span>
+                                      Return
+                                    </span>
+                                  </NavLink>
+
+                                  {/* DELETE */}
                                   <button
                                     type="button"
                                     className="row-menu-item delete-item"
@@ -977,7 +1161,7 @@ export default function AllPurchaseList() {
             )}
           </div>
         </div>
-     
+
 
       </div>
 

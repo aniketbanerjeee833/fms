@@ -61,7 +61,12 @@ const paymentSplitSchema = z
 export const saleReturnFormSchema = z.object({
   /* ── Party ── */
   Party_Name: z.string().min(1, "Party_Name is required"), // 🔹 only real requirement
-Phone_Number: z
+ Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  Phone_Number: z
     .string()
     .trim()
     .refine(
@@ -71,6 +76,11 @@ Phone_Number: z
       }
     )
     .optional(),
+      Billing_Address: z
+        .string()
+        .trim()
+        .optional()
+        .or(z.literal("")),
   GSTIN: z.preprocess(
     (val) => (val === null || val === undefined ? "" : String(val)),
     z.string().refine((val) => val === "" || val.length === 15, {

@@ -10,16 +10,16 @@ import { useGetAllTaxesAndGSTSettingsQuery } from "../redux/api/Settings/taxesAn
 const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
 
-  
-   const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
 
-  const taxesGSTSettings =taxesGSTSettingsData?.settings || [];
+  const { data: taxesGSTSettingsData } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
   const enableHSNCode =
-  Number(
-    taxesGSTSettings.find(
-      (s) => s.setting_key === "enable_hsn_sac"
-    )?.setting_value
-  ) === 1;
+    Number(
+      taxesGSTSettings.find(
+        (s) => s.setting_key === "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
   if (!invoice) return null;
 
 
@@ -32,6 +32,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
     Invoice_Number,
     Invoice_Date,
     Party_Name,
+    Billing_Name,
     GSTIN,
     State,
     Billing_Address,
@@ -544,7 +545,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
       ? (price * qty * discount) / 100
       : discount * qty;
   };
- 
+
   return (
     <div
       ref={ref}
@@ -628,10 +629,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             {/* BILL FROM */}
 
             <td className="invoice-cell invoice-party-cell">
-
+              {/* 
               {Party_Name && (
                 <div className="invoice-bold">
                   {Party_Name}
+                </div>
+              )} */}
+              {(Billing_Name || Party_Name) && (
+                <div className="invoice-bold">
+                  {Billing_Name || Party_Name}
                 </div>
               )}
 
@@ -721,15 +727,15 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               Item name
             </th>
 
-            
+
             {enableHSNCode && (
-  <th
-    className="invoice-table-header"
-    style={{ width: "10%" }}
-  >
-    HSN/ SAC
-  </th>
-)}
+              <th
+                className="invoice-table-header"
+                style={{ width: "10%" }}
+              >
+                HSN/ SAC
+              </th>
+            )}
 
             {hasMRPColumn && (
               <th
@@ -907,10 +913,10 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                   {safe(item.Item_HSN)}
                 </td> */}
                 {enableHSNCode && (
-  <td className="invoice-item-cell">
-    {safe(item.Item_HSN)}
-  </td>
-)}
+                  <td className="invoice-item-cell">
+                    {safe(item.Item_HSN)}
+                  </td>
+                )}
 
                 {hasMRPColumn && (
                   <td className="invoice-item-right">
@@ -919,7 +925,7 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
                 )}
 
                 {/* QUANTITY — use Selected_Unit (the unit this line was actually entered in) */}
-             
+
                 {/* <td className="invoice-item-right">
                   {item.Quantity}
                  
@@ -1100,8 +1106,8 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
             {/* HSN column */}
             {/* <td className="invoice-total-cell"></td> */}
             {enableHSNCode && (
-  <td className="invoice-total-cell"></td>
-)}
+              <td className="invoice-total-cell"></td>
+            )}
             {hasMRPColumn && (
               <td className="invoice-total-cell"></td>
             )}
@@ -1110,15 +1116,14 @@ const InvoicePrintTemplate = forwardRef(({ invoice, type }, ref) => {
               {hasItems ? totalQuantity : ""}
             </td> */}
             <td className="invoice-total-cell">
-  {hasItems &&
-  (totalQuantity.quantity > 0 || totalQuantity.freeQuantity > 0)
-    ? `${totalQuantity.quantity}${
-        totalQuantity.freeQuantity > 0
-          ? ` + ${totalQuantity.freeQuantity}`
-          : ""
-      }`
-    : ""}
-</td>
+              {hasItems &&
+                (totalQuantity.quantity > 0 || totalQuantity.freeQuantity > 0)
+                ? `${totalQuantity.quantity}${totalQuantity.freeQuantity > 0
+                  ? ` + ${totalQuantity.freeQuantity}`
+                  : ""
+                }`
+                : ""}
+            </td>
 
             {showUnitColumn && (
               <td className="invoice-total-cell"></td>

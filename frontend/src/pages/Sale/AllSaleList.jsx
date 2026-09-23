@@ -251,7 +251,7 @@ export default function AllSaleList() {
           overflow: "hidden",
         }}
       > */}
-         <div
+      <div
         className="flex flex-col bg-white"
         style={{
           height: "100%",
@@ -520,7 +520,7 @@ export default function AllSaleList() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                      gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.8fr",
                       //gridTemplateColumns: "60px 110px 130px minmax(300px, 1fr) 160px 132px 120px 50px",
                       width: "100%",
                       minWidth: "1062px",
@@ -543,13 +543,14 @@ export default function AllSaleList() {
                     <div>Payment Type</div>
                     <div>Amount</div>
                     <div>Balance</div>
-                    <div
+                    <div>Action</div>
+                    {/* <div
                       style={{
                         position: "sticky",
                         right: 0,
                         //backgroundColor: "#fff",
                       }}
-                    ></div>
+                    ></div> */}
                   </div>
 
                   {/* VIRTUALIZED BODY */}
@@ -633,7 +634,7 @@ export default function AllSaleList() {
                             }}
                             style={{
                               display: "grid",
-                              gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
+                              gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.8fr",
                               //gridTemplateColumns: "60px 110px 130px minmax(300px, 1fr) 160px 132px 120px 50px",
                               //gridTemplateColumns:"70px 110px 120px minmax(150px, 1fr) 130px 110px 110px 50px",
                               alignItems: "center",
@@ -705,7 +706,7 @@ export default function AllSaleList() {
                             </div>
 
                             {/* THREE DOT MENU */}
-                            <div
+                            {/* <div
                               className="py-2 px-2 table-desi-cell"
                               style={{
                                 position: "sticky",   // 👈 was "relative", now sticky
@@ -901,7 +902,7 @@ export default function AllSaleList() {
                                     Delete
                                   </button>
                                 </div>
-                              )} */}
+                              )} 
                               {rowMenuOpen === sale?.Sale_Id && (
                                 <div
                                   onClick={(e) =>
@@ -917,7 +918,7 @@ export default function AllSaleList() {
                                     overflow: "hidden",
                                   }}
                                 >
-                                  {/* VIEW / EDIT */}
+                                 
                                   <NavLink
                                     to={{
                                       pathname: `/sale/edit/${sale?.Sale_Id}`,
@@ -957,7 +958,7 @@ export default function AllSaleList() {
                                   </NavLink>
 
 
-                                  {/* RETURN */}
+                                 
                                   <NavLink
                                     to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
                                     state={{
@@ -981,7 +982,7 @@ export default function AllSaleList() {
                                   </NavLink>
 
 
-                                  {/* PRINT */}
+                                
                                   <button
                                     type="button"
                                     className="row-menu-item"
@@ -1004,6 +1005,198 @@ export default function AllSaleList() {
                                     </span>
                                   </button>
 
+
+                                  
+                                  <button
+                                    type="button"
+                                    className="row-menu-item delete-item"
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setDeleteTarget({
+                                        Sale_Id:
+                                          sale?.Sale_Id,
+                                      });
+                                    }}
+                                  >
+                                    <Trash2
+                                      size={13}
+                                      style={{
+                                        color: "#dc2626",
+                                      }}
+                                    />
+
+                                    <span>
+                                      Delete
+                                    </span>
+                                  </button>
+                                </div>
+                              )}
+                            </div> */}
+                            {/* ACTION */}
+                            <div
+                              className="py-2 px-2 table-desi-cell"
+                              style={{
+                                position: "sticky",
+                                right: 0,
+                                width: 80,
+                                textAlign: "center",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "2px",
+                              }}
+                            >
+                              {/* PRINT BUTTON */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  setClickHighlightId(sale?.Sale_Id);
+                                  setPrintSaleId(sale?.Sale_Id);
+                                }}
+                                className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                style={{
+                                  backgroundColor: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                                title="Print"
+                              >
+                                <Printer
+                                  size={16}
+                                  className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
+                                />
+                              </button>
+
+                              {/* THREE DOT BUTTON */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+
+                                  setClickHighlightId(sale?.Sale_Id);
+
+                                  setRowMenuOpen(
+                                    rowMenuOpen === sale?.Sale_Id
+                                      ? null
+                                      : sale?.Sale_Id
+                                  );
+                                }}
+                                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                style={{
+                                  backgroundColor: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                }}
+                                title="More"
+                              >
+                                <MoreVertical
+                                  size={16}
+                                  style={{
+                                    color: "#374151",
+                                  }}
+                                />
+                              </button>
+
+                              {/* DROPDOWN MENU */}
+                              {rowMenuOpen === sale?.Sale_Id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute bg-white shadow-lg rounded-md"
+                                  style={{
+                                    right: 0,
+                                    top: "100%",
+                                    width: 150,
+                                    zIndex: 100,
+                                    border: "1px solid #e2e8f0",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  {/* VIEW / EDIT */}
+                                  <NavLink
+                                    to={{
+                                      pathname: `/sale/edit/${sale?.Sale_Id}`,
+                                      search: (() => {
+                                        const params =
+                                          new URLSearchParams(searchParams);
+
+                                        params.set(
+                                          "highlightTxn",
+                                          sale?.Sale_Id
+                                        );
+
+                                        return params.toString();
+                                      })(),
+                                    }}
+                                    state={{
+                                      from: "all-sale-list",
+                                    }}
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setClickHighlightId(null);
+                                      setRowMenuOpen(null);
+                                    }}
+                                  >
+                                    <Eye
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+
+                                    <span>
+                                      View / Edit
+                                    </span>
+                                  </NavLink>
+
+                                  {/* RETURN */}
+                                  <NavLink
+                                    to={`/sale/return/add/${sale?.Sale_Id}${location.search}`}
+                                    state={{
+                                      from: "sale-return-list",
+                                    }}
+                                    className="row-menu-item"
+                                    onClick={() =>
+                                      setRowMenuOpen(null)
+                                    }
+                                  >
+                                    <Undo2
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+
+                                    <span>
+                                      Return
+                                    </span>
+                                  </NavLink>
+
+                                  {/* PRINT */}
+                                  <button
+                                    type="button"
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setRowMenuOpen(null);
+
+                                      setPrintSaleId(
+                                        sale.Sale_Id
+                                      );
+                                    }}
+                                  >
+                                    <Printer
+                                      size={13}
+                                      style={{
+                                        color: "#4CA1AF",
+                                      }}
+                                    />
+
+                                    <span>
+                                      Print
+                                    </span>
+                                  </button>
 
                                   {/* DELETE */}
                                   <button
