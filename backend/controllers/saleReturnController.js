@@ -174,21 +174,38 @@ const getAllSaleReturns = async (req, res, next) => {
     const cursorClauses = [];
     const cursorParams = [];
 
-    if (cursorDate && cursorId) {
-      cursorClauses.push(`(
-        sr.Invoice_Date < ?
-        OR (
-          sr.Invoice_Date = ?
-          AND sr.id < ?
-        )
-      )`);
+    // if (cursorDate && cursorId) {
+    //   cursorClauses.push(`(
+    //     sr.Invoice_Date < ?
+    //     OR (
+    //       sr.Invoice_Date = ?
+    //       AND sr.id < ?
+    //     )
+    //   )`);
 
-      cursorParams.push(
-        cursorDate,
-        cursorDate,
-        cursorId
-      );
-    }
+    //   cursorParams.push(
+    //     cursorDate,
+    //     cursorDate,
+    //     cursorId
+    //   );
+    // }
+    /* ---------- CURSOR CONDITION ---------- */
+
+if (cursorDate && cursorId) {
+  cursorClauses.push(`(
+    sr.Return_Date < ?
+    OR (
+      sr.Return_Date = ?
+      AND sr.id < ?
+    )
+  )`);
+
+  cursorParams.push(
+    cursorDate,
+    cursorDate,
+    cursorId
+  );
+}
 
     /* ---------- MAIN QUERY WHERE (filters + cursor) ---------- */
 
@@ -229,7 +246,7 @@ const getAllSaleReturns = async (req, res, next) => {
        ${mainWhereSQL}
 
        ORDER BY
-         sr.Invoice_Date DESC,
+         sr.Return_Date DESC,
          sr.id DESC
 
        LIMIT ?`,
@@ -238,6 +255,7 @@ const getAllSaleReturns = async (req, res, next) => {
         limit + 1
       ]
     );
+    //sr.Invoice_Date DESC,
 
     /* ---------- DETECT hasMore ---------- */
 
@@ -251,17 +269,30 @@ const getAllSaleReturns = async (req, res, next) => {
 
     let nextCursor = null;
 
-    if (hasMore && pageRows.length > 0) {
-      const last =
-        pageRows[pageRows.length - 1];
+    // if (hasMore && pageRows.length > 0) {
+    //   const last =
+    //     pageRows[pageRows.length - 1];
 
-      nextCursor = Buffer.from(
-        JSON.stringify({
-          date: last.Invoice_Date,
-          id: last.id,
-        })
-      ).toString("base64");
-    }
+    //   nextCursor = Buffer.from(
+    //     JSON.stringify({
+    //       date: last.Invoice_Date,
+    //       id: last.id,
+    //     })
+    //   ).toString("base64");
+    // }
+    /* ---------- NEXT CURSOR ---------- */
+
+if (hasMore && pageRows.length > 0) {
+  const last =
+    pageRows[pageRows.length - 1];
+
+  nextCursor = Buffer.from(
+    JSON.stringify({
+      date: last.Return_Date,
+      id: last.id,
+    })
+  ).toString("base64");
+}
 
     /* ---------- ATTACH SPLIT PAYMENT-TYPE LABELS ---------- */
 

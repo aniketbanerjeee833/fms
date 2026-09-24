@@ -560,16 +560,16 @@ export default function SaleEdit() {
         (s) => s.setting_key === "free_item_quantity"
       )?.setting_value
     ) === 1;
-      const enableBillingNameOfParties =
-        Number(
-          transactionsSettings.find(
-            (s) => s.setting_key === "billing_name_of_parties"
-          )?.setting_value
-        ) === 1
-      //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
-      const showBillingName =
-  enableBillingNameOfParties ||
-  !!currentPartyDetails?.Billing_Name?.trim();
+  const enableBillingNameOfParties =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "billing_name_of_parties"
+      )?.setting_value
+    ) === 1
+  //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
+  const showBillingName =
+    enableBillingNameOfParties ||
+    !!currentPartyDetails?.Billing_Name?.trim();
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -1314,7 +1314,7 @@ export default function SaleEdit() {
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   const [originalSalePrefix, setOriginalSalePrefix] = useState("None");
   const [originalInvoiceNumberPart, setOriginalInvoiceNumberPart] = useState("");
- const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
+  const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
   useEffect(() => {
     if (sale) {
 
@@ -1362,26 +1362,26 @@ export default function SaleEdit() {
       );
       setPartySearch(sale.invoicePartyDetails.Party_Name);
       setCurrentPartyDetails({
-  ...sale.invoicePartyDetails,
-});
-          setHasSavedBillingAddress(
-  !!sale.invoicePartyDetails?.Billing_Address?.trim()
-);
+        ...sale.invoicePartyDetails,
+      });
+      setHasSavedBillingAddress(
+        !!sale.invoicePartyDetails?.Billing_Address?.trim()
+      );
 
-// const matchedParty = parties?.parties?.find(
-//   (party) =>
-//     party.Party_Name?.trim().toLowerCase() ===
-//     sale.invoicePartyDetails?.Party_Name?.trim().toLowerCase()
-// );
+      // const matchedParty = parties?.parties?.find(
+      //   (party) =>
+      //     party.Party_Name?.trim().toLowerCase() ===
+      //     sale.invoicePartyDetails?.Party_Name?.trim().toLowerCase()
+      // );
 
-// setCurrentPartyDetails(matchedParty || null);
+      // setCurrentPartyDetails(matchedParty || null);
 
 
-// setHasSavedBillingAddress(
-//   !!matchedParty?.addresses?.some(
-//     (a) => a.Address_Type === "Billing"
-//   )
-// );
+      // setHasSavedBillingAddress(
+      //   !!matchedParty?.addresses?.some(
+      //     (a) => a.Address_Type === "Billing"
+      //   )
+      // );
 
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item, index) => {
@@ -1492,7 +1492,7 @@ export default function SaleEdit() {
 
       //  checkbox reflects whether a real round-off was applied
       setIsRoundOff(roundOffFromDb !== 0)
-  
+
       reset({
         Party_Name: sale.invoicePartyDetails?.Party_Name || "",
         Billing_Name: sale.invoicePartyDetails?.Billing_Name || "",
@@ -1565,7 +1565,7 @@ export default function SaleEdit() {
 
 
   // const salePartyName = sale?.invoicePartyDetails?.Party_Name;
-  
+
   // useEffect(() => {
   //   if (!salePartyName) return;
   //   if (!parties?.parties?.length) return;
@@ -2725,15 +2725,36 @@ export default function SaleEdit() {
                                   }
 
 
+                                  // =========================================
+                                  // BILLING NAME
+                                  // =========================================
 
-                                  setValue(
-                                    "Billing_Name",
-                                    matchedParty.Billing_Name || "",
-                                    {
+                                  if (matchedParty.Billing_Name?.trim()) {
+                                    setValue("Billing_Name", matchedParty.Billing_Name, {
                                       shouldValidate: true,
                                       shouldDirty: true,
-                                    }
-                                  );
+                                    });
+
+                                  } else if (enableBillingNameOfParties) {
+                                    setValue("Billing_Name", matchedParty.Party_Name, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                  } else {
+                                    setValue("Billing_Name", "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                  }
+                                  // setValue(
+                                  //   "Billing_Name",
+                                  //   matchedParty.Billing_Name || "",
+                                  //   {
+                                  //     shouldValidate: true,
+                                  //     shouldDirty: true,
+                                  //   }
+                                  // );
 
                                   // =================================================
                                   // PHONE
@@ -2848,10 +2869,22 @@ export default function SaleEdit() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Billing_Name", party.Billing_Name || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Billing_Name", party.Billing_Name || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
+                                setValue(
+                                  "Billing_Name",
+                                  party.Billing_Name?.trim()
+                                    ? party.Billing_Name
+                                    : enableBillingNameOfParties
+                                      ? party.Party_Name
+                                      : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
                                 setValue("Phone_Number", party.Phone_Number || "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
@@ -2932,23 +2965,23 @@ export default function SaleEdit() {
 
                     {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && ( */}
                     {showBillingName && (
-  <div className="flex flex-col gap-2">
-    <span className="whitespace-nowrap active">
-      Billing Name (Optional)
-    </span>
+                      <div className="flex flex-col gap-2">
+                        <span className="whitespace-nowrap active">
+                          Billing Name (Optional)
+                        </span>
 
-    <input
-      type="text"
-      id="Billing_Name"
-      {...register("Billing_Name")}
-      placeholder="Billing Name"
-      className="w-full outline-none border-b-2 text-gray-900"
-      style={{ marginBottom: 0 }}
-    />
+                        <input
+                          type="text"
+                          id="Billing_Name"
+                          {...register("Billing_Name")}
+                          placeholder="Billing Name"
+                          className="w-full outline-none border-b-2 text-gray-900"
+                          style={{ marginBottom: 0 }}
+                        />
 
-    
-  </div>
-)}
+
+                      </div>
+                    )}
                     {/* //)} */}
 
                     {/* GSTIN — compact inline label+input, pinned to top */}

@@ -124,16 +124,64 @@ getAllPurchaseReturns: builder.query({
     //   }),
     //   invalidatesTags: ["PurchaseReturn"],
     // }),
-      deletePurchaseReturn: builder.mutation({
-  query: (Purchase_Return_Id) => ({
-    url: `/purchase-return/${Purchase_Return_Id}`,
+//       deletePurchaseReturn: builder.mutation({
+//   query: (Purchase_Return_Id) => ({
+//     url: `/purchase-return/${Purchase_Return_Id}`,
+//     method: "DELETE",
+//   }),
+
+//   async onQueryStarted(
+//     Purchase_Return_Id,
+//     { dispatch, queryFulfilled }
+//   ) {
+//     const patchResult = dispatch(
+//       purchaseReturnApi.util.updateQueryData(
+//         "getAllPurchaseReturns",
+//         {
+//           cursor: null,
+//           search: "",
+//           fromDate: "",
+//           toDate: "",
+//           limit: 10,
+//         },
+//         (draft) => {
+//           if (!draft?.purchaseReturns) return;
+
+//           draft.purchaseReturns =
+//             draft.purchaseReturns.filter(
+//               (item) =>
+//                 String(item.id) !==
+//                 String(Purchase_Return_Id)
+//             );
+
+//           if (draft.totalReturns != null) {
+//             draft.totalReturns = Math.max(
+//               0,
+//               draft.totalReturns - 1
+//             );
+//           }
+//         }
+//       )
+//     );
+
+//     try {
+//       await queryFulfilled;
+//     } catch {
+//       patchResult.undo();
+//     }
+//   },
+
+//   invalidatesTags: [
+//     { type: "PurchaseReturn", id: "LIST" },
+//   ],
+// }),
+deletePurchaseReturn: builder.mutation({
+  query: (id) => ({
+    url: `/purchase-return/${id}`,
     method: "DELETE",
   }),
 
-  async onQueryStarted(
-    Purchase_Return_Id,
-    { dispatch, queryFulfilled }
-  ) {
+  async onQueryStarted(id, { dispatch, queryFulfilled }) {
     const patchResult = dispatch(
       purchaseReturnApi.util.updateQueryData(
         "getAllPurchaseReturns",
@@ -149,9 +197,7 @@ getAllPurchaseReturns: builder.query({
 
           draft.purchaseReturns =
             draft.purchaseReturns.filter(
-              (item) =>
-                String(item.id) !==
-                String(Purchase_Return_Id)
+              (item) => String(item.id) !== String(id)
             );
 
           if (draft.totalReturns != null) {
@@ -170,10 +216,6 @@ getAllPurchaseReturns: builder.query({
       patchResult.undo();
     }
   },
-
-  invalidatesTags: [
-    { type: "PurchaseReturn", id: "LIST" },
-  ],
 }),
     
     getPurchaseReturnPrintReport: builder.query({

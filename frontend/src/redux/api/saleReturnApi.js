@@ -137,13 +137,62 @@ export const saleReturnApi = createApi({
     }),
 
     /* DELETE */
-    deleteSaleReturn: builder.mutation({
-      query: (Sale_Return_Id) => ({
-        url: `/sale-return/${Sale_Return_Id}`,
-        method: "DELETE",
-      }),
-      invalidatesTags: ["SaleReturn"],
-    }),
+    // deleteSaleReturn: builder.mutation({
+    //   query: (Sale_Return_Id) => ({
+    //     url: `/sale-return/${Sale_Return_Id}`,
+    //     method: "DELETE",
+    //   }),
+    //   invalidatesTags: ["SaleReturn"],
+    // }),
+    /* DELETE */
+
+
+
+deleteSaleReturn: builder.mutation({
+  query: (id) => ({
+    url: `/sale-return/${id}`,
+    method: "DELETE",
+  }),
+
+  async onQueryStarted(id, { dispatch, queryFulfilled }) {
+    const patchResult = dispatch(
+      saleReturnApi.util.updateQueryData(
+        "getAllSaleReturns",
+        {
+          cursor: null,
+          search: "",
+          fromDate: "",
+          toDate: "",
+          limit: 10,
+        },
+        (draft) => {
+          draft.saleReturns =
+            draft.saleReturns.filter(
+              (s) => String(s.id) !== String(id)
+            );
+
+          if (draft.totalReturns != null) {
+            draft.totalReturns = Math.max(
+              0,
+              draft.totalReturns - 1
+            );
+          }
+        }
+      )
+    );
+
+    try {
+      await queryFulfilled;
+    } catch {
+      patchResult.undo();
+    }
+  },
+
+  // TEMPORARILY REMOVE THIS
+  // invalidatesTags: [
+  //   { type: "SaleReturn", id: "LIST" },
+  // ],
+}),
     getSaleReturnPrintReport: builder.query({
       query: ({
         search = "",

@@ -197,21 +197,36 @@ const getAllPurchaseReturns = async (req, res, next) => {
     const cursorClauses = [];
     const cursorParams = [];
 
-    if (cursorDate && cursorId) {
-      cursorClauses.push(`(
-        pr.Bill_Date < ?
-        OR (
-          pr.Bill_Date = ?
-          AND pr.id < ?
-        )
-      )`);
+    // if (cursorDate && cursorId) {
+    //   cursorClauses.push(`(
+    //     pr.Bill_Date < ?
+    //     OR (
+    //       pr.Bill_Date = ?
+    //       AND pr.id < ?
+    //     )
+    //   )`);
 
-      cursorParams.push(
-        cursorDate,
-        cursorDate,
-        cursorId
-      );
-    }
+    //   cursorParams.push(
+    //     cursorDate,
+    //     cursorDate,
+    //     cursorId
+    //   );
+    // }
+    if (cursorDate && cursorId) {
+  cursorClauses.push(`(
+    pr.Return_Date < ?
+    OR (
+      pr.Return_Date = ?
+      AND pr.id < ?
+    )
+  )`);
+
+  cursorParams.push(
+    cursorDate,
+    cursorDate,
+    cursorId
+  );
+}
 
     /* ---------- MAIN QUERY WHERE ----------
        Filters + Cursor
@@ -258,7 +273,8 @@ const getAllPurchaseReturns = async (req, res, next) => {
        ${mainWhereSQL}
 
        ORDER BY
-         pr.Bill_Date DESC,
+         
+          pr.Return_Date DESC,
          pr.id DESC
 
        LIMIT ?`,
@@ -267,6 +283,7 @@ const getAllPurchaseReturns = async (req, res, next) => {
         limit + 1
       ]
     );
+    //pr.Bill_Date DESC,
 
     /* ---------- DETECT hasMore ---------- */
 
@@ -284,12 +301,18 @@ const getAllPurchaseReturns = async (req, res, next) => {
       const last =
         pageRows[pageRows.length - 1];
 
+      // nextCursor = Buffer.from(
+      //   JSON.stringify({
+      //     date: last.Bill_Date,
+      //     id: last.id,
+      //   })
+      // ).toString("base64");
       nextCursor = Buffer.from(
-        JSON.stringify({
-          date: last.Bill_Date,
-          id: last.id,
-        })
-      ).toString("base64");
+  JSON.stringify({
+    date: last.Return_Date,
+    id: last.id,
+  })
+).toString("base64");
     }
 
     /* ---------- ATTACH SPLIT PAYMENT-TYPE LABELS ---------- */

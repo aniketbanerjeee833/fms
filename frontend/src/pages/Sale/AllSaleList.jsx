@@ -140,7 +140,7 @@ export default function AllSaleList() {
     try {
       console.log(deleteTarget);
       const res = await deleteSale(deleteTarget.Sale_Id).unwrap();
-      toast.success(res?.message || "Purchase deleted successfully");
+      toast.success(res?.message || "Sale deleted successfully");
       setDeleteTarget(null);
       dispatch(
         itemApi.util.invalidateTags([
@@ -150,7 +150,7 @@ export default function AllSaleList() {
       );
     } catch (err) {
       console.log(err);
-      toast.error(err?.data?.message || "Failed to delete purchase");
+      toast.error(err?.data?.message || "Failed to delete sale");
     }
   };
   const handlePrint = useReactToPrint({
