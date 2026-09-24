@@ -71,6 +71,11 @@ const purchaseSchema = z.object({
       }
     )
     .optional(),
+    Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
   GSTIN: z.preprocess(
     (val) => (val === null || val === undefined ? "" : String(val)),
     z.string().refine((val) => val === "" || val.length === 15, {

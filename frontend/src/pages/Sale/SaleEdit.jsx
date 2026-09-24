@@ -2661,10 +2661,10 @@ export default function SaleEdit() {
                                 });
 
                                 // Non-matching Party → clear phone
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 setCurrentPartyDetails(null);
                               }
@@ -2762,19 +2762,27 @@ export default function SaleEdit() {
                                   // If bill phone is empty → use master phone.
                                   // If bill phone already exists → keep it.
 
-                                  const currentBillPhone =
-                                    watch("Phone_Number");
+                                  // const currentBillPhone =
+                                  //   watch("Phone_Number");
 
-                                  if (!currentBillPhone?.trim()) {
-                                    setValue(
-                                      "Phone_Number",
-                                      matchedParty.Phone_Number || "",
-                                      {
-                                        shouldValidate: true,
-                                        shouldDirty: true,
-                                      }
-                                    );
-                                  }
+                                  // if (!currentBillPhone?.trim()) {
+                                  //   setValue(
+                                  //     "Phone_Number",
+                                  //     matchedParty.Phone_Number || "",
+                                  //     {
+                                  //       shouldValidate: true,
+                                  //       shouldDirty: true,
+                                  //     }
+                                  //   );
+                                  // }
+                                  setValue(
+                                    "Phone_Number",
+                                    matchedParty.Phone_Number || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
 
                                   setCurrentPartyDetails(matchedParty);
                                 } else {

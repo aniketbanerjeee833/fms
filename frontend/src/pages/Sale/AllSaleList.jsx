@@ -302,6 +302,7 @@ export default function AllSaleList() {
                   type="date"
                   value={fromDate}
                   onChange={(e) => {
+                     setCursor(null);
                     setSearchParams({
                       search: searchTerm,
                       fromDate: e.target.value,
@@ -320,6 +321,7 @@ export default function AllSaleList() {
                   type="date"
                   value={toDate}
                   onChange={(e) => {
+                     setCursor(null);
                     setSearchParams({
                       search: searchTerm,
                       fromDate,
@@ -338,6 +340,7 @@ export default function AllSaleList() {
                   placeholder="Search ..."
                   value={searchTerm}
                   onChange={(e) => {
+                    setCursor(null);
                     setSearchParams({
                       search: e.target.value,
                       fromDate,

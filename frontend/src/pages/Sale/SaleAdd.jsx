@@ -2302,10 +2302,10 @@ export default function SaleAdd() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                })
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // })
 
                                 setCurrentPartyDetails(null);
                               }

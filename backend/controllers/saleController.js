@@ -1580,31 +1580,39 @@ const getAllSales = async (req, res, next) => {
 
     if (fromDate && toDate) {
       filterClauses.push(`
-        s.Invoice_Date BETWEEN ? AND ?
+        DATE(s.Invoice_Date) BETWEEN ? AND ?
       `);
 
-      filterParams.push(
-        `${fromDate} 00:00:00`,
-        `${toDate} 23:59:59`
+      // filterParams.push(
+      //   `${fromDate} 00:00:00`,
+      //   `${toDate} 23:59:59`
+      // );
+
+         filterParams.push(
+        fromDate,
+        toDate
       );
 
     } else if (fromDate) {
       filterClauses.push(`
-        s.Invoice_Date >= ?
+        DATE(s.Invoice_Date) >= ?
       `);
+       filterParams.push(fromDate);
 
-      filterParams.push(
-        `${fromDate} 00:00:00`
-      );
+
+      // filterParams.push(
+      //   `${fromDate} 00:00:00`
+      // );
 
     } else if (toDate) {
       filterClauses.push(`
-        s.Invoice_Date <= ?
+        DATE(s.Invoice_Date) <= ?
       `);
+         filterParams.push(toDate);
 
-      filterParams.push(
-        `${toDate} 23:59:59`
-      );
+      // filterParams.push(
+      //   `${toDate} 23:59:59`
+      // );
     }
 
     /* ---------- CURSOR ---------- */

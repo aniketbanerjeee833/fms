@@ -2776,10 +2776,10 @@ export default function SaleReturndEdit() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
                                 setValue("Billing_Address", "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
@@ -2869,10 +2869,10 @@ export default function SaleReturndEdit() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
                                 setValue("Billing_Address", "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
@@ -3204,19 +3204,29 @@ export default function SaleReturndEdit() {
                                   // PHONE NUMBER
                                   // =========================================
 
-                                  const currentBillPhone =
-                                    watch("Phone_Number");
+                                  // const currentBillPhone =
+                                  //   watch("Phone_Number");
 
-                                  if (!currentBillPhone?.trim()) {
-                                    setValue(
-                                      "Phone_Number",
-                                      matchedParty.Phone_Number || "",
-                                      {
-                                        shouldValidate: true,
-                                        shouldDirty: true,
-                                      }
-                                    );
-                                  }
+                                  // if (!currentBillPhone?.trim()) {
+                                  //   setValue(
+                                  //     "Phone_Number",
+                                  //     matchedParty.Phone_Number || "",
+                                  //     {
+                                  //       shouldValidate: true,
+                                  //       shouldDirty: true,
+                                  //     }
+                                  //   );
+                                  // }
+
+                                     setValue(
+                                    "Phone_Number",
+                                    matchedParty.Phone_Number || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
 
                                   setCurrentPartyDetails(matchedParty);
 

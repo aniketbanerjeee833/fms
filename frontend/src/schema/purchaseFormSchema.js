@@ -66,6 +66,11 @@ export const purchaseFormSchema = z.object({
       }
     )
     .optional(),
+    Billing_Name: z
+        .string()
+        .trim()
+        .optional()
+        .or(z.literal("")),
 
   GSTIN: z.preprocess(
     (val) => (val === null || val === undefined ? "" : String(val)),

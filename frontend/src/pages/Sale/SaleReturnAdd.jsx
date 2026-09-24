@@ -2158,10 +2158,10 @@ export default function SaleReturnAdd() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
                                 setValue("Billing_Address", "", {
                                   shouldValidate: true,
                                   shouldDirty: true,
@@ -2286,19 +2286,28 @@ export default function SaleReturnAdd() {
 
                                   // If bill phone is empty,
                                   // populate it from master Party.
-                                  const currentBillPhone =
-                                    watch("Phone_Number");
+                                  // const currentBillPhone =
+                                  //   watch("Phone_Number");
 
-                                  if (!currentBillPhone?.trim()) {
-                                    setValue(
-                                      "Phone_Number",
-                                      matchedParty.Phone_Number || "",
-                                      {
-                                        shouldValidate: true,
-                                        shouldDirty: true,
-                                      }
-                                    );
-                                  }
+                                  // if (!currentBillPhone?.trim()) {
+                                  //   setValue(
+                                  //     "Phone_Number",
+                                  //     matchedParty.Phone_Number || "",
+                                  //     {
+                                  //       shouldValidate: true,
+                                  //       shouldDirty: true,
+                                  //     }
+                                  //   );
+                                  // }
+                                  
+                                     setValue(
+                                    "Phone_Number",
+                                    matchedParty.Phone_Number || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
                                   setCurrentPartyDetails(matchedParty);
                                 } else {
                                   setHasSavedBillingAddress(false);
