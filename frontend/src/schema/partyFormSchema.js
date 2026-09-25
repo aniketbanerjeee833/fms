@@ -30,6 +30,11 @@ const partyAddressSchema = z.object({
 export const partyFormSchema = z.object({
 
   Party_Name: z.string().min(1, "Party name is required minimum 1 character"),
+   Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
 
   GSTIN: z.string()
     .refine((val) => val === "" || val.length === 15, {

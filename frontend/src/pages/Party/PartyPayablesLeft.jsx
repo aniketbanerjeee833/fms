@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { useSearchParams } from "react-router-dom";
 import { partyApi, useGetAllPartiesQuery, useGetAllPayablePartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
-import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon } from "lucide-react";
+import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon, Undo2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useDispatch } from "react-redux";
@@ -149,7 +149,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   );
   const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
     { Party_Id: partyId, cursor, search, limit: initialRightLimit.current },
-    { skip: !partyId }
+    { skip: !partyId ,refetchOnMountOrArgChange: true}
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
   const printRef = useRef(null);
@@ -1340,6 +1340,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               )}
 
 
+
                               <button
                                 type="button"
                                 className="row-menu-item"
@@ -1360,6 +1361,29 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                                 />
                                 Print
                               </button>
+                              {/* RETURN */}
+{["Sale", "Purchase"].includes(row.Txn_Type) && (
+  <NavLink
+    to={
+      row.Txn_Type === "Sale"
+        ? `/sale/return/add/${transactionId}${location.search}`
+        : `/purchase/return/add/${transactionId}${location.search}`
+    }
+    state={{
+      from: "party-payables",
+      partyId,
+    }}
+    className="row-menu-item"
+    onClick={() => setRowMenuOpen(null)}
+  >
+    <Undo2
+      size={13}
+      style={{ color: "#4CA1AF" }}
+    />
+
+    <span>Return</span>
+  </NavLink>
+)}
 
 
                               <button
@@ -1550,9 +1574,9 @@ export default function PartyPayablesLeft() {
       cursor: leftCursor,
       search: leftSearch,
       limit: leftCursor ? 10 : initialLeftLimit.current,
-      // scope: "parties-payables-page-list",
+       scope: "parties-payables-page-list",
 
-    });
+    },{ refetchOnMountOrArgChange: true } );
   const parties = partiesData?.parties || [];
   const totalParties = partiesData?.totalParties || 0;
   console.log("parties", parties);

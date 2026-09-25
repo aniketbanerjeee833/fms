@@ -8,7 +8,12 @@ router.get("/export-purchase-return-excel",userAuth,exportPurchaseReturnReportTo
 router.get("/print-purchase-return-report",userAuth,getPurchaseReturnPrintReport);
 router.get("/",  userAuth,    getAllPurchaseReturns);
 router.get("/:Purchase_Return_Id", userAuth,  getPurchaseReturnById);
-router.post("/:Purchase_Id",  userAuth,   createPurchaseReturn);
+//router.post("/:Purchase_Id",  userAuth,   createPurchaseReturn);
+
+router.post("/", userAuth, createPurchaseReturn);
+
+
+router.post("/:Purchase_Id", userAuth, createPurchaseReturn);
 router.put("/:Purchase_Return_Id", userAuth,  editPurchaseReturn);
 router.delete("/:Purchase_Return_Id",userAuth, deletePurchaseReturn);
 

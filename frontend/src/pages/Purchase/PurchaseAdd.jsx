@@ -2458,6 +2458,11 @@ export default function PurchaseAdd() {
                             setPartySearch(newParty.Party_Name);
                             setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
                             setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                     setValue("Phone_Number", newParty.Phone_Number || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
                             if (newParty.Billing_Name?.trim()) {
                               setValue("Billing_Name", newParty.Billing_Name, {
                                 shouldValidate: true,

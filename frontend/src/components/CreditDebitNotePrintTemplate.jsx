@@ -24,6 +24,7 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
   const {
 
     Party_Name,
+    Billing_Name,
     GSTIN,
     State,
     Billing_Address,
@@ -622,12 +623,16 @@ const CreditDebitNotePrintTemplate = forwardRef(({ invoice, type }, ref) => {
 
             <td className="invoice-cell invoice-party-cell">
 
-              {Party_Name && (
+              {/* {Party_Name && (
                 <div className="invoice-bold">
                   {Party_Name}
                 </div>
+              )} */}
+              {(Billing_Name || Party_Name) && (
+                <div className="invoice-bold">
+                  {Billing_Name || Party_Name}
+                </div>
               )}
-
               {Billing_Address && (
                 <div>
                   {Billing_Address}

@@ -54,6 +54,11 @@ const paymentSplitSchema = z
 export const purchaseReturnFormSchema = z.object({
   /* ── Party ── */
   Party_Name: z.string().min(1, "Party_Name is required"), // 🔹 only real requirement
+   Billing_Name: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal("")),
  Phone_Number: z
     .string()
     .trim()

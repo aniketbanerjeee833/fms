@@ -483,6 +483,7 @@ const getPurchaseReturnById = async (req, res, next) => {
     const [[header]] = await connection.query(
       `SELECT
          pr.id,
+         pr.Billing_Name,
          
          pr.Return_Number,
          pr.Bill_Number,
@@ -916,13 +917,15 @@ const createPurchaseReturn = async (req, res, next) => {
   let connection;
 
   try {
-    const { Purchase_Id } = req.params;
+    //const { Purchase_Id } = req.params;
+    const Purchase_Id = req.params.Purchase_Id || null;
 
     connection = await db.getConnection();
     await connection.beginTransaction();
 
     const {
       Party_Name,
+      Billing_Name, 
       Return_Number,
       Bill_Number,
       Phone_Number,
@@ -943,13 +946,22 @@ const createPurchaseReturn = async (req, res, next) => {
     // Empty item rows / empty items array are allowed.
     // =========================================================
 
-    if (!Purchase_Id || !Party_Name || !Return_Date) {
+    // if (!Purchase_Id || !Party_Name || !Return_Date) {
+    //   await connection.rollback();
+
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "Purchase_Id, Party and Return Date are required",
+    //   });
+    // }
+       if (!Party_Name || !Return_Date) {
       await connection.rollback();
 
       return res.status(400).json({
         success: false,
         message:
-          "Purchase_Id, Party and Return Date are required",
+          " Party and Return Date are required",
       });
     }
 
@@ -1162,14 +1174,16 @@ if (!existingParty) {
     INSERT INTO add_party
       (
         Party_Name,
+        Billing_Name,
         Phone_Number,
         created_at,
         updated_at
       )
-    VALUES (?, ?, NOW(), NOW())
+    VALUES (?, ?,?, NOW(), NOW())
     `,
     [
       cleanPartyName,
+      cleanValue(Billing_Name),
       cleanValue(Phone_Number),
     ]
   );
@@ -1209,26 +1223,61 @@ if (!existingParty) {
 
   // If master party has no phone,
   // save the phone entered in this bill.
-  if (
-    !existingParty.Phone_Number?.trim() &&
-    Phone_Number?.trim()
-  ) {
-    await connection.execute(
-      `
-      UPDATE add_party
-      SET
-        Phone_Number = ?,
-        updated_at = NOW()
-      WHERE Party_Id = ?
-      `,
-      [
-        cleanValue(Phone_Number),
-        existingParty.Party_Id,
-      ]
-    );
+  // if (
+  //   !existingParty.Phone_Number?.trim() &&
+  //   Phone_Number?.trim()
+  // ) {
+  //   await connection.execute(
+  //     `
+  //     UPDATE add_party
+  //     SET
+  //       Phone_Number = ?,
+  //       updated_at = NOW()
+  //     WHERE Party_Id = ?
+  //     `,
+  //     [
+  //       cleanValue(Phone_Number),
+  //       existingParty.Party_Id,
+  //     ]
+  //   );
 
-    party.Phone_Number = Phone_Number.trim();
-  }
+  //   party.Phone_Number = Phone_Number.trim();
+  // }
+  const partyUpdates = [];
+const partyParams = [];
+
+// Phone: update only if master phone is empty
+// and new phone has a value
+if (
+  !existingParty.Phone_Number?.trim() &&
+  Phone_Number?.trim()
+) {
+  partyUpdates.push("Phone_Number = ?");
+  partyParams.push(cleanValue(Phone_Number));
+
+  party.Phone_Number = Phone_Number.trim();
+}
+
+// Billing Name: update only if new Billing Name has a value
+if (Billing_Name?.trim()) {
+  partyUpdates.push("Billing_Name = ?");
+  partyParams.push(cleanValue(Billing_Name));
+}
+
+if (partyUpdates.length > 0) {
+  partyUpdates.push("updated_at = NOW()");
+  partyParams.push(existingParty.Party_Id);
+
+  await connection.execute(
+    `
+    UPDATE add_party
+    SET
+      ${partyUpdates.join(", ")}
+    WHERE Party_Id = ?
+    `,
+    partyParams
+  );
+}
 }
 
     // =========================================================
@@ -1263,6 +1312,7 @@ if (!existingParty) {
        (
          Purchase_Id,
          Party_Id,
+         Billing_Name,
          Return_Number,
          Bill_Number,
          Phone_Number,
@@ -1277,10 +1327,11 @@ if (!existingParty) {
          Total_Received,
          Balance_Due
        )
-       VALUES (?, ?, ?, ?, ?,?, ?,?,?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?,?, ?, ?,?, ?,?,?, ?, ?, ?, ?, ?, ?)`,
       [
         Purchase_Id,
         party.Party_Id,
+        cleanValue(Billing_Name),
         Return_Number || null,
         Bill_Number || null,
         cleanValue(Phone_Number),
@@ -1788,6 +1839,7 @@ const editPurchaseReturn = async (req, res, next) => {
 
     const {
       Party_Name,
+      Billing_Name,
       Return_Number,
       Bill_Number,
       Phone_Number,
@@ -1904,14 +1956,16 @@ if (!existingParty) {
     INSERT INTO add_party
       (
         Party_Name,
+        Billing_Name,
         Phone_Number,
         created_at,
         updated_at
       )
-    VALUES (?, ?, NOW(), NOW())
+    VALUES (?, ?,?, NOW(), NOW())
     `,
     [
       cleanPartyName,
+      cleanValue(Billing_Name),
       cleanValue(Phone_Number),
     ]
   );
@@ -1951,26 +2005,61 @@ if (!existingParty) {
 
   // If master phone is empty but bill has phone,
   // save the phone into Party master.
-  if (
-    !existingParty.Phone_Number?.trim() &&
-    Phone_Number?.trim()
-  ) {
-    await connection.execute(
-      `
-      UPDATE add_party
-      SET
-        Phone_Number = ?,
-        updated_at = NOW()
-      WHERE Party_Id = ?
-      `,
-      [
-        cleanValue(Phone_Number),
-        existingParty.Party_Id,
-      ]
-    );
+  // if (
+  //   !existingParty.Phone_Number?.trim() &&
+  //   Phone_Number?.trim()
+  // ) {
+  //   await connection.execute(
+  //     `
+  //     UPDATE add_party
+  //     SET
+  //       Phone_Number = ?,
+  //       updated_at = NOW()
+  //     WHERE Party_Id = ?
+  //     `,
+  //     [
+  //       cleanValue(Phone_Number),
+  //       existingParty.Party_Id,
+  //     ]
+  //   );
 
-    party.Phone_Number = Phone_Number.trim();
-  }
+  //   party.Phone_Number = Phone_Number.trim();
+  // }
+  const partyUpdates = [];
+const partyParams = [];
+
+// Update phone ONLY if master phone is empty
+// and the new phone has a value
+if (
+  !existingParty.Phone_Number?.trim() &&
+  Phone_Number?.trim()
+) {
+  partyUpdates.push("Phone_Number = ?");
+  partyParams.push(cleanValue(Phone_Number));
+
+  party.Phone_Number = Phone_Number.trim();
+}
+
+// Update Billing Name ONLY if a value is provided
+if (Billing_Name?.trim()) {
+  partyUpdates.push("Billing_Name = ?");
+  partyParams.push(cleanValue(Billing_Name));
+}
+
+if (partyUpdates.length > 0) {
+  partyUpdates.push("updated_at = NOW()");
+  partyParams.push(existingParty.Party_Id);
+
+  await connection.execute(
+    `
+    UPDATE add_party
+    SET
+      ${partyUpdates.join(", ")}
+    WHERE Party_Id = ?
+    `,
+    partyParams
+  );
+}
 }
 
     // =========================================================
@@ -2003,6 +2092,7 @@ if (!existingParty) {
       `UPDATE purchase_return
        SET
          Party_Id        = ?,
+          Billing_Name = ?,
          Return_Number   = ?,
          Bill_Number     = ?,
          Phone_Number    = ?,
@@ -2019,6 +2109,7 @@ if (!existingParty) {
        WHERE id = ?`,
       [
         party.Party_Id,
+        cleanValue(Billing_Name),
         Return_Number || null,
         Bill_Number || null,
         cleanValue(Phone_Number),

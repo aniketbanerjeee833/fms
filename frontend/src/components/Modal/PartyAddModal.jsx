@@ -56,6 +56,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
     resolver: zodResolver(partyFormSchema),
     defaultValues: {
       Party_Name: "",
+      Billing_Name: "",
       GSTIN: "",
       Phone_Number: "",
       State: "",
@@ -121,6 +122,7 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
       Party_Name: partyDetails.Party_Name ?? "",
       GSTIN: partyDetails.GSTIN ?? "",
       Phone_Number: partyDetails.Phone_Number ?? "",
+      Billing_Name: partyDetails.Billing_Name ?? "",
       State: partyDetails.State ?? "",
       Email_Id: partyDetails.Email_Id ?? "",
       Opening_Balance: partyDetails.Opening_Balance ?? "",
@@ -273,6 +275,23 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
               />
               {errors?.Phone_Number && <p className="text-red-500 text-xs mt-1">{errors.Phone_Number.message}</p>}
             </div>
+            {editingParty && partyDetails?.Billing_Name?.trim() && (
+              <div className="flex flex-col">
+                <span className={labelCls}>
+                  Billing Name
+                </span>
+
+                <input
+                  type="text"
+                  placeholder="Billing Name"
+                  className={inputCls}
+                  {...register("Billing_Name")}
+                />
+                <span className="text-xs text-black font-medium mt-1">
+                  Billing Name "{watch("Billing_Name")}" will appear on bills.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ── TABS ── */}
@@ -509,26 +528,26 @@ export default function PartyAddModal({ onClose, onSave, partyDetails, editingPa
                             onClick={(e) => e.stopPropagation()}
                           />
 
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeAddress(i);
-                                }}
-                                style={{
-                                  background: "none",
-                                  border: "none",
-                                  color: "#ef4444",
-                                  cursor: "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  padding: 4,
-                                }}
-                                title="Delete address"
-                              >
-                                <Trash2 size={12} />
-                              </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeAddress(i);
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ef4444",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              padding: 4,
+                            }}
+                            title="Delete address"
+                          >
+                            <Trash2 size={12} />
+                          </button>
 
                           {isDefault && (
                             <span

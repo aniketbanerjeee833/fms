@@ -97,14 +97,24 @@ getAllPurchaseReturns: builder.query({
     }),
  
     /* CREATE */
+    // createPurchaseReturn: builder.mutation({
+    //   query: ({ Purchase_Id, ...body }) => ({
+    //     url: `/purchase-return/${Purchase_Id}`,
+    //     method: "POST",
+    //     body,
+    //   }),
+    //   invalidatesTags: ["PurchaseReturn"],
+    // }),
     createPurchaseReturn: builder.mutation({
-      query: ({ Purchase_Id, ...body }) => ({
-        url: `/purchase-return/${Purchase_Id}`,
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["PurchaseReturn"],
-    }),
+  query: ({ Purchase_Id, ...body }) => ({
+    url: Purchase_Id
+      ? `/purchase-return/${Purchase_Id}`
+      : `/purchase-return`,
+    method: "POST",
+    body,
+  }),
+  invalidatesTags: ["PurchaseReturn"],
+}),
  
     /* EDIT */
     updatePurchaseReturn: builder.mutation({

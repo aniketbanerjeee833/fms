@@ -1578,7 +1578,36 @@ export default function SaleReturnAdd() {
           pathname: "/sale/return",
           search: location.search,
         });
-      } else {
+      } 
+      else if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
+
+        //params.set("itemId", Item_Id);
+
+        navigate({
+          pathname: "/items/all-items",
+          search: location.search,
+        });
+      }
+         else if (from === "party-details") {
+        navigate({
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }  
+      else if (from === "party-receivables") {
+        navigate({
+          pathname: "/party/receivables",
+          search: location.search,
+        });
+      }
+      else if (from === "party-payables") {
+        navigate({
+          pathname: `/party/payables`,
+          search: location.search,
+        })
+      }
+      else {
         navigate({
           pathname: "/sale/return",
           search: location.search,
@@ -1929,6 +1958,12 @@ export default function SaleReturnAdd() {
                       search: location.search,
                     })
                   }
+                    else if (from === "party-payables") {
+                    navigate({
+                      pathname: `/party/payables`,
+                      search: location.search,
+                    })
+                  }
                   else if (from === "party-sales-purchases-details") {
 
                     navigate({
@@ -1943,6 +1978,24 @@ export default function SaleReturnAdd() {
                       search: location.search,
                     })
                     // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else if (from === "party-details") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/party/parties`,
+                      search: location.search,
+                      // search: `?partyId=${partyId}`,
+                    });
+                  }
+                  else if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
+
+                    //params.set("itemId", Item_Id);
+
+                    navigate({
+                      pathname: "/items/all-items",
+                      search: location.search,
+                    });
                   }
                   else {
                     navigate({
@@ -4761,7 +4814,7 @@ export default function SaleReturnAdd() {
 
                                   // setValue(`items.${i}.Discount_Type_On_Sale_Price`, it.Discount_Type_On_Sale_Price || "Percentage",
                                   //   { shouldValidate: true, shouldDirty: true });
-                                  //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                   setValue(
                                     `items.${i}.Discount_On_Sale_Price`,
                                     resolvedSaleDiscount,

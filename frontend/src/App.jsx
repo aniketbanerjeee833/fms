@@ -46,6 +46,7 @@ const PurchaseAdd = lazy(() => import('./pages/Purchase/PurchaseAdd'));
 const PaymentOut= lazy(() => import('./pages/Purchase/PaymentOut'));
 const PurchaseReturn= lazy(() => import('./pages/Purchase/PurchaseReturn'));
 const PurchaseReturnAdd= lazy(() => import('./pages/Purchase/PurchaseReturnAdd'));
+const PurchaseReturnNewAdd= lazy(() => import('./pages/Purchase/PurchaseReturnNewAdd'));
 const PurchaseReturnEdit= lazy(() => import('./pages/Purchase/PurchaseReturnEdit'));
 const PurchaseView = lazy(() => import('./pages/Purchase/PurchaseView'));
 const AllPurchasesList = lazy(() => import('./pages/Purchase/AllPurchaseList'));
@@ -56,6 +57,7 @@ const AllSaleList = lazy(() => import('./pages/Sale/AllSaleList'));
 const PaymentIn= lazy(() => import('./pages/Sale/PaymentIn'));
 const SaleReturn= lazy(() => import('./pages/Sale/SaleReturn'));
 const SaleReturnAdd= lazy(() => import('./pages/Sale/SaleReturnAdd'));
+const SaleReturnNewAdd= lazy(() => import('./pages/Sale/SaleReturnNewAdd'));
 const SaleReturnEdit= lazy(() => import('./pages/Sale/SaleReturnEdit'));
 const SaleAdd = lazy(() => import('./pages/Sale/SaleAdd'));
 const SaleView = lazy(() => import('./pages/Sale/SaleView'));
@@ -349,6 +351,15 @@ function RouterWrapper() {
                  
               }
             />
+
+              <Route
+              path="/sale/return/new/add"
+              element={
+                 
+                  <SaleReturnNewAdd/>
+                 
+              }
+            />
              <Route
               path="/sale/return/edit/:id"
               element={
@@ -393,6 +404,17 @@ function RouterWrapper() {
                  
               }
             />
+
+             <Route
+              path="/purchase/return/new/add"
+              element={
+                 
+                  <PurchaseReturnNewAdd/>
+                 
+              }
+            />
+            
+
               <Route
               path="/purchase/edit/:id"
               element={

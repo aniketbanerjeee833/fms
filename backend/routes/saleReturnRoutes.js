@@ -17,7 +17,10 @@ router.get("/print-sale-return-report",userAuth,getSaleReturnPrintReport);
 router.get("/", userAuth, getAllSaleReturns);
 router.get("/get-latest-return-number",userAuth,getLatestSaleReturnNumber);
 router.get("/:Sale_Return_Id",userAuth, getSaleReturnById);
-router.post("/:Sale_Id",userAuth, createSaleReturn);
+//router.post("/:Sale_Id",userAuth, createSaleReturn);
+// Replace the single optional-param route with two explicit ones:
+router.post("/", userAuth, createSaleReturn);
+router.post("/:Sale_Id", userAuth, createSaleReturn);
 router.put("/:Sale_Return_Id", userAuth, editSaleReturn);
 router.delete("/:Sale_Return_Id",userAuth,  deleteSaleReturn);
 

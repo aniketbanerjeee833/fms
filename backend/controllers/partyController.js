@@ -41,7 +41,7 @@ const addParty = async (req, res, next) => {
 
     const {
       Party_Name,
-      Billing_Name,
+      //Billing_Name,
       GSTIN,
       Phone_Number,
       State,
@@ -109,14 +109,14 @@ const addParty = async (req, res, next) => {
 
     const [result] = await connection.execute(
       `INSERT INTO add_party 
-       (Party_Id, Party_Name,Billing_Name, GSTIN, Phone_Number, State, Email_Id,
+       (Party_Id, Party_Name, GSTIN, Phone_Number, State, Email_Id,
         Opening_Balance, Opening_Balance_Type, Opening_Balance_Date,
         Credit_Limit_Type, Credit_Limit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`,
+       VALUES (?, ?, ?,  ?, ?, ?, ?, ?, ?, ?,?)`,
       [
         newId,
         Party_Name,
-        cleanValue(Billing_Name),
+        //cleanValue(Billing_Name),
         cleanValue(GSTIN),
         cleanValue(Phone_Number),
         cleanValue(State),

@@ -215,8 +215,11 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                     <div>
                                         <div>
                                             <span className="bulk-label">Party: </span>
-                                            <span className="bulk-bold">
+                                            {/* <span className="bulk-bold">
                                                 {doc.Party_Name || "-"}
+                                            </span> */}
+                                            <span className="bulk-bold">
+                                                {doc.Billing_Name || doc.Party_Name || ""}
                                             </span>
                                         </div>
 
@@ -240,7 +243,7 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                         <div>
                                             <span className="bulk-label">{cfg.docLabel} </span>
                                             <span className="bulk-bold">
-                                                {doc[cfg.docNumberKey] || "-"}
+                                                {doc[cfg.docNumberKey] || ""}
                                             </span>
                                         </div>
 
@@ -330,7 +333,7 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                                                                 ? item[cfg.discountTypeKey] === "Percentage"
                                                                     ? `${item[cfg.discountKey]}% (₹${money(item.Discount_Amount || 0)})`
                                                                     : `₹${money(item.Discount_Amount || 0)}`
-                                                                : "-"}
+                                                                : ""}
                                                         </td>
                                                     )}
 

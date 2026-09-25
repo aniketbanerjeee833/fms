@@ -117,14 +117,24 @@ export const saleReturnApi = createApi({
 }),
 
     /* CREATE */
+    // createSaleReturn: builder.mutation({
+    //   query: ({ Sale_Id, ...body }) => ({
+    //     url: `/sale-return/${Sale_Id}`,
+    //     method: "POST",
+    //     body,
+    //   }),
+    //   invalidatesTags: ["SaleReturn"],
+    // }),
     createSaleReturn: builder.mutation({
-      query: ({ Sale_Id, ...body }) => ({
-        url: `/sale-return/${Sale_Id}`,
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["SaleReturn"],
-    }),
+  query: ({ Sale_Id, ...body }) => ({
+    url: Sale_Id
+      ? `/sale-return/${Sale_Id}`
+      : `/sale-return`,
+    method: "POST",
+    body,
+  }),
+  invalidatesTags: ["SaleReturn"],
+}),
 
     /* EDIT */
     updateSaleReturn: builder.mutation({

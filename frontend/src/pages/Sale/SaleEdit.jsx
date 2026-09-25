@@ -2924,6 +2924,10 @@ export default function SaleEdit() {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
+                             setValue("Phone_Number", newParty.Phone_Number || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
                             setValue("Billing_Name", newParty.Billing_Name || "", {
                               shouldValidate: true,

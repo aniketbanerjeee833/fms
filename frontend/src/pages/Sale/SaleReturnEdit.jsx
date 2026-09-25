@@ -4517,6 +4517,7 @@ onChange={(e) => {
                       //value={toLocalDateString(Invoice_Date) || ""}
                       style={{ marginBottom: 0, width: "50%", border: "none" }}
                       {...register("Invoice_Date")}
+                      value={watch("Invoice_Date") || "dd/mm/yyyy"}
                       //placeholder=" Invoice_Date"
                       readOnly
                       className="w-full outline-none invoice-date-class text-gray-900"

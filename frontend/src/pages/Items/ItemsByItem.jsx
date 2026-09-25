@@ -10,7 +10,8 @@ import {
     Eye,
     SquarePen,
     Trash2,
-    Printer
+    Printer,
+    Undo2
 } from "lucide-react";
 
 import {
@@ -205,6 +206,7 @@ export default function ItemsByItem() {
         },
         {
             skip: !selectedItemId,
+            refetchOnMountOrArgChange: true, 
         },
     );
     //     const {
@@ -751,45 +753,45 @@ export default function ItemsByItem() {
     useEffect(() => {
         hasScrolledToHighlightRef.current = false;
     }, [selectedItemId, highlightTxnId, txnSearch]);
-useEffect(() => {
-    if (hasScrolledToHighlightRef.current) return;
-    if (!highlightTxnId) return;
-    if (isBillsLoading || isBillsFetching) return;
-    if (!transactions.length) return;
+    useEffect(() => {
+        if (hasScrolledToHighlightRef.current) return;
+        if (!highlightTxnId) return;
+        if (isBillsLoading || isBillsFetching) return;
+        if (!transactions.length) return;
 
-    const targetIndex = transactions.findIndex(
-        (txn) => String(txn.Ledger_Id) === String(highlightTxnId)
-    );
+        const targetIndex = transactions.findIndex(
+            (txn) => String(txn.Ledger_Id) === String(highlightTxnId)
+        );
 
-    if (targetIndex === -1) {
-        if (hasMore && nextCursor && !isBillsFetching) {
-            setCursor(nextCursor);
+        if (targetIndex === -1) {
+            if (hasMore && nextCursor && !isBillsFetching) {
+                setCursor(nextCursor);
+            }
+            return;
         }
-        return;
-    }
 
-    // give the DOM a moment to actually render the rows before scrolling
-    const timer = setTimeout(() => {
-        virtualRightListRef.current?.scrollToIndex(targetIndex, {
-            align: "auto",
-            behavior: "auto",
-             //behavior: "smooth", 
-        });
-        hasScrolledToHighlightRef.current = true;
-    }, 100);
+        // give the DOM a moment to actually render the rows before scrolling
+        const timer = setTimeout(() => {
+            virtualRightListRef.current?.scrollToIndex(targetIndex, {
+                align: "auto",
+                behavior: "auto",
+                //behavior: "smooth", 
+            });
+            hasScrolledToHighlightRef.current = true;
+        }, 100);
 
-    return () => clearTimeout(timer);
-}, [
-    transactions,
-    highlightTxnId,
-    isBillsLoading,
-    isBillsFetching,
-    hasMore,
-    nextCursor,
-]);
+        return () => clearTimeout(timer);
+    }, [
+        transactions,
+        highlightTxnId,
+        isBillsLoading,
+        isBillsFetching,
+        hasMore,
+        nextCursor,
+    ]);
 
     // useEffect(() => {
-        
+
     //     if (hasScrolledToHighlightRef.current) return;
     //     if (!highlightTxnId) return;
     //     if (isBillsLoading || isBillsFetching) return;
@@ -925,7 +927,7 @@ useEffect(() => {
                             borderRight: "1px solid #e2e8f0",
                             minHeight: 0,
                             boxSizing: "border-box"
-                          
+
                         }}
                     >
                         {/* search — stays fixed, outside the scrolling list */}
@@ -999,9 +1001,9 @@ useEffect(() => {
                                                     <Package size={18} style={{ color: isSelected ? "#4CA1AF" : "#94a3b8" }} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="font-semibold text-black truncate text-sm" 
-                                                    style={{ margin: 0 }}
-                                                    title={item.Item_Name }
+                                                    <p className="font-semibold text-black truncate text-sm"
+                                                        style={{ margin: 0 }}
+                                                        title={item.Item_Name}
                                                     >
                                                         {item.Item_Name}
                                                     </p>
@@ -1307,7 +1309,7 @@ useEffect(() => {
                                 ref={virtualRightListRef}
                                 items={transactions}
                                 //rowHeight={48}
-                                 rowHeight={52}
+                                rowHeight={52}
                                 height="100%"
                                 onLoadMore={handleRightLoadMore}
                                 isFetching={isBillsFetching}
@@ -1419,7 +1421,7 @@ useEffect(() => {
                                                 //     // padding: "0 5px"
 
                                                 // }}
-                                            title={txn.Party_Name || ""}
+                                                title={txn.Party_Name || ""}
                                             >
                                                 {txn.Party_Name || ""}
                                             </div>
@@ -1439,7 +1441,7 @@ useEffect(() => {
                                             </div>
 
                                             {/* QTY */}
-                                           
+
                                             {/* <div className="table-desi-cell">
                                                 {fmt(txn.Quantity)}
 
@@ -1457,20 +1459,20 @@ useEffect(() => {
                                                     : ""}
                                             </div> */}
                                             <div className="table-desi-cell">
-  {Number(txn.Quantity || 0)}
+                                                {Number(txn.Quantity || 0)}
 
-  {txn.Free_Quantity !== null &&
-    Number(txn.Free_Quantity) > 0 && (
-      <>
-        {" + "}
-        {Number(txn.Free_Quantity)}
-      </>
-    )}
+                                                {txn.Free_Quantity !== null &&
+                                                    Number(txn.Free_Quantity) > 0 && (
+                                                        <>
+                                                            {" + "}
+                                                            {Number(txn.Free_Quantity)}
+                                                        </>
+                                                    )}
 
-  {txn.Selected_Unit
-    ? ` ${txn.Selected_Unit}`
-    : ""}
-</div>
+                                                {txn.Selected_Unit
+                                                    ? ` ${txn.Selected_Unit}`
+                                                    : ""}
+                                            </div>
 
                                             {/* PRICE */}
                                             <div
@@ -1499,7 +1501,7 @@ useEffect(() => {
                                                     <>
                                                         <button
                                                             type="button"
-                                                         
+
 
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -1628,7 +1630,47 @@ useEffect(() => {
                                                                             </button>
                                                                         )}
 
+                                                                    {/* RETURN */}
+                                                                    {["Sale", "Purchase"].includes(txn.Txn_Type) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="row-menu-item"
+                                                                            onClick={() => {
+                                                                                setRowMenuOpen(null);
 
+                                                                                const params = new URLSearchParams(searchParams);
+
+                                                                                params.set(
+                                                                                    "highlightTxn",
+                                                                                    txn.Ledger_Id
+                                                                                );
+
+                                                                                navigate(
+                                                                                    {
+                                                                                        pathname:
+                                                                                            txn.Txn_Type === "Sale"
+                                                                                                ? `/sale/return/add/${txn.Document_Id}`
+                                                                                                : `/purchase/return/add/${txn.Document_Id}`,
+                                                                                        search: `?${params.toString()}`,
+                                                                                    },
+                                                                                    {
+                                                                                        state: {
+                                                                                            from: "items-by-item",
+                                                                                            itemId: selectedItemId,
+                                                                                            highlightTxn: txn.Ledger_Id,
+                                                                                        },
+                                                                                    }
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <Undo2
+                                                                                size={13}
+                                                                                style={{ color: "#4CA1AF" }}
+                                                                            />
+
+                                                                            <span>Return</span>
+                                                                        </button>
+                                                                    )}
 
                                                                     <button
                                                                         type="button"

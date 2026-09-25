@@ -258,7 +258,7 @@ export default function SaleReturn() {
           //overflow: "hidden",
         }}
       > */}
-          <div
+      <div
         className="flex flex-col bg-white"
         style={{
           height: "100%",
@@ -277,6 +277,17 @@ export default function SaleReturn() {
                   All Credit Note Details
                 </p>
               </div>
+               <button
+                style={{
+                  outline: "none",
+                  boxShadow: "none",
+                  backgroundColor: "#4CA1AF",
+                }}
+                className="text-white px-4 py-2 rounded-md sm:hidden"
+                onClick={() => navigate("/sale/return/new/add")}
+              >
+                + Add Credit Note
+              </button>
 
             </div>
 
@@ -350,6 +361,19 @@ export default function SaleReturn() {
 
                   className="w-full sm:w-56"
                 />
+              </div>
+               <div className="hidden sm:block">
+                <button
+                  style={{
+                    outline: "none",
+                    boxShadow: "none",
+                    backgroundColor: "#4CA1AF",
+                  }}
+                  className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
+                  onClick={() => navigate("/sale/return/new/add")}
+                >
+                  + Add  Credit Note
+                </button>
               </div>
 
             </div>
@@ -488,7 +512,10 @@ export default function SaleReturn() {
                     display: "grid",
                     //gridTemplateColumns: "0.7fr 1.3fr 1.2fr 2.5fr 1.5fr 1.2fr 1.2fr 0.5fr",
                     //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
-                    gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                    //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                    gridTemplateColumns:
+                      "0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+
                     width: "100%",
                     //minWidth: "1062px",
                     boxSizing: "border-box",
@@ -505,8 +532,9 @@ export default function SaleReturn() {
                 >
                   <div>Sl.No</div>
                   {/* <div>Invoice Date</div> */}
+                  <div>Date</div>
                   <div>Ref No</div>
-                   {/* <div>Return Date</div> */}
+                  {/* <div>Return Date</div> */}
                   <div>Party Name</div>
                   <div>Payment Type</div>
                   <div>Amount</div>
@@ -593,8 +621,9 @@ export default function SaleReturn() {
                           style={{
                             display: "grid",
                             //gridTemplateColumns: "0.7fr 1.3fr 1.2fr 2.5fr 1.5fr 1.2fr 1.2fr 0.5fr",
-                            //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
-                            gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                            
+                            //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                            gridTemplateColumns:"0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
                             alignItems: "center",
                             minHeight: 52,
                             padding: "0 8px",
@@ -615,7 +644,7 @@ export default function SaleReturn() {
 
                           {/* RETURN DATE */}
 
-                          {/* <div>
+                          <div>
                             {saleReturn?.Invoice_Date
                               ? new Date(
                                 saleReturn.Invoice_Date
@@ -627,14 +656,14 @@ export default function SaleReturn() {
                                   year: "numeric",
                                 }
                               )
-                              : "N/A"}
-                          </div> */}
+                              : ""}
+                          </div>
                           <div className="table-desi-cell">
-                          
+
                             {saleReturn?.Return_Number ??
                               ""}
                           </div>
-                            {/* <div>
+                          {/* <div>
                             {saleReturn?.Return_Date
                               ? new Date(
                                 saleReturn.Return_Date
@@ -856,171 +885,171 @@ export default function SaleReturn() {
                             )}
                           </div> */}
                           <div
-  className="py-2 px-2 table-desi-cell"
-  style={{
-    position: "sticky",
-    right: 0,
-    width: 80,
-    textAlign: "center",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "2px",
-  }}
->
-  {/* PRINT BUTTON */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      setClickHighlightId(saleReturn.id);
-      setPrintSaleReturnId(saleReturn.id);
-    }}
-    className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-    style={{
-      backgroundColor: "transparent",
-      border: "none",
-      cursor: "pointer",
-    }}
-    title="Print"
-  >
-    <Printer
-      size={16}
-      className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
-    />
-  </button>
+                            className="py-2 px-2 table-desi-cell"
+                            style={{
+                              position: "sticky",
+                              right: 0,
+                              width: 80,
+                              textAlign: "center",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "2px",
+                            }}
+                          >
+                            {/* PRINT BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClickHighlightId(saleReturn.id);
+                                setPrintSaleReturnId(saleReturn.id);
+                              }}
+                              className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                              title="Print"
+                            >
+                              <Printer
+                                size={16}
+                                className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
+                              />
+                            </button>
 
-  {/* THREE DOT BUTTON */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
+                            {/* THREE DOT BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
 
-      // Highlight this row
-      setClickHighlightId(saleReturn.id);
+                                // Highlight this row
+                                setClickHighlightId(saleReturn.id);
 
-      setRowMenuOpen(
-        rowMenuOpen === saleReturn.id
-          ? null
-          : saleReturn.id
-      );
-    }}
-    className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-    style={{
-      backgroundColor: "transparent",
-      border: "none",
-      cursor: "pointer",
-    }}
-    title="More"
-  >
-    <MoreVertical
-      size={16}
-      className="text-[#374151] group-hover:text-black transition-colors"
-    />
-  </button>
+                                setRowMenuOpen(
+                                  rowMenuOpen === saleReturn.id
+                                    ? null
+                                    : saleReturn.id
+                                );
+                              }}
+                              className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                              title="More"
+                            >
+                              <MoreVertical
+                                size={16}
+                                className="text-[#374151] group-hover:text-black transition-colors"
+                              />
+                            </button>
 
-  {/* THREE DOT MENU */}
-  {rowMenuOpen === saleReturn.id && (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="absolute bg-white shadow-lg rounded-md"
-      style={{
-        right: 0,
-        top: "100%",
-        width: 150,
-        zIndex: 100,
-        border: "1px solid #e2e8f0",
-        overflow: "hidden",
-      }}
-    >
-      {/* VIEW / EDIT */}
-      <NavLink
-        to={{
-          pathname: `/sale/return/edit/${saleReturn?.id}`,
-          search: (() => {
-            const params = new URLSearchParams(searchParams);
+                            {/* THREE DOT MENU */}
+                            {rowMenuOpen === saleReturn.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute bg-white shadow-lg rounded-md"
+                                style={{
+                                  right: 0,
+                                  top: "100%",
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {/* VIEW / EDIT */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/sale/return/edit/${saleReturn?.id}`,
+                                    search: (() => {
+                                      const params = new URLSearchParams(searchParams);
 
-            params.set(
-              "highlightTxn",
-              saleReturn?.id
-            );
+                                      params.set(
+                                        "highlightTxn",
+                                        saleReturn?.id
+                                      );
 
-            return params.toString();
-          })(),
-        }}
-        state={{
-          from: "all-sale-return-list",
-        }}
-        className="row-menu-item"
-        onClick={() => {
-          setClickHighlightId(null);
-          setRowMenuOpen(null);
-        }}
-      >
-        <Eye
-          size={13}
-          style={{
-            color: "#4CA1AF",
-          }}
-        />
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-sale-return-list",
+                                  }}
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setClickHighlightId(null);
+                                    setRowMenuOpen(null);
+                                  }}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
 
-        <span>
-          View / Edit
-        </span>
-      </NavLink>
+                                  <span>
+                                    View / Edit
+                                  </span>
+                                </NavLink>
 
-      {/* PRINT */}
-      <button
-        type="button"
-        className="row-menu-item"
-        onClick={() => {
-          setRowMenuOpen(null);
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
 
-          setPrintSaleReturnId(
-            saleReturn.id
-          );
-        }}
-      >
-        <Printer
-          size={13}
-          style={{
-            color: "#4CA1AF",
-          }}
-        />
+                                    setPrintSaleReturnId(
+                                      saleReturn.id
+                                    );
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
 
-        <span>
-          Print
-        </span>
-      </button>
+                                  <span>
+                                    Print
+                                  </span>
+                                </button>
 
-      {/* DELETE */}
-      <button
-        type="button"
-        className="row-menu-item delete-item"
-        title="Delete sale return"
-        onClick={() => {
-          setRowMenuOpen(null);
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item delete-item"
+                                  title="Delete sale return"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
 
-          setDeleteTarget({
-            Sale_Return_Id:
-              saleReturn.id,
-          });
-        }}
-      >
-        <Trash2
-          size={13}
-          style={{
-            color: "#dc2626",
-          }}
-        />
+                                    setDeleteTarget({
+                                      Sale_Return_Id:
+                                        saleReturn.id,
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{
+                                      color: "#dc2626",
+                                    }}
+                                  />
 
-        <span>
-          Delete
-        </span>
-      </button>
-    </div>
-  )}
-</div>
+                                  <span>
+                                    Delete
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     }}

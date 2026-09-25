@@ -281,6 +281,17 @@ export default function PurchaseReturn() {
                   All Debit Note Details
                 </p>
               </div>
+                <button
+                style={{
+                  outline: "none",
+                  boxShadow: "none",
+                  backgroundColor: "#4CA1AF",
+                }}
+                className="text-white px-4 py-2 rounded-md sm:hidden"
+                onClick={() => navigate("/purchase/return/new/add")}
+              >
+                + Add Debit Note
+              </button>
 
             </div>
 
@@ -371,6 +382,19 @@ export default function PurchaseReturn() {
                   // onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-56"
                 />
+              </div>
+               <div className="hidden sm:block">
+                <button
+                  style={{
+                    outline: "none",
+                    boxShadow: "none",
+                    backgroundColor: "#4CA1AF",
+                  }}
+                  className="hidden sm:block text-white px-4 py-2 rounded-md sm:w-auto"
+                  onClick={() => navigate("/purchase/return/new/add")}
+                >
+                  + Add  Debit Note
+                </button>
               </div>
 
             </div>
@@ -507,7 +531,8 @@ export default function PurchaseReturn() {
                   style={{
                     display: "grid",
                     //gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
-                    gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                    //gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                      gridTemplateColumns: "0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
                     width: "100%",
                     //minWidth: "1062px",
                     boxSizing: "border-box",
@@ -523,8 +548,10 @@ export default function PurchaseReturn() {
                   }}
                 >
                   <div>Sl.No</div>
+                  
                   {/* <div>Bill Date</div> */}
-                    <div>Return Date</div>
+                    <div>Date</div>
+                    <div>Ref No</div>
                   <div>Party Name</div>
                   <div>Payment Type</div>
                   <div>Amount</div>
@@ -613,7 +640,8 @@ export default function PurchaseReturn() {
                           }}
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
+                             gridTemplateColumns:"0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                            //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
                             //gridTemplateColumns:"70px 120px minmax(180px, 1fr) 160px 120px 120px 120px 50px",
                             alignItems: "center",
                             minHeight: 52,
@@ -660,7 +688,12 @@ export default function PurchaseReturn() {
                                   year: "numeric",
                                 }
                               )
-                              : "N/A"}
+                              : ""}
+                          </div>
+                            <div className="table-desi-cell">
+                          
+                            {purchaseReturn?.Return_Number ??
+                              ""}
                           </div>
 
                           {/* PARTY */}

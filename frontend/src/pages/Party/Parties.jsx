@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { useSearchParams } from "react-router-dom";
 import { partyApi, useDeletePartyMutation, useGetAllPartiesCursorQuery, useGetAllPartiesQuery, useGetSinglePartyDetailsSalesPurchasesQuery, useLazyGetPartyPrintReportQuery } from "../../redux/api/partyAPi";
-import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon } from "lucide-react";
+import { MoreVertical, Users, SquarePen, Trash2, Eye, Search, Printer, FileSpreadsheet, PrinterIcon, Undo2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useDispatch } from "react-redux";
@@ -149,7 +149,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       , limit: initialRightLimit.current
 
     },
-    { skip: !partyId }
+    { skip: !partyId,refetchOnMountOrArgChange: true }
   );
   const [deleteTarget, setDeleteTarget] = useState(null); // holds the purchase to delete
 
@@ -1388,42 +1388,6 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               </button>
 
 
-                              // <NavLink 
-                              //   to={{ 
-                              //     pathname: `/${TXN_TYPE_ROUTE_MAP[row.Txn_Type]}/edit/${transactionId}`, 
-                              //     search: (() => { 
-                              //       const params = 
-                              //         new URLSearchParams( 
-                              //           searchParams 
-                              //         ); 
-
-                              //       params.set( 
-                              //         "highlightTxn", 
-                              //         transactionId 
-                              //       ); 
-
-                              //       return `?${params.toString()}`; 
-                              //     })(), 
-                              //   }} 
-                              //   state={{ 
-                              //     from: 
-                              //       "party-details", 
-                              //     partyId, 
-                              //   }} 
-                              //   className="row-menu-item"
-                              //   onClick={() => { 
-                              //     //e.stopPropagation(); 
-                              //     setRowMenuOpen(null); 
-                              //   }} 
-                              // > 
-                              //   <Eye 
-                              //     size={13} 
-                              //     style={{ 
-                              //       color: "#4CA1AF", 
-                              //     }} 
-                              //   /> 
-                              //   View / Edit 
-                              // </NavLink> 
                             )}
 
 
@@ -1446,6 +1410,29 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
                               />
                               Print
                             </button>
+                            {/* RETURN */}
+                            {["Sale", "Purchase"].includes(row.Txn_Type) && (
+                              <NavLink
+                                to={
+                                  row.Txn_Type === "Sale"
+                                    ? `/sale/return/add/${transactionId}${location.search}`
+                                    : `/purchase/return/add/${transactionId}${location.search}`
+                                }
+                                state={{
+                                  from: "party-details",
+                                  partyId,
+                                }}
+                                className="row-menu-item"
+                                onClick={() => setRowMenuOpen(null)}
+                              >
+                                <Undo2
+                                  size={13}
+                                  style={{ color: "#4CA1AF" }}
+                                />
+
+                                <span>Return</span>
+                              </NavLink>
+                            )}
 
 
 
@@ -1652,6 +1639,7 @@ export default function Parties() {
     limit: leftCursor ? 10 : initialLeftLimit.current,
     scope: "parties-page-list",
   },
+  { refetchOnMountOrArgChange: true }
   );
 
   const parties = partiesData?.parties || [];
@@ -1846,13 +1834,13 @@ export default function Parties() {
 
     //const timer = setTimeout(() => {
 
-      virtualLeftListRef.current?.scrollToIndex(targetIndex, {
-        //align: "auto",
-        align: "center",
-        behavior: "auto",
-       });
+    virtualLeftListRef.current?.scrollToIndex(targetIndex, {
+      //align: "auto",
+      align: "center",
+      behavior: "auto",
+    });
 
-      hasScrolledToSelectedRef.current = true;
+    hasScrolledToSelectedRef.current = true;
     //}, 100);
 
     //return () => clearTimeout(timer);

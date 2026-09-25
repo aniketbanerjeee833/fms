@@ -925,11 +925,13 @@ const [partyAddresses] = await connection.query(
 /* ── CREATE ───────────────────────────────────────────────── */
 
 
+
 const createSaleReturn = async (req, res, next) => {
   let connection;
 
   try {
-    const { Sale_Id } = req.params;
+    //const { Sale_Id } = req.params;
+    const Sale_Id = req.params.Sale_Id || null;
 
     connection = await db.getConnection();
     await connection.beginTransaction();
@@ -958,13 +960,20 @@ const createSaleReturn = async (req, res, next) => {
     // 1. BASIC VALIDATION
     // =========================================================
 
-    if (!Sale_Id || !Party_Name || !Return_Date) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Sale_Id, Party and Return Date are required",
-      });
-    }
+    // if (!Sale_Id || !Party_Name || !Return_Date) {
+    //   await connection.rollback();
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Sale_Id, Party and Return Date are required",
+    //   });
+    // }
+    if (!Party_Name || !Return_Date) {
+  await connection.rollback();
+  return res.status(400).json({
+    success: false,
+    message: "Party and Return Date are required",
+  });
+}
     const [fy] = await connection.query(
       `
       SELECT Financial_Year
