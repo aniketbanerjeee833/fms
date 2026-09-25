@@ -2423,7 +2423,7 @@ export default function PurchaseEdit() {
                                   shouldDirty: true,
                                 });
 
-                                //setShowBillingName(false);
+                                setShowBillingName(false);
                                 //setHasSwitchedParty(false);
                                 //setHasSeenBillingNameParty(false);
 
@@ -2492,7 +2492,7 @@ export default function PurchaseEdit() {
                                   shouldDirty: true,
                                 });
 
-                                //setShowBillingName(false);
+                                setShowBillingName(false);
                               }
                             }}
                             onClick={(e) => {
@@ -2652,10 +2652,10 @@ export default function PurchaseEdit() {
                                     shouldValidate: true,
                                     shouldDirty: true,
                                   });
-                                  setShowBillingName(
-                                    enableBillingNameOfParties
-                                  );
-
+                                  // setShowBillingName(
+                                  //   enableBillingNameOfParties
+                                  // );
+                                  setShowBillingName(false);
                                   setHasSwitchedParty(true);
                                   setValue("Phone_Number", "", {
                                     shouldValidate: true,

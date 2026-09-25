@@ -2079,6 +2079,7 @@ export default function SaleReturnAdd() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
+                                setShowBillingName(false);
                                 setCurrentPartyDetails(null);
                                 return;
                               }
@@ -2171,6 +2172,7 @@ export default function SaleReturnAdd() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
+                                 setShowBillingName(false);
                                 setCurrentPartyDetails(null);
 
                               }
@@ -2320,9 +2322,10 @@ export default function SaleReturnAdd() {
                                     shouldDirty: true,
                                   });
 
-                                  setShowBillingName(
-                                    enableBillingNameOfParties
-                                  );
+                                  // setShowBillingName(
+                                  //   enableBillingNameOfParties
+                                  // );
+                                   setShowBillingName(false);
 
                                   setHasSwitchedParty(true);
                                   setValue("Phone_Number", "", {

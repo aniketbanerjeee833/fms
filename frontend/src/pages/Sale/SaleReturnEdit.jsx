@@ -2789,7 +2789,7 @@ export default function SaleReturndEdit() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
-                                //setShowBillingName(false);
+                                setShowBillingName(false);
                                 setCurrentPartyDetails(null);
                                 return;
                               }
@@ -2891,8 +2891,8 @@ export default function SaleReturndEdit() {
                                 setCurrentPartyDetails(null);
 
                                 // Setting ON → unmatched keeps field visible
-                                setShowBillingName(enableBillingNameOfParties);
-
+                               // setShowBillingName(enableBillingNameOfParties);
+                                 setShowBillingName(false);
                                 setHasSwitchedParty(true);
 
                               }
@@ -3257,9 +3257,10 @@ export default function SaleReturndEdit() {
 
                                   // Setting ON → unmatched keeps
                                   // Billing Name field visible
-                                  setShowBillingName(
-                                    enableBillingNameOfParties
-                                  );
+                                  // setShowBillingName(
+                                  //   enableBillingNameOfParties
+                                  // );
+                                   setShowBillingName(false);
 
                                   setHasSwitchedParty(true);
 
