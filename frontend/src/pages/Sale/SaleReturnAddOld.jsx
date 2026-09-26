@@ -688,7 +688,7 @@ export default function SaleReturnAdd() {
   const enableBillingNameOfParties =
     Number(
       transactionsSettings.find(
-        (s) => s.setting_key === "billing_name_of_parties"
+        (s) => s.setting_key === "billing_name_of_parties_sale_return"
       )?.setting_value
     ) === 1
   //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
@@ -699,6 +699,7 @@ export default function SaleReturnAdd() {
   const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
   const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =
     useState(false);
+
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -1079,6 +1080,8 @@ export default function SaleReturnAdd() {
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
+  
+  
   useEffect(() => {
     if (sale) {
       originalTaxTypesRef.current = (sale?.items || []).map(
@@ -1103,8 +1106,7 @@ export default function SaleReturnAdd() {
       setCurrentPartyDetails({
         ...sale.invoicePartyDetails,
       });
-      const savedBillingName =
-        !!sale.invoicePartyDetails?.Billing_Name?.trim();
+      const savedBillingName =!!sale.invoicePartyDetails?.Billing_Name?.trim();
 
       setShowBillingName(savedBillingName);
 

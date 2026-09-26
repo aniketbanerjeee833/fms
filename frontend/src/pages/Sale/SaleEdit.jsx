@@ -567,9 +567,14 @@ export default function SaleEdit() {
       )?.setting_value
     ) === 1
   //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
-  const showBillingName =
-    enableBillingNameOfParties ||
-    !!currentPartyDetails?.Billing_Name?.trim();
+  // const showBillingName =
+  //   enableBillingNameOfParties ||
+  //   !!currentPartyDetails?.Billing_Name?.trim();
+  const billingNameValue = watch("Billing_Name");
+
+const showBillingName =
+  enableBillingNameOfParties ||
+  !!billingNameValue?.trim();
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -2638,20 +2643,20 @@ export default function SaleEdit() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Billing_Address", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Billing_Address", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
-                                setValue("Billing_Name", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Billing_Name", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 setCurrentPartyDetails(null);
 
@@ -3110,7 +3115,7 @@ export default function SaleEdit() {
                         )}
                       </div>
 
-                      {showPartyModal && (
+                      {/* {showPartyModal && (
                         <PartyAddModal
                           onClose={() => setShowPartyModal(false)}
                           onSave={(newParty) => {
@@ -3138,6 +3143,73 @@ export default function SaleEdit() {
 
                             setCurrentPartyDetails(newParty);
 
+                            setShowPartyModal(false);
+                          }}
+                        />
+                      )} */}
+                                           {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);
+                      
+                            // =====================================================
+                            // PARTY NAME
+                            // =====================================================
+                            setPartySearch(newParty.Party_Name);
+                      
+                            setValue("Party_Name", newParty.Party_Name, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                      
+                            // =====================================================
+                            // GSTIN
+                            // =====================================================
+                            setValue("GSTIN", newParty.GSTIN || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                      
+                            // =====================================================
+                            // PHONE
+                            // =====================================================
+                            setValue("Phone_Number", newParty.Phone_Number || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                      
+                            // =====================================================
+                            // BILLING NAME
+                            // =====================================================
+                            // 1. If new party has its own Billing_Name → use it
+                            // 2. Otherwise, if setting is ON → use Party_Name
+                            // 3. Otherwise → keep Billing Name empty
+                            if (newParty.Billing_Name?.trim()) {
+                              setValue("Billing_Name", newParty.Billing_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            } else if (enableBillingNameOfParties) {
+                              setValue("Billing_Name", newParty.Party_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            } else {
+                              setValue("Billing_Name", "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            }
+                      
+                            // =====================================================
+                            // CURRENT PARTY
+                            // =====================================================
+                            setCurrentPartyDetails(newParty);
+                      
+                            // =====================================================
+                            // CLOSE MODAL
+                            // =====================================================
                             setShowPartyModal(false);
                           }}
                         />

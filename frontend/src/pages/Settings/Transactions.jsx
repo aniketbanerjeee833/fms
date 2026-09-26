@@ -358,11 +358,11 @@ const billingNameConfig = {
     label: "Purchase",
   },
 
-  billing_name_of_parties_credit_note: {
+  billing_name_of_parties_sale_return: {
     label: "Credit Note",
   },
 
-  billing_name_of_parties_debit_note: {
+  billing_name_of_parties_purchase_return: {
     label: "Debit Note",
   },
 };
