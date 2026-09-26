@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { partyApi, useGetAllPartiesCursorQuery } from "../../redux/api/partyAPi";
 import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsForDropdownQuery, useLazyGetItemByNameQuery } from "../../redux/api/itemApi";
 
 
@@ -12,7 +12,7 @@ import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsF
 import { toast } from "react-toastify";
 
 
-import {  useGetSingleSaleQuery } from "../../redux/api/saleApi";
+import { useGetSingleSaleQuery } from "../../redux/api/saleApi";
 
 
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -20,7 +20,7 @@ import PartyAddModal from "../../components/Modal/PartyAddModal";
 import { useGetAllItemUnitsQuery } from "../../redux/api/itemApi";
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 
-import { saleReturnApi, useCreateSaleReturnMutation,  useLazyGetLatestSaleReturnNumberQuery } from "../../redux/api/saleReturnApi";
+import { saleReturnApi, useCreateSaleReturnMutation, useLazyGetLatestSaleReturnNumberQuery } from "../../redux/api/saleReturnApi";
 import { saleReturnFormSchema } from "../../schema/saleReturnFormSchema";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
@@ -35,6 +35,7 @@ import ScanCodeModal from "../../components/Modal/ScanCodeModal";
 import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 import { useGetAllTransactionsSettingsQuery, useGetTransactionPrefixesByTypeQuery } from "../../redux/api/Settings/transactionsSettingApi";
+import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
 function ItemDropdownVirtualized({
 
   items,
@@ -275,7 +276,7 @@ export default function SaleReturnAdd() {
     = useGetSingleSaleQuery(Sale_Id, {
       skip: Sale_Id === undefined,
     });
-  const { data: parties } = useGetAllPartiesQuery();
+  // const { data: parties } = useGetAllPartiesQuery();
   const [showItemAddModal, setShowItemAddModal] = useState(false);
 
 
@@ -351,14 +352,41 @@ export default function SaleReturnAdd() {
   const { data: categories } = useGetAllCategoriesQuery()
   const [open, setOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  const [partyCursor, setPartyCursor] = useState(null);
+  //const virtualPartyListRef = useRef(null);
+  const partyScrollRef = useRef(null);
+
   const [partySearch, setPartySearch] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [showPartyModal, setShowPartyModal] = useState(false);
 
+  const [showPartyModal, setShowPartyModal] = useState(false);
   const [showSplitBox, setShowSplitBox] = useState(false);
+  const [showGSTIN, setShowGSTIN] = useState("");
+  const {
+    data: partiesData,
+    isFetching: isPartiesFetching,
+  } = useGetAllPartiesCursorQuery({
+    cursor: partyCursor,
+    search: partySearch,
+    limit: 20,
+    scope: "sale-return-add-party-dropdown",
+  });
+
+  const parties = partiesData?.parties || [];
+  const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
+
+  const handlePartyLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
+    setPartyCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching])
+
   //const [originalTotal, setOriginalTotal] = useState(null);
 
-  const [showGSTIN, setShowGSTIN] = useState("")
+  const [showEditPartyModal, setShowEditPartyModal] = useState(false);
+  const [currentPartyDetails, setCurrentPartyDetails] = useState(null);
+
   const [showBankModal, setShowBankModal] = useState(false);;
   //console.log(latestInvoiceNumber,"latestInvoiceNumber");
 
@@ -389,9 +417,14 @@ export default function SaleReturnAdd() {
     defaultValues: {
       Return_Date: new Date().toISOString().slice(0, 10),  // ✅ FIX — today as default
       Return_Number: "",
+      Return_Number_Prefix: "None",
+      Return_Number_Value: "",
       Party_Name: "",
+      Billing_Name: "",
+      Billing_Address: "",
       GSTIN: "",
       Invoice_Number: "",
+      Phone_Number: "",
       Invoice_Date: "",
       State_Of_Supply: "",
       Transaction_Discount_Percentage: "",
@@ -410,6 +443,7 @@ export default function SaleReturnAdd() {
         Item_Category: "",
         Item_Name: "",
         Quantity: "",
+        Free_Quantity: "",
         Item_Unit: "",
         MRP: "",
         Discount_On_MRP_For_Sale_Percentage: "",
@@ -446,6 +480,70 @@ export default function SaleReturnAdd() {
       );
     }
   }, [activeSaleReturnPrefix?.prefix_name]);
+  const [triggerLatestSaleReturnNumber] = useLazyGetLatestSaleReturnNumberQuery();
+  const [returnNumberPart, setReturnNumberPart] = useState("");
+  useEffect(() => {
+    if (!activeSaleReturnPrefix?.prefix_name) {
+      return;
+    }
+
+    const prefix =
+      activeSaleReturnPrefix.prefix_name;
+
+    setSelectedSaleReturnPrefix(prefix);
+
+    // Automatically fetch the next return number
+    // for the active/default prefix.
+    triggerLatestSaleReturnNumber(prefix)
+      .unwrap()
+      .then((result) => {
+        //setLatestSaleReturnNumber(result);
+
+        const nextNumber =
+          result?.newReturnNumber || "";
+
+        setReturnNumberPart(nextNumber);
+
+        setValue(
+          "Return_Number_Prefix",
+          prefix,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+
+        setValue(
+          "Return_Number_Value",
+          nextNumber,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+
+        setValue(
+          "Return_Number",
+          `${prefix === "None" ? "" : prefix
+          }${nextNumber}`,
+          {
+            shouldValidate: true,
+            shouldDirty: true,
+          }
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "Failed to get latest sale return number:",
+          error
+        );
+        toast.error("Failed to get latest sale return number");
+      });
+  }, [
+    activeSaleReturnPrefix?.prefix_name,
+    triggerLatestSaleReturnNumber,
+    setValue,
+  ]);
   console.log(selectedSaleReturnPrefix, "selectedSaleReturnPrefix");
   // const {
   //   data: latestSaleReturnNumber,
@@ -456,31 +554,8 @@ export default function SaleReturnAdd() {
   //   }
   // );
   // console.log(latestSaleReturnNumber, "latestSaleReturnNumber");
-const [triggerLatestSaleReturnNumber] =
-  useLazyGetLatestSaleReturnNumberQuery();
-  const [returnNumberPart, setReturnNumberPart] = useState("");
-  // useEffect(() => {
-  //   if (!latestSaleReturnNumber?.newReturnNumber) return;
 
-  //   const number =
-  //     latestSaleReturnNumber.newReturnNumber;
 
-  //   setValue(
-  //     "Return_Number",
-  //     `${selectedSaleReturnPrefix === "None"
-  //       ? ""
-  //       : selectedSaleReturnPrefix
-  //     }${number}`,
-  //     {
-  //       shouldValidate: true,
-  //       shouldDirty: true,
-  //     }
-  //   );
-  // }, [
-  //   latestSaleReturnNumber,
-  //   selectedSaleReturnPrefix,
-  //   setValue,
-  // ]);
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
@@ -573,14 +648,14 @@ const [triggerLatestSaleReturnNumber] =
       )?.setting_value
     ) === 1;
 
-  // const enableHSNSAC =
-  //   Number(
-  //     taxesGSTSettings.find(
-  //       (s) =>
-  //         s.setting_key === "enable_hsn_sac"
-  //     )?.setting_value
-  //   ) === 1;
-
+  const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
   const enablePlaceOfSupply =
     Number(
       taxesGSTSettings.find(
@@ -604,6 +679,30 @@ const [triggerLatestSaleReturnNumber] =
     sale?.items?.some(
       (item) => item.hasHistoricalMRP === true
     );
+  const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+  const enableBillingNameOfParties =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "billing_name_of_parties"
+      )?.setting_value
+    ) === 1
+  //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
+  // const showBillingName =
+  //   enableBillingNameOfParties ||
+  //   !!currentPartyDetails?.Billing_Name?.trim();
+  const [showBillingName, setShowBillingName] = useState(false);
+  const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
+  const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =
+    useState(false);
+  const hasHistoricaFreeQuantity = sale?.items?.some(
+    (item) => item.hasHistoricalFreeQuantity === true
+  )
+  const shouldShowFreeQuantity = showFreeQuantity || hasHistoricaFreeQuantity
 
   const shouldShowMRP = showMRP || hasHistoricalMRP;
 
@@ -854,6 +953,7 @@ const [triggerLatestSaleReturnNumber] =
       Item_Name: "",
       Item_HSN: "",
       Quantity: "",
+      Free_Quantity: "",
       Item_Unit: "",
       MRP: "",
       Discount_On_MRP_For_Sale_Percentage: "",
@@ -961,6 +1061,7 @@ const [triggerLatestSaleReturnNumber] =
     MRP: "",
     Discount_On_MRP_For_Sale_Percentage: "",
     Quantity: "",
+    Free_Quantity: "",
     Sale_Price: "",
     Discount_On_Sale_Price: "",
     Discount_Type_On_Sale_Price: "Percentage",
@@ -977,6 +1078,7 @@ const [triggerLatestSaleReturnNumber] =
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
+  const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
   useEffect(() => {
     if (sale) {
       originalTaxTypesRef.current = (sale?.items || []).map(
@@ -998,7 +1100,18 @@ const [triggerLatestSaleReturnNumber] =
         savedDiscountPercentage > 0
       );
       setPartySearch(sale.invoicePartyDetails.Party_Name);
+      setCurrentPartyDetails({
+        ...sale.invoicePartyDetails,
+      });
+      const savedBillingName =
+        !!sale.invoicePartyDetails?.Billing_Name?.trim();
 
+      setShowBillingName(savedBillingName);
+
+      setHasSeenBillingNameParty(savedBillingName);
+      setHasSavedBillingAddress(
+        !!sale.invoicePartyDetails?.Billing_Address?.trim()
+      );
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item, index) => {
 
@@ -1103,6 +1216,7 @@ const [triggerLatestSaleReturnNumber] =
         MRP: item.MRP || "",
         Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
         Quantity: item.Quantity || "",
+        Free_Quantity: item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
         Sale_Price: item.Sale_Price || "",
 
@@ -1124,9 +1238,11 @@ const [triggerLatestSaleReturnNumber] =
         Return_Date: new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
         Return_Number: "",
         Party_Name: sale.invoicePartyDetails?.Party_Name || "",
+        Billing_Name: sale.invoicePartyDetails?.Billing_Name || "",
         GSTIN: sale.invoicePartyDetails?.GSTIN || "",
+        Billing_Address: sale.invoicePartyDetails?.Billing_Address || "",
         Invoice_Number: sale.invoicePartyDetails?.Invoice_Number || "",
-
+        Phone_Number: sale.invoicePartyDetails?.Phone_Number || "",
         Invoice_Date: toLocalDateString(sale.invoicePartyDetails?.Invoice_Date),
         //  Invoice_Date: sale.invoicePartyDetails?.Invoice_Date,
         State_Of_Supply: sale.invoicePartyDetails?.State_Of_Supply || "",
@@ -1188,6 +1304,7 @@ const [triggerLatestSaleReturnNumber] =
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+        const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Sale_Price) || 0;
 
         const subtotal = qty * price;
@@ -1201,6 +1318,7 @@ const [triggerLatestSaleReturnNumber] =
             : discountRaw * qty;
 
         acc.totalQty += qty;
+        acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -1209,6 +1327,7 @@ const [triggerLatestSaleReturnNumber] =
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -1413,12 +1532,12 @@ const [triggerLatestSaleReturnNumber] =
       //     "SaleReturn",
       //   ])
       // );
-     dispatch(
-  saleReturnApi.util.invalidateTags([
-    "SaleReturn",
-    { type: "SaleReturn", id: "LATEST_RETURN" },
-  ])
-);
+      dispatch(
+        saleReturnApi.util.invalidateTags([
+          "SaleReturn",
+          { type: "SaleReturn", id: "LATEST_RETURN" },
+        ])
+      );
 
 
       dispatch(
@@ -1426,6 +1545,7 @@ const [triggerLatestSaleReturnNumber] =
           { type: "Item", id: "LIST" },
           { type: "ItemsByCategory", id: "LIST" },
           { type: "ItemLedger", id: "LIST" },
+          { type: "Item", id: "DROPDOWN" },
         ])
       );;
 
@@ -1458,7 +1578,36 @@ const [triggerLatestSaleReturnNumber] =
           pathname: "/sale/return",
           search: location.search,
         });
-      } else {
+      } 
+      else if (from === "items-by-item") {
+        //const params = new URLSearchParams(location.search);
+
+        //params.set("itemId", Item_Id);
+
+        navigate({
+          pathname: "/items/all-items",
+          search: location.search,
+        });
+      }
+         else if (from === "party-details") {
+        navigate({
+          pathname: "/party/parties",
+          search: location.search,
+        });
+      }  
+      else if (from === "party-receivables") {
+        navigate({
+          pathname: "/party/receivables",
+          search: location.search,
+        });
+      }
+      else if (from === "party-payables") {
+        navigate({
+          pathname: `/party/payables`,
+          search: location.search,
+        })
+      }
+      else {
         navigate({
           pathname: "/sale/return",
           search: location.search,
@@ -1809,6 +1958,12 @@ const [triggerLatestSaleReturnNumber] =
                       search: location.search,
                     })
                   }
+                    else if (from === "party-payables") {
+                    navigate({
+                      pathname: `/party/payables`,
+                      search: location.search,
+                    })
+                  }
                   else if (from === "party-sales-purchases-details") {
 
                     navigate({
@@ -1823,6 +1978,24 @@ const [triggerLatestSaleReturnNumber] =
                       search: location.search,
                     })
                     // navigate(`/item/item-sales-purchases-details/${Item_Id}`);
+                  }
+                  else if (from === "party-details") {
+                    // 🔹 new — return to Bank Accounts page with the same account selected
+                    navigate({
+                      pathname: `/party/parties`,
+                      search: location.search,
+                      // search: `?partyId=${partyId}`,
+                    });
+                  }
+                  else if (from === "items-by-item") {
+                    //const params = new URLSearchParams(location.search);
+
+                    //params.set("itemId", Item_Id);
+
+                    navigate({
+                      pathname: "/items/all-items",
+                      search: location.search,
+                    });
                   }
                   else {
                     navigate({
@@ -1896,197 +2069,534 @@ const [triggerLatestSaleReturnNumber] =
             >
               <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
                 {/* <div className="row"> */}
-                <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
-                  <div className=" flex flex-col relative mt-2 gap-2 party-class"
-                    style={{ marginBottom: "0px", marginTop: "0px" }}>
-                    {/* <div className="input-field col s6 mt-4 relative"> */}
 
-                    <span className="active">
-                      Party
-                      <span className="text-red-500">*</span>
-                    </span>
+                <div className="flex flex-col gap-4 w-full lg:w-2/3">
+                  <div
+                    className="grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4"
+                  //className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 "
+                  >
 
 
-                    <div className="relative w-full">
-                      <div
-                        className="flex flex-row border rounded-md bg-white cursor-pointer"
-                        onClick={() => setOpen((prev) => !prev)}
-                      >
-                        <input
-                          type="text"
-                          id="Party_Name"
-                          value={partySearch}
-                          // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setPartySearch(value);
-                            setValue("Party_Name", value, { shouldValidate: true });
-                            setOpen(true);
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpen(true);
-                          }}
-                          onBlur={() => {
-                            setTimeout(() => {
-                              const typedValue = partySearch?.trim()?.toLowerCase();
-                              const matchedParty = parties?.parties?.find(
-                                (p) => p.Party_Name.toLowerCase() === typedValue
+                    <div className="flex flex-col gap-2 relative party-class">
+                      <span className="whitespace-nowrap active">
+                        Party
+                        <span className="text-red-500">*</span>
+                      </span>
+
+                      <div className="relative w-full">
+                        <div
+                          className="flex flex-row border rounded-md bg-white cursor-pointer"
+                          onClick={() => setOpen((prev) => !prev)}
+                        >
+                          <input
+                            type="text"
+                            id="Party_Name"
+                            value={partySearch}
+                            onChange={(e) => {
+                              setPartyCursor(null);
+
+                              const value = e.target.value;
+
+                              setPartySearch(value);
+
+                              setValue("Party_Name", value, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setOpen(true);
+
+                              const matchedParty = parties.find(
+                                (p) =>
+                                  p.Party_Name?.toLowerCase() ===
+                                  value.trim().toLowerCase()
                               );
 
-                              if (matchedParty) {
-                                setPartySearch(matchedParty.Party_Name);
-                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
-                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
+                              // Party completely cleared
+                              if (!value.trim()) {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setValue("Billing_Address", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                setShowBillingName(false);
+                                setCurrentPartyDetails(null);
+                                return;
                               }
 
-                              setOpen(false);
-                            }, 150);
-                          }}
-                          placeholder="Search By Name/Phone"
-                          className="w-full outline-none py-1 px-2 text-gray-900"
-                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-                        />
-                        <div className="w-10 "></div>
-                        <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
-                      </div>
+                              // Exact existing Party
+                              if (matchedParty) {
+                                setValue("GSTIN", matchedParty.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                const defaultBilling = matchedParty.addresses?.find(
+                                  (a) =>
+                                    a.Address_Type === "Billing" &&
+                                    a.Is_Default
+                                );
 
-                      {open && (
-                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                          <span
-                            onClick={() => setShowPartyModal(true)}
-                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                          >
-                            + Add Party
+                                setValue(
+                                  "Billing_Address",
+                                  defaultBilling?.Address_Text || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                // setCurrentPartyDetails(matchedParty);
+
+                                // setValue(
+                                //   "Billing_Name",
+                                //   matchedParty.Billing_Name || "",
+                                //   {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   }
+                                // );
+                                setCurrentPartyDetails(matchedParty);
+
+                                if (matchedParty.Billing_Name?.trim()) {
+                                  setValue("Billing_Name", matchedParty.Billing_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+                                  setHasSeenBillingNameParty(true);
+
+                                } else if (
+                                  hasSwitchedParty &&
+                                  enableBillingNameOfParties
+                                ) {
+                                  setValue("Billing_Name", matchedParty.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+
+                                } else {
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(false);
+                                }
+
+                                setHasSwitchedParty(true);
+
+                                // DO NOT change Phone_Number here.
+                                // Existing bill phone stays.
+                              }
+
+                              // Party does not exactly match
+                              else {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
+                                setValue("Billing_Address", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                                 setShowBillingName(false);
+                                setCurrentPartyDetails(null);
+
+                              }
+                            }}
+
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(true);
+                            }}
+
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue =
+                                  partySearch?.trim()?.toLowerCase();
+
+                                const matchedParty = parties.find(
+                                  (p) =>
+                                    p.Party_Name?.toLowerCase() === typedValue
+                                );
+
+                                if (matchedParty) {
+                                  setPartyCursor(null);
+                                  setHasSavedBillingAddress(
+                                    !!matchedParty.addresses?.some(
+                                      (a) => a.Address_Type === "Billing"
+                                    )
+                                  );
+
+                                  setPartySearch(matchedParty.Party_Name);
+
+                                  setValue(
+                                    "Party_Name",
+                                    matchedParty.Party_Name,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  setValue(
+                                    "GSTIN",
+                                    matchedParty.GSTIN || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                  const defaultBilling = matchedParty.addresses?.find(
+                                    (a) =>
+                                      a.Address_Type === "Billing" &&
+                                      a.Is_Default
+                                  );
+                                  const currentBillingAddress =
+                                    watch("Billing_Address");
+
+                                  if (!currentBillingAddress?.trim()) {
+                                    setValue(
+                                      "Billing_Address",
+                                      defaultBilling?.Address_Text || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
+
+                                  // setValue(
+                                  //   "Billing_Name",
+                                  //   matchedParty.Billing_Name || "",
+                                  //   {
+                                  //     shouldValidate: true,
+                                  //     shouldDirty: true,
+                                  //   }
+                                  // );
+                                  // =========================================
+                                  // BILLING NAME
+                                  // =========================================
+
+                                  if (matchedParty.Billing_Name?.trim()) {
+                                    // Party has saved Billing Name
+                                    setValue("Billing_Name", matchedParty.Billing_Name, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setShowBillingName(true);
+                                    setHasSeenBillingNameParty(true);
+
+                                  } else if (
+                                    hasSeenBillingNameParty &&
+                                    enableBillingNameOfParties
+                                  ) {
+                                    // Party has no saved Billing Name,
+                                    // but we already encountered a Billing Name party
+                                    setValue("Billing_Name", matchedParty.Party_Name, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setShowBillingName(true);
+
+                                  } else {
+                                    // First party has no Billing Name
+                                    setValue("Billing_Name", "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setShowBillingName(false);
+                                  }
+
+                                  setHasSwitchedParty(true);
+
+                                  // If bill phone is empty,
+                                  // populate it from master Party.
+                                  // const currentBillPhone =
+                                  //   watch("Phone_Number");
+
+                                  // if (!currentBillPhone?.trim()) {
+                                  //   setValue(
+                                  //     "Phone_Number",
+                                  //     matchedParty.Phone_Number || "",
+                                  //     {
+                                  //       shouldValidate: true,
+                                  //       shouldDirty: true,
+                                  //     }
+                                  //   );
+                                  // }
+                                  
+                                     setValue(
+                                    "Phone_Number",
+                                    matchedParty.Phone_Number || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                  setCurrentPartyDetails(matchedParty);
+                                } else {
+                                  setHasSavedBillingAddress(false);
+                                  setValue("GSTIN", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  // setShowBillingName(
+                                  //   enableBillingNameOfParties
+                                  // );
+                                   setShowBillingName(false);
+
+                                  setHasSwitchedParty(true);
+                                  setValue("Phone_Number", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }
+                                //setCurrentPartyDetails(null);
+                                setOpen(false);
+                              }, 150);
+                            }}
+
+                            placeholder="Search By Name/Phone"
+                            className="w-full outline-none py-1 px-2 text-gray-900"
+                            style={{
+                              marginBottom: 0,
+                              marginTop: "4px",
+                              border: "none",
+                              borderBottom: "none",
+                              height: "2rem",
+                            }}
+                          />
+
+                          <div className="w-10"></div>
+
+                          <span className="absolute right-0 px-2 top-1/3 text-gray-700">
+                            ▼
                           </span>
+                        </div>
 
-                          {/* {parties?.parties
-                          ?.filter(
-                            (party) =>
-                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                              party?.Phone_Number?.includes(partySearch)
-                          )
-                          .map((party, i) => (
-                            <div
-                              key={i}
-                              onClick={() => {
+                        {open && (
+                          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+
+                            <span
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setShowPartyModal(true);
+                              }}
+                              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                              style={{
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              + Add Party
+                            </span>
+
+                            <VirtualPartyScrollList
+                              parties={parties}
+                              isFetching={isPartiesFetching}
+                              hasMore={partiesHasMore}
+                              onLoadMore={handlePartyLoadMore}
+                              scrollRef={partyScrollRef}
+                              onSelectParty={(party) => {
+                                setPartyCursor(null);
+                                setHasSavedBillingAddress(
+                                  !!party.addresses?.some(
+                                    (a) => a.Address_Type === "Billing"
+                                  )
+                                );
+
                                 setPartySearch(party.Party_Name);
-                                setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
+
+                                setValue(
+                                  "Party_Name",
+                                  party.Party_Name,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  "GSTIN",
+                                  party.GSTIN || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                // Dropdown selection → always master phone
+                                setValue(
+                                  "Phone_Number",
+                                  party.Phone_Number || "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                                const defaultBilling = party.addresses?.find(
+                                  (a) => a.Address_Type === "Billing" && a.Is_Default
+                                );
+
+                                setValue("Billing_Address", defaultBilling?.Address_Text || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                // setValue("Billing_Name", party.Billing_Name || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
+                                if (party.Billing_Name?.trim()) {
+                                  setValue("Billing_Name", party.Billing_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+                                  setHasSeenBillingNameParty(true);
+
+                                } else if (
+                                  hasSeenBillingNameParty &&
+                                  enableBillingNameOfParties
+                                ) {
+                                  setValue("Billing_Name", party.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+
+                                } else {
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(false);
+                                }
+
+                                setHasSwitchedParty(true);
+
+                                setCurrentPartyDetails(party);
+
                                 setOpen(false);
                               }}
-                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                            >
-                              {party.Party_Name} ({party.Phone_Number})
-                            </div>
-                          ))} */}
-                          {parties?.parties
-                            ?.filter(
-                              (party) =>
-                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                                party?.Phone_Number?.includes(partySearch)
-                            )
-                            .map((party, i) => {
-                              const bal = Number(party.Current_Balance ?? 0);
-                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+                            />
+                          </div>
+                        )}
+                      </div>
 
-                              return (
-                                <div
-                                  key={i}
-                                  onClick={() => {
-                                    setPartySearch(party.Party_Name);
-                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                                    //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                      {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);
 
-                                    setOpen(false);
-                                  }}
-                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
-                                  style={{ borderBottom: "1px solid #f3f4f6" }}
-                                >
-                                  {/* Left — name + phone */}
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-sm text-gray-800 font-medium truncate">
-                                      {party.Party_Name}
-                                    </span>
-                                    <span className="text-xs text-gray-400">
-                                      {party.Phone_Number || "—"}
-                                    </span>
-                                  </div>
+                            setPartySearch(newParty.Party_Name);
 
-                                  {/* Right — balance */}
-                                  <div className="flex flex-col items-end flex-shrink-0">
-                                    <span className="text-xs text-gray-400">Balance</span>
-                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
-                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                            setValue(
+                              "Party_Name",
+                              newParty.Party_Name,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
 
-                          {parties?.parties?.filter((party) =>
-                            party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
-                          ).length === 0 && (
-                              <p className="px-3 py-2 text-gray-500">No Party found</p>
-                            )}
-                        </div>
+                            setValue(
+                              "GSTIN",
+                              newParty.GSTIN || "",
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+
+                            setValue(
+                              "Phone_Number",
+                              newParty.Phone_Number || "",
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                            // setValue("Billing_Name", newParty.Billing_Name || "", {
+                            //   shouldValidate: true,
+                            //   shouldDirty: true,
+                            // });
+                            if (newParty.Billing_Name?.trim()) {
+                              setValue("Billing_Name", newParty.Billing_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setShowBillingName(true);
+                              setHasSeenBillingNameParty(true);
+
+                            } else if (enableBillingNameOfParties) {
+                              setValue("Billing_Name", newParty.Party_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setShowBillingName(true);
+
+                            } else {
+                              setValue("Billing_Name", "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setShowBillingName(false);
+                            }
+
+                            setHasSwitchedParty(true);
+
+                            setCurrentPartyDetails(newParty);
+
+                            setShowPartyModal(false);
+                          }}
+                        />
                       )}
                     </div>
-                    {/* {showPartyModal && (
-                    <PartyAddModal
-                      onClose={() => setShowPartyModal(false)}
-                      onSave={(newParty) => {
-                        setPartySearch(newParty);
-                        setValue("Party_Name", newParty, { shouldValidate: true });
-                        setShowPartyModal(false);
-                      }}
-                    />
-                  )} */}
-                    {showPartyModal && (
-                      <PartyAddModal
-                        onClose={() => setShowPartyModal(false)}
-                        onSave={(newParty) => {
-                          setPartySearch(newParty.Party_Name);
-
-                          setValue(
-                            "Party_Name",
-                            newParty.Party_Name,
-                            {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            }
-                          );
-
-                          setValue(
-                            "GSTIN",
-                            newParty.GSTIN || "",
-                            {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            }
-                          );
-
-                          setValue(
-                            "Billing_Name",
-                            newParty.Billing_Name || "",
-                            {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            }
-                          );
-
-                          //setCurrentPartyDetails(newParty);
-
-                          setShowPartyModal(false);
-                        }}
-                      />
-                    )}
-
-                  </div>
-                  <div className="input-field  flex gap-4
+                    {/* <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
-                    {/* <div className="input-field col s6 mt-4"> */}
+                  
                     <span className="whitespace-nowrap active">
                       GSTIN
 
@@ -2107,7 +2617,204 @@ const [triggerLatestSaleReturnNumber] =
                         {errors?.GSTIN?.message}
                       </p>
                     )}
+                  </div> */}
+                    {/* Phone Number — compact inline label+input */}
+
+                    <div className="flex flex-col gap-2">
+
+                      <span className="whitespace-nowrap active">Phone Number</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        id="Phone_Number"
+                        {...register("Phone_Number")}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
+
+                          setValue("Phone_Number", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
+                        placeholder="Phone Number"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+
+                      {errors?.Phone_Number && (
+                        <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
+                      )}
+                    </div>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+
+                    {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && ( */}
+                    {showBillingName && (
+                      <div className="flex flex-col gap-2">
+                        <span className="whitespace-nowrap active">
+                          Billing Name (Optional)
+                        </span>
+
+                        <input
+                          type="text"
+                          id="Billing_Name"
+                          {...register("Billing_Name")}
+                          placeholder="Billing Name"
+                          className="w-full outline-none border-b-2 text-gray-900"
+                          style={{ marginBottom: 0 }}
+                        />
+
+
+                      </div>
+                    )}
+                    {/* //)} */}
+
+                    {/* GSTIN — compact inline label+input, pinned to top */}
+                    {/* {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (<div className="flex flex-col gap-2 self-start">
+                  
+                                        <span className="whitespace-nowrap active">GSTIN</span>
+                                        <input
+                                          type="text"
+                                          id="GSTIN"
+                                          value={showGSTIN || ""}
+                                          {...register("GSTIN")}
+                                          placeholder="GSTIN"
+                                          className="w-full outline-none border-b-2 text-gray-900"
+                                          style={{ marginBottom: 0 }}
+                                          readOnly
+                                        />
+                                      </div>)} */}
+
+                    {/* ── ROW 2: Billing Address + GSTIN ── */}
+
+                    {watch("Party_Name")?.trim().toLowerCase() !== "cash sale" && (
+                      //currentPartyDetails?.Party_Name.trim().toLowerCase() !== "cash sale" && (
+                      <div>
+                        {/* Billing Address */}
+                        <div className="flex flex-col gap-2">
+                          <span className="active">Billing Address</span>
+
+                          {(() => {
+                            // 🔹 check if party has ANY billing address saved
+                            // const hasPartyBillingAddress = currentPartyDetails?.addresses?.some(
+                            //   (addr) => addr.Address_Type === "Billing"
+                            // );
+                            // const hasPartyBillingAddress =
+                            //   currentPartyDetails?.addresses?.some(
+                            //     (addr) => addr.Address_Type === "Billing"
+                            //   ) || !!watch("Billing_Address")?.trim();
+
+                            return (
+                              <textarea
+                                {...register("Billing_Address")}
+                                rows={5}
+                                placeholder="Billing Address"
+                                readOnly={hasSavedBillingAddress}
+                                //readOnly={hasPartyBillingAddress}   // 🔹 readonly if party has a saved address
+                                // onClick={() => {
+                                //   if (hasPartyBillingAddress) {
+                                //     setShowEditPartyModal(true);   // clicking a readonly field opens the modal too
+                                //   }
+                                // }}
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 outline-none resize-none"
+                                style={{
+                                  minHeight: "80px",
+                                  backgroundColor: hasSavedBillingAddress ? "#f9fafb" : "white",
+                                  cursor: hasSavedBillingAddress ? "pointer" : "text",
+                                  //backgroundColor: hasPartyBillingAddress ? "#f9fafb" : "white",
+                                  //cursor: hasPartyBillingAddress ? "pointer" : "text",
+                                }}
+                              />
+                            );
+                          })()}
+
+                          {/* Address has content — show Remove / Change (only when party HAS a saved address) */}
+                          {hasSavedBillingAddress && watch("Billing_Address") && (
+                            // currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && 
+                            // (
+                            <div className="flex justify-end gap-3 mt-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setValue("Billing_Address", "", {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  })
+                                }
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#ef4444",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                }}
+                              >
+                                Remove
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setShowEditPartyModal(true)}
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#4CA1AF",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Change
+                              </button>
+                            </div>
+                            //)
+                          )}
+
+                          {/* Address was just removed OR party has a saved address but field is empty
+                                              — offer to pick one from the party */}
+                          {hasSavedBillingAddress && !watch("Billing_Address") &&
+                            currentPartyDetails?.addresses?.some((a) => a.Address_Type === "Billing") && (
+                              <div className="flex justify-end mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEditPartyModal(true)}
+                                  style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "#4CA1AF",
+                                    cursor: "pointer",
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  Select Billing Address
+                                </button>
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+
+
+                  {showEditPartyModal && (
+                    <PartyAddModal
+                      editingParty={true}
+                      partyDetails={currentPartyDetails}
+                      restrictedMode={true}
+                      onClose={() => setShowEditPartyModal(false)}
+                      onSave={(updatedParty) => {
+                        const defaultBilling = updatedParty.addresses?.find(
+                          (a) => a.Address_Type === "Billing" && a.Is_Default
+                        );
+                        setValue("Billing_Address", defaultBilling?.Address_Text || "", { shouldDirty: true, shouldValidate: true });
+                        setShowEditPartyModal(false);
+                        setCurrentPartyDetails(updatedParty);
+                      }}
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
@@ -2132,7 +2839,7 @@ const [triggerLatestSaleReturnNumber] =
                     </p>
                   )}
                 </div> */}
-                 {/* Return Number */}
+                  {/* Return Number */}
                   {/* <div className="flex items-center w-full gap-3 justify-end">
                     <span className="whitespace-nowrap">
                       Return Number
@@ -2199,129 +2906,234 @@ const [triggerLatestSaleReturnNumber] =
                       </p>
                     )}
                   </div> */}
+                  {/* <div className="flex items-center w-full gap-3 justify-end">
+                    <span className="whitespace-nowrap">
+                      Return Number
+                     
+                    </span>
+
+                   
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={selectedSaleReturnPrefix}
+                        onChange={async (e) => {
+                          const prefix = e.target.value;
+
+                          setSelectedSaleReturnPrefix(prefix);
+
+                          try {
+                            // Call latest number API for the selected prefix
+                            const response =
+                              await triggerLatestSaleReturnNumber(prefix).unwrap();
+
+                            const number =
+                              response?.newReturnNumber || "";
+
+                            // Show only numeric part in input
+                            setReturnNumberPart(String(number));
+
+                            // Store complete value in form
+                            setValue(
+                              "Return_Number",
+                              `${prefix === "None"
+                                ? ""
+                                : prefix
+                              }${number}`,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                          } catch (error) {
+                            console.error(
+                              "Failed to get latest sale return number:",
+                              error
+                            );
+
+                            setReturnNumberPart("");
+
+                            setValue(
+                              "Return_Number",
+                              prefix === "None" ? "" : prefix,
+                              {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              }
+                            );
+                          }
+                        }}
+                        className="py-1 border-b-2 border-gray-300"
+                        style={{
+                          marginBottom: 0,
+                          minWidth: "100px",
+                          height: "32px",
+                          border: "1px solid #ccc",
+                        }}
+                      >
+                        {saleReturnPrefixes.map((prefix) => (
+                          <option
+                            key={prefix.id}
+                            value={prefix.prefix_name}
+                          >
+                            {prefix.prefix_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    
+                    <input
+                      type="text"
+                      id="Return_Number"
+                      value={returnNumberPart}
+                      placeholder="Return Number"
+                      onChange={(e) => {
+                        // Only allow numbers
+                        const number = e.target.value.replace(/\D/g, "");
+
+                        setReturnNumberPart(number);
+
+                        // Build complete return number
+                        const fullReturnNumber =
+                          selectedSaleReturnPrefix === "None"
+                            ? number
+                            : `${selectedSaleReturnPrefix}${number}`;
+
+                        setValue(
+                          "Return_Number",
+                          fullReturnNumber,
+                          {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          }
+                        );
+                      }}
+                      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+                      style={{
+                        marginBottom: 0,
+                        height: "1rem",
+                      }}
+                    />
+
+                    {errors?.Return_Number && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Return_Number?.message}
+                      </p>
+                    )}
+                  </div> */}
                   <div className="flex items-center w-full gap-3 justify-end">
-  <span className="whitespace-nowrap">
-    Return Number
-    {/* <span className="text-red-500">*</span> */}
-  </span>
+                    <span className="whitespace-nowrap">
+                      Return Number
+                      {/* <span className="text-red-500">*</span> */}
+                    </span>
 
-  {/* Prefix Dropdown */}
-  <div className="relative flex-shrink-0">
-    <select
-      value={selectedSaleReturnPrefix}
-      onChange={async (e) => {
-        const prefix = e.target.value;
+                    {/* Prefix Dropdown */}
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={selectedSaleReturnPrefix}
+                        onChange={async (e) => {
+                          const prefix = e.target.value;
 
-        setSelectedSaleReturnPrefix(prefix);
+                          setSelectedSaleReturnPrefix(prefix);
 
-        try {
-          // Call latest number API for the selected prefix
-          const response =
-            await triggerLatestSaleReturnNumber(prefix).unwrap();
+                          try {
+                            // Get latest number for the selected prefix
+                            const response = await triggerLatestSaleReturnNumber(prefix).unwrap();
 
-          const number =
-            response?.newReturnNumber || "";
+                            const number = response?.newReturnNumber ?? "";
 
-          // Show only numeric part in input
-          setReturnNumberPart(String(number));
+                            // Show only numeric part in the input
+                            setReturnNumberPart(String(number));
 
-          // Store complete value in form
-          setValue(
-            "Return_Number",
-            `${
-              prefix === "None"
-                ? ""
-                : prefix
-            }${number}`,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        } catch (error) {
-          console.error(
-            "Failed to get latest sale return number:",
-            error
-          );
+                            // Store prefix separately
+                            setValue("Return_Number_Prefix", prefix, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
-          setReturnNumberPart("");
+                            // Store numeric value separately
+                            setValue("Return_Number_Value", String(number), {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          } catch (error) {
+                            console.error(
+                              "Failed to get latest sale return number:",
+                              error
+                            );
 
-          setValue(
-            "Return_Number",
-            prefix === "None" ? "" : prefix,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        }
-      }}
-      className="py-1 border-b-2 border-gray-300"
-      style={{
-        marginBottom: 0,
-        minWidth: "100px",
-        height: "32px",
-        border: "1px solid #ccc",
-      }}
-    >
-      {saleReturnPrefixes.map((prefix) => (
-        <option
-          key={prefix.id}
-          value={prefix.prefix_name}
-        >
-          {prefix.prefix_name}
-        </option>
-      ))}
-    </select>
-  </div>
+                            setReturnNumberPart("");
 
-  {/* Return Number - Editable */}
-  <input
-    type="text"
-    id="Return_Number"
-    value={returnNumberPart}
-    placeholder="Return Number"
-    onChange={(e) => {
-      // Only allow numbers
-      const number = e.target.value.replace(/\D/g, "");
+                            // Still store the selected prefix
+                            setValue("Return_Number_Prefix", prefix, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
-      setReturnNumberPart(number);
+                            // Clear numeric value if API fails
+                            setValue("Return_Number_Value", "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                          }
+                        }}
+                        className="py-1 border-b-2 border-gray-300"
+                        style={{
+                          marginBottom: 0,
+                          minWidth: "100px",
+                          height: "32px",
+                          border: "1px solid #ccc",
+                        }}
+                      >
+                        {saleReturnPrefixes.map((prefix) => (
+                          <option
+                            key={prefix.id}
+                            value={prefix.prefix_name}
+                          >
+                            {prefix.prefix_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-      // Build complete return number
-      const fullReturnNumber =
-        selectedSaleReturnPrefix === "None"
-          ? number
-          : `${selectedSaleReturnPrefix}${number}`;
+                    {/* Return Number - Editable Numeric Part */}
+                    <input
+                      type="text"
+                      id="Return_Number_Value"
+                      value={returnNumberPart}
+                      placeholder="Return Number"
+                      onChange={(e) => {
+                        // Only allow numbers
+                        const number = e.target.value.replace(/\D/g, "");
 
-      setValue(
-        "Return_Number",
-        fullReturnNumber,
-        {
-          shouldValidate: true,
-          shouldDirty: true,
-        }
-      );
-    }}
-    className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
-    style={{
-      marginBottom: 0,
-      height: "1rem",
-    }}
-  />
+                        setReturnNumberPart(number);
 
-  {errors?.Return_Number && (
-    <p className="text-red-500 text-xs mt-1">
-      {errors?.Return_Number?.message}
-    </p>
-  )}
-</div>
+                        // Store ONLY numeric value
+                        setValue("Return_Number_Value", number, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }}
+                      className="invoice-number-class outline-none text-gray-900 py-1 bg-transparent border-b-2 flex-1 min-w-0"
+                      style={{
+                        marginBottom: 0,
+                        height: "1rem",
+                      }}
+                    />
+
+                    {errors?.Return_Number_Value && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Return_Number_Value?.message}
+                      </p>
+                    )}
+                  </div>
                   <div className="flex items-center w-full gap-3  justify-end">
                     {/* <div className="row  "> */}
 
                     {/* Invoice Number */}
                     {/* <div className="input-field col s6 mt-4"> */}
                     <span className="whitespace-nowrap ">
-                      Invoice Number 
+                      Invoice Number
                       {/* <span className="text-red-500">*</span> */}
                     </span>
 
@@ -2453,7 +3265,7 @@ const [triggerLatestSaleReturnNumber] =
                       </th>
                       <th>Category</th>
                       <th>Item</th>
-                      <th>Item_HSN</th>
+                      {enableHSNCode && <th>Item_HSN</th>}
                       {/* <th>MRP</th>
                     <th>Discount On MRP (%)</th> */}
                       {shouldShowMRP && <th>MRP</th>}
@@ -2462,6 +3274,7 @@ const [triggerLatestSaleReturnNumber] =
                         <th>Discount On MRP (%)</th>
                       )}
                       <th>Qty</th>
+                      {shouldShowFreeQuantity && <th>Free Qty</th>}
                       <th>Unit</th>
                       <th>Price/Unit</th>
                       <th>Discount</th>
@@ -2711,7 +3524,14 @@ const [triggerLatestSaleReturnNumber] =
 
 
                         {/* Item Dropdown */}
-                        <td style={{ padding: "0px", width: "20%", position: "relative" }}>
+                        <td
+                          style={{
+                            padding: "0px",
+                            width: shouldShowFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                        //style={{ padding: "0px", width: "20%", position: "relative" }}
+                        >
                           <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
                             <input
                               type="text"
@@ -3994,7 +4814,7 @@ const [triggerLatestSaleReturnNumber] =
 
                                   // setValue(`items.${i}.Discount_Type_On_Sale_Price`, it.Discount_Type_On_Sale_Price || "Percentage",
                                   //   { shouldValidate: true, shouldDirty: true });
-                                  //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
                                   setValue(
                                     `items.${i}.Discount_On_Sale_Price`,
                                     resolvedSaleDiscount,
@@ -4053,7 +4873,7 @@ const [triggerLatestSaleReturnNumber] =
                         </td>
 
                         {/*HSN Code */}
-                        <td style={{ padding: "0px", width: "8%" }}>
+                        {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
                           <input
                             type="text"
                             //readOnly
@@ -4076,7 +4896,7 @@ const [triggerLatestSaleReturnNumber] =
                               {errors.items[i].Item_HSN.message}
                             </p>
                           )}
-                        </td>
+                        </td>)}
                         {/*MRP */}
                         {shouldShowMRP && (
                           <td style={{ padding: "0px", width: "6%" }}>
@@ -4297,6 +5117,38 @@ const [triggerLatestSaleReturnNumber] =
                             </p>
                           )}
                         </td>
+                        {shouldShowFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
+
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
+
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
+
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
+                        )}
 
 
 
@@ -5152,7 +6004,14 @@ const [triggerLatestSaleReturnNumber] =
                       </td> */}
 
                         {/* Tax Amount Entry */}
-                        <td style={{ padding: "0px", width: "12%" }}>
+                        <td
+                          style={{
+                            padding: "0px",
+                            width: shouldShowFreeQuantity ? "8%" : "10%"
+                          }}
+                        //style={{ padding: "0px", width: "12%" }}
+
+                        >
                           <Controller
                             control={control}
                             name={`items.${i}.Tax_Type`}
@@ -5252,7 +6111,7 @@ const [triggerLatestSaleReturnNumber] =
                         </td>
 
                         {/* Amount */}
-                        <td style={{ width: "8%" }}>
+                        <td style={{ width: "16%" }}>
                           <input
                             type="text"
                             className="form-control"
@@ -5268,7 +6127,7 @@ const [triggerLatestSaleReturnNumber] =
                     <tr>
                       <td colSpan={2}></td>
                       <td>Total</td>
-                      <td></td>
+                      {enableHSNCode && <td></td>}
                       {shouldShowMRP && <td></td>}
 
                       {/* MRP Discount column */}
@@ -5277,6 +6136,9 @@ const [triggerLatestSaleReturnNumber] =
                       <td className="text-right">
                         {totals.totalQty}
                       </td>
+                      {shouldShowFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
 
                       <td></td>
                       <td></td>
@@ -6229,3 +7091,272 @@ const [triggerLatestSaleReturnNumber] =
     </>
   );
 }
+{/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
+                    style={{ marginBottom: "0px", marginTop: "0px" }}>
+                 
+
+                    <span className="active">
+                      Party
+                      <span className="text-red-500">*</span>
+                    </span>
+
+
+                    <div className="relative w-full">
+                      <div
+                        className="flex flex-row border rounded-md bg-white cursor-pointer"
+                        onClick={() => setOpen((prev) => !prev)}
+                      >
+                        <input
+                          type="text"
+                          id="Party_Name"
+                          value={partySearch}
+                          // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPartySearch(value);
+                            setValue("Party_Name", value, { shouldValidate: true });
+                            setOpen(true);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const typedValue = partySearch?.trim()?.toLowerCase();
+                              const matchedParty = parties?.parties?.find(
+                                (p) => p.Party_Name.toLowerCase() === typedValue
+                              );
+
+                              if (matchedParty) {
+                                setPartySearch(matchedParty.Party_Name);
+                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
+                              }
+
+                              setOpen(false);
+                            }, 150);
+                          }}
+                          placeholder="Search By Name/Phone"
+                          className="w-full outline-none py-1 px-2 text-gray-900"
+                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                        />
+                        <div className="w-10 "></div>
+                        <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
+                      </div>
+
+                      {open && (
+                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          <span
+                            onClick={() => setShowPartyModal(true)}
+                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                          >
+                            + Add Party
+                          </span>
+
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                 
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                 
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                          {parties?.parties?.filter((party) =>
+                            party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+                          ).length === 0 && (
+                              <p className="px-3 py-2 text-gray-500">No Party found</p>
+                            )}
+                        </div>
+                      )}
+                    </div>
+
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartySearch(newParty.Party_Name);
+
+                          setValue(
+                            "Party_Name",
+                            newParty.Party_Name,
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          setValue(
+                            "GSTIN",
+                            newParty.GSTIN || "",
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          setValue(
+                            "Billing_Name",
+                            newParty.Billing_Name || "",
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          //setCurrentPartyDetails(newParty);
+
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )}
+
+                  </div> */}
+
+
+
+
+{/* <div className="flex flex-col gap-2 relative party-class">
+                    <span className="whitespace-nowrap active">
+                      Party
+                      <span className="text-red-500">*</span>
+                    </span>
+                  
+                    <div className="relative w-full">
+                      <div
+                        className="flex flex-row border rounded-md bg-white cursor-pointer"
+                        onClick={() => setOpen((prev) => !prev)}
+                      >
+                        <input
+                          type="text"
+                          id="Party_Name"
+                          value={partySearch}
+                          onChange={(e) => {
+                            setPartyCursor(null);   // ← ADDED
+                            const value = e.target.value;
+                            setPartySearch(value);
+                            setValue("Party_Name", value, { shouldValidate: true, shouldDirty: true });
+                            setOpen(true);
+                  
+                            const matchedParty = parties.find(
+                              (p) => p.Party_Name.toLowerCase() === value.trim().toLowerCase()
+                            );
+                  
+                            if (matchedParty) {
+                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                            } else {
+                              setValue("GSTIN", "", { shouldValidate: true, shouldDirty: true });
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const typedValue = partySearch?.trim()?.toLowerCase();
+                              const matchedParty = parties.find(
+                                (p) => p.Party_Name.toLowerCase() === typedValue
+                              );
+                  
+                              if (matchedParty) {
+                                setPartyCursor(null);   // ← ADDED
+                                setPartySearch(matchedParty.Party_Name);
+                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              }
+                  
+                              setOpen(false);
+                            }, 150);
+                          }}
+                          placeholder="Search By Name/Phone"
+                          className="w-full outline-none py-1 px-2 text-gray-900"
+                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                        />
+                        <div className="w-10"></div>
+                        <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                      </div>
+                  
+                      {open && (
+                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                  
+                          <span
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setShowPartyModal(true);
+                            }}
+                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                            style={{ borderBottom: "1px solid #f3f4f6" }}
+                          >
+                            + Add Party
+                          </span>
+                  
+                          <VirtualPartyScrollList
+                            parties={parties}
+                            isFetching={isPartiesFetching}
+                            hasMore={partiesHasMore}
+                            onLoadMore={handlePartyLoadMore}
+                            scrollRef={partyScrollRef}
+                            onSelectParty={(party) => {
+                              setPartyCursor(null);   // ← ADDED
+                              setPartySearch(party.Party_Name);
+                              setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                              setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              setOpen(false);
+                            }}
+                          />
+                  
+                        </div>
+                      )}
+                    </div>
+                  
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartyCursor(null);   // ← ADDED
+                          setPartySearch(newParty.Party_Name);
+                          setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                          setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )}
+                  </div> */}

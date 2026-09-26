@@ -2578,33 +2578,7 @@ export default function SaleReturnNewAdd() {
                       </p>
                     )}
                   </div> */}
-                    {/* Phone Number — compact inline label+input */}
-
-                    <div className="flex flex-col gap-2">
-
-                      <span className="whitespace-nowrap active">Phone Number</span>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        id="Phone_Number"
-                        {...register("Phone_Number")}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, "");
-
-                          setValue("Phone_Number", value, {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          });
-                        }}
-                        placeholder="Phone Number"
-                        className="w-full outline-none border-b-2 text-gray-900"
-                        style={{ marginBottom: 0 }}
-                      />
-
-                      {errors?.Phone_Number && (
-                        <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
-                      )}
-                    </div>
+                    
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
@@ -2628,6 +2602,7 @@ export default function SaleReturnNewAdd() {
 
                       </div>
                     )}
+                    
                     {/* //)} */}
 
                     {/* GSTIN — compact inline label+input, pinned to top */}

@@ -509,7 +509,9 @@ export default function PurchaseEdit() {
   const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =useState(false);
  
 
-const [hasBillingNamePartyMismatch, setHasBillingNamePartyMismatch] =useState(false);
+//const [hasBillingNamePartyMismatch, setHasBillingNamePartyMismatch] =useState(false);
+const [initialBillHadBillingName, setInitialBillHadBillingName] =useState(false);
+const initialBillHadBillingNameRef = useRef(false);
   const hasHistoricaFreeQuantity = purchase?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -1100,6 +1102,8 @@ const [hasBillingNamePartyMismatch, setHasBillingNamePartyMismatch] =useState(fa
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
+  const firstMismatchHandledRef = useRef(false);
+  const partyWasUserChangedRef = useRef(false);
   useEffect(() => {
     if (purchase) {
       originalTaxTypesRef.current = (purchase?.items || []).map(
@@ -1222,6 +1226,39 @@ const [hasBillingNamePartyMismatch, setHasBillingNamePartyMismatch] =useState(fa
 
       //  checkbox reflects whether a real round-off was applied
       setIsRoundOff(roundOffFromDb !== 0);
+const savedBillingName =
+  purchase?.billPurchaseDetails?.Billing_Name?.trim();
+  console.log("EDIT BILLING INIT", {
+  purchaseId: purchase?.billPurchaseDetails?.Purchase_Id,
+  partyName: purchase?.billPurchaseDetails?.Party_Name,
+  savedBillingName,
+  rawBillingName:
+    purchase?.billPurchaseDetails?.Billing_Name,
+});
+
+const billInitiallyHadBillingName =
+  !!savedBillingName;
+
+initialBillHadBillingNameRef.current =
+  billInitiallyHadBillingName;
+
+setInitialBillHadBillingName(
+  billInitiallyHadBillingName
+);
+
+setShowBillingName(
+  billInitiallyHadBillingName &&
+  enableBillingNameOfParties
+);
+
+setHasSeenBillingNameParty(false);
+setHasSwitchedParty(false);
+
+// IMPORTANT:
+// reset() below is NOT a user party change.
+partyWasUserChangedRef.current = false;
+
+firstMismatchHandledRef.current = false;
       reset({
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
         Billing_Name: purchase?.billPurchaseDetails?.Billing_Name || "",
@@ -1956,27 +1993,27 @@ const skipFallbackForPartyIdRef = useRef(null);
 // INITIALIZATION
 // =========================================================
 
-useEffect(() => {
-  const initialBillingName = getValues("Billing_Name");
+// useEffect(() => {
+//   const initialBillingName = getValues("Billing_Name");
 
-  if (initialBillingName?.trim()) {
-    // Existing bill already has Billing Name.
-    setShowBillingName(true);
+//   if (initialBillingName?.trim()) {
+//     // Existing bill already has Billing Name.
+//     setShowBillingName(true);
 
-    // IMPORTANT:
-    // Existing saved Billing Name does NOT mean that
-    // a Billing-Name party has been encountered.
-    setHasSeenBillingNameParty(false);
-  } else {
-    setShowBillingName(false);
-    setHasSeenBillingNameParty(false);
-  }
+//     // IMPORTANT:
+//     // Existing saved Billing Name does NOT mean that
+//     // a Billing-Name party has been encountered.
+//     setHasSeenBillingNameParty(false);
+//   } else {
+//     setShowBillingName(false);
+//     setHasSeenBillingNameParty(false);
+//   }
 
-  setHasSwitchedParty(false);
+//   setHasSwitchedParty(false);
 
-  // Run only once on mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+//   // Run only once on mount.
+//   // eslint-disable-next-line react-hooks/exhaustive-deps
+// }, []);
 
 
 // =========================================================
@@ -1985,11 +2022,9 @@ useEffect(() => {
 
 const watchedPartyName = watch("Party_Name");
 
-
 useEffect(() => {
   const typedValue =
     watchedPartyName?.trim()?.toLowerCase();
-
 
   // =======================================================
   // 1. EMPTY PARTY
@@ -2011,30 +2046,22 @@ useEffect(() => {
       shouldDirty: true,
     });
 
-
-    // Setting OFF:
-    // Billing Name must always be hidden.
     if (!enableBillingNameOfParties) {
+      setShowBillingName(false);
+      return;
+    }
+
+    // If a Billing-Name party has already been
+    // encountered, keep the field visible.
+    if (hasSeenBillingNameParty) {
+      setShowBillingName(true);
+    } else {
       setShowBillingName(false);
     }
 
-    // Setting ON:
-    // If we have already encountered a party
-    // having Billing Name, keep field visible.
-    //
-    // Otherwise hide it.
-    else {
-      setShowBillingName(
-        hasSeenBillingNameParty
-      );
-    }
-
-
     setHasSwitchedParty(true);
-
     return;
   }
-
 
   // =======================================================
   // FIND EXACT PARTY
@@ -2046,12 +2073,77 @@ useEffect(() => {
       typedValue
   );
 
-
   // =======================================================
   // 2. MISMATCH
   // =======================================================
 
-  if (!matchedParty) {
+  // if (!matchedParty) {
+  //   setValue("GSTIN", "", {
+  //     shouldValidate: true,
+  //     shouldDirty: true,
+  //   });
+
+  //   setValue("Billing_Name", "", {
+  //     shouldValidate: true,
+  //     shouldDirty: true,
+  //   });
+
+  //   if (!enableBillingNameOfParties) {
+  //     setShowBillingName(false);
+  //     setHasSwitchedParty(true);
+  //     return;
+  //   }
+
+  //   // -----------------------------------------------------
+  //   // INITIAL BILL HAD BILLING NAME
+  //   // -----------------------------------------------------
+
+  //   if (initialBillHadBillingNameRef.current) {
+  //     // First mismatch after Edit opens
+  //     if (!firstMismatchHandledRef.current) {
+  //       firstMismatchHandledRef.current = true;
+
+  //       setShowBillingName(false);
+  //       setHasSwitchedParty(true);
+
+  //       return;
+  //     }
+
+  //     // IMPORTANT:
+  //     // Once the user has actually encountered a
+  //     // Billing-Name party, later mismatches are visible.
+  //     if (hasSeenBillingNameParty) {
+  //       setShowBillingName(true);
+  //     } else {
+  //       setShowBillingName(false);
+  //     }
+
+  //     setHasSwitchedParty(true);
+  //     return;
+  //   }
+
+  //   // -----------------------------------------------------
+  //   // INITIAL BILL HAD NO BILLING NAME
+  //   // -----------------------------------------------------
+
+  //   if (hasSeenBillingNameParty) {
+  //     // Billing-Name party was encountered earlier.
+  //     // Mismatch → empty + visible.
+  //     setShowBillingName(true);
+  //   } else {
+  //     // No Billing-Name party encountered yet.
+  //     // Mismatch → empty + hidden.
+  //     setShowBillingName(false);
+  //   }
+
+  //   setHasSwitchedParty(true);
+  //   return;
+  // }
+  // =======================================================
+// 2. MISMATCH
+// =======================================================
+
+if (!matchedParty) {
   setValue("GSTIN", "", {
     shouldValidate: true,
     shouldDirty: true,
@@ -2063,19 +2155,28 @@ useEffect(() => {
   });
 
   if (!enableBillingNameOfParties) {
-    // Setting OFF = always hidden
     setShowBillingName(false);
-  } else {
-    // Setting ON:
-    // once a party with Billing Name has been encountered,
-    // every mismatch keeps the field visible.
-    setShowBillingName(hasSeenBillingNameParty);
+    setHasSwitchedParty(true);
+    return;
+  }
+
+  // Before user has encountered a party
+  // having its own Billing Name:
+  // mismatch → EMPTY + HIDDEN
+  if (!hasSeenBillingNameParty) {
+    setShowBillingName(false);
+  }
+
+  // After user has encountered a party
+  // having its own Billing Name:
+  // mismatch → EMPTY + VISIBLE
+  else {
+    setShowBillingName(true);
   }
 
   setHasSwitchedParty(true);
   return;
 }
-
 
   // =======================================================
   // 3. EXACT PARTY MATCH
@@ -2099,7 +2200,6 @@ useEffect(() => {
     }
   );
 
-
   const hasBillingName =
     !!matchedParty.Billing_Name?.trim();
 
@@ -2107,122 +2207,199 @@ useEffect(() => {
     skipFallbackForPartyIdRef.current ===
     matchedParty.Party_Id;
 
-
   // =======================================================
-  // 3A. PARTY HAS ITS OWN BILLING NAME
+  // 3A. PARTY HAS BILLING NAME
   // =======================================================
 
-if (hasBillingName) {
-  setValue("Billing_Name", matchedParty.Billing_Name, {
+  if (hasBillingName) {
+    setValue(
+      "Billing_Name",
+      matchedParty.Billing_Name,
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    if (enableBillingNameOfParties) {
+      setShowBillingName(true);
+    } else {
+      setShowBillingName(false);
+    }
+
+    // IMPORTANT:
+    // Initial reset does NOT count.
+    //
+    // Only an actual user change counts.
+    if (partyWasUserChangedRef.current) {
+      setHasSeenBillingNameParty(true);
+    }
+
+    skipFallbackForPartyIdRef.current = null;
+
+    return;
+  }
+
+//   // =======================================================
+//   // 3B. NEW PARTY WITHOUT BILLING NAME
+//   // FIRST APPEARANCE
+//   // =======================================================
+
+//   if (isSkippedNewParty) {
+//     setValue(
+//       "Billing_Name",
+//       "",
+//       {
+//         shouldValidate: true,
+//         shouldDirty: true,
+//       }
+//     );
+
+//     setShowBillingName(false);
+
+//     skipFallbackForPartyIdRef.current = null;
+
+//     return;
+//   }
+
+
+
+//  // =======================================================
+// // 3C. PARTY WITHOUT BILLING NAME
+// // AFTER BILLING NAME EXISTS / WAS ENCOUNTERED
+// // =======================================================
+
+// if (
+//   enableBillingNameOfParties &&
+//   (
+//     hasSeenBillingNameParty ||
+//     initialBillHadBillingNameRef.current
+//   )
+// ) {
+//   setValue(
+//     "Billing_Name",
+//     matchedParty.Party_Name,
+//     {
+//       shouldValidate: true,
+//       shouldDirty: true,
+//     }
+//   );
+
+//   setShowBillingName(true);
+
+//   return;
+// }
+
+//   // =======================================================
+//   // 3D. PARTY WITHOUT BILLING NAME
+//   // NO BILLING-NAME PARTY ENCOUNTERED
+//   // =======================================================
+
+//   setValue(
+//     "Billing_Name",
+//     "",
+//     {
+//       shouldValidate: true,
+//       shouldDirty: true,
+//     }
+//   );
+
+//   setShowBillingName(false);
+// =======================================================
+console.log("BILLING DEBUG", {
+  party: matchedParty.Party_Name,
+  partyBillingName: matchedParty.Billing_Name,
+  isSkippedNewParty,
+  enableBillingNameOfParties,
+  hasSeenBillingNameParty,
+  initialBillHadBillingName:
+    initialBillHadBillingNameRef.current,
+});
+// 3B. NEW PARTY WITHOUT BILLING NAME
+// FIRST APPEARANCE
+// =======================================================
+
+if (isSkippedNewParty) {
+  setValue("Billing_Name", "", {
     shouldValidate: true,
     shouldDirty: true,
   });
 
-  if (enableBillingNameOfParties) {
-    setShowBillingName(true);
-  } else {
-    setShowBillingName(false);
-  }
-
-  // THIS is the important flag.
-  setHasSeenBillingNameParty(true);
+  setShowBillingName(false);
 
   skipFallbackForPartyIdRef.current = null;
+
+  return;
 }
 
-  // =======================================================
-  // 3B. NEW PARTY WITHOUT BILLING NAME
-  // FIRST APPEARANCE
-  // =======================================================
 
-  else if (isSkippedNewParty) {
-    // IMPORTANT:
-    //
-    // New party has no Billing Name.
-    //
-    // First appearance:
-    // Billing Name = EMPTY
-    // Billing Name field = HIDDEN
-    // DO NOT use Party_Name.
-    setValue(
-      "Billing_Name",
-      "",
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+// =======================================================
+// 3C. PARTY WITHOUT BILLING NAME
+// USE PARTY NAME AS FALLBACK
+// =======================================================
 
+// 3C. PARTY WITHOUT BILLING NAME
+// const shouldUsePartyNameAsBillingName =
+//   enableBillingNameOfParties &&
+//   (
+//     hasSeenBillingNameParty ||
+//     initialBillHadBillingNameRef.current ||
+//     partyWasUserChangedRef.current
+//   );
 
-    setShowBillingName(false);
+// if (shouldUsePartyNameAsBillingName) {
+//   setValue(
+//     "Billing_Name",
+//     matchedParty.Party_Name,
+//     {
+//       shouldValidate: true,
+//       shouldDirty: true,
+//     }
+//   );
 
+//   setShowBillingName(true);
 
-    // This party has now had its first appearance.
-    //
-    // If the user selects it again later, normal
-    // fallback rules will apply.
-    skipFallbackForPartyIdRef.current = null;
-  }
+//   return;
+// }
 
+// =======================================================
+// 3C. PARTY WITHOUT BILLING NAME
+// =======================================================
 
-  // =======================================================
-  // 3C. PARTY WITHOUT BILLING NAME
-  // AFTER A BILLING-NAME PARTY WAS ENCOUNTERED
-  // =======================================================
+const shouldUsePartyNameAsBillingName =
+  enableBillingNameOfParties &&
+  (
+    hasSeenBillingNameParty ||
+    initialBillHadBillingNameRef.current
+  );
 
-  else if (
-    hasSeenBillingNameParty &&
-    enableBillingNameOfParties
-  ) {
-    // Now Party_Name can be used as Billing Name.
-    setValue(
-      "Billing_Name",
-      matchedParty.Party_Name,
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
-
-
-    setShowBillingName(true);
-  }
-
-
-  // =======================================================
-  // 3D. PARTY WITHOUT BILLING NAME
-  // NO BILLING-NAME PARTY ENCOUNTERED YET
-  // =======================================================
-
-  else {
-    setValue(
-      "Billing_Name",
-      "",
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
-
-
-    // Setting OFF -> hidden.
-    if (!enableBillingNameOfParties) {
-      setShowBillingName(false);
+if (shouldUsePartyNameAsBillingName) {
+  setValue(
+    "Billing_Name",
+    matchedParty.Party_Name,
+    {
+      shouldValidate: true,
+      shouldDirty: true,
     }
+  );
 
-    // Setting ON but no Billing-Name party seen yet
-    // -> hidden.
-    else {
-      setShowBillingName(false);
-    }
-  }
+  setShowBillingName(true);
+
+  return;
+}
 
 
-  setHasSwitchedParty(true);
 
-  // IMPORTANT:
-  // enableBillingNameOfParties is included so that
-  // turning the setting OFF immediately hides the field.
+// =======================================================
+// 3D. NO BILLING NAME + NO FALLBACK
+// =======================================================
+
+setValue("Billing_Name", "", {
+  shouldValidate: true,
+  shouldDirty: true,
+});
+
+setShowBillingName(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [
   watchedPartyName,
@@ -3144,6 +3321,7 @@ if (hasBillingName) {
         value={partySearch}
 
         onChange={(e) => {
+          partyWasUserChangedRef.current = true;
           setPartyCursor(null);
 
           const value = e.target.value;
@@ -3248,7 +3426,7 @@ if (hasBillingName) {
           scrollRef={partyScrollRef}
 
           onSelectParty={(party) => {
-
+            partyWasUserChangedRef.current = true;
             setPartyCursor(null);
 
             setPartySearch(
@@ -3290,7 +3468,7 @@ if (hasBillingName) {
 
 
       onSave={(newParty) => {
-
+partyWasUserChangedRef.current = true;
         setPartyCursor(null);
 
 
