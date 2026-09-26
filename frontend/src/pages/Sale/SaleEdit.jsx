@@ -3178,6 +3178,15 @@ const showBillingName =
                               shouldValidate: true,
                               shouldDirty: true,
                             });
+                             const defaultBilling = newParty.addresses?.find(
+                              (a) => a.Address_Type === "Billing" && a.Is_Default
+                            );
+
+                            setValue("Billing_Address", defaultBilling?.Address_Text || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
                       
                             // =====================================================
                             // BILLING NAME
@@ -3215,8 +3224,8 @@ const showBillingName =
                         />
                       )}
                       {/* =========================
-      VALIDATION ERROR
-     ========================= */}
+                        VALIDATION ERROR
+                    ========================= */}
                       {errors?.Party_Name && (
                         <p className="text-red-500 text-xs mt-1">
                           {errors?.Party_Name?.message}

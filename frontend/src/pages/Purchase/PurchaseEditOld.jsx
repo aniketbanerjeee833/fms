@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { NavLink, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { purchaseFormSchema } from "../../schema/purchaseFormSchema";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { partyApi, useGetAllPartiesQuery } from "../../redux/api/partyAPi";
-import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetAllItemsQuery } from "../../redux/api/itemApi";
+import { partyApi, useGetAllPartiesCursorQuery } from "../../redux/api/partyAPi";
+import { itemApi, useAddCategoryMutation, useGetAllCategoriesQuery, useGetItemsForDropdownQuery, useLazyGetItemByNameQuery } from "../../redux/api/itemApi";
 import { useRef } from "react";
 import { useEffect } from "react";
 
@@ -20,20 +20,174 @@ import { dashboardApi } from "../../redux/api/dashboardApi";
 import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 import { bankAccountApi, useGetAllBankAccountsQuery } from "../../redux/api/bankAccountApi";
-import { Trash2 } from "lucide-react";
+import { ScanLine, Trash2 } from "lucide-react";
 import { termsConditionsApi, useGetAllTermsQuery } from "../../redux/api/termsConditionsApi";
 import TermsAndConditionsSelector from "../../components/TermsAndConditionSelector";
 import AddItemModal from "../../components/Modal/AddItemModal";
 import BankAccountModal from "../../components/Modal/BankAccountModal";
 import PaymentTypeSelect from "../../components/PaymentTypeSelect";
 import ScanCodeModal from "../../components/Modal/ScanCodeModal";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback } from "react";
+import { useGetAllSettingsQuery } from "../../redux/api/Settings/settingsApi";
+import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
+import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
+import VirtualScrollList from "../../components/VirtualScrollList";
+import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+function ItemDropdownVirtualized({
+
+  items,
+  isDropdownFetching,
+  loadMoreItems,
+  scrollRef,
+  onAddItemClick,
+  onSelectItem,
+}) {
+  const ROW_HEIGHT = 44; // px — adjust to match your actual row's rendered height
+
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 12, // renders a few extra rows above/below viewport so fast scrolling never shows blank gaps
+  });
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
+  // 🔹 fetch-more trigger — fires when the virtualizer's last rendered
+  //    item gets within ~15 rows of the end of currently-loaded data.
+  //    Runs through the virtualizer's own render cycle, not raw scroll
+  //    events, so it's naturally throttled (no manual RAF guard needed).
+  useEffect(() => {
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (!lastItem) return;
+
+    if (lastItem.index >= items.length - 15 && !isDropdownFetching) {
+      loadMoreItems();
+    }
+  }, [virtualItems, items.length, isDropdownFetching, loadMoreItems]);
+
+  return (
+    <div
+      style={{ width: "45rem" }}
+      className="absolute z-20 w-full bg-white border border-gray-300 rounded-md shadow-lg"
+    >
+      {/* Add Item — stays a normal sticky element, outside the virtual scroll area */}
+      <div
+        onMouseDown={(e) => {
+          e.preventDefault();
+          onAddItemClick();
+        }}
+        className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
+        style={{
+          borderBottom: "1px solid #e5e7eb",
+          color: "#4CA1AF",
+          fontWeight: 600,
+          fontSize: 13,
+          backgroundColor: "#fff",
+        }}
+      >
+        <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
+        Add Item
+      </div>
+
+      {/* Column header row — static, matches the old <thead> */}
+      <div
+        className="grid text-xs font-semibold bg-gray-100 border-b"
+        style={{ gridTemplateColumns: "10% 40% 20% 20% 10%", }}
+      >
+        <div className="px-3 py-2">SL.NO</div>
+        <div className="px-3 py-2">ITEM NAME</div>
+        <div className="px-3 py-2">SALE PRICE</div>
+        <div className="px-3 py-2">PURCHASE PRICE</div>
+        <div className="px-3 py-2">STOCK</div>
+      </div>
+
+
+      {/* 🔹 Scroll viewport — fixed height, this is what the virtualizer measures against */}
+      <div
+        ref={(el) => (scrollRef.current = el)}
+        className="item-dropdown-scroll"
+        style={{
+          height: Math.min(
+            items.length * ROW_HEIGHT,
+            240
+          ),
+          overflowY: "auto",
+          position: "relative",
+        }}
+      >
+        {items.length === 0 && !isDropdownFetching ? (
+          <div className="px-3 py-2 text-gray-400 text-center">No Item found</div>
+        ) : (
+          // 🔹 THE key virtualization trick: a spacer div sized to the FULL
+          //    (unrendered) list height, so the scrollbar behaves correctly —
+          //    then only the visible rows are absolutely positioned inside it.
+          <div style={{ height: rowVirtualizer.getTotalSize(), width: "100%", position: "relative" }}>
+            {virtualItems.map((virtualRow) => {
+              const it = items[virtualRow.index];
+              if (!it) return null;
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  onClick={() => onSelectItem(it, virtualRow.index)}
+                  className="grid hover:bg-gray-100 cursor-pointer  text-sm"
+                  style={{
+                    gridTemplateColumns: "10% 40% 20% 20% 10%",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    alignItems: "center",
+                  }}
+                >
+                  <div className="px-3">{virtualRow.index + 1}</div>
+
+                  <div className="px-3 truncate">
+                    {it.Item_Name}{" "}
+                    {it.Item_Code && (
+                      <span style={{ color: "#9ca3af", fontWeight: 400 }}>({it.Item_Code})</span>
+                    )}
+                  </div>
+
+                  <div className="px-3 text-gray-600">{it.Sale_Price || 0}</div>
+
+                  <div className="px-3 text-gray-600">
+                    {it.Item_Type === "Service" ? "" : it.Purchase_Price ?? 0}
+                  </div>
+
+                  <div
+                    className="px-3"
+                    style={{
+                      color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {it.Item_Type === "Service" ? "" : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {isDropdownFetching && (
+          <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>
+        )}
+      </div>
+    </div >
+  );
+}
 export default function PurchaseEdit() {
   const location = useLocation();
   const from = location.state?.from
 
   const Party_Id = location.state?.partyId;
   const Item_Id = location.state?.itemId
-  const bankId = location.state?.bankId;
+  //const bankId = location.state?.bankId;
   // const partyId=location.state?.partyId;
   // //console.log("Edit page query:", location.search, from);
   const { id: Purchase_Id } = useParams();
@@ -64,13 +218,113 @@ export default function PurchaseEdit() {
   const basePurchaseUnitRef = useRef({});
   const unitRefs = useRef([]);
   const navigate = useNavigate();
-  const { data: parties } = useGetAllPartiesQuery();
-  const [showItemAddModal, setShowItemAddModal] = useState(false);
-  //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
-  const [activeItemRow, setActiveItemRow] = useState(null);
-  // find this line in your code and add refetch:
-  const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
+  //const { data: parties } = useGetAllPartiesQuery();
+  const [partyCursor, setPartyCursor] = useState(null);
+  //const virtualPartyListRef = useRef(null);
+  const partyScrollRef = useRef(null);
+  const [partySearch, setPartySearch] = useState("");
+  const [newCategory, setNewCategory] = useState("");
 
+  const [showPartyModal, setShowPartyModal] = useState(false);
+  const [showSplitBox, setShowSplitBox] = useState(false);
+  const [showGSTIN, setShowGSTIN] = useState("");
+  const {
+    data: partiesData,
+    isFetching: isPartiesFetching,
+  } = useGetAllPartiesCursorQuery({
+    cursor: partyCursor,
+    search: partySearch,
+    limit: 20,
+    scope: "purchase-edit-party-dropdown",
+  });
+
+  const parties = partiesData?.parties || [];
+  const partiesHasMore = partiesData?.hasMore ?? false;
+  const partiesNextCursor = partiesData?.nextCursor ?? null;
+
+
+  const handlePartyLoadMore = useCallback(() => {
+    if (!partiesHasMore || !partiesNextCursor || isPartiesFetching) return;
+    setPartyCursor(partiesNextCursor);
+  }, [partiesHasMore, partiesNextCursor, isPartiesFetching]);
+  // reset cursor whenever the search text changes — starts a fresh page-1 fetch
+  // useEffect(() => {
+  //   setPartyCursor(null);
+  // }, [partySearch]);
+  const [showItemAddModal, setShowItemAddModal] = useState(false);
+  const [rows, setRows] = useState([
+    {
+      itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
+      isUnitLocked: false, CategoryOpen: false,
+      categorySearch: "", unitOpen: false, unitSearch: "",
+    }
+  ]);
+  //const [newlyAddedItem, setNewlyAddedItem] = useState(null);
+
+  // find this line in your code and add refetch:
+  // const { data: items, refetch: refetchItems } = useGetAllItemsQuery();
+  const [activeItemRow, setActiveItemRow] = useState(null);
+
+  const [itemCursor, setItemCursor] =
+    useState(null);
+
+  const activeSearch =
+    activeItemRow !== null
+      ? rows[activeItemRow]?.itemSearch || ""
+      : "";
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(activeSearch), 300);
+    return () => clearTimeout(timer);
+  }, [activeSearch]);
+  const {
+    data: items,
+    isFetching: isDropdownFetching,
+    refetch: refetchItems
+
+  } =
+    useGetItemsForDropdownQuery(
+      {
+        cursor: itemCursor,
+        search: debouncedSearch,
+        limit: 20,
+      },
+      {
+        skip: activeItemRow === null,
+      }
+    );
+
+  const dropdownScrollRefs = useRef({});
+
+  // helper to get/create the ref for row i
+  const getDropdownScrollRef = (i) => {
+    if (!dropdownScrollRefs.current[i]) {
+      dropdownScrollRefs.current[i] = { current: null };
+    }
+    return dropdownScrollRefs.current[i];
+  };
+
+
+
+  useEffect(() => {
+    setItemCursor(null);
+  }, [activeItemRow, activeSearch]);
+
+  const loadMoreItems = useCallback(() => {
+    if (
+      !isDropdownFetching &&
+      items?.hasMore &&
+      items?.nextCursor
+    ) {
+      setItemCursor(items.nextCursor);
+    }
+  }, [
+    isDropdownFetching,
+    items?.hasMore,
+    items?.nextCursor,
+  ]);
+  const [getItemByName] = useLazyGetItemByNameQuery();
   const { data: categories } = useGetAllCategoriesQuery()
   const { data: termsTemplates } = useGetAllTermsQuery("Purchase_Bill");
   console.log(termsTemplates, "termsTemplates");
@@ -81,17 +335,11 @@ export default function PurchaseEdit() {
   //const[categoryOpen,setCategoryOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   //const[selected,setSelected] = useState([]);
-  const [partySearch, setPartySearch] = useState("");
-  const [newCategory, setNewCategory] = useState("");
-  // const dropdownRef=useRef(null);
-  // const[search,setSearch] = useState("");
-  const [showPartyModal, setShowPartyModal] = useState(false);
-  const [showSplitBox, setShowSplitBox] = useState(false);
-  const [showBankModal, setShowBankModal] = useState(false);
-  const [showGSTIN, setShowGSTIN] = useState("");
+
   //const [originalTotal, setOriginalTotal] = useState(null);
   const [addCategory] = useAddCategoryMutation();
 
+  const [showBankModal, setShowBankModal] = useState(false);
   const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [activeUnitRow, setActiveUnitRow] = useState(null);
 
@@ -175,16 +423,96 @@ export default function PurchaseEdit() {
     }
   };
 
-  const [rows, setRows] = useState([
-    {
-      itemSearch: "", itemOpen: false, isExistingItem: false, isHSNLocked: false,
-      isUnitLocked: false, CategoryOpen: false,
-      categorySearch: "", unitOpen: false, unitSearch: "",
-    }
-  ]);
+
 
   const [editPurchase, { isLoading: isEditingPurchase }] = useEditPurchaseMutation();
   // helper to update a field in a specific row
+  const { data: settingsData } = useGetAllSettingsQuery();
+  const settings = settingsData?.settings || [];
+
+  const showMRP =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "show_mrp"
+      )?.setting_value
+    ) === 1;
+  const barcodeScanEnabled =
+    Number(
+      settings.find(
+        (s) => s.setting_key === "barcode_scan"
+      )?.setting_value
+    ) === 1;
+  const hasHistoricalMRP =
+    purchase?.items?.some(
+      (item) => item.hasHistoricalMRP === true
+    );
+  const {
+    data: taxesGSTSettingsData,
+  } = useGetAllTaxesAndGSTSettingsQuery();
+
+  const taxesGSTSettings = taxesGSTSettingsData?.settings || [];
+
+  const enableGST =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key === "enable_gst"
+      )?.setting_value
+    ) === 1;
+
+  const enableHSNCode =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_hsn_sac"
+      )?.setting_value
+    ) === 1;
+  const enablePlaceOfSupply =
+    Number(
+      taxesGSTSettings.find(
+        (s) =>
+          s.setting_key ===
+          "enable_place_of_supply"
+      )?.setting_value
+    ) === 1;
+  const { data: transactionsSettingsData } = useGetAllTransactionsSettingsQuery();
+
+  const transactionsSettings = transactionsSettingsData?.settings || [];
+
+  const enableTransactionWiseDiscount =
+    Number(
+      transactionsSettings.find(
+        (s) =>
+          s.setting_key === "transaction_wise_discount"
+      )?.setting_value
+    ) === 1;
+
+  const showFreeQuantity =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "free_item_quantity"
+      )?.setting_value
+    ) === 1;
+  const enableBillingNameOfParties =
+    Number(
+      transactionsSettings.find(
+        (s) => s.setting_key === "billing_name_of_parties"
+      )?.setting_value
+    ) === 1
+  //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
+  // const showBillingName =
+  //   enableBillingNameOfParties ||
+  //   !!currentPartyDetails?.Billing_Name?.trim();
+  const [showBillingName, setShowBillingName] = useState(false);
+  const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
+  const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =
+    useState(false);
+  const hasHistoricaFreeQuantity = purchase?.items?.some(
+    (item) => item.hasHistoricalFreeQuantity === true
+  )
+  const shouldShowFreeQuantity = showFreeQuantity || hasHistoricaFreeQuantity
+  const shouldShowMRP = showMRP || hasHistoricalMRP;
   const handleRowChange = (index, field, value) => {
     setRows((prev) => {
       const updated = [...prev];
@@ -245,6 +573,7 @@ export default function PurchaseEdit() {
     setValue,
     watch,
     reset,
+    getValues,
     clearErrors,
     //getValues,
     formState: { errors },
@@ -252,10 +581,14 @@ export default function PurchaseEdit() {
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: {
       Party_Name: "",
+      Billing_Name: "",
 
       Bill_Number: "",
+      Phone_Number: "",
       Bill_Date: "",
       State_Of_Supply: "",
+      Transaction_Discount_Percentage: "",
+      Transaction_Discount_Amount: "",
       Total_Amount: "",
       Round_Off: "",
       Balance_Due: "",
@@ -272,8 +605,10 @@ export default function PurchaseEdit() {
         Item_Category: "",
         Item_Name: "",
         Quantity: "",
+        Free_Quantity: "",
         Item_Unit: "",
         Purchase_Price: "",
+        MRP: "",
 
         Discount_On_Purchase_Price: "",
         Discount_Type_On_Purchase_Price: "Percentage",
@@ -285,7 +620,7 @@ export default function PurchaseEdit() {
     }
 
   })
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
   });
@@ -344,28 +679,157 @@ export default function PurchaseEdit() {
       Balance_Due: (totalAmount - num(totalPaid)).toFixed(2),
     };
   };
+  // const getRawTotal = () => {
+  //   return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+  // };
   const getRawTotal = () => {
-    return (itemsValues || []).reduce((sum, it) => sum + (Number(it.Amount) || 0), 0);
+    const currentItems = getValues("items") || [];
+
+    return currentItems.reduce(
+      (sum, it) => sum + (Number(it.Amount) || 0),
+      0
+    );
   };
 
+  // const applyRoundOff = (roundOffValue) => {
+  //   const rawTotal = getRawTotal();
+  //   const totalPaid = Number(watch("Total_Paid")) || 0;
+  //   const newTotal = rawTotal + roundOffValue;
+
+  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  // };
   const applyRoundOff = (roundOffValue) => {
     const rawTotal = getRawTotal();
+
+    const discountAmount =
+      Number(watch("Transaction_Discount_Amount")) || 0;
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
     const totalPaid = Number(watch("Total_Paid")) || 0;
-    const newTotal = rawTotal + roundOffValue;
+
+    const newTotal = afterDiscount + Number(roundOffValue || 0);
+
 
     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
     setValue("Balance_Due", (newTotal - totalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
   };
-  const syncTotalsAfterItemChange = () => {
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      applyRoundOff(currentRoundOff);
-    } else {
-      const rawTotal = getRawTotal();
-      setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
+  const syncTotalsAfterItemChange = (rawTotalOverride = null) => {
+    const rawTotal =
+      rawTotalOverride !== null
+        ? Number(rawTotalOverride) || 0
+        : getRawTotal();
+
+    const discountPercentage =
+      Number(watch("Transaction_Discount_Percentage")) || 0;
+
+    const discountAmount =
+      discountPercentage > 0
+        ? (rawTotal * discountPercentage) / 100
+        : 0;
+
+    setValue(
+      "Transaction_Discount_Amount",
+      discountAmount > 0
+        ? discountAmount.toFixed(2)
+        : "",
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    const afterDiscount = Math.max(
+      0,
+      rawTotal - discountAmount
+    );
+
+    const roundOff = isRoundOff
+      ? Number(watch("Round_Off")) || 0
+      : 0;
+
+    const finalTotal = Math.max(
+      0,
+      afterDiscount + roundOff
+    );
+
+    const totalPaid =
+      Number(watch("Total_Paid")) || 0;
+
+    setValue(
+      "Total_Amount",
+      finalTotal.toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
+
+    setValue(
+      "Balance_Due",
+      (finalTotal - totalPaid).toFixed(2),
+      {
+        shouldValidate: true,
+        shouldDirty: true,
+      }
+    );
   };
+  // const syncTotalsAfterItemChange = (
+  //   discountAmountOverride = null
+  // ) => {
+  //   const rawTotal = getRawTotal();
+
+  //   const discountAmount =
+  //     discountAmountOverride !== null
+  //       ? Number(discountAmountOverride) || 0
+  //       : Number(watch("Transaction_Discount_Amount")) || 0;
+
+  //   const afterDiscount = Math.max(
+  //     0,
+  //     rawTotal - discountAmount
+  //   );
+
+  //   const roundOff = isRoundOff
+  //     ? Number(watch("Round_Off")) || 0
+  //     : 0;
+
+  //   const finalTotal = afterDiscount + roundOff;
+
+  //   const totalPaid =
+  //     Number(watch("Total_Paid")) || 0;
+
+  //   setValue(
+  //     "Total_Amount",
+  //     finalTotal.toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+
+  //   setValue(
+  //     "Balance_Due",
+  //     (finalTotal - totalPaid).toFixed(2),
+  //     {
+  //       shouldValidate: true,
+  //       shouldDirty: true,
+  //     }
+  //   );
+  // };
+  // const syncTotalsAfterItemChange = () => {
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     applyRoundOff(currentRoundOff);
+  //   } else {
+  //     const rawTotal = getRawTotal();
+  //     setValue("Total_Amount", rawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (rawTotal - Number(watch("Total_Paid") || 0)).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+  // };
   const handleAddRow = () => {
     setRows((prev) => [
       // only close CategoryOpen, preserve lock states
@@ -392,9 +856,13 @@ export default function PurchaseEdit() {
       Item_Category: "",
       Item_Name: "",
       Item_HSN: "",
+      MRP: "",
       Quantity: "",
+      Free_Quantity: "",
       Item_Unit: "",
+
       Purchase_Price: "",
+
       Discount_On_Purchase_Price: "",
       Discount_Type_On_Purchase_Price: "Percentage",
       Tax_Type: "None",
@@ -403,88 +871,74 @@ export default function PurchaseEdit() {
     });
   };
 
-  // const handleDeleteRow = (i) => {
-  //   setRows((prev) => prev.filter((_, idx) => idx !== i)); // remove UI state
-  //   remove(i); // remove from form
-  // };
 
   // const handleDeleteRow = (i) => {
   //   // 1. get current items BEFORE removal
   //   const currentItems = watch("items");
 
-  //   // 2. calculate new total excluding the deleted row
-  //   const newTotal = currentItems.reduce((sum, row, idx) => {
-  //     if (idx === i) return sum;                    // skip deleted row
+  //   // 2. calculate new raw total excluding the deleted row
+  //   const newRawTotal = currentItems.reduce((sum, row, idx) => {
+  //     if (idx === i) return sum;
   //     return sum + parseFloat(row.Amount || 0);
   //   }, 0);
 
   //   const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
-  //   const newBalanceDue = newTotal - currentTotalPaid;
 
   //   // 3. remove from UI state and form
   //   setRows((prev) => prev.filter((_, idx) => idx !== i));
   //   remove(i);
 
-  //   // 4. update totals
-  //   setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true });
-  //   setValue("Balance_Due", newBalanceDue.toFixed(2), { shouldValidate: true });
+  //   // 4. update totals — respecting Round Off if active
+  //   if (isRoundOff) {
+  //     const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
+  //     const newTotal = newRawTotal + currentRoundOff;
+  //     setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   } else {
+  //     setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //     setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   }
+
+  //   // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
+  //   // if (isTotalPaid) {
+  //   //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
+  //   //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
+  //   //   if ((watch("splits") || []).length === 1) {
+  //   //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
+  //   //   }
+  //   // }
   // };
   const handleDeleteRow = (i) => {
-    // 1. get current items BEFORE removal
-    const currentItems = watch("items");
+    // Get current items BEFORE removal
+    const currentItems = watch("items") || [];
 
-    // 2. calculate new raw total excluding the deleted row
-    const newRawTotal = currentItems.reduce((sum, row, idx) => {
-      if (idx === i) return sum;
-      return sum + parseFloat(row.Amount || 0);
-    }, 0);
+    // Calculate subtotal AFTER deleting this row
+    const newRawTotal = currentItems.reduce(
+      (sum, row, idx) => {
+        if (idx === i) return sum;
 
-    const currentTotalPaid = parseFloat(watch("Total_Paid") || 0);
+        return sum + (Number(row.Amount) || 0);
+      },
+      0
+    );
 
-    // 3. remove from UI state and form
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
+    // Remove from UI
+    setRows((prev) =>
+      prev.filter((_, idx) => idx !== i)
+    );
+
+    // Remove from React Hook Form
     remove(i);
 
-    // 4. update totals — respecting Round Off if active
-    if (isRoundOff) {
-      const currentRoundOff = parseFloat(watch("Round_Off")) || 0;
-      const newTotal = newRawTotal + currentRoundOff;
-      setValue("Total_Amount", newTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("Total_Amount", newRawTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-      setValue("Balance_Due", (newRawTotal - currentTotalPaid).toFixed(2), { shouldValidate: true, shouldDirty: true });
-    }
-
-    // 5. if "Total Paid" checkbox is active, keep it in sync with the new total too
-    // if (isTotalPaid) {
-    //   const finalTotal = isRoundOff ? newRawTotal + (parseFloat(watch("Round_Off")) || 0) : newRawTotal;
-    //   setValue("Total_Paid", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    //   setValue("Balance_Due", "0.00", { shouldValidate: true, shouldDirty: true });
-    //   if ((watch("splits") || []).length === 1) {
-    //     setValue("splits.0.Amount", finalTotal.toFixed(2), { shouldValidate: true, shouldDirty: true });
-    //   }
-    // }
+    // Recalculate discount + total + balance
+    syncTotalsAfterItemChange(newRawTotal);
   };
-
 
 
   const formValues = watch();
 
-  // const handleSelect = (rowIndex, categoryName) => {
-  //   setRows((prev) => {
-  //     const updated = [...prev];
-  //     updated[rowIndex] = {
-  //       ...updated[rowIndex],
-  //       Item_Category: categoryName,
-  //       CategoryOpen: false,
-  //       isExistingItem: false,   // user-typed, so still editable
-  //     };
-  //     return updated;
-  //   });
 
-  //   setValue(`items.${rowIndex}.Item_Category`, categoryName, { shouldValidate: true });
-  // };
 
 
 
@@ -587,6 +1041,7 @@ export default function PurchaseEdit() {
     return items.reduce(
       (acc, item) => {
         const qty = Number(item.Quantity) || 0;
+        const freeQuantity = Number(item.Free_Quantity) || 0
         const price = Number(item.Purchase_Price) || 0;
 
         const subtotal = qty * price;
@@ -600,6 +1055,7 @@ export default function PurchaseEdit() {
             : discountRaw * qty;
 
         acc.totalQty += qty;
+        acc.freeQuantity += freeQuantity
         acc.totalDiscount += discount;
         acc.totalTax += Number(item.Tax_Amount) || 0;
         acc.totalAmount += Number(item.Amount) || 0;
@@ -608,6 +1064,7 @@ export default function PurchaseEdit() {
       },
       {
         totalQty: 0,
+        freeQuantity: 0,
         totalDiscount: 0,
         totalTax: 0,
         totalAmount: 0,
@@ -619,9 +1076,13 @@ export default function PurchaseEdit() {
     Item_Name: "",
     itemSearch: "",
     Item_HSN: "",
+    MRP: "",
     Quantity: "",
+    Free_Quantity: "",
     Item_Unit: "",
+
     Purchase_Price: "",
+
     Discount_On_Purchase_Price: "",
     Discount_Type_On_Purchase_Price: "Percentage",
     Tax_Type: "None",
@@ -635,29 +1096,35 @@ export default function PurchaseEdit() {
     isUnitLocked: false,
     isExistingItem: false,
   });
+  const originalTaxTypesRef = useRef([]);
+  const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   useEffect(() => {
     if (purchase) {
+      originalTaxTypesRef.current = (purchase?.items || []).map(
+        (item) => item?.Tax_Type || "None"
+      );
+      const savedDiscountAmount =
+        Number(
+          purchase?.billPurchaseDetails?.Transaction_Discount_Amount
+        ) || 0;
+
+      const savedDiscountPercentage =
+        Number(
+          purchase?.billPurchaseDetails?.Transaction_Discount_Percentage
+        ) || 0;
+
+      setShowTransactionDiscount(
+        enableTransactionWiseDiscount ||
+        savedDiscountAmount > 0 ||
+        savedDiscountPercentage > 0
+      );
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
+      const savedBillingName =
+        !!purchase?.billPurchaseDetails?.Billing_Name?.trim();
 
-      // const prefilledRows = purchase?.items?.length > 0
-      //   ? purchase.items.map((item) => ({
-      //     ...item,
-      //     // Primary_Unit: item.Primary_Unit || "",
-      //     // Secondary_Unit: item.Secondary_Unit || "",
-      //     // Conversion_Rate: item.Conversion_Rate || "",
+      setShowBillingName(savedBillingName);
 
-      //     // Available_Units: Array.isArray(item.Available_Units)
-      //     //   ? item.Available_Units
-      //     //   : [],
-      //     Item_Unit: item.Selected_Unit || "",
-      //     itemSearch: item.Item_Name,
-      //     itemOpen: false,
-      //     CategoryOpen: false,
-      //     isHSNLocked: false,
-      //     isUnitLocked: false,
-      //     isExistingItem: true,
-      //   }))
-      //   : [emptyRow()];
+      setHasSeenBillingNameParty(savedBillingName);
 
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item, index) => {
@@ -665,23 +1132,7 @@ export default function PurchaseEdit() {
           // Original purchase price saved in this purchase line
           const purchasePrice = Number(item.Purchase_Price) || 0;
 
-          // If this purchase was saved in secondary unit,
-          // convert its price back to PRIMARY price.
-          // const primaryUnit = item.Primary_Unit || "";
-          // const secondaryUnit = item.Secondary_Unit || "";
-          //       const primaryUnit =
-          //   item.Primary_Unit ||
-          //   availableUnits[0]?.Unit_Shorthand ||
-          //   "";
 
-          // const secondaryUnit =
-          //   item.Secondary_Unit ||
-          //   availableUnits.find(
-          //     (u) => u.Unit_Shorthand !== primaryUnit
-          //   )?.Unit_Shorthand ||
-          //   "";
-          //       const conversionRate = Number(item.Conversion_Rate) || 0;
-          //       const selectedUnit = item.Selected_Unit || primaryUnit;
           const conversionRate = Number(item.Conversion_Rate) || 0;
 
           const availableUnits = Array.isArray(item.Available_Units)
@@ -746,8 +1197,11 @@ export default function PurchaseEdit() {
         Item_Name: item.Item_Name || "",
         Item_Category: item.Item_Category || "",
         Item_HSN: item.Item_HSN || "",
+        MRP: Number(item.MRP) > 0
+          ? item.MRP
+          : "",
         Quantity: item.Quantity || "",
-
+        Free_Quantity: item.Free_Quantity || "",
         Item_Unit: item.Item_Unit || "",
 
         Purchase_Price: item.Purchase_Price || "",
@@ -768,8 +1222,10 @@ export default function PurchaseEdit() {
       setIsRoundOff(roundOffFromDb !== 0);
       reset({
         Party_Name: purchase?.billPurchaseDetails?.Party_Name,
+        Billing_Name: purchase?.billPurchaseDetails?.Billing_Name || "",
         GSTIN: purchase?.billPurchaseDetails?.GSTIN,
         Bill_Number: purchase?.billPurchaseDetails?.Bill_Number,
+        Phone_Number: purchase?.billPurchaseDetails?.Phone_Number || "",
         Bill_Date: toLocalDateString(purchase?.billPurchaseDetails?.Bill_Date),
         State_Of_Supply: purchase?.billPurchaseDetails?.State_Of_Supply,
         Total_Amount: purchase?.billPurchaseDetails?.Total_Amount,
@@ -779,6 +1235,15 @@ export default function PurchaseEdit() {
         Terms_Conditions_Id: purchase?.billPurchaseDetails?.Terms_Conditions_Id ?? null,
 
         Terms_Conditions_Description: purchase?.billPurchaseDetails?.Terms_Conditions_Description ?? "",
+        Transaction_Discount_Amount:
+          Number(purchase?.billPurchaseDetails?.Transaction_Discount_Amount) > 0
+            ? purchase?.billPurchaseDetails?.Transaction_Discount_Amount
+            : "",
+
+        Transaction_Discount_Percentage:
+          Number(purchase?.billPurchaseDetails?.Transaction_Discount_Percentage) > 0
+            ? purchase?.billPurchaseDetails?.Transaction_Discount_Percentage
+            : "",
         //Payment_Type: purchase?.billPurchaseDetails?.Payment_Type,
         //Bank_Account_Id: purchase?.billPurchaseDetails?.Bank_Account_Id, // ✅ Add this
         //Reference_Number: purchase?.billPurchaseDetails?.Reference_Number,
@@ -951,8 +1416,16 @@ export default function PurchaseEdit() {
         purchaseApi.util.invalidateTags(["Purchase"])
       );
 
+      // dispatch(
+      //   itemApi.util.invalidateTags(["Item", "ItemLedger"])
+      // );
       dispatch(
-        itemApi.util.invalidateTags(["Item", "ItemLedger"])
+        itemApi.util.invalidateTags([
+          { type: "Item", id: "LIST" },
+          { type: "Item", id: "DROPDOWN" },
+          { type: "ItemsByCategory", id: "LIST" },
+          { type: "ItemLedger", id: "LIST" },
+        ])
       );
 
       dispatch(
@@ -1118,6 +1591,10 @@ export default function PurchaseEdit() {
       Item_Category: item.Item_Category || "",
       Item_Name: item.Item_Name || "",
       Item_HSN: item.Item_HSN || "",
+      MRP: showMRP && Number(item.MRP) > 0
+        ? Number(item.MRP)
+        : "",
+      //MRP: Number(item.MRP) > 0 ? Number(item.MRP) : "",
 
       Quantity: Number(item.Quantity) || 1,
 
@@ -1205,23 +1682,157 @@ export default function PurchaseEdit() {
     // UPDATE REACT HOOK FORM
     // =====================================================
 
-    setValue(
-      "items",
-      calculatedItems,
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "items",
+    //   calculatedItems,
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
+    replace(calculatedItems);
 
     // =====================================================
     // CREATE UI ROWS
     // =====================================================
 
-    const scannedUiRows = scannedItems.map(
-      (item) => ({
-        itemSearch:
-          item.Item_Name || "",
+    // const scannedUiRows = scannedItems.map(
+    //   (item) => ({
+    //     itemSearch:
+    //       item.Item_Name || "",
+
+    //     itemOpen: false,
+
+    //     isExistingItem: true,
+    //     isHSNLocked: false,
+    //     isUnitLocked: false,
+
+    //     CategoryOpen: false,
+    //     categorySearch:
+    //       item.Item_Category || "",
+
+    //     unitOpen: false,
+    //     unitSearch: "",
+
+    //     Item_Id:
+    //       item.Item_Id || "",
+
+    //     Item_Name:
+    //       item.Item_Name || "",
+
+    //     Item_Category:
+    //       item.Item_Category || "",
+
+    //     Item_HSN: item.Item_HSN || "",
+
+    //     // MRP: Number(item.MRP) > 0
+    //     //   ? Number(item.MRP)
+    //     //   : "",
+    //     MRP: showMRP && Number(item.MRP) > 0
+    //       ? Number(item.MRP)
+    //       : "",
+
+    //     Primary_Unit:
+    //       item.Primary_Unit || null,
+
+    //     Secondary_Unit:
+    //       item.Secondary_Unit || null,
+
+    //     Conversion_Rate:
+    //       item.Conversion_Rate || null,
+
+    //     Available_Units:
+    //       Array.isArray(item.Available_Units)
+    //         ? item.Available_Units
+    //         : [],
+
+    //     // ✅ PURCHASE PRICE
+    //     Purchase_Price:
+    //       Number(item.Purchase_Price) || 0,
+
+    //     // ✅ PURCHASE DISCOUNT
+    //     Discount_On_Purchase_Price:
+    //       item.Discount_On_Purchase_Price ?? "",
+
+    //     Discount_Type_On_Purchase_Price:
+    //       item.Discount_Type_On_Purchase_Price ||
+    //       "Percentage",
+
+    //     Tax_Type:
+    //       item.Tax_Type || "None",
+    //   })
+    // );
+
+    // =====================================================
+    // UPDATE UI ROWS
+    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
+    // =====================================================
+
+    // setRows((prev) => {
+    //   const updatedRows = [...prev];
+
+    //   let uiScanIndex = 0;
+
+    //   // ---------------------------------------------------
+    //   // Fill existing blank rows
+    //   // ---------------------------------------------------
+
+    //   for (
+    //     let i = 0;
+    //     i < updatedRows.length &&
+    //     uiScanIndex < scannedUiRows.length;
+    //     i++
+    //   ) {
+    //     const row = updatedRows[i];
+
+    //     const isBlankRow =
+    //       !row?.Item_Name ||
+    //       !row.Item_Name.trim();
+
+    //     if (isBlankRow) {
+    //       updatedRows[i] =
+    //         scannedUiRows[uiScanIndex];
+
+    //       uiScanIndex++;
+    //     }
+    //   }
+
+    //   // ---------------------------------------------------
+    //   // Remove remaining blank rows
+    //   // ---------------------------------------------------
+
+    //   const filledRows =
+    //     updatedRows.filter(
+    //       (row) =>
+    //         row?.Item_Name &&
+    //         row.Item_Name.trim()
+    //     );
+
+    //   // ---------------------------------------------------
+    //   // Append remaining scanned rows
+    //   // ---------------------------------------------------
+
+    //   if (
+    //     uiScanIndex <
+    //     scannedUiRows.length
+    //   ) {
+    //     filledRows.push(
+    //       ...scannedUiRows.slice(
+    //         uiScanIndex
+    //       )
+    //     );
+    //   }
+
+    //   return filledRows;
+    // });
+    // =====================================================
+    // UPDATE UI ROWS
+    // USE THE SAME combinedItems ORDER AS RHF
+    // =====================================================
+
+    setRows(
+      combinedItems.map((item) => ({
+        itemSearch: item.Item_Name || "",
 
         itemOpen: false,
 
@@ -1230,43 +1841,36 @@ export default function PurchaseEdit() {
         isUnitLocked: false,
 
         CategoryOpen: false,
-        categorySearch:
-          item.Item_Category || "",
+        categorySearch: item.Item_Category || "",
 
         unitOpen: false,
         unitSearch: "",
 
-        Item_Id:
-          item.Item_Id || "",
+        Item_Id: item.Item_Id || "",
 
-        Item_Name:
-          item.Item_Name || "",
+        Item_Name: item.Item_Name || "",
+        Item_Category: item.Item_Category || "",
+        Item_HSN: item.Item_HSN || "",
 
-        Item_Category:
-          item.Item_Category || "",
+        // Historical MRP is allowed to remain visible
+        // in the existing bill, but scanned/selected items
+        // must respect the CURRENT MRP setting.
+        MRP:
+          showMRP && Number(item.MRP) > 0
+            ? Number(item.MRP)
+            : "",
 
-        Item_HSN:
-          item.Item_HSN || "",
+        Primary_Unit: item.Primary_Unit || null,
+        Secondary_Unit: item.Secondary_Unit || null,
+        Conversion_Rate: item.Conversion_Rate || null,
 
-        Primary_Unit:
-          item.Primary_Unit || null,
+        Available_Units: Array.isArray(item.Available_Units)
+          ? item.Available_Units
+          : [],
 
-        Secondary_Unit:
-          item.Secondary_Unit || null,
-
-        Conversion_Rate:
-          item.Conversion_Rate || null,
-
-        Available_Units:
-          Array.isArray(item.Available_Units)
-            ? item.Available_Units
-            : [],
-
-        // ✅ PURCHASE PRICE
         Purchase_Price:
           Number(item.Purchase_Price) || 0,
 
-        // ✅ PURCHASE DISCOUNT
         Discount_On_Purchase_Price:
           item.Discount_On_Purchase_Price ?? "",
 
@@ -1276,71 +1880,8 @@ export default function PurchaseEdit() {
 
         Tax_Type:
           item.Tax_Type || "None",
-      })
+      }))
     );
-
-    // =====================================================
-    // UPDATE UI ROWS
-    // FILL BLANKS FIRST + REMOVE UNUSED BLANKS
-    // =====================================================
-
-    setRows((prev) => {
-      const updatedRows = [...prev];
-
-      let uiScanIndex = 0;
-
-      // ---------------------------------------------------
-      // Fill existing blank rows
-      // ---------------------------------------------------
-
-      for (
-        let i = 0;
-        i < updatedRows.length &&
-        uiScanIndex < scannedUiRows.length;
-        i++
-      ) {
-        const row = updatedRows[i];
-
-        const isBlankRow =
-          !row?.Item_Name ||
-          !row.Item_Name.trim();
-
-        if (isBlankRow) {
-          updatedRows[i] =
-            scannedUiRows[uiScanIndex];
-
-          uiScanIndex++;
-        }
-      }
-
-      // ---------------------------------------------------
-      // Remove remaining blank rows
-      // ---------------------------------------------------
-
-      const filledRows =
-        updatedRows.filter(
-          (row) =>
-            row?.Item_Name &&
-            row.Item_Name.trim()
-        );
-
-      // ---------------------------------------------------
-      // Append remaining scanned rows
-      // ---------------------------------------------------
-
-      if (
-        uiScanIndex <
-        scannedUiRows.length
-      ) {
-        filledRows.push(
-          ...scannedUiRows.slice(
-            uiScanIndex
-          )
-        );
-      }
-
-      return filledRows;
-    });
 
     // =====================================================
     // CALCULATE GRAND TOTAL
@@ -1354,44 +1895,46 @@ export default function PurchaseEdit() {
         0
       );
 
-    const roundOff = isRoundOff
-      ? Number(watch("Round_Off")) || 0
-      : 0;
+    // const roundOff = isRoundOff
+    //   ? Number(watch("Round_Off")) || 0
+    //   : 0;
 
-    const finalTotal =
-      rawTotal + roundOff;
+    // const finalTotal =
+    //   rawTotal + roundOff;
 
-    const totalPaid =
-      Number(watch("Total_Paid")) || 0;
+    // const totalPaid =
+    //   Number(watch("Total_Paid")) || 0;
 
-    const balanceDue =
-      finalTotal - totalPaid;
+    // const balanceDue =
+    //   finalTotal - totalPaid;
 
-    // =====================================================
-    // UPDATE TOTAL
-    // =====================================================
+    // // =====================================================
+    // // UPDATE TOTAL
+    // // =====================================================
 
-    setValue(
-      "Total_Amount",
-      finalTotal.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Total_Amount",
+    //   finalTotal.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
 
-    // =====================================================
-    // UPDATE BALANCE
-    // =====================================================
+    // // =====================================================
+    // // UPDATE BALANCE
+    // // =====================================================
 
-    setValue(
-      "Balance_Due",
-      balanceDue.toFixed(2),
-      {
-        shouldValidate: true,
-        shouldDirty: true,
-      }
-    );
+    // setValue(
+    //   "Balance_Due",
+    //   balanceDue.toFixed(2),
+    //   {
+    //     shouldValidate: true,
+    //     shouldDirty: true,
+    //   }
+    // );
+    // Total Amount and Balance Due
+    syncTotalsAfterItemChange(rawTotal);
 
     // =====================================================
     // CLOSE MODAL
@@ -1399,25 +1942,10 @@ export default function PurchaseEdit() {
 
     setShowScanCodeModal(false);
   };
-
+  //const partyWasEditedRef = useRef(false);
   return (
     <>
-      {/* <div className="sb2-2-2">
-        <ul>
-          <li>
-         
-            <NavLink style={{ display: "flex", flexDirection: "row" }}
-              to="/home"
 
-            >
-              <LayoutDashboard size={20} style={{ marginRight: '8px' }} />
-             
-              Dashboard
-            </NavLink>
-          </li>
-
-        </ul>
-      </div> */}
 
       {/* Main Content */}
       {/* <div className="sb2-2-3">
@@ -1426,10 +1954,22 @@ export default function PurchaseEdit() {
             <div style={{ padding: "20px" }}
               className="box-inn-sp"> */}
 
-      <div style={{ padding: "20px" }}
-        className="flex flex-col bg-white ">
+      {/* <div style={{ padding: "20px" }}
+        className="flex flex-col bg-white "> */}
+      <div
+        className="flex flex-col bg-white"
+        style={{
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          padding: "20px",
+          boxSizing: "border-box",
+          //  marginTop: "2rem"
+        }}
+      >
 
-        <div className="inn-title w-full px-2 py-3">
+        <div className="inn-title w-full px-2 py-2"
+          style={{ marginTop: "2rem" }} >
 
           <div className="
     flex flex-col sm:flex-row 
@@ -1534,13 +2074,7 @@ export default function PurchaseEdit() {
                       search: location.search,
                     });
                   }
-                  // else if (from === "cash-in-hand") {
-                  //   // 🔹 new — return to Bank Accounts page with the same account selected
-                  //   navigate({
-                  //     pathname: `/cash-bank/cash-in-hand`,
 
-                  //   });
-                  // }
                   else {
                     navigate({
                       pathname: "/purchase/all-purchases",
@@ -1562,9 +2096,22 @@ export default function PurchaseEdit() {
                 Back
               </button>
 
-              <button
+              {/* <button
                 type="button"
                 onClick={() => navigate("/purchase/all-purchases")}
+                className="text-white py-2 px-4 rounded"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                All Purchases
+              </button> */}
+              <button
+                type="button"
+                onClick={() =>
+                  navigate({
+                    pathname: "/purchase/all-purchases",
+                    search: location.search,
+                  })
+                }
                 className="text-white py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
@@ -1574,540 +2121,1705 @@ export default function PurchaseEdit() {
 
           </div>
         </div>
-        <div style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} className="tab-inn">
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="flex flex-col justify-between gap-6 w-full sm:flex-row heading-wrapper">
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            minWidth: 0,
+            overflow: "hidden",
+            padding: "0px",
+            backgroundColor: "#f1f1f19d",
+          }}
+          //style={{ padding: "0px", backgroundColor: "#f1f1f19d" }} 
+          //className="tab-inn"
+          className="tab-inn flex flex-col"
+        >
+          <form onSubmit={handleSubmit(onSubmit)}
+            className="flex flex-col"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              overflow: "hidden",
+
+            }}
+          >
+            {/* SCROLLABLE FORM CONTENT */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+
+                minWidth: 0,
+                overflowY: "auto",
+                overflowX: "hidden",
+              }}
+            >
+              <div className="flex flex-col justify-between gap-6 p-2 w-full sm:flex-row heading-wrapper">
+
+                <div className="flex flex-col gap-4 w-full lg:w-2/3">
+                  <div
+                    //className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
+                    className="grid grid-cols-1  sm:grid-cols-2  gap-x-6 gap-y-4"
+                  >
+                    {/* <div className=" flex flex-col relative mt-2 gap-2 party-class"
+                    style={{ marginBottom: "0px", marginTop: "0px" }}>
+                    <span className="whitespace-nowrap active ">
+                      Party
+                      <span className="text-red-500">*</span>
+                    </span>
 
 
-              <div className="grid grid-rows-2 ml-2 w-full sm:w-1/2 lg:w-1/3 ">
+                    <div className="relative w-full">
+                      <div
+                        className="flex flex-row border rounded-md bg-white cursor-pointer"
+                        onClick={() => setOpen((prev) => !prev)}
+                      >
+                        <input
+                          type="text"
+                          id="Party_Name"
+                          value={partySearch}
+                          // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPartySearch(value);
+                            setValue("Party_Name", value, { shouldValidate: true });
+                            setOpen(true);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(true);
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              const typedValue = partySearch?.trim()?.toLowerCase();
+                              const matchedParty = parties?.parties?.find(
+                                (p) => p.Party_Name.toLowerCase() === typedValue
+                              );
 
-                <div className=" flex flex-col relative mt-2 gap-2 party-class"
-                  style={{ marginBottom: "0px", marginTop: "0px" }}>
-                  <span className="whitespace-nowrap active ">
-                    Party
-                    <span className="text-red-500">*</span>
-                  </span>
+                              if (matchedParty) {
+                                setPartySearch(matchedParty.Party_Name);
+                                setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
+                                setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
+                              }
 
+                              setOpen(false);
+                            }, 150);
+                          }}
+                          placeholder="Search By Name/Phone"
+                          className="w-full outline-none py-1 px-2 text-gray-900"
+                          style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                        />
+                        <div className="w-10 "></div>
+                        <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
+                      </div>
 
-                  <div className="relative w-full">
-                    <div
-                      className="flex flex-row border rounded-md bg-white cursor-pointer"
-                      onClick={() => setOpen((prev) => !prev)}
-                    >
-                      <input
-                        type="text"
-                        id="Party_Name"
-                        value={partySearch}
-                        // value={partySearch.length>10?partySearch.slice(0,15)+"...":partySearch}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPartySearch(value);
-                          setValue("Party_Name", value, { shouldValidate: true });
-                          setOpen(true);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpen(true);
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            const typedValue = partySearch?.trim()?.toLowerCase();
-                            const matchedParty = parties?.parties?.find(
-                              (p) => p.Party_Name.toLowerCase() === typedValue
-                            );
+                      {open && (
+                        <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          <span
+                            onClick={() => setShowPartyModal(true)}
+                            className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
+                          >
+                            + Add Party
+                          </span>
 
-                            if (matchedParty) {
-                              setPartySearch(matchedParty.Party_Name);
-                              setValue("Party_Name", matchedParty.Party_Name, { shouldValidate: true });
-                              setValue("GSTIN", matchedParty.GSTIN || "", { shouldValidate: true });
-                            }
+                          
+                          {parties?.parties
+                            ?.filter(
+                              (party) =>
+                                party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
+                                party?.Phone_Number?.includes(partySearch)
+                            )
+                            .map((party, i) => {
+                              const bal = Number(party.Current_Balance ?? 0);
+                              const balColor = bal < 0 ? "#ef4444" : "#16a34a";
 
-                            setOpen(false);
-                          }, 150);
-                        }}
-                        placeholder="Search By Name/Phone"
-                        className="w-full outline-none py-1 px-2 text-gray-900"
-                        style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
-                      />
-                      <div className="w-10 "></div>
-                      <span className=" absolute right-0 px-2  top-1/3  text-gray-700">▼</span>
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setPartySearch(party.Party_Name);
+                                    setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                                    setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                                    //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+
+                                    setOpen(false);
+                                  }}
+                                  className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
+                                  style={{ borderBottom: "1px solid #f3f4f6" }}
+                                >
+                                  
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-sm text-gray-800 font-medium truncate">
+                                      {party.Party_Name}
+                                    </span>
+                                    <span className="text-xs text-gray-400">
+                                      {party.Phone_Number || "—"}
+                                    </span>
+                                  </div>
+
+                                 
+                                  <div className="flex flex-col items-end flex-shrink-0">
+                                    <span className="text-xs text-gray-400">Balance</span>
+                                    <span className="text-xs font-semibold" style={{ color: balColor }}>
+                                      ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                          {parties?.parties?.filter((party) =>
+                            party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
+                          ).length === 0 && (
+                              <p className="px-3 py-2 text-gray-500">No Party found</p>
+                            )}
+                        </div>
+                      )}
                     </div>
 
-                    {open && (
-                      <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        <span
-                          onClick={() => setShowPartyModal(true)}
-                          className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer"
-                        >
-                          + Add Party
-                        </span>
+                    
+                    {showPartyModal && (
+                      <PartyAddModal
+                        onClose={() => setShowPartyModal(false)}
+                        onSave={(newParty) => {
+                          setPartySearch(newParty.Party_Name);
 
-                        {/* {parties?.parties
-                          ?.filter(
-                            (party) =>
-                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                              party?.Phone_Number?.includes(partySearch)
-                          )
-                          .map((party, i) => (
-                            <div
-                              key={i}
-                              onClick={() => {
+                          setValue(
+                            "Party_Name",
+                            newParty.Party_Name,
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          setValue(
+                            "GSTIN",
+                            newParty.GSTIN || "",
+                            {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            }
+                          );
+
+                          // setValue(
+                          //   "Billing_Name",
+                          //   newParty.Billing_Name || "",
+                          //   {
+                          //     shouldValidate: true,
+                          //     shouldDirty: true,
+                          //   }
+                          // );
+
+
+
+                          setShowPartyModal(false);
+                        }}
+                      />
+                    )}
+
+                   
+                    {errors?.Party_Name && (
+                      <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
+                    )}
+                  </div> */}
+
+                    <div className="flex flex-col gap-2 relative party-class">
+                      <span className="whitespace-nowrap active">
+                        Party
+                        <span className="text-red-500">*</span>
+                      </span>
+
+                      <div className="relative w-full">
+                        <div
+                          className="flex flex-row border rounded-md bg-white cursor-pointer"
+                          onClick={() => setOpen((prev) => !prev)}
+                        >
+                          <input
+                            type="text"
+                            id="Party_Name"
+                            value={partySearch}
+
+                            // onChange={(e) => {
+                            //   setPartyCursor(null);
+
+                            //   const value = e.target.value;
+
+                            //   setPartySearch(value);
+
+                            //   setValue("Party_Name", value, {
+                            //     shouldValidate: true,
+                            //     shouldDirty: true,
+                            //   });
+
+                            //   setOpen(true);
+
+                            //   const matchedParty = parties.find(
+                            //     (p) =>
+                            //       p.Party_Name?.toLowerCase() ===
+                            //       value.trim().toLowerCase()
+                            //   );
+
+                            //   if (matchedParty) {
+                            //     setValue("GSTIN", matchedParty.GSTIN || "", {
+                            //       shouldValidate: true,
+                            //       shouldDirty: true,
+                            //     });
+
+                            //     // Exact match → keep existing bill phone
+                            //   } else {
+                            //     setValue("GSTIN", "", {
+                            //       shouldValidate: true,
+                            //       shouldDirty: true,
+                            //     });
+
+                            //     // Not an exact match → clear phone
+                            //     setValue("Phone_Number", "", {
+                            //       shouldValidate: true,
+                            //       shouldDirty: true,
+                            //     });
+                            //   }
+                            // }}
+                            onChange={(e) => {
+                              setPartyCursor(null);
+
+                              const value = e.target.value;
+
+                              setPartySearch(value);
+
+                              setValue("Party_Name", value, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setOpen(true);
+
+                              const matchedParty = parties.find(
+                                (p) =>
+                                  p.Party_Name?.toLowerCase() ===
+                                  value.trim().toLowerCase()
+                              );
+                              console.log("TYPED:", value);
+                              console.log(
+                                "MATCHED PARTY:",
+                                matchedParty?.Party_Name,
+                                matchedParty?.Phone_Number
+                              );
+
+                              if (!value.trim()) {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Phone_Number", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setShowBillingName(false);
+                                //setHasSwitchedParty(false);
+                                //setHasSeenBillingNameParty(false);
+
+                                return;
+                              }
+
+                              if (matchedParty) {
+                                setValue("GSTIN", matchedParty.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                // =========================================
+                                // BILLING NAME
+                                // =========================================
+
+                                if (matchedParty.Billing_Name?.trim()) {
+                                  setValue("Billing_Name", matchedParty.Billing_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+                                  setHasSeenBillingNameParty(true);
+
+                                } else if (
+                                  //hasSwitchedParty &&
+                                  hasSeenBillingNameParty &&
+                                  enableBillingNameOfParties
+                                ) {
+                                  setValue("Billing_Name", matchedParty.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+
+                                } else {
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(false);
+                                }
+
+                                setHasSwitchedParty(true);
+                              } else {
+                                setValue("GSTIN", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
+
+                                setValue("Billing_Name", "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setShowBillingName(false);
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpen(true);
+                            }}
+
+                            // onBlur={() => {
+                            //   setTimeout(() => {
+                            //     const typedValue =
+                            //       partySearch?.trim()?.toLowerCase();
+
+                            //     const matchedParty = parties.find(
+                            //       (p) =>
+                            //         p.Party_Name?.toLowerCase() === typedValue
+                            //     );
+
+                            //     if (matchedParty) {
+                            //       setPartyCursor(null);
+
+                            //       setPartySearch(matchedParty.Party_Name);
+
+                            //       setValue("Party_Name", matchedParty.Party_Name, {
+                            //         shouldValidate: true,
+                            //         shouldDirty: true,
+                            //       });
+
+                            //       setValue("GSTIN", matchedParty.GSTIN || "", {
+                            //         shouldValidate: true,
+                            //         shouldDirty: true,
+                            //       });
+
+                            //       // If bill phone is empty, restore master phone
+                            //       const currentBillPhone = watch("Phone_Number");
+
+                            //       if (!currentBillPhone?.trim()) {
+                            //         setValue(
+                            //           "Phone_Number",
+                            //           matchedParty.Phone_Number || "",
+                            //           {
+                            //             shouldValidate: true,
+                            //             shouldDirty: true,
+                            //           }
+                            //         );
+                            //       }
+                            //     } else {
+                            //       // No exact Party match → phone must remain cleared
+                            //       setValue("Phone_Number", "", {
+                            //         shouldValidate: true,
+                            //         shouldDirty: true,
+                            //       });
+                            //     }
+
+                            //     setOpen(false);
+                            //   }, 150);
+                            // }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue =
+                                  partySearch?.trim()?.toLowerCase();
+
+                                const matchedParty = parties.find(
+                                  (p) =>
+                                    p.Party_Name?.toLowerCase() === typedValue
+                                );
+                                console.log("TYPED:", typedValue);
+                                console.log(
+                                  "MATCHED PARTY:",
+                                  matchedParty?.Party_Name,
+                                  matchedParty?.Phone_Number
+                                );
+
+
+                                if (matchedParty) {
+                                  setPartyCursor(null);
+
+                                  setPartySearch(matchedParty.Party_Name);
+
+                                  setValue("Party_Name", matchedParty.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setValue("GSTIN", matchedParty.GSTIN || "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  // const currentBillPhone = watch("Phone_Number");
+
+                                  // if (!currentBillPhone?.trim()) {
+                                  //   setValue(
+                                  //     "Phone_Number",
+                                  //     matchedParty.Phone_Number || "",
+                                  //     {
+                                  //       shouldValidate: true,
+                                  //       shouldDirty: true,
+                                  //     }
+                                  //   );
+                                  // }
+                                  setValue(
+                                    "Phone_Number",
+                                    matchedParty.Phone_Number || "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  // =========================================
+                                  // BILLING NAME
+                                  // =========================================
+
+                                  if (matchedParty.Billing_Name?.trim()) {
+                                    setValue("Billing_Name", matchedParty.Billing_Name, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setShowBillingName(true);
+                                    setHasSeenBillingNameParty(true);
+
+                                  } else if (
+                                    //hasSwitchedParty &&
+                                    hasSeenBillingNameParty &&
+                                    enableBillingNameOfParties
+                                  ) {
+                                    setValue("Billing_Name", matchedParty.Party_Name, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setShowBillingName(true);
+
+                                  } else {
+                                    setValue("Billing_Name", "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setShowBillingName(false);
+                                  }
+
+                                  setHasSwitchedParty(true);
+
+
+
+                                } else {
+                                  setValue("GSTIN", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+
+
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                  // setShowBillingName(
+                                  //   enableBillingNameOfParties
+                                  // );
+                                  setShowBillingName(false);
+                                  setHasSwitchedParty(true);
+                                  setValue("Phone_Number", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  //setShowBillingName(false);
+                                }
+
+                                setOpen(false);
+                              }, 150);
+                            }}
+                            placeholder="Search By Name/Phone"
+                            className="w-full outline-none py-1 px-2 text-gray-900"
+                            style={{ marginBottom: 0, marginTop: "4px", border: "none", borderBottom: "none", height: "2rem" }}
+                          />
+                          <div className="w-10"></div>
+                          <span className="absolute right-0 px-2 top-1/3 text-gray-700">▼</span>
+                        </div>
+
+                        {open && (
+                          <div className="absolute z-20 flex flex-col mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+
+                            <span
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setShowPartyModal(true);
+                              }}
+                              className="block px-3 py-2 text-[#4CA1AF] font-medium hover:bg-gray-100 cursor-pointer flex-shrink-0"
+                              style={{ borderBottom: "1px solid #f3f4f6" }}
+                            >
+                              + Add Party
+                            </span>
+
+                            <VirtualPartyScrollList
+                              parties={parties}
+                              isFetching={isPartiesFetching}
+                              hasMore={partiesHasMore}
+                              onLoadMore={handlePartyLoadMore}
+                              scrollRef={partyScrollRef}
+                              // onSelectParty={(party) => {
+                              //   setPartyCursor(null);   // ← ADDED
+                              //   setPartySearch(party.Party_Name);
+                              //   setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
+                              //   setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                              //   setValue("Phone_Number", party.Phone_Number || "", {
+                              //     shouldValidate: true,
+                              //     shouldDirty: true,
+                              //   });
+                              //   setOpen(false);
+                              // }}
+                              onSelectParty={(party) => {
+                                setPartyCursor(null);
+
                                 setPartySearch(party.Party_Name);
-                                setValue("Party_Name", party.Party_Name, { shouldValidate: true });
-                                setValue("GSTIN", party.GSTIN || "", { shouldValidate: true });
+
+                                setValue("Party_Name", party.Party_Name, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("GSTIN", party.GSTIN || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                setValue("Phone_Number", party.Phone_Number || "", {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                // =========================================
+                                // BILLING NAME
+                                // =========================================
+
+                                if (party.Billing_Name?.trim()) {
+                                  setValue("Billing_Name", party.Billing_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+                                  setHasSeenBillingNameParty(true);
+
+                                } else if (
+                                  //hasSwitchedParty &&
+                                  hasSeenBillingNameParty &&
+                                  enableBillingNameOfParties
+                                ) {
+                                  setValue("Billing_Name", party.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(true);
+
+                                } else {
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  setShowBillingName(false);
+                                }
+
+                                setHasSwitchedParty(true);
                                 setOpen(false);
                               }}
-                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                            >
-                              {party.Party_Name} ({party.Phone_Number})
-                            </div>
-                          ))} */}
-                        {parties?.parties
-                          ?.filter(
-                            (party) =>
-                              party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase()) ||
-                              party?.Phone_Number?.includes(partySearch)
-                          )
-                          .map((party, i) => {
-                            const bal = Number(party.Current_Balance ?? 0);
-                            const balColor = bal < 0 ? "#ef4444" : "#16a34a";
+                            />
 
-                            return (
-                              <div
-                                key={i}
-                                onClick={() => {
-                                  setPartySearch(party.Party_Name);
-                                  setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                                  setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                                  //setValue("Billing_Name", party.Billing_Name || "", { shouldValidate: true, shouldDirty: true });
+                          </div>
+                        )}
+                      </div>
 
-                                  setOpen(false);
-                                }}
-                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-100 cursor-pointer gap-4"
-                                style={{ borderBottom: "1px solid #f3f4f6" }}
-                              >
-                                {/* Left — name + phone */}
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-sm text-gray-800 font-medium truncate">
-                                    {party.Party_Name}
-                                  </span>
-                                  <span className="text-xs text-gray-400">
-                                    {party.Phone_Number || "—"}
-                                  </span>
-                                </div>
+                      {showPartyModal && (
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          // onSave={(newParty) => {
+                          //   setPartyCursor(null);   // ← ADDED
+                          //   setPartySearch(newParty.Party_Name);
+                          //   setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
+                          //   setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
+                          //   setShowPartyModal(false);
+                          // }}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);
 
-                                {/* Right — balance */}
-                                <div className="flex flex-col items-end flex-shrink-0">
-                                  <span className="text-xs text-gray-400">Balance</span>
-                                  <span className="text-xs font-semibold" style={{ color: balColor }}>
-                                    ₹{bal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
+                            setPartySearch(newParty.Party_Name);
 
-                        {parties?.parties?.filter((party) =>
-                          party?.Party_Name?.toLowerCase()?.includes(partySearch.toLowerCase())
-                        ).length === 0 && (
-                            <p className="px-3 py-2 text-gray-500">No Party found</p>
-                          )}
+                            setValue("Party_Name", newParty.Party_Name, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            setValue("GSTIN", newParty.GSTIN || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            setValue("Phone_Number", newParty.Phone_Number || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+
+                            // =========================================
+                            // BILLING NAME
+                            // =========================================
+
+                            if (newParty.Billing_Name?.trim()) {
+                              setValue("Billing_Name", newParty.Billing_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setShowBillingName(true);
+                              setHasSeenBillingNameParty(true);
+
+                            } else if (enableBillingNameOfParties) {
+                              setValue("Billing_Name", newParty.Party_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setShowBillingName(true);
+
+                            } else {
+                              setValue("Billing_Name", "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              setShowBillingName(false);
+                            }
+
+                            setHasSwitchedParty(true);
+
+                            setShowPartyModal(false);
+                          }}
+                        />
+                      )}
+                    </div>
+                    {/* Phone Number — compact inline label+input */}
+
+                    <div className="flex flex-col gap-2">
+
+                      <span className="whitespace-nowrap active">Phone Number</span>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        id="Phone_Number"
+                        {...register("Phone_Number")}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "");
+
+                          setValue("Phone_Number", value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          });
+                        }}
+                        placeholder="Phone Number"
+                        className="w-full outline-none border-b-2 text-gray-900"
+                        style={{ marginBottom: 0 }}
+                      />
+
+                      {errors?.Phone_Number && (
+                        <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
+                      )}
+                    </div>
+                    {/* <div className="input-field  flex gap-4
+                              justify-center items-center  gstin-class">
+                    <span className=" whitespace-nowrap active ">
+                      GSTIN
+
+                    </span>
+
+                    <input
+                      type="text"
+                      id=" GSTIN"
+                      style={{ marginBottom: "0px" }}
+                      value={showGSTIN || ""}
+                      {...register("GSTIN")}
+                      placeholder="GSTIN"
+                      className="w-full outline-none border-b-2 text-gray-900"
+                      readOnly
+                    />
+                    {errors?.GSTIN && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.GSTIN?.message}
+                      </p>
+                    )}
+                  </div> */}
+                    {showBillingName && (
+                      <div className="flex flex-col gap-2">
+                        <span className="whitespace-nowrap active">
+                          Billing Name (Optional)
+                        </span>
+
+                        <input
+                          type="text"
+                          id="Billing_Name"
+                          {...register("Billing_Name")}
+                          placeholder="Billing Name"
+                          className="w-full outline-none border-b-2 text-gray-900"
+                          style={{ marginBottom: 0 }}
+                        />
+
+
                       </div>
                     )}
+
                   </div>
-
-                  {/* Add Party Modal */}
-                  {/* {showPartyModal && (
-                    <PartyAddModal
-                      onClose={() => setShowPartyModal(false)}
-                      onSave={(newParty) => {
-                        setPartySearch(newParty);
-                        setValue("Party_Name", newParty, { shouldValidate: true });
-                        setShowPartyModal(false);
-                      }}
-                    />
-                  )} */}
-                  {showPartyModal && (
-                    <PartyAddModal
-                      onClose={() => setShowPartyModal(false)}
-                      onSave={(newParty) => {
-                        setPartySearch(newParty.Party_Name);
-
-                        setValue(
-                          "Party_Name",
-                          newParty.Party_Name,
-                          {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          }
-                        );
-
-                        setValue(
-                          "GSTIN",
-                          newParty.GSTIN || "",
-                          {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          }
-                        );
-
-                        // setValue(
-                        //   "Billing_Name",
-                        //   newParty.Billing_Name || "",
-                        //   {
-                        //     shouldValidate: true,
-                        //     shouldDirty: true,
-                        //   }
-                        // );
-
-
-
-                        setShowPartyModal(false);
-                      }}
-                    />
-                  )}
-
-                  {/* RHF Error */}
-                  {errors?.Party_Name && (
-                    <p className="text-red-500 text-xs mt-1">{errors?.Party_Name?.message}</p>
-                  )}
                 </div>
-                <div className="input-field  flex gap-4
-                              justify-center items-center  gstin-class">
-                  <span className=" whitespace-nowrap active ">
-                    GSTIN
-
-                  </span>
-
-                  <input
-                    type="text"
-                    id=" GSTIN"
-                    style={{ marginBottom: "0px" }}
-                    value={showGSTIN || ""}
-                    {...register("GSTIN")}
-                    placeholder="GSTIN"
-                    className="w-full outline-none border-b-2 text-gray-900"
-                    readOnly
-                  />
-                  {errors?.GSTIN && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.GSTIN?.message}
-                    </p>
-                  )}
-                </div>
-
-              </div>
-              <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
+                <div className="grid grid-rows-3 w-full sm:w-1/2 lg:w-1/3 
           ml-auto gap-0  mr-2">
 
 
 
 
 
-                {/* Bill Number */}
-                <div className="flex items-center w-full gap-3  justify-end">
-                  <span className="whitespace-nowrap ">
-                    Bill Number
-                    {/* <span className="text-red-500">*</span> */}
-                  </span>
+                  {/* Bill Number */}
+                  <div className="flex items-center w-full gap-3  justify-end">
+                    <span className="whitespace-nowrap ">
+                      Bill Number
+                      {/* <span className="text-red-500">*</span> */}
+                    </span>
 
-                  <input
-                    type="text"
-                    style={{ marginBottom: 0, border: "none", width: "50%" }}
-                    id=" Bill_Number"
-                    {...register("Bill_Number")}
-                    placeholder="Bill_Number"
-                    className="w-full outline-none invoice-number-class  text-gray-900"
-                  />
-                  {errors?.Bill_Number && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.Bill_Number?.message}
-                    </p>
-                  )}
-                </div>
+                    <input
+                      type="text"
+                      style={{ marginBottom: 0, border: "none", width: "50%" }}
+                      id=" Bill_Number"
+                      {...register("Bill_Number")}
+                      placeholder="Bill_Number"
+                      className="w-full outline-none invoice-number-class  text-gray-900"
+                    />
+                    {errors?.Bill_Number && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Bill_Number?.message}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="flex items-center w-full gap-3  justify-end">
-                  <span className="whitespace-nowrap ">
-                    Bill Date
-                    {/* <span className="text-red-500">*</span> */}
-                  </span>
+                  <div className="flex items-center w-full gap-3  justify-end">
+                    <span className="whitespace-nowrap ">
+                      Bill Date
+                      {/* <span className="text-red-500">*</span> */}
+                    </span>
 
-                  <input
-                    style={{ marginBottom: 0, border: "none", width: "50%" }}
-                    type="date"
-                    id=" Bill_Date"
-                    {...register("Bill_Date")}
-                    placeholder=" Bill_Date"
-                    className="w-full outline-none invoice-date-class   text-gray-900"
-                  />
-                  {errors?.Bill_Date && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.Bill_Date?.message}
-                    </p>
-                  )}
-                </div>
-                {/* State of Supply */}
-
-
+                    <input
+                      style={{ marginBottom: 0, border: "none", width: "50%" }}
+                      type="date"
+                      id=" Bill_Date"
+                      {...register("Bill_Date")}
+                      placeholder=" Bill_Date"
+                      className="w-full outline-none invoice-date-class   text-gray-900"
+                    />
+                    {errors?.Bill_Date && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.Bill_Date?.message}
+                      </p>
+                    )}
+                  </div>
+                  {/* State of Supply */}
 
 
-                <div className="flex
-                                           items-center w-full gap-3 justify-end
+
+
+                  {enablePlaceOfSupply && (<div className="flex items-center w-full gap-3 justify-end
                                            state-of-supply-class">
-                  <span className="whitespace-nowrap ">
-                    State of Supply
-                    {/* <span className="text-red-500">*</span> */}
-                  </span>
-                  <select
-                    style={{ marginBottom: "0px", width: "50%", border: "none" }}
-                    id="stateOfSupply"
-                    className="validate mt-2"
-                    {...register("State_Of_Supply")}
-                  >
-                    <option value="">Select State</option>
-                    {states.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                    {/* <option value="West Bengal">West Bengal</option>
-                        <option value="Maharashtra">Maharashtra</option>
-                        <option value="Karnataka">Karnataka</option>
-                        <option value="Delhi">Delhi</option> */}
-                  </select>
-                  {errors?.State_Of_Supply && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors?.State_Of_Supply?.message}
-                    </p>
-                  )}
+                    <span className="whitespace-nowrap ">
+                      State of Supply
+                      {/* <span className="text-red-500">*</span> */}
+                    </span>
+                    <select
+                      style={{ marginBottom: "0px", width: "50%", border: "none" }}
+                      id="stateOfSupply"
+                      className="validate mt-2"
+                      {...register("State_Of_Supply")}
+                    >
+                      <option value="">Select State</option>
+                      {states.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+
+                    </select>
+                    {errors?.State_Of_Supply && (
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors?.State_Of_Supply?.message}
+                      </p>
+                    )}
+                  </div>)}
                 </div>
+
+
+
               </div>
 
 
 
-            </div>
 
 
 
 
 
+              <div className="table-responsive table-desi"
+              //           style={{
+              //   // maxHeight: "400px",
+              //   // overflowY: "auto",
+              //   overflowX: "auto",
+              // }}
 
+              >
 
+                <table className="table table-hover">
+                  <thead>
+                    <tr>
 
-            <div className="table-responsive table-desi mt-4">
-
-              <table className="table table-hover">
-                <thead>
-                  <tr>
-
-                    <th
-                      className=" cursor-pointer"
-                      onClick={handleOpenScanModal}
-                    >
-                      Sl.No
-                    </th>
-                    <th>Category</th>
-                    <th>Item</th>
-                    <th>Item_HSN</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th>Price/Unit</th>
-                    <th>Discount</th>
-                    <th>Tax</th>
-                    <th>Tax Amount</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
-                <tbody style={{ maxHeight: "10rem", overflowY: "scroll" }}>
-                  {fields.map((field, i) => (
-                    <tr key={field.id}>
-                      {/* Action + Serial Number */}
-                      <td style={{ padding: "0px", textAlign: "center", verticalAlign: "middle" }}>
-                        <div
-                          className="flex align-center justify-center text-center gap-2"
-                          style={{ whiteSpace: "nowrap" }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRow(i)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "red",
-                              cursor: "pointer",
-                            }}
+                      <th
+                        className="cursor-pointer"
+                        onClick={handleOpenScanModal}
+                      >
+                        {barcodeScanEnabled ? (
+                          <ScanLine size={18} />
+                        ) : (
+                          "Sl.No"
+                        )}
+                      </th>
+                      <th>Category</th>
+                      <th>Item</th>
+                      {enableHSNCode && <th>Item_HSN</th>}
+                      {shouldShowMRP && <th>MRP</th>}
+                      <th>Qty</th>
+                      {shouldShowFreeQuantity && <th>Free Qty</th>}
+                      <th>Unit</th>
+                      <th>Price/Unit</th>
+                      <th>Discount</th>
+                      <th>Tax</th>
+                      <th>Tax Amount</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody
+                  //style={{ maxHeight: "10rem", overflowY: "scroll" }}
+                  >
+                    {fields.map((field, i) => (
+                      <tr key={field.id}>
+                        {/* Action + Serial Number */}
+                        <td style={{ padding: "0px", textAlign: "center", verticalAlign: "middle" }}>
+                          <div
+                            className="flex align-center justify-center text-center gap-2"
+                            style={{ whiteSpace: "nowrap" }}
                           >
-                            🗑
-                          </button>
-                          <span>{i + 1}</span>
-                        </div>
-                      </td>
-
-
-
-                      <td style={{ padding: "0px", width: "10%", position: "relative" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Category`}
-                          defaultValue="All"
-                          render={({ field }) => (
-                            <select
-                              {...field}
-                              className="form-select"
-                              style={{ width: "100%", fontSize: "12px" }}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (value === "__ADD_CATEGORY__") {
-                                  setShowModal(true);
-                                  return; // don't commit this as the selected value
-                                }
-                                field.onChange(value);
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(i)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "red",
+                                cursor: "pointer",
                               }}
                             >
-                              <option value="All">All</option>
-                              <option value="__ADD_CATEGORY__">➕ Add Category</option>
-                              {categories?.map((cat) => (
-                                <option key={cat.Category_Id} value={cat.Item_Category}>
-                                  {cat.Item_Category}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        />
+                              🗑
+                            </button>
+                            <span>{i + 1}</span>
+                          </div>
+                        </td>
 
-                        {showModal && (
-                          <div
-                            style={{
-                              position: "fixed", inset: 0, display: "flex",
-                              alignItems: "center", justifyContent: "center",
-                              backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
-                            }}
-                          >
-                            <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowModal(false)}
-                                style={{ backgroundColor: "transparent" }}
-                                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+
+
+                        <td style={{ padding: "0px", width: "10%", position: "relative" }}>
+                          <Controller
+                            control={control}
+                            name={`items.${i}.Item_Category`}
+                            defaultValue="All"
+                            render={({ field }) => (
+                              <select
+                                {...field}
+                                className="form-select"
+                                style={{ width: "100%", fontSize: "12px" }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === "__ADD_CATEGORY__") {
+                                    setShowModal(true);
+                                    return; // don't commit this as the selected value
+                                  }
+                                  field.onChange(value);
+                                }}
                               >
-                                ✕
-                              </button>
-                              <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
-                              <input
-                                type="text"
-                                value={newCategory}
-                                onChange={(e) => setNewCategory(e.target.value)}
-                                className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
-                                placeholder="Enter category name"
-                              />
-                              <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
-                                  Cancel
-                                </button>
+                                <option value="All">All</option>
+                                <option value="__ADD_CATEGORY__">➕ Add Category</option>
+                                {categories?.map((cat) => (
+                                  <option key={cat.Category_Id} value={cat.Item_Category}>
+                                    {cat.Item_Category}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          />
+
+                          {showModal && (
+                            <div
+                              style={{
+                                position: "fixed", inset: 0, display: "flex",
+                                alignItems: "center", justifyContent: "center",
+                                backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 30,
+                              }}
+                            >
+                              <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
                                 <button
                                   type="button"
-                                  onClick={async () => {
-                                    const created = await handleAddCategory(); // should return the created category object
-                                    if (created?.Item_Category) {
-                                      setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
-                                    }
-                                    setShowModal(false);
-                                  }}
-                                  style={{ backgroundColor: "#4CA1AF" }}
-                                  className="px-4 py-2 rounded-md text-white"
+                                  onClick={() => setShowModal(false)}
+                                  style={{ backgroundColor: "transparent" }}
+                                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
                                 >
-                                  Add
+                                  ✕
                                 </button>
+                                <h4 className="text-lg font-semibold mb-4">Add New Category</h4>
+                                <input
+                                  type="text"
+                                  value={newCategory}
+                                  onChange={(e) => setNewCategory(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-md p-2 mb-4 focus:outline-none focus:ring-2 focus:ring-[#4CA1AF]"
+                                  placeholder="Enter category name"
+                                />
+                                <div className="flex justify-end gap-3">
+                                  <button type="button" onClick={() => setShowModal(false)} style={{ backgroundColor: "lightgray" }} className="px-4 py-2 rounded-md">
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const created = await handleAddCategory(); // should return the created category object
+                                      if (created?.Item_Category) {
+                                        setValue(`items.${i}.Item_Category`, created.Item_Category, { shouldValidate: true });
+                                      }
+                                      setShowModal(false);
+                                    }}
+                                    style={{ backgroundColor: "#4CA1AF" }}
+                                    className="px-4 py-2 rounded-md text-white"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </td>
-                      {/* Item Dropdown */}
-                      <td style={{ padding: "0px", width: "18%", position: "relative" }}>
-                        <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
-                          <input
-                            type="text"
-                            value={rows[i]?.itemSearch || ""}
-                            onChange={(e) => {
-                              const typedValue = e.target.value;
-                              handleRowChange(i, "itemSearch", typedValue);
-                              handleRowChange(i, "CategoryOpen", false);
-                              handleRowChange(i, "unitOpen", false);
-                              setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                              handleRowChange(i, "isHSNLocked", false);
-                              handleRowChange(i, "isExistingItem", false);
-                              handleRowChange(i, "isUnitLocked", false);
-                              // ✅ If typed value doesn’t match any existing item → unlock category
-                              const exists = items?.items?.find(
-                                (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              );
-                              if (exists) {
-                                // ✅ Only store if it's a valid item
-                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                handleRowChange(i, "isExistingItem", true);
-                              } else {
-                                // ❌ Clear Item_Name in RHF to trigger error
-                                // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
-                                // handleRowChange(i, "isExistingItem", false);
-                                setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                                handleRowChange(i, "isExistingItem", false);
-                                handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                                handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                                handleRowChange(i, "Available_Units", []);
-                              }
-                              //handleRowChange(i, "isExistingItem", exists); // false if new item
-                            }}
-                            onBlur={() => {
-                              setTimeout(() => {
-                                const typedValue = rows[i]?.itemSearch?.trim() || "";
-                                if (!typedValue) return;
+                          )}
+                        </td>
+                        {/* Item Dropdown */}
+                        <td
+                          style={{
+                            padding: "0px",
+                            width: shouldShowFreeQuantity ? "18%" : "22%",
+                            position: "relative",
+                          }}
+                        //style={{ padding: "0px", width: "18%", position: "relative" }}
+                        >
+                          <div ref={(el) => (itemRefs.current[i] = el)}> {/* ✅ attach ref */}
+                            <input
+                              type="text"
+                              value={rows[i]?.itemSearch || ""}
+                              // onChange={(e) => {
+                              //   const typedValue = e.target.value;
+                              //   handleRowChange(i, "itemSearch", typedValue);
+                              //   handleRowChange(i, "CategoryOpen", false);
+                              //   handleRowChange(i, "unitOpen", false);
+                              //   setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                              //   handleRowChange(i, "isHSNLocked", false);
+                              //   handleRowChange(i, "isExistingItem", false);
+                              //   handleRowChange(i, "isUnitLocked", false);
+                              //   // ✅ If typed value doesn’t match any existing item → unlock category
+                              //   const exists = items?.items?.find(
+                              //     (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                              //   );
+                              //   if (exists) {
+                              //     // ✅ Only store if it's a valid item
+                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                              //     handleRowChange(i, "isExistingItem", true);
+                              //   } else {
+                              //     // ❌ Clear Item_Name in RHF to trigger error
+                              //     // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
+                              //     // handleRowChange(i, "isExistingItem", false);
+                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
+                              //     handleRowChange(i, "isExistingItem", false);
+                              //     handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                              //     handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                              //     handleRowChange(i, "Available_Units", []);
+                              //   }
+                              //   //handleRowChange(i, "isExistingItem", exists); // false if new item
+                              // }}
+                              onChange={(e) => {
+                                const typedValue = e.target.value;
+                                // 🔹 This row is now the active search row
+                                setActiveItemRow(i);
 
-                                const matchedItem = items?.items?.find(
-                                  (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                                // 🔹 New search must start from the first cursor page
+                                setItemCursor(null);
+
+
+                                handleRowChange(i, "itemSearch", typedValue);
+
+                                handleRowChange(i, "CategoryOpen", false);
+                                handleRowChange(i, "unitOpen", false);
+
+                                setValue(
+                                  `items.${i}.Item_Name`,
+                                  typedValue,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
                                 );
 
-                                if (matchedItem) {
-                                  // ✅ auto-fill exactly like clicking from dropdown
+                                handleRowChange(i, "isHSNLocked", false);
+                                handleRowChange(i, "isExistingItem", false);
+                                handleRowChange(i, "isUnitLocked", false);
+
+                                // Clear previously selected item details
+                                handleRowChange(i, "Primary_Unit", null);
+                                handleRowChange(i, "Secondary_Unit", null);
+                                handleRowChange(i, "Available_Units", []);
+                              }}
+                              // onBlur={() => {
+                              //   setTimeout(() => {
+                              //     const typedValue = rows[i]?.itemSearch?.trim() || "";
+                              //     if (!typedValue) return;
+
+                              //     const matchedItem = items?.items?.find(
+                              //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
+                              //     );
+
+                              //     if (matchedItem) {
+                              //       // ✅ auto-fill exactly like clicking from dropdown
+                              //       setRows((prev) => {
+                              //         const updated = [...prev];
+                              //         updated[i] = {
+                              //           ...updated[i],
+                              //           itemSearch: matchedItem.Item_Name,   // normalize display
+                              //           Item_Category: matchedItem.Item_Category || "",
+                              //           Item_HSN: matchedItem.Item_HSN || "",
+                              //           categorySearch: matchedItem.Item_Category || "",
+                              //           isExistingItem: true,
+                              //           isHSNLocked: false,
+                              //           isUnitLocked: false,
+                              //           itemOpen: false,
+                              //           // ✅ CURRENT MASTER
+                              //           Primary_Unit: matchedItem.Primary_Unit || null,
+                              //           Secondary_Unit: matchedItem.Secondary_Unit || null,
+                              //           Conversion_Rate: matchedItem.Conversion_Rate || null,
+
+                              //           // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
+                              //           Available_Units: Array.isArray(matchedItem.Available_Units)
+                              //             ? matchedItem.Available_Units
+                              //             : [],
+                              //         };
+                              //         return updated;
+                              //       });
+
+                              //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
+                              //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
+                              //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                              //       setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+
+                              //       setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
+                              //       basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
+                              //       basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
+                              //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                              //         {
+                              //           ...itemsValues[i],
+                              //           Item_Name: matchedItem.Item_Name,
+                              //           Purchase_Price: matchedItem.Purchase_Price || 0,
+                              //           Quantity: itemsValues[i]?.Quantity || 0,
+                              //         },
+                              //         i,
+                              //         itemsValues
+                              //       );
+
+                              //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                              //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                              //       syncTotalsAfterItemChange();
+                              //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                              //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              //     } else {
+                              //       // // no match — close dropdown
+                              //       //      handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
+                              //       // handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
+                              //       handleRowChange(i, "itemOpen", false);
+                              //     }
+                              //   }, 150); // small delay so click-from-dropdown fires first
+                              // }}
+                              onBlur={() => {
+                                setTimeout(async () => {
+                                  const typedValue =
+                                    rows[i]?.itemSearch?.trim() || "";
+
+                                  if (!typedValue) {
+                                    handleRowChange(i, "itemOpen", false);
+                                    return;
+                                  }
+
+                                  // =====================================================
+                                  // IMPORTANT:
+                                  // Existing purchase transaction values are the SOURCE
+                                  // OF TRUTH.
+                                  //
+                                  // These came from add_purchase_items.
+                                  // =====================================================
+
+                                  const currentRow =
+                                    itemsValues[i] || {};
+
+                                  try {
+                                    // ===================================================
+                                    // EXACT ITEM LOOKUP FROM API
+                                    // Replaces old frontend items.find(...)
+                                    // ===================================================
+
+                                    const response = await getItemByName(typedValue).unwrap();
+
+                                    const matchedItem = response?.item;
+                                    const existingItemId =
+                                      currentRow.Item_Id || "";
+
+                                    const isSameExistingItem =
+                                      existingItemId &&
+                                      matchedItem.Item_Id === existingItemId;
+
+                                    // MRP
+                                    const resolvedMRP =
+                                      isSameExistingItem
+                                        ? (currentRow.MRP ?? "")
+                                        : (
+                                          Number(matchedItem.MRP) > 0
+                                            ? matchedItem.MRP
+                                            : ""
+                                        );
+
+                                    // PURCHASE PRICE
+                                    // No MRP calculation.
+                                    // Just take master Purchase_Price for a different/new item.
+                                    const resolvedPurchasePrice =
+                                      isSameExistingItem
+                                        ? (currentRow.Purchase_Price ?? "")
+                                        : (matchedItem.Purchase_Price ?? "");
+
+                                    if (!matchedItem?.Item_Id) {
+                                      handleRowChange(
+                                        i,
+                                        "itemOpen",
+                                        false
+                                      );
+                                      return;
+                                    }
+
+                                    // ===================================================
+                                    // UPDATE ROW MASTER INFORMATION
+                                    // ===================================================
+
+                                    setRows((prev) => {
+                                      const updated = [...prev];
+
+                                      updated[i] = {
+                                        ...updated[i],
+
+                                        itemSearch:
+                                          matchedItem.Item_Name,
+
+                                        Item_Id:
+                                          matchedItem.Item_Id,
+
+                                        Item_Category:
+                                          matchedItem.Item_Category || "",
+
+                                        Item_HSN:
+                                          matchedItem.Item_HSN || "",
+
+                                        categorySearch:
+                                          matchedItem.Item_Category || "",
+
+                                        isExistingItem: true,
+
+                                        isHSNLocked: false,
+                                        isUnitLocked: false,
+
+                                        itemOpen: false,
+
+                                        Primary_Unit:
+                                          matchedItem.Primary_Unit || null,
+
+                                        Secondary_Unit:
+                                          matchedItem.Secondary_Unit || null,
+
+                                        Conversion_Rate:
+                                          matchedItem.Conversion_Rate ?? null,
+
+                                        Available_Units:
+                                          Array.isArray(
+                                            matchedItem.Available_Units
+                                          )
+                                            ? matchedItem.Available_Units
+                                            : [],
+                                      };
+
+                                      return updated;
+                                    });
+
+                                    // ===================================================
+                                    // ITEM INFORMATION FROM MASTER
+                                    // ===================================================
+
+                                    setValue(
+                                      `items.${i}.Item_Id`,
+                                      matchedItem.Item_Id,
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    setValue(
+                                      `items.${i}.Item_Name`,
+                                      matchedItem.Item_Name,
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    setValue(
+                                      `items.${i}.Item_Category`,
+                                      matchedItem.Item_Category || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    setValue(
+                                      `items.${i}.Item_HSN`,
+                                      matchedItem.Item_HSN || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    setValue(
+                                      `items.${i}.MRP`,
+                                      resolvedMRP,
+                                      //currentRow.MRP ?? "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    // ===================================================
+                                    // ❗ PURCHASE PRICE
+                                    //
+                                    // DO NOT take matchedItem.Purchase_Price here.
+                                    //
+                                    // Existing add_purchase_items value stays.
+                                    // ===================================================
+
+                                    // setValue(
+                                    //   `items.${i}.Purchase_Price`,
+                                    //   matchedItem.Purchase_Price ?? "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
+
+                                    setValue(
+                                      `items.${i}.Purchase_Price`,
+                                      resolvedPurchasePrice,
+                                      //currentRow.Purchase_Price ?? "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    // ===================================================
+                                    // ❗ PURCHASE PRICE TYPE
+                                    // ===================================================
+
+                                    // setValue(
+                                    //   `items.${i}.Purchase_Price_Type`,
+                                    //   currentRow.Purchase_Price_Type ||
+                                    //   "Without_Tax",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
+
+                                    // ===================================================
+                                    // ❗ PURCHASE DISCOUNT
+                                    //
+                                    // SOURCE = add_purchase_items
+                                    // ===================================================
+
+                                    setValue(
+                                      `items.${i}.Discount_On_Purchase_Price`,
+                                      currentRow.Discount_On_Purchase_Price ?? "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    setValue(
+                                      `items.${i}.Discount_Type_On_Purchase_Price`,
+                                      currentRow.Discount_Type_On_Purchase_Price ||
+                                      "Percentage",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    // ===================================================
+                                    // TAX
+                                    // Existing transaction value stays.
+                                    // ===================================================
+
+                                    setValue(
+                                      `items.${i}.Tax_Type`,
+                                      currentRow.Tax_Type || "None",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    // ===================================================
+                                    // QUANTITY
+                                    // Existing transaction value stays.
+                                    // ===================================================
+
+                                    setValue(
+                                      `items.${i}.Quantity`,
+                                      currentRow.Quantity || 1,
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    // ===================================================
+                                    // UNIT
+                                    //
+                                    // Keep the unit already saved in the purchase.
+                                    // If there isn't one, use current master primary unit.
+                                    // ===================================================
+
+                                    // const selectedUnit =
+                                    //   currentRow.Item_Unit ||
+                                    //   matchedItem.Primary_Unit ||
+                                    //   "";
+
+                                    const selectedUnit =
+
+                                      matchedItem.Primary_Unit ||
+                                      "";
+
+                                    setValue(
+                                      `items.${i}.Item_Unit`,
+                                      selectedUnit,
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                    // setValue(
+                                    //   `items.${i}.Item_Unit`,
+                                    //   matchedItem.Primary_Unit || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
+
+                                    // ===================================================
+                                    // BASE PRICE / UNIT
+                                    // ===================================================
+
+                                    // basePurchasePriceRef.current[i] =
+                                    //   Number(
+                                    //     matchedItem.Purchase_Price
+                                    //   ) || 0;
+                                    basePurchasePriceRef.current[i] =
+                                      Number(resolvedPurchasePrice) || 0;
+                                    // basePurchasePriceRef.current[i] =
+                                    //   Number(currentRow.Purchase_Price) || 0;
+
+                                    basePurchaseUnitRef.current[i] =
+                                      selectedUnit;
+
+                                    // ===================================================
+                                    // CALCULATE USING EXISTING PURCHASE VALUES
+                                    // ===================================================
+
+                                    const calculatedRow = {
+                                      ...currentRow,
+
+                                      Item_Id:
+                                        matchedItem.Item_Id || "",
+
+                                      Item_Name:
+                                        matchedItem.Item_Name || "",
+
+                                      Item_Category:
+                                        matchedItem.Item_Category || "",
+
+                                      Item_HSN:
+                                        matchedItem.Item_HSN || "",
+
+                                      // ✅ add_purchase_items
+                                      Purchase_Price:
+                                        resolvedPurchasePrice,
+                                      //Purchase_Price: currentRow.Purchase_Price ?? "",
+
+                                      // ✅ add_purchase_items
+                                      // Purchase_Price_Type:
+                                      //   currentRow.Purchase_Price_Type ||
+                                      //   "Without_Tax",
+
+                                      Quantity:
+                                        currentRow.Quantity || 1,
+
+                                      Item_Unit:
+                                        selectedUnit,
+
+                                      // ✅ add_purchase_items
+                                      Discount_On_Purchase_Price:
+                                        currentRow.Discount_On_Purchase_Price ??
+                                        "",
+
+                                      // ✅ add_purchase_items
+                                      Discount_Type_On_Purchase_Price:
+                                        currentRow.Discount_Type_On_Purchase_Price ||
+                                        "Percentage",
+
+                                      // ✅ add_purchase_items
+                                      Tax_Type:
+                                        currentRow.Tax_Type ||
+                                        "None",
+                                    };
+
+                                    const {
+                                      Tax_Amount,
+                                      Amount,
+                                    } = calculateRowAmount(
+                                      calculatedRow,
+                                      i,
+                                      itemsValues
+                                    );
+
+                                    setValue(
+                                      `items.${i}.Tax_Amount`,
+                                      Tax_Amount,
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    setValue(
+                                      `items.${i}.Amount`,
+                                      Amount,
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+
+                                    syncTotalsAfterItemChange();
+
+                                    // ===================================================
+                                    // CLOSE DROPDOWN
+                                    // ===================================================
+
+                                    handleRowChange(
+                                      i,
+                                      "itemOpen",
+                                      false
+                                    );
+
+                                  } catch (error) {
+                                    console.error(
+                                      "❌ Error fetching item by name:",
+                                      error
+                                    );
+
+                                    handleRowChange(
+                                      i,
+                                      "itemOpen",
+                                      false
+                                    );
+                                  }
+                                }, 150);
+                              }}
+                              onClick={() => {
+                                const currentSearch =
+                                  rows[i]?.itemSearch?.trim() || "";
+
+                                setActiveItemRow(i);
+                                setItemCursor(null);
+
+                                // IMPORTANT:
+                                // Existing Edit item should be searched immediately.
+                                setDebouncedSearch(currentSearch);
+
+                                handleRowChange(i, "itemOpen", true);
+                                handleRowChange(i, "unitOpen", false);
+                                handleRowChange(i, "CategoryOpen", false);
+                              }}
+                              // onClick={() => {
+                              //   setActiveItemRow(i);
+                              //   setItemCursor(null);
+                              //   handleRowChange(i, "itemOpen", true);
+                              //   handleRowChange(i, "unitOpen", false);
+                              //   handleRowChange(i, "CategoryOpen", false);
+                              // }}
+                              //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+                              placeholder="Item Name"
+                              className="w-full outline-none border-b-2 text-gray-900"
+                            />
+                            {/* RHF error */}
+                            {errors?.items?.[i]?.Item_Name && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors?.items?.[i]?.Item_Name?.message}
+                              </p>
+                            )}
+                            {/* Dropdown List */}
+
+
+                            {rows[i]?.itemOpen && (
+                              <ItemDropdownVirtualized
+                                rowIndex={i}
+                                items={items?.items || []}
+                                isDropdownFetching={isDropdownFetching}
+                                loadMoreItems={loadMoreItems}
+                                scrollRef={getDropdownScrollRef(i)}
+                                onAddItemClick={() => {
+                                  handleRowChange(i, "itemOpen", true);
+                                  setActiveItemRow(i);
+                                  setShowItemAddModal(true);
+                                }}
+                                onSelectItem={(it) => {
                                   setRows((prev) => {
                                     const updated = [...prev];
                                     updated[i] = {
                                       ...updated[i],
-                                      itemSearch: matchedItem.Item_Name,   // normalize display
-                                      Item_Category: matchedItem.Item_Category || "",
-                                      Item_HSN: matchedItem.Item_HSN || "",
-                                      categorySearch: matchedItem.Item_Category || "",
+                                      Item_Category: it.Item_Category || "",
+                                      Item_HSN: it.Item_HSN || "",
+                                      categorySearch: it.Item_Category || "",
                                       isExistingItem: true,
                                       isHSNLocked: false,
                                       isUnitLocked: false,
-                                      itemOpen: false,
-                                      // ✅ CURRENT MASTER
-                                      Primary_Unit: matchedItem.Primary_Unit || null,
-                                      Secondary_Unit: matchedItem.Secondary_Unit || null,
-                                      Conversion_Rate: matchedItem.Conversion_Rate || null,
-
-                                      // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
-                                      Available_Units: Array.isArray(matchedItem.Available_Units)
-                                        ? matchedItem.Available_Units
-                                        : [],
+                                      Primary_Unit: it.Primary_Unit || null,
+                                      Secondary_Unit: it.Secondary_Unit || null,
+                                      Conversion_Rate: it.Conversion_Rate || null,
+                                      Available_Units: Array.isArray(it.Available_Units) ? it.Available_Units : [],
                                     };
                                     return updated;
                                   });
 
-                                  setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  handleRowChange(i, "itemSearch", it.Item_Name);
+                                  handleRowChange(i, "isExistingItem", true);
+                                  handleRowChange(i, "CategoryOpen", false);
+                                  handleRowChange(i, "unitOpen", false);
 
-                                  setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-                                  basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
-                                  basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
-                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                  setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
+                                  //setValue(`items.${i}.MRP`, it.MRP || "", { shouldValidate: true, shouldDirty: true });
+                                  if (showMRP) {
+                                    setValue(
+                                      `items.${i}.MRP`,
+                                      Number(it.MRP) > 0 ? it.MRP : "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  } else {
+                                    setValue(
+                                      `items.${i}.MRP`,
+                                      "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                  }
+                                  setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
+                                  setValue(
+                                    `items.${i}.Quantity`,
+                                    Number(itemsValues[i]?.Quantity) || 1,
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+                                  //setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
+                                  setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
+
+                                  basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
+                                  basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
+                                  handleRowChange(i, "itemOpen", false);
+
+                                  const { Tax_Amount, Amount } = calculateRowAmount(
                                     {
                                       ...itemsValues[i],
-                                      Item_Name: matchedItem.Item_Name,
-                                      Purchase_Price: matchedItem.Purchase_Price || 0,
+                                      Item_Name: it.Item_Name,
+                                      Purchase_Price: it.Purchase_Price || 0,
                                       Quantity: itemsValues[i]?.Quantity || 0,
+                                      Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
+                                      Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
+                                      Tax_Type: itemsValues[i]?.Tax_Type,
                                     },
                                     i,
                                     itemsValues
@@ -2116,40 +3828,16 @@ export default function PurchaseEdit() {
                                   setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
                                   setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
                                   syncTotalsAfterItemChange();
-                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                } else {
-                                  // // no match — close dropdown
-                                  //      handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                                  // handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                                  handleRowChange(i, "itemOpen", false);
-                                }
-                              }, 150); // small delay so click-from-dropdown fires first
-                            }}
-                            onClick={() => {
-                              handleRowChange(i, "itemOpen", true);
-                              handleRowChange(i, "unitOpen", false);
-                              handleRowChange(i, "CategoryOpen", false);
-                            }}
-                            //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
-                            placeholder="Item Name"
-                            className="w-full outline-none border-b-2 text-gray-900"
-                          />
-                          {/* RHF error */}
-                          {errors?.items?.[i]?.Item_Name && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {errors?.items?.[i]?.Item_Name?.message}
-                            </p>
-                          )}
-                          {/* Dropdown List */}
-
-                          {rows[i]?.itemOpen && (
+                                }}
+                              />
+                            )}
+                            {/* {rows[i]?.itemOpen && (
                             <div
                               style={{ width: "45rem" }}
                               className="absolute z-20  w-full bg-white border
                       border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
                             >
-                              {/* ✅ ADD ITEM BUTTON — new addition, sits above the table */}
+                       
                               <div
                                 onMouseDown={(e) => {
                                   e.preventDefault();
@@ -2173,9 +3861,7 @@ export default function PurchaseEdit() {
                                 Add Item
                               </div>
 
-                              {/* ══════════════════════════════════════════════
-                                    EVERYTHING BELOW IS YOUR EXISTING CODE — UNCHANGED
-    ══                              ════════════════════════════════════════════ */}
+                            
                               <table className="w-full text-sm border-collapse">
                                 <thead className="bg-gray-100 border-b">
                                   <tr>
@@ -2274,16 +3960,7 @@ export default function PurchaseEdit() {
                                           )}
                                           </td>
                                           <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                          {/* <td className="px-3 py-2 text-gray-600">{it.Purchase_Price || 0}</td>
-                                        <td className="px-3 py-2 whitespace-nowrap"
-                                          style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500", // optional: matches Tailwind's medium weight
-                                          }}
-                                        >
-                                          {it.Stock_Quantity || 0}{" "}{it.Primary_Unit}
-                                        </td> */}
+                                         
                                           <td className="px-3 py-2 text-gray-600">
                                             {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
                                           </td>
@@ -2314,689 +3991,151 @@ export default function PurchaseEdit() {
                                 </tbody>
                               </table>
                             </div>
+                          )} */}
+
+
+
+
+                          </div>
+                        </td>
+
+                        {/*HSN Code */}
+                        {enableHSNCode && (<td style={{ padding: "0px", width: "8%" }}>
+                          <input
+                            type="text"
+                            maxLength={8}
+                            value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
+                            onChange={(e) => {
+
+                              e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                              handleRowChange(i, "Item_HSN", e.target.value);
+                              setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
+                            }}
+                            placeholder="HSN Code"
+                            className="w-full outline-none border-b-2 text-gray-900"
+                          //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
+                          />
+                          {errors?.items?.[i]?.Item_HSN && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Item_HSN.message}
+                            </p>
                           )}
-
-
-
-                        </div>
-                      </td>
-
-                      {/*HSN Code */}
-                      <td style={{ padding: "0px", width: "8%" }}>
-                        <input
-                          type="text"
-                          maxLength={8}
-                          value={rows[i]?.Item_HSN || watch(`items.${i}.Item_HSN`) || ""}
-                          onChange={(e) => {
-                            // if (!rows[i]?.isHSNLocked) {
-                            //   handleRowChange(i, "Item_HSN", e.target.value);
-                            //   setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                            // }
-                            e.target.value = e.target.value.replace(/[^0-9]/g, "");
-                            handleRowChange(i, "Item_HSN", e.target.value);
-                            setValue(`items.${i}.Item_HSN`, e.target.value, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          placeholder="HSN Code"
-                          className="w-full outline-none border-b-2 text-gray-900"
-                        //readOnly={rows[i]?.isHSNLocked} // ✅ lock if item is from dropdown
-                        />
-                        {errors?.items?.[i]?.Item_HSN && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Item_HSN.message}
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Qty */}
-                      <td style={{ padding: "0px", width: "4%" }}>
-                        <input
-                          type="text"
-                          className="form-control"
-                          style={{ width: "100%" }}
-
-                          // {...register(`items.${i}.Quantity`)}
-                          {...register(`items.${i}.Quantity`)}
-
-                          onChange={(e) => {
-
-                            e.target.value = e.target.value
-                              .replace(/[^0-9.]/g, "")
-                              .replace(/(\..*)\./g, "$1");
-                            setValue(`items.${i}.Quantity`, e.target.value, {
-                              shouldValidate: true,
-                              shouldDirty: true,
-                            });
-
-                            // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
-                            //   return;
-                            // }
-                            // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
-                            //   ...itemsValues[i],
-                            //   Quantity: e.target.value,
-                            // });
-
-                            const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              {
-                                ...itemsValues[i],
-                                Quantity: Number(e.target.value),
-                              },
-                              i,
-                              itemsValues
-                            );
-
-                            setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                            setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                            syncTotalsAfterItemChange();
-                            // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                            // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                          }}
-                          placeholder="Qty"
-                        />
-                        {errors?.items?.[i]?.Quantity && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Quantity.message}
-                          </p>
-                        )}
-                      </td>
-
-
-
-                      {/* <td style={{ padding: "0px", width: "12%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => {
-                            const row = rows[i];
-                            const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-                            console.log(row, "row")
-                            return (
-                              <select
-                                {...field}
-                                value={field.value || ""}
-                                className="form-select"
-                                style={{ width: "100%", fontSize: "12px", marginLeft: "0px" }}
-                                //disabled={row?.isUnitLocked}
-                                onChange={(e) => {
-                                  const newUnit = e.target.value;
-
-                                  if (newUnit === "__ADD_UNIT__") {
-                                    setActiveUnitRow(i);
-                                    setShowAddUnitModal(true);
-                                    return;
-                                  }
-
-                                  const previousUnit = field.value;
-                                  field.onChange(newUnit);
-                                  handleRowChange(i, "Item_Unit", newUnit);
-                                  setValue(`items.${i}.Item_Unit`, newUnit, { shouldValidate: true, shouldDirty: true });
-                                  //const quantity = Number(itemsValues[i]?.Quantity);
-
-                                  // if (!Number.isFinite(quantity) || quantity <= 0) {
-                                  //   return;
-                                  // }
-                                  // 🔹 auto-scale Price/Unit when switching between Primary <-> Secondary
-                                  // const primaryUnit = row?.Primary_Unit;
-                                  // const secondaryUnit = row?.Secondary_Unit;
-                                  // const conversionRate = Number(row?.Conversion_Rate) || 0;
-                                  // const currentItem = itemsValues[i];
-
-                                  // const primaryUnit =
-                                  //   currentItem?.Primary_Unit ||
-                                  //   availableUnits?.[0]?.Unit_Shorthand ||
-                                  //   "";
-
-                                  // const secondaryUnit =
-                                  //   currentItem?.Secondary_Unit ||
-                                  //   availableUnits?.find(
-                                  //     (u) => u.Unit_Shorthand !== primaryUnit
-                                  //   )?.Unit_Shorthand ||
-                                  //   "";
-
-                                  // const conversionRate =
-                                  //   Number(currentItem?.Conversion_Rate) || 0;
-                                  // const row = rows[i];
-
-                                  // const availableUnits = Array.isArray(row?.Available_Units)
-                                  //   ? row.Available_Units
-                                  //   : [];
-
-                                  const primaryUnit =
-                                    row?.Primary_Unit ||
-                                    availableUnits?.[0]?.Unit_Shorthand ||
-                                    "";
-
-                                  const secondaryUnit =
-                                    row?.Secondary_Unit ||
-                                    availableUnits?.find(
-                                      (u) => u.Unit_Shorthand !== primaryUnit
-                                    )?.Unit_Shorthand ||
-                                    "";
-
-                                  const conversionRate =
-                                    Number(row?.Conversion_Rate) || 0;
-
-                                  if (
-                                    previousUnit &&
-                                    newUnit &&
-                                    previousUnit !== newUnit &&
-                                    primaryUnit &&
-                                    secondaryUnit &&
-                                    conversionRate > 0
-                                  ) {
-                                    //const currentPrice = Number(itemsValues[i]?.Purchase_Price) || 0;
-
-                                    //let newPrice = currentPrice;
-
-                                    // switching FROM primary TO secondary — price per unit gets smaller
-                                    // if (previousUnit === primaryUnit && newUnit === secondaryUnit) {
-                                    //   newPrice = currentPrice / conversionRate;
-                                    // }
-                                    // // switching FROM secondary TO primary — price per unit gets bigger
-                                    // else if (previousUnit === secondaryUnit && newUnit === primaryUnit) {
-                                    //   newPrice = currentPrice * conversionRate;
-                                    // }
-
-                                    //const roundedPrice = newPrice.toFixed(2);
-                                    const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
-
-                                    // if (basePrice <= 0) {
-                                    //   return;
-                                    // }
-
-                                    // let newPrice = basePrice;
-
-                                    // =====================================================
-                                    // PRIMARY → SECONDARY
-                                    // Example:
-                                    // ₹45 / Kg
-                                    // 1 Kg = 1000 Gm
-                                    // ₹45 / 1000 = ₹0.045
-                                    // UI allows only 2 decimals → ₹0.05
-                                    // =====================================================
-
-                                    // if (
-                                    //   previousUnit === primaryUnit &&
-                                    //   newUnit === secondaryUnit
-                                    // ) {
-                                    //   newPrice = basePrice / conversionRate;
-                                    // }
-
-                                    // =====================================================
-                                    // SECONDARY → PRIMARY
-                                    // IMPORTANT:
-                                    // Do NOT use current displayed price.
-                                    // Restore original base price.
-                                    // =====================================================
-
-                                    // else if (
-                                    //   previousUnit === secondaryUnit &&
-                                    //   newUnit === primaryUnit
-                                    // ) {
-                                    //   newPrice = basePrice;
-
-                                    // }
-
-                                    // else {
-                                    //   return;
-                                    // }
-
-                                    //const roundedPrice = newPrice.toFixed(2);
-                                    const baseUnit =
-                                      basePurchaseUnitRef.current[i];
-
-                                    if (basePrice <= 0 || !baseUnit) {
-                                      return;
-                                    }
-
-                                    let newPrice;
-
-                                    if (newUnit === baseUnit) {
-                                      // Back to the unit in which the price was entered
-                                      newPrice = basePrice;
-                                    }
-
-                                    else if (
-                                      baseUnit === primaryUnit &&
-                                      newUnit === secondaryUnit
-                                    ) {
-                                      // Primary → Secondary
-                                      newPrice = basePrice / conversionRate;
-                                    }
-
-                                    else if (
-                                      baseUnit === secondaryUnit &&
-                                      newUnit === primaryUnit
-                                    ) {
-                                      // Secondary → Primary
-                                      newPrice = basePrice * conversionRate;
-                                    }
-
-                                    else {
-                                      return;
-                                    }
-
-                                    const roundedPrice = newPrice.toFixed(2);
-
-
-
-
-
-                                    setValue(`items.${i}.Purchase_Price`, roundedPrice, { shouldValidate: true, shouldDirty: true });
-
-                                    // recompute Amount/Tax/Total with the new price
-                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                      { ...itemsValues[i], Purchase_Price: roundedPrice },
-                                      i,
-                                      itemsValues
-                                    );
-
-                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                    setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                  }
-                                }}
-                              >
-                                {availableUnits.length > 0 ? (
-                                  availableUnits.map((unit) => (
-                                    <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                      {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                    </option>
-                                  ))
-                                ) : (
-                                  <>
-                                    <option value="">NONE</option>
-                                    {Array.isArray(itemUnits) &&
-                                      itemUnits.map((unit) => (
-                                        <option key={unit.Unit_Shorthand} value={unit.Unit_Shorthand}>
-                                          {unit.Unit_Name} ({unit.Unit_Shorthand})
-                                        </option>
-                                      ))}
-                                    <option value="__ADD_UNIT__">➕ Add Unit</option>
-                                  </>
-                                )}
-                              </select>
-                            );
-                          }}
-                        />
-
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
-                        )}
-                      </td> */}
-                      <td style={{ padding: "0px", width: "10%" }}>
-                        <Controller
-                          control={control}
-                          name={`items.${i}.Item_Unit`}
-                          render={({ field }) => {
-                            const row = rows[i];
-                            const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
-                            //const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
-                            const allUnits =
-                              availableUnits.length > 0
-                                ? availableUnits
-                                : (Array.isArray(itemUnits) ? itemUnits : []);
-
-
-                            const hasPrimary = !!row?.Primary_Unit;
-                            const hasSecondary = !!row?.Secondary_Unit;
-
-                            let unitsWithNone = [];
-
-                            if (!hasPrimary && !hasSecondary) {
-                              // No units configured → show None + all master units
-                              unitsWithNone = [
-                                {
-                                  Unit_Name: "None",
-                                  Unit_Shorthand: "",
-                                },
-                                ...(Array.isArray(itemUnits) ? itemUnits : []),
-                              ];
-                            } else {
-                              // Item has its own units
-                              unitsWithNone = allUnits;
-                            }
-
-
-
-                            const selectedLabel = unitsWithNone.find(
-                              u => u.Unit_Shorthand === field.value
-                            );
-
-                            const getUnitLabel = (unit) =>
-                              unit?.Unit_Shorthand
-                                ? `${unit.Unit_Name} (${unit.Unit_Shorthand})`
-                                : unit.Unit_Name;
-                            const displayLabel = selectedLabel
-                              ? getUnitLabel(selectedLabel)
-                              : "";
-                            const filtered = unitsWithNone.filter((u) => {
-                              const label = getUnitLabel(u).toLowerCase();
-
-                              return label.includes(
-                                (rows[i]?.unitSearch || "").toLowerCase()
-                              );
-                            });
-                            return (
-                              <div
-                                //  ref={unitRef} 
-                                ref={(el) => (unitRefs.current[i] = el)}
-                                style={{ position: "relative", width: "100%" }}>
-
-
-                                <input
-                                  readOnly
-                                  value={displayLabel}
-                                  onClick={() => {
-                                    handleRowChange(i, "unitOpen", true);
-                                    handleRowChange(i, "itemOpen", false);
-                                    handleRowChange(i, "CategoryOpen", false);
-                                  }}
-                                />
-
-                                {rows[i]?.unitOpen && (
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: "100%",
-                                      left: 0,
-                                      zIndex: 30,
-                                      width: "180px",
-                                      background: "white",
-                                      border: "1px solid #e5e7eb",
-                                      borderRadius: 6,
-                                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                      marginTop: 2,
-                                      maxHeight: 180,
-                                      overflowY: "auto",
-                                    }}
-                                  >
-                                    <input
-                                      type="text"
-                                      placeholder="Search unit..."
-                                      value={rows[i]?.unitSearch || ""}
-                                      // value={unitSearch}
-                                      onChange={(e) =>
-                                        handleRowChange(i, "unitSearch", e.target.value)
-                                      }
-                                      //onChange={(e) => setUnitSearch(e.target.value)}
-                                      style={{
-                                        width: "100%",
-                                        marginBottom: 0,
-
-                                      }}
-                                    />
-                                    {!hasPrimary && !hasSecondary && (
-                                      <div
-                                        onClick={() => {
-                                          setActiveUnitRow(i);
-                                          setShowAddUnitModal(true);
-
-                                          handleRowChange(i, "unitOpen", false);
-                                          handleRowChange(i, "unitSearch", "");
-                                        }}
-                                        style={{
-                                          padding: "8px 10px",
-                                          borderBottom: "1px solid #e5e7eb",
-                                          cursor: "pointer",
-                                          fontSize: 12,
-                                          fontWeight: 600,
-                                          color: "#4CA1AF",
-                                          background: "#f8fafc",
-                                        }}
-                                      >
-                                        + Add Unit
-                                      </div>
-                                    )}
-                                    {filtered.length === 0 ? (
-                                      <div
-                                        onClick={() => {
-                                          field.onChange("");
-
-                                          setValue(
-                                            `items.${i}.Item_Unit`,
-                                            "",
-                                            {
-                                              shouldValidate: true,
-                                              shouldDirty: true,
-                                            }
-                                          );
-
-                                          handleRowChange(i, "unitOpen", false);
-                                          handleRowChange(i, "unitSearch", "");
-
-                                          //setUnitSearch("");
-                                        }}
-                                        style={{
-                                          padding: "6px 10px",
-                                          fontSize: 12,
-                                          //color: "#9ca3af",
-                                          backgroundColor:
-                                            field.value === "" ? "#eaf6f7" : "transparent",
-                                          color:
-                                            field.value === "" ? "#4CA1AF" : "#374151",
-                                          fontWeight:
-                                            field.value === "" ? 500 : 400,
-                                        }}
-                                      >
-                                        None
-                                      </div>
-                                    ) : (
-                                      filtered.map((unit) => {
-                                        const isSelected =
-                                          field.value === unit.Unit_Shorthand;
-
-                                        return (
-                                          <div
-                                            key={unit.Unit_Shorthand}
-                                            onClick={() => {
-                                              const newUnit = unit.Unit_Shorthand;
-
-                                              const previousUnit = field.value;
-
-                                              field.onChange(newUnit);
-
-                                              handleRowChange(
-                                                i,
-                                                "Item_Unit",
-                                                newUnit
-                                              );
-
-                                              setValue(
-                                                `items.${i}.Item_Unit`,
-                                                newUnit,
-                                                {
-                                                  shouldValidate: true,
-                                                  shouldDirty: true,
-                                                }
-                                              );
-
-                                              // close dropdown
-                                              handleRowChange(i, "unitOpen", false);
-                                              handleRowChange(i, "unitSearch", "");
-
-                                              //setUnitSearch("");
-
-
-                                              const primaryUnit =
-                                                row?.Primary_Unit;
-
-                                              const secondaryUnit =
-                                                row?.Secondary_Unit;
-
-                                              const conversionRate =
-                                                Number(
-                                                  row?.Conversion_Rate
-                                                ) || 0;
-
-                                              if (
-                                                previousUnit &&
-                                                newUnit &&
-                                                previousUnit !== newUnit &&
-                                                primaryUnit &&
-                                                secondaryUnit &&
-                                                conversionRate > 0
-                                              ) {
-                                                const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
-
-                                                const baseUnit = basePurchaseUnitRef.current[i];
-
-                                                if (
-                                                  basePrice <= 0 ||
-                                                  !baseUnit
-                                                )
-                                                  return;
-
-                                                let newPrice;
-
-                                                if (newUnit === baseUnit) {
-                                                  newPrice = basePrice;
-                                                } else if (
-                                                  baseUnit === primaryUnit &&
-                                                  newUnit === secondaryUnit
-                                                ) {
-                                                  newPrice =
-                                                    basePrice /
-                                                    conversionRate;
-                                                } else if (
-                                                  baseUnit === secondaryUnit &&
-                                                  newUnit === primaryUnit
-                                                ) {
-                                                  newPrice =
-                                                    basePrice *
-                                                    conversionRate;
-                                                } else {
-                                                  return;
-                                                }
-
-                                                const roundedPrice =
-                                                  newPrice.toFixed(2);
-
-                                                setValue(
-                                                  `items.${i}.Purchase_Price`,
-                                                  roundedPrice,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
-
-                                                const {
-                                                  Tax_Amount,
-                                                  Amount,
-                                                  Total_Amount,
-                                                  Balance_Due,
-                                                } = calculateRowAmount(
-                                                  {
-                                                    ...itemsValues[i],
-                                                    Purchase_Price:
-                                                      roundedPrice,
-                                                  },
-                                                  i,
-                                                  itemsValues
-                                                );
-
-                                                setValue(
-                                                  `items.${i}.Tax_Amount`,
-                                                  Tax_Amount,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
-
-                                                setValue(
-                                                  `items.${i}.Amount`,
-                                                  Amount,
-                                                  {
-                                                    shouldValidate: true,
-                                                    shouldDirty: true,
-                                                  }
-                                                );
-
-                                                // setValue("Total_Amount",Total_Amount,{shouldValidate: true,shouldDirty: true,}
-                                                // );
-
-                                                // setValue("Balance_Due",Balance_Due,{shouldValidate: true,shouldDirty: true,
-                                                //   }
-                                                // );
-                                                syncTotalsAfterItemChange();
-                                              }
-                                            }}
-                                            style={{
-                                              padding: "6px 10px",
-                                              fontSize: 12,
-                                              cursor: "pointer",
-                                              backgroundColor: isSelected
-                                                ? "#eaf6f7"
-                                                : "transparent",
-                                              color: isSelected
-                                                ? "#4CA1AF"
-                                                : "#374151",
-                                              fontWeight: isSelected
-                                                ? 500
-                                                : 400,
-                                            }}
-                                          >
-                                            {getUnitLabel(unit)}
-                                            {/* {unit.Unit_Name} (
-                                                                    {unit.Unit_Shorthand}) */}
-                                          </div>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }}
-                        />
-
-                        {errors?.items?.[i]?.Item_Unit && (
-                          <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
-                        )}
-                      </td>
-
-
-                      {/* Price/Unit */}
-                      <td style={{ padding: "0px", width: "6%" }}>
-                        <div className="d-flex align-items-center">
+                        </td>)}
+                        {/*MRP */}
+                        {shouldShowMRP && (<td style={{ padding: "0px", width: "6%" }}>
+                          <div className="d-flex align-items-center">
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%", marginBottom: "0px" }}
+                              {...register(`items.${i}.MRP`)}
+                              onChange={(e) => {
+                                let val = e.target.value;
+
+                                // ✅ allow digits and one dot
+                                val = val.replace(/[^0-9.]/g, "");
+
+                                // ✅ if more than one dot, keep only the first
+                                const parts = val.split(".");
+                                if (parts.length > 2) {
+                                  val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
+                                }
+
+                                // ✅ limit to 2 decimal places
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 2);
+                                }
+                                if (val === "") {
+                                  setValue(`items.${i}.MRP`, "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+
+
+                                  return;
+                                }
+
+                                //const displayValue = Number(val) === 0 ? "" : val;
+
+                                //e.target.value = displayValue;
+                                setValue(`items.${i}.MRP`, val,
+                                  { shouldValidate: true, shouldDirty: true });
+
+                                //basePurchasePriceRef.current[i] = Number(val) || 0;
+                                //basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+
+
+                                // const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                //   { ...itemsValues[i], Purchase_Price: val },
+                                //   i,
+                                //   itemsValues
+                                // );
+
+                                //setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                //setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                //syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              }}
+                              onBlur={(e) => {
+                                if (Number(e.target.value) === 0) {
+                                  e.target.value = "";
+
+                                  setValue(`items.${i}.MRP`, "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+                                }
+                              }}
+
+                              placeholder="MRP"
+                            />
+
+
+
+                          </div>
+                          {errors?.items?.[i]?.MRP && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].MRP.message}
+                            </p>
+                          )}
+                        </td>)}
+
+                        {/* Qty */}
+                        <td style={{ padding: "0px", width: "4%" }}>
                           <input
                             type="text"
                             className="form-control"
-                            style={{ width: "100%", marginBottom: "0px" }}
-                            {...register(`items.${i}.Purchase_Price`)}
+                            style={{ width: "100%" }}
+
+                            // {...register(`items.${i}.Quantity`)}
+                            {...register(`items.${i}.Quantity`)}
+
                             onChange={(e) => {
-                              let val = e.target.value.replace(/[^0-9.]/g, "");;
 
-                              // ✅ allow digits and one dot
+                              e.target.value = e.target.value
+                                .replace(/[^0-9.]/g, "")
+                                .replace(/(\..*)\./g, "$1");
+                              setValue(`items.${i}.Quantity`, e.target.value, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
 
-
-                              // ✅ if more than one dot, keep only the first
-                              const parts = val.split(".");
-                              if (parts.length > 2) {
-                                val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
-                              }
-
-                              // ✅ limit to 2 decimal places
-                              if (val.includes(".")) {
-                                const [int, dec] = val.split(".");
-                                val = int + "." + dec.slice(0, 2);
-                              }
-
-                              e.target.value = val;
-                              setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
-                              basePurchasePriceRef.current[i] = Number(val) || 0;
-                              basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
-
-                              //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
                               // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
                               //   return;
                               // }
-
+                              // const { Tax_Amount, Amount,Total_Amount } = calculateRowAmount({
+                              //   ...itemsValues[i],
+                              //   Quantity: e.target.value,
+                              // });
 
                               const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                { ...itemsValues[i], Purchase_Price: val },
+                                {
+                                  ...itemsValues[i],
+                                  Quantity: Number(e.target.value),
+                                },
                                 i,
                                 itemsValues
                               );
@@ -3007,94 +4146,522 @@ export default function PurchaseEdit() {
                               // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
                               // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
                             }}
-
-                            placeholder="Price"
+                            placeholder="Qty"
                           />
+                          {errors?.items?.[i]?.Quantity && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Quantity.message}
+                            </p>
+                          )}
+                        </td>
 
-                        </div>
-                        {errors?.items?.[i]?.Purchase_Price && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errors.items[i].Purchase_Price.message}
-                          </p>
+                        {shouldShowFreeQuantity && (
+                          <td style={{ padding: "0px", width: "4%" }}>
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%" }}
+                              {...register(`items.${i}.Free_Quantity`)}
+                              onChange={(e) => {
+                                let value = e.target.value;
+
+                                value = value
+                                  .replace(/[^0-9.]/g, "")
+                                  .replace(/(\..*)\./g, "$1");
+
+                                if (value.includes(".")) {
+                                  const [whole, decimal] = value.split(".");
+                                  value = `${whole}.${decimal.slice(0, 2)}`;
+                                }
+
+                                setValue(
+                                  `items.${i}.Free_Quantity`,
+                                  value,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+                              }}
+                              placeholder="Free"
+                            />
+                          </td>
                         )}
-                      </td>
-                      {/* Discount */}
-                      <td style={{ padding: "0px", width: "14%" }}>
-                        <div className="d-flex align-items-center">
-                          <input
-                            type="text"
-                            className="form-control"
-                            style={{ width: "50%", marginBottom: "0px" }}
-                            {...register(`items.${i}.Discount_On_Purchase_Price`)}
 
-                            onInput={(e) => {
-                              let val = e.target.value;
 
-                              // allow digits + 1 dot
-                              val = val.replace(/[^0-9.]/g, "");
 
-                              const parts = val.split(".");
-                              if (parts.length > 2) {
-                                val = parts[0] + "." + parts.slice(1).join("");
-                              }
 
-                              if (val.includes(".")) {
-                                const [int, dec] = val.split(".");
-                                val = int + "." + dec.slice(0, 2);
-                              }
-
-                              e.target.value = val;
-
-                              const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                { ...itemsValues[i], Discount_On_Purchase_Price: val },
-                                i,
-                                itemsValues
-                              );
-
-                              setValue(`items.${i}.Tax_Amount`, Tax_Amount);
-                              setValue(`items.${i}.Amount`, Amount);
-                              syncTotalsAfterItemChange();
-                              // setValue("Total_Amount", Total_Amount);
-                              // setValue("Balance_Due", Balance_Due);
-                            }}
-
-                            placeholder="Discount"
-                          />
+                        <td style={{ padding: "0px", width: "10%" }}>
                           <Controller
                             control={control}
-                            name={`items.${i}.Discount_Type_On_Purchase_Price`}
-                            render={({ field }) => (
-                              <select
-                                {...field}
-                                className="form-select ms-2"
-                                style={{ width: "50%", fontSize: "12px" }}
-                                onChange={(e) => {
-                                  field.onChange(e); // ✅ let RHF handle its state
+                            name={`items.${i}.Item_Unit`}
+                            render={({ field }) => {
+                              const row = rows[i];
+                              const availableUnits = Array.isArray(row?.Available_Units) ? row.Available_Units : [];
+                              //const allUnits = availableUnits.length > 0 ? availableUnits : (Array.isArray(itemUnits) ? itemUnits : []);
+                              const allUnits =
+                                availableUnits.length > 0
+                                  ? availableUnits
+                                  : (Array.isArray(itemUnits) ? itemUnits : []);
 
 
-                                  const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                    { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
-                                    i,
-                                    itemsValues
-                                  );
+                              const hasPrimary = !!row?.Primary_Unit;
+                              const hasSecondary = !!row?.Secondary_Unit;
 
-                                  setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                  setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                  syncTotalsAfterItemChange();
-                                  // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                  // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                }}
-                              >
-                                <option value="Percentage">%</option>
-                                <option value="Amount">Amount</option>
-                              </select>
-                            )}
+                              let unitsWithNone = [];
+
+                              if (!hasPrimary && !hasSecondary) {
+                                // No units configured → show None + all master units
+                                unitsWithNone = [
+                                  {
+                                    Unit_Name: "None",
+                                    Unit_Shorthand: "",
+                                  },
+                                  ...(Array.isArray(itemUnits) ? itemUnits : []),
+                                ];
+                              } else {
+                                // Item has its own units
+                                unitsWithNone = allUnits;
+                              }
+
+
+
+                              const selectedLabel = unitsWithNone.find(
+                                u => u.Unit_Shorthand === field.value
+                              );
+
+                              const getUnitLabel = (unit) =>
+                                unit?.Unit_Shorthand
+                                  ? `${unit.Unit_Name} (${unit.Unit_Shorthand})`
+                                  : unit.Unit_Name;
+                              const displayLabel = selectedLabel
+                                ? getUnitLabel(selectedLabel)
+                                : "";
+                              const filtered = unitsWithNone.filter((u) => {
+                                const label = getUnitLabel(u).toLowerCase();
+
+                                return label.includes(
+                                  (rows[i]?.unitSearch || "").toLowerCase()
+                                );
+                              });
+                              return (
+                                <div
+                                  //  ref={unitRef} 
+                                  ref={(el) => (unitRefs.current[i] = el)}
+                                  style={{ position: "relative", width: "100%" }}>
+
+
+                                  <input
+                                    readOnly
+                                    value={displayLabel}
+                                    onClick={() => {
+                                      handleRowChange(i, "unitOpen", true);
+                                      handleRowChange(i, "itemOpen", false);
+                                      handleRowChange(i, "CategoryOpen", false);
+                                    }}
+                                  />
+
+                                  {rows[i]?.unitOpen && (
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        zIndex: 30,
+                                        width: "180px",
+                                        background: "white",
+                                        border: "1px solid #e5e7eb",
+                                        borderRadius: 6,
+                                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                        marginTop: 2,
+                                        maxHeight: 180,
+                                        overflowY: "auto",
+                                      }}
+                                    >
+                                      <input
+                                        type="text"
+                                        placeholder="Search unit..."
+                                        value={rows[i]?.unitSearch || ""}
+                                        // value={unitSearch}
+                                        onChange={(e) =>
+                                          handleRowChange(i, "unitSearch", e.target.value)
+                                        }
+                                        //onChange={(e) => setUnitSearch(e.target.value)}
+                                        style={{
+                                          width: "100%",
+                                          marginBottom: 0,
+
+                                        }}
+                                      />
+                                      {!hasPrimary && !hasSecondary && (
+                                        <div
+                                          onClick={() => {
+                                            setActiveUnitRow(i);
+                                            setShowAddUnitModal(true);
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+                                          }}
+                                          style={{
+                                            padding: "8px 10px",
+                                            borderBottom: "1px solid #e5e7eb",
+                                            cursor: "pointer",
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: "#4CA1AF",
+                                            background: "#f8fafc",
+                                          }}
+                                        >
+                                          + Add Unit
+                                        </div>
+                                      )}
+                                      {filtered.length === 0 ? (
+                                        <div
+                                          onClick={() => {
+                                            field.onChange("");
+
+                                            setValue(
+                                              `items.${i}.Item_Unit`,
+                                              "",
+                                              {
+                                                shouldValidate: true,
+                                                shouldDirty: true,
+                                              }
+                                            );
+
+                                            handleRowChange(i, "unitOpen", false);
+                                            handleRowChange(i, "unitSearch", "");
+
+                                            //setUnitSearch("");
+                                          }}
+                                          style={{
+                                            padding: "6px 10px",
+                                            fontSize: 12,
+                                            //color: "#9ca3af",
+                                            backgroundColor:
+                                              field.value === "" ? "#eaf6f7" : "transparent",
+                                            color:
+                                              field.value === "" ? "#4CA1AF" : "#374151",
+                                            fontWeight:
+                                              field.value === "" ? 500 : 400,
+                                          }}
+                                        >
+                                          None
+                                        </div>
+                                      ) : (
+                                        filtered.map((unit) => {
+                                          const isSelected =
+                                            field.value === unit.Unit_Shorthand;
+
+                                          return (
+                                            <div
+                                              key={unit.Unit_Shorthand}
+                                              onClick={() => {
+                                                const newUnit = unit.Unit_Shorthand;
+
+                                                const previousUnit = field.value;
+
+                                                field.onChange(newUnit);
+
+                                                handleRowChange(
+                                                  i,
+                                                  "Item_Unit",
+                                                  newUnit
+                                                );
+
+                                                setValue(
+                                                  `items.${i}.Item_Unit`,
+                                                  newUnit,
+                                                  {
+                                                    shouldValidate: true,
+                                                    shouldDirty: true,
+                                                  }
+                                                );
+
+                                                // close dropdown
+                                                handleRowChange(i, "unitOpen", false);
+                                                handleRowChange(i, "unitSearch", "");
+
+                                                //setUnitSearch("");
+
+
+                                                const primaryUnit =
+                                                  row?.Primary_Unit;
+
+                                                const secondaryUnit =
+                                                  row?.Secondary_Unit;
+
+                                                const conversionRate =
+                                                  Number(
+                                                    row?.Conversion_Rate
+                                                  ) || 0;
+
+                                                if (
+                                                  previousUnit &&
+                                                  newUnit &&
+                                                  previousUnit !== newUnit &&
+                                                  primaryUnit &&
+                                                  secondaryUnit &&
+                                                  conversionRate > 0
+                                                ) {
+                                                  const basePrice = Number(basePurchasePriceRef.current[i]) || 0;
+
+                                                  const baseUnit = basePurchaseUnitRef.current[i];
+
+                                                  if (
+                                                    basePrice <= 0 ||
+                                                    !baseUnit
+                                                  )
+                                                    return;
+
+                                                  let newPrice;
+
+                                                  if (newUnit === baseUnit) {
+                                                    newPrice = basePrice;
+                                                  } else if (
+                                                    baseUnit === primaryUnit &&
+                                                    newUnit === secondaryUnit
+                                                  ) {
+                                                    newPrice =
+                                                      basePrice /
+                                                      conversionRate;
+                                                  } else if (
+                                                    baseUnit === secondaryUnit &&
+                                                    newUnit === primaryUnit
+                                                  ) {
+                                                    newPrice =
+                                                      basePrice *
+                                                      conversionRate;
+                                                  } else {
+                                                    return;
+                                                  }
+
+                                                  const roundedPrice =
+                                                    newPrice.toFixed(2);
+
+                                                  setValue(
+                                                    `items.${i}.Purchase_Price`,
+                                                    roundedPrice,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
+
+                                                  const {
+                                                    Tax_Amount,
+                                                    Amount,
+                                                    Total_Amount,
+                                                    Balance_Due,
+                                                  } = calculateRowAmount(
+                                                    {
+                                                      ...itemsValues[i],
+                                                      Purchase_Price:
+                                                        roundedPrice,
+                                                    },
+                                                    i,
+                                                    itemsValues
+                                                  );
+
+                                                  setValue(
+                                                    `items.${i}.Tax_Amount`,
+                                                    Tax_Amount,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
+
+                                                  setValue(
+                                                    `items.${i}.Amount`,
+                                                    Amount,
+                                                    {
+                                                      shouldValidate: true,
+                                                      shouldDirty: true,
+                                                    }
+                                                  );
+
+                                                  // setValue("Total_Amount",Total_Amount,{shouldValidate: true,shouldDirty: true,}
+                                                  // );
+
+                                                  // setValue("Balance_Due",Balance_Due,{shouldValidate: true,shouldDirty: true,
+                                                  //   }
+                                                  // );
+                                                  syncTotalsAfterItemChange();
+                                                }
+                                              }}
+                                              style={{
+                                                padding: "6px 10px",
+                                                fontSize: 12,
+                                                cursor: "pointer",
+                                                backgroundColor: isSelected
+                                                  ? "#eaf6f7"
+                                                  : "transparent",
+                                                color: isSelected
+                                                  ? "#4CA1AF"
+                                                  : "#374151",
+                                                fontWeight: isSelected
+                                                  ? 500
+                                                  : 400,
+                                              }}
+                                            >
+                                              {getUnitLabel(unit)}
+                                              {/* {unit.Unit_Name} (
+                                                                    {unit.Unit_Shorthand}) */}
+                                            </div>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }}
                           />
-                        </div>
-                      </td>
+
+                          {errors?.items?.[i]?.Item_Unit && (
+                            <p className="text-red-500 text-xs mt-1">{errors.items[i].Item_Unit.message}</p>
+                          )}
+                        </td>
 
 
-                      <td style={{ padding: "0px", width: "12%" }}>
+                        {/* Price/Unit */}
+                        <td style={{ padding: "0px", width: "6%" }}>
+                          <div className="d-flex align-items-center">
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "100%", marginBottom: "0px" }}
+                              {...register(`items.${i}.Purchase_Price`)}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/[^0-9.]/g, "");;
+
+                                // ✅ allow digits and one dot
+
+
+                                // ✅ if more than one dot, keep only the first
+                                const parts = val.split(".");
+                                if (parts.length > 2) {
+                                  val = parts[0] + "." + parts.slice(1).join(""); // collapse extra dots
+                                }
+
+                                // ✅ limit to 2 decimal places
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 2);
+                                }
+
+                                e.target.value = val;
+                                setValue(`items.${i}.Purchase_Price`, val, { shouldValidate: true });
+                                basePurchasePriceRef.current[i] = Number(val) || 0;
+                                basePurchaseUnitRef.current[i] = itemsValues[i]?.Item_Unit || "";
+
+                                //setValue(`items.${i}.Purchase_Price`, Number(val), { shouldValidate: true });
+                                // if (!itemsValues[i]?.Item_Name || itemsValues[i]?.Item_Name.trim() === "") {
+                                //   return;
+                                // }
+
+
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                  { ...itemsValues[i], Purchase_Price: val },
+                                  i,
+                                  itemsValues
+                                );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                              }}
+
+                              placeholder="Price"
+                            />
+
+                          </div>
+                          {errors?.items?.[i]?.Purchase_Price && (
+                            <p className="text-red-500 text-xs mt-1">
+                              {errors.items[i].Purchase_Price.message}
+                            </p>
+                          )}
+                        </td>
+                        {/* Discount */}
+                        <td style={{ padding: "0px", width: "14%" }}>
+                          <div className="d-flex align-items-center">
+                            <input
+                              type="text"
+                              className="form-control"
+                              style={{ width: "50%", marginBottom: "0px" }}
+                              {...register(`items.${i}.Discount_On_Purchase_Price`)}
+
+                              onInput={(e) => {
+                                let val = e.target.value;
+
+                                // allow digits + 1 dot
+                                val = val.replace(/[^0-9.]/g, "");
+
+                                const parts = val.split(".");
+                                if (parts.length > 2) {
+                                  val = parts[0] + "." + parts.slice(1).join("");
+                                }
+
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 2);
+                                }
+
+                                e.target.value = val;
+
+                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                  { ...itemsValues[i], Discount_On_Purchase_Price: val },
+                                  i,
+                                  itemsValues
+                                );
+
+                                setValue(`items.${i}.Tax_Amount`, Tax_Amount);
+                                setValue(`items.${i}.Amount`, Amount);
+                                syncTotalsAfterItemChange();
+                                // setValue("Total_Amount", Total_Amount);
+                                // setValue("Balance_Due", Balance_Due);
+                              }}
+
+                              placeholder="Discount"
+                            />
+                            <Controller
+                              control={control}
+                              name={`items.${i}.Discount_Type_On_Purchase_Price`}
+                              render={({ field }) => (
+                                <select
+                                  {...field}
+                                  className="form-select ms-2"
+                                  style={{ width: "50%", fontSize: "12px" }}
+                                  onChange={(e) => {
+                                    field.onChange(e); // ✅ let RHF handle its state
+
+
+                                    const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                      { ...itemsValues[i], Discount_Type_On_Purchase_Price: e.target.value },
+                                      i,
+                                      itemsValues
+                                    );
+
+                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
+                                    setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
+                                    syncTotalsAfterItemChange();
+                                    // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
+                                    // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
+                                  }}
+                                >
+                                  <option value="Percentage">%</option>
+                                  <option value="Amount">Amount</option>
+                                </select>
+                              )}
+                            />
+                          </div>
+                        </td>
+
+
+                        {/* <td style={{ padding: "0px", width: "12%" }}>
                         <Controller
                           control={control}
                           name={`items.${i}.Tax_Type`}
@@ -3107,7 +4674,7 @@ export default function PurchaseEdit() {
                                 field.onChange(e); // ✅ update RHF value
 
 
-                                const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
+                                const { Tax_Amount, Amount } = calculateRowAmount(
                                   { ...itemsValues[i], Tax_Type: e.target.value },
                                   i,
                                   itemsValues
@@ -3139,186 +4706,282 @@ export default function PurchaseEdit() {
                             </select>
                           )}
                         />
-                      </td>
+                      </td> */}
+                        {/* Tax Amount Entry */}
+                        <td style={{
+                          padding: "0px",
+                          width: shouldShowFreeQuantity ? "8%" : "10%"
+                          //width: "12%" 
+                        }}>
+                          <Controller
+                            control={control}
+                            name={`items.${i}.Tax_Type`}
+                            render={({ field }) => {
+                              const originalTaxType =
+                                originalTaxTypesRef.current[i] || "None";
 
-                      {/* Tax Amount */}
-                      <td style={{ width: "8%" }}>
-                        <input
-                          type="text"
-                          className="form-control"
-                          style={{ backgroundColor: "transparent" }}
-                          {...register(`items.${i}.Tax_Amount`)}
-                          readOnly
-                        />
-                      </td>
+                              return (
+                                <select
+                                  {...field}
+                                  className="form-select bg-gray-100 text-gray-700"
+                                  onChange={(e) => {
+                                    field.onChange(e);
 
-                      {/* Amount */}
-                      <td style={{ width: "8%" }}>
-                        <input
-                          type="text"
-                          className="form-control"
-                          style={{ backgroundColor: "transparent" }}
-                          {...register(`items.${i}.Amount`)}
-                          readOnly
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={2}></td>
-                    <td>Total</td>
-                    <td></td>
+                                    // Recalculate amounts on Tax_Type change
+                                    const {
+                                      Tax_Amount,
+                                      Amount,
+                                    } = calculateRowAmount(
+                                      {
+                                        ...itemsValues[i],
+                                        Tax_Type: e.target.value,
+                                      },
+                                      i,
+                                      itemsValues
+                                    );
 
-                    <td className="text-right">
-                      {totals.totalQty}
-                    </td>
+                                    setValue(`items.${i}.Tax_Amount`, Tax_Amount, {
+                                      shouldValidate: true,
+                                    });
 
-                    <td></td>
-                    <td></td>
+                                    setValue(`items.${i}.Amount`, Amount, {
+                                      shouldValidate: true,
+                                    });
 
-                    <td className="text-right">
-                      ₹{totals.totalDiscount.toFixed(2)}
-                    </td>
+                                    syncTotalsAfterItemChange();
+                                  }}
+                                >
+                                  {/* Always show None */}
+                                  <option value="None">None</option>
 
-                    <td></td>
+                                  {enableGST ? (
+                                    <>
+                                      <option value="GST0">GST @0%</option>
+                                      <option value="IGST0">IGST @0%</option>
 
-                    <td className="text-right">
-                      ₹{totals.totalTax.toFixed(2)}
-                    </td>
+                                      <option value="GST0.25">GST @0.25%</option>
+                                      <option value="IGST0.25">IGST @0.25%</option>
 
-                    <td className="text-right">
-                      ₹{totals.totalAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
+                                      <option value="GST3">GST @3%</option>
+                                      <option value="IGST3">IGST @3%</option>
 
+                                      <option value="GST5">GST @5%</option>
+                                      <option value="IGST5">IGST @5%</option>
 
-              </table>
+                                      <option value="GST12">GST @12%</option>
+                                      <option value="IGST12">IGST @12%</option>
 
+                                      <option value="GST18">GST @18%</option>
+                                      <option value="IGST18">IGST @18%</option>
 
-              <div className="flex sm:w-1/4 p-2">
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
-                  style={{ backgroundColor: "#4CA1AF" }}
-                >
-                  + Add Row
-                </button>
-              </div>
+                                      <option value="GST28">GST @28%</option>
+                                      <option value="IGST28">IGST @28%</option>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
-
-                {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
-
-                <TermsAndConditionsSelector
-                  termsList={termsTemplates}
-                  value={watch("Terms_Conditions_Id")}
-                  description={watch("Terms_Conditions_Description")}
-                  onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
-                    setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    });
-
-                    setValue(
-                      "Terms_Conditions_Description",
-                      Terms_Conditions_Description,
-                      {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      }
-                    );
-                  }}
-                  onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
-                />
-                <div className="flex flex-col px-2">
-                  <div className="flex flex-col mt-3 gap-2 w-full">
-                    {!showSplitBox ? (
-                      <>
-                        <div className="flex flex-col w-full">
-                          <span className="active">Payment Type</span>
-
-                          <input
-                            type="hidden"
-                            {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
-                          />
-
-
-                          <PaymentTypeSelect
-                            value={
-                              paymentType === "Bank"
-                                ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
-                                : paymentType || ""
-                            }
-                            banks={banks}
-                            onAddBank={() => setShowBankModal(true)}
-                            onChange={(val) => {
-                              if (val.startsWith("bank_")) {
-                                const bankId = val.replace("bank_", "");
-                                setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
-                              } else {
-                                setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
-                                setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
-                              }
+                                      <option value="GST40">GST @40%</option>
+                                      <option value="IGST40">IGST @40%</option>
+                                    </>
+                                  ) : (
+                                    /* GST OFF:
+                                       Show None + original saved tax type */
+                                    originalTaxType !== "None" && (
+                                      <option value={originalTaxType}>
+                                        {originalTaxType.startsWith("GST")
+                                          ? `GST @${originalTaxType.replace("GST", "")}%`
+                                          : originalTaxType.startsWith("IGST")
+                                            ? `IGST @${originalTaxType.replace("IGST", "")}%`
+                                            : originalTaxType}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              );
                             }}
                           />
+                        </td>
 
-                          {errors?.splits?.[0]?.Payment_Type && (
-                            <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
-                          )}
-                        </div>
+                        {/* Tax Amount */}
+                        <td style={{ width: "8%" }}>
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ backgroundColor: "transparent" }}
+                            {...register(`items.${i}.Tax_Amount`)}
+                            readOnly
+                          />
+                        </td>
+
+                        {/* Amount */}
+                        <td style={{ width: "16%" }}>
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{ backgroundColor: "transparent" }}
+                            {...register(`items.${i}.Amount`)}
+                            readOnly
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={2}></td>
+                      <td>Total</td>
+                      {enableHSNCode && <td></td>}
+                      {shouldShowMRP && <td></td>}
+
+                      <td className="text-right">
+                        {totals.totalQty}
+                      </td>
+
+                      {shouldShowFreeQuantity && (<td className="text-right">
+                        {totals.freeQuantity}
+                      </td>)}
+
+                      <td></td>
+                      <td></td>
+
+                      <td className="text-right">
+                        ₹{totals.totalDiscount.toFixed(2)}
+                      </td>
+
+                      <td></td>
+
+                      <td className="text-right">
+                        ₹{totals.totalTax.toFixed(2)}
+                      </td>
+
+                      <td className="text-right">
+                        ₹{totals.totalAmount.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
 
 
-                        {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
-                          <div className="mt-3 flex flex-col">
-                            <label className="text-sm">Reference Number</label>
+                </table>
+
+
+                <div className="flex sm:w-1/4 p-2">
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className="w-full sm:w-auto whitespace-nowrap text-white font-bold py-2 px-4 rounded"
+                    style={{ backgroundColor: "#4CA1AF" }}
+                  >
+                    + Add Row
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 px-2 gap-4 w-full sale-wrapper">
+
+                  {/* <div className="flex flex-col px-2 w-full  sale-left"> */}
+
+                  <TermsAndConditionsSelector
+                    termsList={termsTemplates}
+                    value={watch("Terms_Conditions_Id")}
+                    description={watch("Terms_Conditions_Description")}
+                    onChange={({ Terms_Conditions_Id, Terms_Conditions_Description }) => {
+                      setValue("Terms_Conditions_Id", Terms_Conditions_Id, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+
+                      setValue(
+                        "Terms_Conditions_Description",
+                        Terms_Conditions_Description,
+                        {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        }
+                      );
+                    }}
+                    onRefresh={() => dispatch(termsConditionsApi.util.invalidateTags(["Terms"]))}
+                  />
+                  <div className="flex flex-col px-2">
+                    <div className="flex flex-col mt-3 gap-2 w-full">
+                      {!showSplitBox ? (
+                        <>
+                          <div className="flex flex-col w-full">
+                            <span className="active">Payment Type</span>
+
                             <input
-                              type="text"
-                              //readOnly={isView}
-                              style={{ marginBottom: "0px" }}
-                              {...register("splits.0.Reference_Number")}
+                              type="hidden"
+                              {...register("splits.0.Payment_Type", { required: "Payment Type is required" })}
                             />
+
+
+                            <PaymentTypeSelect
+                              value={
+                                paymentType === "Bank"
+                                  ? `bank_${watch("splits.0.Bank_Account_Id") || ""}`
+                                  : paymentType || ""
+                              }
+                              banks={banks}
+                              onAddBank={() => setShowBankModal(true)}
+                              onChange={(val) => {
+                                if (val.startsWith("bank_")) {
+                                  const bankId = val.replace("bank_", "");
+                                  setValue("splits.0.Payment_Type", "Bank", { shouldValidate: true, shouldDirty: true });
+                                  setValue("splits.0.Bank_Account_Id", Number(bankId), { shouldValidate: true, shouldDirty: true });
+                                } else {
+                                  setValue("splits.0.Payment_Type", val, { shouldValidate: true, shouldDirty: true });
+                                  setValue("splits.0.Bank_Account_Id", null, { shouldValidate: true, shouldDirty: true });
+                                }
+                              }}
+                            />
+
+                            {errors?.splits?.[0]?.Payment_Type && (
+                              <p className="text-red-500 text-xs mt-1">{errors.splits[0].Payment_Type.message}</p>
+                            )}
                           </div>
-                        )}
 
-                        <button
-                          type="button"
-                          onClick={handleAddPaymentType}
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none", padding: 0 }}
-                        >
-                          + Add Payment Type
-                        </button>
-                      </>
-                    ) : (
-                      <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
-                        {splitFields.map((field, index) => {
-                          const rowType = watch(`splits.${index}.Payment_Type`);
-                          const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
-                          //const rowOptions = getAvailableOptions(index);
-                          const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
-                          const amountField = register(`splits.${index}.Amount`, {
-                            required: "Required",
-                            validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
-                          });
-                          const usedValues = splitsWatch
-                            .map((s, idx) => {
-                              if (idx === index) return null; // exclude current row
-                              return s.Payment_Type === "Bank"
-                                ? `bank_${s.Bank_Account_Id}`
-                                : s.Payment_Type || null;
-                            }).filter(Boolean);
 
-                          return (
-                            <div key={field.id} className="flex flex-col gap-2">
-                              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Payment Type</span>
-                                  {/* <select
+                          {(paymentType === "Bank" || paymentType === "Cheque" || paymentType === "Neft") && (
+                            <div className="mt-3 flex flex-col">
+                              <label className="text-sm">Reference Number</label>
+                              <input
+                                type="text"
+                                //readOnly={isView}
+                                style={{ marginBottom: "0px" }}
+                                {...register("splits.0.Reference_Number")}
+                              />
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleAddPaymentType}
+                            className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                            style={{ background: "transparent", border: "none", padding: 0 }}
+                          >
+                            + Add Payment Type
+                          </button>
+                        </>
+                      ) : (
+                        <div className="border border-gray-300 rounded-md max-h-64 overflow-y-auto p-3 bg-gray-50 flex flex-col gap-3">
+                          {splitFields.map((field, index) => {
+                            const rowType = watch(`splits.${index}.Payment_Type`);
+                            const needsRef = rowType === "Cheque" || rowType === "Neft" || rowType === "Bank";
+                            //const rowOptions = getAvailableOptions(index);
+                            const currentIdentifier = getRowIdentifier(rowType, watch(`splits.${index}.Bank_Account_Id`));
+                            const amountField = register(`splits.${index}.Amount`, {
+                              required: "Required",
+                              validate: (v) => (v !== "" && Number(v) > 0) || "Enter valid amount",
+                            });
+                            const usedValues = splitsWatch
+                              .map((s, idx) => {
+                                if (idx === index) return null; // exclude current row
+                                return s.Payment_Type === "Bank"
+                                  ? `bank_${s.Bank_Account_Id}`
+                                  : s.Payment_Type || null;
+                              }).filter(Boolean);
+
+                            return (
+                              <div key={field.id} className="flex flex-col gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-start">
+                                  <div className="flex flex-col flex-1">
+                                    <span className="text-xs text-gray-500 mb-1">Payment Type</span>
+                                    {/* <select
                                     value={currentIdentifier || ""}
                                     onChange={(e) => {
                                       const val = e.target.value;
@@ -3339,334 +5002,480 @@ export default function PurchaseEdit() {
                                       </option>
                                     ))}
                                   </select> */}
-                                  <PaymentTypeSelect
-                                    value={currentIdentifier || ""}
-                                    banks={banks}
-                                    onAddBank={() => setShowBankModal(true)}
-                                    usedValues={usedValues}
-                                    onChange={(val) => {
-                                      if (val.startsWith("bank_")) {
-                                        setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
-                                      } else {
-                                        setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
-                                        setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
-                                      }
-                                    }}
-                                  />
-                                </div>
+                                    <PaymentTypeSelect
+                                      value={currentIdentifier || ""}
+                                      banks={banks}
+                                      onAddBank={() => setShowBankModal(true)}
+                                      usedValues={usedValues}
+                                      onChange={(val) => {
+                                        if (val.startsWith("bank_")) {
+                                          setValue(`splits.${index}.Payment_Type`, "Bank", { shouldValidate: true });
+                                          setValue(`splits.${index}.Bank_Account_Id`, Number(val.replace("bank_", "")), { shouldValidate: true });
+                                        } else {
+                                          setValue(`splits.${index}.Payment_Type`, val, { shouldValidate: true });
+                                          setValue(`splits.${index}.Bank_Account_Id`, null, { shouldValidate: true });
+                                        }
+                                      }}
+                                    />
+                                  </div>
 
-                                <div className="flex flex-col flex-1">
-                                  <span className="text-xs text-gray-500 mb-1">Amount</span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Amount"
-                                    style={{ marginBottom: "0px", width: "80%" }}
-                                    className="border rounded-md px-2 py-1.5"
-                                    {...amountField}
-                                    onChange={(e) => {
-                                      e.target.value = sanitizeAmount(e.target.value);
-                                      amountField.onChange(e);
-                                      clearErrors(`splits.${index}.Amount`);
-                                    }}
-                                  />
-                                  {errors?.splits?.[index]?.Amount && (
-                                    <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                  <div className="flex flex-col flex-1">
+                                    <span className="text-xs text-gray-500 mb-1">Amount</span>
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder="Amount"
+                                      style={{ marginBottom: "0px", width: "80%" }}
+                                      className="border rounded-md px-2 py-1.5"
+                                      {...amountField}
+                                      onChange={(e) => {
+                                        e.target.value = sanitizeAmount(e.target.value);
+                                        amountField.onChange(e);
+                                        clearErrors(`splits.${index}.Amount`);
+                                      }}
+                                    />
+                                    {errors?.splits?.[index]?.Amount && (
+                                      <p className="text-red-500 text-xs mt-1">{errors.splits[index].Amount.message}</p>
+                                    )}
+                                  </div>
+
+                                  {splitFields.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSplit(index)}
+                                      className="text-gray-500 mb-2 mt-4"
+                                      style={{ background: "transparent", border: "none" }}
+                                    >
+                                      <Trash2 size={18} />
+                                    </button>
                                   )}
                                 </div>
 
-                                {splitFields.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSplit(index)}
-                                    className="text-gray-500 mb-2 mt-4"
-                                    style={{ background: "transparent", border: "none" }}
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
+                                {needsRef && (
+                                  <input
+                                    type="text"
+                                    placeholder="Reference Number"
+                                    style={{ width: "80%" }}
+                                    // className="border rounded-md px-2 py-1.5 w-full"
+                                    {...register(`splits.${index}.Reference_Number`)}
+                                  />
                                 )}
                               </div>
+                            );
+                          })}
 
-                              {needsRef && (
-                                <input
-                                  type="text"
-                                  placeholder="Reference Number"
-                                  style={{ width: "80%" }}
-                                  // className="border rounded-md px-2 py-1.5 w-full"
-                                  {...register(`splits.${index}.Reference_Number`)}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
-                          }
-                          className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
-                          style={{ background: "transparent", border: "none" }}
-                        >
-                          + Add Another Payment
-                        </button>
-                      </div>
-                    )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              appendSplit({ Payment_Type: "", Bank_Account_Id: null, Reference_Number: "", Amount: "" })
+                            }
+                            className="text-[#4CA1AF] text-sm font-medium hover:underline self-start"
+                            style={{ background: "transparent", border: "none" }}
+                          >
+                            + Add Another Payment
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {/* <div style={{ width: "100%" }}
+                  {/* <div style={{ width: "100%" }}
                   className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 sale-right"
                   > */}
 
-                <div style={{ width: "100%" }}
-                  className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
-                >
-
                   <div style={{ width: "100%" }}
-                    className="flex justify-between items-start gap-6 w-full mr-4">
-                    {/* <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          const totalAmount = parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+                    className="grid grid-rows-2 gap-2 w-full sm:w-1/2 lg:w-1/3 ml-auto mr-2 "
+                  >
+
+                    <div style={{ width: "100%" }}
+                      className="flex justify-between items-start gap-6 w-full mr-4">
+                      <div
+                        style={{ width: "100%" }}
+                        className="flex flex-col gap-4 mt-3 w-full"
+                      >
+                        {showTransactionDiscount && (
+                          <div
+                            style={{ width: "50%" }}
+                            className="flex items-center gap-2 justify-end ml-auto"
+                          >
+                            <span className="font-medium whitespace-nowrap">
+                              Discount
+                            </span>
+
+                            {/* Discount Percentage */}
+                            <input
+                              type="text"
+                              placeholder="%"
+                              className="form-control"
+                              style={{
+                                marginBottom: "0px",
+                                height: "1.5rem",
+                                textAlign: "right",
+                              }}
+                              {...register("Transaction_Discount_Percentage")}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                                const parts = val.split(".");
+
+                                // Only one decimal point
+                                if (parts.length > 2) {
+                                  val =
+                                    parts[0] +
+                                    "." +
+                                    parts.slice(1).join("");
+                                }
+
+                                // Maximum 3 decimal places
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 3);
+                                }
+
+                                const numericValue = Number(val);
+
+                                //  Prevent ANY value greater than 100
+                                if (val !== "" && numericValue > 100) {
+                                  toast.error("Discount percentage cannot be greater than 100%");
+
+                                  // Restore previous valid value
+                                  const previousValue =
+                                    watch("Transaction_Discount_Percentage") || "";
+
+                                  e.target.value = previousValue;
+
+                                  return;
+                                }
+
+                                e.target.value = val;
+
+                                const percentage = Number(val) || 0;
+                                const subtotal = getRawTotal();
+
+                                const discountAmount =
+                                  (subtotal * percentage) / 100;
+
+                                setValue(
+                                  "Transaction_Discount_Percentage",
+                                  val,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  "Transaction_Discount_Amount",
+                                  discountAmount > 0
+                                    ? discountAmount.toFixed(2)
+                                    : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                // syncTotalsAfterItemChange(discountAmount);
+                                syncTotalsAfterItemChange();
+                              }}
+                            />
+
+                            {/* Discount Amount */}
+                            <input
+                              type="text"
+                              placeholder="Amount"
+                              className="form-control"
+                              style={{
+                                marginBottom: "0px",
+                                height: "1.5rem",
+                                textAlign: "right",
+                              }}
+                              {...register("Transaction_Discount_Amount")}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                                const parts = val.split(".");
+                                if (parts.length > 2) {
+                                  val =
+                                    parts[0] +
+                                    "." +
+                                    parts.slice(1).join("");
+                                }
+
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 3);
+                                }
+
+                                e.target.value = val;
+
+                                const amount = Number(val) || 0;
+                                const subtotal = getRawTotal();
+
+                                const percentage =
+                                  subtotal > 0
+                                    ? (amount / subtotal) * 100
+                                    : 0;
+
+                                setValue(
+                                  "Transaction_Discount_Amount",
+                                  val,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  "Transaction_Discount_Percentage",
+                                  amount > 0
+                                    ? percentage.toFixed(3)
+                                    : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                // syncTotalsAfterItemChange(amount);
+                                syncTotalsAfterItemChange();
+                              }}
+                            />
+                          </div>
+                        )}
 
 
-                          if (!totalAmount || isNaN(totalAmount)) return;
+                        {/* <div style={{ width: "100%" }} 
+                    className="flex flex-col gap-4 mt-3 w-full"> */}
+                        <div style={{ width: "100%" }}
+                          className="flex justify-between items-center gap-6 w-full mr-4"
+                        >
 
-                          if (isChecked) {
-                            setOriginalTotal(totalAmount);
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="roundOffCheck"
+                              className="w-4 h-4 cursor-pointer"
+                              checked={isRoundOff}
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                setIsRoundOff(isChecked);
 
-                            // Round off to nearest integer
-                            const rounded = Math.round(totalAmount);
+                                if (isChecked) {
+                                  const rawTotal = getRawTotal();
 
-                            setValue("Total_Amount", rounded.toFixed(2), { shouldValidate: true });
-                            setValue("Balance_Due", (rounded - totalReceived).toFixed(2), { shouldValidate: true });
+                                  const discountAmount =
+                                    Number(watch("Transaction_Discount_Amount")) || 0;
 
-                          } else {
-                            if (originalTotal !== null) {
-                              setValue("Total_Amount", originalTotal.toFixed(2), { shouldValidate: true });
+                                  const totalBeforeRoundOff = Math.max(
+                                    0,
+                                    rawTotal - discountAmount
+                                  );
 
-                              setValue(
-                                "Balance_Due",
-                                (originalTotal - totalReceived).toFixed(2),
-                                { shouldValidate: true }
-                              );
-                            }
-                          }
-                        }}
-                      />
+                                  const rounded = Math.round(totalBeforeRoundOff);
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                                  const diff = Number(
+                                    (rounded - totalBeforeRoundOff).toFixed(2)
+                                  );
+
+                                  setValue(
+                                    "Round_Off",
+                                    diff !== 0 ? diff.toFixed(2) : "",
+                                    {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    }
+                                  );
+
+                                  applyRoundOff(diff);
+                                } else {
+                                  setValue("Round_Off", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
+
+                                  applyRoundOff(0);
+                                }
+                              }}
+                            />
+
+                            <span className="font-medium whitespace-nowrap">
+                              Round Off
+                            </span>
+
+                            <input
+                              type="text"
+                              style={{
+                                marginTop: "10px",
+                                height: "1.5rem",
+                              }}
+                              className="border border-gray-300 text-right text-sm"
+                              {...register("Round_Off")}
+                              disabled={!isRoundOff}
+                              onChange={(e) => {
+                                const val = e.target.value;
+
+                                setValue("Round_Off", val, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+
+                                const numVal = parseFloat(val) || 0;
+
+                                applyRoundOff(numVal);
+                              }}
+                            />
+                          </div>
+                          {/* Total Amount */}
+                          <div
+                            style={{ width: "100%" }}
+                            className="flex items-center gap-2"
+                          >
+                            <span className="font-medium whitespace-nowrap">
+                              Total Amount
+                            </span>
+
+                            <input
+                              style={{ marginBottom: "0px", backgroundColor: "transparent", height: "1rem", width: "100%" }}
+                              type="text"
+                              className="form-control"
+                              {...register("Total_Amount")}
+                              readOnly
+                            />
+                          </div>
+                        </div>
 
 
-                      <input
 
-                        type="text"
+                        <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
 
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="w-3  border border-gray-300  text-right text-sm"
-                        {...register("Round_Off")}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const totalAmount = originalTotal ?? parseFloat(watch("Total_Amount"));
-                          const totalReceived = parseFloat(watch("Total_Paid")) || 0;
+                          <div className="flex items-center gap-2 relative">
 
-                          if (isNaN(totalAmount)) return;
+                            <input
+                              type="checkbox"
 
-                          // New Total
-                          const newTotal = totalAmount + val;
 
-                          setValue("Total_Amount", newTotal.toFixed(2));
-                          setValue("Balance_Due", (newTotal - totalReceived).toFixed(2));
-                        }}
-                      //disabled={!watch("roundOffCheck") && originalTotal === null}
-                      />
-                    </div> */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="roundOffCheck"
-                        className="w-4 h-4 cursor-pointer"
-                        checked={isRoundOff}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setIsRoundOff(isChecked);
+                              id="totalPaidCheck"
+                              className="w-4 h-4 cursor-pointer"
+                              disabled={splitsWatch.length > 1}   // 🔹 add this
 
-                          const rawTotal = getRawTotal();
+                              onChange={(e) => {
 
-                          if (isChecked) {
-                            const rounded = Math.round(rawTotal);
-                            const diff = Number((rounded - rawTotal).toFixed(2));
-                            setValue("Round_Off", diff !== 0 ? diff.toFixed(2) : "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(diff);
-                          } else {
-                            setValue("Round_Off", "", { shouldValidate: true, shouldDirty: true });
-                            applyRoundOff(0);
-                          }
-                        }}
-                      />
+                                const isChecked = e.target.checked;
+                                const totalAmount = parseFloat(watch("Total_Amount"));
 
-                      <span className="font-medium whitespace-nowrap">Round Off</span>
+                                // 🧠 If no total amount entered, do nothing
+                                if (!totalAmount || isNaN(totalAmount)) {
+                                  // Optional: visually reset the checkbox
 
-                      <input
-                        type="text"
-                        style={{ marginTop: "10px", width: "60px", height: "1.5rem" }}
-                        className="border border-gray-300 text-right text-sm"
-                        {...register("Round_Off")}
-                        disabled={!isRoundOff}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setValue("Round_Off", val, { shouldValidate: true, shouldDirty: true });
-                          const numVal = parseFloat(val) || 0;
-                          applyRoundOff(numVal);
-                        }}
-                      />
-                    </div>
 
-                    <div style={{ width: "100%" }} className="flex flex-col gap-4 mt-3 w-full">
-                      <div className="flex gap-3 items-center  w-full sm:w-auto">
+                                  // Clear both fields to stay consistent
+                                  setValue("Total_Paid", "");
+                                  setValue("Balance_Due", "");
+                                  if (splitsWatch.length === 1) {
+                                    setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
+                                  }
+                                  return;
+                                }
 
-                        <div style={{ width: "100%" }} className="flex gap-2 ">
-                          <span className="font-medium whitespace-nowrap">Total Amount</span>
+                                if (isChecked) {
+                                  // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
+                                  setValue("Total_Paid", totalAmount.toFixed(2));
+                                  setValue("Balance_Due", 0);
+                                } else {
+                                  // ✅ When unchecked, restore Balance_Due = Total_Amount
+                                  setValue("Total_Paid", "");
+                                  setValue("Balance_Due", totalAmount.toFixed(2));
+                                }
+                                if (splitsWatch.length === 1) {
+                                  setValue(
+                                    "splits.0.Amount",
+                                    isChecked ? totalAmount.toFixed(2) : "",
+                                    { shouldValidate: true, shouldDirty: true }
+                                  );
+                                }
+                              }}
+                            />
+                            <span
+                              htmlFor="totalPaidCheck"
+                              className="font-medium whitespace-nowrap"
+                            >
+                              Total Paid
+                            </span>
+
+                          </div>
+
 
                           <input
-                            style={{ backgroundColor: "transparent", height: "1rem" }}
                             type="text"
+                            {...register("Total_Paid")}
+                            style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
+                            readOnly={splitsWatch.length > 1}
+                            onChange={(e) => {
+                              if (splitsWatch.length > 1) return;
+                              let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                              // Allow only one dot
+                              const parts = val.split(".");
+                              if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
+
+                              // Limit to 2 decimals
+                              if (val.includes(".")) {
+                                const [int, dec] = val.split(".");
+                                val = int + "." + dec.slice(0, 2);
+                              }
+
+                              e.target.value = val;
+                              setValue("Total_Paid", val);
+
+                              const totalReceived = parseFloat(val || 0);
+                              const totalAmount = parseFloat(watch("Total_Amount") || 0);
+                              setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
+                              if (splitsWatch.length === 1) {
+                                const val = e.target.value;
+                                setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
+                              }
+                              clearErrors("splits.0.Amount"); // already there ✅
+                            }}
                             className="form-control"
-                            {...register("Total_Amount")}
+                          />
+                        </div>
+
+
+
+                        <div style={{ width: "100%" }}
+                          className="flex  gap-2 items-center ">
+
+                          <span className="font-medium whitespace-nowrap">Balance Due</span>
+                          <input
+                            style={{
+                              backgroundColor: "transparent", marginBottom: "0px",
+                              height: "1rem", width: "100%"
+                            }}
+                            type="text"
+                            className="form-control  "
+                            {...register("Balance_Due")}
+
                             readOnly
                           />
                         </div>
-                      </div>
-
-
-
-                      <div style={{ width: "100%" }} className="flex items-center  gap-3 relative ">
-
-                        <div className="flex items-center gap-2 relative">
-
-                          <input
-                            type="checkbox"
-
-
-                            id="totalPaidCheck"
-                            className="w-4 h-4 cursor-pointer"
-                            disabled={splitsWatch.length > 1}   // 🔹 add this
-
-                            onChange={(e) => {
-
-                              const isChecked = e.target.checked;
-                              const totalAmount = parseFloat(watch("Total_Amount"));
-
-                              // 🧠 If no total amount entered, do nothing
-                              if (!totalAmount || isNaN(totalAmount)) {
-                                // Optional: visually reset the checkbox
-
-
-                                // Clear both fields to stay consistent
-                                setValue("Total_Paid", "");
-                                setValue("Balance_Due", "");
-                                if (splitsWatch.length === 1) {
-                                  setValue("splits.0.Amount", "", { shouldValidate: true, shouldDirty: true });
-                                }
-                                return;
-                              }
-
-                              if (isChecked) {
-                                // ✅ Set Total_Paid = Total_Amount, Balance_Due = 0
-                                setValue("Total_Paid", totalAmount.toFixed(2));
-                                setValue("Balance_Due", 0);
-                              } else {
-                                // ✅ When unchecked, restore Balance_Due = Total_Amount
-                                setValue("Total_Paid", "");
-                                setValue("Balance_Due", totalAmount.toFixed(2));
-                              }
-                              if (splitsWatch.length === 1) {
-                                setValue(
-                                  "splits.0.Amount",
-                                  isChecked ? totalAmount.toFixed(2) : "",
-                                  { shouldValidate: true, shouldDirty: true }
-                                );
-                              }
-                            }}
-                          />
-                          <span
-                            htmlFor="totalPaidCheck"
-                            className="font-medium whitespace-nowrap"
-                          >
-                            Total Paid
-                          </span>
-
-                        </div>
-
-
-                        <input
-                          type="text"
-                          {...register("Total_Paid")}
-                          style={{ marginBottom: "0px", height: "1rem", width: "100%" }}
-                          readOnly={splitsWatch.length > 1}
-                          onChange={(e) => {
-                            if (splitsWatch.length > 1) return;
-                            let val = e.target.value.replace(/[^0-9.]/g, "");
-
-                            // Allow only one dot
-                            const parts = val.split(".");
-                            if (parts.length > 2) val = parts[0] + "." + parts.slice(1).join("");
-
-                            // Limit to 2 decimals
-                            if (val.includes(".")) {
-                              const [int, dec] = val.split(".");
-                              val = int + "." + dec.slice(0, 2);
-                            }
-
-                            e.target.value = val;
-                            setValue("Total_Paid", val);
-
-                            const totalReceived = parseFloat(val || 0);
-                            const totalAmount = parseFloat(watch("Total_Amount") || 0);
-                            setValue("Balance_Due", (totalAmount - totalReceived).toFixed(2));
-                            if (splitsWatch.length === 1) {
-                              const val = e.target.value;
-                              setValue("splits.0.Amount", val, { shouldValidate: true, shouldDirty: true });
-                            }
-                            clearErrors("splits.0.Amount"); // already there ✅
-                          }}
-                          className="form-control"
-                        />
-                      </div>
-
-
-
-                      <div style={{ width: "100%" }}
-                        className="flex  gap-2 items-center ">
-
-                        <span className="font-medium whitespace-nowrap">Balance Due</span>
-                        <input
-                          style={{
-                            backgroundColor: "transparent", marginBottom: "0px",
-                            height: "1rem", width: "100%"
-                          }}
-                          type="text"
-                          className="form-control  "
-                          {...register("Balance_Due")}
-
-                          readOnly
-                        />
+                        {/* </div> */}
                       </div>
                     </div>
+
+
                   </div>
-
-
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-4 ">
-              <button
+            <div className="flex justify-end gap-4"
+              style={{
+                //flexShrink: 0,
+                background: "#fff",
+                borderTop: "1px solid #e2e8f0",
+                padding: "8px",
+              }}
+            >
+              {/* <button
                 type="button"
                 onClick={() => {
                   // setShowModal(false)
@@ -3702,17 +5511,20 @@ export default function PurchaseEdit() {
                 style={{ backgroundColor: "#4CA1AF" }}
               >
                 Cancel
-              </button>
+              </button> */}
               <button
                 type="submit"
                 disabled={formValues.errorCount > 0 || isEditingPurchase}
                 className=" text-white font-bold py-2 px-4 rounded"
                 style={{ backgroundColor: "#4CA1AF" }}
               >
-                {isEditingPurchase ? "Updating..." : "Update Purchase"}
+                {isEditingPurchase ? "Saving..." : "Save"}
               </button>
             </div>
+
           </form >
+
+
 
         </div >
 
@@ -3929,6 +5741,20 @@ export default function PurchaseEdit() {
       padding-left: 30px !important;
     }
   }
+       .item-dropdown-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.item-dropdown-scroll::-webkit-scrollbar { width: 14px; }
+.item-dropdown-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+.item-dropdown-scroll::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 8px;
+  border: 3px solid #f1f5f9;
+}
+.item-dropdown-scroll::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
 `}
       </style>
     </>

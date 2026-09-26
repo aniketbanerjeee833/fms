@@ -422,7 +422,60 @@ export default function PurchaseEdit() {
       }
     }
   };
+  const {
+    control,
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    getValues,
+    clearErrors,
+    //getValues,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(purchaseFormSchema),
+    defaultValues: {
+      Party_Name: "",
+      Billing_Name: "",
 
+      Bill_Number: "",
+      Phone_Number: "",
+      Bill_Date: "",
+      State_Of_Supply: "",
+      Transaction_Discount_Percentage: "",
+      Transaction_Discount_Amount: "",
+      Total_Amount: "",
+      Round_Off: "",
+      Balance_Due: "",
+      Total_Paid: "",
+      Terms_Conditions_Id: null,
+      Terms_Conditions_Description: "",
+      // Payment_Type: "Cash",
+      // Reference_Number: "",
+      //Bank_Account_Id: null,   // 🔹 added
+      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
+      items: [{
+
+
+        Item_Category: "",
+        Item_Name: "",
+        Quantity: "",
+        Free_Quantity: "",
+        Item_Unit: "",
+        Purchase_Price: "",
+        MRP: "",
+
+        Discount_On_Purchase_Price: "",
+        Discount_Type_On_Purchase_Price: "Percentage",
+        Tax_Type: "None",
+        Tax_Amount: "",
+        Amount: "",
+      }
+      ]
+    }
+
+  })
 
 
   const [editPurchase, { isLoading: isEditingPurchase }] = useEditPurchaseMutation();
@@ -497,17 +550,22 @@ export default function PurchaseEdit() {
   const enableBillingNameOfParties =
     Number(
       transactionsSettings.find(
-        (s) => s.setting_key === "billing_name_of_parties"
+        (s) => s.setting_key === "billing_name_of_parties_purchase"
       )?.setting_value
     ) === 1
   //const [billingNameManuallyEntered, setBillingNameManuallyEntered] = useState(false);
   // const showBillingName =
   //   enableBillingNameOfParties ||
   //   !!currentPartyDetails?.Billing_Name?.trim();
-  const [showBillingName, setShowBillingName] = useState(false);
-  const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
-  const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =
-    useState(false);
+  //const [showBillingName, setShowBillingName] = useState(false);
+  //const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
+  //const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =useState(false);
+  const billingNameValue = watch("Billing_Name");
+
+  const showBillingName =
+    enableBillingNameOfParties ||
+    !!billingNameValue?.trim();
+
   const hasHistoricaFreeQuantity = purchase?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -566,60 +624,7 @@ export default function PurchaseEdit() {
 
 
 
-  const {
-    control,
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    getValues,
-    clearErrors,
-    //getValues,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(purchaseFormSchema),
-    defaultValues: {
-      Party_Name: "",
-      Billing_Name: "",
 
-      Bill_Number: "",
-      Phone_Number: "",
-      Bill_Date: "",
-      State_Of_Supply: "",
-      Transaction_Discount_Percentage: "",
-      Transaction_Discount_Amount: "",
-      Total_Amount: "",
-      Round_Off: "",
-      Balance_Due: "",
-      Total_Paid: "",
-      Terms_Conditions_Id: null,
-      Terms_Conditions_Description: "",
-      // Payment_Type: "Cash",
-      // Reference_Number: "",
-      //Bank_Account_Id: null,   // 🔹 added
-      splits: [{ Payment_Type: "Cash", Bank_Account_Id: null, Reference_Number: "", Amount: "" }],
-      items: [{
-
-
-        Item_Category: "",
-        Item_Name: "",
-        Quantity: "",
-        Free_Quantity: "",
-        Item_Unit: "",
-        Purchase_Price: "",
-        MRP: "",
-
-        Discount_On_Purchase_Price: "",
-        Discount_Type_On_Purchase_Price: "Percentage",
-        Tax_Type: "None",
-        Tax_Amount: "",
-        Amount: "",
-      }
-      ]
-    }
-
-  })
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "items",
@@ -1098,6 +1103,8 @@ export default function PurchaseEdit() {
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
+   const originalPartyNameRef = useRef("");
+    const partyWasCommittedRef = useRef(false);
   useEffect(() => {
     if (purchase) {
       originalTaxTypesRef.current = (purchase?.items || []).map(
@@ -1119,13 +1126,13 @@ export default function PurchaseEdit() {
         savedDiscountPercentage > 0
       );
       setPartySearch(purchase?.billPurchaseDetails?.Party_Name)
-      const savedBillingName =
-        !!purchase?.billPurchaseDetails?.Billing_Name?.trim();
+      //const savedBillingName =!!purchase?.billPurchaseDetails?.Billing_Name?.trim();
 
-      setShowBillingName(savedBillingName);
+      //setShowBillingName(savedBillingName);
 
-      setHasSeenBillingNameParty(savedBillingName);
-
+      //setHasSeenBillingNameParty(savedBillingName);
+       originalPartyNameRef.current = purchase?.billPurchaseDetails?.Party_Name?.trim() || "";
+      partyWasCommittedRef.current = false;
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item, index) => {
 
@@ -2341,46 +2348,7 @@ export default function PurchaseEdit() {
                             id="Party_Name"
                             value={partySearch}
 
-                            // onChange={(e) => {
-                            //   setPartyCursor(null);
-
-                            //   const value = e.target.value;
-
-                            //   setPartySearch(value);
-
-                            //   setValue("Party_Name", value, {
-                            //     shouldValidate: true,
-                            //     shouldDirty: true,
-                            //   });
-
-                            //   setOpen(true);
-
-                            //   const matchedParty = parties.find(
-                            //     (p) =>
-                            //       p.Party_Name?.toLowerCase() ===
-                            //       value.trim().toLowerCase()
-                            //   );
-
-                            //   if (matchedParty) {
-                            //     setValue("GSTIN", matchedParty.GSTIN || "", {
-                            //       shouldValidate: true,
-                            //       shouldDirty: true,
-                            //     });
-
-                            //     // Exact match → keep existing bill phone
-                            //   } else {
-                            //     setValue("GSTIN", "", {
-                            //       shouldValidate: true,
-                            //       shouldDirty: true,
-                            //     });
-
-                            //     // Not an exact match → clear phone
-                            //     setValue("Phone_Number", "", {
-                            //       shouldValidate: true,
-                            //       shouldDirty: true,
-                            //     });
-                            //   }
-                            // }}
+                          
                             onChange={(e) => {
                               setPartyCursor(null);
 
@@ -2400,12 +2368,12 @@ export default function PurchaseEdit() {
                                   p.Party_Name?.toLowerCase() ===
                                   value.trim().toLowerCase()
                               );
-                              console.log("TYPED:", value);
-                              console.log(
-                                "MATCHED PARTY:",
-                                matchedParty?.Party_Name,
-                                matchedParty?.Phone_Number
-                              );
+                              // console.log("TYPED:", value);
+                              // console.log(
+                              //   "MATCHED PARTY:",
+                              //   matchedParty?.Party_Name,
+                              //   matchedParty?.Phone_Number
+                              // );
 
                               if (!value.trim()) {
                                 setValue("GSTIN", "", {
@@ -2413,17 +2381,17 @@ export default function PurchaseEdit() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Phone_Number", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
-                                setValue("Billing_Name", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Billing_Name", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
-                                setShowBillingName(false);
+                                //setShowBillingName(false);
                                 //setHasSwitchedParty(false);
                                 //setHasSeenBillingNameParty(false);
 
@@ -2436,46 +2404,47 @@ export default function PurchaseEdit() {
                                   shouldDirty: true,
                                 });
 
-                                setValue("Phone_Number", matchedParty.Phone_Number || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Phone_Number", matchedParty.Phone_Number || "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
                                 // =========================================
                                 // BILLING NAME
                                 // =========================================
 
-                                if (matchedParty.Billing_Name?.trim()) {
-                                  setValue("Billing_Name", matchedParty.Billing_Name, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                // if (matchedParty.Billing_Name?.trim()) {
+                                //   setValue("Billing_Name", matchedParty.Billing_Name, {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
 
-                                  setShowBillingName(true);
-                                  setHasSeenBillingNameParty(true);
+                                //   setShowBillingName(true);
+                                //   setHasSeenBillingNameParty(true);
 
-                                } else if (
-                                  //hasSwitchedParty &&
-                                  hasSeenBillingNameParty &&
-                                  enableBillingNameOfParties
-                                ) {
-                                  setValue("Billing_Name", matchedParty.Party_Name, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                // } else if (
+                                //   //hasSwitchedParty &&
+                                //   hasSeenBillingNameParty &&
+                                //   enableBillingNameOfParties
+                                // ) {
+                                //   setValue("Billing_Name", matchedParty.Party_Name, {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
 
-                                  setShowBillingName(true);
+                                //   setShowBillingName(true);
 
-                                } else {
-                                  setValue("Billing_Name", "", {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                // } else {
+                                //   setValue("Billing_Name", "", {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
 
-                                  setShowBillingName(false);
-                                }
+                                //   setShowBillingName(false);
+                                // }
 
-                                setHasSwitchedParty(true);
+                                //setHasSwitchedParty(true);
+                              
                               } else {
                                 setValue("GSTIN", "", {
                                   shouldValidate: true,
@@ -2487,12 +2456,12 @@ export default function PurchaseEdit() {
                                 //   shouldDirty: true,
                                 // });
 
-                                setValue("Billing_Name", "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+                                // setValue("Billing_Name", "", {
+                                //   shouldValidate: true,
+                                //   shouldDirty: true,
+                                // });
 
-                                setShowBillingName(false);
+                                //setShowBillingName(false);
                               }
                             }}
                             onClick={(e) => {
@@ -2500,6 +2469,7 @@ export default function PurchaseEdit() {
                               setOpen(true);
                             }}
 
+                          
                             // onBlur={() => {
                             //   setTimeout(() => {
                             //     const typedValue =
@@ -2509,6 +2479,13 @@ export default function PurchaseEdit() {
                             //       (p) =>
                             //         p.Party_Name?.toLowerCase() === typedValue
                             //     );
+                            //     console.log("TYPED:", typedValue);
+                            //     console.log(
+                            //       "MATCHED PARTY:",
+                            //       matchedParty?.Party_Name,
+                            //       matchedParty?.Phone_Number
+                            //     );
+
 
                             //     if (matchedParty) {
                             //       setPartyCursor(null);
@@ -2525,25 +2502,88 @@ export default function PurchaseEdit() {
                             //         shouldDirty: true,
                             //       });
 
-                            //       // If bill phone is empty, restore master phone
-                            //       const currentBillPhone = watch("Phone_Number");
+                            //       // const currentBillPhone = watch("Phone_Number");
 
-                            //       if (!currentBillPhone?.trim()) {
-                            //         setValue(
-                            //           "Phone_Number",
-                            //           matchedParty.Phone_Number || "",
-                            //           {
-                            //             shouldValidate: true,
-                            //             shouldDirty: true,
-                            //           }
-                            //         );
+                            //       // if (!currentBillPhone?.trim()) {
+                            //       //   setValue(
+                            //       //     "Phone_Number",
+                            //       //     matchedParty.Phone_Number || "",
+                            //       //     {
+                            //       //       shouldValidate: true,
+                            //       //       shouldDirty: true,
+                            //       //     }
+                            //       //   );
+                            //       // }
+                            //       setValue(
+                            //         "Phone_Number",
+                            //         matchedParty.Phone_Number || "",
+                            //         {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         }
+                            //       );
+
+                            //       // =========================================
+                            //       // BILLING NAME
+                            //       // =========================================
+
+                            //       if (matchedParty.Billing_Name?.trim()) {
+                            //         setValue("Billing_Name", matchedParty.Billing_Name, {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         });
+
+                            //         setShowBillingName(true);
+                            //         setHasSeenBillingNameParty(true);
+
+                            //       } else if (
+                            //         //hasSwitchedParty &&
+                            //         hasSeenBillingNameParty &&
+                            //         enableBillingNameOfParties
+                            //       ) {
+                            //         setValue("Billing_Name", matchedParty.Party_Name, {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         });
+
+                            //         setShowBillingName(true);
+
+                            //       } else {
+                            //         setValue("Billing_Name", "", {
+                            //           shouldValidate: true,
+                            //           shouldDirty: true,
+                            //         });
+
+                            //         setShowBillingName(false);
                             //       }
+
+                            //       setHasSwitchedParty(true);
+
+
+
                             //     } else {
-                            //       // No exact Party match → phone must remain cleared
+                            //       setValue("GSTIN", "", {
+                            //         shouldValidate: true,
+                            //         shouldDirty: true,
+                            //       });
+
+
+
+                            //       setValue("Billing_Name", "", {
+                            //         shouldValidate: true,
+                            //         shouldDirty: true,
+                            //       });
+                            //       // setShowBillingName(
+                            //       //   enableBillingNameOfParties
+                            //       // );
+                            //       setShowBillingName(false);
+                            //       setHasSwitchedParty(true);
                             //       setValue("Phone_Number", "", {
                             //         shouldValidate: true,
                             //         shouldDirty: true,
                             //       });
+
+                            //       //setShowBillingName(false);
                             //     }
 
                             //     setOpen(false);
@@ -2554,20 +2594,21 @@ export default function PurchaseEdit() {
                                 const typedValue =
                                   partySearch?.trim()?.toLowerCase();
 
+                                const originalPartyName =
+                                  originalPartyNameRef.current?.trim()?.toLowerCase();
+
                                 const matchedParty = parties.find(
                                   (p) =>
-                                    p.Party_Name?.toLowerCase() === typedValue
-                                );
-                                console.log("TYPED:", typedValue);
-                                console.log(
-                                  "MATCHED PARTY:",
-                                  matchedParty?.Party_Name,
-                                  matchedParty?.Phone_Number
+                                    p.Party_Name?.trim()?.toLowerCase() === typedValue
                                 );
 
-
+                                // =====================================================
+                                // EXACT PARTY
+                                // =====================================================
                                 if (matchedParty) {
                                   setPartyCursor(null);
+
+                                  
 
                                   setPartySearch(matchedParty.Party_Name);
 
@@ -2581,88 +2622,87 @@ export default function PurchaseEdit() {
                                     shouldDirty: true,
                                   });
 
-                                  // const currentBillPhone = watch("Phone_Number");
+                                  // =====================================================
+                                  // DID USER COMMIT A PARTY CHANGE?
+                                  // =====================================================
 
-                                  // if (!currentBillPhone?.trim()) {
-                                  //   setValue(
-                                  //     "Phone_Number",
-                                  //     matchedParty.Phone_Number || "",
-                                  //     {
-                                  //       shouldValidate: true,
-                                  //       shouldDirty: true,
-                                  //     }
-                                  //   );
-                                  // }
-                                  setValue(
-                                    "Phone_Number",
-                                    matchedParty.Phone_Number || "",
-                                    {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    }
-                                  );
+                                  const isOriginalParty =
+                                    typedValue === originalPartyName;
 
-                                  // =========================================
-                                  // BILLING NAME
-                                  // =========================================
-
-                                  if (matchedParty.Billing_Name?.trim()) {
-                                    setValue("Billing_Name", matchedParty.Billing_Name, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    });
-
-                                    setShowBillingName(true);
-                                    setHasSeenBillingNameParty(true);
-
-                                  } else if (
-                                    //hasSwitchedParty &&
-                                    hasSeenBillingNameParty &&
-                                    enableBillingNameOfParties
+                                  if (
+                                    partyWasCommittedRef.current ||
+                                    !isOriginalParty
                                   ) {
-                                    setValue("Billing_Name", matchedParty.Party_Name, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    });
+                                
 
-                                    setShowBillingName(true);
+                                    // ===================================================
+                                    // BILLING NAME → MASTER
+                                    // ===================================================
 
-                                  } else {
-                                    setValue("Billing_Name", "", {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                    });
+                                    if (matchedParty.Billing_Name?.trim()) {
+                                      setValue(
+                                        "Billing_Name",
+                                        matchedParty.Billing_Name,
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        }
+                                      );
+                                    } else if (enableBillingNameOfParties) {
+                                      setValue(
+                                        "Billing_Name",
+                                        matchedParty.Party_Name,
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        }
+                                      );
+                                    } else {
+                                      setValue("Billing_Name", "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                    }
 
-                                    setShowBillingName(false);
+                                    // ===================================================
+                                    // PHONE → MASTER
+                                    // ===================================================
+
+                                    setValue(
+                                      "Phone_Number",
+                                      matchedParty.Phone_Number || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
                                   }
 
-                                  setHasSwitchedParty(true);
-
-
+                                  //setCurrentPartyDetails(matchedParty);
 
                                 } else {
-                                  setValue("GSTIN", "", {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                  // =====================================================
+                                  // NO EXACT PARTY MATCH
+                                  // =====================================================
 
+                                  //setHasSavedBillingAddress(false);
 
+                                  // Party was committed as a different/non-existing party
+                                  partyWasCommittedRef.current = true;
 
                                   setValue("Billing_Name", "", {
                                     shouldValidate: true,
                                     shouldDirty: true,
                                   });
-                                  // setShowBillingName(
-                                  //   enableBillingNameOfParties
-                                  // );
-                                  setShowBillingName(false);
-                                  setHasSwitchedParty(true);
+
+                                 
+
                                   setValue("Phone_Number", "", {
                                     shouldValidate: true,
                                     shouldDirty: true,
                                   });
 
-                                  //setShowBillingName(false);
+                                  //setCurrentPartyDetails(null);
                                 }
 
                                 setOpen(false);
@@ -2696,18 +2736,9 @@ export default function PurchaseEdit() {
                               hasMore={partiesHasMore}
                               onLoadMore={handlePartyLoadMore}
                               scrollRef={partyScrollRef}
-                              // onSelectParty={(party) => {
-                              //   setPartyCursor(null);   // ← ADDED
-                              //   setPartySearch(party.Party_Name);
-                              //   setValue("Party_Name", party.Party_Name, { shouldValidate: true, shouldDirty: true });
-                              //   setValue("GSTIN", party.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                              //   setValue("Phone_Number", party.Phone_Number || "", {
-                              //     shouldValidate: true,
-                              //     shouldDirty: true,
-                              //   });
-                              //   setOpen(false);
-                              // }}
+                              
                               onSelectParty={(party) => {
+                                partyWasCommittedRef.current = true;
                                 setPartyCursor(null);
 
                                 setPartySearch(party.Party_Name);
@@ -2721,6 +2752,18 @@ export default function PurchaseEdit() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
+                                 setValue(
+                                  "Billing_Name",
+                                  party.Billing_Name?.trim()
+                                    ? party.Billing_Name
+                                    : enableBillingNameOfParties
+                                      ? party.Party_Name
+                                      : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
 
                                 setValue("Phone_Number", party.Phone_Number || "", {
                                   shouldValidate: true,
@@ -2731,37 +2774,37 @@ export default function PurchaseEdit() {
                                 // BILLING NAME
                                 // =========================================
 
-                                if (party.Billing_Name?.trim()) {
-                                  setValue("Billing_Name", party.Billing_Name, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                // if (party.Billing_Name?.trim()) {
+                                //   setValue("Billing_Name", party.Billing_Name, {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
 
-                                  setShowBillingName(true);
-                                  setHasSeenBillingNameParty(true);
+                                //   setShowBillingName(true);
+                                //   setHasSeenBillingNameParty(true);
 
-                                } else if (
-                                  //hasSwitchedParty &&
-                                  hasSeenBillingNameParty &&
-                                  enableBillingNameOfParties
-                                ) {
-                                  setValue("Billing_Name", party.Party_Name, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                // } else if (
+                                //   //hasSwitchedParty &&
+                                //   hasSeenBillingNameParty &&
+                                //   enableBillingNameOfParties
+                                // ) {
+                                //   setValue("Billing_Name", party.Party_Name, {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
 
-                                  setShowBillingName(true);
+                                //   setShowBillingName(true);
 
-                                } else {
-                                  setValue("Billing_Name", "", {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                  });
+                                // } else {
+                                //   setValue("Billing_Name", "", {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
 
-                                  setShowBillingName(false);
-                                }
+                                //   setShowBillingName(false);
+                                // }
 
-                                setHasSwitchedParty(true);
+                                //setHasSwitchedParty(true);
                                 setOpen(false);
                               }}
                             />
@@ -2773,13 +2816,7 @@ export default function PurchaseEdit() {
                       {showPartyModal && (
                         <PartyAddModal
                           onClose={() => setShowPartyModal(false)}
-                          // onSave={(newParty) => {
-                          //   setPartyCursor(null);   // ← ADDED
-                          //   setPartySearch(newParty.Party_Name);
-                          //   setValue("Party_Name", newParty.Party_Name, { shouldValidate: true, shouldDirty: true });
-                          //   setValue("GSTIN", newParty.GSTIN || "", { shouldValidate: true, shouldDirty: true });
-                          //   setShowPartyModal(false);
-                          // }}
+                         
                           onSave={(newParty) => {
                             setPartyCursor(null);
 
@@ -2804,33 +2841,55 @@ export default function PurchaseEdit() {
                             // BILLING NAME
                             // =========================================
 
+                            // if (newParty.Billing_Name?.trim()) {
+                            //   setValue("Billing_Name", newParty.Billing_Name, {
+                            //     shouldValidate: true,
+                            //     shouldDirty: true,
+                            //   });
+
+                            //   setShowBillingName(true);
+                            //   setHasSeenBillingNameParty(true);
+
+                            // } else if (enableBillingNameOfParties) {
+                            //   setValue("Billing_Name", newParty.Party_Name, {
+                            //     shouldValidate: true,
+                            //     shouldDirty: true,
+                            //   });
+
+                            //   setShowBillingName(true);
+
+                            // } else {
+                            //   setValue("Billing_Name", "", {
+                            //     shouldValidate: true,
+                            //     shouldDirty: true,
+                            //   });
+
+                            //   setShowBillingName(false);
+                            // }
+                            // =====================================================
+                            // BILLING NAME
+                            // =====================================================
+                            // 1. If new party has its own Billing_Name → use it
+                            // 2. Otherwise, if setting is ON → use Party_Name
+                            // 3. Otherwise → keep Billing Name empty
                             if (newParty.Billing_Name?.trim()) {
                               setValue("Billing_Name", newParty.Billing_Name, {
                                 shouldValidate: true,
                                 shouldDirty: true,
                               });
-
-                              setShowBillingName(true);
-                              setHasSeenBillingNameParty(true);
-
                             } else if (enableBillingNameOfParties) {
                               setValue("Billing_Name", newParty.Party_Name, {
                                 shouldValidate: true,
                                 shouldDirty: true,
                               });
-
-                              setShowBillingName(true);
-
                             } else {
                               setValue("Billing_Name", "", {
                                 shouldValidate: true,
                                 shouldDirty: true,
                               });
-
-                              setShowBillingName(false);
                             }
 
-                            setHasSwitchedParty(true);
+                            //setHasSwitchedParty(true);
 
                             setShowPartyModal(false);
                           }}

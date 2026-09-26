@@ -699,11 +699,11 @@ export default function SaleReturnAdd() {
   // const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
   // const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =
   //   useState(false);
-    const billingNameValue = watch("Billing_Name");
+  const billingNameValue = watch("Billing_Name");
 
-const showBillingName =
-  enableBillingNameOfParties ||
-  !!billingNameValue?.trim();
+  const showBillingName =
+    enableBillingNameOfParties ||
+    !!billingNameValue?.trim();
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -1084,9 +1084,9 @@ const showBillingName =
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
-  
-    const originalPartyNameRef = useRef("");
-    const partyWasCommittedRef = useRef(false);
+
+  const originalPartyNameRef = useRef("");
+  const partyWasCommittedRef = useRef(false);
   useEffect(() => {
     if (sale) {
       originalTaxTypesRef.current = (sale?.items || []).map(
@@ -1108,6 +1108,8 @@ const showBillingName =
         savedDiscountPercentage > 0
       );
       setPartySearch(sale.invoicePartyDetails.Party_Name);
+      originalPartyNameRef.current = sale.invoicePartyDetails?.Party_Name?.trim() || "";
+      partyWasCommittedRef.current = false;
       setCurrentPartyDetails({
         ...sale.invoicePartyDetails,
       });
@@ -1585,7 +1587,7 @@ const showBillingName =
           pathname: "/sale/return",
           search: location.search,
         });
-      } 
+      }
       else if (from === "items-by-item") {
         //const params = new URLSearchParams(location.search);
 
@@ -1596,12 +1598,12 @@ const showBillingName =
           search: location.search,
         });
       }
-         else if (from === "party-details") {
+      else if (from === "party-details") {
         navigate({
           pathname: "/party/parties",
           search: location.search,
         });
-      }  
+      }
       else if (from === "party-receivables") {
         navigate({
           pathname: "/party/receivables",
@@ -1965,7 +1967,7 @@ const showBillingName =
                       search: location.search,
                     })
                   }
-                    else if (from === "party-payables") {
+                  else if (from === "party-payables") {
                     navigate({
                       pathname: `/party/payables`,
                       search: location.search,
@@ -2361,7 +2363,7 @@ const showBillingName =
                             //       //     }
                             //       //   );
                             //       // }
-                                  
+
                             //          setValue(
                             //         "Phone_Number",
                             //         matchedParty.Phone_Number || "",
@@ -2398,7 +2400,7 @@ const showBillingName =
                             //   }, 150);
                             // }}
 
-                              onBlur={() => {
+                            onBlur={() => {
                               setTimeout(() => {
                                 const typedValue =
                                   partySearch?.trim()?.toLowerCase();
@@ -2665,7 +2667,7 @@ const showBillingName =
                                 // }
 
                                 // setHasSwitchedParty(true);
-                                              setValue(
+                                setValue(
                                   "Billing_Name",
                                   party.Billing_Name?.trim()
                                     ? party.Billing_Name
@@ -2677,10 +2679,7 @@ const showBillingName =
                                     shouldDirty: true,
                                   }
                                 );
-                                setValue("Phone_Number", party.Phone_Number || "", {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                });
+
 
                                 setCurrentPartyDetails(party);
 
@@ -2764,72 +2763,79 @@ const showBillingName =
                         />
                       )} */}
                       {showPartyModal && (
-  <PartyAddModal
-    onClose={() => setShowPartyModal(false)}
-    onSave={(newParty) => {
-      setPartyCursor(null);
+                        <PartyAddModal
+                          onClose={() => setShowPartyModal(false)}
+                          onSave={(newParty) => {
+                            setPartyCursor(null);
 
-      // =====================================================
-      // PARTY NAME
-      // =====================================================
-      setPartySearch(newParty.Party_Name);
+                            // =====================================================
+                            // PARTY NAME
+                            // =====================================================
+                            setPartySearch(newParty.Party_Name);
 
-      setValue("Party_Name", newParty.Party_Name, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                            setValue("Party_Name", newParty.Party_Name, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
-      // =====================================================
-      // GSTIN
-      // =====================================================
-      setValue("GSTIN", newParty.GSTIN || "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                            // =====================================================
+                            // GSTIN
+                            // =====================================================
+                            setValue("GSTIN", newParty.GSTIN || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
 
-      // =====================================================
-      // PHONE
-      // =====================================================
-      setValue("Phone_Number", newParty.Phone_Number || "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                            // =====================================================
+                            // PHONE
+                            // =====================================================
+                            setValue("Phone_Number", newParty.Phone_Number || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                            const defaultBilling = newParty.addresses?.find(
+                              (a) => a.Address_Type === "Billing" && a.Is_Default
+                            );
 
-      // =====================================================
-      // BILLING NAME
-      // =====================================================
-      // 1. If new party has its own Billing_Name → use it
-      // 2. Otherwise, if setting is ON → use Party_Name
-      // 3. Otherwise → keep Billing Name empty
-      if (newParty.Billing_Name?.trim()) {
-        setValue("Billing_Name", newParty.Billing_Name, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-      } else if (enableBillingNameOfParties) {
-        setValue("Billing_Name", newParty.Party_Name, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-      } else {
-        setValue("Billing_Name", "", {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-      }
+                            setValue("Billing_Address", defaultBilling?.Address_Text || "", {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                            // =====================================================
+                            // BILLING NAME
+                            // =====================================================
+                            // 1. If new party has its own Billing_Name → use it
+                            // 2. Otherwise, if setting is ON → use Party_Name
+                            // 3. Otherwise → keep Billing Name empty
+                            if (newParty.Billing_Name?.trim()) {
+                              setValue("Billing_Name", newParty.Billing_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            } else if (enableBillingNameOfParties) {
+                              setValue("Billing_Name", newParty.Party_Name, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            } else {
+                              setValue("Billing_Name", "", {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            }
 
-      // =====================================================
-      // CURRENT PARTY
-      // =====================================================
-      setCurrentPartyDetails(newParty);
+                            // =====================================================
+                            // CURRENT PARTY
+                            // =====================================================
+                            setCurrentPartyDetails(newParty);
 
-      // =====================================================
-      // CLOSE MODAL
-      // =====================================================
-      setShowPartyModal(false);
-    }}
-  />
-)}
+                            // =====================================================
+                            // CLOSE MODAL
+                            // =====================================================
+                            setShowPartyModal(false);
+                          }}
+                        />
+                      )}
                     </div>
                     {/* <div className="input-field  flex gap-4
                               justify-center items-center  gstin-class">
