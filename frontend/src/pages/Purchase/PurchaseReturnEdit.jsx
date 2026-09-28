@@ -944,6 +944,7 @@ export default function PurchaseReturndEdit() {
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   const originalPartyNameRef = useRef("");
   const partyWasCommittedRef = useRef(false);
+  const committedItemRef = useRef({});
   useEffect(() => {
     if (purchase) {
       originalTaxTypesRef.current = (purchase?.purchaseReturn?.items || []).map(
@@ -974,7 +975,7 @@ export default function PurchaseReturndEdit() {
       partyWasCommittedRef.current = false;
       const prefilledRows = purchase?.purchaseReturn?.items.length > 0
         ? purchase?.purchaseReturn.items.map((item, index) => {
-
+          committedItemRef.current[index] = item.Item_Id || "";
           // Original purchase price saved in this purchase line
           const purchasePrice = Number(item.Purchase_Price) || 0;
 
@@ -1766,7 +1767,7 @@ export default function PurchaseReturndEdit() {
     syncTotalsAfterItemChange(rawTotal)
     setShowScanCodeModal(false);
   };
-  const committedItemRef = useRef({});
+  
   return (
     <>
       {/* <div className="sb2-2-2">

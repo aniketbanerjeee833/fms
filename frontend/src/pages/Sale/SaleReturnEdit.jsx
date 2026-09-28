@@ -6386,6 +6386,10 @@ onChange={(e) => {
                                 <select
                                   {...field}
                                   className="form-select bg-gray-100 text-gray-700"
+                                   style={{
+                                    fontSize: shouldShowFreeQuantity ? "10px" : "12px",
+                                    padding: "2px 4px",
+                                  }}
                                   onChange={(e) => {
                                     field.onChange(e);
 

@@ -1105,6 +1105,7 @@ export default function PurchaseEdit() {
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   const originalPartyNameRef = useRef("");
   const partyWasCommittedRef = useRef(false);
+    const committedItemRef = useRef({});
   useEffect(() => {
     if (purchase) {
       originalTaxTypesRef.current = (purchase?.items || []).map(
@@ -1135,6 +1136,7 @@ export default function PurchaseEdit() {
       partyWasCommittedRef.current = false;
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item, index) => {
+           committedItemRef.current[index] = item.Item_Id || "";
 
           // Original purchase price saved in this purchase line
           const purchasePrice = Number(item.Purchase_Price) || 0;
@@ -1950,7 +1952,7 @@ export default function PurchaseEdit() {
     setShowScanCodeModal(false);
   };
   //const partyWasEditedRef = useRef(false);
-  const committedItemRef = useRef({});
+
   return (
     <>
 
