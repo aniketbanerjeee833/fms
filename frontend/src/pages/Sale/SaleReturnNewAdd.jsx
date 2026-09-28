@@ -1,6 +1,6 @@
 import { useDispatch } from "react-redux";
 import { useState, useRef, useEffect } from "react";
-import {  useNavigate,} from "react-router-dom";
+import { useNavigate, } from "react-router-dom";
 
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -678,8 +678,8 @@ export default function SaleReturnNewAdd() {
   //   sale?.items?.some(
   //     (item) => item.hasHistoricalMRP === true
   //   );
-  
-  
+
+
   const showFreeQuantity =
     Number(
       transactionsSettings.find(
@@ -699,16 +699,16 @@ export default function SaleReturnNewAdd() {
   // const [showBillingName, setShowBillingName] = useState(false);
   // const [hasSwitchedParty, setHasSwitchedParty] = useState(false);
   // const [hasSeenBillingNameParty, setHasSeenBillingNameParty] =useState(false);
-   const billingNameValue = watch("Billing_Name");
-  const showBillingName =enableBillingNameOfParties || 
-  !!billingNameValue?.trim()
+  const billingNameValue = watch("Billing_Name");
+  const showBillingName = enableBillingNameOfParties ||
+    !!billingNameValue?.trim()
   // const hasHistoricaFreeQuantity = sale?.items?.some(
   //   (item) => item.hasHistoricalFreeQuantity === true
   // )
   // const showFreeQuantity = showFreeQuantity || hasHistoricaFreeQuantity
 
   // const showMRP = showMRP || hasHistoricalMRP;
-//const showFreeQuantity = showFreeQuantity
+  //const showFreeQuantity = showFreeQuantity
 
   //const showMRP = showMRP;
   // helper to update a field in a specific row
@@ -1048,215 +1048,7 @@ export default function SaleReturnNewAdd() {
   const originalTaxTypesRef = useRef([]);
   //const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
   const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
-  // useEffect(() => {
-  //   if (sale) {
-  //     originalTaxTypesRef.current = (sale?.items || []).map(
-  //       (item) => item?.Tax_Type || "None"
-  //     );
-  //     const savedDiscountAmount =
-  //       Number(
-  //         sale?.invoicePartyDetails?.Transaction_Discount_Amount
-  //       ) || 0;
 
-  //     const savedDiscountPercentage =
-  //       Number(
-  //         sale?.invoicePartyDetails?.Transaction_Discount_Percentage
-  //       ) || 0;
-
-  //     setShowTransactionDiscount(
-  //       enableTransactionWiseDiscount ||
-  //       savedDiscountAmount > 0 ||
-  //       savedDiscountPercentage > 0
-  //     );
-  //     setPartySearch(sale.invoicePartyDetails.Party_Name);
-  //     setCurrentPartyDetails({
-  //       ...sale.invoicePartyDetails,
-  //     });
-  //     const savedBillingName =
-  //       !!sale.invoicePartyDetails?.Billing_Name?.trim();
-
-  //     setShowBillingName(savedBillingName);
-
-  //     setHasSeenBillingNameParty(savedBillingName);
-  //     setHasSavedBillingAddress(
-  //       !!sale.invoicePartyDetails?.Billing_Address?.trim()
-  //     );
-  //     const prefilledRows = sale?.items?.length > 0
-  //       ? sale.items.map((item, index) => {
-
-  //         // Original purchase price saved in this purchase line
-  //         const salePrice = Number(item.Sale_Price) || 0;
-
-  //         const historicalMRPDiscount =
-  //           Number(item.Discount_On_MRP_For_Sale_Percentage) > 0
-  //             ? Number(item.Discount_On_MRP_For_Sale_Percentage)
-  //             : 0;
-
-  //         const currentMasterMRPDiscount =
-  //           Number(item.Current_MRP_Discount) > 0
-  //             ? Number(item.Current_MRP_Discount)
-  //             : 0;
-
-  //         masterMrpDiscountRef.current[index] =
-  //           historicalMRPDiscount > 0
-  //             ? historicalMRPDiscount
-  //             : currentMasterMRPDiscount;
-
-  //         // If this purchase was saved in secondary unit,
-  //         // convert its price back to PRIMARY price.
-  //         // const primaryUnit = item.Primary_Unit || "";
-  //         // const secondaryUnit = item.Secondary_Unit || "";
-  //         //       const primaryUnit =
-  //         //   item.Primary_Unit ||
-  //         //   availableUnits[0]?.Unit_Shorthand ||
-  //         //   "";
-
-  //         // const secondaryUnit =
-  //         //   item.Secondary_Unit ||
-  //         //   availableUnits.find(
-  //         //     (u) => u.Unit_Shorthand !== primaryUnit
-  //         //   )?.Unit_Shorthand ||
-  //         //   "";
-  //         //       const conversionRate = Number(item.Conversion_Rate) || 0;
-  //         //       const selectedUnit = item.Selected_Unit || primaryUnit;
-  //         const conversionRate = Number(item.Conversion_Rate) || 0;
-
-  //         const availableUnits = Array.isArray(item.Available_Units)
-  //           ? item.Available_Units
-  //           : [];
-
-  //         // Historical snapshot may have Secondary_Unit = null.
-  //         // In that case use CURRENT available units.
-  //         const primaryUnit =
-  //           item.Primary_Unit ||
-  //           availableUnits[0]?.Unit_Shorthand ||
-  //           "";
-
-  //         const secondaryUnit =
-  //           item.Secondary_Unit ||
-  //           availableUnits.find(
-  //             (u) => u.Unit_Shorthand !== primaryUnit
-  //           )?.Unit_Shorthand ||
-  //           "";
-
-  //         const selectedUnit = item.Selected_Unit || primaryUnit;
-
-  //         let baseSalePrice = salePrice;
-
-  //         if (
-  //           selectedUnit === secondaryUnit &&
-  //           conversionRate > 0
-  //         ) {
-  //           baseSalePrice = salePrice * conversionRate;
-  //         }
-
-  //         // Store original/base price separately
-  //         baseSalePriceRef.current[index] = baseSalePrice;
-  //         baseSaleUnitRef.current[index] = primaryUnit;
-
-  //         return {
-  //           ...item,
-
-  //           Item_Unit: selectedUnit,
-
-  //           itemSearch: item.Item_Name,
-  //           itemOpen: false,
-  //           CategoryOpen: false,
-  //           unitOpen: false,
-  //           unitSearch: "",
-
-  //           isHSNLocked: false,
-  //           isUnitLocked: false,
-  //           isExistingItem: true,
-
-  //           Primary_Unit: primaryUnit,
-  //           Secondary_Unit: secondaryUnit,
-  //           Conversion_Rate: conversionRate,
-
-  //           Available_Units: availableUnits,
-  //         };
-  //       })
-  //       : [emptyRow()];
-  //     const formItems = prefilledRows.map((item) => ({
-  //       Item_Id: item.Item_Id,
-  //       Item_Name: item.Item_Name || "",
-  //       Item_Category: item.Item_Category || "",
-  //       Item_HSN: item.Item_HSN || "",
-  //       MRP: item.MRP || "",
-  //       Discount_On_MRP_For_Sale_Percentage: item.Discount_On_MRP_For_Sale_Percentage || "",
-  //       Quantity: item.Quantity || "",
-  //       Free_Quantity: item.Free_Quantity || "",
-  //       Item_Unit: item.Item_Unit || "",
-  //       Sale_Price: item.Sale_Price || "",
-
-  //       Discount_On_Sale_Price: item.Discount_On_Sale_Price || "",
-
-  //       Discount_Type_On_Sale_Price: item.Discount_Type_On_Sale_Price || "Percentage",
-
-  //       Tax_Type: item.Tax_Type || "None",
-  //       Tax_Amount: item.Tax_Amount || "",
-  //       Amount: item.Amount || "",
-  //     }));
-  //     setRows(prefilledRows)
-  //     const roundOffFromDb = Number(sale.invoicePartyDetails?.Round_Off) || 0;
-
-  //     //  checkbox reflects whether a real round-off was applied
-  //     setIsRoundOff(roundOffFromDb !== 0);
-
-  //     reset({
-  //       Return_Date: new Date().toISOString().slice(0, 10),   // ✅ FIX 1 — today by default
-  //       Return_Number: "",
-  //       Party_Name: sale.invoicePartyDetails?.Party_Name || "",
-  //       Billing_Name: sale.invoicePartyDetails?.Billing_Name || "",
-  //       GSTIN: sale.invoicePartyDetails?.GSTIN || "",
-  //       Billing_Address: sale.invoicePartyDetails?.Billing_Address || "",
-  //       Invoice_Number: sale.invoicePartyDetails?.Invoice_Number || "",
-  //       Phone_Number: sale.invoicePartyDetails?.Phone_Number || "",
-  //       Invoice_Date: toLocalDateString(sale.invoicePartyDetails?.Invoice_Date),
-  //       //  Invoice_Date: sale.invoicePartyDetails?.Invoice_Date,
-  //       State_Of_Supply: sale.invoicePartyDetails?.State_Of_Supply || "",
-  //       Total_Amount: sale.invoicePartyDetails?.Total_Amount || "",
-  //       Round_Off: roundOffFromDb !== 0 ? roundOffFromDb.toFixed(2) : "",
-  //       //Total_Paid: sale.invoicePartyDetails?.Total_Paid || "",
-  //       Balance_Due: "",
-  //       Transaction_Discount_Amount:
-  //         Number(sale.invoicePartyDetails?.Transaction_Discount_Amount) > 0
-  //           ? sale.invoicePartyDetails?.Transaction_Discount_Amount
-  //           : "",
-
-  //       Transaction_Discount_Percentage:
-  //         Number(sale.invoicePartyDetails?.Transaction_Discount_Percentage) > 0
-  //           ? sale.invoicePartyDetails?.Transaction_Discount_Percentage
-  //           : "",
-  //       //Balance_Due: sale.invoicePartyDetails?.Balance_Due || "",
-  //       // Payment_Type: sale.invoicePartyDetails?.Payment_Type || "",
-  //       // Reference_Number: sale.invoicePartyDetails?.Reference_Number || "",
-  //       splits:
-  //         sale?.splits?.length > 0
-  //           ? sale.splits.map((split) => ({
-  //             Payment_Type: split.Payment_Type,
-  //             Bank_Account_Id: split.Bank_Account_Id,
-  //             Reference_Number: split.Reference_Number || "",
-  //             Amount: split.Amount, // or split.Amount if you want to prefill the original amount
-  //           }))
-  //           : [
-  //             {
-  //               Payment_Type: "Cash",
-  //               Bank_Account_Id: null,
-  //               Reference_Number: "",
-  //               Amount: "",
-  //             },
-  //           ],
-
-  //       //items: prefilledRows,
-  //       items: formItems,
-  //     })
-  //     setShowSplitBox((sale?.splits?.length || 0) > 1);
-  //   }
-  // }, [sale]);
-  //const Invoice_Number=sale.invoicePartyDetails?.Invoice_Number 
-  //const Invoice_Date=sale?.invoicePartyDetails?.Invoice_Date
-  //console.log(sale)
   console.log("Current form values:", formValues);
   console.log("Form errors:", errors);
 
@@ -1577,10 +1369,10 @@ export default function SaleReturnNewAdd() {
       //   })
       // }
       //else {
-        navigate({
-          pathname: "/sale/return",
-          search: location.search,
-        });
+      navigate({
+        pathname: "/sale/return",
+        search: location.search,
+      });
       //}
 
     } catch (error) {
@@ -1869,6 +1661,7 @@ export default function SaleReturnNewAdd() {
   //const originalPartyNameRef = useRef("");
   const partyWasCommittedRef = useRef(false);
   const committedPartyNameRef = useRef("");
+  const committedItemRef = useRef({});
   return (
     <>
 
@@ -1970,11 +1763,11 @@ export default function SaleReturnNewAdd() {
                   //   });
                   // }
                   //else {
-                    navigate({
-                      //pathname: "/sale/all-sales",
-                      pathname: "/sale/return",
-                      search: location.search,
-                    })
+                  navigate({
+                    //pathname: "/sale/all-sales",
+                    pathname: "/sale/return",
+                    search: location.search,
+                  })
                   //}
                 }}
 
@@ -2190,7 +1983,7 @@ export default function SaleReturnNewAdd() {
                                 //   shouldValidate: true,
                                 //   shouldDirty: true,
                                 // });
-                                 //setShowBillingName(false);
+                                //setShowBillingName(false);
                                 setCurrentPartyDetails(null);
 
                               }
@@ -2319,7 +2112,7 @@ export default function SaleReturnNewAdd() {
                             //       //     }
                             //       //   );
                             //       // }
-                                  
+
                             //          setValue(
                             //         "Phone_Number",
                             //         matchedParty.Phone_Number || "",
@@ -2355,178 +2148,178 @@ export default function SaleReturnNewAdd() {
                             //     setOpen(false);
                             //   }, 150);
                             // }}
-                             onBlur={() => {
-  setTimeout(() => {
-    const typedValue =
-      partySearch?.trim()?.toLowerCase();
+                            onBlur={() => {
+                              setTimeout(() => {
+                                const typedValue =
+                                  partySearch?.trim()?.toLowerCase();
 
-    const matchedParty = parties.find(
-      (p) =>
-        p.Party_Name?.trim()?.toLowerCase() === typedValue
-    );
+                                const matchedParty = parties.find(
+                                  (p) =>
+                                    p.Party_Name?.trim()?.toLowerCase() === typedValue
+                                );
 
-    // =====================================================
-    // EXACT PARTY
-    // =====================================================
-    if (matchedParty) {
-      setPartyCursor(null);
+                                // =====================================================
+                                // EXACT PARTY
+                                // =====================================================
+                                if (matchedParty) {
+                                  setPartyCursor(null);
 
-      setHasSavedBillingAddress(
-        !!matchedParty.addresses?.some(
-          (a) => a.Address_Type === "Billing"
-        )
-      );
+                                  setHasSavedBillingAddress(
+                                    !!matchedParty.addresses?.some(
+                                      (a) => a.Address_Type === "Billing"
+                                    )
+                                  );
 
-      setPartySearch(matchedParty.Party_Name);
+                                  setPartySearch(matchedParty.Party_Name);
 
-      setValue("Party_Name", matchedParty.Party_Name, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                                  setValue("Party_Name", matchedParty.Party_Name, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-      setValue("GSTIN", matchedParty.GSTIN || "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                                  setValue("GSTIN", matchedParty.GSTIN || "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-      // =====================================================
-      // CHECK WHETHER PARTY ACTUALLY CHANGED
-      // =====================================================
+                                  // =====================================================
+                                  // CHECK WHETHER PARTY ACTUALLY CHANGED
+                                  // =====================================================
 
-      const isCommittedParty =
-        typedValue ===
-        committedPartyNameRef.current
-          ?.trim()
-          ?.toLowerCase();
+                                  const isCommittedParty =
+                                    typedValue ===
+                                    committedPartyNameRef.current
+                                      ?.trim()
+                                      ?.toLowerCase();
 
-      // =====================================================
-      // PARTY CHANGED
-      // LOAD MASTER VALUES
-      // =====================================================
+                                  // =====================================================
+                                  // PARTY CHANGED
+                                  // LOAD MASTER VALUES
+                                  // =====================================================
 
-      if (!isCommittedParty) {
+                                  if (!isCommittedParty) {
 
-        // ===================================================
-        // BILLING ADDRESS → MASTER
-        // ===================================================
+                                    // ===================================================
+                                    // BILLING ADDRESS → MASTER
+                                    // ===================================================
 
-        const defaultBilling =
-          matchedParty.addresses?.find(
-            (a) =>
-              a.Address_Type === "Billing" &&
-              a.Is_Default
-          );
+                                    const defaultBilling =
+                                      matchedParty.addresses?.find(
+                                        (a) =>
+                                          a.Address_Type === "Billing" &&
+                                          a.Is_Default
+                                      );
 
-        setValue(
-          "Billing_Address",
-          defaultBilling?.Address_Text || "",
-          {
-            shouldValidate: true,
-            shouldDirty: true,
-          }
-        );
+                                    setValue(
+                                      "Billing_Address",
+                                      defaultBilling?.Address_Text || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
 
-        // ===================================================
-        // BILLING NAME → MASTER
-        // ===================================================
+                                    // ===================================================
+                                    // BILLING NAME → MASTER
+                                    // ===================================================
 
-        if (matchedParty.Billing_Name?.trim()) {
-          setValue(
-            "Billing_Name",
-            matchedParty.Billing_Name,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        } else if (enableBillingNameOfParties) {
-          setValue(
-            "Billing_Name",
-            matchedParty.Party_Name,
-            {
-              shouldValidate: true,
-              shouldDirty: true,
-            }
-          );
-        } else {
-          setValue("Billing_Name", "", {
-            shouldValidate: true,
-            shouldDirty: true,
-          });
-        }
+                                    if (matchedParty.Billing_Name?.trim()) {
+                                      setValue(
+                                        "Billing_Name",
+                                        matchedParty.Billing_Name,
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        }
+                                      );
+                                    } else if (enableBillingNameOfParties) {
+                                      setValue(
+                                        "Billing_Name",
+                                        matchedParty.Party_Name,
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        }
+                                      );
+                                    } else {
+                                      setValue("Billing_Name", "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                    }
 
-        // ===================================================
-        // PHONE → MASTER
-        // ===================================================
+                                    // ===================================================
+                                    // PHONE → MASTER
+                                    // ===================================================
 
-        setValue(
-          "Phone_Number",
-          matchedParty.Phone_Number || "",
-          {
-            shouldValidate: true,
-            shouldDirty: true,
-          }
-        );
+                                    setValue(
+                                      "Phone_Number",
+                                      matchedParty.Phone_Number || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
 
-        // ===================================================
-        // THIS PARTY IS NOW COMMITTED
-        // ===================================================
+                                    // ===================================================
+                                    // THIS PARTY IS NOW COMMITTED
+                                    // ===================================================
 
-        committedPartyNameRef.current =
-          matchedParty.Party_Name;
-      }
+                                    committedPartyNameRef.current =
+                                      matchedParty.Party_Name;
+                                  }
 
-      // =====================================================
-      // CURRENT PARTY DETAILS
-      // =====================================================
+                                  // =====================================================
+                                  // CURRENT PARTY DETAILS
+                                  // =====================================================
 
-      setCurrentPartyDetails(matchedParty);
+                                  setCurrentPartyDetails(matchedParty);
 
-    } else {
-      // =====================================================
-      // NO EXACT PARTY MATCH
-      // =====================================================
+                                } else {
+                                  // =====================================================
+                                  // NO EXACT PARTY MATCH
+                                  // =====================================================
 
-      setHasSavedBillingAddress(false);
+                                  setHasSavedBillingAddress(false);
 
-      partyWasCommittedRef.current = true;
+                                  partyWasCommittedRef.current = true;
 
-      // No valid Party is currently committed
-      committedPartyNameRef.current = "";
+                                  // No valid Party is currently committed
+                                  committedPartyNameRef.current = "";
 
-      // ===================================================
-      // CLEAR BILLING NAME
-      // ===================================================
+                                  // ===================================================
+                                  // CLEAR BILLING NAME
+                                  // ===================================================
 
-      setValue("Billing_Name", "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                                  setValue("Billing_Name", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-      // ===================================================
-      // CLEAR BILLING ADDRESS
-      // ===================================================
+                                  // ===================================================
+                                  // CLEAR BILLING ADDRESS
+                                  // ===================================================
 
-      setValue("Billing_Address", "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                                  setValue("Billing_Address", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-      // ===================================================
-      // CLEAR PHONE
-      // ===================================================
+                                  // ===================================================
+                                  // CLEAR PHONE
+                                  // ===================================================
 
-      setValue("Phone_Number", "", {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+                                  setValue("Phone_Number", "", {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  });
 
-      setCurrentPartyDetails(null);
-    }
+                                  setCurrentPartyDetails(null);
+                                }
 
-    setOpen(false);
-  }, 150);
-}}
+                                setOpen(false);
+                              }, 150);
+                            }}
                             placeholder="Search By Name/Phone"
                             className="w-full outline-none py-1 px-2 text-gray-900"
                             style={{
@@ -2568,7 +2361,7 @@ export default function SaleReturnNewAdd() {
                               onLoadMore={handlePartyLoadMore}
                               scrollRef={partyScrollRef}
                               onSelectParty={(party) => {
-                                 partyWasCommittedRef.current = true;
+                                partyWasCommittedRef.current = true;
                                 committedPartyNameRef.current = party.Party_Name?.trim() || "";
                                 setPartyCursor(null);
                                 setHasSavedBillingAddress(
@@ -2649,7 +2442,7 @@ export default function SaleReturnNewAdd() {
                                 // }
 
                                 //setHasSwitchedParty(true);
-                                          setValue(
+                                setValue(
                                   "Billing_Name",
                                   party.Billing_Name?.trim()
                                     ? party.Billing_Name
@@ -2742,23 +2535,23 @@ export default function SaleReturnNewAdd() {
                           }}
                         />
                       )} */}
-                                            {showPartyModal && (
+                      {showPartyModal && (
                         <PartyAddModal
                           onClose={() => setShowPartyModal(false)}
                           onSave={(newParty) => {
                             committedPartyNameRef.current = newParty.Party_Name?.trim() || "";
                             setPartyCursor(null);
-                      
+
                             // =====================================================
                             // PARTY NAME
                             // =====================================================
                             setPartySearch(newParty.Party_Name);
-                      
+
                             setValue("Party_Name", newParty.Party_Name, {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                      
+
                             // =====================================================
                             // GSTIN
                             // =====================================================
@@ -2766,7 +2559,7 @@ export default function SaleReturnNewAdd() {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                      
+
                             // =====================================================
                             // PHONE
                             // =====================================================
@@ -2774,7 +2567,7 @@ export default function SaleReturnNewAdd() {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                               const defaultBilling = newParty.addresses?.find(
+                            const defaultBilling = newParty.addresses?.find(
                               (a) => a.Address_Type === "Billing" && a.Is_Default
                             );
 
@@ -2782,7 +2575,7 @@ export default function SaleReturnNewAdd() {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                      
+
                             // =====================================================
                             // BILLING NAME
                             // =====================================================
@@ -2805,12 +2598,12 @@ export default function SaleReturnNewAdd() {
                                 shouldDirty: true,
                               });
                             }
-                      
+
                             // =====================================================
                             // CURRENT PARTY
                             // =====================================================
                             setCurrentPartyDetails(newParty);
-                      
+
                             // =====================================================
                             // CLOSE MODAL
                             // =====================================================
@@ -2818,7 +2611,7 @@ export default function SaleReturnNewAdd() {
                           }}
                         />
                       )}
-                       {errors?.Party_Name && (
+                      {errors?.Party_Name && (
                         <p className="text-red-500 text-xs mt-1">
                           {errors?.Party_Name?.message}
                         </p>
@@ -2873,7 +2666,7 @@ export default function SaleReturnNewAdd() {
                         <p className="text-red-500 text-xs ">{errors?.Phone_Number?.message}</p>
                       )}
                     </div>
-                    
+
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
 
@@ -2897,7 +2690,7 @@ export default function SaleReturnNewAdd() {
 
                       </div>
                     )}
-                    
+
                     {/* //)} */}
 
                     {/* GSTIN — compact inline label+input, pinned to top */}
@@ -3404,7 +3197,7 @@ export default function SaleReturnNewAdd() {
                       style={{ marginBottom: 0, width: "50%", border: "none" }}
                       {...register("Invoice_Date")}
                       placeholder=" Invoice_Date"
-                      
+
                       className="w-full outline-none invoice-date-class text-gray-900"
 
                     />
@@ -3766,111 +3559,7 @@ export default function SaleReturnNewAdd() {
                             <input
                               type="text"
                               value={rows[i]?.itemSearch || ""}
-                              // onChange={(e) => {
-                              //   const typedValue = e.target.value;
-                              //   handleRowChange(i, "itemSearch", typedValue);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   // setValue(`items.${i}.Item_Name`, typedValue);
-                              //   handleRowChange(i, "isHSNLocked", false);
-                              //   handleRowChange(i, "isExistingItem", false);
-                              //   handleRowChange(i, "isUnitLocked", false);
 
-                              //   const exists = items?.items?.find(
-                              //     (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //   );
-                              //   if (exists) {
-                              //     // ✅ Only store if it's a valid item
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                              //     handleRowChange(i, "isExistingItem", true);
-                              //   } else {
-                              //     // ❌ Clear Item_Name in RHF to trigger error
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                              //     handleRowChange(i, "isExistingItem", false);
-                              //     handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                              //     handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                              //     handleRowChange(i, "Available_Units", []);
-                              //   }
-                              //   //handleRowChange(i, "isExistingItem", exists); // false if new item
-                              // }}
-                              // onBlur={() => {
-                              //   setTimeout(() => {
-                              //     const typedValue = rows[i]?.itemSearch?.trim() || "";
-                              //     if (!typedValue) return;
-
-                              //     const matchedItem = items?.items?.find(
-                              //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //     );
-
-                              //     if (matchedItem) {
-                              //       // ✅ auto-fill exactly like clicking from dropdown
-                              //       setRows((prev) => {
-                              //         const updated = [...prev];
-                              //         updated[i] = {
-                              //           ...updated[i],
-                              //           itemSearch: matchedItem.Item_Name,   // normalize display
-                              //           Item_Category: matchedItem.Item_Category || "",
-                              //           Item_HSN: matchedItem.Item_HSN || "",
-                              //           categorySearch: matchedItem.Item_Category || "",
-                              //           isExistingItem: true,
-                              //           isHSNLocked: false,
-                              //           isUnitLocked: false,
-                              //           itemOpen: false,
-                              //           Primary_Unit: matchedItem.Primary_Unit || null,
-                              //           Secondary_Unit: matchedItem.Secondary_Unit || null,
-                              //           Conversion_Rate: matchedItem.Conversion_Rate || null,
-
-                              //           // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
-                              //           Available_Units: Array.isArray(matchedItem.Available_Units)
-                              //             ? matchedItem.Available_Units
-                              //             : [],
-                              //         };
-                              //         return updated;
-                              //       });
-
-                              //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Sale_Price`, matchedItem.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
-                              //       //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(
-                              //         `items.${i}.Item_Unit`,
-                              //         matchedItem.Primary_Unit || "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-                              //       baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                              //       baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
-                              //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              //         {
-                              //           ...itemsValues[i],
-                              //           Item_Name: matchedItem.Item_Name,
-                              //           Sale_Price: matchedItem.Sale_Price || 0,
-                              //           Quantity: itemsValues[i]?.Quantity || 0,
-                              //         },
-                              //         i,
-                              //         itemsValues
-                              //       );
-
-                              //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              //       syncTotalsAfterItemChange();
-                              //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              //     } else {
-                              //       // no match — close dropdown
-                              //       handleRowChange(i, "itemOpen", false);
-                              //     }
-                              //   }, 150); // small delay so click-from-dropdown fires first
-                              // }}
-                              // onClick={() => {
-                              //   handleRowChange(i, "itemOpen", true);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              // }}
-                              //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
 
                               onChange={(e) => {
                                 const typedValue = e.target.value;
@@ -3890,16 +3579,16 @@ export default function SaleReturnNewAdd() {
                                   }
                                 );
 
-                                handleRowChange(i, "isHSNLocked", false);
-                                handleRowChange(i, "isExistingItem", false);
-                                handleRowChange(i, "isUnitLocked", false);
+                                // handleRowChange(i, "isHSNLocked", false);
+                                // handleRowChange(i, "isExistingItem", false);
+                                // handleRowChange(i, "isUnitLocked", false);
 
-                                // Clear previously selected item details
-                                handleRowChange(i, "Primary_Unit", null);
-                                handleRowChange(i, "Secondary_Unit", null);
-                                handleRowChange(i, "Available_Units", []);
+                                // // Clear previously selected item details
+                                // handleRowChange(i, "Primary_Unit", null);
+                                // handleRowChange(i, "Secondary_Unit", null);
+                                // handleRowChange(i, "Available_Units", []);
                               }}
-                              
+
                               onBlur={() => {
                                 setTimeout(async () => {
                                   const typedValue =
@@ -3916,14 +3605,13 @@ export default function SaleReturnNewAdd() {
                                   // This preserves existing transaction values.
                                   // =====================================================
 
-                                  const currentRow =
-                                    itemsValues[i] || {};
+
 
                                   // Original item currently belonging to this transaction row.
                                   // If the user deletes the name and types the same item again,
                                   // Item_Id lets us recognize that it is the same item.
-                                  const existingItemId =
-                                    currentRow.Item_Id || "";
+                                  const currentRow = itemsValues[i] || {};
+                                  const committedItemId = committedItemRef.current[i] || "";
 
                                   try {
                                     // ===================================================
@@ -3939,14 +3627,100 @@ export default function SaleReturnNewAdd() {
                                     // NO EXACT ITEM FOUND
                                     // ===================================================
 
+                                    // if (!matchedItem?.Item_Id) {
+                                    //   handleRowChange(
+                                    //     i,
+                                    //     "itemOpen",
+                                    //     false
+                                    //   );
+                                    //   return;
+                                    // }
                                     if (!matchedItem?.Item_Id) {
-                                      handleRowChange(
-                                        i,
-                                        "itemOpen",
-                                        false
-                                      );
+                                      committedItemRef.current[i] = "";
+
+                                      setValue(`items.${i}.Item_Id`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_Category`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_HSN`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Sale_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      // setValue(`items.${i}.Discount_On_Purchase_Price`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      // setValue(`items.${i}.Discount_Type_On_Purchase_Price`, "Percentage", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      setValue(`items.${i}.Tax_Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Tax_Type`, "None", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.MRP`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                      // setValue(`items.${i}.Item_Unit`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      // setRows((prev) => {
+                                      //   const updated = [...prev];
+
+                                      //   updated[i] = {
+                                      //     ...updated[i],
+                                      //     Purchase_Price: "",
+                                      //     Tax_Amount: "",
+                                      //   };
+
+                                      //   return updated;
+                                      // });
+
+                                      handleRowChange(i, "isExistingItem", false);
+                                      handleRowChange(i, "Primary_Unit", null);
+                                      handleRowChange(i, "Secondary_Unit", null);
+                                      handleRowChange(i, "Available_Units", []);
+                                      handleRowChange(i, "itemOpen", false);
+
                                       return;
                                     }
+                                    const isSameCommittedItem =
+                                      committedItemId &&
+                                      String(committedItemId) === String(matchedItem?.Item_Id);
                                     masterMrpDiscountRef.current[i] =
                                       Number(matchedItem?.Discount_On_MRP_For_Sale) > 0
                                         ? Number(matchedItem.Discount_On_MRP_For_Sale)
@@ -3957,9 +3731,9 @@ export default function SaleReturnNewAdd() {
                                     // THAT WAS ALREADY IN THIS TRANSACTION ROW
                                     // ===================================================
 
-                                    const isSameExistingItem =
-                                      existingItemId &&
-                                      matchedItem.Item_Id === existingItemId;
+                                    // const isSameExistingItem =
+                                    //   existingItemId &&
+                                    //   matchedItem.Item_Id === existingItemId;
 
                                     // ===================================================
                                     // MASTER MRP / MRP DISCOUNT
@@ -3977,6 +3751,12 @@ export default function SaleReturnNewAdd() {
                                       Number(matchedItem.MRP) > 0
                                         ? matchedItem.MRP
                                         : "";
+                                         const resolvedMRP =
+                                      isSameCommittedItem
+                                        ? currentRow.MRP ?? ""
+                                        : showMRP
+                                          ? masterMRP
+                                          : "";
 
                                     // const masterMRPDiscount =
                                     //   Number(
@@ -3999,7 +3779,7 @@ export default function SaleReturnNewAdd() {
                                         ? matchedItem.Discount_On_MRP_For_Sale
                                         : "";
                                     const resolvedMRPDiscount =
-                                      isSameExistingItem && historicalMRPDiscount > 0
+                                      isSameCommittedItem && historicalMRPDiscount > 0
                                         ? historicalMRPDiscount
                                         : masterMRPDiscount;
 
@@ -4045,10 +3825,7 @@ export default function SaleReturnNewAdd() {
                                     //     use master MRP values
                                     // ===================================================
 
-                                    const resolvedMRP =
-                                      isSameExistingItem
-                                        ? (currentRow.MRP ?? "")
-                                        : masterMRP;
+                                    
 
                                     // const resolvedMRPDiscount =
                                     //   isSameExistingItem
@@ -4060,7 +3837,7 @@ export default function SaleReturnNewAdd() {
                                     //     : masterMRPDiscount;
 
                                     const resolvedSalePrice =
-                                      isSameExistingItem
+                                      isSameCommittedItem
                                         ? (currentRow.Sale_Price ?? "")
                                         : calculatedMasterSalePrice;
 
@@ -4094,7 +3871,7 @@ export default function SaleReturnNewAdd() {
                                         : "Percentage";
 
                                     const resolvedSaleDiscount =
-                                      isSameExistingItem
+                                      isSameCommittedItem
                                         ? (
                                           currentRow
                                             .Discount_On_Sale_Price ?? ""
@@ -4102,7 +3879,7 @@ export default function SaleReturnNewAdd() {
                                         : masterSaleDiscount;
 
                                     const resolvedSaleDiscountType =
-                                      isSameExistingItem
+                                      isSameCommittedItem
                                         ? (
                                           currentRow
                                             .Discount_Type_On_Sale_Price ||
@@ -4113,7 +3890,7 @@ export default function SaleReturnNewAdd() {
                                     // ===================================================
                                     // UPDATE ROW
                                     // ===================================================
-
+                                        committedItemRef.current[i] = matchedItem.Item_Id;
                                     setRows((prev) => {
                                       const updated = [...prev];
 
@@ -4204,23 +3981,46 @@ export default function SaleReturnNewAdd() {
                                       }
                                     );
 
-                                    setValue(
+                                    // setValue(
+                                    //   `items.${i}.Item_Category`,
+                                    //   matchedItem.Item_Category || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
+                                     setValue(
                                       `items.${i}.Item_Category`,
-                                      matchedItem.Item_Category || "",
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      }
+                                    );
+                                              setValue(
+                                      `items.${i}.Item_HSN`,
+
+                                      isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
+
+
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       }
                                     );
 
-                                    setValue(
-                                      `items.${i}.Item_HSN`,
-                                      matchedItem.Item_HSN || "",
-                                      {
-                                        shouldValidate: true,
-                                        shouldDirty: true,
-                                      }
-                                    );
+                                    // setValue(
+                                    //   `items.${i}.Item_HSN`,
+                                    //   matchedItem.Item_HSN || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
 
                                     // ===================================================
                                     // MRP
@@ -4342,10 +4142,14 @@ export default function SaleReturnNewAdd() {
                                     // Otherwise use master primary unit.
                                     // ===================================================
 
-                                    const selectedUnit =
-                                      currentRow.Item_Unit ||
-                                      matchedItem.Primary_Unit ||
-                                      "";
+                                    // const selectedUnit =
+                                    //   currentRow.Item_Unit ||
+                                    //   matchedItem.Primary_Unit ||
+                                    //   "";
+                                     const selectedUnit =
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Unit || ""
+                                        : matchedItem.Primary_Unit || "";
 
                                     setValue(
                                       `items.${i}.Item_Unit`,
@@ -4381,11 +4185,17 @@ export default function SaleReturnNewAdd() {
                                       Item_Name:
                                         matchedItem.Item_Name || "",
 
-                                      Item_Category:
-                                        matchedItem.Item_Category || "",
+                                      // Item_Category:matchedItem.Item_Category || "",
 
-                                      Item_HSN:
-                                        matchedItem.Item_HSN || "",
+                                      // Item_HSN:matchedItem.Item_HSN || "",
+                                        Item_Category: isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
+
+
+                                      Item_HSN: isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
 
                                       // ==============================================
                                       // RESOLVED SALE PRICE
@@ -4481,17 +4291,87 @@ export default function SaleReturnNewAdd() {
                                       false
                                     );
 
-                                  } catch (err) {
-                                    console.error(
-                                      "❌ Item name lookup failed:",
-                                      err
-                                    );
+                                  } 
+                                  // catch (err) {
+                                  //   console.error(
+                                  //     "❌ Item name lookup failed:",
+                                  //     err
+                                  //   );
 
-                                    handleRowChange(
-                                      i,
-                                      "itemOpen",
-                                      false
-                                    );
+                                  //   handleRowChange(
+                                  //     i,
+                                  //     "itemOpen",
+                                  //     false
+                                  //   );
+                                  // }
+                                   catch (err) {
+                                    console.error("❌ Item name lookup failed:", err);
+
+                                    committedItemRef.current[i] = "";
+
+                                    setValue(`items.${i}.Item_Id`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_Category`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_HSN`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+
+                                    setValue(`items.${i}.Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.MRP`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    // setValue(`items.${i}.Item_Unit`, "", {
+                                    //   shouldValidate: true,
+                                    //   shouldDirty: true,
+                                    // });
+
+                                    setValue(`items.${i}.Tax_Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Tax_Type`, "None", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                    // Clear Sale Discount for non-existing item
+                                    setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                    setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                    baseSalePriceRef.current[i] = 0;
+                                    baseSaleUnitRef.current[i] = "";
+
+                                    handleRowChange(i, "isExistingItem", false);
+                                    handleRowChange(i, "Primary_Unit", null);
+                                    handleRowChange(i, "Secondary_Unit", null);
+                                    handleRowChange(i, "Available_Units", []);
+                                    handleRowChange(i, "itemOpen", false);
                                   }
                                 }, 150);
                               }}
@@ -4560,6 +4440,7 @@ export default function SaleReturnNewAdd() {
                                     calculateSalePriceFromMRP && mrp > 0
                                       ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
                                       : (it.Sale_Price || 0);
+                                  committedItemRef.current[i] = it.Item_Id;
                                   setRows((prev) => {
                                     const updated = [...prev];
                                     updated[i] = {
@@ -4612,7 +4493,7 @@ export default function SaleReturnNewAdd() {
                                       }
                                     );
                                   }
-                                 
+
                                   setValue(
                                     `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
                                     showMRP &&
@@ -6395,158 +6276,158 @@ export default function SaleReturnNewAdd() {
                             />
                           </div>
                         )} */}
-                          {enableTransactionWiseDiscount && (
-                                                  <div
-                                                    style={{ width: "50%" }}
-                                                    className="flex items-center gap-2 justify-end ml-auto"
-                                                  >
-                                                    <span className="font-medium whitespace-nowrap">
-                                                      Discount
-                                                    </span>
-                        
-                                                    {/* Discount Percentage */}
-                                                    <input
-                                                      type="text"
-                                                      placeholder="%"
-                                                      className="form-control"
-                                                      style={{
-                                                        marginBottom: "0px",
-                                                        height: "1.5rem",
-                                                        textAlign: "right",
-                                                      }}
-                                                      {...register("Transaction_Discount_Percentage")}
-                                                      onChange={(e) => {
-                                                        let val = e.target.value.replace(/[^0-9.]/g, "");
-                        
-                                                        const parts = val.split(".");
-                        
-                                                        // Only one decimal point
-                                                        if (parts.length > 2) {
-                                                          val =
-                                                            parts[0] +
-                                                            "." +
-                                                            parts.slice(1).join("");
-                                                        }
-                        
-                                                        // Maximum 3 decimal places
-                                                        if (val.includes(".")) {
-                                                          const [int, dec] = val.split(".");
-                                                          val = int + "." + dec.slice(0, 3);
-                                                        }
-                        
-                                                        const numericValue = Number(val);
-                        
-                                                        //  Prevent ANY value greater than 100
-                                                        if (val !== "" && numericValue > 100) {
-                                                          toast.error("Discount percentage cannot be greater than 100%");
-                        
-                                                          // Restore previous valid value
-                                                          const previousValue =
-                                                            watch("Transaction_Discount_Percentage") || "";
-                        
-                                                          e.target.value = previousValue;
-                        
-                                                          return;
-                                                        }
-                        
-                                                        e.target.value = val;
-                        
-                                                        const percentage = Number(val) || 0;
-                                                        const subtotal = getRawTotal();
-                        
-                                                        const discountAmount =
-                                                          (subtotal * percentage) / 100;
-                        
-                                                        setValue(
-                                                          "Transaction_Discount_Percentage",
-                                                          val,
-                                                          {
-                                                            shouldValidate: true,
-                                                            shouldDirty: true,
-                                                          }
-                                                        );
-                        
-                                                        setValue(
-                                                          "Transaction_Discount_Amount",
-                                                          discountAmount > 0
-                                                            ? discountAmount.toFixed(2)
-                                                            : "",
-                                                          {
-                                                            shouldValidate: true,
-                                                            shouldDirty: true,
-                                                          }
-                                                        );
-                        
-                                                        // syncTotalsAfterItemChange(discountAmount);
-                                                        syncTotalsAfterItemChange();
-                                                      }}
-                                                    />
-                        
-                                                    {/* Discount Amount */}
-                                                    <input
-                                                      type="text"
-                                                      placeholder="Amount"
-                                                      className="form-control"
-                                                      style={{
-                                                        marginBottom: "0px",
-                                                        height: "1.5rem",
-                                                        textAlign: "right",
-                                                      }}
-                                                      {...register("Transaction_Discount_Amount")}
-                                                      onChange={(e) => {
-                                                        let val = e.target.value.replace(/[^0-9.]/g, "");
-                        
-                                                        const parts = val.split(".");
-                                                        if (parts.length > 2) {
-                                                          val =
-                                                            parts[0] +
-                                                            "." +
-                                                            parts.slice(1).join("");
-                                                        }
-                        
-                                                        if (val.includes(".")) {
-                                                          const [int, dec] = val.split(".");
-                                                          val = int + "." + dec.slice(0, 3);
-                                                        }
-                        
-                                                        e.target.value = val;
-                        
-                                                        const amount = Number(val) || 0;
-                                                        const subtotal = getRawTotal();
-                        
-                                                        const percentage =
-                                                          subtotal > 0
-                                                            ? (amount / subtotal) * 100
-                                                            : 0;
-                        
-                                                        setValue(
-                                                          "Transaction_Discount_Amount",
-                                                          val,
-                                                          {
-                                                            shouldValidate: true,
-                                                            shouldDirty: true,
-                                                          }
-                                                        );
-                        
-                                                        setValue(
-                                                          "Transaction_Discount_Percentage",
-                                                          amount > 0
-                                                            ? percentage.toFixed(3)
-                                                            : "",
-                                                          {
-                                                            shouldValidate: true,
-                                                            shouldDirty: true,
-                                                          }
-                                                        );
-                        
-                                                        //syncTotalsAfterItemChange(amount);
-                                                        syncTotalsAfterItemChange();
-                                                      }}
-                                                    />
-                                                  </div>
-                                                )}
+                        {enableTransactionWiseDiscount && (
+                          <div
+                            style={{ width: "50%" }}
+                            className="flex items-center gap-2 justify-end ml-auto"
+                          >
+                            <span className="font-medium whitespace-nowrap">
+                              Discount
+                            </span>
 
-                        
+                            {/* Discount Percentage */}
+                            <input
+                              type="text"
+                              placeholder="%"
+                              className="form-control"
+                              style={{
+                                marginBottom: "0px",
+                                height: "1.5rem",
+                                textAlign: "right",
+                              }}
+                              {...register("Transaction_Discount_Percentage")}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                                const parts = val.split(".");
+
+                                // Only one decimal point
+                                if (parts.length > 2) {
+                                  val =
+                                    parts[0] +
+                                    "." +
+                                    parts.slice(1).join("");
+                                }
+
+                                // Maximum 3 decimal places
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 3);
+                                }
+
+                                const numericValue = Number(val);
+
+                                //  Prevent ANY value greater than 100
+                                if (val !== "" && numericValue > 100) {
+                                  toast.error("Discount percentage cannot be greater than 100%");
+
+                                  // Restore previous valid value
+                                  const previousValue =
+                                    watch("Transaction_Discount_Percentage") || "";
+
+                                  e.target.value = previousValue;
+
+                                  return;
+                                }
+
+                                e.target.value = val;
+
+                                const percentage = Number(val) || 0;
+                                const subtotal = getRawTotal();
+
+                                const discountAmount =
+                                  (subtotal * percentage) / 100;
+
+                                setValue(
+                                  "Transaction_Discount_Percentage",
+                                  val,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  "Transaction_Discount_Amount",
+                                  discountAmount > 0
+                                    ? discountAmount.toFixed(2)
+                                    : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                // syncTotalsAfterItemChange(discountAmount);
+                                syncTotalsAfterItemChange();
+                              }}
+                            />
+
+                            {/* Discount Amount */}
+                            <input
+                              type="text"
+                              placeholder="Amount"
+                              className="form-control"
+                              style={{
+                                marginBottom: "0px",
+                                height: "1.5rem",
+                                textAlign: "right",
+                              }}
+                              {...register("Transaction_Discount_Amount")}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/[^0-9.]/g, "");
+
+                                const parts = val.split(".");
+                                if (parts.length > 2) {
+                                  val =
+                                    parts[0] +
+                                    "." +
+                                    parts.slice(1).join("");
+                                }
+
+                                if (val.includes(".")) {
+                                  const [int, dec] = val.split(".");
+                                  val = int + "." + dec.slice(0, 3);
+                                }
+
+                                e.target.value = val;
+
+                                const amount = Number(val) || 0;
+                                const subtotal = getRawTotal();
+
+                                const percentage =
+                                  subtotal > 0
+                                    ? (amount / subtotal) * 100
+                                    : 0;
+
+                                setValue(
+                                  "Transaction_Discount_Amount",
+                                  val,
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                setValue(
+                                  "Transaction_Discount_Percentage",
+                                  amount > 0
+                                    ? percentage.toFixed(3)
+                                    : "",
+                                  {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                  }
+                                );
+
+                                //syncTotalsAfterItemChange(amount);
+                                syncTotalsAfterItemChange();
+                              }}
+                            />
+                          </div>
+                        )}
+
+
                         <div
                           style={{ width: "100%" }}
                           className="flex justify-between items-center gap-6 w-full mr-4"

@@ -3936,9 +3936,14 @@ export default function SaleAdd() {
                                         // MASTER SALE DISCOUNT
                                         // ==========================================
 
-                                        Discount_On_Sale_Price:masterSaleDiscount,
+                                        // Discount_On_Sale_Price:masterSaleDiscount,
 
-                                        Discount_Type_On_Sale_Price:masterSaleDiscountType,
+                                        // Discount_Type_On_Sale_Price:masterSaleDiscountType,
+                                           Discount_On_Sale_Price:
+                                          resolvedSaleDiscount,
+
+                                        Discount_Type_On_Sale_Price:
+                                          resolvedSaleDiscountType,
                                         // Discount_On_Sale_Price: currentRow.Discount_On_Sale_Price ??
                                         //   "",
 

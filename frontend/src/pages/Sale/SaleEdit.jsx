@@ -1105,7 +1105,7 @@ export default function SaleEdit() {
 
 
 
-
+const committedItemRef = useRef({});
   const handleItemSelect = (it, i) => {
     console.log("Selected Item:", it, "at row", i);
     masterMrpDiscountRef.current[i] =
@@ -1376,6 +1376,7 @@ export default function SaleEdit() {
   const [hasSavedBillingAddress, setHasSavedBillingAddress] = useState(false);
   const originalPartyNameRef = useRef("");
   const partyWasCommittedRef = useRef(false);
+  
   useEffect(() => {
     if (sale) {
 
@@ -2370,7 +2371,7 @@ export default function SaleEdit() {
     setShowScanCodeModal(false);
   };
   //const containerRef = useRef(null);
-  const committedItemRef = useRef({});
+ 
 
   return (
     <>
@@ -4210,19 +4211,7 @@ export default function SaleEdit() {
                                     shouldDirty: true,
                                   }
                                 );
-                                // const committedItemId = committedItemRef.current[i] || "";
-
-                                // if (committedItemId) {
-                                //   setValue(`items.${i}.Discount_On_Sale_Price`, "", {
-                                //     shouldValidate: true,
-                                //     shouldDirty: true,
-                                //   });
-
-                                //   setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage", {
-                                //     shouldValidate: true,
-                                //     shouldDirty: true,
-                                //   });
-                                // }
+             
 
                                 // handleRowChange(i, "isHSNLocked", false);
                                 // handleRowChange(i, "isExistingItem", false);

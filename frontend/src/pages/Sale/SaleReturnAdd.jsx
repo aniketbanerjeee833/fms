@@ -1087,6 +1087,7 @@ export default function SaleReturnAdd() {
 
   const originalPartyNameRef = useRef("");
   const partyWasCommittedRef = useRef(false);
+   const committedItemRef = useRef({});
   useEffect(() => {
     if (sale) {
       originalTaxTypesRef.current = (sale?.items || []).map(
@@ -1123,6 +1124,7 @@ export default function SaleReturnAdd() {
       );
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item, index) => {
+          committedItemRef.current[index] = item.Item_Id || "";
 
           // Original purchase price saved in this purchase line
           const salePrice = Number(item.Sale_Price) || 0;
@@ -1905,7 +1907,8 @@ export default function SaleReturnAdd() {
     // =====================================================
     syncTotalsAfterItemChange(rawTotal);
     setShowScanCodeModal(false);
-  };
+  }; 
+
   return (
     <>
 
@@ -3779,111 +3782,7 @@ export default function SaleReturnAdd() {
                             <input
                               type="text"
                               value={rows[i]?.itemSearch || ""}
-                              // onChange={(e) => {
-                              //   const typedValue = e.target.value;
-                              //   handleRowChange(i, "itemSearch", typedValue);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   // setValue(`items.${i}.Item_Name`, typedValue);
-                              //   handleRowChange(i, "isHSNLocked", false);
-                              //   handleRowChange(i, "isExistingItem", false);
-                              //   handleRowChange(i, "isUnitLocked", false);
 
-                              //   const exists = items?.items?.find(
-                              //     (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //   );
-                              //   if (exists) {
-                              //     // ✅ Only store if it's a valid item
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                              //     handleRowChange(i, "isExistingItem", true);
-                              //   } else {
-                              //     // ❌ Clear Item_Name in RHF to trigger error
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                              //     handleRowChange(i, "isExistingItem", false);
-                              //     handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                              //     handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                              //     handleRowChange(i, "Available_Units", []);
-                              //   }
-                              //   //handleRowChange(i, "isExistingItem", exists); // false if new item
-                              // }}
-                              // onBlur={() => {
-                              //   setTimeout(() => {
-                              //     const typedValue = rows[i]?.itemSearch?.trim() || "";
-                              //     if (!typedValue) return;
-
-                              //     const matchedItem = items?.items?.find(
-                              //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //     );
-
-                              //     if (matchedItem) {
-                              //       // ✅ auto-fill exactly like clicking from dropdown
-                              //       setRows((prev) => {
-                              //         const updated = [...prev];
-                              //         updated[i] = {
-                              //           ...updated[i],
-                              //           itemSearch: matchedItem.Item_Name,   // normalize display
-                              //           Item_Category: matchedItem.Item_Category || "",
-                              //           Item_HSN: matchedItem.Item_HSN || "",
-                              //           categorySearch: matchedItem.Item_Category || "",
-                              //           isExistingItem: true,
-                              //           isHSNLocked: false,
-                              //           isUnitLocked: false,
-                              //           itemOpen: false,
-                              //           Primary_Unit: matchedItem.Primary_Unit || null,
-                              //           Secondary_Unit: matchedItem.Secondary_Unit || null,
-                              //           Conversion_Rate: matchedItem.Conversion_Rate || null,
-
-                              //           // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
-                              //           Available_Units: Array.isArray(matchedItem.Available_Units)
-                              //             ? matchedItem.Available_Units
-                              //             : [],
-                              //         };
-                              //         return updated;
-                              //       });
-
-                              //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Sale_Price`, matchedItem.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
-                              //       //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(
-                              //         `items.${i}.Item_Unit`,
-                              //         matchedItem.Primary_Unit || "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-                              //       baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                              //       baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || ""
-                              //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              //         {
-                              //           ...itemsValues[i],
-                              //           Item_Name: matchedItem.Item_Name,
-                              //           Sale_Price: matchedItem.Sale_Price || 0,
-                              //           Quantity: itemsValues[i]?.Quantity || 0,
-                              //         },
-                              //         i,
-                              //         itemsValues
-                              //       );
-
-                              //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              //       syncTotalsAfterItemChange();
-                              //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              //     } else {
-                              //       // no match — close dropdown
-                              //       handleRowChange(i, "itemOpen", false);
-                              //     }
-                              //   }, 150); // small delay so click-from-dropdown fires first
-                              // }}
-                              // onClick={() => {
-                              //   handleRowChange(i, "itemOpen", true);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              // }}
-                              //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
 
                               onChange={(e) => {
                                 const typedValue = e.target.value;
@@ -3903,417 +3802,16 @@ export default function SaleReturnAdd() {
                                   }
                                 );
 
-                                handleRowChange(i, "isHSNLocked", false);
-                                handleRowChange(i, "isExistingItem", false);
-                                handleRowChange(i, "isUnitLocked", false);
+                                // handleRowChange(i, "isHSNLocked", false);
+                                // handleRowChange(i, "isExistingItem", false);
+                                // handleRowChange(i, "isUnitLocked", false);
 
-                                // Clear previously selected item details
-                                handleRowChange(i, "Primary_Unit", null);
-                                handleRowChange(i, "Secondary_Unit", null);
-                                handleRowChange(i, "Available_Units", []);
+                                // // Clear previously selected item details
+                                // handleRowChange(i, "Primary_Unit", null);
+                                // handleRowChange(i, "Secondary_Unit", null);
+                                // handleRowChange(i, "Available_Units", []);
                               }}
-                              // onBlur={() => {
-                              //   setTimeout(async () => {
-                              //     const typedValue =
-                              //       rows[i]?.itemSearch?.trim() || "";
 
-                              //     if (!typedValue) {
-                              //       handleRowChange(i, "itemOpen", false);
-                              //       return;
-                              //     }
-
-                              //     // =====================================================
-                              //     // IMPORTANT:
-                              //     // Existing add_sale_items values are the SOURCE OF TRUTH
-                              //     // =====================================================
-
-                              //     const currentRow =
-                              //       itemsValues[i] || {};
-
-                              //     try {
-                              //       // ===================================================
-                              //       // EXACT ITEM LOOKUP FROM BACKEND
-                              //       // Replaces old frontend items.find(...)
-                              //       // ===================================================
-
-                              //       const response =
-                              //         await getItemByName(typedValue).unwrap();
-
-                              //       const matchedItem =
-                              //         response?.item;
-
-                              //       // ===================================================
-                              //       // NO EXACT ITEM FOUND
-                              //       // ===================================================
-
-                              //       if (!matchedItem?.Item_Id) {
-                              //         handleRowChange(
-                              //           i,
-                              //           "itemOpen",
-                              //           false
-                              //         );
-                              //         return;
-                              //       }
-
-                              //       // ===================================================
-                              //       // UPDATE ROW
-                              //       // Master/current item information
-                              //       // ===================================================
-
-                              //       setRows((prev) => {
-                              //         const updated = [...prev];
-
-                              //         updated[i] = {
-                              //           ...updated[i],
-
-                              //           itemSearch:
-                              //             matchedItem.Item_Name || "",
-
-                              //           Item_Id:
-                              //             matchedItem.Item_Id || "",
-
-                              //           Item_Category:
-                              //             matchedItem.Item_Category || "",
-
-                              //           Item_HSN:
-                              //             matchedItem.Item_HSN || "",
-
-                              //           categorySearch:
-                              //             matchedItem.Item_Category || "",
-
-                              //           isExistingItem: true,
-
-                              //           isHSNLocked: false,
-                              //           isUnitLocked: false,
-
-                              //           itemOpen: false,
-
-                              //           // ==========================================
-                              //           // CURRENT MASTER UNIT INFORMATION
-                              //           // ==========================================
-
-                              //           Primary_Unit:
-                              //             matchedItem.Primary_Unit || null,
-
-                              //           Primary_Unit_Id:
-                              //             matchedItem.Primary_Unit_Id || null,
-
-                              //           Secondary_Unit:
-                              //             matchedItem.Secondary_Unit || null,
-
-                              //           Secondary_Unit_Id:
-                              //             matchedItem.Secondary_Unit_Id || null,
-
-                              //           Conversion_Rate:
-                              //             matchedItem.Conversion_Rate ?? null,
-
-                              //           Available_Units:
-                              //             Array.isArray(
-                              //               matchedItem.Available_Units
-                              //             )
-                              //               ? matchedItem.Available_Units
-                              //               : [],
-                              //         };
-
-                              //         return updated;
-                              //       });
-
-                              //       // ===================================================
-                              //       // ITEM MASTER INFORMATION
-                              //       // ===================================================
-
-                              //       setValue(
-                              //         `items.${i}.Item_Name`,
-                              //         matchedItem.Item_Name || "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       setValue(
-                              //         `items.${i}.Item_Id`,
-                              //         matchedItem.Item_Id || "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       setValue(
-                              //         `items.${i}.Item_Category`,
-                              //         matchedItem.Item_Category || "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       setValue(
-                              //         `items.${i}.Item_HSN`,
-                              //         matchedItem.Item_HSN || "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // ❗ SALE PRICE
-                              //       //
-                              //       // add_sale_items = SOURCE OF TRUTH
-                              //       //
-                              //       // DO NOT use matchedItem.Sale_Price here.
-                              //       // ===================================================
-
-                              //       // setValue(
-                              //       //   `items.${i}.Sale_Price`,
-                              //       //   matchedItem.Sale_Price ?? "",
-                              //       //   {
-                              //       //     shouldValidate: true,
-                              //       //     shouldDirty: true,
-                              //       //   }
-                              //       // );
-
-                              //        setValue(
-                              //         `items.${i}.Sale_Price`,
-                              //         currentRow.Sale_Price ?? "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // ❗ SALE PRICE TYPE
-                              //       //
-                              //       // add_sale_items = SOURCE OF TRUTH
-                              //       // ===================================================
-
-                              //       // setValue(
-                              //       //   `items.${i}.Sale_Price_Type`,
-                              //       //   currentRow.Sale_Price_Type ||
-                              //       //   "Without_Tax",
-                              //       //   {
-                              //       //     shouldValidate: true,
-                              //       //     shouldDirty: true,
-                              //       //   }
-                              //       // );
-
-                              //       // ===================================================
-                              //       // ❗ DISCOUNT
-                              //       //
-                              //       // add_sale_items = SOURCE OF TRUTH
-                              //       //
-                              //       // NEVER take these from matchedItem on blur.
-                              //       // ===================================================
-
-                              //       setValue(
-                              //         `items.${i}.Discount_On_Sale_Price`,
-                              //         currentRow.Discount_On_Sale_Price ?? "",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       setValue(
-                              //         `items.${i}.Discount_Type_On_Sale_Price`,
-                              //         currentRow.Discount_Type_On_Sale_Price ||
-                              //         "Percentage",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // TAX
-                              //       //
-                              //       // add_sale_items = SOURCE OF TRUTH
-                              //       // ===================================================
-
-                              //       setValue(
-                              //         `items.${i}.Tax_Type`,
-                              //         currentRow.Tax_Type || "None",
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // QUANTITY
-                              //       //
-                              //       // Existing transaction value stays.
-                              //       // ===================================================
-
-                              //       setValue(
-                              //         `items.${i}.Quantity`,
-                              //         currentRow.Quantity || 1,
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // UNIT
-                              //       //
-                              //       // Keep the unit saved in add_sale_items.
-                              //       // Only if missing, use current master primary unit.
-                              //       // ===================================================
-
-                              //       // const selectedUnit =
-                              //       //   currentRow.Item_Unit ||
-                              //       //   matchedItem.Primary_Unit ||
-                              //       //   "";
-                              //         const selectedUnit =
-
-                              //         matchedItem.Primary_Unit ||
-                              //         "";
-
-                              //       setValue(
-                              //         `items.${i}.Item_Unit`,
-                              //         selectedUnit,
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // BASE SALE PRICE / UNIT
-                              //       // ===================================================
-
-                              //       // baseSalePriceRef.current[i] =
-                              //       //   Number(
-                              //       //     matchedItem.Sale_Price
-                              //       //   ) || 0;
-                              //        baseSalePriceRef.current[i] =
-                              //         Number(currentRow.Sale_Price) || 0;
-
-                              //       baseSaleUnitRef.current[i] =
-                              //         selectedUnit;
-
-                              //       // ===================================================
-                              //       // CALCULATE ROW
-                              //       //
-                              //       // All transaction values come from currentRow.
-                              //       // ===================================================
-
-                              //       const calculatedRow = {
-                              //         ...currentRow,
-
-                              //         Item_Id:
-                              //           matchedItem.Item_Id || "",
-
-                              //         Item_Name:
-                              //           matchedItem.Item_Name || "",
-
-                              //         Item_Category:
-                              //           matchedItem.Item_Category || "",
-
-                              //         Item_HSN:
-                              //           matchedItem.Item_HSN || "",
-
-                              //         // ==============================================
-                              //         // ✅ add_sale_items = SOURCE OF TRUTH
-                              //         // ==============================================
-
-                              //         //Sale_Price:matchedItem.Sale_Price ?? "",
-                              //            Sale_Price:currentRow.Sale_Price ?? "",
-                              //         // Sale_Price_Type:
-                              //         //   currentRow.Sale_Price_Type ||
-                              //         //   "Without_Tax",
-
-                              //         Quantity:
-                              //           currentRow.Quantity || 1,
-
-                              //         // ==============================================
-                              //         // Keep existing transaction unit if available
-                              //         // ==============================================
-
-                              //         Item_Unit:
-                              //           selectedUnit,
-
-                              //         // ==============================================
-                              //         // ✅ add_sale_items = SOURCE OF TRUTH
-                              //         // ==============================================
-
-                              //         Discount_On_Sale_Price:
-                              //           currentRow.Discount_On_Sale_Price ?? "",
-
-                              //         Discount_Type_On_Sale_Price:
-                              //           currentRow.Discount_Type_On_Sale_Price ||
-                              //           "Percentage",
-
-                              //         Tax_Type:
-                              //           currentRow.Tax_Type ||
-                              //           "None",
-                              //       };
-
-                              //       // ===================================================
-                              //       // CALCULATE TAX + AMOUNT
-                              //       // ===================================================
-
-                              //       const {
-                              //         Tax_Amount,
-                              //         Amount,
-                              //       } = calculateRowAmount(
-                              //         calculatedRow,
-                              //         i,
-                              //         itemsValues
-                              //       );
-
-                              //       setValue(
-                              //         `items.${i}.Tax_Amount`,
-                              //         Tax_Amount,
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       setValue(
-                              //         `items.${i}.Amount`,
-                              //         Amount,
-                              //         {
-                              //           shouldValidate: true,
-                              //           shouldDirty: true,
-                              //         }
-                              //       );
-
-                              //       // ===================================================
-                              //       // UPDATE TOTALS
-                              //       // ===================================================
-
-                              //       syncTotalsAfterItemChange();
-
-                              //       // ===================================================
-                              //       // CLOSE DROPDOWN
-                              //       // ===================================================
-
-                              //       handleRowChange(
-                              //         i,
-                              //         "itemOpen",
-                              //         false
-                              //       );
-
-                              //     } catch (err) {
-                              //       console.error(
-                              //         "❌ Item name lookup failed:",
-                              //         err
-                              //       );
-
-                              //       handleRowChange(
-                              //         i,
-                              //         "itemOpen",
-                              //         false
-                              //       );
-                              //     }
-                              //   }, 150);
-                              // }}
                               onBlur={() => {
                                 setTimeout(async () => {
                                   const typedValue =
@@ -4330,37 +3828,122 @@ export default function SaleReturnAdd() {
                                   // This preserves existing transaction values.
                                   // =====================================================
 
-                                  const currentRow =
-                                    itemsValues[i] || {};
+                                  const currentRow =itemsValues[i] || {};
+                                  const committedItemId = committedItemRef.current[i] || "";
 
                                   // Original item currently belonging to this transaction row.
                                   // If the user deletes the name and types the same item again,
                                   // Item_Id lets us recognize that it is the same item.
-                                  const existingItemId =
-                                    currentRow.Item_Id || "";
+                                  //const existingItemId =currentRow.Item_Id || "";
 
                                   try {
                                     // ===================================================
                                     // EXACT ITEM LOOKUP FROM BACKEND
                                     // ===================================================
 
-                                    const response =
-                                      await getItemByName(typedValue).unwrap();
+                                    const response =await getItemByName(typedValue).unwrap();
 
                                     const matchedItem = response?.item;
+                             
 
                                     // ===================================================
                                     // NO EXACT ITEM FOUND
                                     // ===================================================
 
+                                    // if (!matchedItem?.Item_Id) {
+                                    //   handleRowChange(
+                                    //     i,
+                                    //     "itemOpen",
+                                    //     false
+                                    //   );
+                                    //   return;
+                                    // }
                                     if (!matchedItem?.Item_Id) {
-                                      handleRowChange(
-                                        i,
-                                        "itemOpen",
-                                        false
-                                      );
+                                      committedItemRef.current[i] = "";
+
+                                      setValue(`items.${i}.Item_Id`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_Category`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_HSN`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Sale_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      // setValue(`items.${i}.Discount_On_Purchase_Price`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      // setValue(`items.${i}.Discount_Type_On_Purchase_Price`, "Percentage", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      setValue(`items.${i}.Tax_Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Tax_Type`, "None", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.MRP`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                      // setValue(`items.${i}.Item_Unit`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      // setRows((prev) => {
+                                      //   const updated = [...prev];
+
+                                      //   updated[i] = {
+                                      //     ...updated[i],
+                                      //     Purchase_Price: "",
+                                      //     Tax_Amount: "",
+                                      //   };
+
+                                      //   return updated;
+                                      // });
+
+                                      handleRowChange(i, "isExistingItem", false);
+                                      handleRowChange(i, "Primary_Unit", null);
+                                      handleRowChange(i, "Secondary_Unit", null);
+                                      handleRowChange(i, "Available_Units", []);
+                                      handleRowChange(i, "itemOpen", false);
+
                                       return;
                                     }
+                                    const isSameCommittedItem =
+                                      committedItemId &&
+                                      String(committedItemId) === String(matchedItem?.Item_Id);
                                     masterMrpDiscountRef.current[i] =
                                       Number(matchedItem?.Discount_On_MRP_For_Sale) > 0
                                         ? Number(matchedItem.Discount_On_MRP_For_Sale)
@@ -4371,9 +3954,9 @@ export default function SaleReturnAdd() {
                                     // THAT WAS ALREADY IN THIS TRANSACTION ROW
                                     // ===================================================
 
-                                    const isSameExistingItem =
-                                      existingItemId &&
-                                      matchedItem.Item_Id === existingItemId;
+                                    // const isSameExistingItem =
+                                    //   existingItemId &&
+                                    //   matchedItem.Item_Id === existingItemId;
 
                                     // ===================================================
                                     // MASTER MRP / MRP DISCOUNT
@@ -4391,6 +3974,12 @@ export default function SaleReturnAdd() {
                                       Number(matchedItem.MRP) > 0
                                         ? matchedItem.MRP
                                         : "";
+                                    const resolvedMRP =
+                                      isSameCommittedItem
+                                        ? currentRow.MRP ?? ""
+                                        : showMRP
+                                          ? masterMRP
+                                          : "";
 
                                     // const masterMRPDiscount =
                                     //   Number(
@@ -4413,7 +4002,7 @@ export default function SaleReturnAdd() {
                                         ? matchedItem.Discount_On_MRP_For_Sale
                                         : "";
                                     const resolvedMRPDiscount =
-                                      isSameExistingItem && historicalMRPDiscount > 0
+                                      isSameCommittedItem && historicalMRPDiscount > 0
                                         ? historicalMRPDiscount
                                         : masterMRPDiscount;
 
@@ -4459,10 +4048,7 @@ export default function SaleReturnAdd() {
                                     //     use master MRP values
                                     // ===================================================
 
-                                    const resolvedMRP =
-                                      isSameExistingItem
-                                        ? (currentRow.MRP ?? "")
-                                        : masterMRP;
+
 
                                     // const resolvedMRPDiscount =
                                     //   isSameExistingItem
@@ -4474,8 +4060,8 @@ export default function SaleReturnAdd() {
                                     //     : masterMRPDiscount;
 
                                     const resolvedSalePrice =
-                                      isSameExistingItem
-                                        ? (currentRow.Sale_Price ?? "")
+                                      isSameCommittedItem
+                                        ? currentRow.Sale_Price ?? ""
                                         : calculatedMasterSalePrice;
 
                                     // ===================================================
@@ -4508,7 +4094,8 @@ export default function SaleReturnAdd() {
                                         : "Percentage";
 
                                     const resolvedSaleDiscount =
-                                      isSameExistingItem
+                                      //isSameExistingItem
+                                      isSameCommittedItem
                                         ? (
                                           currentRow
                                             .Discount_On_Sale_Price ?? ""
@@ -4516,7 +4103,8 @@ export default function SaleReturnAdd() {
                                         : masterSaleDiscount;
 
                                     const resolvedSaleDiscountType =
-                                      isSameExistingItem
+                                      //isSameExistingItem
+                                      isSameCommittedItem
                                         ? (
                                           currentRow
                                             .Discount_Type_On_Sale_Price ||
@@ -4527,7 +4115,7 @@ export default function SaleReturnAdd() {
                                     // ===================================================
                                     // UPDATE ROW
                                     // ===================================================
-
+                                    committedItemRef.current[i] = matchedItem.Item_Id;
                                     setRows((prev) => {
                                       const updated = [...prev];
 
@@ -4586,11 +4174,9 @@ export default function SaleReturnAdd() {
                                         // PRESERVE / RESOLVE SALE DISCOUNT
                                         // ==========================================
 
-                                        Discount_On_Sale_Price:
-                                          resolvedSaleDiscount,
+                                        Discount_On_Sale_Price: resolvedSaleDiscount,
 
-                                        Discount_Type_On_Sale_Price:
-                                          resolvedSaleDiscountType,
+                                        Discount_Type_On_Sale_Price: resolvedSaleDiscountType,
                                       };
 
                                       return updated;
@@ -4618,18 +4204,41 @@ export default function SaleReturnAdd() {
                                       }
                                     );
 
+                                    // setValue(
+                                    //   `items.${i}.Item_Category`,
+                                    //   matchedItem.Item_Category || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
                                     setValue(
                                       `items.${i}.Item_Category`,
-                                      matchedItem.Item_Category || "",
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       }
                                     );
 
+                                    // setValue(
+                                    //   `items.${i}.Item_HSN`,
+                                    //   matchedItem.Item_HSN || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
                                     setValue(
                                       `items.${i}.Item_HSN`,
-                                      matchedItem.Item_HSN || "",
+
+                                      isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
+
+
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4756,10 +4365,14 @@ export default function SaleReturnAdd() {
                                     // Otherwise use master primary unit.
                                     // ===================================================
 
+                                    // const selectedUnit =
+                                    //   currentRow.Item_Unit ||
+                                    //   matchedItem.Primary_Unit ||
+                                    //   "";
                                     const selectedUnit =
-                                      currentRow.Item_Unit ||
-                                      matchedItem.Primary_Unit ||
-                                      "";
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Unit || ""
+                                        : matchedItem.Primary_Unit || "";
 
                                     setValue(
                                       `items.${i}.Item_Unit`,
@@ -4795,12 +4408,17 @@ export default function SaleReturnAdd() {
                                       Item_Name:
                                         matchedItem.Item_Name || "",
 
-                                      Item_Category:
-                                        matchedItem.Item_Category || "",
+                                      // Item_Category:matchedItem.Item_Category || "",
 
-                                      Item_HSN:
-                                        matchedItem.Item_HSN || "",
+                                      // Item_HSN:matchedItem.Item_HSN || "",
+                                      Item_Category: isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
 
+
+                                      Item_HSN: isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
                                       // ==============================================
                                       // RESOLVED SALE PRICE
                                       // ==============================================
@@ -4895,17 +4513,87 @@ export default function SaleReturnAdd() {
                                       false
                                     );
 
-                                  } catch (err) {
-                                    console.error(
-                                      "❌ Item name lookup failed:",
-                                      err
-                                    );
+                                  } 
+                                  // catch (err) {
+                                  //   console.error(
+                                  //     "❌ Item name lookup failed:",
+                                  //     err
+                                  //   );
 
-                                    handleRowChange(
-                                      i,
-                                      "itemOpen",
-                                      false
-                                    );
+                                  //   handleRowChange(
+                                  //     i,
+                                  //     "itemOpen",
+                                  //     false
+                                  //   );
+                                  // }
+                                   catch (err) {
+                                    console.error("❌ Item name lookup failed:", err);
+
+                                    committedItemRef.current[i] = "";
+
+                                    setValue(`items.${i}.Item_Id`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_Category`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_HSN`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+
+                                    setValue(`items.${i}.Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.MRP`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    // setValue(`items.${i}.Item_Unit`, "", {
+                                    //   shouldValidate: true,
+                                    //   shouldDirty: true,
+                                    // });
+
+                                    setValue(`items.${i}.Tax_Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Tax_Type`, "None", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                    // Clear Sale Discount for non-existing item
+                                    setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                    setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                    baseSalePriceRef.current[i] = 0;
+                                    baseSaleUnitRef.current[i] = "";
+
+                                    handleRowChange(i, "isExistingItem", false);
+                                    handleRowChange(i, "Primary_Unit", null);
+                                    handleRowChange(i, "Secondary_Unit", null);
+                                    handleRowChange(i, "Available_Units", []);
+                                    handleRowChange(i, "itemOpen", false);
                                   }
                                 }, 150);
                               }}
@@ -4974,6 +4662,7 @@ export default function SaleReturnAdd() {
                                     calculateSalePriceFromMRP && mrp > 0
                                       ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
                                       : (it.Sale_Price || 0);
+                                      committedItemRef.current[i] = it.Item_Id;
                                   setRows((prev) => {
                                     const updated = [...prev];
                                     updated[i] = {
@@ -6266,6 +5955,10 @@ export default function SaleReturnAdd() {
                                 <select
                                   {...field}
                                   className="form-select bg-gray-100 text-gray-700"
+                                  style={{
+                                    fontSize: showFreeQuantity ? "10px" : "12px",
+                                    padding: "2px 4px",
+                                  }}
                                   onChange={(e) => {
                                     field.onChange(e);
 
